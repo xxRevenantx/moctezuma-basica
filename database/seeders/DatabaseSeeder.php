@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'moctezuma@basica.com',
             'password' => bcrypt('12345678'),
         ]);
-          $this->call(WorldTableSeeder::class);
+        $this->call([
+            // WorldTableSeeder::class
+            EscuelaSeeder::class,
+        ]);
     }
 }

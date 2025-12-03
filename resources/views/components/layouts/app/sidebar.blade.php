@@ -33,7 +33,7 @@
                             {{ auth()->user()->name }}
                         </span>
                         <span class="text-[11px] text-zinc-400">
-                            Personal
+                            Administrador
                         </span>
                     </div>
                 </div>
@@ -41,7 +41,7 @@
                 {{-- mini menú (solo icono, el dropdown completo queda abajo) --}}
                 <flux:dropdown class="hidden lg:inline-flex" position="bottom" align="end">
                     <button type="button"
-                        class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700">
+                        class="inline-flex h-7 w-7 items-center justify-center rounded-lg  bg-indigo-500 text-zinc-300 hover:from-zinc-600 hover:to-zinc-700">
                         <x-flux::icon name="chevrons-up-down" class="w-4 h-4" />
                     </button>
 
