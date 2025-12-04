@@ -66,11 +66,14 @@ select:focus[data-flux-control] {
 } */
 
 body{
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Recursive', sans-serif;
 }
 
 button{
     cursor: pointer;
+}
+input:checked + label{
+    @apply bg-accent text-accent-foreground border-transparent;
 }
 
 

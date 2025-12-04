@@ -1,1 +1,1 @@
-<img src="/letra.png" alt="">
+<img src="/logo.png" alt="Logo Moctezuma">

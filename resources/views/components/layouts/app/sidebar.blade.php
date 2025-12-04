@@ -105,7 +105,7 @@
                     </flux:navlist.item>
                     <flux:navlist.item icon="home" :href="route('misrutas.directivos')"
                         :current="request()->routeIs('misrutas.directivos')" wire:navigate>
-                        Directivos
+                        Personal directivo
                     </flux:navlist.item>
                     <flux:navlist.item icon="home" :href="route('misrutas.niveles')"
                         :current="request()->routeIs('misrutas.niveles')" wire:navigate>
