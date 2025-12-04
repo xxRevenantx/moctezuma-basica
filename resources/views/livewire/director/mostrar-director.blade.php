@@ -257,7 +257,11 @@
                                                                 Género
                                                             </p>
                                                             <p class="text-xs">
-                                                                {{ $directivo->genero ?: '---' }}
+                                                                @if ($directivo->genero === 'M')
+                                                                    HOMBRE
+                                                                @else
+                                                                    MUJER
+                                                                @endif
                                                             </p>
                                                         </div>
 
