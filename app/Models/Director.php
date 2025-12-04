@@ -23,6 +23,7 @@ class Director extends Model
         'zona_escolar',
         'telefono',
         'correo',
+        'genero',
         'status',
     ];
 }

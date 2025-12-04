@@ -212,6 +212,14 @@
                                                         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-gray-700 dark:text-gray-200">
                                                         <div class="space-y-0.5">
                                                             <p class="font-semibold text-gray-900 dark:text-white">
+                                                                Identificador
+                                                            </p>
+                                                            <p class="font-mono text-[11px] sm:text-xs">
+                                                                {{ $directivo->identificador ?: '---' }}
+                                                            </p>
+                                                        </div>
+                                                        <div class="space-y-0.5">
+                                                            <p class="font-semibold text-gray-900 dark:text-white">
                                                                 CURP
                                                             </p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
@@ -242,6 +250,23 @@
                                                             </p>
                                                             <p class="text-xs">
                                                                 {{ $directivo->correo ?: '---' }}
+                                                            </p>
+                                                        </div>
+                                                        <div class="space-y-0.5">
+                                                            <p class="font-semibold text-gray-900 dark:text-white">
+                                                                Género
+                                                            </p>
+                                                            <p class="text-xs">
+                                                                {{ $directivo->genero ?: '---' }}
+                                                            </p>
+                                                        </div>
+
+                                                        <div class="space-y-0.5">
+                                                            <p class="font-semibold text-gray-900 dark:text-white">
+                                                                Teléfono
+                                                            </p>
+                                                            <p class="text-xs">
+                                                                {{ $directivo->telefono ?: '---' }}
                                                             </p>
                                                         </div>
                                                     </div>

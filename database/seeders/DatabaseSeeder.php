@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use PhpParser\Node\Scalar\MagicConst\Dir;
 
 class DatabaseSeeder extends Seeder
 {
@@ -23,6 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // WorldTableSeeder::class
             EscuelaSeeder::class,
+            DirectorSeeder::class,
         ]);
     }
 }

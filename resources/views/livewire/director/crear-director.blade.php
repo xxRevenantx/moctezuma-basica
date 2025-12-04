@@ -62,40 +62,49 @@
                         {{-- Grid de inputs --}}
                         <flux:field>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <flux:input wire:model="titulo" :label="__('Título')" type="text"
+                                <flux:input badge="Requerido" wire:model="titulo" :label="__('Título')" type="text"
                                     placeholder="Ej.: M.C., Lic., Dr., Mtro., Profr., etc." autocomplete="title" />
 
-                                <flux:input wire:model="nombre" :label="__('Nombre')" type="text"
+                                <flux:input badge="Requerido" wire:model="nombre" :label="__('Nombre')" type="text"
                                     placeholder="Nombre del directivo" autocomplete="given-name" />
 
-                                <flux:input wire:model="apellido_paterno" :label="__('Apellido Paterno')" type="text"
-                                    placeholder="Apellido paterno" autocomplete="family-name" />
+                                <flux:input badge="Requerido" wire:model="apellido_paterno"
+                                    :label="__('Apellido Paterno')" type="text" placeholder="Apellido paterno"
+                                    autocomplete="family-name" />
 
-                                <flux:input wire:model="apellido_materno" :label="__('Apellido Materno')" type="text"
-                                    placeholder="Apellido materno" autocomplete="additional-name" />
+                                <flux:input badge="Opcional" wire:model="apellido_materno"
+                                    :label="__('Apellido Materno')" type="text" placeholder="Apellido materno"
+                                    autocomplete="additional-name" />
 
-                                <flux:input wire:model="curp" :label="__('CURP')" type="text"
+                                <flux:input badge="Opcional" wire:model="curp" :label="__('CURP')" type="text"
                                     placeholder="CURP del directivo" maxlength="18" autocomplete="off"
                                     class="uppercase" />
 
-                                <flux:input wire:model="rfc" :label="__('RFC')" type="text"
+                                <flux:input badge="Opcional" wire:model="rfc" :label="__('RFC')" type="text"
                                     placeholder="RFC del directivo" maxlength="13" autocomplete="off"
                                     class="uppercase" />
 
-                                <flux:input wire:model="cargo" :label="__('Cargo')" type="text" placeholder="Cargo"
-                                    autocomplete="organization-title" />
+                                <flux:input badge="Requerido" wire:model="cargo" :label="__('Cargo')" type="text"
+                                    placeholder="Cargo" autocomplete="organization-title" />
 
-                                <flux:input wire:model="identificador" :label="__('Identificador')" type="text"
-                                    placeholder="Ej.: Director, Supervisor, Jefe, Rector…" autocomplete="off" />
+                                <flux:input badge="Requerido" wire:model="identificador" :label="__('Identificador')"
+                                    type="text" placeholder="Ej.: Director, Supervisor, Jefe, Rector…"
+                                    autocomplete="off" />
 
-                                <flux:input wire:model="zona_escolar" :label="__('Zona escolar')" type="text"
-                                    placeholder="Ej.: Zona 021, Zona Altamirano, etc." autocomplete="off" />
+                                <flux:input badge="Opcional" wire:model="zona_escolar" :label="__('Zona escolar')"
+                                    type="text" placeholder="Ej.: Zona 021, Zona Altamirano, etc."
+                                    autocomplete="off" />
 
-                                <flux:input wire:model="telefono" :label="__('Teléfono')" type="text"
-                                    placeholder="Teléfono" autocomplete="tel" />
+                                <flux:input badge="Opcional" wire:model="telefono" :label="__('Teléfono')"
+                                    type="text" placeholder="Teléfono" autocomplete="tel" />
 
-                                <flux:input wire:model="correo" :label="__('Correo Electrónico')" type="email"
-                                    placeholder="correo@dominio.com" autocomplete="email" />
+                                <flux:input badge="Opcional" wire:model="correo" :label="__('Correo Electrónico')"
+                                    type="email" placeholder="correo@dominio.com" autocomplete="email" />
+                                <flux:select badge="Requerido" wire:model="genero" :label="__('Género')">
+                                    <option value="">-- Selecciona una opción --</option>
+                                    <option value="M">Hombre</option>
+                                    <option value="F">Mujer</option>
+                                </flux:select>
                             </div>
 
                             {{-- Status --}}
