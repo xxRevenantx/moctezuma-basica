@@ -130,9 +130,7 @@
 
 
                             <flux:button variant="primary" type="submit"
-                                class="w-full sm:w-auto min-w-[150px] cursor-pointer
-                       bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600
-                       hover:from-sky-600 hover:via-blue-700 hover:to-indigo-700
+                                class="w-full sm:w-auto min-w-[150px] cursor-pointer btn-gradient
                        text-sm font-semibold tracking-wide
                        shadow-lg hover:shadow-xl focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-500"
                                 wire:loading.attr="disabled" wire:target="guardarEscuela">

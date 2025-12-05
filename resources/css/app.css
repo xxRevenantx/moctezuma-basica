@@ -72,6 +72,11 @@ body{
 button{
     cursor: pointer;
 }
+
+.btn-gradient{
+    @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700;
+}
+
 input:checked + label{
     @apply bg-accent text-accent-foreground border-transparent;
 }

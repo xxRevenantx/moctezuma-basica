@@ -6,6 +6,7 @@
 </head>
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
+
     <flux:sidebar sticky stashable class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 ">
         {{-- Toggle mobile --}}
         <flux:sidebar.toggle class="lg:hidden mb-2" icon="x-mark" />
@@ -21,22 +22,7 @@
             class="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900  px-3.5 py-3 flex flex-col gap-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
             {{-- Encabezado usuario --}}
             <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                    <span class="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg">
-                        <span
-                            class="flex h-full w-full items-center justify-center rounded-lg bg-zinc-800 text-sm font-semibold text-zinc-50">
-                            {{ auth()->user()->initials() }}
-                        </span>
-                    </span>
-                    <div class="flex flex-col leading-tight">
-                        <span class="text-sm font-semibold truncate">
-                            {{ auth()->user()->name }}
-                        </span>
-                        <span class="text-[11px] text-zinc-400">
-                            Administrador
-                        </span>
-                    </div>
-                </div>
+                <livewire:ImageProfile.image-profile />
 
                 {{-- mini menú (solo icono, el dropdown completo queda abajo) --}}
                 <flux:dropdown class="hidden lg:inline-flex" position="bottom" align="end">
@@ -99,18 +85,25 @@
                         :current="request()->routeIs('dashboard')" wire:navigate>
                         Inicio
                     </flux:navlist.item>
-                    <flux:navlist.item icon="home" :href="route('misrutas.escuela')"
-                        :current="request()->routeIs('misrutas.escuela')" wire:navigate>
-                        Escuela
-                    </flux:navlist.item>
-                    <flux:navlist.item icon="home" :href="route('misrutas.directivos')"
-                        :current="request()->routeIs('misrutas.directivos')" wire:navigate>
-                        Personal directivo
-                    </flux:navlist.item>
-                    <flux:navlist.item icon="home" :href="route('misrutas.niveles')"
-                        :current="request()->routeIs('misrutas.niveles')" wire:navigate>
-                        Niveles
-                    </flux:navlist.item>
+
+
+                    <flux:sidebar.group expandable heading="ACADÉMICA" class="grid text-xs gap-1 text-zinc-300">
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.escuela')"
+                            :current="request()->routeIs('misrutas.escuela')" wire:navigate>
+                            Escuela
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.directivos')"
+                            :current="request()->routeIs('misrutas.directivos')" wire:navigate>
+                            Personal directivo
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.niveles')"
+                            :current="request()->routeIs('misrutas.niveles')" wire:navigate>
+                            Niveles
+                        </flux:navlist.item>
+                    </flux:sidebar.group>
 
 
 
@@ -123,6 +116,7 @@
 
 
     </flux:sidebar>
+
 
 
     <!-- Mobile User Menu -->
@@ -172,9 +166,12 @@
         </flux:dropdown>
     </flux:header>
 
+
     {{ $slot }}
 
     @fluxScripts
 </body>
+
+
 
 </html>

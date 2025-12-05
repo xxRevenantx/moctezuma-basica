@@ -7,6 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class Nivel extends Model
 {
+    protected $table = "niveles";
     /** @use HasFactory<\Database\Factories\NivelFactory> */
     use HasFactory;
+    protected $fillable = [
+        'logo',
+        'nombre',
+        'slug',
+        'cct',
+        'color',
+        'director_id',
+        'supervisor_id',
+    ];
+
+    public function director()
+{
+    return $this->belongsTo(Director::class, 'director_id');
+}
 }

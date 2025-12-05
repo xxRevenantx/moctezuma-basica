@@ -26,4 +26,9 @@ class Director extends Model
         'genero',
         'status',
     ];
+
+    public function nivel()
+    {
+        return $this->hasMany(Nivel::class, 'director_id');
+    }
 }

@@ -132,8 +132,9 @@
                                 Cancelar
                             </button>
 
-                            <flux:button variant="primary" type="submit" class="w-full sm:w-auto cursor-pointer"
-                                wire:loading.attr="disabled" wire:target="crearDirectivo">
+                            <flux:button variant="primary" type="submit"
+                                class="w-full sm:w-auto cursor-pointer btn-gradient" wire:loading.attr="disabled"
+                                wire:target="crearDirectivo">
                                 {{ __('Guardar') }}
                             </flux:button>
                         </div>

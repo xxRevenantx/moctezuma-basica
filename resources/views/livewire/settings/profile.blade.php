@@ -14,38 +14,58 @@
                     const reader = new FileReader();
                     reader.onload = e => this.preview = e.target.result;
                     reader.readAsDataURL(file);
+                },
+                clearImage() {
+                    this.preview = null;
+                    if ($refs.fileInput) {
+                        $refs.fileInput.value = null;
+                    }
                 }
             }" class="w-full">
                 <flux:field :label="__('Profile photo')" class="space-y-3">
                     <div class="flex flex-col sm:flex-row items-center gap-4">
-                        {{-- Avatar preview --}}
-                        <div class="relative">
+                        {{-- Avatar preview + botón eliminar --}}
+                        <div class="flex flex-col items-center gap-2">
                             <div
                                 class="h-20 w-20 rounded-full border-2 border-indigo-500/70 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden shadow-md">
                                 <template x-if="preview">
                                     <img x-bind:src="preview" alt="Avatar preview"
                                         class="h-full w-full object-cover">
                                 </template>
+
                                 <template x-if="!preview">
-                                    <div
-                                        class="h-full w-full flex items-center justify-center text-xs text-slate-500 dark:text-slate-400">
-                                        {{ __('Sin foto') }}
-                                    </div>
+                                    @if (auth()->user()->photo)
+                                        <img src="{{ asset('storage/profile-photos/' . auth()->user()->photo) }}"
+                                            alt="Avatar" class="h-full w-full object-cover">
+                                    @else
+                                        <div
+                                            class="h-full w-full flex items-center justify-center text-xs text-slate-500 dark:text-slate-400">
+                                            {{ __('Sin foto') }}
+                                        </div>
+                                    @endif
                                 </template>
                             </div>
+
+                            {{-- Botón eliminar (solo si hay imagen) --}}
+                            <button type="button" x-show="preview || {{ auth()->user()->photo ? 'true' : 'false' }}"
+                                x-cloak @click.prevent="clearImage(); $wire.call('removePhoto')"
+                                class="inline-flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-zinc-950">
+                                <x-flux::icon name="trash" class="w-3.5 h-3.5" />
+                                <span>{{ __('Eliminar imagen') }}</span>
+                            </button>
                         </div>
 
                         {{-- Dropzone bonita --}}
                         <label for="photo" class="flex-1 cursor-pointer">
                             <div
                                 class="relative w-full rounded-2xl border-2 border-dashed border-indigo-400/70 bg-gradient-to-r from-indigo-50 via-violet-50 to-sky-50
-                                        dark:from-slate-900 dark:via-slate-900 dark:to-slate-900
-                                        px-4 py-4 sm:px-5 sm:py-5
-                                        flex flex-col sm:flex-row items-center sm:items-start gap-3
-                                        shadow-sm hover:shadow-md transition-shadow duration-200">
+                            dark:from-slate-900 dark:via-slate-900 dark:to-slate-900
+                            px-4 py-4 sm:px-5 sm:py-5
+                            flex flex-col sm:flex-row items-center sm:items-start gap-3
+                            shadow-sm hover:shadow-md transition-shadow duration-200">
                                 <div
                                     class="inline-flex h-9 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600
-                                           px-4 text-xs font-medium text-white shadow-md">
+                               px-4 text-xs font-medium text-white shadow-md">
                                     {{ __('Subir imagen') }}
                                 </div>
 
@@ -60,7 +80,7 @@
                             </div>
 
                             <input id="photo" type="file" class="hidden" accept="image/*" wire:model="photo"
-                                x-on:change="handleChange">
+                                x-ref="fileInput" x-on:change="handleChange">
                         </label>
                     </div>
 
@@ -69,6 +89,7 @@
                     @enderror
                 </flux:field>
             </div>
+
 
 
 
