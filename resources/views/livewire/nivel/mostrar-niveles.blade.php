@@ -84,7 +84,8 @@
                                     class="sticky top-0 z-10 bg-gray-50/95 dark:bg-neutral-900 backdrop-blur text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-neutral-800">
                                     <tr>
                                         <th class="px-4 py-3 text-center font-semibold">#</th>
-                                        <th class="px-4 py-3 text-left font-semibold">Imagen</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Logo</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Color</th>
                                         <th class="px-4 py-3 text-left font-semibold">Nivel</th>
                                         <th class="px-4 py-3 text-left font-semibold">C.C.T.</th>
                                         <th class="px-4 py-3 text-center font-semibold">Acciones</th>
@@ -150,7 +151,19 @@
                                                 </td>
 
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $nivel->logo ?: '---' }}
+                                                    @if ($nivel->logo)
+                                                        <img src="{{ asset('storage/' . $nivel->logo) }}"
+                                                            alt="Logo {{ $nivel->nombre }}"
+                                                            class="h-10 w-10 object-contain rounded">
+                                                    @else
+                                                        <img src="./penacho.jpg" alt="Logo {{ $nivel->nombre }}"
+                                                            class="h-10 w-10 object-contain rounded">
+                                                    @endif
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    <div class="h-6 w-12 rounded"
+                                                        style="background-color: {{ $nivel->color ?? '#cccccc' }};">
+                                                    </div>
                                                 </td>
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     {{ $nivel->nombre ?: '---' }}
@@ -168,12 +181,12 @@
                                                             <flux:icon.square-pen class="w-3.5 h-3.5" />
                                                             <!-- ícono -->
                                                         </flux:button>
-
+                                                        {{--
                                                         <flux:button variant="danger"
                                                             class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
                                                             @click="eliminar({{ $nivel->id }}, '{{ $nivel->nombre }}')">
                                                             <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                                        </flux:button>
+                                                        </flux:button> --}}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -192,67 +205,22 @@
                                                         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-gray-700 dark:text-gray-200">
                                                         <div class="space-y-0.5">
                                                             <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Identificador
+                                                                Director
                                                             </p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $nivel->identificador ?: '---' }}
+                                                                {{ $nivel->director->nombre ?? '---' }}
                                                             </p>
                                                         </div>
                                                         <div class="space-y-0.5">
                                                             <p class="font-semibold text-gray-900 dark:text-white">
-                                                                CURP
+                                                                Supervisor
                                                             </p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $nivel->curp ?: '---' }}
-                                                            </p>
-                                                        </div>
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                RFC
-                                                            </p>
-                                                            <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $nivel->rfc ?: '---' }}
-                                                            </p>
-                                                        </div>
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Zona escolar
-                                                            </p>
-                                                            <p class="text-xs">
-                                                                {{ $nivel->zona_escolar ?: '---' }}
+                                                                {{ $nivel->director->nombre ?? '---' }}
                                                             </p>
                                                         </div>
 
 
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Correo
-                                                            </p>
-                                                            <p class="text-xs">
-                                                                {{ $nivel->correo ?: '---' }}
-                                                            </p>
-                                                        </div>
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Género
-                                                            </p>
-                                                            <p class="text-xs">
-                                                                @if ($nivel->genero === 'M')
-                                                                    HOMBRE
-                                                                @else
-                                                                    MUJER
-                                                                @endif
-                                                            </p>
-                                                        </div>
-
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Teléfono
-                                                            </p>
-                                                            <p class="text-xs">
-                                                                {{ $nivel->telefono ?: '---' }}
-                                                            </p>
-                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>

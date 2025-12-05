@@ -8,7 +8,8 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 class MostrarNiveles extends Component
-{   use WithPagination;
+{
+    use WithPagination;
 
     public $search = '';
 
@@ -29,9 +30,9 @@ class MostrarNiveles extends Component
             $nivel->delete();
 
             $this->dispatch('swal', [
-            'title' => 'Nivel eliminado correctamente!',
-            'icon' => 'success',
-            'position' => 'top-end',
+                'title' => 'Nivel eliminado correctamente!',
+                'icon' => 'success',
+                'position' => 'top-end',
             ]);
         }
     }
@@ -43,9 +44,9 @@ class MostrarNiveles extends Component
         $niveles = Nivel::with(['director'])
             ->when($this->search, function ($query) {
                 $query->where('nombre', 'like', "%{$this->search}%")
-                      ->orWhere('cct', 'like', "%{$this->search}%");
+                    ->orWhere('cct', 'like', "%{$this->search}%");
             })
-            ->orderBy('nombre')
+            ->orderBy('id')
             ->paginate(10);
 
         return view('livewire.nivel.mostrar-niveles', compact('niveles'));

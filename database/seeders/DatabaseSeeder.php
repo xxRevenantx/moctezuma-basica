@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             // WorldTableSeeder::class
             EscuelaSeeder::class,
             DirectorSeeder::class,
+            NivelSeeder::class,
         ]);
     }
 }
