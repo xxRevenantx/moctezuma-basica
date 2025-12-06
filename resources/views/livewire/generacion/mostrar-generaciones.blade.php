@@ -15,9 +15,9 @@
 }" class="space-y-5">
     <!-- Encabezado -->
     <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Grados</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Generaciones</h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Busca, edita o elimina grados educativos.
+            Busca, edita o elimina generaciones.
         </p>
     </div>
 
@@ -32,8 +32,8 @@
             <div class="flex flex-col gap-3 lg:gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <!-- Buscador -->
                 <div class="w-full sm:max-w-xl">
-                    <label for="buscar-grado" class="sr-only">Buscar Grado</label>
-                    <flux:input id="buscar-grado" type="text" wire:model.live="search" placeholder="Buscar…"
+                    <label for="buscar-generacion" class="sr-only">Buscar Generación</label>
+                    <flux:input id="buscar-generacion" type="text" wire:model.live="search" placeholder="Buscar…"
                         icon="magnifying-glass" class="w-full" />
                 </div>
 
@@ -44,7 +44,7 @@
                         <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                             Resultados:
-                            <strong>{{ method_exists($grados, 'total') ? $grados->total() : $grados->count() }}</strong>
+                            <strong>{{ method_exists($generaciones, 'total') ? $generaciones->total() : $generaciones->count() }}</strong>
                         </span>
                     </div>
                 </div>
@@ -88,11 +88,15 @@
                                         </th>
                                         <th
                                             class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Grado
+                                            Generación
                                         </th>
                                         <th
                                             class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
                                             Nivel
+                                        </th>
+                                        <th
+                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
+                                            Estado
                                         </th>
                                         <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
                                             Acciones
@@ -101,7 +105,7 @@
                                 </thead>
 
                                 <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
-                                    @if ($grados->isEmpty())
+                                    @if ($generaciones->isEmpty())
                                         <tr>
                                             <td colspan="9"
                                                 class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
@@ -110,7 +114,7 @@
                                                         class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 bg-white/70 dark:bg-neutral-900/70">
                                                         <div
                                                             class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
-                                                            No hay grados disponibles
+                                                            No hay generaciones disponibles
                                                         </div>
                                                         <p class="text-sm text-gray-500 dark:text-gray-400">
                                                             Ajusta tu búsqueda.
@@ -124,9 +128,9 @@
                                             $nivelActual = null;
                                         @endphp
 
-                                        @foreach ($grados as $key => $grado)
+                                        @foreach ($generaciones as $key => $generacion)
                                             @php
-                                                $nivelId = optional($grado->nivel)->id;
+                                                $nivelId = optional($generacion->nivel)->id;
                                             @endphp
 
                                             {{-- Fila de cabecera de grupo por nivel --}}
@@ -139,7 +143,7 @@
                                                                 class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400"></span>
                                                             <span
                                                                 class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
-                                                                {{ $grado->nivel->nombre ?? 'Sin nivel asignado' }}
+                                                                {{ $generacion->nivel->nombre ?? 'Sin nivel asignado' }}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -164,7 +168,7 @@
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     <div class="flex flex-col">
                                                         <span class="font-semibold">
-                                                            {{ $grado->nombre ? $grado->nombre . '° GRADO' : '---' }}
+                                                            {{ $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso }}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -173,8 +177,23 @@
                                                 <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
                                                     <span
                                                         class="inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-900/40 px-3 py-1 text-xs font-medium text-sky-700 dark:text-sky-200 ring-1 ring-sky-100 dark:ring-sky-800">
-                                                        {{ $grado->nivel->nombre ?? '---' }}
+                                                        {{ $generacion->nivel->nombre ?? '---' }}
                                                     </span>
+                                                </td>
+
+                                                <!-- Estado -->
+                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                    @if ($generacion->status === 'activa')
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-900/40 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-100 dark:ring-emerald-800">
+                                                            Activa
+                                                        </span>
+                                                    @else
+                                                        <span
+                                                            class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-900/40 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-200 ring-1 ring-red-100 dark:ring-red-800">
+                                                            Inactiva
+                                                        </span>
+                                                    @endif
                                                 </td>
 
                                                 <!-- Acciones -->
@@ -185,7 +204,7 @@
                                                         <flux:button variant="primary"
                                                             class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
                                                             @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $grado->id }} });
+                                                                Livewire.dispatch('editarModal', { id: {{ $generacion->id }} });
                                                             ">
                                                             <flux:icon.square-pen class="w-3.5 h-3.5" />
                                                             <!-- ícono -->
@@ -205,18 +224,18 @@
 
                     <!-- Tarjetas (mobile) -->
                     <div class="md:hidden space-y-3">
-                        @if ($grados->isEmpty())
+                        @if ($generaciones->isEmpty())
                             <div
                                 class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
                                 <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">
-                                    No hay grados disponibles
+                                    No hay generaciones disponibles
                                 </div>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">
                                     Ajusta tu búsqueda o importa datos.
                                 </p>
                             </div>
                         @else
-                            @foreach ($grados as $key => $grado)
+                            @foreach ($generaciones as $key => $generacion)
                                 <div
                                     class="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm">
                                     <div class="flex items-start justify-between gap-3">
@@ -227,10 +246,10 @@
                                             </div>
                                             <div>
                                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                                    {{ $grado->nombre ?: '---' }}
+                                                    {{ $generacion->nombre ?: '---' }}
                                                 </h2>
                                                 <p class="text-sm text-gray-700 dark:text-gray-300">
-                                                    Nivel: {{ $grado->nivel->nombre ?: '---' }}
+                                                    Nivel: {{ $generacion->nivel->nombre ?: '---' }}
                                                 </p>
                                             </div>
                                         </div>
@@ -240,7 +259,7 @@
                                             <flux:button variant="primary"
                                                 class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
                                                 @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $grado->id }} });
+                                                                Livewire.dispatch('editarModal', { id: {{ $generacion->id }} });
                                                             ">
                                                 <flux:icon.square-pen class="w-3.5 h-3.5" />
                                                 <!-- ícono -->
@@ -258,12 +277,12 @@
 
                 <!-- Paginación -->
                 <div class="mt-5">
-                    {{ $grados->links() }}
+                    {{ $generaciones->links() }}
                 </div>
             </div>
         </div>
 
         <!-- Modal editar -->
-        <livewire:grado.editar-grados />
+        <livewire:generacion.editar-generacion />
     </div>
 </div>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Basica\Generacion;
+namespace App\Livewire\Generacion;
 
 use Livewire\Component;
 
@@ -8,6 +8,6 @@ class EditarGeneracion extends Component
 {
     public function render()
     {
-        return view('livewire.basica.generacion.editar-generacion');
+        return view('livewire.generacion.editar-generacion');
     }
 }

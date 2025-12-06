@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class CrearNivel extends Component
 {
-      use WithFileUploads;
+    use WithFileUploads;
 
     public $logo;
     public $nombre;
@@ -24,14 +24,14 @@ class CrearNivel extends Component
     public $director_id;
     public $supervisor_id;
 
-       public $directores = [];
+    public $directores = [];
 
     public function mount()
     {
         $this->directores = Director::orderBy('nombre')->get();
     }
 
-        // Cuando se actualice "nombre", se genera el slug
+    // Cuando se actualice "nombre", se genera el slug
     public function updatedNombre($value)
     {
         $this->slug = Str::slug($value);
@@ -47,7 +47,7 @@ class CrearNivel extends Component
             'color'         => ['required', 'string', 'max:10'],
             'director_id'   => ['nullable', 'exists:directores,id'],
             'supervisor_id' => ['nullable', 'exists:directores,id'],
-        ],[
+        ], [
             'slug.unique' => 'El slug ya está en uso. Por favor, elige otro.',
             'cct' => 'El campo C.C.T. es obligatorio.',
             'color' => 'El campo Color es obligatorio.',
@@ -59,7 +59,7 @@ class CrearNivel extends Component
         $logoPath = null;
         if ($this->logo) {
             // Guarda la nueva imagen
-            $path = $this->logo->store('logos');
+            $path = $this->logo->store('logos', 'public'); // 👈 importante
             $logoPath = str_replace('logos/', '', $path);
         }
 
@@ -73,7 +73,7 @@ class CrearNivel extends Component
             'supervisor_id' => $this->supervisor_id,
         ]);
 
-         $this->dispatch('swal', [
+        $this->dispatch('swal', [
             'title' => '¡Nivel creado correctamente!',
             'icon' => 'success',
             'position' => 'top-end',

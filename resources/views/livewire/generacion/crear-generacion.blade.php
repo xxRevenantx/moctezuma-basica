@@ -17,25 +17,28 @@
     {{-- ENCABEZADO --}}
     <div class="mb-6">
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            Crear Nuevo Grado
+            Crear Nueva Generación
         </h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Registra un nuevo grado educativo indicando su nivel correspondiente.
+            Registra una nueva generación indicando su nivel correspondiente.
         </p>
     </div>
 
     {{-- FORMULARIO --}}
-    <form wire:submit.prevent="guardarGrado" class="space-y-6">
+    <form wire:submit.prevent="guardarGeneracion" class="space-y-6">
         <div
             class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-sm p-5 space-y-5">
 
 
             <flux:field>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
 
-                    <flux:input label="Grado" placeholder="Primero, segundo, tercero" wire:model.live="nombre"
+                    <flux:input label="Fecha de inicio" placeholder="2020" wire:model.live="anio_ingreso"
+                        type="number" />
+
+                    <flux:input label="Fecha de término" placeholder="2024" wire:model.live="anio_egreso"
                         type="number" />
 
                     <flux:select wire:model="nivel_id" label="Nivel educativo">
@@ -56,8 +59,8 @@
             <div class="flex items-center justify-end gap-3">
 
                 <flux:button type="submit" variant="primary" class="btn-gradient text-xs sm:text-sm"
-                    spinner="guardarGrado">
-                    Guardar grado
+                    spinner="guardarGeneracion">
+                    Guardar Generación
                 </flux:button>
             </div>
         </div>

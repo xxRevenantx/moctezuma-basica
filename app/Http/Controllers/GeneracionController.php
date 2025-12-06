@@ -1,19 +1,16 @@
 <?php
 
-namespace App\Http\Controllers\Basica;
-use App\Http\Controllers\Controller;
+namespace App\Http\Controllers;
 
 use App\Models\GeneracionBasica;
 use App\Http\Requests\StoreGeneracionBasicaRequest;
 use App\Http\Requests\UpdateGeneracionBasicaRequest;
 
-class GeneracionBasicaController extends Controller
+class GeneracionController extends Controller
 {
 
     public function index()
     {
-        return view('basica.generaciones.index');
+        return view('generaciones.index');
     }
-
-
 }

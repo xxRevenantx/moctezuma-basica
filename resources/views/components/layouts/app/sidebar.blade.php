@@ -112,8 +112,8 @@
                             Grados
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.generaciones.basica')"
-                            :current="request()->routeIs('misrutas.generaciones.basica')" wire:navigate>
+                        <flux:navlist.item icon="home" :href="route('misrutas.generaciones')"
+                            :current="request()->routeIs('misrutas.generaciones')" wire:navigate>
                             Generaciones
                         </flux:navlist.item>
 

@@ -14,7 +14,7 @@ use Livewire\WithFileUploads;
 
 class Profile extends Component
 {
-     use WithFileUploads;
+    use WithFileUploads;
 
     public string $name = '';
 
@@ -40,6 +40,8 @@ class Profile extends Component
     {
         $user = Auth::user();
 
+
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
 
@@ -55,7 +57,7 @@ class Profile extends Component
             ],
         ]);
 
-            // Si se sube una nueva foto...
+        // Si se sube una nueva foto...
         if ($this->photo) {
             // Elimina la imagen anterior si no es la default
             if ($user->photo && $user->photo !== 'default.jpg') {
@@ -77,27 +79,27 @@ class Profile extends Component
 
         $user->save();
 
-         $this->dispatch('refreshHeader');
+        $this->dispatch('refreshHeader');
         $this->dispatch('refreshProfile');
 
         $this->dispatch('profile-updated', name: $user->name);
     }
 
 
-        public function removePhoto()
-        {
-            // Borra el archivo físico si existe
-            if (auth()->user()->photo) {
-                Storage::disk('public')->delete('profile-photos/' . auth()->user()->photo);
-                auth()->user()->update(['photo' => null]);
-            }
+    public function removePhoto()
+    {
+        // Borra el archivo físico si existe
+        if (auth()->user()->photo) {
+            Storage::disk('public')->delete('profile-photos/' . auth()->user()->photo);
+            auth()->user()->update(['photo' => null]);
+        }
 
-               $this->dispatch('refreshHeader');
+        $this->dispatch('refreshHeader');
         $this->dispatch('refreshProfile');
 
-            // Resetea el campo de carga
-            $this->reset('photo');
-        }
+        // Resetea el campo de carga
+        $this->reset('photo');
+    }
 
     /**
      * Send an email verification notification to the current user.
