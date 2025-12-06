@@ -27,8 +27,13 @@ class Director extends Model
         'status',
     ];
 
-    public function nivel()
+    public function nivelesDirector()
     {
         return $this->hasMany(Nivel::class, 'director_id');
+    }
+
+    public function nivelesSupervisor()
+    {
+        return $this->hasMany(Nivel::class, 'supervisor_id');
     }
 }

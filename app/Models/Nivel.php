@@ -24,4 +24,16 @@ class Nivel extends Model
 {
     return $this->belongsTo(Director::class, 'director_id');
 }
+    public function supervisor()
+{
+    return $this->belongsTo(Director::class, 'supervisor_id');
+}
+
+// RELACION CON GRADOS
+    public function grados()
+    {
+        return $this->hasMany(Grado::class);
+    }
+
+
 }

@@ -152,7 +152,7 @@
 
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     @if ($nivel->logo)
-                                                        <img src="{{ asset('storage/' . $nivel->logo) }}"
+                                                        <img src="{{ asset('storage/logos/' . $nivel->logo) }}"
                                                             alt="Logo {{ $nivel->nombre }}"
                                                             class="h-10 w-10 object-contain rounded">
                                                     @else
@@ -208,7 +208,36 @@
                                                                 Director
                                                             </p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $nivel->director->nombre ?? '---' }}
+                                                                <flux:heading class="flex items-center gap-2">
+                                                                    @if ($nivel->director)
+                                                                        {{ $nivel->director->nombre ?? '---' }}
+                                                                        {{ $nivel->director->apellido_paterno ?? '---' }}
+                                                                        {{ $nivel->director->apellido_materno ?? '---' }}
+                                                                    @else
+                                                                        ---
+                                                                    @endif
+                                                                    @if ($nivel->director)
+                                                                        <flux:tooltip toggleable>
+                                                                            <flux:button icon="information-circle"
+                                                                                size="sm" variant="ghost" />
+                                                                            <flux:tooltip.content
+                                                                                class="max-w-[20rem] space-y-2">
+                                                                                <p>Zona Escolar:
+                                                                                    {{ $nivel->director->zona_escolar ?? '---' }}
+                                                                                </p>
+                                                                                <p>Teléfono:
+                                                                                    {{ $nivel->director->telefono ?? '---' }}
+                                                                                </p>
+                                                                                <p>Correo:
+                                                                                    {{ $nivel->director->correo ?? '---' }}
+                                                                                </p>
+                                                                                <p>Cargo:
+                                                                                    {{ $nivel->director->cargo ?? '---' }}
+                                                                                </p>
+                                                                            </flux:tooltip.content>
+                                                                        </flux:tooltip>
+                                                                    @endif
+                                                                </flux:heading>
                                                             </p>
                                                         </div>
                                                         <div class="space-y-0.5">
@@ -216,11 +245,37 @@
                                                                 Supervisor
                                                             </p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $nivel->director->nombre ?? '---' }}
+
+                                                                <flux:heading class="flex items-center gap-2">
+                                                                    @if ($nivel->supervisor)
+                                                                        {{ $nivel->supervisor->nombre ?? '---' }}
+                                                                        {{ $nivel->supervisor->apellido_paterno ?? '---' }}
+                                                                        {{ $nivel->supervisor->apellido_materno ?? '---' }}
+                                                                    @else
+                                                                        ---
+                                                                    @endif
+                                                                    @if ($nivel->supervisor)
+                                                                        <flux:tooltip toggleable>
+                                                                            <flux:button icon="information-circle"
+                                                                                size="sm" variant="ghost" />
+                                                                            <flux:tooltip.content
+                                                                                class="max-w-[20rem] space-y-2">
+                                                                                <p>Zona Escolar:
+                                                                                    {{ $nivel->supervisor->zona_escolar ?? '---' }}
+                                                                                </p>
+                                                                                <p>Teléfono:
+                                                                                    {{ $nivel->supervisor->telefono ?? '---' }}
+                                                                                </p>
+                                                                                <p>Correo:
+                                                                                    {{ $nivel->supervisor->correo ?? '---' }}
+                                                                                </p>
+                                                                            </flux:tooltip.content>
+                                                                        </flux:tooltip>
+                                                                    @endif
+                                                                </flux:heading>
+
                                                             </p>
                                                         </div>
-
-
                                                     </div>
                                                 </td>
                                             </tr>

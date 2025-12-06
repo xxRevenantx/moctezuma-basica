@@ -105,6 +105,28 @@
                         </flux:navlist.item>
                     </flux:sidebar.group>
 
+                    <flux:sidebar.group expandable heading="BÁSICA" class="grid text-xs gap-1 text-zinc-300">
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.grados')"
+                            :current="request()->routeIs('misrutas.grados')" wire:navigate>
+                            Grados
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.generaciones.basica')"
+                            :current="request()->routeIs('misrutas.generaciones.basica')" wire:navigate>
+                            Generaciones
+                        </flux:navlist.item>
+
+                    </flux:sidebar.group>
+
+                    <flux:sidebar.group expandable heading="MEDIA SUPERIOR" class="grid text-xs gap-1 text-zinc-300">
+
+                        <flux:navlist.item icon="home" wire:navigate>
+                            Generaciones
+                        </flux:navlist.item>
+
+                    </flux:sidebar.group>
+
 
 
                 </flux:navlist.group>

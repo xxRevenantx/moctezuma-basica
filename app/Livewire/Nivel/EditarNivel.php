@@ -3,6 +3,7 @@
 namespace App\Livewire\Nivel;
 
 use App\Models\Nivel;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -69,22 +70,36 @@ class EditarNivel extends Component
 
         $nivel = Nivel::findOrFail($this->nivelId);
 
-        // si hay logo nuevo, lo guardas y actualizas
-        if ($this->logo_nuevo) {
-            $path = $this->logo_nuevo->store('logos', 'public'); // o disco que uses
-            $filename = basename($path);
-            $nivel->logo = $filename;
+
+        if ($this->logo_nuevo   ) {
+            if ($this->logo_actual) {
+                Storage::disk('public')->delete('logos/' . $this->logo_actual);
+            }
+            $path = $this->logo_nuevo->store('logos', 'public'); // storage/app/public/logos
+            $this->logo_actual = basename($path);
         }
 
-        $nivel->nombre = $this->nombre;
-        $nivel->slug = $this->slug;
-        $nivel->cct = $this->cct;
-        $nivel->color = $this->color;
-        $nivel->director_id = $this->director_id;
-        $nivel->supervisor_id = $this->supervisor_id;
-        $nivel->save();
 
-        // ...
+
+        $nivel->update([
+            'nombre'      => $this->nombre,
+            'logo'        => $this->logo_actual,
+            'slug'        => $this->slug,
+            'cct'         => $this->cct,
+            'color'       => $this->color,
+            'director_id' => $this->director_id,
+            'supervisor_id' => $this->supervisor_id,
+        ]);
+
+        $this->dispatch('swal', [
+            'title' => '¡Nivel actualizado correctamente!',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+
+        $this->dispatch('refreshNiveles');
+        $this->dispatch('cerrar-modal-editar');
+        $this->cerrarModal();
     }
 
 
@@ -96,7 +111,8 @@ class EditarNivel extends Component
             'nivelId',
             'nombre',
             'slug',
-            'logo',
+            'logo_actual',
+            'logo_nuevo',
             'cct',
             'color',
             'director_id',

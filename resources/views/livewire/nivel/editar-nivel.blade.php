@@ -121,10 +121,12 @@
                                     </div>
                                 @elseif(!empty($logo_actual))
                                     {{-- Logo actual guardado en BD --}}
+
                                     <div
                                         class="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700
                                bg-white dark:bg-neutral-900 p-2">
-                                        <img src="{{ asset('logos/' . $logo_actual) }}" alt="Logo actual del nivel"
+                                        <img src="{{ asset('storage/logos/' . $logo_actual) }}"
+                                            alt="Logo actual del nivel"
                                             class="w-full h-32 md:h-40 object-contain mx-auto">
                                         <span
                                             class="absolute bottom-2 left-2 rounded-full bg-black/70 text-white text-[11px] px-2 py-0.5">
@@ -146,9 +148,7 @@
 
                             {{-- INPUT DE SUBIDA / REEMPLAZO --}}
                             <div class="w-full space-y-2">
-                                <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-200">
-                                    Subir / reemplazar logo
-                                </label>
+
 
                                 <label
                                     class="w-full flex flex-col items-center justify-center gap-2 rounded-xl border

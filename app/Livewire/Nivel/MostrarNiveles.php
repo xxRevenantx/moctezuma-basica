@@ -41,7 +41,7 @@ class MostrarNiveles extends Component
     #[On('refreshNiveles')]
     public function render()
     {
-        $niveles = Nivel::with(['director'])
+        $niveles = Nivel::with(['director', 'supervisor'] )
             ->when($this->search, function ($query) {
                 $query->where('nombre', 'like', "%{$this->search}%")
                     ->orWhere('cct', 'like', "%{$this->search}%");
