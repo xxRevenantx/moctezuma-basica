@@ -105,7 +105,7 @@
                         </flux:navlist.item>
                     </flux:sidebar.group>
 
-                    <flux:sidebar.group expandable heading="BÁSICA" class="grid text-xs gap-1 text-zinc-300">
+                    <flux:sidebar.group expandable heading="ESTRUCTURA" class="grid text-xs gap-1 text-zinc-300">
 
                         <flux:navlist.item icon="home" :href="route('misrutas.grados')"
                             :current="request()->routeIs('misrutas.grados')" wire:navigate>
@@ -115,6 +115,11 @@
                         <flux:navlist.item icon="home" :href="route('misrutas.generaciones')"
                             :current="request()->routeIs('misrutas.generaciones')" wire:navigate>
                             Generaciones
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.semestres')"
+                            :current="request()->routeIs('misrutas.semestres')" wire:navigate>
+                            Semestres
                         </flux:navlist.item>
 
                     </flux:sidebar.group>

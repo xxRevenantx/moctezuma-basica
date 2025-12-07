@@ -1,19 +1,4 @@
-<div x-data="{
-    preview: null,
-    handleLogoChange(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => this.preview = ev.target.result;
-        reader.readAsDataURL(file);
-    }
-}"
-    x-on:logo-cleared.window="
-        preview = null;
-        if ($refs.logoInput) {
-            $refs.logoInput.value = null;
-        }
-    ">
+<div>
     {{-- ENCABEZADO --}}
     <div class="mb-6">
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">

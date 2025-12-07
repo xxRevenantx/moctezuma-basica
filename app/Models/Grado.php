@@ -25,4 +25,10 @@ class Grado extends Model
     {
         return $this->belongsTo(Nivel::class);
     }
+
+    // RELACION CON SEMESTRES
+    public function semestres()
+    {
+        return $this->hasMany(Semestre::class);
+    }
 }

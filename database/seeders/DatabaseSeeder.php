@@ -26,6 +26,9 @@ class DatabaseSeeder extends Seeder
             EscuelaSeeder::class,
             DirectorSeeder::class,
             NivelSeeder::class,
+            GradoSeeder::class,
+            MesesBachilleratoSeeder::class,
+            SemestreSeeder::class,
         ]);
     }
 }

@@ -72,6 +72,9 @@ body{
 button{
     cursor: pointer;
 }
+input[type="checkbox"], input[type="radio"]{
+    cursor: pointer;
+}
 
 .btn-gradient{
     @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700;
