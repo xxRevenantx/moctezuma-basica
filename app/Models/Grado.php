@@ -31,4 +31,12 @@ class Grado extends Model
     {
         return $this->hasMany(Semestre::class);
     }
+
+
+    // RELACION CON GRUPOS
+    public function grupos()
+    {
+        return $this->hasMany(Grupo::class);
+    }
+
 }

@@ -34,7 +34,7 @@
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                 </svg>
                 <p class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                    Cargando datos del nivel...
+                    Cargando datos del grupo...
                 </p>
             </div>
         </div>
@@ -48,15 +48,18 @@
         <div
             class="px-5 sm:px-6 pt-4  flex items-start justify-between gap-3 sticky top-0 bg-white/95 dark:bg-neutral-900/95 backdrop-blur z-10">
             <div class="min-w-0">
-                <h2 id="titulo-modal-generacion" class="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
-                    Editar Generación
+                <h2 id="titulo-modal-grupo" class="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
+                    Editar Grupo
                 </h2>
                 <p class="text-sm text-neutral-600 dark:text-neutral-400">
                     <span class="inline-flex items-center gap-2">
-                        <flux:badge color="indigo">Generación: {{ $anio_ingreso }} - {{ $anio_egreso }}
+                        <flux:badge color="indigo">
+                            {{ $grado_nombre ?? 'Grado no seleccionado' }}°
+                            {{ $nivel_nombre ?? 'Nivel no seleccionado' }} | Grupo: {{ $nombre ?? 'No definido' }}
                         </flux:badge>
                     </span>
                 </p>
+
             </div>
 
             <button @click="show = false; $wire.cerrarModal()" type="button"
@@ -69,29 +72,67 @@
             </button>
         </div>
 
-        <form wire:submit.prevent="actualizarGeneracion">
+        <form wire:submit.prevent="actualizarGrupo">
             {{-- Grid de inputs --}}
             <flux:field class="p-4 space-y-6">
 
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+                    {{-- Nombre del grupo --}}
+                    <flux:input label="Nombre" placeholder="A, B, C, D..." wire:model="nombre" type="text" />
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-
-                    <flux:input label="Fecha de inicio" placeholder="2020" wire:model.live="anio_ingreso"
-                        type="number" />
-
-                    <flux:input label="Fecha de término" placeholder="2024" wire:model.live="anio_egreso"
-                        type="number" />
-
-                    <flux:select wire:model="nivel_id" label="Nivel educativo">
+                    {{-- Nivel --}}
+                    <flux:select wire:model.live="nivel_id" label="Nivel educativo">
                         <flux:select.option value="">--Selecciona un nivel--</flux:select.option>
                         @foreach ($niveles as $nivel)
-                            <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}
+                            <flux:select.option value="{{ $nivel->id }}">
+                                {{ $nivel->nombre }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
+
+
+
+                    {{-- Grado (filtrado por nivel) --}}
+                    <flux:select wire:model="grado_id" label="Grado">
+                        <flux:select.option value="">--Selecciona un grado--</flux:select.option>
+                        @foreach ($grados as $grado)
+                            <flux:select.option value="{{ $grado->id }}">
+                                {{ $grado->nombre }}° GRADO
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+
+                    {{-- Generación (filtrada por nivel) --}}
+                    <flux:select wire:model.live="generacion_id" label="Generación">
+
+                        <flux:select.option value="">--Selecciona una generación--</flux:select.option>
+                        @foreach ($generaciones as $generacion)
+                            <flux:select.option value="{{ $generacion->id }}">
+                                {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                            </flux:select.option>
+                        @endforeach
+
+                    </flux:select>
+
+                    {{-- Semestre (solo para nivel Bachillerato) --}}
+                    <flux:select wire:model="semestre_id" label="Semestre">
+                        @if (!$esBachillerato)
+                            <flux:select.option value="">
+                                Solo aplica para nivel Bachillerato
+                            </flux:select.option>
+                        @else
+                            <flux:select.option value="">--Selecciona un semestre--</flux:select.option>
+                            @foreach ($semestres as $semestre)
+                                <flux:select.option value="{{ $semestre->id }}">
+                                    {{ $semestre->numero }}° SEMESTRE
+                                </flux:select.option>
+                            @endforeach
+                        @endif
+                    </flux:select>
+
+
 
                 </div>
 
@@ -108,7 +149,7 @@
                     </button>
 
                     <flux:button variant="primary" type="submit" class="w-full sm:w-auto cursor-pointer"
-                        wire:loading.attr="disabled" wire:target="actualizarGeneracion">
+                        wire:loading.attr="disabled" wire:target="actualizarGrupo">
                         {{ __('Guardar') }}
                     </flux:button>
                 </div>

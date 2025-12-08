@@ -40,4 +40,10 @@ class Nivel extends Model
     {
         return $this->hasMany(Generacion::class);
     }
+
+    // RELACION CON GRUPOS
+    public function grupos()
+    {
+        return $this->hasMany(Grupo::class);
+    }
 }

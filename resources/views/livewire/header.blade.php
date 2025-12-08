@@ -36,34 +36,53 @@
                     </div>
 
 
-                    <!-- Avatar -->
-                    @if (auth()->user()->photo)
-                        <div class="relative w-10 h-10 hidden lg:block">
-                            @if (auth()->user()->photo && file_exists(storage_path('app/public/profile-photos/' . auth()->user()->photo)))
-                                <div
-                                    class="w-full h-full rounded-full overflow-hidden border-4 border-white shadow ring-1 ring-neutral-200 dark:ring-neutral-700">
-                                    <img src="{{ asset('storage/profile-photos/' . auth()->user()->photo) }}"
-                                        alt="Avatar" class="w-full h-full object-cover">
-                                </div>
-                            @else
-                                <flux:avatar circle badge badge:circle badge:color="green"
-                                    :initials="auth()->user()->initials()" :name="auth()->user()->username" />
-                            @endif
-                            <span
-                                class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-neutral-800 rounded-full shadow-md"></span>
-                        </div>
-                        <div class="w-full text-center lg:hidden">
-                            <span
-                                class="block font-semibold text-neutral-800 dark:text-neutral-100">{{ auth()->user()->username }}</span>
-                        </div>
+                    @auth
+                        @php($user = auth()->user())
+
+                        {{-- Si hay usuario logueado --}}
+                        @if ($user->photo)
+                            <div class="relative w-10 h-10 hidden lg:block">
+                                @if ($user->photo && file_exists(storage_path('app/public/profile-photos/' . $user->photo)))
+                                    <div
+                                        class="w-full h-full rounded-full overflow-hidden border-4 border-white shadow ring-1 ring-neutral-200 dark:ring-neutral-700">
+                                        <img src="{{ asset('storage/profile-photos/' . $user->photo) }}" alt="Avatar"
+                                            class="w-full h-full object-cover">
+                                    </div>
+                                @else
+                                    <flux:avatar circle badge badge:circle badge:color="green" :initials="$user->initials()"
+                                        :name="$user->username" />
+                                @endif
+
+                                <span
+                                    class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-neutral-800 rounded-full shadow-md"></span>
+                            </div>
+
+                            <div class="w-full text-center lg:hidden">
+                                <span class="block font-semibold text-neutral-800 dark:text-neutral-100">
+                                    {{ $user->username }}
+                                </span>
+                            </div>
+                        @else
+                            {{-- Usuario logueado pero sin foto --}}
+                            <flux:avatar circle badge badge:circle badge:color="green" :initials="$user->initials()"
+                                :name="$user->username" />
+
+                            <div class="w-full text-center lg:hidden">
+                                <span class="block font-semibold text-neutral-800 dark:text-neutral-100">
+                                    {{ $user->username }}
+                                </span>
+                            </div>
+                        @endif
                     @else
+                        {{-- Sin usuario autenticado (invitado) --}}
                         <flux:avatar badge badge:color="green" />
 
                         <div class="w-full text-center lg:hidden">
-                            <span
-                                class="block font-semibold text-neutral-800 dark:text-neutral-100">{{ auth()->user()->username }}</span>
+                            <span class="block font-semibold text-neutral-800 dark:text-neutral-100">
+                                Invitado
+                            </span>
                         </div>
-                    @endif
+                    @endauth
                 </div>
             </div>
         </div>

@@ -1,12 +1,26 @@
 <div>
     {{-- ENCABEZADO --}}
-    <div class="mb-6">
+    <div class="mb-3">
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">
             Crear Nuevo Semestre
         </h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Registra un nuevo semestre indicando su nivel correspondiente.
         </p>
+    </div>
+
+    <!-- Nota SOLO bachillerato -->
+    <div
+        class="mb-3 w-full inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-100 text-xs sm:text-sm">
+        <span
+            class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[11px] font-semibold text-amber-800 dark:bg-amber-800/70 dark:text-amber-50">
+            i
+        </span>
+        <span>
+            <span class="font-semibold">Nota:</span>
+            Este módulo de semestres aplica <span class="font-semibold uppercase">únicamente</span> para el
+            nivel <span class="font-semibold">Bachillerato</span>.
+        </span>
     </div>
 
     {{-- FORMULARIO --}}

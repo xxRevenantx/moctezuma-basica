@@ -6,6 +6,7 @@ use App\Http\Controllers\NivelController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
+use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\SemestreController;
 
 
@@ -25,3 +26,7 @@ Route::get('/generaciones', [GeneracionController::class, 'index'])->name('misru
 
 //RUTAS DE SEMESTRES
 Route::get('/semestres', [SemestreController::class, 'index'])->name('misrutas.semestres');
+
+
+// RUTAS DE GRUPOS
+Route::get('/grupos', [GrupoController::class, 'index'])->name('misrutas.grupos');

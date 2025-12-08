@@ -14,32 +14,32 @@ class SemestreSeeder extends Seeder
     {
         $semestres = [
             [
-                'grado_id' => 1,
+                'grado_id' => 13,
                 'numero' => '1',
                 'mes_id' => 1,
             ],
             [
-                'grado_id' => 1,
+                'grado_id' => 13,
                 'numero' => '2',
                 'mes_id' => 2,
             ],
             [
-                'grado_id' => 2,
+                'grado_id' =>14,
                 'numero' => '3',
                 'mes_id' => 1,
             ],
             [
-                'grado_id' => 2,
+                'grado_id' => 14,
                 'numero' => '4',
                 'mes_id' => 2,
             ],
             [
-                'grado_id' => 3,
+                'grado_id' => 15,
                 'numero' => '5',
                 'mes_id' => 1,
             ],
             [
-                'grado_id' => 3,
+                'grado_id' => 15,
                 'numero' => '6',
                 'mes_id' => 2,
             ],

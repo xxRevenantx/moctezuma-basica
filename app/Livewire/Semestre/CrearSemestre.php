@@ -33,7 +33,6 @@ class CrearSemestre extends Component
         // VERIFICAR QUE NO EXISTA EL SEMESTRE EN ESE GRADO
          $existe = \App\Models\Semestre::where('numero', $this->numero)
             ->where('grado_id', $this->grado_id)
-            ->where('mes_id', $this->mes_id)
             ->exists();
 
         if ($existe) {

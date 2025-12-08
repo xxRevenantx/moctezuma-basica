@@ -38,13 +38,17 @@
                                     <span class="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-lg">
                                         <span
                                             class="flex h-full w-full items-center justify-center rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
-                                            {{ auth()->user()->initials() }}
+                                            @auth
+                                                {{ auth()->user()->initials() }}
+                                            @endauth
                                         </span>
                                     </span>
 
                                     <div class="grid flex-1 text-start text-sm leading-tight">
-                                        <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
-                                        <span class="truncate text-xs">{{ auth()->user()->email }}</span>
+                                        @auth
+                                            <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
+                                            <span class="truncate text-xs">{{ auth()->user()->email }}</span>
+                                        @endauth
                                     </div>
                                 </div>
                             </div>
@@ -117,17 +121,22 @@
                             Generaciones
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.semestres')"
-                            :current="request()->routeIs('misrutas.semestres')" wire:navigate>
-                            Semestres
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.grupos')"
+                            :current="request()->routeIs('misrutas.grupos')" wire:navigate>
+                            Grupos
                         </flux:navlist.item>
+
+
+
 
                     </flux:sidebar.group>
 
                     <flux:sidebar.group expandable heading="MEDIA SUPERIOR" class="grid text-xs gap-1 text-zinc-300">
 
-                        <flux:navlist.item icon="home" wire:navigate>
-                            Generaciones
+                        <flux:navlist.item icon="home" :href="route('misrutas.semestres')"
+                            :current="request()->routeIs('misrutas.semestres')" wire:navigate>
+                            Semestres
                         </flux:navlist.item>
 
                     </flux:sidebar.group>

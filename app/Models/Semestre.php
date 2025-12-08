@@ -28,4 +28,10 @@ class Semestre extends Model
     {
         return $this->belongsTo(MesesBachillerato::class, 'mes_id');
     }
+
+    // RELACION CON GRUPOS
+    public function grupos()
+    {
+        return $this->hasMany(Grupo::class);
+    }
 }

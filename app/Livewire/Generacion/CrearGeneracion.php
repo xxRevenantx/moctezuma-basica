@@ -33,6 +33,17 @@ class CrearGeneracion extends Component
 
         ]);
 
+        // VERIFICAR SI YA EXISTE LA GENERACION
+        $existe = \App\Models\Generacion::where('nivel_id', $this->nivel_id)
+            ->where('anio_ingreso', $this->anio_ingreso)
+            ->where('anio_egreso', $this->anio_egreso)
+            ->exists();
+
+        if ($existe) {
+            $this->addError('anio_ingreso', 'La generación ya existe en este nivel.');
+            return;
+        }
+
         \App\Models\Generacion::create([
             'anio_ingreso' => $this->anio_ingreso,
             'anio_egreso' => $this->anio_egreso,

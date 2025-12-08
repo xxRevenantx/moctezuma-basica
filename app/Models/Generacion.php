@@ -26,4 +26,10 @@ class Generacion extends Model
     {
         return $this->belongsTo(Nivel::class);
     }
+
+    // RELACIONES CON GRUPOS
+    public function grupos()
+    {
+        return $this->hasMany(Grupo::class);
+    }
 }

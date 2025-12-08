@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Generacion;
 
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -18,11 +19,13 @@ class MostrarGeneraciones extends Component
     }
 
 
+    #[On('refreshGeneraciones')]
     public function render()
     {
         $generaciones = \App\Models\Generacion::where('anio_ingreso', 'like', '%' . $this->search . '%')
             ->orWhere('anio_egreso', 'like', '%' . $this->search . '%')
-            ->orderBy('anio_ingreso', 'desc')
+            ->orderBy('nivel_id', 'asc')
+            ->orderBy('anio_ingreso', 'asc')
             ->paginate(10);
         return view('livewire.generacion.mostrar-generaciones', compact('generaciones'));
     }
