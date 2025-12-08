@@ -11,10 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('ciclo_escolares', function (Blueprint $table) {
+        Schema::create('periodos', function (Blueprint $table) {
             $table->id();
-            $table->year('inicio_anio');
-            $table->year('fin_anio');
+            $table->unsignedTinyInteger('numero');   // 1, 2, 3...
+            $table->string('nombre');                // "Primer periodo", "Segundo periodo", etc.
+            $table->enum('uso', ['basico', 'bachillerato', 'ambos'])
+                ->default('basico');
             $table->timestamps();
         });
     }
@@ -24,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('ciclo_escolars');
+        Schema::dropIfExists('periodos');
     }
 };

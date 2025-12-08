@@ -79,6 +79,8 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+                    {{-- {{ $nivel_id }} --}}
+
                     {{-- Nombre del grupo --}}
                     <flux:input label="Nombre" placeholder="A, B, C, D..." wire:model="nombre" type="text" />
 
@@ -93,24 +95,24 @@
                     </flux:select>
 
 
-
                     {{-- Grado (filtrado por nivel) --}}
-                    <flux:select wire:model="grado_id" label="Grado">
+                    <flux:select wire:model="grado_id" label="Grado" class="uppercase">
                         <flux:select.option value="">--Selecciona un grado--</flux:select.option>
                         @foreach ($grados as $grado)
                             <flux:select.option value="{{ $grado->id }}">
-                                {{ $grado->nombre }}° GRADO
+                                {{ $grado->nombre }}° GRADO DE {{ $grado->nivel->nombre }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
 
                     {{-- Generación (filtrada por nivel) --}}
-                    <flux:select wire:model.live="generacion_id" label="Generación">
+                    <flux:select wire:model.live="generacion_id" label="Generación" class="uppercase">
 
                         <flux:select.option value="">--Selecciona una generación--</flux:select.option>
                         @foreach ($generaciones as $generacion)
                             <flux:select.option value="{{ $generacion->id }}">
-                                {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                                {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }} DE
+                                {{ $generacion->nivel->nombre }}
                             </flux:select.option>
                         @endforeach
 

@@ -98,6 +98,11 @@
                             Escuela
                         </flux:navlist.item>
 
+                        <flux:navlist.item icon="home" :href="route('misrutas.ciclos')"
+                            :current="request()->routeIs('misrutas.ciclos')" wire:navigate>
+                            Ciclos Escolares
+                        </flux:navlist.item>
+
                         <flux:navlist.item icon="home" :href="route('misrutas.directivos')"
                             :current="request()->routeIs('misrutas.directivos')" wire:navigate>
                             Personal directivo
@@ -125,6 +130,11 @@
                         <flux:navlist.item icon="home" :href="route('misrutas.grupos')"
                             :current="request()->routeIs('misrutas.grupos')" wire:navigate>
                             Grupos
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.periodos-basica')"
+                            :current="request()->routeIs('misrutas.periodos-basica')" wire:navigate>
+                            Periodos Básica
                         </flux:navlist.item>
 
 

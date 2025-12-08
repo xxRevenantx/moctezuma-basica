@@ -23,12 +23,14 @@ class DatabaseSeeder extends Seeder
         ]);
         $this->call([
             // WorldTableSeeder::class
+            CicloEscolarSeeder::class,
             EscuelaSeeder::class,
             DirectorSeeder::class,
             NivelSeeder::class,
             GradoSeeder::class,
             MesesBachilleratoSeeder::class,
             SemestreSeeder::class,
+            PeriodoSeeder::class,
         ]);
     }
 }

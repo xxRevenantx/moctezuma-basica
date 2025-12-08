@@ -39,6 +39,8 @@ class CrearNivel extends Component
 
     public function guardarNivel()
     {
+
+        dd($this->logo);
         $this->validate([
             'logo'          => ['nullable', 'image', 'max:2048'],
             'nombre'        => ['required', 'string', 'max:255'],
@@ -48,19 +50,25 @@ class CrearNivel extends Component
             'director_id'   => ['nullable', 'exists:directores,id'],
             'supervisor_id' => ['nullable', 'exists:directores,id'],
         ], [
-            'slug.unique' => 'El slug ya está en uso. Por favor, elige otro.',
-            'cct' => 'El campo C.C.T. es obligatorio.',
-            'color' => 'El campo Color es obligatorio.',
+            'logo_nivel.image' => 'El archivo debe ser una imagen.',
+            'logo_nivel.max'   => 'La imagen no debe pesar más de 2MB.',
+            'nombre.required' => 'El nombre es obligatorio.',
+            'nombre.max'      => 'El nombre no debe exceder los 255 caracteres.',
+            'slug.required'   => 'El slug es obligatorio.',
+            'slug.max'        => 'El slug no debe exceder los 255 caracteres.',
+            'slug.unique'     => 'El slug ya está en uso. Por favor, elige otro.',
+            'cct.required'    => 'El CCT es obligatorio.',
+            'cct.max'         => 'El CCT no debe exceder los 50 caracteres.',
+            'color.required'  => 'El color es obligatorio.',
+            'color.max'       => 'El color no debe exceder los 10 caracteres.',
+            'director_id.exists'   => 'El director seleccionado no es válido.',
+            'supervisor_id.exists' => 'El supervisor seleccionado no es válido.',
         ]);
 
-
-
-        // Si se sube una nueva foto...
         $logoPath = null;
         if ($this->logo) {
-            // Guarda la nueva imagen
-            $path = $this->logo->store('logos', 'public'); // 👈 importante
-            $logoPath = str_replace('logos/', '', $path);
+            $path = $this->logo->store('logos', 'public');
+            $logoPath = basename($path);
         }
 
         Nivel::create([
@@ -80,7 +88,7 @@ class CrearNivel extends Component
         ]);
 
         $this->reset([
-            'logo',
+            'logo_nivel',
             'nombre',
             'slug',
             'cct',
