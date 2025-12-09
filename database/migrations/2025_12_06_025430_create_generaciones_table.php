@@ -21,8 +21,8 @@ return new class extends Migration
 
 
             // Años escolares de entrada y salida del nivel
-            $table->unsignedSmallInteger('anio_ingreso'); // ej. 2021
-            $table->unsignedSmallInteger('anio_egreso');  // ej. 2027
+            $table->year('anio_ingreso'); // ej. 2021
+            $table->year('anio_egreso');  // ej. 2027
 
 
             // Estado de la generación

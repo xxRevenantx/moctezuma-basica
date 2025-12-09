@@ -15,4 +15,15 @@ class cicloEscolar extends Model
         'inicio_anio',
         'fin_anio',
     ];
+
+
+    // Relación con Periodos_basico
+    public function periodosBasicos()
+    {
+        return $this->hasMany(Periodos_basico::class, 'ciclo_escolar_id');
+    }
+    public function periodos()
+    {
+        return $this->hasMany(Periodo::class, 'ciclo_escolar_id');
+    }
 }

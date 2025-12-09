@@ -15,11 +15,12 @@
             class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-sm p-5 space-y-5">
 
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 {{-- Ciclo Escolar --}}
                 <div>
                     <flux:select wire:model="ciclo_escolar_id" label="Ciclo Escolar"
                         placeholder="Selecciona un ciclo escolar">
+                        <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
                         @foreach ($ciclosEscolares as $ciclo)
                             <flux:select.option value="{{ $ciclo->id }}">
                                 {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}
@@ -31,6 +32,7 @@
                 {{-- Período --}}
                 <div>
                     <flux:select wire:model="periodo_id" label="Período" placeholder="Selecciona un período">
+                        <flux:select.option value="">Selecciona un período</flux:select.option>
                         @foreach ($periodos as $periodo)
                             <flux:select.option value="{{ $periodo->id }}">{{ $periodo->nombre }}</flux:select.option>
                         @endforeach
