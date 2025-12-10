@@ -1,9 +1,8 @@
 <div x-data="{
-    openRow: null,
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `El grado ${nombre} se eliminará de forma permanente`,
+            text: `El ${nombre} grado se eliminará de forma permanente`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#2563EB',
@@ -33,8 +32,9 @@
                 <!-- Buscador -->
                 <div class="w-full sm:max-w-xl">
                     <label for="buscar-grado" class="sr-only">Buscar Grado</label>
-                    <flux:input id="buscar-grado" type="text" wire:model.live="search" placeholder="Buscar…"
-                        icon="magnifying-glass" class="w-full" />
+                    <flux:input id="buscar-grado" type="text" wire:model.live="search"
+                        placeholder="Buscar por nombre, CCT, director o supervisor…" icon="magnifying-glass"
+                        class="w-full" />
                 </div>
 
                 <!-- Resumen -->
@@ -71,199 +71,210 @@
                     </div>
                 </div>
 
-                <!-- ⬇️ Contenido que se desenfoca mientras se busca/carga -->
+                <!-- Contenido -->
                 <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
 
-                    <!-- Tabla (desktop) -->
-                    <div
-                        class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
-                        <div class="overflow-x-auto max-h-[65vh]">
-                            <table class="min-w-full text-sm">
-                                <thead
-                                    class="sticky top-0 z-10 bg-gradient-to-r from-indigo-600 via-sky-500 to-blue-600 text-white shadow-sm">
-                                    <tr>
-                                        <th
-                                            class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            #
-                                        </th>
-                                        <th
-                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Grado
-                                        </th>
-                                        <th
-                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Nivel
-                                        </th>
-                                        <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
-                                            Acciones
-                                        </th>
-                                    </tr>
-                                </thead>
-
-                                <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
-                                    @if ($grados->isEmpty())
-                                        <tr>
-                                            <td colspan="9"
-                                                class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                                <div class="mx-auto w-full max-w-md">
-                                                    <div
-                                                        class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 bg-white/70 dark:bg-neutral-900/70">
-                                                        <div
-                                                            class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
-                                                            No hay grados disponibles
-                                                        </div>
-                                                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                            Ajusta tu búsqueda.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @else
-                                        @php
-                                            $nivelActual = null;
-                                        @endphp
-
-                                        @foreach ($grados as $key => $grado)
-                                            @php
-                                                $nivelId = optional($grado->nivel)->id;
-                                            @endphp
-
-                                            {{-- Fila de cabecera de grupo por nivel --}}
-                                            @if ($nivelId !== $nivelActual)
-                                                <tr>
-                                                    <td colspan="4" class="px-4 py-2">
-                                                        <div
-                                                            class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
-                                                            <span
-                                                                class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400"></span>
-                                                            <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
-                                                                {{ $grado->nivel->nombre ?? 'Sin nivel asignado' }}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                @php
-                                                    $nivelActual = $nivelId;
-                                                @endphp
-                                            @endif
-
-                                            {{-- Fila principal del grado --}}
-                                            <tr
-                                                class="transition-colors duration-150 odd:bg-slate-50/80 even:bg-white dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40">
-                                                <!-- # -->
-                                                <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
-                                                    <span
-                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-100 dark:ring-indigo-800">
-                                                        {{ $key + 1 }}
-                                                    </span>
-                                                </td>
-
-                                                <!-- Grado -->
-                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    <div class="flex flex-col">
-                                                        <span class="font-semibold">
-                                                            {{ $grado->nombre ? $grado->nombre . '° GRADO' : '---' }}
-                                                        </span>
-                                                    </div>
-                                                </td>
-
-                                                <!-- Nivel -->
-                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-900/40 px-3 py-1 text-xs font-medium text-sky-700 dark:text-sky-200 ring-1 ring-sky-100 dark:ring-sky-800">
-                                                        {{ $grado->nivel->nombre ?? '---' }}
-                                                    </span>
-                                                </td>
-
-                                                <!-- Acciones -->
-                                                <td class="px-4 py-3">
-                                                    <div class="flex items-center justify-center gap-2">
-
-
-                                                        <flux:button variant="primary"
-                                                            class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                            @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $grado->id }} });
-                                                            ">
-                                                            <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                            <!-- ícono -->
-                                                        </flux:button>
-
-
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @endif
-                                </tbody>
-                            </table>
-
-                        </div>
-                    </div>
-
-                    <!-- Tarjetas (mobile) -->
-                    <div class="md:hidden space-y-3">
-                        @if ($grados->isEmpty())
-                            <div
-                                class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
-                                <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">
-                                    No hay grados disponibles
-                                </div>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    Ajusta tu búsqueda o importa datos.
-                                </p>
-                            </div>
-                        @else
-                            @foreach ($grados as $key => $grado)
+                    @if ($niveles->isEmpty())
+                        <div class="py-10">
+                            <div class="mx-auto w-full max-w-md">
                                 <div
-                                    class="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm">
+                                    class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 bg-white/70 dark:bg-neutral-900/70 text-center">
+                                    <div class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
+                                        No hay niveles disponibles
+                                    </div>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        Ajusta tu búsqueda o registra un nuevo nivel.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        {{-- GRID DE CARDS POR NIVEL --}}
+                        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            @foreach ($niveles as $key => $nivel)
+                                <div
+                                    class="relative rounded-2xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 shadow-sm flex flex-col gap-4">
+                                    {{-- Header: índice + logo + nombre + CCT --}}
                                     <div class="flex items-start justify-between gap-3">
-                                        <div class="space-y-2">
-                                            <div
-                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1 text-white text-xs font-medium shadow-sm">
-                                                <span>#{{ $key + 1 }}</span>
+                                        <div class="flex items-start gap-3 min-w-0">
+                                            {{-- Logo --}}
+                                            <div class="shrink-0">
+                                                @if ($nivel->logo)
+                                                    <img src="{{ asset('storage/logos/' . $nivel->logo) }}"
+                                                        alt="Logo {{ $nivel->nombre }}"
+                                                        class="h-12 w-12 object-contain rounded-lg ring-1 ring-gray-200/70 dark:ring-neutral-700/70 bg-white dark:bg-neutral-900">
+                                                @else
+                                                    <div
+                                                        class="h-12 w-12 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold">
+                                                        {{ Str::of($nivel->nombre)->substr(0, 2)->upper() }}
+                                                    </div>
+                                                @endif
                                             </div>
-                                            <div>
-                                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                                    {{ $grado->nombre ?: '---' }}
-                                                </h2>
-                                                <p class="text-sm text-gray-700 dark:text-gray-300">
-                                                    Nivel: {{ $grado->nivel->nombre ?: '---' }}
+
+                                            <div class="space-y-1 min-w-0">
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    <span
+                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-[11px] font-semibold text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800/70">
+                                                        {{ $key + 1 + ($niveles->currentPage() - 1) * $niveles->perPage() }}
+                                                    </span>
+                                                    <h2
+                                                        class="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
+                                                        {{ $nivel->nombre ?: 'Nivel sin nombre' }}
+                                                    </h2>
+                                                </div>
+
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                    <span class="font-medium">C.C.T:</span>
+                                                    {{ $nivel->cct ?: '---' }}
                                                 </p>
+
+                                                @if ($nivel->slug)
+                                                    <p
+                                                        class="text-[11px] text-gray-400 dark:text-gray-500 font-mono truncate">
+                                                        /{{ $nivel->slug }}
+                                                    </p>
+                                                @endif
                                             </div>
                                         </div>
 
-                                        <div class="flex items-center justify-center gap-2">
-
-                                            <flux:button variant="primary"
-                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $grado->id }} });
-                                                            ">
-                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                <!-- ícono -->
-                                            </flux:button>
-
-
-
+                                        {{-- Color del nivel --}}
+                                        <div class="flex flex-col items-end gap-1">
+                                            <div class="h-6 w-12 rounded-md border border-white/40 shadow-sm"
+                                                style="background-color: {{ $nivel->color ?? '#e5e7eb' }};">
+                                            </div>
+                                            <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                                                Color
+                                            </span>
                                         </div>
                                     </div>
+
+                                    {{-- Director y Supervisor --}}
+                                    <div
+                                        class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-[13px] text-gray-700 dark:text-gray-200">
+                                        <div class="space-y-1">
+                                            <p
+                                                class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+                                                Director
+                                            </p>
+                                            <div class="flex items-start gap-1.5">
+                                                <span class="text-[11px] text-gray-400 dark:text-gray-500 mt-[2px]">
+                                                    ■
+                                                </span>
+                                                <div class="space-y-0.5">
+                                                    <p class="font-medium truncate">
+                                                        @if ($nivel->director)
+                                                            {{ $nivel->director->nombre ?? '' }}
+                                                            {{ $nivel->director->apellido_paterno ?? '' }}
+                                                            {{ $nivel->director->apellido_materno ?? '' }}
+                                                        @else
+                                                            ---
+                                                        @endif
+                                                    </p>
+                                                    @if ($nivel->director)
+                                                        <p
+                                                            class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                                                            Zona: {{ $nivel->director->zona_escolar ?? '---' }} ·
+                                                            Tel: {{ $nivel->director->telefono ?? '---' }}
+                                                        </p>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-1">
+                                            <p
+                                                class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                <span class="inline-block h-2 w-2 rounded-full bg-sky-500"></span>
+                                                Supervisor
+                                            </p>
+                                            <div class="flex items-start gap-1.5">
+                                                <span class="text-[11px] text-gray-400 dark:text-gray-500 mt-[2px]">
+                                                    ■
+                                                </span>
+                                                <div class="space-y-0.5">
+                                                    <p class="font-medium truncate">
+                                                        @if ($nivel->supervisor)
+                                                            {{ $nivel->supervisor->nombre ?? '' }}
+                                                            {{ $nivel->supervisor->apellido_paterno ?? '' }}
+                                                            {{ $nivel->supervisor->apellido_materno ?? '' }}
+                                                        @else
+                                                            ---
+                                                        @endif
+                                                    </p>
+                                                    @if ($nivel->supervisor)
+                                                        <p
+                                                            class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                                                            Zona: {{ $nivel->supervisor->zona_escolar ?? '---' }} ·
+                                                            Tel: {{ $nivel->supervisor->telefono ?? '---' }}
+                                                        </p>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {{-- 🎓 Grados asignados a este nivel (EDITABLES) --}}
+                                    <div class="pt-2 border-t border-dashed border-gray-200 dark:border-neutral-700">
+                                        <p
+                                            class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                                            Grados asignados (clic para editar)
+                                        </p>
+
+                                        @if ($nivel->grados && $nivel->grados->count())
+                                            <div class="flex flex-wrap gap-1.5">
+                                                @foreach ($nivel->grados as $grado)
+                                                    <button type="button"
+                                                        class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-100 dark:ring-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-800/60 hover:shadow-sm transition"
+                                                        @click="$dispatch('abrir-modal-editar');
+                                                    Livewire.dispatch('editarModal', { id: {{ $grado->id }} });">
+                                                        <span
+                                                            class="h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-300"></span>
+                                                        {{ $grado->nombre ? $grado->nombre . '°' : 'Grado' }}
+                                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                                            class="h-3 w-3 opacity-80" viewBox="0 0 20 20"
+                                                            fill="currentColor" aria-hidden="true">
+                                                            <path
+                                                                d="M13.586 3.586a2 2 0 112.828 2.828l-7.5 7.5a2 2 0 01-.878.514l-3 0.75a1 1 0 01-1.213-1.213l.75-3a2 2 0 01.514-.878l7.5-7.5z" />
+                                                        </svg>
+                                                    </button>
+
+                                                    <button type="button"
+                                                        class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-red-50 dark:bg-red-900/40 text-red-600 dark:text-red-300 ring-1 ring-red-100 dark:ring-red-800 hover:bg-red-100 dark:hover:bg-red-800/60 hover:shadow-sm transition"
+                                                        @click="eliminar({{ $grado->id }}, '{{ $grado->nombre }}°')"
+                                                        title="Eliminar grado">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5"
+                                                            viewBox="0 0 20 20" fill="currentColor"
+                                                            aria-hidden="true">
+                                                            <path fill-rule="evenodd"
+                                                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                                                clip-rule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <p class="text-[11px] text-gray-400 dark:text-gray-500">
+                                                Sin grados asignados a este nivel.
+                                            </p>
+                                        @endif
+                                    </div>
+
+
                                 </div>
                             @endforeach
-                        @endif
-                    </div>
+                        </div>
+                    @endif
                 </div>
 
                 <!-- Paginación -->
                 <div class="mt-5">
-                    {{ $grados->links() }}
+                    {{ $niveles->links() }}
                 </div>
             </div>
         </div>
 
-        <!-- Modal editar -->
+        <!-- Modal editar GRADO -->
         <livewire:grado.editar-grados />
     </div>
 </div>

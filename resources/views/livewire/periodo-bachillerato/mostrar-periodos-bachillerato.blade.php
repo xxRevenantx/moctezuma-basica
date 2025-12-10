@@ -25,7 +25,7 @@
     <div
         class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow">
         <!-- Acabado superior -->
-        <div class="h-1 w-full bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-600"></div>
+        <div class="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500"></div>
 
         <!-- Toolbar -->
         <div class="p-4 sm:p-5 lg:p-6">
@@ -64,7 +64,7 @@
                     aria-live="polite" aria-busy="true">
                     <div
                         class="flex items-center gap-3 rounded-xl bg-white dark:bg-neutral-900 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-800 shadow">
-                        <svg class="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" viewBox="0 0 24 24"
+                        <svg class="h-5 w-5 animate-spin text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
                             fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                 stroke-width="4"></circle>
@@ -82,8 +82,7 @@
                         class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
                         <div class="overflow-x-auto max-h-[65vh]">
                             <table class="min-w-full text-sm">
-                                <thead
-                                    class="sticky top-0 z-10 bg-gradient-to-r from-indigo-600 via-sky-500 to-blue-600 text-white shadow-sm">
+                                <thead class="sticky top-0 z-10 table-gradient">
                                     <tr>
                                         <th
                                             class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide border-r border-white/10">
@@ -94,6 +93,9 @@
                                         </th>
                                         <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
                                             Generación
+                                        </th>
+                                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
+                                            Semestre
                                         </th>
                                         <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
                                             Mes
@@ -144,11 +146,11 @@
                                                 <tr>
                                                     <td colspan="7" class="px-4 pt-4 pb-2">
                                                         <div
-                                                            class="inline-flex flex-wrap items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
+                                                            class="inline-flex flex-wrap items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 shadow-sm ring-1 ring-emerald-100 dark:ring-emerald-900/60">
                                                             <span
-                                                                class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400"></span>
+                                                                class="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
                                                             <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
+                                                                class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
                                                                 GENERACIÓN:
                                                                 {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
                                                                 -
@@ -157,7 +159,7 @@
                                                             <span
                                                                 class="text-xs font-medium text-gray-600 dark:text-gray-400">|</span>
                                                             <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
+                                                                class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
                                                                 CICLO ESCOLAR:
                                                                 {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? '---' }}
                                                                 -
@@ -173,11 +175,11 @@
 
                                             {{-- Fila principal del periodo --}}
                                             <tr
-                                                class="transition-colors duration-150 odd:bg-slate-50/80 even:bg-white dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40">
+                                                class="transition-colors duration-150 odd:bg-slate-50/80 even:bg-white dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40">
                                                 <!-- # -->
                                                 <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
                                                     <span
-                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-100 dark:ring-indigo-800">
+                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-100 dark:ring-emerald-800">
                                                         {{ $key + 1 + ($periodosBachilleratos->currentPage() - 1) * $periodosBachilleratos->perPage() }}
                                                     </span>
                                                 </td>
@@ -194,6 +196,10 @@
                                                     {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
                                                     -
                                                     {{ $periodoBachillerato->generacion->anio_egreso ?? '---' }}
+                                                </td>
+                                                <!-- Semestre -->
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $periodoBachillerato->semestre->numero ?? '---' }}° Semestre
                                                 </td>
 
                                                 <!-- Meses -->
@@ -257,10 +263,10 @@
                                 {{-- Header de generación también en mobile --}}
                                 @if ($generacionId !== $generacionActualMobile)
                                     <div
-                                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
-                                        <span class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400"></span>
+                                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 shadow-sm ring-1 ring-emerald-100 dark:ring-emerald-900/60">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
                                         <span
-                                            class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
+                                            class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
                                             GENERACIÓN:
                                             {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
                                             -
@@ -277,7 +283,7 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="space-y-2">
                                             <div
-                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1 text-white text-xs font-medium shadow-sm">
+                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-sky-500 px-3 py-1 text-white text-xs font-medium shadow-sm">
                                                 <span>#{{ $key + 1 + ($periodosBachilleratos->currentPage() - 1) * $periodosBachilleratos->perPage() }}</span>
                                                 <span>
                                                     {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? 'Sin ciclo' }}

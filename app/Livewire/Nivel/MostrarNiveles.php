@@ -41,10 +41,16 @@ class MostrarNiveles extends Component
     #[On('refreshNiveles')]
     public function render()
     {
-        $niveles = Nivel::with(['director', 'supervisor'] )
+        $niveles = Nivel::with(['director', 'supervisor'])
             ->when($this->search, function ($query) {
                 $query->where('nombre', 'like', "%{$this->search}%")
-                    ->orWhere('cct', 'like', "%{$this->search}%");
+                    ->orWhere('cct', 'like', "%{$this->search}%")
+                    ->orWhereHas('director', function ($q) {
+                        $q->where('nombre', 'like', "%{$this->search}%");
+                    })
+                    ->orWhereHas('supervisor', function ($q) {
+                        $q->where('nombre', 'like', "%{$this->search}%");
+                    });
             })
             ->orderBy('id')
             ->paginate(10);

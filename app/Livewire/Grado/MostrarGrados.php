@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Grado;
 
+use App\Models\Nivel;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -34,7 +35,9 @@ class MostrarGrados extends Component
             ->orderBy('nivel_id')
             ->orderBy('nombre')
             ->paginate(10);
+        $niveles = Nivel::with(['director', 'supervisor', 'grados'])->paginate(10);
 
-        return view('livewire.grado.mostrar-grados', compact('grados'));
+
+        return view('livewire.grado.mostrar-grados', compact('grados', 'niveles'));
     }
 }

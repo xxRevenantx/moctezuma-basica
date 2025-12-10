@@ -27,7 +27,7 @@
     <div
         class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow">
         <!-- Acabado superior -->
-        <div class="h-1 w-full bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-600"></div>
+        <div class="h-1 w-full table-gradient"></div>
 
         <!-- Toolbar -->
         <div class="p-4 sm:p-5 lg:p-6">
@@ -82,8 +82,7 @@
                         class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
                         <div class="overflow-x-auto max-h-[65vh]">
                             <table class="min-w-full text-sm">
-                                <thead
-                                    class="sticky top-0 z-10 bg-gradient-to-r from-indigo-600 via-sky-500 to-blue-600 text-white shadow-sm">
+                                <thead class="sticky top-0 z-10 table-gradient">
                                     <tr>
                                         <th
                                             class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide border-r border-white/10">
