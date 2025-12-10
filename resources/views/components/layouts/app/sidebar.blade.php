@@ -148,6 +148,10 @@
                             :current="request()->routeIs('misrutas.semestres')" wire:navigate>
                             Semestres
                         </flux:navlist.item>
+                        <flux:navlist.item icon="home" :href="route('misrutas.periodos-bachillerato')"
+                            :current="request()->routeIs('misrutas.periodos-bachillerato')" wire:navigate>
+                            Periodos Bachi
+                        </flux:navlist.item>
 
                     </flux:sidebar.group>
 

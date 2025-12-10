@@ -32,4 +32,10 @@ class Generacion extends Model
     {
         return $this->hasMany(Grupo::class);
     }
+
+    // RELACIONES CON PERIODOS BACHILLERATO
+    public function periodosBachillerato()
+    {
+        return $this->hasMany(PeriodosBachillerato::class);
+    }
 }

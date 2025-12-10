@@ -18,4 +18,10 @@ class MesesBachillerato extends Model
     {
         return $this->hasMany(Semestre::class, 'mes_id');
     }
+
+    //RELACION CON PERIODOS BACHILLERATO
+    public function periodosBachillerato()
+    {
+        return $this->hasMany(PeriodosBachillerato::class, 'mes_id');
+    }
 }

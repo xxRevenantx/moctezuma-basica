@@ -34,4 +34,9 @@ class Semestre extends Model
     {
         return $this->hasMany(Grupo::class);
     }
+    // RELACION CON PERIODOS DE BACHILLERATO
+    public function periodosBachillerato()
+    {
+        return $this->hasMany(PeriodosBachillerato::class);
+    }
 }

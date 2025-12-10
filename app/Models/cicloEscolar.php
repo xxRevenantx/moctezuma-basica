@@ -26,4 +26,9 @@ class cicloEscolar extends Model
     {
         return $this->hasMany(Periodo::class, 'ciclo_escolar_id');
     }
+
+    public function periodosBachillerato()
+    {
+        return $this->hasMany(PeriodosBachillerato::class, 'ciclo_escolar_id');
+    }
 }

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
+use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\SemestreController;
 
@@ -40,3 +41,6 @@ Route::get('/grupos', [GrupoController::class, 'index'])->name('misrutas.grupos'
 
 // RUTAS DE PERIODOS BASICA
 Route::get('/periodos-basica', [PeriodosBasicoController::class, 'index'])->name('misrutas.periodos-basica');
+
+// RUTAS DE PERIODOS BACHILLERATO
+Route::get('/periodos-bachillerato', [PeriodosBachilleratoController::class, 'index'])->name('misrutas.periodos-bachillerato');
