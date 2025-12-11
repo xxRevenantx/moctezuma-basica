@@ -9,9 +9,11 @@ use Livewire\WithPagination;
 
 class MostrarGrupos extends Component
 {
-     use WithPagination;
+    use WithPagination;
 
     public $search = '';
+
+    protected $paginationTheme = 'tailwind';
 
     // Cuando cambie el buscador, regresa a la página 1
     public function updatingSearch()
@@ -22,8 +24,30 @@ class MostrarGrupos extends Component
     #[On('refreshGrupos')]
     public function render()
     {
-        $grupos = Grupo::where('nombre', 'like', '%' . $this->search . '%')->paginate(10);
+        $grupos = Grupo::with(['nivel', 'grado', 'generacion', 'semestre'])
+            ->where('nombre', 'like', '%' . $this->search . '%')
+            ->orderBy('nivel_id', 'asc')
+            ->orderBy('nombre', 'asc')
+            ->paginate(12);
 
-        return view('livewire.grupo.mostrar-grupos', compact('grupos'));
+        // Colección de la página actual
+        $collection = $grupos->getCollection();
+
+        // Agrupar por nombre de nivel
+        $groupedByNivel = $collection->groupBy(function ($g) {
+            return optional($g->nivel)->nombre ?? 'Sin nivel asignado';
+        });
+
+        $totalGrupos    = $grupos->total();
+        $totalNiveles   = $collection->pluck('nivel_id')->filter()->unique()->count();
+        $gruposSinNivel = $collection->whereNull('nivel_id')->count();
+
+        return view('livewire.grupo.mostrar-grupos', [
+            'grupos'          => $grupos,
+            'groupedByNivel'  => $groupedByNivel,
+            'totalGrupos'     => $totalGrupos,
+            'totalNiveles'    => $totalNiveles,
+            'gruposSinNivel'  => $gruposSinNivel,
+        ]);
     }
 }

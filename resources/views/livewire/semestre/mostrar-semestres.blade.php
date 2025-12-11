@@ -15,19 +15,25 @@
 }" class="space-y-5">
     <!-- Encabezado -->
     <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Semestres</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Semestres
+        </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
             Busca, edita o elimina semestres educativos.
         </p>
 
-
+        <div
+            class="inline-flex items-center gap-2 text-xs rounded-full bg-amber-50 text-amber-800 dark:bg-amber-900/40 dark:text-amber-100 px-3 py-1 ring-1 ring-amber-100/70 dark:ring-amber-800/60 w-fit">
+            <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span>Los semestres aplican únicamente para el nivel Bachillerato.</span>
+        </div>
     </div>
 
     <!-- Contenedor listado -->
     <div
-        class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow">
+        class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 shadow-xl">
         <!-- Acabado superior -->
-        <div class="h-1 w-full table-gradient"></div>
+        <div class="h-1 w-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"></div>
 
         <!-- Toolbar -->
         <div class="p-4 sm:p-5 lg:p-6">
@@ -38,12 +44,12 @@
                     <flux:input id="buscar-semestre" type="text" wire:model.live="search" placeholder="Buscar…"
                         icon="magnifying-glass" class="w-full" />
                 </div>
-                {{ $semestres }}
+
                 <!-- Resumen -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 justify-end">
                     <div
-                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50 dark:bg-neutral-700">
-                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50/80 dark:bg-neutral-800/80 backdrop-blur">
+                        <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                             Resultados:
                             <strong>{{ method_exists($semestres, 'total') ? $semestres->total() : $semestres->count() }}</strong>
@@ -59,10 +65,10 @@
 
                 <!-- Loader -->
                 <div wire:loading.delay wire:target="search, eliminar"
-                    class="absolute inset-0 z-10 grid place-items-center rounded-xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
+                    class="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
                     aria-live="polite" aria-busy="true">
                     <div
-                        class="flex items-center gap-3 rounded-xl bg-white dark:bg-neutral-900 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-800 shadow">
+                        class="flex items-center gap-3 rounded-xl bg-white dark:bg-neutral-900 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-800 shadow-lg">
                         <svg class="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" viewBox="0 0 24 24"
                             fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
@@ -73,203 +79,107 @@
                     </div>
                 </div>
 
-                <!-- ⬇️ Contenido que se desenfoca mientras se busca/carga -->
+                <!-- Contenido (cards) -->
                 <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
 
-                    <!-- Tabla (desktop) -->
-                    {{ $semestres }}
-                    <div
-                        class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
-                        <div class="overflow-x-auto max-h-[65vh]">
-                            <table class="min-w-full text-sm">
-                                <thead class="sticky top-0 z-10 table-gradient">
-                                    <tr>
-                                        <th
-                                            class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            #
-                                        </th>
-                                        <th
-                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Semestre
-                                        </th>
-                                        <th
-                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Grado Educativo
-                                        </th>
-
-                                        <th
-                                            class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide border-r border-white/10">
-                                            Meses
-                                        </th>
-                                        <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
-                                            Acciones
-                                        </th>
-                                    </tr>
-                                </thead>
-
-
-                                <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
-                                    @if ($semestres->isEmpty())
-                                        <tr>
-                                            <td colspan="9"
-                                                class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                                <div class="mx-auto w-full max-w-md">
-                                                    <div
-                                                        class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 bg-white/70 dark:bg-neutral-900/70">
-                                                        <div
-                                                            class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
-                                                            No hay semestres disponibles
-                                                        </div>
-                                                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                            Ajusta tu búsqueda.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @else
-                                        @php
-                                            $nivelActual = null;
-                                        @endphp
-
-                                        @foreach ($semestres as $key => $semestre)
-                                            @php
-                                                $nivelId = optional($semestre->grado->nivel)->id;
-                                            @endphp
-
-                                            {{-- Fila de cabecera de grupo por nivel --}}
-                                            @if ($nivelId !== $nivelActual)
-                                                <tr>
-                                                    <td colspan="4" class="px-4 py-2">
-                                                        <div
-                                                            class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
-                                                            <span
-                                                                class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400"></span>
-                                                            <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200">
-                                                                BACHILLERATO
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                @php
-                                                    $nivelActual = $nivelId;
-                                                @endphp
-                                            @endif
-
-                                            {{-- Fila principal del grado --}}
-                                            <tr
-                                                class="transition-colors duration-150 odd:bg-slate-50/80 even:bg-white dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40">
-                                                <!-- # -->
-                                                <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
-                                                    <span
-                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-100 dark:ring-indigo-800">
-                                                        {{ $key + 1 }}
-                                                    </span>
-                                                </td>
-
-                                                <!-- Grado -->
-                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    <div class="flex flex-col">
-                                                        <span class="font-semibold">
-                                                            {{ $semestre->numero ? $semestre->numero . '° SEMESTRE' : '---' }}
-                                                        </span>
-                                                    </div>
-                                                </td>
-
-                                                <!-- Nivel -->
-                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-900/40 px-3 py-1 text-xs font-medium text-sky-700 dark:text-sky-200 ring-1 ring-sky-100 dark:ring-sky-800">
-
-                                                        {{ $semestre->grado->nombre ? $semestre->grado->nombre . '° GRADO' : '---' }}
-                                                    </span>
-                                                </td>
-                                                <!-- Meses -->
-                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/40 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-200 ring-1 ring-green-100 dark:ring-green-800">
-
-                                                        {{ $semestre->mesesBachillerato->meses ?? '---' }}
-                                                    </span>
-                                                </td>
-
-                                                <!-- Acciones -->
-                                                <td class="px-4 py-3">
-                                                    <div class="flex items-center justify-center gap-2">
-                                                        <flux:button variant="primary"
-                                                            class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                            @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $semestre->id }} });
-                                                            ">
-                                                            <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                            <!-- ícono -->
-                                                        </flux:button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @endif
-                                </tbody>
-                            </table>
-
-                        </div>
-                    </div>
-
-                    <!-- Tarjetas (mobile) -->
-                    <div class="md:hidden space-y-3">
-                        @if ($semestres->isEmpty())
-                            <div
-                                class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
-                                <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">
-                                    No hay semestres disponibles
-                                </div>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    Ajusta tu búsqueda o importa datos.
-                                </p>
+                    @if ($semestres->isEmpty())
+                        <div
+                            class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-8 bg-white/80 dark:bg-neutral-900/80 text-center max-w-md mx-auto">
+                            <div class="mb-2 text-base font-semibold text-gray-800 dark:text-gray-100">
+                                No hay semestres disponibles
                             </div>
-                        @else
-                            @foreach ($semestres as $key => $semestre)
-                                <div
-                                    class="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm">
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div class="space-y-2">
-                                            <div
-                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1 text-white text-xs font-medium shadow-sm">
-                                                <span>#{{ $key + 1 }}</span>
-                                            </div>
-                                            <div>
-                                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                                    {{ $semestre->grado->nombre ?: '---' }}
-                                                </h2>
-                                                <p class="text-sm text-gray-700 dark:text-gray-300">
-                                                    Nivel: {{ $semestre->grado->nivel->nombre ?: '---' }}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <span
-                                                    class="inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-900/40 px-3 py-1 text-xs font-medium text-sky-700 dark:text-sky-200 ring-1 ring-sky-100 dark:ring-sky-800">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Ajusta tu búsqueda o registra nuevos semestres.
+                            </p>
+                        </div>
+                    @else
+                        <div class="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 auto-rows-fr">
 
-                                                    {{ $semestre->numero ? $semestre->numero . '° SEMESTRE' : '---' }}
+                            @foreach ($semestres as $key => $semestre)
+                                @php
+                                    $grado = $semestre->grado ?? null;
+                                    $nivel = $grado?->nivel ?? null;
+                                @endphp
+
+                                <article
+                                    class="group relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-neutral-800/80 bg-gradient-to-b from-slate-50/80 via-white to-white dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                                    <!-- Barra superior -->
+                                    <div
+                                        class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500">
+                                    </div>
+
+                                    <div class="p-4 pt-5 sm:p-5 flex flex-col h-full">
+                                        <!-- Header: etiqueta y número -->
+                                        <div class="flex items-start justify-between gap-3 mb-3">
+                                            <div class="space-y-1">
+                                                <div
+                                                    class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1 text-[11px] font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-100/80 dark:ring-indigo-900/60">
+                                                    <span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                                                    <span>Semestre #{{ $key + 1 }}</span>
+                                                </div>
+
+                                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                                    {{ $semestre->numero ? $semestre->numero . '° Semestre' : 'Semestre sin número' }}
+                                                </h2>
+                                            </div>
+
+                                            <div
+                                                class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 dark:bg-sky-900/40 ring-1 ring-sky-100 dark:ring-sky-800 text-sky-700 dark:text-sky-200 text-xs font-semibold">
+                                                {{ $grado?->nombre ? $grado->nombre . '°' : '--' }}
+                                            </div>
+                                        </div>
+
+                                        <!-- Info principal -->
+                                        <div class="space-y-2 text-sm mb-4 flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-900/40 px-2.5 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-200 ring-1 ring-sky-100 dark:ring-sky-800">
+                                                    <flux:icon.academic-cap class="w-3.5 h-3.5 mr-1" />
+                                                    {{ $nivel->nombre ?? 'Bachillerato' }}
+                                                </span>
+                                            </div>
+
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span
+                                                    class="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-100 dark:ring-emerald-800">
+                                                    <flux:icon.calendar class="w-3.5 h-3.5 mr-1" />
+                                                    Meses:
+                                                    {{ $semestre->mesesBachillerato->meses ?? 'Sin asignar' }}
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <div class="flex items-center justify-center gap-2">
-                                            <flux:button variant="primary"
-                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $semestre->id }} });
-                                                            ">
-                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                <!-- ícono -->
-                                            </flux:button>
+                                        <!-- Footer acciones -->
+                                        <div
+                                            class="mt-auto pt-3 border-t border-dashed border-gray-200 dark:border-neutral-800 flex items-center justify-between gap-3">
+                                            <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                                                ID: <span class="font-mono text-gray-700 dark:text-gray-200">
+                                                    {{ $semestre->id }}
+                                                </span>
+                                            </div>
+
+                                            <div class="flex items-center gap-2">
+                                                <flux:button variant="primary" size="xs"
+                                                    class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                                                    @click="$dispatch('abrir-modal-editar');
+                                                        Livewire.dispatch('editarModal', { id: {{ $semestre->id }} });
+                                                    ">
+                                                    <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                                    <span class="hidden sm:inline-block text-xs">Editar</span>
+                                                </flux:button>
+
+                                                <flux:button variant="ghost" size="xs"
+                                                    class="text-red-500 hover:text-red-600 hover:bg-red-50/70 dark:hover:bg-red-900/30"
+                                                    @click="eliminar({{ $semestre->id }}, '{{ $semestre->numero ? $semestre->numero . '° Semestre' : 'Semestre' }}')">
+                                                    <flux:icon.trash-2 class="w-3.5 h-3.5" />
+                                                </flux:button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                </article>
                             @endforeach
-                        @endif
-                    </div>
+                        </div>
+                    @endif
                 </div>
 
                 <!-- Paginación -->
