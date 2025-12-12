@@ -95,6 +95,9 @@
                                     type="text" placeholder="Ej.: Zona 021, Zona Altamirano, etc."
                                     autocomplete="off" />
 
+                                <flux:input badge="Opcional" wire:model="sector" :label="__('Sector')" type="text"
+                                    placeholder="Ej.: 01, 02.." autocomplete="off" />
+
                                 <flux:input badge="Opcional" wire:model="telefono" :label="__('Teléfono')"
                                     type="text" placeholder="Teléfono" autocomplete="tel" />
 

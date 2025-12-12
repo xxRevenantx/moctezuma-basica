@@ -14,6 +14,8 @@ class EditarGeneracion extends Component
     public $anio_egreso;
     public $nivel_id;
 
+    public $status;
+
 
 
     #[On('editarModal')]
@@ -24,6 +26,8 @@ class EditarGeneracion extends Component
         $this->anio_ingreso = $generacion->anio_ingreso;
         $this->anio_egreso = $generacion->anio_egreso;
         $this->nivel_id = $generacion->nivel_id;
+
+        $this->status = $generacion->status == 1 ? true : false;
 
 
         $this->open = true;
@@ -37,6 +41,7 @@ class EditarGeneracion extends Component
             'anio_ingreso' => 'required|integer|min:0|digits:4',
             'anio_egreso' => 'required|integer|min:0|digits:4|gt:anio_ingreso',
             'nivel_id' => 'required|exists:niveles,id',
+            'status' => 'boolean',
         ], [
             'anio_ingreso.required' => 'La fecha de inicio es obligatorio.',
             'anio_ingreso.integer' => 'La fecha de inicio debe ser un número entero.',
@@ -78,6 +83,7 @@ class EditarGeneracion extends Component
             'anio_ingreso' => $this->anio_ingreso,
             'anio_egreso' => $this->anio_egreso,
             'nivel_id' => $this->nivel_id,
+           'status' => $this->status ? 1 : 0,
         ]);
 
         $this->dispatch('swal', [
@@ -100,7 +106,8 @@ class EditarGeneracion extends Component
             'generacionId',
             'anio_ingreso',
             'anio_egreso',
-            'nivel_id'
+            'nivel_id',
+            'status'
         ]);
             $this->resetValidation();
     }

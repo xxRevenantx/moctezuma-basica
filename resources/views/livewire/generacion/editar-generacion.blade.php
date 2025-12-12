@@ -76,7 +76,7 @@
 
 
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
 
                     <flux:input label="Fecha de inicio" placeholder="2020" wire:model.live="anio_ingreso"
@@ -92,6 +92,11 @@
                             </flux:select.option>
                         @endforeach
                     </flux:select>
+
+                    <div class="flex  items-center align-items">
+                        <flux:checkbox wire:model="status" label="Status" />
+                    </div>
+
 
                 </div>
 

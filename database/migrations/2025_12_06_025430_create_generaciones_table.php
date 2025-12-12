@@ -26,8 +26,7 @@ return new class extends Migration
 
 
             // Estado de la generación
-            $table->enum('status', ['activa', 'egresada', 'inactiva'])
-                ->default('activa');
+            $table->boolean('status')->default(true);
 
             // Comentarios generales
             $table->text('observaciones')->nullable();

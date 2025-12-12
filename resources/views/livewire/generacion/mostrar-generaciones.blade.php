@@ -226,7 +226,7 @@
                                                                 </span>
                                                             </div>
 
-                                                            @if ($generacion->status === 'activa')
+                                                            @if ($generacion->status === 1)
                                                                 <span
                                                                     class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-100 dark:ring-emerald-800">
                                                                     <span
