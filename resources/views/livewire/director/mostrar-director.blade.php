@@ -242,6 +242,14 @@
                                                                 {{ $directivo->zona_escolar ?: '---' }}
                                                             </p>
                                                         </div>
+                                                        <div class="space-y-0.5">
+                                                            <p class="font-semibold text-gray-900 dark:text-white">
+                                                                Sector
+                                                            </p>
+                                                            <p class="text-xs">
+                                                                {{ $directivo->sector ?: '---' }}
+                                                            </p>
+                                                        </div>
 
 
                                                         <div class="space-y-0.5">

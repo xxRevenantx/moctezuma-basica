@@ -16,12 +16,13 @@ return new class extends Migration
             $table->string('titulo');
             $table->string('nombre');
             $table->string('apellido_paterno');
-            $table->string('apellido_materno');
+            $table->string('apellido_materno')->nullable();
             $table->string('curp', 18)->unique()->nullable();
             $table->string('rfc')->unique()->nullable();
             $table->string('cargo');
             $table->string('identificador');
             $table->string('zona_escolar')->nullable();
+            $table->string('sector')->nullable();
             $table->string('telefono', 10)->nullable();
             $table->string('correo')->nullable();
             $table->enum('genero', ['M', 'F']);

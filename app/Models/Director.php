@@ -21,6 +21,7 @@ class Director extends Model
         'cargo',
         'identificador',
         'zona_escolar',
+        'sector',
         'telefono',
         'correo',
         'genero',
