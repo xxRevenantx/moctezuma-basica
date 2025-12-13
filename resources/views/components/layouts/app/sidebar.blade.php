@@ -103,9 +103,14 @@
                             Ciclos Escolares
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.directivos')"
-                            :current="request()->routeIs('misrutas.directivos')" wire:navigate>
-                            Personal directivo
+                        <flux:navlist.item icon="home" :href="route('misrutas.supervisores')"
+                            :current="request()->routeIs('misrutas.supervisores')" wire:navigate>
+                            Supervisores
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.personal')"
+                            :current="request()->routeIs('misrutas.personal')" wire:navigate>
+                            Personal
                         </flux:navlist.item>
 
                         <flux:navlist.item icon="home" :href="route('misrutas.niveles')"

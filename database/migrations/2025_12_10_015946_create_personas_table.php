@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::create('personas', function (Blueprint $table) {
             $table->id();
-                // Datos de identificación
+            // Datos de identificación
             $table->string('nombre');
             $table->string('apellido_paterno');
             $table->string('apellido_materno')->nullable();
             $table->string('foto')->nullable();
 
-            $table->string('curp', 18)->nullable()->unique();
+            $table->string('curp', 18)->unique();
             $table->string('rfc', 13)->nullable()->unique();
 
             // Contacto

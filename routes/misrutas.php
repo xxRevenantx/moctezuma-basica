@@ -10,6 +10,7 @@ use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
+use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\SemestreController;
 
 
@@ -24,7 +25,10 @@ Route::get('/ciclos-escolares', [CicloEscolarController::class, 'index'])->name(
 Route::get('/escuela', [EscuelaController::class, 'index'])->name('misrutas.escuela');
 
 // RUTA DIRECTIVOS
-Route::get('/directivos', [DirectorController::class, 'index'])->name('misrutas.directivos');
+Route::get('/supervisores', [DirectorController::class, 'index'])->name('misrutas.supervisores');
+
+// PERSONAL
+Route::get('/personal', [PersonaController::class, 'index'])->name('misrutas.personal');
 
 // RUTAS DE GRADOS
 Route::get('/grados', [GradoController::class, 'index'])->name('misrutas.grados');
