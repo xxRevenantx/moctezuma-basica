@@ -46,4 +46,10 @@ class Nivel extends Model
     {
         return $this->hasMany(Grupo::class);
     }
+
+    public function personaNiveles()
+{
+    return $this->hasMany(\App\Models\PersonaNivel::class);
+}
+
 }

@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             MesesBachilleratoSeeder::class,
             SemestreSeeder::class,
             PeriodoSeeder::class,
+            RolePersonaSeeder::class,
         ]);
     }
 }

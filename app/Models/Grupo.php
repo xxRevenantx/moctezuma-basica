@@ -36,4 +36,32 @@ class Grupo extends Model
         return $this->belongsTo(Semestre::class);
     }
 
+public function docentesGrupo()
+{
+    return $this->hasMany(\App\Models\DocenteGrupo::class, 'grupo_id');
+}
+
+public function docentes()
+{
+    return $this->belongsToMany(\App\Models\Persona::class, 'docente_grupo', 'grupo_id', 'persona_id')
+        ->withPivot(['ciclo_escolar_id', 'es_tutor'])
+        ->withTimestamps();
+}
+
+// Docentes por ciclo escolar
+public function docentesPorCiclo(int $cicloEscolarId)
+{
+    return $this->docentes()->wherePivot('ciclo_escolar_id', $cicloEscolarId);
+}
+
+// Tutor por ciclo escolar
+public function tutorPorCiclo(int $cicloEscolarId)
+{
+    return $this->docentes()
+        ->wherePivot('ciclo_escolar_id', $cicloEscolarId)
+        ->wherePivot('es_tutor', true);
+}
+
+
+
 }
