@@ -8,67 +8,95 @@ use Livewire\WithFileUploads;
 
 class CrearPersonal extends Component
 {
-    public $nombre, $apellido_paterno, $apellido_materno, $foto;
-    public $curp, $rfc, $correo, $telefono_movil, $telefono_fijo;
-    public $fecha_nacimiento, $genero, $grado_estudios, $especialidad;
+    public $nombre;
+
+    public $apellido_paterno;
+
+    public $apellido_materno;
+
+    public $foto;
+
+    public $curp;
+
+    public $rfc;
+
+    public $correo;
+
+    public $telefono_movil;
+
+    public $telefono_fijo;
+
+    public $fecha_nacimiento;
+
+    public $genero;
+
+    public $grado_estudios;
+
+    public $especialidad;
+
     public $status = true;
-    public $calle, $numero_exterior, $numero_interior, $colonia, $municipio, $estado, $codigo_postal;
+
+    public $calle;
+
+    public $numero_exterior;
+
+    public $numero_interior;
+
+    public $colonia;
+
+    public $municipio;
+
+    public $estado;
+
+    public $codigo_postal;
+
     public $datosCurp = [];
 
     use WithFileUploads;
 
-
-
-    public function updated($propertyName)
+    public function updatedCurp($value)
     {
-        if ($propertyName === 'curp') {
+        $curp = strtoupper(trim($value));
+        $this->curp = $curp;
 
-            if (!$this->curp) {
-                // Reiniciar campos si no hay usuario seleccionado
-                $this->reset([
-                    'nombre',
-                    'apellido_paterno',
-                    'apellido_materno',
-                    'usuario_email',
-                    'CURP',
-                    'datosCurp',
+        if (! $curp || strlen($curp) < 18) {
+            $this->reset([
+                'nombre',
+                'apellido_paterno',
+                'apellido_materno',
+                'datosCurp',
+            ]);
 
-                ]);
-                return;
-            }
-
-            $this->usuarios = User::role('Profesor')
-                ->whereNotIn('id', Profesor::pluck('user_id'))
-                ->where('status', "true")
-                ->orderBy('id', 'desc')
-                ->get();
-
-            $this->usuario_email = User::where('id', $this->user_id)->value('email');
-            $this->CURP = User::where('id', $this->user_id)->value('CURP');
-            $servicio = new CurpService();
-            $this->datosCurp = $servicio->obtenerDatosPorCurp($this->CURP);
-
-            // Validar que la respuesta sea válida y no haya error
-            if (!$this->datosCurp['error'] && isset($this->datosCurp['response'])) {
-                $info = $this->datosCurp['response']['Solicitante'];
-
-                $this->nombre = $info['Nombres'] ?? '';
-                $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
-                $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
-            } else {
-                // Enviar un mensaje de error si hay un problema con los datos de la CURP
-                $this->dispatch('swal', [
-                    'title' => 'Este CURP no se encuentra en RENAPO.',
-                    'icon' => 'error',
-                    'position' => 'top-end',
-                ]);
-            }
+            return;
         }
 
-        //  $this->validateOnly($propertyName);
+        // Dispara una acción para que wire:loading sea consistente
+        $this->consultarCurp();
     }
 
+    public function consultarCurp()
+    {
+        $servicio = new CurpService;
+        $this->datosCurp = $servicio->obtenerDatosPorCurp($this->curp);
 
+
+
+        if (! ($this->datosCurp['error'] ?? true) && isset($this->datosCurp['response'])) {
+            $info = $this->datosCurp['response']['Solicitante'] ?? [];
+
+            dd($info);
+
+            $this->nombre = $info['Nombres'] ?? '';
+            $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
+            $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
+        } else {
+            $this->dispatch('swal', [
+                'title' => 'Este CURP no se encuentra en RENAPO.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
 
     // CREAR PERSONA
     public function crearPersonal()
@@ -128,8 +156,6 @@ class CrearPersonal extends Component
             'municipio.max' => 'El municipio no debe superar los 255 caracteres.',
             'estado.max' => 'El estado no debe superar los 255 caracteres.',
             'codigo_postal.max' => 'El código postal no debe superar los 10 caracteres.',
-
-
 
         ]);
 

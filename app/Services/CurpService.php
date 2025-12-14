@@ -6,7 +6,11 @@ use Illuminate\Support\Facades\Http;
 
 class CurpService
 {
-    protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/';
+     // URL DE PRUEBAS
+    // protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/?token=pruebas&curp=XAXX010101XAXAXA00';
+
+    protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/?';
+
     protected $token = 'pruebas';
     // protected $token = '8d51c37a-87b1-40c9-8ae6-7b5651406d1f';
 
