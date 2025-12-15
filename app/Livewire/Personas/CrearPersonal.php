@@ -79,19 +79,18 @@ class CrearPersonal extends Component
         $servicio = new CurpService;
         $this->datosCurp = $servicio->obtenerDatosPorCurp($this->curp);
 
-
-
         if (! ($this->datosCurp['error'] ?? true) && isset($this->datosCurp['response'])) {
             $info = $this->datosCurp['response']['Solicitante'] ?? [];
 
-           // dd($info);
+            // dd($info);
 
             $this->nombre = $info['Nombres'] ?? '';
             $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
             $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
             $this->fecha_nacimiento = isset($info['FechaNacimiento']) ? date('Y-m-d', strtotime($info['FechaNacimiento'])) : '';
-            // $this->genero = $info['ClaveSexo'] ?? '';
+            $this->genero = $info['ClaveSexo'] === "H" ? "H" : "M";
 
+            $this->rfc = substr($this->curp, 0, 10);
         } else {
             $this->dispatch('swal', [
                 'title' => 'Este CURP no se encuentra en RENAPO.',
@@ -134,6 +133,8 @@ class CrearPersonal extends Component
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'curp.required' => 'La CURP es obligatoria.',
+            'curp.size' => 'La CURP debe tener 18 caracteres.',
+            'curp.unique' => 'La CURP ya está registrada.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
             'curp.unique' => 'La CURP ya está registrada.',
@@ -160,10 +161,73 @@ class CrearPersonal extends Component
             'estado.max' => 'El estado no debe superar los 255 caracteres.',
             'codigo_postal.max' => 'El código postal no debe superar los 10 caracteres.',
 
+        ], []);
+
+
+        // Código para guardar la persona en la base de datos aquí...
+        $fotoPath = null;
+        if ($this->foto) {
+            $path = $this->foto->store('personal', 'public');
+            $fotoPath = basename($path);
+        }
+
+        \App\Models\Persona::create([
+            'nombre' => $this->nombre,
+            'apellido_paterno' => $this->apellido_paterno,
+            'apellido_materno' => $this->apellido_materno,
+            'foto' => $fotoPath,
+            'curp' => $this->curp,
+            'rfc' => $this->rfc,
+            'correo' => $this->correo,
+            'telefono_movil' => $this->telefono_movil,
+            'telefono_fijo' => $this->telefono_fijo,
+            'fecha_nacimiento' => $this->fecha_nacimiento,
+            'genero' => $this->genero,
+            'grado_estudios' => $this->grado_estudios,
+            'especialidad' => $this->especialidad,
+            'status' => $this->status,
+            'calle' => $this->calle,
+            'numero_exterior' => $this->numero_exterior,
+            'numero_interior' => $this->numero_interior,
+            'colonia' => $this->colonia,
+            'municipio' => $this->municipio,
+            'estado' => $this->estado,
+            'codigo_postal' => $this->codigo_postal,
         ]);
 
-        // Lógica para crear la persona en la base de datos
 
+
+        $this->dispatch('swal', [
+            'title' => 'Personal creado exitosamente.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+
+        $this->reset([
+            'nombre',
+            'apellido_paterno',
+            'apellido_materno',
+            'foto',
+            'curp',
+            'rfc',
+            'correo',
+            'telefono_movil',
+            'telefono_fijo',
+            'fecha_nacimiento',
+            'genero',
+            'grado_estudios',
+            'especialidad',
+            'status',
+            'calle',
+            'numero_exterior',
+            'numero_interior',
+            'colonia',
+            'municipio',
+            'estado',
+            'codigo_postal',
+        ]);
+
+        $this->dispatch('refreshPersonal');
     }
 
     public function render()

@@ -182,34 +182,11 @@
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
                                     <div class="relative">
-                                        <flux:input wire:model.live="curp" maxlength="18"
-                                            class="uppercase pr-11" placeholder="18 caracteres" />
+                                        <flux:input wire:model.live="curp" maxlength="18" class="uppercase pr-11"
+                                            placeholder="18 caracteres" />
+                                        <flux:error name="curp" />
 
-                                        {{-- Icono/Loader en el input --}}
-                                        <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                                            <div wire:loading.flex wire:target="consultarCurp,curp"
-                                                class="items-center gap-2 rounded-full bg-indigo-600/10 dark:bg-indigo-400/10 px-2.5 py-1">
-                                                <svg class="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-300"
-                                                    viewBox="0 0 24 24" fill="none">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                        stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                                </svg>
-                                                <span
-                                                    class="text-[11px] font-semibold text-indigo-700 dark:text-indigo-200">RENAPO</span>
-                                            </div>
 
-                                            <div wire:loading.remove wire:target="consultarCurp,curp"
-                                                class="h-8 w-8 grid place-items-center rounded-full text-zinc-400">
-                                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M12 21a9 9 0 110-18 9 9 0 010 18z" />
-                                                </svg>
-                                            </div>
-                                        </div>
 
                                         {{-- Overlay sutil tipo “buscando datos” (solo sobre esta zona) --}}
                                         <div wire:loading.delay wire:target="consultarCurp"
