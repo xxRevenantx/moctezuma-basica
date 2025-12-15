@@ -84,11 +84,14 @@ class CrearPersonal extends Component
         if (! ($this->datosCurp['error'] ?? true) && isset($this->datosCurp['response'])) {
             $info = $this->datosCurp['response']['Solicitante'] ?? [];
 
-            dd($info);
+           // dd($info);
 
             $this->nombre = $info['Nombres'] ?? '';
             $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
             $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
+            $this->fecha_nacimiento = isset($info['FechaNacimiento']) ? date('Y-m-d', strtotime($info['FechaNacimiento'])) : '';
+            // $this->genero = $info['ClaveSexo'] ?? '';
+
         } else {
             $this->dispatch('swal', [
                 'title' => 'Este CURP no se encuentra en RENAPO.',
