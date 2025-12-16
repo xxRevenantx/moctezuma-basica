@@ -54,51 +54,99 @@ class CrearPersonal extends Component
 
     use WithFileUploads;
 
-    public function updatedCurp($value)
-    {
-        $curp = strtoupper(trim($value));
-        $this->curp = $curp;
+  public function updatedCurp($value)
+{
+    $curp = strtoupper(trim($value));
+    $this->curp = $curp;
 
-        if (! $curp || strlen($curp) < 18) {
-            $this->reset([
-                'nombre',
-                'apellido_paterno',
-                'apellido_materno',
-                'datosCurp',
-            ]);
-
-            return;
-        }
-
-        // Dispara una acción para que wire:loading sea consistente
-        $this->consultarCurp();
+    // Limpia mientras escribe o si está incompleto
+    if (! $curp || strlen($curp) < 18) {
+        $this->reset([
+            'nombre',
+            'apellido_paterno',
+            'apellido_materno',
+            'fecha_nacimiento',
+            'genero',
+            'rfc',
+            'datosCurp',
+        ]);
+        return;
     }
 
-    public function consultarCurp()
-    {
-        $servicio = new CurpService;
-        $this->datosCurp = $servicio->obtenerDatosPorCurp($this->curp);
+    // Si quieres: evita llamadas repetidas si pega el mismo valor
+    // if ($this->datosCurp && ($this->datosCurp['_curp'] ?? null) === $curp) return;
 
-        if (! ($this->datosCurp['error'] ?? true) && isset($this->datosCurp['response'])) {
-            $info = $this->datosCurp['response']['Solicitante'] ?? [];
+    $this->consultarCurp();
+}
 
-            // dd($info);
+public function consultarCurp()
+{
+    // ✅ Resetea estado previo (opcional)
+    $this->datosCurp = [];
 
-            $this->nombre = $info['Nombres'] ?? '';
-            $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
-            $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
-            $this->fecha_nacimiento = isset($info['FechaNacimiento']) ? date('Y-m-d', strtotime($info['FechaNacimiento'])) : '';
-            $this->genero = $info['ClaveSexo'] === "H" ? "H" : "M";
+    /** @var CurpService $servicio */
+    $servicio = app(CurpService::class);
 
-            $this->rfc = substr($this->curp, 0, 10);
-        } else {
-            $this->dispatch('swal', [
-                'title' => 'Este CURP no se encuentra en RENAPO.',
-                'icon' => 'error',
-                'position' => 'top-end',
-            ]);
-        }
+    $data = $servicio->obtenerDatosPorCurp($this->curp);
+
+    // Guarda respuesta completa por si quieres debug
+    $this->datosCurp = $data;
+    // $this->datosCurp['_curp'] = $this->curp;
+
+    if (($data['error'] ?? false) === true) {
+        // Limpia campos si falló
+        $this->reset([
+            'nombre',
+            'apellido_paterno',
+            'apellido_materno',
+            'fecha_nacimiento',
+            'genero',
+            'rfc',
+        ]);
+
+        $this->dispatch('swal', [
+            'title' => $data['message'] ?? 'No se pudo consultar el CURP',
+            'text'  => $data['detail'] ?? null,
+            'icon'  => 'error',
+            'position' => 'top-end',
+        ]);
+
+        return;
     }
+
+    // ✅ Según tu API, tú esperas: $data['response']['Solicitante']
+    $info = data_get($data, 'response.Solicitante', []);
+
+    // Si la API respondió "ok" pero no trajo solicitante
+    if (empty($info)) {
+        $this->dispatch('swal', [
+            'title' => 'Este CURP no se encuentra en RENAPO.',
+            'icon' => 'warning',
+            'position' => 'top-end',
+        ]);
+        return;
+    }
+
+    $this->nombre = $info['Nombres'] ?? '';
+    $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
+    $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
+
+    $fecha = $info['FechaNacimiento'] ?? null;
+    $this->fecha_nacimiento = $fecha ? date('Y-m-d', strtotime($fecha)) : '';
+
+    $sexo = $info['ClaveSexo'] ?? null;
+    $this->genero = ($sexo === 'H' || $sexo === 'M') ? $sexo : null;
+
+    $this->rfc = substr($this->curp, 0, 10);
+
+    $this->dispatch('swal', [
+        'title' => 'CURP consultado correctamente',
+        'icon' => 'success',
+        'position' => 'top-end',
+        'timer' => 1200,
+        'showConfirmButton' => false,
+    ]);
+}
 
     // CREAR PERSONA
     public function crearPersonal()

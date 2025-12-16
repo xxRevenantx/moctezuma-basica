@@ -9,7 +9,7 @@ class CurpService
     // URL DE PRUEBAS
     // protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/?token=pruebas&curp=XAXX010101XAXAXA00';
 
-    protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/?';
+    protected $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/';
 
     protected $token = 'pruebas';
 

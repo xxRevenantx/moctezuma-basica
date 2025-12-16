@@ -182,8 +182,8 @@
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
                                     <div class="relative">
-                                        <flux:input wire:model.live="curp" maxlength="18" class="uppercase pr-11"
-                                            placeholder="18 caracteres" />
+                                        <flux:input wire:model.live.debounce.500ms="curp" maxlength="18"
+                                            class="uppercase pr-11" placeholder="18 caracteres" />
                                         <flux:error name="curp" />
 
 
