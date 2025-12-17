@@ -1,5 +1,24 @@
 <div x-data="{
     openRow: null,
+
+    // ===== Lightbox Foto =====
+    photoOpen: false,
+    photoSrc: '',
+    photoAlt: '',
+    openPhoto(src, alt = 'Foto') {
+        if (!src) return;
+        this.photoSrc = src;
+        this.photoAlt = alt;
+        this.photoOpen = true;
+        document.body.classList.add('overflow-hidden');
+        this.$nextTick(() => this.$refs.photoImg?.focus());
+    },
+    closePhoto() {
+        this.photoOpen = false;
+        document.body.classList.remove('overflow-hidden');
+    },
+
+    // ===== Eliminar =====
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
@@ -12,7 +31,8 @@
             confirmButtonText: 'Sí, eliminar'
         }).then((r) => r.isConfirmed && @this.call('eliminarPersonal', id))
     }
-}" class="space-y-5">
+}" @keydown.escape.window="closePhoto()" class="space-y-5">
+
     <!-- Encabezado -->
     <div class="flex flex-col gap-1">
         <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Personal</h1>
@@ -149,14 +169,26 @@
                                                 <!-- Foto -->
                                                 <td class="px-4 py-3">
                                                     @if ($persona->foto)
-                                                        <img src="{{ asset('storage/' . $persona->foto) }}"
-                                                            alt="Foto de {{ $persona->nombre }}"
-                                                            class="h-9 w-9 rounded-xl object-cover ring-1 ring-black/10"
-                                                            onerror="this.style.display='none'; this.parentElement.innerHTML='---';">
+                                                        @php
+                                                            $src = asset('storage/personal/' . $persona->foto);
+                                                            $alt = 'Foto de ' . $persona->nombre;
+                                                        @endphp
+
+                                                        <button type="button" class="group relative inline-flex"
+                                                            @click.stop="openPhoto(@js($src), @js($alt))"
+                                                            aria-label="Ver foto">
+                                                            <img src="{{ $src }}" alt="{{ $alt }}"
+                                                                class="h-9 w-9 rounded-xl object-cover ring-1 ring-black/10 dark:ring-white/10
+                                                                   transition duration-200 group-hover:scale-105 group-hover:ring-blue-500/40"
+                                                                onerror="this.closest('button').outerHTML='<span class=&quot;text-gray-500 dark:text-gray-400&quot;>---</span>';">
+                                                            <span
+                                                                class="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-blue-500/30"></span>
+                                                        </button>
                                                     @else
                                                         <span class="text-gray-500 dark:text-gray-400">---</span>
                                                     @endif
                                                 </td>
+
 
                                                 <!-- Datos -->
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
@@ -381,6 +413,53 @@
                 </div>
             </div>
         </div>
+
+        <!-- ===== Lightbox Foto (GLOBAL) ===== -->
+        <div x-show="photoOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            role="dialog" aria-modal="true">
+
+            <!-- Overlay -->
+            <button type="button" class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="closePhoto()"
+                aria-label="Cerrar"></button>
+
+            <!-- Panel -->
+            <div x-show="photoOpen" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100 blur-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100 blur-0"
+                x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
+                class="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/10 dark:bg-neutral-900 dark:ring-white/10"
+                @click.stop>
+
+                <!-- Top bar -->
+                <div
+                    class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600">
+                    <p class="text-sm font-semibold text-white" x-text="photoAlt"></p>
+                    <button type="button"
+                        class="rounded-xl bg-white/15 p-2 text-white hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        @click="closePhoto()" aria-label="Cerrar">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Imagen -->
+                <div class="p-4">
+                    <div class="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
+                        <img x-ref="photoImg" tabindex="-1" :src="photoSrc" :alt="photoAlt"
+                            class="max-h-[70vh] w-full object-contain select-none" x-data="{ zoom: false }"
+                            @dblclick="zoom = !zoom"
+                            :class="zoom ? 'scale-110 cursor-zoom-out' : 'scale-100 cursor-zoom-in'"
+                            style="transition: transform .25s ease;">
+                    </div>
+
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        Doble click para zoom • ESC para cerrar
+                    </p>
+                </div>
+            </div>
+        </div>
+
 
         <!-- Modal editar -->
         <livewire:personas.editar-personal />
