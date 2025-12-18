@@ -13,4 +13,10 @@ class PersonaController extends Controller
     {
         return view('persona.index');
     }
+
+
+    public function rolePersona()
+    {
+        return view('role-persona.index');
+    }
 }

@@ -30,6 +30,9 @@ Route::get('/supervisores', [DirectorController::class, 'index'])->name('misruta
 // PERSONAL
 Route::get('/personal', [PersonaController::class, 'index'])->name('misrutas.personal');
 
+// ROLE DEL PERSONAL
+Route::get('/roles-del-personal', [PersonaController::class, 'rolePersona'])->name('misrutas.role-persona');
+
 // RUTAS DE GRADOS
 Route::get('/grados', [GradoController::class, 'index'])->name('misrutas.grados');
 // RUTAS DE GENERACIONES

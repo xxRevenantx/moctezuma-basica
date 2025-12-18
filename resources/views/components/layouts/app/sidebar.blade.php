@@ -108,10 +108,18 @@
                             Supervisores
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.personal')"
-                            :current="request()->routeIs('misrutas.personal')" wire:navigate>
-                            Personal
-                        </flux:navlist.item>
+                        <flux:sidebar.group expandable heading="PERSONAL" class="grid text-xs gap-1 text-zinc-300">
+                            <flux:navlist.item icon="home" :href="route('misrutas.personal')"
+                                :current="request()->routeIs('misrutas.personal')" wire:navigate>
+                                Crear Persona
+                            </flux:navlist.item>
+                            <flux:navlist.item icon="home" :href="route('misrutas.role-persona')"
+                                :current="request()->routeIs('misrutas.role-persona')" wire:navigate>
+                                Roles
+                            </flux:navlist.item>
+                        </flux:sidebar.group>
+
+
 
                         <flux:navlist.item icon="home" :href="route('misrutas.niveles')"
                             :current="request()->routeIs('misrutas.niveles')" wire:navigate>
