@@ -71,11 +71,12 @@
                                     <flux:label class="sr-only">Seleccionar personal</flux:label>
 
                                     <flux:select wire:model.live="persona_id" placeholder="Selecciona personal…">
+                                        <flux:select.option value="">-- Ninguno --</flux:select.option>
                                         @foreach ($personal as $p)
-                                            <option value="{{ $p->id }}">
-                                                {{ $p->nombre }} {{ $p->apellido_paterno }}
+                                            <flux:select.option value="{{ $p->id }}"> {{ $p->nombre }}
+                                                {{ $p->apellido_paterno }}
                                                 {{ $p->apellido_materno }}
-                                            </option>
+                                            </flux:select.option>
                                         @endforeach
                                     </flux:select>
 
@@ -156,10 +157,10 @@
                                     <flux:label class="sr-only">Seleccionar rol</flux:label>
 
                                     <flux:select wire:model.live="role_persona_id" placeholder="Selecciona un rol…">
+                                        <flux:select.option value="">-- Ninguno --</flux:select.option>
                                         @foreach ($personaRoles as $r)
-                                            <option value="{{ $r->id }}">
-                                                {{ $r->nombre }}
-                                            </option>
+                                            <flux:select.option value="{{ $r->id }}"> {{ $r->nombre }}
+                                            </flux:select.option>
                                         @endforeach
                                     </flux:select>
 

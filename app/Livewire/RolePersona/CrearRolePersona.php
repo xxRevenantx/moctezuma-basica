@@ -30,7 +30,7 @@ class CrearRolePersona extends Component
         // Tabla pivot sugerida: persona_role_persona
         // Campos: persona_id, role_persona_id
         // ==========================
-        DB::table('persona_role_persona')->updateOrInsert(
+        DB::table('persona_role')->updateOrInsert(
             [
                 'persona_id' => $this->persona_id,
                 'role_persona_id' => $this->role_persona_id,
@@ -40,6 +40,14 @@ class CrearRolePersona extends Component
                 'created_at' => now(),
             ]
         );
+
+        $this->dispatch('swal', [
+            'title' => '¡Rol asignado correctamente!',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+
+        $this->dispatch('refreshRolePersona');
 
         // ==========================
         // OPCIÓN B (COLUMNA EN PERSONAS) ✅
