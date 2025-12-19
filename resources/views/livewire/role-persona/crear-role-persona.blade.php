@@ -110,6 +110,7 @@
                     <div class="lg:col-span-6">
                         <div
                             class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-gray-50/60 dark:bg-neutral-800/40 p-4 sm:p-5">
+
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex items-start gap-3">
                                     <div
@@ -131,25 +132,43 @@
                                     </div>
                                 </div>
 
-                                <div class="shrink-0">
-                                    @if ($role_persona_id)
-                                        <span
-                                            class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
+
+
+                                <div class="flex items-center gap-2">
+
+
+                                    <div class="shrink-0">
+                                        @if ($role_persona_id)
+                                            <span
+                                                class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
                                             bg-violet-50 text-violet-700 dark:bg-violet-900/25 dark:text-violet-200
                                             ring-1 ring-violet-600/15">
-                                            <span class="h-2 w-2 rounded-full bg-violet-500"></span>
-                                            Elegido
-                                        </span>
-                                    @else
-                                        <span
-                                            class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
+                                                <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                                Elegido
+                                            </span>
+                                        @else
+                                            <span
+                                                class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
                                             bg-white/80 dark:bg-neutral-900/60 text-gray-700 dark:text-gray-200
                                             ring-1 ring-black/5 dark:ring-white/10">
-                                            <span class="h-2 w-2 rounded-full bg-gray-400"></span>
-                                            Pendiente
-                                        </span>
-                                    @endif
+                                                <span class="h-2 w-2 rounded-full bg-gray-400"></span>
+                                                Pendiente
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <flux:button variant="primary" wire:click="crearNuevoRol">
+                                            <div class="flex items-center gap-2">
+                                                <flux:icon name="plus" class="h-4 w-4" />
+                                                Nuevo Rol
+                                            </div>
+
+
+                                        </flux:button>
+                                    </div>
                                 </div>
+
+
                             </div>
 
                             <div class="mt-4">

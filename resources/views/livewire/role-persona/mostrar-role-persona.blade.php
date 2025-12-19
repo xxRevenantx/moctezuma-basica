@@ -105,7 +105,6 @@
                                         <th class="px-4 py-3 text-left font-semibold">Apellido Materno</th>
                                         <th class="px-4 py-3 text-left font-semibold">Roles</th>
                                         <th class="px-4 py-3 text-center font-semibold">Status</th>
-                                        <th class="px-4 py-3 text-center font-semibold">Acciones</th>
                                     </tr>
                                 </thead>
 
@@ -161,6 +160,7 @@
 
                                                 <!-- Foto -->
                                                 <td class="px-4 py-3">
+
                                                     @if ($persona->foto)
                                                         @php
                                                             $src = asset('storage/personal/' . $persona->foto);
@@ -230,16 +230,7 @@
                                                     @endif
                                                 </td>
 
-                                                <!-- Acciones -->
-                                                <td class="px-4 py-3">
-                                                    <div class="flex items-center justify-center gap-2">
-                                                        <flux:button variant="primary"
-                                                            class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                            @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $persona->id }} });">
-                                                            <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                        </flux:button>
-                                                    </div>
-                                                </td>
+
                                             </tr>
 
                                             <!-- Detalles (opcional) -->
@@ -332,13 +323,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="flex items-center justify-center gap-2">
-                                            <flux:button variant="primary"
-                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $persona->id }} });">
-                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                            </flux:button>
-                                        </div>
+
                                     </div>
                                 </div>
                             @endforeach
@@ -393,7 +378,6 @@
             </div>
         </div>
 
-        <!-- Modal editar -->
-        <livewire:personas.editar-personal />
+
     </div>
 </div>
