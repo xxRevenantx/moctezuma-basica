@@ -2,53 +2,52 @@
 
 namespace App\Livewire\RolePersona;
 
-use App\Models\RolePersona;
+use App\Models\Persona;
+use App\Models\PersonaRole;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class MostrarRolePersona extends Component
 {
     use WithPagination;
 
-    use WithFileUploads;
-
-    public $search = '';
-
-    public $archivo;
-
-    public $erroresImportacion;
-
+    public string $search = '';
 
     public function updatingSearch()
     {
         $this->resetPage();
     }
 
-
-    public function eliminarPersonal($id)
+    public function eliminarRol(int $personaRoleId): void
     {
-        $personal = RolePersona::find($id);
-
-        if ($personal) {
-            $personal->delete();
-
-            $this->dispatch('swal', [
-                'title' => '¡Role de la Persona eliminado correctamente!',
-                'icon' => 'success',
-                'position' => 'top-end',
-            ]);
-        }
+        PersonaRole::whereKey($personaRoleId)->delete();
     }
 
     #[On('refreshRolePersona')]
     public function render()
     {
-        $rolesPersona = RolePersona::with('rolesPersona')
-            ->where('nombre', 'like', '%' . $this->search . '%')
-            ->orderBy('id', 'desc')
+        $s = trim($this->search);
+
+        $personas = Persona::query()
+            ->with(['personaRoles.rolePersona']) // trae pivote + rol
+            ->when($s !== '', function ($q) use ($s) {
+                $q->where(function ($qq) use ($s) {
+                    // buscar por persona
+                    $qq->where('nombre', 'like', "%{$s}%")
+                        ->orWhere('apellido_paterno', 'like', "%{$s}%")
+                        ->orWhere('apellido_materno', 'like', "%{$s}%")
+
+                        // buscar por rol (vía pivote)
+                        ->orWhereHas('personaRoles.rolePersona', function ($rq) use ($s) {
+                            $rq->where('nombre', 'like', "%{$s}%")
+                               ->orWhere('slug', 'like', "%{$s}%");
+                        });
+                });
+            })
+            ->latest('id')
             ->paginate(10);
-        return view('livewire.role-persona.mostrar-role-persona', compact('rolesPersona'));
+
+        return view('livewire.role-persona.mostrar-role-persona', compact('personas'));
     }
 }

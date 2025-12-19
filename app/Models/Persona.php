@@ -65,5 +65,13 @@ public function ciclosEscolares()
         ->withTimestamps();
 }
 
+// RELACION PERSONA ROLE
+public function personaRoles()
+{
+    return $this->hasMany(\App\Models\PersonaRole::class, 'persona_id');
+}
+
+
+
 
 }

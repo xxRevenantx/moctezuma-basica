@@ -18,56 +18,51 @@
         document.body.classList.remove('overflow-hidden');
     },
 
-    // ===== Eliminar =====
+    // ===== Eliminar pivote PersonaRole =====
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `El role ${nombre} se eliminará de forma permanente`,
+            text: `El rol ${nombre} se eliminará de forma permanente`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#2563EB',
             cancelButtonColor: '#EF4444',
             cancelButtonText: 'Cancelar',
             confirmButtonText: 'Sí, eliminar'
-        }).then((r) => r.isConfirmed && @this.call('eliminarPersonal', id))
+        }).then((r) => r.isConfirmed && @this.call('eliminarRol', id))
     }
 }" @keydown.escape.window="closePhoto()" class="space-y-5">
 
     <!-- Encabezado -->
     <div class="flex flex-col gap-1">
         <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Roles de la Persona</h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Busca, edita o elimina asignaciones rol ↔ persona.</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Busca, edita o elimina roles de la persona.</p>
     </div>
 
     <!-- Contenedor listado -->
     <div
-        class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow">
-        <!-- Acabado superior -->
+        class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow">
         <div class="h-1 w-full bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-600"></div>
 
         <!-- Toolbar -->
         <div class="p-4 sm:p-5 lg:p-6">
             <div class="flex flex-col gap-3 lg:gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                <!-- Buscador -->
                 <div class="w-full sm:max-w-xl">
-                    <label for="buscar-role-persona" class="sr-only">Buscar</label>
-                    <flux:input id="buscar-role-persona" type="text" wire:model.live.debounce.350ms="search"
-                        placeholder="Buscar por persona, rol o descripción…" icon="magnifying-glass" class="w-full" />
+                    <label for="buscar-role-persona" class="sr-only">Buscar Roles de la Persona</label>
+                    <flux:input id="buscar-role-persona" type="text" wire:model.live="search"
+                        placeholder="Buscar por nombre, apellido, rol o correo…" icon="magnifying-glass"
+                        class="w-full" />
                 </div>
 
-                <!-- Resumen -->
                 <div class="flex items-center gap-3">
                     <div
-                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50 dark:bg-neutral-800">
+                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50 dark:bg-neutral-700">
                         <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                        <span class="text-xs font-medium text-gray-700 dark:text-gray-200">
-                            Resultados:
-                            <strong>{{ method_exists($rolesPersona, 'total') ? $rolesPersona->total() : $rolesPersona->count() }}</strong>
+                        <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            Resultados: <strong>{{ $personas->total() }}</strong>
                         </span>
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -76,7 +71,7 @@
             <div class="relative">
 
                 <!-- Loader -->
-                <div wire:loading.delay wire:target="search, eliminarPersonal"
+                <div wire:loading.delay wire:target="search, eliminarRol"
                     class="absolute inset-0 z-10 grid place-items-center rounded-xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
                     aria-live="polite" aria-busy="true">
                     <div
@@ -91,71 +86,46 @@
                     </div>
                 </div>
 
-                <!-- Contenido con blur -->
+                <!-- Contenido que se desenfoca -->
                 <div class="transition filter duration-200" wire:loading.class="blur-sm"
-                    wire:target="search, eliminarPersonal">
+                    wire:target="search, eliminarRol">
 
                     <!-- Tabla (desktop) -->
                     <div
-                        class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                        class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
                         <div class="overflow-x-auto max-h-[65vh]">
                             <table class="min-w-full text-sm">
                                 <thead
-                                    class="sticky top-0 z-10 bg-gray-50/95 dark:bg-neutral-950/70 backdrop-blur text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-neutral-800">
+                                    class="sticky top-0 z-10 bg-gray-50/95 dark:bg-neutral-900 backdrop-blur text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-neutral-800">
                                     <tr>
                                         <th class="px-4 py-3 text-center font-semibold">#</th>
-                                        <th class="px-4 py-3 text-left font-semibold">Persona</th>
-                                        <th class="px-4 py-3 text-left font-semibold">Rol</th>
-                                        <th class="px-4 py-3 text-left font-semibold">Descripción</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Foto</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Nombre(s)</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Apellido Paterno</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Apellido Materno</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Roles</th>
                                         <th class="px-4 py-3 text-center font-semibold">Status</th>
                                         <th class="px-4 py-3 text-center font-semibold">Acciones</th>
                                     </tr>
                                 </thead>
 
                                 <tbody class="divide-y divide-gray-100 dark:divide-neutral-800">
-                                    @if ($rolesPersona->isEmpty())
+                                    @if ($personas->isEmpty())
                                         <tr>
-                                            <td colspan="6"
+                                            <td colspan="8"
                                                 class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                                                 <div class="mx-auto w-full max-w-md">
                                                     <div
                                                         class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6">
-                                                        <div class="mb-1 text-base font-semibold">No hay asignaciones
-                                                        </div>
+                                                        <div class="mb-1 text-base font-semibold">No hay personal
+                                                            disponible</div>
                                                         <p class="text-sm">Ajusta tu búsqueda.</p>
                                                     </div>
                                                 </div>
                                             </td>
                                         </tr>
                                     @else
-                                        @foreach ($rolesPersona as $key => $rp)
-                                            @php
-                                                // Ajusta estos nombres según tus relaciones reales:
-                                                // rp->persona (modelo Persona) y rp->rol (modelo Role)
-                                                $persona = $rp->persona ?? null;
-                                                $rol = $rp->rol ?? null;
-
-                                                $nombrePersona = $persona
-                                                    ? trim(
-                                                        ($persona->nombre ?? '') .
-                                                            ' ' .
-                                                            ($persona->apellido_paterno ?? '') .
-                                                            ' ' .
-                                                            ($persona->apellido_materno ?? ''),
-                                                    )
-                                                    : $rp->persona_nombre ?? '---'; // fallback si guardas nombre en la tabla
-
-                                                $rolNombre =
-                                                    $rol->nombre ?? ($rp->rol_nombre ?? ($rp->nombre ?? '---')); // fallback
-                                                $rolDesc = $rol->descripcion ?? ($rp->descripcion ?? '—');
-
-                                                $foto = $persona->foto ?? null;
-                                                $src = $foto ? asset('storage/personal/' . $foto) : null;
-                                                $alt = 'Foto de ' . $nombrePersona;
-                                                $status = (int) ($rp->status ?? 1); // si no tienes status, déjalo en 1
-                                            @endphp
-
-                                            <!-- Fila principal -->
+                                        @foreach ($personas as $key => $persona)
                                             <tr
                                                 class="transition-colors hover:bg-gray-50/70 dark:hover:bg-neutral-800/50">
                                                 <!-- # + botón desplegar -->
@@ -163,17 +133,17 @@
                                                     <div class="flex items-center justify-center gap-2">
                                                         <button type="button"
                                                             class="inline-flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 dark:focus:ring-offset-neutral-900 transition-transform duration-150 hover:scale-105 active:scale-95"
-                                                            @click="openRow === {{ $rp->id }} ? openRow = null : openRow = {{ $rp->id }}"
-                                                            :aria-expanded="openRow === {{ $rp->id }}"
-                                                            aria-label="Ver más datos">
-                                                            <svg x-show="openRow !== {{ $rp->id }}"
+                                                            @click="openRow === {{ $persona->id }} ? openRow = null : openRow = {{ $persona->id }}"
+                                                            :aria-expanded="openRow === {{ $persona->id }}"
+                                                            aria-label="Ver roles de la persona">
+                                                            <svg x-show="openRow !== {{ $persona->id }}"
                                                                 xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5"
                                                                 viewBox="0 0 20 20" fill="currentColor">
                                                                 <path fill-rule="evenodd"
                                                                     d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
                                                                     clip-rule="evenodd" />
                                                             </svg>
-                                                            <svg x-show="openRow === {{ $rp->id }}" x-cloak
+                                                            <svg x-show="openRow === {{ $persona->id }}" x-cloak
                                                                 xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5"
                                                                 viewBox="0 0 20 20" fill="currentColor">
                                                                 <path fill-rule="evenodd"
@@ -189,54 +159,62 @@
                                                     </div>
                                                 </td>
 
-                                                <!-- Persona (foto + nombre) -->
+                                                <!-- Foto -->
                                                 <td class="px-4 py-3">
-                                                    <div class="flex items-center gap-3">
-                                                        @if ($src)
-                                                            <button type="button" class="group relative inline-flex"
-                                                                @click.stop="openPhoto(@js($src), @js($alt))"
-                                                                aria-label="Ver foto">
-                                                                <img src="{{ $src }}" alt="{{ $alt }}"
-                                                                    class="h-9 w-9 rounded-xl object-cover ring-1 ring-black/10 dark:ring-white/10
-                                                                        transition duration-200 group-hover:scale-105 group-hover:ring-blue-500/40"
-                                                                    onerror="this.closest('button').outerHTML='<span class=&quot;text-gray-500 dark:text-gray-400&quot;>---</span>';">
+                                                    @if ($persona->foto)
+                                                        @php
+                                                            $src = asset('storage/personal/' . $persona->foto);
+                                                            $alt = 'Foto de ' . $persona->nombre;
+                                                        @endphp
+
+                                                        <button type="button" class="group relative inline-flex"
+                                                            @click.stop="openPhoto(@js($src), @js($alt))"
+                                                            aria-label="Ver foto">
+                                                            <img src="{{ $src }}" alt="{{ $alt }}"
+                                                                class="h-9 w-9 rounded-xl object-cover ring-1 ring-black/10 dark:ring-white/10
+                                                                transition duration-200 group-hover:scale-105 group-hover:ring-blue-500/40">
+                                                            <span
+                                                                class="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-blue-500/30"></span>
+                                                        </button>
+                                                    @else
+                                                        <span class="text-gray-500 dark:text-gray-400">---</span>
+                                                    @endif
+                                                </td>
+
+                                                <!-- Datos -->
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $persona->nombre ?: '---' }}</td>
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $persona->apellido_paterno ?: '---' }}</td>
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $persona->apellido_materno ?: '---' }}</td>
+
+                                                <!-- Roles (✅ correcto por persona) -->
+                                                <td class="px-4 py-3">
+                                                    <div class="flex flex-wrap gap-2 max-w-xs">
+                                                        @forelse($persona->personaRoles as $rp)
+                                                            <span
+                                                                class="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/60 px-3 py-1 text-xs text-gray-800 dark:text-gray-200">
                                                                 <span
-                                                                    class="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-blue-500/30"></span>
-                                                            </button>
-                                                        @else
-                                                            <div
-                                                                class="h-9 w-9 rounded-xl grid place-items-center bg-gray-100 dark:bg-neutral-800 text-gray-500 ring-1 ring-black/5 dark:ring-white/10">
-                                                                <span class="text-xs font-semibold">
-                                                                    {{ strtoupper(mb_substr($nombrePersona ?: 'P', 0, 1)) }}
-                                                                </span>
-                                                            </div>
-                                                        @endif
+                                                                    class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                                                                {{ $rp->rolePersona->nombre ?? ($rp->rolePersona->slug ?? 'Rol') }}
 
-                                                        <div class="min-w-0">
-                                                            <p
-                                                                class="font-semibold text-gray-900 dark:text-white truncate">
-                                                                {{ $nombrePersona ?: '---' }}</p>
-                                                            <p
-                                                                class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                                ID asignación: #{{ $rp->id }}
-                                                            </p>
-                                                        </div>
+                                                                <button type="button"
+                                                                    class="ml-1 inline-flex items-center justify-center rounded-full bg-rose-600/10 text-rose-700 dark:text-rose-300 px-2 py-0.5 hover:bg-rose-600/20"
+                                                                    @click="eliminar({{ $rp->id }}, '{{ addslashes($rp->rolePersona->nombre ?? 'rol') }}')">
+                                                                    ✕
+                                                                </button>
+                                                            </span>
+                                                        @empty
+                                                            <span class="text-xs text-gray-500 dark:text-gray-400">Sin
+                                                                roles asignados.</span>
+                                                        @endforelse
                                                     </div>
-                                                </td>
-
-                                                <!-- Rol -->
-                                                <td class="px-4 py-3 text-gray-900 dark:text-white font-medium">
-                                                    {{ $rolNombre ?: '---' }}
-                                                </td>
-
-                                                <!-- Descripción -->
-                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                                                    {{ $rolDesc ?: '—' }}
                                                 </td>
 
                                                 <!-- Status -->
                                                 <td class="px-4 py-3 text-center">
-                                                    @if ($status === 1)
+                                                    @if ($persona->status == 1)
                                                         <span
                                                             class="inline-flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-700/50">
                                                             <span
@@ -257,59 +235,37 @@
                                                     <div class="flex items-center justify-center gap-2">
                                                         <flux:button variant="primary"
                                                             class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                            @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $rp->id }} });">
+                                                            @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $persona->id }} });">
                                                             <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                        </flux:button>
-
-                                                        <flux:button variant="danger"
-                                                            class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
-                                                            @click="eliminar({{ $rp->id }}, @js($nombrePersona . ' — ' . $rolNombre))">
-                                                            <flux:icon.trash-2 class="w-3.5 h-3.5" />
                                                         </flux:button>
                                                     </div>
                                                 </td>
                                             </tr>
 
-                                            <!-- Detalles -->
-                                            <tr x-show="openRow === {{ $rp->id }}" x-cloak
+                                            <!-- Detalles (opcional) -->
+                                            <tr x-show="openRow === {{ $persona->id }}" x-cloak
                                                 x-transition:enter="transition ease-out duration-200"
                                                 x-transition:enter-start="opacity-0 -translate-y-1"
                                                 x-transition:enter-end="opacity-100 translate-y-0"
                                                 x-transition:leave="transition ease-in duration-150"
                                                 x-transition:leave-start="opacity-100 translate-y-0"
                                                 x-transition:leave-end="opacity-0 -translate-y-1"
-                                                class="bg-gray-50/80 dark:bg-neutral-950/70">
-                                                <td colspan="6" class="px-6 py-4">
+                                                class="bg-gray-50/80 dark:bg-neutral-900/80">
+                                                <td colspan="8" class="px-6 py-4">
                                                     <div
                                                         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-gray-700 dark:text-gray-200">
                                                         <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Persona ID</p>
+                                                            <p class="font-semibold text-gray-900 dark:text-white">ID
+                                                                Persona</p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $rp->persona_id ?? '—' }}</p>
-                                                        </div>
-
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">Rol
-                                                                ID</p>
-                                                            <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ $rp->role_id ?? ($rp->rol_id ?? '—') }}</p>
+                                                                {{ $persona->id }}</p>
                                                         </div>
 
                                                         <div class="space-y-0.5">
                                                             <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Creado</p>
+                                                                Total roles</p>
                                                             <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ optional($rp->created_at)->format('d/m/Y H:i') ?? '—' }}
-                                                            </p>
-                                                        </div>
-
-                                                        <div class="space-y-0.5">
-                                                            <p class="font-semibold text-gray-900 dark:text-white">
-                                                                Actualizado</p>
-                                                            <p class="font-mono text-[11px] sm:text-xs">
-                                                                {{ optional($rp->updated_at)->format('d/m/Y H:i') ?? '—' }}
-                                                            </p>
+                                                                {{ $persona->personaRoles->count() }}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -323,43 +279,24 @@
 
                     <!-- Tarjetas (mobile) -->
                     <div class="md:hidden space-y-3">
-                        @if ($rolesPersona->isEmpty())
+                        @if ($personas->isEmpty())
                             <div
                                 class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
-                                <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">No hay asignaciones
-                                </div>
+                                <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">No hay roles de la
+                                    persona</div>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">Ajusta tu búsqueda.</p>
                             </div>
                         @else
-                            @foreach ($rolesPersona as $key => $rp)
-                                @php
-                                    $persona = $rp->persona ?? null;
-                                    $rol = $rp->rol ?? null;
-
-                                    $nombrePersona = $persona
-                                        ? trim(
-                                            ($persona->nombre ?? '') .
-                                                ' ' .
-                                                ($persona->apellido_paterno ?? '') .
-                                                ' ' .
-                                                ($persona->apellido_materno ?? ''),
-                                        )
-                                        : $rp->persona_nombre ?? '---';
-
-                                    $rolNombre = $rol->nombre ?? ($rp->rol_nombre ?? ($rp->nombre ?? '---'));
-                                    $rolDesc = $rol->descripcion ?? ($rp->descripcion ?? '—');
-                                    $status = (int) ($rp->status ?? 1);
-                                @endphp
-
+                            @foreach ($personas as $key => $persona)
                                 <div
                                     class="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm">
                                     <div class="flex items-start justify-between gap-3">
-                                        <div class="min-w-0">
+                                        <div class="min-w-0 w-full">
                                             <div
                                                 class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                                 <span>#{{ $key + 1 }}</span>
 
-                                                @if ($status === 1)
+                                                @if ($persona->status == 1)
                                                     <span
                                                         class="inline-flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-700/50">
                                                         Activo
@@ -373,29 +310,33 @@
                                             </div>
 
                                             <div class="mt-1 font-semibold text-gray-900 dark:text-white truncate">
-                                                {{ $nombrePersona ?: '---' }}
+                                                {{ $persona->nombre }} {{ $persona->apellido_paterno }}
+                                                {{ $persona->apellido_materno }}
                                             </div>
 
-                                            <div class="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                                                <span class="font-medium">Rol:</span> {{ $rolNombre ?: '---' }}
-                                            </div>
-
-                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                                                {{ $rolDesc ?: '—' }}
+                                            <div class="mt-2 flex flex-wrap gap-2">
+                                                @forelse($persona->personaRoles as $rp)
+                                                    <span
+                                                        class="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-neutral-800 px-2.5 py-1 text-[11px] text-gray-700 dark:text-gray-200">
+                                                        {{ $rp->rolePersona->nombre ?? ($rp->rolePersona->slug ?? 'Rol') }}
+                                                        <button type="button"
+                                                            class="rounded-full bg-rose-600/10 text-rose-700 dark:text-rose-300 px-2 py-0.5"
+                                                            @click="eliminar({{ $rp->id }}, '{{ addslashes($rp->rolePersona->nombre ?? 'rol') }}')">
+                                                            ✕
+                                                        </button>
+                                                    </span>
+                                                @empty
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400">Sin
+                                                        roles</span>
+                                                @endforelse
                                             </div>
                                         </div>
 
                                         <div class="flex items-center justify-center gap-2">
                                             <flux:button variant="primary"
                                                 class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $rp->id }} });">
+                                                @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $persona->id }} });">
                                                 <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                            </flux:button>
-
-                                            <flux:button variant="danger"
-                                                class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
-                                                @click="eliminar({{ $rp->id }}, @js($nombrePersona . ' — ' . $rolNombre))">
-                                                <flux:icon.trash-2 class="w-3.5 h-3.5" />
                                             </flux:button>
                                         </div>
                                     </div>
@@ -408,7 +349,7 @@
 
                 <!-- Paginación -->
                 <div class="mt-5">
-                    {{ $rolesPersona->links() }}
+                    {{ $personas->links() }}
                 </div>
             </div>
         </div>
@@ -416,12 +357,9 @@
         <!-- ===== Lightbox Foto (GLOBAL) ===== -->
         <div x-show="photoOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             role="dialog" aria-modal="true">
-
-            <!-- Overlay -->
             <button type="button" class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="closePhoto()"
                 aria-label="Cerrar"></button>
 
-            <!-- Panel -->
             <div x-show="photoOpen" x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100 blur-0"
@@ -430,7 +368,7 @@
                 x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
                 class="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/10 dark:bg-neutral-900 dark:ring-white/10"
                 @click.stop>
-                <!-- Top bar -->
+
                 <div
                     class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600">
                     <p class="text-sm font-semibold text-white" x-text="photoAlt"></p>
@@ -439,7 +377,6 @@
                         @click="closePhoto()" aria-label="Cerrar">✕</button>
                 </div>
 
-                <!-- Imagen -->
                 <div class="p-4">
                     <div class="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
                         <img x-ref="photoImg" tabindex="-1" :src="photoSrc" :alt="photoAlt"
@@ -456,7 +393,7 @@
             </div>
         </div>
 
-        <!-- Modal editar (AJUSTA al tuyo real de role-persona) -->
-        {{-- <livewire:role-persona.editar-role-persona /> --}}
+        <!-- Modal editar -->
+        <livewire:personas.editar-personal />
     </div>
 </div>

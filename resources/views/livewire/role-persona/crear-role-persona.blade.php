@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Asignación de personal</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Roles del Persona</h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
             Selecciona un integrante y asígnale un rol dentro del sistema.
         </p>

@@ -25,4 +25,6 @@ public function personaNiveles()
     return $this->hasMany(\App\Models\PersonaNivel::class, 'role_persona_id');
 }
 
+
+
 }

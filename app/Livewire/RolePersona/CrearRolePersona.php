@@ -62,8 +62,7 @@ class CrearRolePersona extends Component
         // Si quieres limpiar después de guardar:
         $this->resetSeleccion();
 
-        // Si usas eventos/toasts:
-        // $this->dispatch('toast', type: 'success', message: 'Asignación guardada.');
+
     }
 
     public function render()
