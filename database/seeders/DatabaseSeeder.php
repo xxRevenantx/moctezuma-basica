@@ -31,7 +31,12 @@ class DatabaseSeeder extends Seeder
             MesesBachilleratoSeeder::class,
             SemestreSeeder::class,
             PeriodoSeeder::class,
-            RolePersonaSeeder::class,
+            RolePersonaSeeder::class, // DE PRUEBA
+            GeneracionBasicaSeeder::class, // DE PRUEBA
+            GrupoSeeder::class, // DE PRUEBA
+            PersonaSeeder::class, // DE PRUEBA
+            PersonaRoleSeeder::class, // DE PRUEBA
+            PersonaNivelSeeder::class, // DE PRUEBA
         ]);
     }
 }

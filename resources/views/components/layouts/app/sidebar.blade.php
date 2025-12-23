@@ -113,10 +113,21 @@
                                 :current="request()->routeIs('misrutas.personal')" wire:navigate>
                                 Crear Persona
                             </flux:navlist.item>
+
                             <flux:navlist.item icon="home" :href="route('misrutas.role-persona')"
                                 :current="request()->routeIs('misrutas.role-persona')" wire:navigate>
                                 Roles
                             </flux:navlist.item>
+
+                            <flux:navlist.item icon="home" :href="route('misrutas.asignacion-niveles')"
+                                :current="request()->routeIs('misrutas.asignacion-niveles')" wire:navigate>
+                                Asignación
+                            </flux:navlist.item>
+
+
+
+
+
                         </flux:sidebar.group>
 
 

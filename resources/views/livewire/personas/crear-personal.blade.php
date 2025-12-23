@@ -1,8 +1,8 @@
 <div>
     <!-- Header -->
     <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Asignación del personal</h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Formulario para asignar nuevo personal.</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Crear el personal</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Formulario para crear nuevo personal.</p>
     </div>
 
     <div x-data="{ open: false }" class="my-4">

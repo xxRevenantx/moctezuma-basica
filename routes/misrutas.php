@@ -11,8 +11,9 @@ use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\PersonaController;
+use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\SemestreController;
-
+use App\Models\PersonaNivel;
 
 // RUTA NIVELES
 Route::get('/niveles', [NivelController::class, 'index'])->name('misrutas.niveles');
@@ -32,6 +33,10 @@ Route::get('/personal', [PersonaController::class, 'index'])->name('misrutas.per
 
 // ROLE DEL PERSONAL
 Route::get('/roles-del-personal', [PersonaController::class, 'rolePersona'])->name('misrutas.role-persona');
+
+
+// ASIGNACIÓN DE NIVELES
+Route::get('asignacion-niveles', [PersonaNivelController::class, 'asignacionNiveles'])->name('misrutas.asignacion-niveles');
 
 // RUTAS DE GRADOS
 Route::get('/grados', [GradoController::class, 'index'])->name('misrutas.grados');

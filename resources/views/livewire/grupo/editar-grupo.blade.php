@@ -118,6 +118,8 @@
 
                     </flux:select>
 
+
+
                     {{-- Semestre (solo para nivel Bachillerato) --}}
                     <flux:select wire:model="semestre_id" label="Semestre">
                         @if (!$esBachillerato)

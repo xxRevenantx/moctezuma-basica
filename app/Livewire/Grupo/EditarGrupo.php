@@ -9,6 +9,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Illuminate\Validation\Rule;
 
 class EditarGrupo extends Component
 {
@@ -48,6 +49,7 @@ class EditarGrupo extends Component
         $this->grado_id      = $grupo->grado_id;
         $this->generacion_id = $grupo->generacion_id;
         $this->semestre_id   = $grupo->semestre_id;
+
 
         $this->skipResetNivel = false;
 
@@ -98,87 +100,104 @@ class EditarGrupo extends Component
         $this->grado_nombre = $grado?->nombre;
     }
 
-    public function actualizarGrupo()
-    {
-        $rules = [
-            'nombre'         => 'required|string|max:255',
-            'nivel_id'       => 'required|exists:niveles,id',
-            'grado_id'       => 'required|exists:grados,id',
-            'generacion_id'  => 'required|exists:generaciones,id',
-            'semestre_id'    => 'nullable|exists:semestres,id',
-        ];
+   public function actualizarGrupo()
+{
+    // Normaliza antes de validar (para evitar diferencias por minúsculas/espacios)
+    $this->nombre = strtoupper(trim($this->nombre));
 
-        // Si el nivel es Bachillerato, semestre_id es obligatorio
-        $nivelSeleccionado = Nivel::find($this->nivel_id);
-        if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
-            $rules['semestre_id'] = 'required|exists:semestres,id';
-        }
+    $nivelSeleccionado = Nivel::find($this->nivel_id);
+    $esBachillerato = $nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato';
 
-        $this->validate($rules, [
-            'nombre.required'         => 'El nombre es obligatorio.',
-            'nivel_id.required'       => 'El nivel es obligatorio.',
-            'nivel_id.exists'         => 'El nivel seleccionado no es válido.',
-            'grado_id.required'       => 'El grado es obligatorio.',
-            'grado_id.exists'         => 'El grado seleccionado no es válido.',
-            'generacion_id.required'  => 'La generación es obligatoria.',
-            'generacion_id.exists'    => 'La generación seleccionada no es válida.',
-            'semestre_id.required'    => 'El semestre es obligatorio para Bachillerato.',
-            'semestre_id.exists'      => 'El semestre seleccionado no es válido.',
-        ]);
+    $rules = [
+        'nombre'        => [
+            'required',
+            'string',
+            'max:255',
+            Rule::unique('grupos', 'nombre')
+                ->ignore($this->grupoId) // <- IMPORTANTÍSIMO: ignora el registro actual
+                ->where(fn ($q) => $q
+                    ->where('nivel_id', $this->nivel_id)
+                    ->where('grado_id', $this->grado_id)
+                    ->where('generacion_id', $this->generacion_id)
+                    ->when($esBachillerato, fn ($qq) => $qq->where('semestre_id', $this->semestre_id))
+                    // Si NO es bachillerato, forzamos a comparar con semestre NULL
+                    ->when(!$esBachillerato, fn ($qq) => $qq->whereNull('semestre_id'))
+                ),
+        ],
+        'nivel_id'      => ['required', 'exists:niveles,id'],
+        'grado_id'      => ['required', 'exists:grados,id'],
+        'generacion_id' => ['required', 'exists:generaciones,id'],
+        'semestre_id'   => [$esBachillerato ? 'required' : 'nullable', 'exists:semestres,id'],
+    ];
 
-        // -------------------------------
-        // VALIDACIONES DE CONSISTENCIA
-        // -------------------------------
+    $this->validate($rules, [
+        'nombre.required'        => 'El nombre es obligatorio.',
+        'nombre.unique'          => 'Ya existe un grupo con este nombre para el nivel/grado/generación' . ($esBachillerato ? ' y semestre' : '') . ' seleccionados.',
+        'nivel_id.required'      => 'El nivel es obligatorio.',
+        'nivel_id.exists'        => 'El nivel seleccionado no es válido.',
+        'grado_id.required'      => 'El grado es obligatorio.',
+        'grado_id.exists'        => 'El grado seleccionado no es válido.',
+        'generacion_id.required' => 'La generación es obligatoria.',
+        'generacion_id.exists'   => 'La generación seleccionada no es válida.',
+        'semestre_id.required'   => 'El semestre es obligatorio para Bachillerato.',
+        'semestre_id.exists'     => 'El semestre seleccionado no es válido.',
+    ]);
 
-        // 1) Grado pertenece al nivel
-        $grado = Grado::find($this->grado_id);
-        if (!$grado || $grado->nivel_id != $this->nivel_id) {
-            $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
-            return;
-        }
+    // -------------------------------
+    // VALIDACIONES DE CONSISTENCIA
+    // -------------------------------
 
-        // 2) Generación pertenece al nivel
-        $generacion = Generacion::find($this->generacion_id);
-        if (!$generacion || $generacion->nivel_id != $this->nivel_id) {
-            $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
-            return;
-        }
-
-        // 3) El semestre (si existe) pertenece al grado (y por cadena al nivel)
-        if ($this->semestre_id) {
-            $semestre = Semestre::find($this->semestre_id);
-
-            if (!$semestre) {
-                $this->addError('semestre_id', 'El semestre seleccionado no es válido.');
-                return;
-            }
-
-            if ($semestre->grado_id != $this->grado_id) {
-                $this->addError('semestre_id', 'El semestre no pertenece al grado seleccionado.');
-                return;
-            }
-        }
-
-        // Si todo es consistente, ahora sí actualizamos
-        $grupo = Grupo::findOrFail($this->grupoId);
-
-        $grupo->update([
-            'nombre'        => strtoupper($this->nombre),
-            'nivel_id'      => $this->nivel_id,
-            'grado_id'      => $this->grado_id,
-            'generacion_id' => $this->generacion_id,
-            'semestre_id'   => $this->semestre_id ?: null,
-        ]);
-
-        $this->dispatch('swal', [
-            'title'    => '¡Grupo actualizado correctamente!',
-            'icon'     => 'success',
-            'position' => 'top-end',
-        ]);
-
-        $this->dispatch('refreshGrupos');
-        $this->dispatch('cerrar-modal-editar');
+    // 1) Grado pertenece al nivel
+    $grado = Grado::find($this->grado_id);
+    if (! $grado || (int)$grado->nivel_id !== (int)$this->nivel_id) {
+        $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
+        return;
     }
+
+    // 2) Generación pertenece al nivel
+    $generacion = Generacion::find($this->generacion_id);
+    if (! $generacion || (int)$generacion->nivel_id !== (int)$this->nivel_id) {
+        $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
+        return;
+    }
+
+    // 3) Semestre (si aplica) pertenece al grado
+    if ($esBachillerato) {
+        $semestre = Semestre::find($this->semestre_id);
+
+        if (! $semestre) {
+            $this->addError('semestre_id', 'El semestre seleccionado no es válido.');
+            return;
+        }
+
+        if ((int)$semestre->grado_id !== (int)$this->grado_id) {
+            $this->addError('semestre_id', 'El semestre no pertenece al grado seleccionado.');
+            return;
+        }
+    }
+
+    // -------------------------------
+    // ACTUALIZAR
+    // -------------------------------
+    $grupo = Grupo::findOrFail($this->grupoId);
+
+    $grupo->update([
+        'nombre'        => $this->nombre,
+        'nivel_id'      => $this->nivel_id,
+        'grado_id'      => $this->grado_id,
+        'generacion_id' => $this->generacion_id,
+        'semestre_id'   => $esBachillerato ? $this->semestre_id : null,
+    ]);
+
+    $this->dispatch('swal', [
+        'title'    => '¡Grupo actualizado correctamente!',
+        'icon'     => 'success',
+        'position' => 'top-end',
+    ]);
+
+    $this->dispatch('refreshGrupos');
+    $this->dispatch('cerrar-modal-editar');
+}
 
     public function cerrarModal()
     {
@@ -212,7 +231,7 @@ class EditarGrupo extends Component
 
         if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
             $esBachillerato = true;
-            $semestres = Semestre::orderBy('id')->get();
+            $semestres = Semestre::all();
         }
 
 

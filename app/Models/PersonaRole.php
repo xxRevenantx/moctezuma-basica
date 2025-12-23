@@ -18,9 +18,9 @@ class PersonaRole extends Model
         return $this->belongsTo(Persona::class);
     }
 
-    public function rolePersona()
+     public function rolePersona()
     {
-        return $this->belongsTo(RolePersona::class, 'role_persona_id');
+        return $this->belongsTo(\App\Models\RolePersona::class, 'role_persona_id');
     }
 
 }

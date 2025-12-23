@@ -51,6 +51,25 @@ class CrearGrupo extends Component
             'semestre_id.exists' => 'El semestre seleccionado no es válido.',
         ]);
 
+        // VERIFICA QUE EL GRUPO NO EXISTA YA EN EN EL NIVEL, GRADO Y GENERACIÓN
+        $queryGrupo = Grupo::where('nombre', strtoupper($this->nombre))
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $this->generacion_id);
+
+        // Si es bachillerato, también validar por semestre
+        $nivelSeleccionado = Nivel::find($this->nivel_id);
+        if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
+            $queryGrupo->where('semestre_id', $this->semestre_id);
+        }
+
+        $existeGrupo = $queryGrupo->first();
+
+        if ($existeGrupo) {
+            $this->addError('nombre', 'Ya existe un grupo con este nombre en el nivel, grado, generación' . ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato' ? ' y semestre' : '') . ' seleccionados.');
+            return;
+        }
+
         Grupo::create([
             'nombre' => strtoupper($this->nombre),
             'nivel_id' => $this->nivel_id,

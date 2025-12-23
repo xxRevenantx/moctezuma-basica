@@ -198,9 +198,10 @@
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     {{ $persona->apellido_materno ?: '---' }}</td>
 
-                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200 uppercase">
                                                     {{ $persona->curp ?: '---' }}</td>
-                                                <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
+                                                <td
+                                                    class="px-4 py-3 text-center text-gray-800 dark:text-gray-200 uppercase">
                                                     {{ $persona->rfc ?: '---' }}</td>
 
                                                 <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">

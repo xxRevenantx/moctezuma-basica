@@ -185,7 +185,6 @@ public function consultarCurp()
             'curp.unique' => 'La CURP ya está registrada.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
-            'curp.unique' => 'La CURP ya está registrada.',
             'rfc.unique' => 'El RFC ya está registrado.',
             'correo.unique' => 'El correo ya está registrado.',
             'correo.email' => 'El correo no es válido.',
@@ -194,7 +193,6 @@ public function consultarCurp()
             'telefono_movil.size' => 'El teléfono móvil debe tener 10 dígitos.',
             'telefono_fijo.size' => 'El teléfono fijo debe tener 10 dígitos.',
             'genero.in' => 'El género seleccionado no es válido.',
-            'curp.size' => 'La CURP debe tener 18 caracteres.',
 
             'rfc.size' => 'El RFC debe tener 13 caracteres.',
             'codigo_postal.max' => 'El código postal no debe superar los 10 caracteres.',
@@ -207,7 +205,6 @@ public function consultarCurp()
             'colonia.max' => 'La colonia no debe superar los 255 caracteres.',
             'municipio.max' => 'El municipio no debe superar los 255 caracteres.',
             'estado.max' => 'El estado no debe superar los 255 caracteres.',
-            'codigo_postal.max' => 'El código postal no debe superar los 10 caracteres.',
 
         ], []);
 
@@ -224,8 +221,8 @@ public function consultarCurp()
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
             'foto' => $fotoPath,
-            'curp' => $this->curp,
-            'rfc' => $this->rfc,
+            'curp' => strtoupper(trim($this->curp)),
+            'rfc' => strtoupper(trim($this->rfc)),
             'correo' => $this->correo,
             'telefono_movil' => $this->telefono_movil,
             'telefono_fijo' => $this->telefono_fijo,
@@ -252,6 +249,7 @@ public function consultarCurp()
         ]);
 
         $this->reset([
+            
             'nombre',
             'apellido_paterno',
             'apellido_materno',

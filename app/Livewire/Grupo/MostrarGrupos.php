@@ -21,6 +21,15 @@ class MostrarGrupos extends Component
         $this->resetPage();
     }
 
+    // ELIMINAR GRUPO
+    public function eliminar($id){
+        $grupo = Grupo::find($id);
+        if ($grupo) {
+            $grupo->delete();
+            $this->dispatch('refreshGrupos'); // Emitir evento para refrescar la lista
+        }
+    }
+
     #[On('refreshGrupos')]
     public function render()
     {

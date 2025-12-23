@@ -6,13 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('persona_nivel', function (Blueprint $table) {
-             $table->id();
+            $table->id();
 
             $table->foreignId('persona_id')
                 ->constrained('personas')
@@ -24,29 +21,29 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            // Rol que cumple en ese nivel: docente, director, intendente, etc.
-            $table->foreignId('role_persona_id')
-                ->constrained('role_personas')
+            // ✅ Si siempre es obligatorio en tu UI, quítale nullable
+            $table->foreignId('grado_id')
+                ->constrained('grados')
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            // Control / historial
+            // ✅ Si siempre es obligatorio en tu UI, quítale nullable
+            $table->foreignId('grupo_id')
+                ->constrained('grupos')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+
             $table->date('ingreso_seg')->nullable();
             $table->date('ingreso_sep')->nullable();
 
+            // ✅ default y unsigned (opcional), pero recomendado
+            $table->unsignedInteger('orden')->default(1);
+
             $table->timestamps();
 
-            // Evita duplicados (misma persona, mismo nivel, mismo rol)
-            $table->unique(
-                ['persona_id', 'nivel_id', 'role_persona_id'],
-                'persona_nivel_unique'
-            );
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('persona_nivel');

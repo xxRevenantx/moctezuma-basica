@@ -22,7 +22,7 @@ class RolePersona extends Model
 }
 public function personaNiveles()
 {
-    return $this->hasMany(\App\Models\PersonaNivel::class, 'role_persona_id');
+    return $this->hasMany(\App\Models\PersonaNivel::class, foreignKey: 'role_persona_id');
 }
 
 

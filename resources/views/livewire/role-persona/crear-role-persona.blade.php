@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Roles del Persona</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Asignar roles del Personal</h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
             Selecciona un integrante y asígnale un rol dentro del sistema.
         </p>
@@ -157,14 +157,17 @@
                                         @endif
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <flux:button variant="primary" wire:click="crearNuevoRol">
-                                            <div class="flex items-center gap-2">
+                                        <flux:button type="button" variant="primary"
+                                            @click="$dispatch('abrir-modal-editar');
+                                                        Livewire.dispatch('editarModal');">
+                                            <div
+                                                class="flex
+                                            items-center gap-2">
                                                 <flux:icon name="plus" class="h-4 w-4" />
-                                                Nuevo Rol
+                                                Crear o editar Rol
                                             </div>
-
-
                                         </flux:button>
+
                                     </div>
                                 </div>
 
@@ -271,4 +274,5 @@
             </div>
         </form>
     </div>
+    <livewire:persona-role.crear-editar-persona-role>
 </div>

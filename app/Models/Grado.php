@@ -39,4 +39,11 @@ class Grado extends Model
         return $this->hasMany(Grupo::class);
     }
 
+    // RELACION CON PERSONA_NIVEL
+    public function personaNiveles()
+    {
+        return $this->hasMany(PersonaNivel::class);
+    }
+
+
 }

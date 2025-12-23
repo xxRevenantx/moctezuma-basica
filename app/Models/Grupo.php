@@ -36,6 +36,12 @@ class Grupo extends Model
         return $this->belongsTo(Semestre::class);
     }
 
+    // RELACION CON PERSONA_NIVEL
+    public function personaNiveles()
+    {
+        return $this->hasMany(PersonaNivel::class);
+    }
+
 public function docentesGrupo()
 {
     return $this->hasMany(\App\Models\DocenteGrupo::class, 'grupo_id');

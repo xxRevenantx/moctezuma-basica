@@ -299,9 +299,11 @@
                                                                 </div>
 
                                                                 <div class="flex items-center gap-2">
-                                                                    <flux:button variant="ghost"
-                                                                        class="!px-2.5 !py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                                                                        x-on:click="eliminar({{ $grupo->id }}, @js($grupo->nombre))">
+
+
+                                                                    <flux:button variant="danger"
+                                                                        class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
+                                                                        @click="eliminar({{ $grupo->id }}, '{{ addslashes($grupo->nombre) }}')">
                                                                         <flux:icon.trash-2 class="w-3.5 h-3.5" />
                                                                     </flux:button>
 

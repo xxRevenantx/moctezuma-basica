@@ -119,6 +119,7 @@ class EditarNivel extends Component
             'supervisor_id',
 
         ]);
+        $this->resetValidation();
     }
 
 
