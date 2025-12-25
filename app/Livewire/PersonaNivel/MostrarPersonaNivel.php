@@ -11,117 +11,83 @@ class MostrarPersonaNivel extends Component
 {
     public string $search = '';
 
-    public function updatingSearch(): void
-    {
-        // si luego agregas paginación, aquí resetPage()
-    }
-
     #[On('refreshPersonaNivelList')]
     public function refreshPersonaNivelList(): void
     {
         $this->dispatch('$refresh');
     }
 
-    /**
-     * Scope inclusivo: SOLO afecta al mismo (nivel_id + grupo_id)
-     * (si grupo_id es null, aplica whereNull)
-     */
-    private function scopedQuery(PersonaNivel $row)
+    // ELIMINAR
+    public function eliminar(int $id): void
     {
-        return PersonaNivel::query()
-            ->where('nivel_id', $row->nivel_id)
-            ->when(
-                is_null($row->grupo_id),
-                fn ($q) => $q->whereNull('grupo_id'),
-                fn ($q) => $q->where('grupo_id', $row->grupo_id)
-            );
-    }
-
-    public function subir(int $personaNivelId): void
-    {
-        $actual = PersonaNivel::findOrFail($personaNivelId);
-
-        // Si por alguna razón no tiene orden, normaliza primero
-        if (empty($actual->orden)) {
-            $this->normalizarOrden($actual->nivel_id, $actual->grupo_id);
-            $actual->refresh();
+        $pn = PersonaNivel::find($id);
+        if (! $pn) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Registro no encontrado.']);
+            return;
         }
 
-        $previo = $this->scopedQuery($actual)
-            ->where('orden', '<', $actual->orden)
-            ->orderBy('orden', 'desc')
-            ->orderBy('id', 'desc')
-            ->first();
+        $pn->delete();
 
-        if (! $previo) return;
+        // Reordenar los restantes del mismo nivel
+        DB::transaction(function () use ($pn) {
+            $all = PersonaNivel::query()
+                ->where('nivel_id', $pn->nivel_id)
+                ->orderBy('orden')
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
 
-        DB::transaction(function () use ($actual, $previo) {
-            [$actual->orden, $previo->orden] = [$previo->orden, $actual->orden];
-            $actual->save();
-            $previo->save();
-        });
-
-        // ✅ deja secuencia limpia 1..N en ese nivel+grupo
-        $this->normalizarOrden($actual->nivel_id, $actual->grupo_id);
-
-        $this->dispatch('$refresh');
-    }
-
-    public function bajar(int $personaNivelId): void
-    {
-        $actual = PersonaNivel::findOrFail($personaNivelId);
-
-        if (empty($actual->orden)) {
-            $this->normalizarOrden($actual->nivel_id, $actual->grupo_id);
-            $actual->refresh();
-        }
-
-        $siguiente = $this->scopedQuery($actual)
-            ->where('orden', '>', $actual->orden)
-            ->orderBy('orden', 'asc')
-            ->orderBy('id', 'asc')
-            ->first();
-
-        if (! $siguiente) return;
-
-        DB::transaction(function () use ($actual, $siguiente) {
-            [$actual->orden, $siguiente->orden] = [$siguiente->orden, $actual->orden];
-            $actual->save();
-            $siguiente->save();
-        });
-
-        $this->normalizarOrden($actual->nivel_id, $actual->grupo_id);
-
-        $this->dispatch('$refresh');
-    }
-
-    /**
-     * Normaliza el orden (1..N) dentro del mismo (nivel_id + grupo_id)
-     * ✅ inclusivo: NO toca otros niveles ni otros grupos
-     */
-    public function normalizarOrden(int $nivelId, ?int $grupoId): void
-    {
-        $items = PersonaNivel::query()
-            ->where('nivel_id', $nivelId)
-            ->when(
-                is_null($grupoId),
-                fn ($q) => $q->whereNull('grupo_id'),
-                fn ($q) => $q->where('grupo_id', $grupoId)
-            )
-            ->orderBy('orden')
-            ->orderBy('id')
-            ->get();
-
-        DB::transaction(function () use ($items) {
             $i = 1;
-            foreach ($items as $row) {
-                if ((int) $row->orden !== $i) {
-                    $row->orden = $i;
-                    $row->save();
-                }
-                $i++;
+            foreach ($all as $pid) {
+                PersonaNivel::whereKey($pid)->update(['orden' => $i++]);
             }
         });
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Registro eliminado correctamente.']);
+        $this->dispatch('$refresh');
+    }
+
+    /**
+     * ✅ Orden lineal por NIVEL (1..N)
+     * Firma compatible con el JS del blade: ordenarJs(nivelId, ids)
+     */
+    public function ordenarJs(int $nivelId, array $ids): void
+    {
+        $ids = collect($ids)->map(fn ($v) => (int) $v)->filter()->values();
+        if ($ids->isEmpty()) return;
+
+        // Seguridad: solo IDs del mismo nivel
+        $validIds = PersonaNivel::query()
+            ->where('nivel_id', $nivelId)
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+
+        $validSet = array_flip($validIds);
+
+        DB::transaction(function () use ($ids, $validSet, $nivelId) {
+            // aplica el nuevo orden
+            $i = 1;
+            foreach ($ids as $id) {
+                if (!isset($validSet[$id])) continue;
+                PersonaNivel::whereKey($id)->update(['orden' => $i++]);
+            }
+
+            // normaliza 1..N por si quedó hueco
+            $all = PersonaNivel::query()
+                ->where('nivel_id', $nivelId)
+                ->orderBy('orden')
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
+
+            $j = 1;
+            foreach ($all as $pid) {
+                PersonaNivel::whereKey($pid)->update(['orden' => $j++]);
+            }
+        });
+
+        $this->dispatch('$refresh');
     }
 
     public function render()
@@ -148,17 +114,15 @@ class MostrarPersonaNivel extends Component
                         ->orWhereHas('persona.personaRoles.rolePersona', fn ($r) => $r->where('nombre', 'like', "%{$s}%"));
                 });
             })
+            // ✅ orden lineal por NIVEL
             ->orderBy('nivel_id')
-            ->orderBy('grupo_id')
             ->orderBy('orden')
             ->orderBy('id')
             ->get();
 
-        // NIVEL -> GRUPO
-        $personalNivel = $rows
-            ->groupBy(fn ($r) => $r->nivel?->nombre ?? 'Sin nivel')
-            ->map(fn ($itemsNivel) => $itemsNivel->groupBy(fn ($r) => $r->grupo?->nombre ?? 'Sin grupo'));
+        // ✅ Solo collapse por NIVEL
+        $porNivel = $rows->groupBy(fn ($r) => $r->nivel?->nombre ?? 'Sin nivel');
 
-        return view('livewire.persona-nivel.mostrar-persona-nivel', compact('personalNivel'));
+        return view('livewire.persona-nivel.mostrar-persona-nivel', compact('porNivel'));
     }
 }

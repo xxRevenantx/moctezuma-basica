@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use PhpParser\Node\Scalar\MagicConst\Dir;
 
 class DatabaseSeeder extends Seeder
 {
@@ -36,7 +35,7 @@ class DatabaseSeeder extends Seeder
             GrupoSeeder::class, // DE PRUEBA
             PersonaSeeder::class, // DE PRUEBA
             PersonaRoleSeeder::class, // DE PRUEBA
-            PersonaNivelSeeder::class, // DE PRUEBA
+            // PersonaNivelSeeder::class, // DE PRUEBA
         ]);
     }
 }

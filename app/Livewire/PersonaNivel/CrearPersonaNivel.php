@@ -111,12 +111,11 @@ class CrearPersonaNivel extends Component
             return;
         }
 
-        // ✅ ORDEN INCLUSIVO POR NIVEL+GRUPO
-        // Cada (nivel_id, grupo_id) tiene su propia secuencia 1..N
+
+        // CrearPersonaNivel.php (solo el cambio clave para NO repetir orden)
         DB::transaction(function () {
             $maxOrden = PersonaNivel::query()
-                ->where('nivel_id', $this->nivel_id)
-                ->where('grupo_id', $this->grupo_id)
+                ->where('nivel_id', $this->nivel_id) // ✅ SOLO nivel
                 ->max('orden');
 
             $nuevoOrden = ((int) ($maxOrden ?? 0)) + 1;
@@ -128,9 +127,10 @@ class CrearPersonaNivel extends Component
                 'grupo_id'     => $this->grupo_id,
                 'ingreso_seg'  => $this->ingreso_seg,
                 'ingreso_sep'  => $this->ingreso_sep,
-                'orden'        => $nuevoOrden, // ✅ aquí
+                'orden'        => $nuevoOrden,
             ]);
         });
+
 
         $this->dispatch('swal', [
             'title' => 'Asignación exitosa',

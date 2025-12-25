@@ -243,6 +243,7 @@
 
     {{ $slot }}
 
+
     @fluxScripts
 </body>
 

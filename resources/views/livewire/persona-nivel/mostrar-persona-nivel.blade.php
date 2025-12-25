@@ -4,6 +4,20 @@
     isOpen(key) { return this.open.has(key) },
     openAll() { document.querySelectorAll('[data-nivel]').forEach(el => this.open.add(el.dataset.nivel)) },
     closeAll() { this.open = new Set() },
+
+    // ===== Eliminar =====
+    eliminar(id, nombre) {
+        Swal.fire({
+            title: '¿Estás seguro?',
+            text: `Esta fila se eliminará de forma permanente`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#2563EB',
+            cancelButtonColor: '#EF4444',
+            cancelButtonText: 'Cancelar',
+            confirmButtonText: 'Sí, eliminar'
+        }).then((r) => r.isConfirmed && @this.call('eliminar', id))
+    }
 }">
     <!-- Header -->
     <div class="flex flex-col gap-1">
@@ -11,7 +25,7 @@
             Personal asignado por nivel
         </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Nivel (collapse) → Grupo (secciones) → Personal (filas)
+            Nivel (collapse) → Tabla lineal (Drag & Drop) con orden consecutivo por NIVEL.
         </p>
     </div>
 
@@ -31,7 +45,9 @@
                 </div>
                 <div>
                     <p class="text-sm font-semibold text-gray-900 dark:text-white">Listado</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Agrupación por nivel y grupo</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Reordenamiento global por nivel (sin repetir orden)
+                    </p>
                 </div>
             </div>
 
@@ -60,20 +76,16 @@
                 <div class="flex gap-2">
                     <button type="button" @click="openAll()"
                         class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-gray-200 dark:border-neutral-800
-                               bg-white dark:bg-neutral-900
-                               text-gray-700 dark:text-gray-200
-                               hover:bg-gray-50 dark:hover:bg-neutral-800/60
+                               border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
+                               text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-800/60
                                focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                         Abrir todo
                     </button>
 
                     <button type="button" @click="closeAll()"
                         class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-gray-200 dark:border-neutral-800
-                               bg-white dark:bg-neutral-900
-                               text-gray-700 dark:text-gray-200
-                               hover:bg-gray-50 dark:hover:bg-neutral-800/60
+                               border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
+                               text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-800/60
                                focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                         Cerrar todo
                     </button>
@@ -84,15 +96,16 @@
 
     <!-- Niveles -->
     <div class="space-y-4">
-        @forelse($personalNivel as $nivelNombre => $gruposDelNivel)
+        @forelse($porNivel as $nivelNombre => $itemsNivel)
             @php
                 $nivelKey = \Illuminate\Support\Str::slug($nivelNombre) . '-' . crc32($nivelNombre);
-                $totalNivel = $gruposDelNivel->flatten(1)->count();
-                $numGrupos = $gruposDelNivel->count();
+                $totalNivel = $itemsNivel->count();
+                $nivelId = (int) ($itemsNivel->first()?->nivel_id ?? 0);
             @endphp
 
             <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
                 data-nivel="{{ $nivelKey }}">
+
                 <!-- Header nivel -->
                 <button type="button" @click="toggle('{{ $nivelKey }}')"
                     :aria-expanded="isOpen('{{ $nivelKey }}')"
@@ -108,12 +121,9 @@
                         </div>
 
                         <div class="min-w-0">
-                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                                {{ $nivelNombre }}
+                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ $nivelNombre }}
                             </p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ $numGrupos }} grupo(s) · {{ $totalNivel }} asignación(es)
-                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $totalNivel }} asignación(es)</p>
                         </div>
                     </div>
 
@@ -153,143 +163,110 @@
                                     <th class="px-4 py-3 font-semibold">Función</th>
                                     <th class="px-4 py-3 font-semibold">Grado</th>
                                     <th class="px-4 py-3 font-semibold">Grupo</th>
+                                    <th class="px-4 py-3 font-semibold">Ingreso SEG</th>
+                                    <th class="px-4 py-3 font-semibold">Ingreso SEP</th>
                                     <th class="px-4 py-3 font-semibold text-right">Acciones</th>
                                 </tr>
                             </thead>
 
-                            <tbody class="divide-y divide-gray-100 dark:divide-neutral-800">
-                                @foreach ($gruposDelNivel as $grupoNombre => $items)
-                                    @php $countGrupo = $items->count(); @endphp
+                            {{-- ✅ sortable lineal por NIVEL --}}
+                            <tbody wire:ignore.self data-sortable="nivel" data-nivel-id="{{ $nivelId }}"
+                                class="divide-y divide-gray-100 dark:divide-neutral-800">
+                                @forelse($itemsNivel as $idx => $row)
+                                    @php
+                                        $p = $row->persona;
+                                        $nombreCompleto = trim(
+                                            ($p->nombre ?? '') .
+                                                ' ' .
+                                                ($p->apellido_paterno ?? '') .
+                                                ' ' .
+                                                ($p->apellido_materno ?? ''),
+                                        );
+                                        $roles = $p?->personaRoles ?? collect();
+                                    @endphp
 
-                                    <!-- Separador GRUPO -->
-                                    <tr class="bg-emerald-50/70 dark:bg-emerald-900/15">
-                                        <td colspan="7" class="px-4 py-2">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <span
-                                                        class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                                            viewBox="0 0 24 24" fill="currentColor">
-                                                            <path
-                                                                d="M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                                                        </svg>
-                                                    </span>
-                                                    <p class="font-semibold text-gray-900 dark:text-white">
-                                                        Grupo: {{ $grupoNombre }}
-                                                    </p>
-                                                </div>
+                                    <tr wire:key="pn-{{ $row->id }}" data-id="{{ $row->id }}"
+                                        class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $idx + 1 }}</td>
 
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                                                    {{ $countGrupo }} persona(s)
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-
-                                    <!-- Filas del PERSONAL -->
-                                    @foreach ($items as $idx => $row)
-                                        @php
-                                            $p = $row->persona;
-
-                                            $nombreCompleto = trim(
-                                                ($p->nombre ?? '') .
-                                                    ' ' .
-                                                    ($p->apellido_paterno ?? '') .
-                                                    ' ' .
-                                                    ($p->apellido_materno ?? ''),
-                                            );
-
-                                            $grado = $row->grado?->nombre ?? '—';
-                                            $grupo = $row->grupo?->nombre ?? '—';
-
-                                            // rolesPersona viene del eager load: persona.personaRoles.rolePersona
-                                            $roles = $p?->personaRoles ?? collect();
-                                        @endphp
-
-                                        <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
-                                            <!-- # -->
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                {{ $idx + 1 }}
-                                            </td>
-
-                                            <!-- Orden + controles -->
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center gap-2">
-                                                    {{-- <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                                 bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                        {{ $row->orden ?? '—' }}
-                                                    </span> --}}
-
-                                                    <div class="flex items-center gap-1">
-                                                        <button type="button"
-                                                            wire:click="subir({{ $row->id }})"
-                                                            class="inline-flex items-center justify-center h-8 w-8 rounded-xl
-                                                                   border border-gray-200 dark:border-neutral-700
-                                                                   hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                                                                   focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                                                            ▲
-                                                        </button>
-
-                                                        <button type="button"
-                                                            wire:click="bajar({{ $row->id }})"
-                                                            class="inline-flex items-center justify-center h-8 w-8 rounded-xl
-                                                                   border border-gray-200 dark:border-neutral-700
-                                                                   hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                                                                   focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                                                            ▼
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <!-- Personal -->
-                                            <td class="px-4 py-3">
-                                                <div class="font-semibold text-gray-900 dark:text-white">
-                                                    {{ $nombreCompleto ?: 'Sin nombre' }}
-                                                </div>
-                                            </td>
-
-                                            <!-- Función -->
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                <div class="flex flex-wrap gap-1.5">
-                                                    @forelse($roles as $pr)
-                                                        <span
-                                                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                                     bg-gray-100 text-indigo-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                            {{ $pr->rolePersona?->nombre ?? '—' }}
-                                                        </span>
-                                                    @empty
-                                                        <span class="text-xs text-gray-400">—</span>
-                                                    @endforelse
-                                                </div>
-                                            </td>
-
-                                            <!-- Grado -->
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                {{ $grado }}
-                                            </td>
-
-                                            <!-- Grupo -->
-                                            <td class="px-4 py-3">
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
                                                 <span
                                                     class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
                                                              bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                    {{ $grupo }}
+                                                    {{ $row->orden ?? '—' }}
                                                 </span>
-                                            </td>
 
-                                            <!-- Acciones -->
-                                            <td class="px-4 py-3 text-right">
-                                                {{-- Solo reordenamiento; no invento otras acciones --}}
-                                                <span class="text-xs text-gray-400">—</span>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @endforeach
+                                                <button type="button" data-handle
+                                                    class="inline-flex items-center justify-center h-8 w-8 rounded-xl
+                                                           border border-gray-200 dark:border-neutral-700
+                                                           hover:bg-gray-50 dark:hover:bg-neutral-800/60
+                                                           focus:outline-none focus:ring-2 focus:ring-blue-500/20
+                                                           cursor-grab active:cursor-grabbing"
+                                                    title="Arrastra para reordenar">
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="h-4 w-4 text-gray-500 dark:text-gray-300"
+                                                        viewBox="0 0 24 24" fill="currentColor">
+                                                        <path
+                                                            d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
 
-                                @if ($gruposDelNivel->flatten(1)->isEmpty())
+                                        <td class="px-4 py-3">
+                                            <div class="font-semibold text-gray-900 dark:text-white">
+                                                {{ $nombreCompleto ?: 'Sin nombre' }}
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                            <div class="flex flex-wrap gap-1.5">
+                                                @forelse($roles as $pr)
+                                                    <span
+                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                                                                 bg-gray-100 text-indigo-700 dark:bg-neutral-800 dark:text-gray-200">
+                                                        {{ $pr->rolePersona?->nombre ?? '—' }}
+                                                    </span>
+                                                @empty
+                                                    <span class="text-xs text-gray-400">—</span>
+                                                @endforelse
+                                            </div>
+                                        </td>
+
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                            {{ $row->grado?->nombre ?? '—' }}
+                                        </td>
+
+                                        <td class="px-4 py-3">
+                                            <span
+                                                class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                                                         bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
+                                                {{ $row->grupo?->nombre ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                            {{ $row->ingreso_seg ? \Carbon\Carbon::parse($row->ingreso_seg)->format('d/m/Y') : '—' }}
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                            {{ $row->ingreso_sep ? \Carbon\Carbon::parse($row->ingreso_sep)->format('d/m/Y') : '—' }}
+                                        </td>
+
+                                        <td class="px-4 py-3 text-right">
+                                            <flux:button variant="primary"
+                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
+                                                @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $row->id }} });">
+                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                            </flux:button>
+
+                                            <flux:button variant="danger"
+                                                class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
+                                                @click="eliminar({{ $row->id }})">
+                                                <flux:icon.trash-2 class="w-3.5 h-3.5" />
+                                            </flux:button>
+                                        </td>
+                                    </tr>
+                                @empty
                                     <tr>
                                         <td colspan="7" class="px-6 py-10 text-center">
                                             <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin
@@ -299,22 +276,96 @@
                                             </p>
                                         </td>
                                     </tr>
-                                @endif
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
 
                 </div>
             </div>
-
-            @empty
-                <div
-                    class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
-                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin resultados</p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        No hay personal asignado o tu búsqueda no coincide.
-                    </p>
-                </div>
-            @endforelse
-        </div>
+        @empty
+            <div
+                class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin resultados</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    No hay personal asignado o tu búsqueda no coincide.
+                </p>
+            </div>
+        @endforelse
     </div>
+
+    {{-- ✅ Carga Sortable (solo una vez) --}}
+    @once
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+        <script>
+            (function() {
+                function initSortableForAll() {
+                    if (typeof Sortable === 'undefined') return;
+
+                    document.querySelectorAll('tbody[data-sortable="nivel"]').forEach((tbody) => {
+                        if (tbody._sortable) return;
+
+                        const nivelId = parseInt(tbody.dataset.nivelId || '0', 10);
+                        if (!nivelId) return;
+
+                        tbody._sortable = new Sortable(tbody, {
+                            animation: 150,
+                            handle: '[data-handle]',
+                            draggable: 'tr[data-id]',
+                            dataIdAttr: 'data-id',
+                            forceFallback: true,
+                            fallbackOnBody: true,
+                            fallbackTolerance: 5,
+
+                            onEnd: () => {
+                                const ids = tbody._sortable.toArray()
+                                    .map(v => parseInt(v, 10))
+                                    .filter(Boolean);
+
+                                if (!ids.length) return;
+
+                                // ✅ Livewire v3: $wire está disponible en el componente actual
+                                // pero aquí estamos fuera; tomamos el componente padre más cercano:
+                                const root = tbody.closest('[wire\\:id]');
+                                if (!root) return;
+
+                                const componentId = root.getAttribute('wire:id');
+                                const component = Livewire.find(componentId);
+                                if (!component) return;
+
+                                component.call('ordenarJs', nivelId, ids);
+                            },
+                        });
+                    });
+                }
+
+                // Inicializa cuando DOM está listo
+                document.addEventListener('DOMContentLoaded', () => {
+                    initSortableForAll();
+                });
+
+                // Inicializa cuando Livewire está listo
+                document.addEventListener('livewire:init', () => {
+                    initSortableForAll();
+
+                    // Re-inicializa tras cada render (por búsqueda, refresh, etc.)
+                    Livewire.hook('message.processed', () => {
+                        initSortableForAll();
+                    });
+                });
+
+                // Por si Sortable carga “tarde”
+                const t = setInterval(() => {
+                    if (typeof Sortable !== 'undefined') {
+                        clearInterval(t);
+                        initSortableForAll();
+                    }
+                }, 120);
+            })
+            ();
+        </script>
+    @endonce
+
+    <livewire:persona-nivel.editar-persona-nivel />
+</div>
