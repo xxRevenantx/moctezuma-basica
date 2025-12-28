@@ -24,8 +24,6 @@ class CicloEscolarSeeder extends Seeder
             ['inicio_anio' => 2023, 'fin_anio' => 2024],
             ['inicio_anio' => 2024, 'fin_anio' => 2025],
             ['inicio_anio' => 2025, 'fin_anio' => 2026],
-            ['inicio_anio' => 2026, 'fin_anio' => 2027],
-            ['inicio_anio' => 2027, 'fin_anio' => 2028],
         ];
 
         foreach ($ciclos as $ciclo) {

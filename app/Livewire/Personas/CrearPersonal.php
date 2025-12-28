@@ -8,6 +8,7 @@ use Livewire\WithFileUploads;
 
 class CrearPersonal extends Component
 {
+    public $titulo;
     public $nombre;
 
     public $apellido_paterno;
@@ -62,6 +63,8 @@ class CrearPersonal extends Component
     // Limpia mientras escribe o si está incompleto
     if (! $curp || strlen($curp) < 18) {
         $this->reset([
+
+            'titulo',
             'nombre',
             'apellido_paterno',
             'apellido_materno',
@@ -96,6 +99,7 @@ public function consultarCurp()
     if (($data['error'] ?? false) === true) {
         // Limpia campos si falló
         $this->reset([
+            'titulo',
             'nombre',
             'apellido_paterno',
             'apellido_materno',
@@ -152,6 +156,7 @@ public function consultarCurp()
     public function crearPersonal()
     {
         $this->validate([
+            'titulo' => 'required|string|max:50',
             'nombre' => 'required|string|max:255',
             'apellido_paterno' => 'required|string|max:255',
             'apellido_materno' => 'nullable|string|max:255',
@@ -178,6 +183,7 @@ public function consultarCurp()
             'estado' => 'nullable|string|max:255',
             'codigo_postal' => 'nullable|string|max:10',
         ], [
+            'titulo.required' => 'El título es obligatorio.',
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'curp.required' => 'La CURP es obligatoria.',
@@ -217,6 +223,7 @@ public function consultarCurp()
         }
 
         \App\Models\Persona::create([
+            'titulo' => $this->titulo,
             'nombre' => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
@@ -249,7 +256,7 @@ public function consultarCurp()
         ]);
 
         $this->reset([
-            
+            'titulo',
             'nombre',
             'apellido_paterno',
             'apellido_materno',

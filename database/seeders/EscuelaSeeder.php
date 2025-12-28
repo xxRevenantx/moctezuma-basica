@@ -24,6 +24,7 @@ class EscuelaSeeder extends Seeder
             'telefono' => '7676880774',
             'correo' => 'centrouniversitariomoctezuma@gmail.com',
             'pagina_web' => 'https://centrouniversitariomoctezuma.com',
+            'lema' => '2025, Año de la mujer indígena',
         ];
 
         \App\Models\Escuela::create($escuela);

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\PersonaNivel;
 
+use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -123,6 +124,9 @@ class MostrarPersonaNivel extends Component
         // ✅ Solo collapse por NIVEL
         $porNivel = $rows->groupBy(fn ($r) => $r->nivel?->nombre ?? 'Sin nivel');
 
-        return view('livewire.persona-nivel.mostrar-persona-nivel', compact('porNivel'));
+
+        $niveles = Nivel::orderBy('id')->get();
+        $ciclos = \App\Models\CicloEscolar::orderBy('id', 'desc')->get();
+        return view('livewire.persona-nivel.mostrar-persona-nivel', compact('porNivel', 'niveles', 'ciclos'));
     }
 }

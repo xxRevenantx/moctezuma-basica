@@ -227,6 +227,11 @@
                             </div>
                         </flux:field>
                         <flux:field>
+                            <flux:label badge="Requerido">Título</flux:label>
+                            <flux:input wire:model="titulo" placeholder="Ej. Dr. Lic. Profr." />
+                            <flux:error name="titulo" />
+                        </flux:field>
+                        <flux:field>
                             <flux:label badge="Requerido">Nombre(s)</flux:label>
                             <flux:input wire:model.defer="nombre" placeholder="Ej. John" />
                             <flux:error name="nombre" />

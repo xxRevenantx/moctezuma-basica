@@ -32,7 +32,7 @@ class CrearDirector extends Component
         'curp' => 'nullable|string|size:18|unique:directores,curp',
         'rfc' => 'nullable|string|unique:directores,rfc',
         'cargo' => 'required|string|max:100',
-        'identificador' => 'required|string|max:20',
+        'identificador' => 'required|string|max:100',
         'zona_escolar' => 'nullable|string|max:20',
         'sector' => 'nullable|string|max:10',
         'telefono' => 'nullable|string|max:10',

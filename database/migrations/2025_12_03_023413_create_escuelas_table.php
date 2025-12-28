@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('telefono', 10);
             $table->string('correo')->nullable();
             $table->string('pagina_web')->nullable();
+            $table->string('lema')->nullable();
             $table->timestamps();
         });
     }

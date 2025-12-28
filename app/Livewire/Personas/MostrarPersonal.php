@@ -52,6 +52,7 @@ class MostrarPersonal extends Component
     {
         $personal = Persona::where(function($query) {
                         $query->where('nombre', 'like', '%' . $this->search . '%')
+                            ->orWhere('titulo','like', '%' . $this->search . '%')
                             ->orWhere('apellido_paterno', 'like', '%' . $this->search . '%')
                             ->orWhere('apellido_materno', 'like', '%' . $this->search . '%')
                             ->orWhereRaw("CONCAT(nombre, ' ', apellido_paterno, ' ', apellido_materno) LIKE ?", ['%' . $this->search . '%'])

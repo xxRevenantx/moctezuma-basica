@@ -122,7 +122,12 @@
                             <flux:input wire:model="pagina_web" :label="__('Página Web')" type="url"
                                 placeholder="https://ejemplo.edu.mx" autocomplete="url"
                                 class="sm:col-span-2 lg:col-span-2" />
+
+
                         </div>
+                        {{-- LEMA --}}
+                        <flux:input wire:model="lema" :label="__('Lema')" type="text"
+                            placeholder="Lema de la escuela" autocomplete="organization" class="col-span-1" />
 
                         <!-- Botonera -->
                         <div

@@ -103,9 +103,9 @@
                             Ciclos Escolares
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.supervisores')"
-                            :current="request()->routeIs('misrutas.supervisores')" wire:navigate>
-                            Supervisores
+                        <flux:navlist.item icon="home" :href="route('misrutas.autoridades')"
+                            :current="request()->routeIs('misrutas.autoridades')" wire:navigate>
+                            Autoridades
                         </flux:navlist.item>
 
                         <flux:sidebar.group expandable heading="PERSONAL" class="grid text-xs gap-1 text-zinc-300">

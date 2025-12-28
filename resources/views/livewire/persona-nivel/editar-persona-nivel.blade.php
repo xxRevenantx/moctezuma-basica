@@ -7,15 +7,14 @@
     "
     @keydown.escape.window="show = false; $wire.cerrarModal()" class="fixed inset-0 z-50 flex items-center justify-center"
     aria-live="polite">
-
     <!-- Overlay -->
     <div class="absolute inset-0 bg-neutral-900/70 backdrop-blur-sm" x-show="show" x-transition.opacity
         @click.self="show = false; $wire.cerrarModal()"></div>
 
     <!-- Modal -->
     <div class="relative w-[92vw] sm:w-[88vw] md:w-[90vw] max-w-2xl mx-4 sm:mx-6
-                bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10
-                overflow-hidden flex flex-col max-h-[85vh]"
+               bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10
+               overflow-hidden flex flex-col max-h-[85vh]"
         role="dialog" aria-modal="true" aria-labelledby="titulo-modal-personal" x-show="show"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 scale-95 translate-y-2"
@@ -23,7 +22,6 @@
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 translate-y-2" wire:ignore.self>
-
         <!-- Overlay de carga -->
         <div x-show="loading" x-transition.opacity
             class="absolute inset-0 z-20 flex items-center justify-center
@@ -49,16 +47,29 @@
             class="px-5 sm:px-6 pt-4 pb-3 flex items-start justify-between gap-3
                    sticky top-0 bg-white/95 dark:bg-neutral-900/95 backdrop-blur z-10">
             <div class="min-w-0">
-                <h2 id="titulo-modal-generacion" class="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
-                    Editar Personal
+                <h2 id="titulo-modal-personal" class="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
+                    Editar Asignación de Nivel
                 </h2>
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    <span class="inline-flex items-center gap-2">
-                        <flux:badge color="indigo">
-                            {{-- {{ $nombre }} {{ $apellido_paterno }} {{ $apellido_materno }} --}}
+
+                <div class="mt-2 space-y-1.5">
+                    <p class="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+                        Información actual:
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <flux:badge color="indigo" size="sm">
+                            👤 {{ $nombrePersona ?? '—' }}
                         </flux:badge>
-                    </span>
-                </p>
+                        <flux:badge color="violet" size="sm">
+                            📚 {{ $nombreNivel ?? '—' }}
+                        </flux:badge>
+                        <flux:badge color="purple" size="sm">
+                            🎓 {{ $nombreGrado ?? '—' }}
+                        </flux:badge>
+                        <flux:badge color="fuchsia" size="sm">
+                            👥 {{ $nombreGrupo ?? '—' }}
+                        </flux:badge>
+                    </div>
+                </div>
             </div>
 
             <button @click="show = false; $wire.cerrarModal()" type="button"
@@ -76,18 +87,66 @@
 
         <!-- Contenido con scroll -->
         <div class="flex-1 overflow-y-auto">
-            <form wire:submit.prevent="actualizarPersonalNivel">
-                {{-- Grid de inputs --}}
+            <form wire:submit.prevent="actualizarPersonal">
                 <flux:field class="p-4">
-
-
-
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+
+                        <!-- Persona -->
+                        <flux:select label="Personal" wire:model="persona_id">
+                            <flux:select.option value="" disabled>-- Seleccione personal --</flux:select.option>
+                            @foreach ($personas as $persona)
+                                <flux:select.option value="{{ $persona->id }}">
+                                    {{ $persona->persona->especialidad }} -
+                                    {{ $persona->persona->nombre }} {{ $persona->persona->apellido_paterno }}
+                                    {{ $persona->persona->apellido_materno }} => {{ $persona->rolePersona->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        <!-- Nivel -->
+                        <flux:select wire:model.live="nivel_id" label="Seleccionar Nivel">
+                            <flux:select.option value="">-- Seleccionar Nivel --</flux:select.option>
+                            @foreach ($niveles as $nivel)
+                                <flux:select.option value="{{ $nivel->id }}">
+                                    {{ $nivel->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        <!-- Grado -->
+                        <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
+                            :disabled="!$nivel_id || $grados->isEmpty()">
+                            <flux:select.option value="">-- Seleccionar Grado --</flux:select.option>
+                            @foreach ($grados as $grado)
+                                <flux:select.option value="{{ $grado->id }}">
+                                    {{ $grado->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        <!-- Grupo -->
+                        <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
+                            :disabled="!$grado_id || $grupos->isEmpty()">
+                            <flux:select.option value="">-- Seleccionar Grupo --</flux:select.option>
+                            @foreach ($grupos as $grupo)
+                                <flux:select.option value="{{ $grupo->id }}">
+                                    {{ $grupo->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        <!-- Ingreso SEG -->
+                        <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG" />
+
+                        <!-- Ingreso SEP -->
+                        <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP" />
+
+                        {{-- INGRESO CT --}}
+                        <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso CT" />
                     </div>
 
-
+                    <!-- Acciones -->
                     <div class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
                         <button @click="show = false; $wire.cerrarModal()" type="button"
                             class="inline-flex justify-center rounded-xl px-4 py-2.5 border border-neutral-200 dark:border-neutral-700

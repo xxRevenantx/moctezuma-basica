@@ -10,6 +10,6 @@ class PersonaSeeder extends Seeder
 {
     public function run(): void
     {
-        Persona::factory()->count(50)->create();
+        Persona::factory()->count(30)->create();
     }
 }

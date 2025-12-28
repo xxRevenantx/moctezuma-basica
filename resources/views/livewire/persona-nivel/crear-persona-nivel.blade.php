@@ -75,9 +75,9 @@
                                     </flux:select.option>
                                     @foreach ($PersonasRoles as $roles)
                                         <flux:select.option value="{{ $roles->id }}">
-                                            {{ $roles->persona->especialidad }} -
+                                            {{ $roles->persona->titulo }} -
                                             {{ $roles->persona->nombre }} {{ $roles->persona->apellido_paterno }}
-                                            {{ $roles->persona->apellido_materno }}
+                                            {{ $roles->persona->apellido_materno }} => {{ $roles->rolePersona->nombre }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
@@ -126,6 +126,9 @@
 
                                 {{-- INGRESO SEP --}}
                                 <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP" />
+
+                                {{-- INGRESO C.T. --}}
+                                <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso C.T." />
 
 
                             </div>

@@ -23,6 +23,8 @@ class Escuela extends Component
     public $correo;
     public $pagina_web;
 
+    public $lema;
+
   protected $rules = [
         'nombre'         => 'required|string|min:3|max:180',
         'calle'          => 'required|string|min:3|max:180',
@@ -36,6 +38,7 @@ class Escuela extends Component
         'telefono'       => 'required|digits:10',
         'correo'         => 'nullable|email:rfc,dns|max:180',
         'pagina_web'     => 'nullable|url|max:255',
+        'lema'           => 'nullable|string|min:3|max:255',
     ];
 
     protected $messages = [
@@ -46,6 +49,8 @@ class Escuela extends Component
         'size'          => 'Debe tener exactamente :size caracteres.',
         'email'         => 'Introduce un correo válido.',
         'url'           => 'Introduce una URL válida (con https://).',
+        'lema.min'       => 'El lema debe contener al menos :min caracteres.',
+        'lema.max'       => 'El lema no puede exceder :max caracteres.',
     ];
 
     /** Validación en vivo por campo */
@@ -71,6 +76,7 @@ class Escuela extends Component
             $this->telefono      = $escuela->telefono;
             $this->correo        = $escuela->correo;
             $this->pagina_web    = $escuela->pagina_web;
+            $this->lema          = $escuela->lema;
         }
     }
 

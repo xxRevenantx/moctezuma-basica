@@ -1,0 +1,11 @@
+{
+    "roboto": {
+        "normal": "roboto_normal_18402436b61cde1da308bb8797797272"
+    },
+    "times": {
+        "normal": "times_normal_2e7e0b27f741cb093096650f2f589540",
+        "bold": "C:\\laragon\\www\\moctezuma-basica\\vendor\\dompdf\\dompdf\/lib\/fonts\/Times-Bold",
+        "italic": "C:\\laragon\\www\\moctezuma-basica\\vendor\\dompdf\\dompdf\/lib\/fonts\/Times-Italic",
+        "bold_italic": "C:\\laragon\\www\\moctezuma-basica\\vendor\\dompdf\\dompdf\/lib\/fonts\/Times-BoldItalic"
+    }
+}

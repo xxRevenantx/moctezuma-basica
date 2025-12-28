@@ -100,6 +100,7 @@
                                     <tr>
                                         <th class="px-4 py-3 text-center font-semibold">#</th>
                                         <th class="px-4 py-3 text-left font-semibold">Foto</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Título</th>
                                         <th class="px-4 py-3 text-left font-semibold">Nombre(s)</th>
                                         <th class="px-4 py-3 text-left font-semibold">Apellido Paterno</th>
                                         <th class="px-4 py-3 text-left font-semibold">Apellido Materno</th>
@@ -182,6 +183,8 @@
                                                 </td>
 
                                                 <!-- Datos -->
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $persona->titulo ?: '---' }}</td>
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     {{ $persona->nombre ?: '---' }}</td>
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">

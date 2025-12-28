@@ -22,6 +22,7 @@ class PersonaNivel extends Model
         'grupo_id',
         'ingreso_seg',
         'ingreso_sep',
+        'ingreso_ct',
         'orden',
     ];
 

@@ -4,6 +4,7 @@ use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\NivelController;
+use App\Http\Controllers\PDFController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
@@ -26,7 +27,7 @@ Route::get('/ciclos-escolares', [CicloEscolarController::class, 'index'])->name(
 Route::get('/escuela', [EscuelaController::class, 'index'])->name('misrutas.escuela');
 
 // RUTA DIRECTIVOS
-Route::get('/supervisores', [DirectorController::class, 'index'])->name('misrutas.supervisores');
+Route::get('/autoridades', [DirectorController::class, 'index'])->name('misrutas.autoridades');
 
 // PERSONAL
 Route::get('/personal', [PersonaController::class, 'index'])->name('misrutas.personal');
@@ -56,3 +57,7 @@ Route::get('/periodos-basica', [PeriodosBasicoController::class, 'index'])->name
 
 // RUTAS DE PERIODOS BACHILLERATO
 Route::get('/periodos-bachillerato', [PeriodosBachilleratoController::class, 'index'])->name('misrutas.periodos-bachillerato');
+
+
+// PDF
+Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');

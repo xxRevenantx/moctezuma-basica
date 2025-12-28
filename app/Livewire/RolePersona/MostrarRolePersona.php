@@ -32,20 +32,22 @@ class MostrarRolePersona extends Component
         $personas = Persona::query()
             ->with(['personaRoles.rolePersona']) // trae pivote + rol
             ->when($s !== '', function ($q) use ($s) {
-                $q->where(function ($qq) use ($s) {
-                    // buscar por persona
-                    $qq->where('nombre', 'like', "%{$s}%")
-                        ->orWhere('apellido_paterno', 'like', "%{$s}%")
-                        ->orWhere('apellido_materno', 'like', "%{$s}%")
+            $q->where(function ($qq) use ($s) {
+                // buscar por persona
+                $qq->where('nombre', 'like', "%{$s}%")
+                ->orWhere('apellido_paterno', 'like', "%{$s}%")
+                ->orWhere('apellido_materno', 'like', "%{$s}%")
 
-                        // buscar por rol (vía pivote)
-                        ->orWhereHas('personaRoles.rolePersona', function ($rq) use ($s) {
-                            $rq->where('nombre', 'like', "%{$s}%")
-                               ->orWhere('slug', 'like', "%{$s}%");
-                        });
+                // buscar por rol (vía pivote)
+                ->orWhereHas('personaRoles.rolePersona', function ($rq) use ($s) {
+                    $rq->where('nombre', 'like', "%{$s}%")
+                       ->orWhere('slug', 'like', "%{$s}%");
                 });
+            });
             })
-            ->latest('id')
+            ->orderBy('nombre')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
             ->paginate(10);
 
         return view('livewire.role-persona.mostrar-role-persona', compact('personas'));

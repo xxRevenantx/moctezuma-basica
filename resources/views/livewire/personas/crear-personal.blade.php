@@ -178,7 +178,7 @@
 
 
                             {{-- ====== Datos personales ====== --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
                                     <div class="relative">
@@ -213,6 +213,11 @@
                                             </div>
                                         </div>
                                     </div>
+                                </flux:field>
+                                <flux:field>
+                                    <flux:label badge="Requerido">Título</flux:label>
+                                    <flux:input wire:model="titulo" placeholder="Ej. Lic, Profr, Dr" />
+                                    <flux:error name="titulo" />
                                 </flux:field>
                                 <flux:field>
                                     <flux:label badge="Requerido">Nombre(s)</flux:label>

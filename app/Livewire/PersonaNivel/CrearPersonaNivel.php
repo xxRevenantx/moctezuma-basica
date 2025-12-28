@@ -26,6 +26,10 @@ class CrearPersonaNivel extends Component
 
     public ?string $ingreso_seg = null;
     public ?string $ingreso_sep = null;
+    public ?string $ingreso_ct = null;
+
+
+
 
     public function mount(): void
     {
@@ -33,7 +37,10 @@ class CrearPersonaNivel extends Component
         $this->PersonasRoles = PersonaRole::with('persona')
             ->get()
             ->unique('persona_id')
+            ->sortBy(fn ($pr) => $pr->persona->nombre ?? '')
             ->values();
+
+            // dd($this->PersonasRoles);
 
         $this->niveles = Nivel::orderBy('id')->get();
 
@@ -81,6 +88,7 @@ class CrearPersonaNivel extends Component
             'grupo_id'    => ['required', 'integer', 'exists:grupos,id'],
             'ingreso_seg' => ['nullable', 'date'],
             'ingreso_sep' => ['nullable', 'date'],
+            'ingreso_ct' => ['nullable', 'date'],
         ], [
             'persona_id.required' => 'El campo Personal es obligatorio.',
             'persona_id.exists'   => 'El personal seleccionado no es válido.',
@@ -92,6 +100,7 @@ class CrearPersonaNivel extends Component
             'grupo_id.exists'     => 'El grupo seleccionado no es válido.',
             'ingreso_seg.date'    => 'La Fecha de Ingreso SEG debe ser una fecha válida.',
             'ingreso_sep.date'    => 'La Fecha de Ingreso SEP debe ser una fecha válida.',
+            'ingreso_ct.date'    => 'La Fecha de Ingreso C.T. debe ser una fecha válida.',
         ]);
 
         // VERIFICAR SI YA EXISTE LA ASIGNACIÓN (misma persona en mismo nivel+grado+grupo)
@@ -104,9 +113,26 @@ class CrearPersonaNivel extends Component
 
         if ($existeAsignacion) {
             $this->dispatch('swal', [
-                'title' => 'La asignación ya existe.',
-                'icon' => 'warning',
-                'position' => 'top',
+            'title' => 'Esta persona ya está asignada a este nivel, grado y grupo.',
+            'icon' => 'warning',
+            'position' => 'top',
+            ]);
+            return;
+        }
+
+        // VERIFICAR SI YA HAY OTRA PERSONA EN EL MISMO NIVEL+GRADO+GRUPO
+        $existeOtraPersona = PersonaNivel::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->where('grupo_id', $this->grupo_id)
+            ->where('persona_id', '!=', $this->persona_id)
+            ->exists();
+
+        if ($existeOtraPersona) {
+            $this->dispatch('swal', [
+            'title' => 'No puedes asignar más de dos personas a este nivel, grado y grupo.',
+            'icon' => 'warning',
+            'position' => 'top',
             ]);
             return;
         }
@@ -127,6 +153,7 @@ class CrearPersonaNivel extends Component
                 'grupo_id'     => $this->grupo_id,
                 'ingreso_seg'  => $this->ingreso_seg,
                 'ingreso_sep'  => $this->ingreso_sep,
+                'ingreso_ct'   => $this->ingreso_ct,
                 'orden'        => $nuevoOrden,
             ]);
         });
@@ -141,7 +168,7 @@ class CrearPersonaNivel extends Component
         $this->dispatch('refreshPersonaNivelList');
 
         // reset campos
-        $this->reset(['persona_id', 'nivel_id', 'grado_id', 'grupo_id', 'ingreso_seg', 'ingreso_sep']);
+        $this->reset(['persona_id', 'nivel_id', 'grado_id', 'grupo_id', 'ingreso_seg', 'ingreso_sep', 'ingreso_ct']);
         $this->grados = collect();
         $this->grupos = collect();
     }

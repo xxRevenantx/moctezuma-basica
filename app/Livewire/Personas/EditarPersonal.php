@@ -12,6 +12,7 @@ class EditarPersonal extends Component
 {
 
     public $personaId;
+     public $titulo;
      public $nombre;
 
     public $apellido_paterno;
@@ -67,6 +68,7 @@ class EditarPersonal extends Component
         $personal = Persona::findOrFail($id);
 
         $this->personaId = $personal->id;
+        $this->titulo = $personal->titulo;
         $this->nombre = $personal->nombre;
         $this->foto_actual = $personal->foto;
         $this->apellido_paterno = $personal->apellido_paterno;
@@ -103,6 +105,7 @@ class EditarPersonal extends Component
     public function actualizarPersonal()
     {
         $this->validate([
+            'titulo'=> 'nullable|string|max:10',
             'nombre'=> 'required|string|max:255',
             'apellido_paterno'=> 'required|string|max:255',
             'apellido_materno'=> 'nullable|string|max:255',
@@ -140,6 +143,7 @@ class EditarPersonal extends Component
 
 
         $personal->update([
+            'titulo'=> $this->titulo,
             'nombre' => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
@@ -182,6 +186,8 @@ class EditarPersonal extends Component
     {
         $this->reset([
             'open',
+            'personaId',
+            'titulo',
             'nombre',
             'apellido_paterno',
             'apellido_materno',

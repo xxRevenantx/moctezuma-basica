@@ -192,6 +192,8 @@
 
                                                 <!-- Datos -->
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    {{ $persona->titulo ?: '---' }}</td>
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     {{ $persona->nombre ?: '---' }}</td>
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                     {{ $persona->apellido_paterno ?: '---' }}</td>

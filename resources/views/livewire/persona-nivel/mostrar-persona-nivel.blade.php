@@ -51,321 +51,421 @@
                 </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <!-- Search -->
-                <div class="w-full sm:w-[380px]">
-                    <div class="relative">
-                        <span
-                            class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-gray-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24"
-                                fill="currentColor">
-                                <path
-                                    d="M10 4a6 6 0 104.472 10.03l4.249 4.249 1.414-1.414-4.249-4.249A6 6 0 0010 4zm-4 6a4 4 0 118 0 4 4 0 01-8 0z" />
-                            </svg>
-                        </span>
 
-                        <input type="text" wire:model.live.debounce.300ms="search"
-                            placeholder="Buscar por nombre, especialidad, grado, grupo o nivel…"
-                            class="w-full rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
+
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+
+
+                {{-- MODAL PARA REANUDACIONES  --}}
+                <div>
+                    <flux:modal.trigger name="reanudaciones">
+                        <flux:button variant="primary"
+                            class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            Reanudaciones
+                        </flux:button>
+                    </flux:modal.trigger>
+
+                    <flux:modal name="reanudaciones" flyout variant="floating" class="md:w-lg">
+
+                        <form action="{{ route('misrutas.reanudaciones') }}" class="p-6" target="_blank">
+                            <div class="space-y-6">
+                                <flux:heading size="lg">Descarga los oficios de Reanudaciones de Labores
+                                </flux:heading>
+
+                                <flux:subheading>Formulario para descargar Reanudaciones </flux:subheading>
+
+                                {{-- NIVELES --}}
+                                <flux:select label="Nivel" name="nivel_id" required>
+                                    <flux:select.option value="">--Selecciona un nivel--</flux:select.option>
+                                    @foreach ($niveles as $nivel)
+                                        <flux:select.option value="{{ $nivel->id }}">
+                                            {{ $nivel->nombre }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+
+                                <flux:select label="Tipo de reanudación" name="tipo_reanudacion" required>
+                                    <flux:select.option value="">--Selecciona el tipo de reanudación--
+                                    </flux:select.option>
+                                    <flux:select.option value="1">Reanudación de Receso de clases(Agosto)
+                                    </flux:select.option>
+                                    <flux:select.option value="2">Reanudaciones de invierno
+                                    </flux:select.option>
+                                    <flux:select.option value="3">Reanudaciones de primavera</flux:select.option>
+                                </flux:select>
+
+                                <flux:input label="Fecha del director" name="fecha_director" type="date" required />
+
+                                <flux:input label="Fecha del docente" name="fecha_docente" type="date" required />
+
+                                <flux:select label="Ciclo escolar" name="ciclo_escolar" required>
+                                    <flux:select.option value="">--Selecciona el ciclo escolar--
+                                    </flux:select.option>
+                                    @foreach ($ciclos as $ciclo)
+                                        <flux:select.option value="{{ $ciclo->id }}">
+                                            {{ $ciclo->inicio_anio }} - {{ $ciclo->fin_anio }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+
+                                <flux:textarea name="copias" label="C.C.P" placeholder="Escribe aquí las copias..." />
+
+
+                                <flux:modal.close>
+                                    <flux:button variant="filled">Cancelar</flux:button>
+                                </flux:modal.close>
+
+                                <flux:button type="submit" variant="primary">Generar</flux:button>
+                        </form>
+
+                </div>
+
+                </flux:modal>
+            </div>
+
+
+
+            <!-- Search -->
+            <div class="w-full sm:w-[380px]">
+                <div class="relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M10 4a6 6 0 104.472 10.03l4.249 4.249 1.414-1.414-4.249-4.249A6 6 0 0010 4zm-4 6a4 4 0 118 0 4 4 0 01-8 0z" />
+                        </svg>
+                    </span>
+
+                    <input type="text" wire:model.live.debounce.300ms="search"
+                        placeholder="Buscar por nombre, especialidad, grado, grupo o nivel…"
+                        class="w-full rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
                                    pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400
                                    focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
-                    </div>
                 </div>
+            </div>
 
-                <!-- Open/close all -->
-                <div class="flex gap-2">
-                    <button type="button" @click="openAll()"
-                        class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
-                               text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                               focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                        Abrir todo
-                    </button>
+            <!-- Open/close all -->
+            <div class="flex gap-2">
+                <button type="button" @click="openAll()"
+                    class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
+                               border border-emerald-200 dark:border-emerald-800
+                               bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950
+                               text-emerald-700 dark:text-emerald-300 font-medium
+                               hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900 dark:hover:to-teal-900
+                               shadow-sm hover:shadow-md hover:shadow-emerald-500/10
+                               transition-all duration-200
+                               focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Abrir todo
+                </button>
 
-                    <button type="button" @click="closeAll()"
-                        class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
-                               text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                               focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                        Cerrar todo
-                    </button>
-                </div>
+                <button type="button" @click="closeAll()"
+                    class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
+                               border border-slate-200 dark:border-slate-800
+                               bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950 dark:to-gray-950
+                               text-slate-700 dark:text-slate-300 font-medium
+                               hover:from-slate-100 hover:to-gray-100 dark:hover:from-slate-900 dark:hover:to-gray-900
+                               shadow-sm hover:shadow-md hover:shadow-slate-500/10
+                               transition-all duration-200
+                               focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                    </svg>
+                    Cerrar todo
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Niveles -->
-    <div class="space-y-4">
-        @forelse($porNivel as $nivelNombre => $itemsNivel)
-            @php
-                $nivelKey = \Illuminate\Support\Str::slug($nivelNombre) . '-' . crc32($nivelNombre);
-                $totalNivel = $itemsNivel->count();
-                $nivelId = (int) ($itemsNivel->first()?->nivel_id ?? 0);
-            @endphp
+<!-- Niveles -->
+<div class="space-y-4">
+    @forelse($porNivel as $nivelNombre => $itemsNivel)
+        @php
+            $nivelKey = \Illuminate\Support\Str::slug($nivelNombre) . '-' . crc32($nivelNombre);
+            $totalNivel = $itemsNivel->count();
+            $nivelId = (int) ($itemsNivel->first()?->nivel_id ?? 0);
+        @endphp
 
-            <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
-                data-nivel="{{ $nivelKey }}">
+        <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
+            data-nivel="{{ $nivelKey }}">
 
-                <!-- Header nivel -->
-                <button type="button" @click="toggle('{{ $nivelKey }}')"
-                    :aria-expanded="isOpen('{{ $nivelKey }}')"
-                    class="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-neutral-800/60 transition">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div
-                            class="h-11 w-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/25 grid place-items-center shrink-0">
-                            <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
-                                    d="M3 7h18M6 7v14h12V7M9 7V4h6v3" />
-                            </svg>
-                        </div>
-
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ $nivelNombre }}
-                            </p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $totalNivel }} asignación(es)</p>
-                        </div>
+            <!-- Header nivel -->
+            <button type="button" @click="toggle('{{ $nivelKey }}')"
+                :aria-expanded="isOpen('{{ $nivelKey }}')"
+                class="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-neutral-800/60 transition">
+                <div class="flex items-center gap-3 min-w-0 ">
+                    <div
+                        class="h-11 w-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/25 grid place-items-center shrink-0">
+                        <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                d="M3 7h18M6 7v14h12V7M9 7V4h6v3" />
+                        </svg>
                     </div>
 
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span
-                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
-                            {{ $totalNivel }}
-                        </span>
 
-                        <span class="transition-transform duration-200"
-                            :class="isOpen('{{ $nivelKey }}') ? 'rotate-180' : 'rotate-0'">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 dark:text-gray-300"
-                                viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 15.5l-6-6h12l-6 6z" />
-                            </svg>
-                        </span>
+
+
+
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ $nivelNombre }}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $totalNivel }} asignación(es)</p>
                     </div>
-                </button>
 
-                <!-- Contenido nivel -->
-                <div x-show="isOpen('{{ $nivelKey }}')" x-cloak
-                    x-transition:enter="transition ease-out duration-250"
-                    x-transition:enter-start="opacity-0 -translate-y-1"
-                    x-transition:enter-end="opacity-100 translate-y-0"
-                    x-transition:leave="transition ease-in duration-200"
-                    x-transition:leave-start="opacity-100 translate-y-0"
-                    x-transition:leave-end="opacity-0 -translate-y-1"
-                    class="border-t border-gray-200 dark:border-neutral-800">
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <thead class="bg-gray-50 dark:bg-neutral-800/70">
-                                <tr class="text-left text-gray-600 dark:text-gray-200">
-                                    <th class="px-4 py-3 font-semibold">#</th>
-                                    <th class="px-4 py-3 font-semibold">Orden</th>
-                                    <th class="px-4 py-3 font-semibold">Personal</th>
-                                    <th class="px-4 py-3 font-semibold">Función</th>
-                                    <th class="px-4 py-3 font-semibold">Grado</th>
-                                    <th class="px-4 py-3 font-semibold">Grupo</th>
-                                    <th class="px-4 py-3 font-semibold">Ingreso SEG</th>
-                                    <th class="px-4 py-3 font-semibold">Ingreso SEP</th>
-                                    <th class="px-4 py-3 font-semibold text-right">Acciones</th>
-                                </tr>
-                            </thead>
 
-                            {{-- ✅ sortable lineal por NIVEL --}}
-                            <tbody wire:ignore.self data-sortable="nivel" data-nivel-id="{{ $nivelId }}"
-                                class="divide-y divide-gray-100 dark:divide-neutral-800">
-                                @forelse($itemsNivel as $idx => $row)
-                                    @php
-                                        $p = $row->persona;
-                                        $nombreCompleto = trim(
-                                            ($p->nombre ?? '') .
-                                                ' ' .
-                                                ($p->apellido_paterno ?? '') .
-                                                ' ' .
-                                                ($p->apellido_materno ?? ''),
-                                        );
-                                        $roles = $p?->personaRoles ?? collect();
-                                    @endphp
+                </div>
 
-                                    <tr wire:key="pn-{{ $row->id }}" data-id="{{ $row->id }}"
-                                        class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $idx + 1 }}</td>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span
+                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
+                        {{ $totalNivel }}
+                    </span>
 
-                                        <td class="px-4 py-3">
-                                            <div class="flex items-center gap-2">
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                             bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                    {{ $row->orden ?? '—' }}
-                                                </span>
+                    <span class="transition-transform duration-200"
+                        :class="isOpen('{{ $nivelKey }}') ? 'rotate-180' : 'rotate-0'">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 dark:text-gray-300"
+                            viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 15.5l-6-6h12l-6 6z" />
+                        </svg>
+                    </span>
+                </div>
+            </button>
 
-                                                <button type="button" data-handle
-                                                    class="inline-flex items-center justify-center h-8 w-8 rounded-xl
+            <!-- Contenido nivel -->
+            <div x-show="isOpen('{{ $nivelKey }}')" x-cloak x-transition:enter="transition ease-out duration-250"
+                x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1"
+                class="border-t border-gray-200 dark:border-neutral-800">
+
+
+
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-neutral-800/70">
+                            <tr class="text-left text-gray-600 dark:text-gray-200">
+                                <th class="px-4 py-3 font-semibold">#</th>
+                                <th class="px-4 py-3 font-semibold">Orden</th>
+                                <th class="px-4 py-3 font-semibold">Personal</th>
+                                <th class="px-4 py-3 font-semibold">Función</th>
+                                <th class="px-4 py-3 font-semibold">Grado</th>
+                                <th class="px-4 py-3 font-semibold">Grupo</th>
+                                <th class="px-4 py-3 font-semibold">Ingreso SEG</th>
+                                <th class="px-4 py-3 font-semibold">Ingreso SEP</th>
+                                <th class="px-4 py-3 font-semibold">Ingreso C.T.</th>
+                                <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                            </tr>
+                        </thead>
+
+                        {{-- ✅ sortable lineal por NIVEL --}}
+                        <tbody wire:ignore.self data-sortable="nivel" data-nivel-id="{{ $nivelId }}"
+                            class="divide-y divide-gray-100 dark:divide-neutral-800">
+                            @forelse($itemsNivel as $idx => $row)
+                                @php
+                                    $p = $row->persona;
+                                    $nombreCompleto = trim(
+                                        ($p->nombre ?? '') .
+                                            ' ' .
+                                            ($p->apellido_paterno ?? '') .
+                                            ' ' .
+                                            ($p->apellido_materno ?? ''),
+                                    );
+                                    $roles = $p?->personaRoles ?? collect();
+                                @endphp
+
+                                <tr wire:key="pn-{{ $row->id }}" data-id="{{ $row->id }}"
+                                    class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $idx + 1 }}
+                                    </td>
+
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+
+
+                                            <button type="button" data-handle
+                                                class="inline-flex items-center justify-center h-8 w-8 rounded-xl
                                                            border border-gray-200 dark:border-neutral-700
                                                            hover:bg-gray-50 dark:hover:bg-neutral-800/60
                                                            focus:outline-none focus:ring-2 focus:ring-blue-500/20
                                                            cursor-grab active:cursor-grabbing"
-                                                    title="Arrastra para reordenar">
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="h-4 w-4 text-gray-500 dark:text-gray-300"
-                                                        viewBox="0 0 24 24" fill="currentColor">
-                                                        <path
-                                                            d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
+                                                title="Arrastra para reordenar">
+                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                    class="h-4 w-4 text-gray-500 dark:text-gray-300"
+                                                    viewBox="0 0 24 24" fill="currentColor">
+                                                    <path
+                                                        d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
 
-                                        <td class="px-4 py-3">
-                                            <div class="font-semibold text-gray-900 dark:text-white">
-                                                {{ $nombreCompleto ?: 'Sin nombre' }}
-                                            </div>
-                                        </td>
+                                    <td class="px-4 py-3">
+                                        <div class="font-semibold text-gray-900 dark:text-white">
+                                            {{ $nombreCompleto ?: 'Sin nombre' }}
+                                        </div>
+                                    </td>
 
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                            <div class="flex flex-wrap gap-1.5">
-                                                @forelse($roles as $pr)
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @forelse($roles as $pr)
+                                                <span
+                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
                                                                  bg-gray-100 text-indigo-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                        {{ $pr->rolePersona?->nombre ?? '—' }}
-                                                    </span>
-                                                @empty
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                @endforelse
-                                            </div>
-                                        </td>
+                                                    {{ $pr->rolePersona?->nombre ?? '—' }}
+                                                </span>
+                                            @empty
+                                                <span class="text-xs text-gray-400">—</span>
+                                            @endforelse
+                                        </div>
+                                    </td>
 
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                            {{ $row->grado?->nombre ?? '—' }}
-                                        </td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                        {{ $row->grado?->nombre ?? '—' }}
+                                    </td>
 
-                                        <td class="px-4 py-3">
-                                            <span
-                                                class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                                    <td class="px-4 py-3">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
                                                          bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                {{ $row->grupo?->nombre ?? '—' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                            {{ $row->ingreso_seg ? \Carbon\Carbon::parse($row->ingreso_seg)->format('d/m/Y') : '—' }}
-                                        </td>
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                            {{ $row->ingreso_sep ? \Carbon\Carbon::parse($row->ingreso_sep)->format('d/m/Y') : '—' }}
-                                        </td>
+                                            {{ $row->grupo?->nombre ?? '—' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                        {{ $row->ingreso_seg ? \Carbon\Carbon::parse($row->ingreso_seg)->format('d/m/Y') : '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                        {{ $row->ingreso_sep ? \Carbon\Carbon::parse($row->ingreso_sep)->format('d/m/Y') : '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                        {{ $row->ingreso_ct ? \Carbon\Carbon::parse($row->ingreso_ct)->format('d/m/Y') : '—' }}
+                                    </td>
 
-                                        <td class="px-4 py-3 text-right">
-                                            <flux:button variant="primary"
-                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $row->id }} });">
-                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                            </flux:button>
+                                    <td class="px-4 py-3 text-right">
+                                        <flux:button variant="primary"
+                                            class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
+                                            @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $row->id }} });">
+                                            <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                        </flux:button>
 
-                                            <flux:button variant="danger"
-                                                class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
-                                                @click="eliminar({{ $row->id }})">
-                                                <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                            </flux:button>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="px-6 py-10 text-center">
-                                            <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin
-                                                asignaciones</p>
-                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                Este nivel no tiene personal asignado.
-                                            </p>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
+                                        <flux:button variant="danger"
+                                            class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
+                                            @click="eliminar({{ $row->id }})">
+                                            <flux:icon.trash-2 class="w-3.5 h-3.5" />
+                                        </flux:button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="px-6 py-10 text-center">
+                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin
+                                            asignaciones</p>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Este nivel no tiene personal asignado.
+                                        </p>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
+
             </div>
-        @empty
-            <div
-                class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
-                <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin resultados</p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    No hay personal asignado o tu búsqueda no coincide.
-                </p>
-            </div>
-        @endforelse
-    </div>
+        </div>
+    @empty
+        <div
+            class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin resultados</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                No hay personal asignado o tu búsqueda no coincide.
+            </p>
+        </div>
+    @endforelse
+</div>
 
-    {{-- ✅ Carga Sortable (solo una vez) --}}
-    @once
-        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{{-- ✅ Carga Sortable (solo una vez) --}}
+@once
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-        <script>
-            (function() {
-                function initSortableForAll() {
-                    if (typeof Sortable === 'undefined') return;
+    <script>
+        (function() {
+            function initSortableForAll() {
+                if (typeof Sortable === 'undefined') return;
 
-                    document.querySelectorAll('tbody[data-sortable="nivel"]').forEach((tbody) => {
-                        if (tbody._sortable) return;
+                document.querySelectorAll('tbody[data-sortable="nivel"]').forEach((tbody) => {
+                    if (tbody._sortable) return;
 
-                        const nivelId = parseInt(tbody.dataset.nivelId || '0', 10);
-                        if (!nivelId) return;
+                    const nivelId = parseInt(tbody.dataset.nivelId || '0', 10);
+                    if (!nivelId) return;
 
-                        tbody._sortable = new Sortable(tbody, {
-                            animation: 150,
-                            handle: '[data-handle]',
-                            draggable: 'tr[data-id]',
-                            dataIdAttr: 'data-id',
-                            forceFallback: true,
-                            fallbackOnBody: true,
-                            fallbackTolerance: 5,
+                    tbody._sortable = new Sortable(tbody, {
+                        animation: 150,
+                        handle: '[data-handle]',
+                        draggable: 'tr[data-id]',
+                        dataIdAttr: 'data-id',
+                        forceFallback: true,
+                        fallbackOnBody: true,
+                        fallbackTolerance: 5,
 
-                            onEnd: () => {
-                                const ids = tbody._sortable.toArray()
-                                    .map(v => parseInt(v, 10))
-                                    .filter(Boolean);
+                        onEnd: () => {
+                            const ids = tbody._sortable.toArray()
+                                .map(v => parseInt(v, 10))
+                                .filter(Boolean);
 
-                                if (!ids.length) return;
+                            if (!ids.length) return;
 
-                                // ✅ Livewire v3: $wire está disponible en el componente actual
-                                // pero aquí estamos fuera; tomamos el componente padre más cercano:
-                                const root = tbody.closest('[wire\\:id]');
-                                if (!root) return;
+                            // ✅ Livewire v3: $wire está disponible en el componente actual
+                            // pero aquí estamos fuera; tomamos el componente padre más cercano:
+                            const root = tbody.closest('[wire\\:id]');
+                            if (!root) return;
 
-                                const componentId = root.getAttribute('wire:id');
-                                const component = Livewire.find(componentId);
-                                if (!component) return;
+                            const componentId = root.getAttribute('wire:id');
+                            const component = Livewire.find(componentId);
+                            if (!component) return;
 
-                                component.call('ordenarJs', nivelId, ids);
-                            },
-                        });
+                            component.call('ordenarJs', nivelId, ids);
+                        },
                     });
+                });
+            }
+
+            // Inicializa cuando DOM está listo
+            document.addEventListener('DOMContentLoaded', () => {
+                initSortableForAll();
+            });
+
+            // Inicializa cuando Livewire está listo
+            document.addEventListener('livewire:init', () => {
+                initSortableForAll();
+
+                // Re-inicializa tras cada render (por búsqueda, refresh, etc.)
+                Livewire.hook('message.processed', () => {
+                    initSortableForAll();
+                });
+            });
+
+            // Por si Sortable carga “tarde”
+            const t = setInterval(() => {
+                if (typeof Sortable !== 'undefined') {
+                    clearInterval(t);
+                    initSortableForAll();
                 }
+            }, 120);
+        })
+        ();
+    </script>
+@endonce
 
-                // Inicializa cuando DOM está listo
-                document.addEventListener('DOMContentLoaded', () => {
-                    initSortableForAll();
-                });
-
-                // Inicializa cuando Livewire está listo
-                document.addEventListener('livewire:init', () => {
-                    initSortableForAll();
-
-                    // Re-inicializa tras cada render (por búsqueda, refresh, etc.)
-                    Livewire.hook('message.processed', () => {
-                        initSortableForAll();
-                    });
-                });
-
-                // Por si Sortable carga “tarde”
-                const t = setInterval(() => {
-                    if (typeof Sortable !== 'undefined') {
-                        clearInterval(t);
-                        initSortableForAll();
-                    }
-                }, 120);
-            })
-            ();
-        </script>
-    @endonce
-
-    <livewire:persona-nivel.editar-persona-nivel />
+<livewire:persona-nivel.editar-persona-nivel />
 </div>

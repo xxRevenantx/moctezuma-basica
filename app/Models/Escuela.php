@@ -25,6 +25,7 @@ class Escuela extends Model
         'telefono',
         'correo',
         'pagina_web',
+        'lema',
     ];
 
 
