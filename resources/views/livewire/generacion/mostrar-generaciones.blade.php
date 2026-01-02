@@ -72,6 +72,8 @@
                     </div>
                 </div>
 
+
+
                 <!-- Contenido -->
                 <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
 
@@ -91,216 +93,149 @@
                             </p>
                         </div>
                     @else
-                        <!-- Cards resumen arriba -->
-                        <div class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <!-- Total -->
-                            <div
-                                class="relative overflow-hidden rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-600 via-sky-500 to-blue-600 text-white shadow-sm">
-                                <div
-                                    class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
-                                </div>
-                                <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-medium uppercase tracking-wide text-indigo-100/90">
-                                            Total de generaciones
-                                        </p>
-                                        <p class="mt-1 text-2xl font-bold leading-tight">
-                                            {{ $totalGeneraciones }}
-                                        </p>
-                                        <p class="mt-1 text-[11px] text-indigo-100/90">
-                                            Coinciden con el filtro actual.
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
-                                        <flux:icon.users class="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </div>
+                        <!-- Tabla agrupada por nivel -->
+                        <div
+                            class="mt-2 overflow-hidden rounded-2xl border border-slate-200/80 dark:border-neutral-800/80 bg-white/80 dark:bg-neutral-950/80">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead
+                                        class="bg-slate-50/80 dark:bg-neutral-900/80 border-b border-slate-200/70 dark:border-neutral-800/80">
+                                        <tr class="text-left">
+                                            <th
+                                                class="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                #
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                Generación
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                Ingreso
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                Egreso
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                Estado
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                Acciones
+                                            </th>
+                                        </tr>
+                                    </thead>
 
-                            <!-- Activas -->
-                            <div
-                                class="relative overflow-hidden rounded-xl border border-emerald-100 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-500 text-white shadow-sm">
-                                <div
-                                    class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
-                                </div>
-                                <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-medium uppercase tracking-wide text-emerald-50/90">
-                                            Generaciones activas
-                                        </p>
-                                        <p class="mt-1 text-2xl font-bold leading-tight">
-                                            {{ $generacionesActivas }}
-                                        </p>
-                                        <p class="mt-1 text-[11px] text-emerald-50/90">
-                                            Actualmente en curso o vigentes.
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
-                                        <flux:icon.badge-check class="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </div>
+                                    <tbody class="divide-y divide-slate-200/70 dark:divide-neutral-800/80">
+                                        @php $row = 0; @endphp
 
-                            <!-- Inactivas -->
-                            <div
-                                class="relative overflow-hidden rounded-xl border border-rose-100 dark:border-rose-900/60 bg-gradient-to-r from-rose-500 via-rose-400 to-orange-500 text-white shadow-sm">
-                                <div
-                                    class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
-                                </div>
-                                <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-medium uppercase tracking-wide text-rose-50/90">
-                                            Generaciones inactivas
-                                        </p>
-                                        <p class="mt-1 text-2xl font-bold leading-tight">
-                                            {{ $generacionesInactivas }}
-                                        </p>
-                                        <p class="mt-1 text-[11px] text-rose-50/90">
-                                            Ya concluidas o dadas de baja.
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
-                                        <flux:icon.archive class="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- AGRUPADO POR NIVEL EN COLLAPSE -->
-                        <div class="space-y-4">
-                            @foreach ($groupedByNivel as $nivelNombre => $items)
-                                <section x-data="{ open: true }"
-                                    class="rounded-2xl border border-slate-200/80 dark:border-neutral-800/80 bg-white/80 dark:bg-neutral-950/80 shadow-sm overflow-hidden">
-
-                                    <!-- Header colapsable -->
-                                    <button type="button" @click="open = !open"
-                                        class="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3 sm:py-3.5 bg-slate-50/80 dark:bg-neutral-900/80 hover:bg-slate-100/80 dark:hover:bg-neutral-900 transition-colors">
-                                        <div class="flex items-center gap-2">
-                                            <div
-                                                class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/70 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
-                                                <span
-                                                    class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-300"></span>
-                                                <span
-                                                    class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-100">
-                                                    {{ $nivelNombre }}
-                                                </span>
-                                            </div>
-
-                                            <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                                                {{ $items->count() }} generaciones
-                                            </span>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">
-                                                Mostrar / ocultar
-                                            </span>
-                                            {{-- evitamos el objeto JS para que Blade no se confunda --}}
-                                            <flux:icon.chevron-down
-                                                class="w-4 h-4 text-gray-500 dark:text-gray-300 transform transition-transform duration-200"
-                                                x-bind:class="open ? 'rotate-180' : ''" />
-                                        </div>
-                                    </button>
-
-                                    <!-- Contenido colapsable -->
-                                    <div x-show="open" x-transition.opacity x-transition.duration.200ms
-                                        class="px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
-                                        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                                            @foreach ($items as $generacion)
-                                                <div
-                                                    class="group relative overflow-hidden rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-900 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
-                                                    <!-- Glow de fondo -->
+                                        @foreach ($groupedByNivel as $nivelNombre => $items)
+                                            <!-- Separador por nivel -->
+                                            <tr
+                                                class="bg-gradient-to-r from-indigo-50/70 via-white to-sky-50/60 dark:from-indigo-950/30 dark:via-neutral-950 dark:to-sky-950/20">
+                                                <td colspan="6" class="px-4 py-3">
                                                     <div
-                                                        class="pointer-events-none absolute inset-x-0 -top-10 h-24 bg-gradient-to-br from-indigo-500/25 via-sky-400/20 to-transparent opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-300">
-                                                    </div>
-
-                                                    <div class="relative p-4 sm:p-5 flex flex-col gap-4">
-                                                        <!-- Top: índice local + estado -->
-                                                        <div class="flex items-start justify-between gap-3">
-                                                            <div class="flex items-center gap-2 flex-wrap">
-                                                                <span
-                                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950 text-[11px] font-semibold text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-100 dark:ring-indigo-800">
-                                                                    #{{ $loop->iteration }}
-                                                                </span>
-                                                            </div>
-
-                                                            @if ($generacion->status === 1)
-                                                                <span
-                                                                    class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-100 dark:ring-emerald-800">
-                                                                    <span
-                                                                        class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                                    Activa
-                                                                </span>
-                                                            @else
-                                                                <span
-                                                                    class="inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-900/40 px-2.5 py-1 text-[11px] font-semibold text-red-700 dark:text-red-200 ring-1 ring-red-100 dark:ring-red-800">
-                                                                    <span
-                                                                        class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
-                                                                    Inactiva
-                                                                </span>
-                                                            @endif
-                                                        </div>
-
-                                                        <!-- Centro: rango de años -->
-                                                        <div class="space-y-1">
-                                                            <h2
-                                                                class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-                                                                {{ $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso }}
-                                                            </h2>
-                                                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                                Generación académica registrada para
-                                                                {{ strtolower($nivelNombre) }}.
-                                                            </p>
-                                                        </div>
-
-                                                        <!-- Footer: info + acciones -->
-                                                        <div class="mt-1 flex items-center justify-between gap-3">
+                                                        class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div class="flex items-center gap-2">
                                                             <div
-                                                                class="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                                                                <span class="inline-flex items-center gap-1">
-                                                                    <flux:icon.calendar class="w-3.5 h-3.5" />
-                                                                    Ingreso:
-                                                                    <strong
-                                                                        class="font-semibold text-gray-700 dark:text-gray-200">
-                                                                        {{ $generacion->anio_ingreso }}
-                                                                    </strong>
-                                                                </span>
-                                                                <span class="mx-1 text-gray-400">•</span>
-                                                                <span class="inline-flex items-center gap-1">
-                                                                    Egreso:
-                                                                    <strong
-                                                                        class="font-semibold text-gray-700 dark:text-gray-200">
-                                                                        {{ $generacion->anio_egreso }}
-                                                                    </strong>
+                                                                class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/70 px-3 py-1 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-900/60">
+                                                                <span
+                                                                    class="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-300"></span>
+                                                                <span
+                                                                    class="text-xs font-semibold tracking-wide uppercase text-indigo-700 dark:text-indigo-100">
+                                                                    {{ $nivelNombre }}
                                                                 </span>
                                                             </div>
 
-                                                            <div class="flex items-center gap-2">
-                                                                <flux:button variant="ghost"
-                                                                    class="!px-2.5 !py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                                                                    x-on:click="eliminar({{ $generacion->id }}, '{{ $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso }}')">
-                                                                    <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                                                </flux:button>
+                                                            <span
+                                                                class="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                                {{ $items->count() }} generaciones (en esta página)
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
 
-                                                                <flux:button variant="primary"
-                                                                    class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white !px-3 !py-1.5 text-xs"
-                                                                    @click="$dispatch('abrir-modal-editar');
+                                            @foreach ($items as $generacion)
+                                                @php $row++; @endphp
+                                                <tr
+                                                    class="hover:bg-slate-50/80 dark:hover:bg-neutral-900/40 transition-colors">
+                                                    <td class="px-4 py-3">
+                                                        <span
+                                                            class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950 text-[11px] font-semibold text-indigo-700 dark:text-indigo-200 ring-1 ring-indigo-100 dark:ring-indigo-800">
+                                                            {{ $row }}
+                                                        </span>
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex flex-col">
+                                                            <span class="font-semibold text-slate-900 dark:text-white">
+                                                                {{ $generacion->anio_ingreso }} -
+                                                                {{ $generacion->anio_egreso }}
+                                                            </span>
+                                                            <span
+                                                                class="text-[11px] text-slate-500 dark:text-slate-400">
+                                                                Generación académica
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
+                                                        {{ $generacion->anio_ingreso }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
+                                                        {{ $generacion->anio_egreso }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        @if ((int) $generacion->status === 1)
+                                                            <span
+                                                                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-100 dark:ring-emerald-800">
+                                                                <span
+                                                                    class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                Activa
+                                                            </span>
+                                                        @else
+                                                            <span
+                                                                class="inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-900/40 px-2.5 py-1 text-[11px] font-semibold text-rose-700 dark:text-rose-200 ring-1 ring-rose-100 dark:ring-rose-800">
+                                                                <span
+                                                                    class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                                                Inactiva
+                                                            </span>
+                                                        @endif
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex items-center justify-end gap-2">
+
+
+
+                                                            <flux:button variant="danger"
+                                                                class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
+                                                                @click="eliminar({{ $generacion->id }}, '{{ addslashes($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso) }}')">
+                                                                <flux:icon.trash-2 class="w-3.5 h-3.5" />
+                                                            </flux:button>
+
+                                                            <flux:button variant="primary"
+                                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white !px-3 !py-1.5 text-xs"
+                                                                @click="$dispatch('abrir-modal-editar');
                                                                         Livewire.dispatch('editarModal', { id: {{ $generacion->id }} });
                                                                     ">
-                                                                    <flux:icon.square-pen class="w-3.5 h-3.5 mr-1" />
+                                                                <flux:icon.square-pen class="w-3.5 h-3.5 mr-1" />
+                                                            </flux:button>
 
-                                                                </flux:button>
-                                                            </div>
+
                                                         </div>
-                                                    </div>
-                                                </div>
+                                                    </td>
+                                                </tr>
                                             @endforeach
-                                        </div>
-                                    </div>
-                                </section>
-                            @endforeach
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -309,6 +244,7 @@
                 <div class="mt-5">
                     {{ $generaciones->links() }}
                 </div>
+
             </div>
         </div>
 

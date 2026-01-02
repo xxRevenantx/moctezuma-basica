@@ -20,11 +20,14 @@ class Matricula extends Component
 
     public ?Nivel $nivel = null;
 
-    // ✅ ahora filtramos por generación y grupo
+    // ✅ Filtros: Generación + Grupo
     public ?int $generacion_id = null;
     public ?int $grupo_id = null;
 
     public string $search = '';
+
+    // ✅ Mostrar grado(s) asociado(s) a la generación seleccionada
+    public ?string $gradoGeneracionLabel = null;
 
     // =========================
     // Selección de filas
@@ -37,9 +40,8 @@ class Matricula extends Component
     public bool $selectPage = false;
 
     // =========================
-    // Cambiar grado (modal)
+    // Cambiar grado (dropdown bajo tabla)
     // =========================
-    public bool $openCambiarGrado = false;
     public ?int $nuevo_grado_id = null;
 
     public function mount(): void
@@ -61,18 +63,32 @@ class Matricula extends Component
     {
         $this->selected = [];
         $this->selectPage = false;
+
+        // ✅ resetea el dropdown
+        $this->nuevo_grado_id = null;
     }
 
     public function updatedSelected(): void
     {
+        // Si se desmarca y ya no coincide el "select page", lo bajamos
         if ($this->selectPage && $this->selectedCount < $this->perPage) {
             $this->selectPage = false;
+        }
+
+        // ✅ si ya no hay seleccionados, limpia dropdown
+        if ($this->selectedCount === 0) {
+            $this->nuevo_grado_id = null;
         }
     }
 
     public function updatedSelectPage($value): void
     {
         if (!$value) {
+            $this->resetSelection();
+            return;
+        }
+
+        if (!$this->generacion_id) {
             $this->resetSelection();
             return;
         }
@@ -99,8 +115,32 @@ class Matricula extends Component
     public function updatedGeneracionId(): void
     {
         $this->grupo_id = null;
+        $this->search = '';
+        $this->gradoGeneracionLabel = null;
+
         $this->resetPage();
         $this->resetSelection();
+
+        if (!$this->generacion_id || !$this->nivel) return;
+
+        // ✅ Grado(s) de la generación: desde GRUPOS (generacion_id + grado_id)
+        $grados = Grado::query()
+            ->select('grados.nombre')
+            ->join('grupos', 'grupos.grado_id', '=', 'grados.id')
+            ->whereNull('grupos.deleted_at')
+            ->where('grupos.nivel_id', $this->nivel->id)
+            ->where('grupos.generacion_id', $this->generacion_id)
+            ->distinct()
+            ->orderBy('grados.nombre')
+            ->pluck('grados.nombre');
+
+        if ($grados->count() === 1) {
+            $this->gradoGeneracionLabel = $grados->first();
+        } elseif ($grados->count() > 1) {
+            $this->gradoGeneracionLabel = $grados->implode(', ');
+        } else {
+            $this->gradoGeneracionLabel = null;
+        }
     }
 
     public function updatedGrupoId(): void
@@ -112,68 +152,60 @@ class Matricula extends Component
     public function clearFilters(): void
     {
         $this->reset(['generacion_id', 'grupo_id', 'search']);
+        $this->gradoGeneracionLabel = null;
+
         $this->resetPage();
         $this->resetSelection();
     }
 
-   private function baseQuery(): Builder
-{
-    return Inscripcion::query()
-        ->select([
-            'id',
-            'curp',
-            'matricula',
-            'folio',
-            'nombre',
-            'apellido_paterno',
-            'apellido_materno',
-            'genero',
-            'nivel_id',
-            'grado_id',
-            'grupo_id',
-            'generacion_id', // ✅ importante
-            'activo',
-        ])
-        ->with([
-            'grado:id,nombre,nivel_id',
-            'grupo:id,nombre,nivel_id,grado_id',
-            // ✅ Generación según tu tabla:
-            'generacion:id,nivel_id,anio_ingreso,anio_egreso',
-        ])
-        ->where('activo', 1)
-        ->where('nivel_id', $this->nivel->id)
-        ->when($this->generacion_id, fn ($q) => $q->where('generacion_id', $this->generacion_id))
-        ->when($this->grupo_id, fn ($q) => $q->where('grupo_id', $this->grupo_id))
-        ->when($this->search !== '', function ($q) {
-            $s = trim($this->search);
+    private function baseQuery(): Builder
+    {
+        // ✅ REGLA: si no hay generación seleccionada, NO mostramos nada
+        if (!$this->generacion_id || !$this->nivel) {
+            return Inscripcion::query()->whereRaw('1=0');
+        }
 
-            $q->where(function ($qq) use ($s) {
-                $qq->where('matricula', 'like', "%{$s}%")
-                    ->orWhere('curp', 'like', "%{$s}%")
-                    ->orWhere('nombre', 'like', "%{$s}%")
-                    ->orWhere('apellido_paterno', 'like', "%{$s}%")
-                    ->orWhere('apellido_materno', 'like', "%{$s}%");
+        return Inscripcion::query()
+            ->select([
+                'id',
+                'curp',
+                'matricula',
+                'folio',
+                'nombre',
+                'apellido_paterno',
+                'apellido_materno',
+                'genero',
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'grupo_id',
+                'activo',
+            ])
+            ->with([
+                'grado:id,nombre,nivel_id',
+                'grupo:id,nombre,nivel_id,grado_id,generacion_id',
+                'generacion:id,nivel_id,anio_ingreso,anio_egreso',
+            ])
+            ->where('activo', 1)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->when($this->grupo_id, fn ($q) => $q->where('grupo_id', $this->grupo_id))
+            ->when($this->search !== '', function ($q) {
+                $s = trim($this->search);
+
+                $q->where(function ($qq) use ($s) {
+                    $qq->where('matricula', 'like', "%{$s}%")
+                        ->orWhere('curp', 'like', "%{$s}%")
+                        ->orWhere('nombre', 'like', "%{$s}%")
+                        ->orWhere('apellido_paterno', 'like', "%{$s}%")
+                        ->orWhere('apellido_materno', 'like', "%{$s}%");
+                });
             });
-        });
-}
-
-    // =========================
-    // Cambiar grado (se mantiene)
-    // =========================
-    public function openCambiarGradoModal(): void
-    {
-        if ($this->selectedCount === 0) return;
-
-        $this->nuevo_grado_id = null;
-        $this->openCambiarGrado = true;
     }
 
-    public function cerrarCambiarGradoModal(): void
-    {
-        $this->openCambiarGrado = false;
-        $this->nuevo_grado_id = null;
-    }
-
+    // =========================
+    // Cambiar grado (aplicar desde dropdown bajo tabla)
+    // =========================
     public function aplicarCambiarGrado(): void
     {
         if ($this->selectedCount === 0) return;
@@ -199,66 +231,87 @@ class Matricula extends Component
                 ->whereIn('id', $this->selected)
                 ->update([
                     'grado_id' => $this->nuevo_grado_id,
-                    'grupo_id' => null,
+                    // 'grupo_id' => null, // recomendado
                 ]);
         });
 
-        $this->cerrarCambiarGradoModal();
         $this->resetSelection();
 
         $this->dispatch('toast', type: 'success', message: 'Grado cambiado correctamente.');
     }
 
-   public function render()
-{
-    // ✅ Generaciones disponibles por nivel, activas
-    $generaciones = Generacion::query()
-        ->select('id', 'anio_ingreso', 'anio_egreso')
-        ->where('nivel_id', $this->nivel->id)
-        ->where('status', 1)
-        ->orderByDesc('anio_ingreso')
-        ->get();
+    public function render()
+    {
+        // ✅ Generaciones del nivel
+        $generaciones = Generacion::query()
+            ->select('id', 'anio_ingreso', 'anio_egreso', 'status')
+            ->where('nivel_id', $this->nivel->id)
+            ->where('status', 1)
+            ->orderByDesc('anio_ingreso')
+            ->get()
+            ->map(function ($gen) {
+                // grados únicos de esa generación (vía grupos)
+                $grados = Grado::query()
+                    ->select('grados.nombre')
+                    ->join('grupos', 'grupos.grado_id', '=', 'grados.id')
+                    ->whereNull('grupos.deleted_at')
+                    ->where('grupos.nivel_id', $this->nivel->id)
+                    ->where('grupos.generacion_id', $gen->id)
+                    ->distinct()
+                    ->orderBy('grados.nombre')
+                    ->pluck('grados.nombre');
 
-    // ✅ Grupos disponibles según inscripciones con filtros (nivel + generación)
-    $grupoIds = Inscripcion::query()
-        ->where('activo', 1)
-        ->where('nivel_id', $this->nivel->id)
-        ->when($this->generacion_id, fn ($q) => $q->where('generacion_id', $this->generacion_id))
-        ->whereNotNull('grupo_id')
-        ->distinct()
-        ->pluck('grupo_id');
+                $gradoLabel = $grados->isEmpty() ? 'Sin grado' : $grados->implode(', ');
 
-    $grupos = Grupo::query()
-        ->select('id', 'nombre')
-        ->whereIn('id', $grupoIds)
-        ->orderBy('nombre')
-        ->get();
+                // ✅ label final para el option
+                $gen->label = "{$gen->anio_ingreso} - {$gen->anio_egreso} · {$gradoLabel}";
 
-    $rows = $this->baseQuery()
-        ->orderBy('id', 'desc')
-        ->paginate($this->perPage);
+                return $gen;
+            });
 
-    $statsQuery = (clone $this->baseQuery());
-    $total   = (clone $statsQuery)->count();
-    $hombres = (clone $statsQuery)->where('genero', 'H')->count();
-    $mujeres = (clone $statsQuery)->where('genero', 'M')->count();
+        // ✅ Grupos dependen de generación
+        $grupos = collect();
+        if ($this->generacion_id) {
+            $grupos = Grupo::query()
+                ->select('id', 'nombre')
+                ->where('nivel_id', $this->nivel->id)
+                ->where('generacion_id', $this->generacion_id)
+                ->orderBy('nombre')
+                ->get();
+        }
 
-    // modal cambiar grado (se mantiene)
-    $grados = Grado::query()
-        ->select('id', 'nombre')
-        ->where('nivel_id', $this->nivel->id)
-        ->orderBy('nombre')
-        ->get();
+        // ✅ Grados del nivel (para el dropdown bajo tabla)
+        $grados = Grado::query()
+            ->select('id', 'nombre')
+            ->where('nivel_id', $this->nivel->id)
+            ->orderBy('nombre')
+            ->get();
 
-    return view('livewire.accion.matricula', [
-        'generaciones' => $generaciones,
-        'grupos'       => $grupos,
-        'rows'         => $rows,
-        'total'        => $total,
-        'hombres'      => $hombres,
-        'mujeres'      => $mujeres,
-        'grados'       => $grados,
-    ]);
-}
+        $rows = $this->baseQuery()
+            ->orderBy('id', 'desc')
+            ->paginate($this->perPage);
 
+        // ✅ Stats
+        if (!$this->generacion_id) {
+            $total = 0;
+            $hombres = 0;
+            $mujeres = 0;
+        } else {
+            $statsQuery = (clone $this->baseQuery());
+            $total = (clone $statsQuery)->count();
+            $hombres = (clone $statsQuery)->where('genero', 'H')->count();
+            $mujeres = (clone $statsQuery)->where('genero', 'M')->count();
+        }
+
+        return view('livewire.accion.matricula', [
+            'nivel' => $this->nivel,
+            'generaciones' => $generaciones,
+            'grupos' => $grupos,
+            'grados' => $grados,
+            'rows' => $rows,
+            'total' => $total,
+            'hombres' => $hombres,
+            'mujeres' => $mujeres,
+        ]);
+    }
 }

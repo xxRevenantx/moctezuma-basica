@@ -22,18 +22,21 @@ class MostrarGrupos extends Component
     }
 
     // ELIMINAR GRUPO
-    public function eliminar($id){
+    public function eliminar($id)
+    {
         $grupo = Grupo::find($id);
+
         if ($grupo) {
             $grupo->delete();
-            $this->dispatch('refreshGrupos'); // Emitir evento para refrescar la lista
+            $this->dispatch('refreshGrupos');
         }
     }
 
     #[On('refreshGrupos')]
     public function render()
     {
-        $grupos = Grupo::with(['nivel', 'grado', 'generacion', 'semestre'])
+        $grupos = Grupo::query()
+            ->with(['nivel', 'grado', 'generacion', 'semestre'])
             ->where('nombre', 'like', '%' . $this->search . '%')
             ->orderBy('nivel_id', 'asc')
             ->orderBy('nombre', 'asc')

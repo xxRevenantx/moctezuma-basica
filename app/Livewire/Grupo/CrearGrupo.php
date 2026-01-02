@@ -17,6 +17,8 @@ class CrearGrupo extends Component
     public $generacion_id = '';
     public $semestre_id = '';
 
+
+
     public function updatedNivelId()
     {
         // Cuando cambie el nivel, limpiamos dependientes

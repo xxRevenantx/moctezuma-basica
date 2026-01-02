@@ -26,20 +26,15 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
-            // Ciclo escolar (para mantener historial por año)
-            $table->foreignId('ciclo_escolar_id')
-                ->constrained('ciclo_escolares')
-                ->cascadeOnUpdate()
-                ->cascadeOnDelete();
+            $table->boolean('status')->default(true);
 
-            // Tutor del grupo (opcional)
-            $table->boolean('es_tutor')->default(false);
+
 
             $table->timestamps();
 
             // Evitar duplicar al mismo docente en el mismo grupo del mismo ciclo
             $table->unique(
-                ['persona_id', 'grupo_id', 'ciclo_escolar_id'],
+                ['persona_id', 'grupo_id'],
                 'docente_grupo_unique'
             );
         });
