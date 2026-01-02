@@ -21,6 +21,20 @@ class MostrarGrados extends Component
         $this->resetPage();
     }
 
+       public function eliminar($id)
+    {
+        $grado = \App\Models\Grado::find($id);
+
+        if ($grado) {
+            $grado->delete();
+
+            $this->dispatch('swal', [
+            'title' => 'Grado eliminado correctamente!',
+            'icon' => 'success',
+            'position' => 'top-end',
+            ]);
+        }
+    }
 
 
     #[On('refreshGrados')]

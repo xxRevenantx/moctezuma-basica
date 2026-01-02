@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Grupo extends Model
 {
-    /** @use HasFactory<\Database\Factories\GrupoFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'nombre',
@@ -23,14 +23,17 @@ class Grupo extends Model
     {
         return $this->belongsTo(Nivel::class);
     }
+
     public function grado()
     {
-        return $this->belongsTo( Grado::class);
+        return $this->belongsTo(Grado::class);
     }
+
     public function generacion()
     {
         return $this->belongsTo(Generacion::class);
     }
+
     public function semestre()
     {
         return $this->belongsTo(Semestre::class);
@@ -42,32 +45,33 @@ class Grupo extends Model
         return $this->hasMany(PersonaNivel::class);
     }
 
-public function docentesGrupo()
-{
-    return $this->hasMany(\App\Models\DocenteGrupo::class, 'grupo_id');
-}
+    public function docentesGrupo()
+    {
+        return $this->hasMany(\App\Models\DocenteGrupo::class, 'grupo_id');
+    }
 
-public function docentes()
-{
-    return $this->belongsToMany(\App\Models\Persona::class, 'docente_grupo', 'grupo_id', 'persona_id')
-        ->withPivot(['ciclo_escolar_id', 'es_tutor'])
-        ->withTimestamps();
-}
+    public function docentes()
+    {
+        return $this->belongsToMany(\App\Models\Persona::class, 'docente_grupo', 'grupo_id', 'persona_id')
+            ->withPivot(['ciclo_escolar_id', 'es_tutor'])
+            ->withTimestamps();
+    }
 
-// Docentes por ciclo escolar
-public function docentesPorCiclo(int $cicloEscolarId)
-{
-    return $this->docentes()->wherePivot('ciclo_escolar_id', $cicloEscolarId);
-}
+    public function docentesPorCiclo(int $cicloEscolarId)
+    {
+        return $this->docentes()->wherePivot('ciclo_escolar_id', $cicloEscolarId);
+    }
 
-// Tutor por ciclo escolar
-public function tutorPorCiclo(int $cicloEscolarId)
-{
-    return $this->docentes()
-        ->wherePivot('ciclo_escolar_id', $cicloEscolarId)
-        ->wherePivot('es_tutor', true);
-}
+    public function tutorPorCiclo(int $cicloEscolarId)
+    {
+        return $this->docentes()
+            ->wherePivot('ciclo_escolar_id', $cicloEscolarId)
+            ->wherePivot('es_tutor', true);
+    }
 
-
-
+    // RELACIÓN CON INSCRIPCIONES
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
 }

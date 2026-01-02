@@ -38,4 +38,10 @@ class Generacion extends Model
     {
         return $this->hasMany(PeriodosBachillerato::class);
     }
+
+    // RELACIONES CON INSCRIPCIONES
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
 }

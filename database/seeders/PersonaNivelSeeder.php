@@ -156,6 +156,7 @@ class PersonaNivelSeeder extends Seeder
             [
                 'ingreso_seg' => null,
                 'ingreso_sep' => null,
+                'ingreso_ct'  => null,
                 'orden'       => $orden,
                 'updated_at'  => now(),
                 'created_at'  => now(),

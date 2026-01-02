@@ -72,7 +72,26 @@
         margin-top: 20px;
     }
 
+    .contenedor_secundaria {
+        font-size: 14px;
+        margin-top: 20px;
+    }
+
     .fondo_primaria {
+
+        background-size: cover;
+        background-repeat: no-repeat;
+
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    .fondo_secundaria {
 
         background-size: cover;
         background-repeat: no-repeat;
@@ -163,9 +182,6 @@
 
 
     @if ($nivel->slug == 'preescolar')
-
-
-
         @foreach ($asignacionesNivel as $personal)
             @php
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
@@ -215,35 +231,27 @@
 
                     @foreach ($personal->persona->personaRoles as $rolePersona)
                         @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            <p style="text-transform: uppercase; text-align: justify; line-height: 19px;">
+                            <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
                                 EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
                                         {{ $rolePersona->persona->nombre }}
                                         {{ $rolePersona->persona->apellido_paterno }}
                                         {{ $rolePersona->persona->apellido_materno }}</u></b>,
                                 SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
                                 LABORES, DESPUÉS DE HABER
-                                DISFRUTADO EL <b> <u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
+                                DISFRUTADO EL <b><u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
                                 <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                             </p>
                         @else
-                            <p style="text-transform: uppercase; text-align: justify;">
+                            <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
                                 EL (A) QUE SUSCRIBE C.
 
-                                <b><u>
-                                        @if (($rolePersona->persona->genero ?? null) === 'M')
-                                            Profra.
-                                        @else
-                                            Profr.
-                                        @endif
-
+                                <b><u>{{ $rolePersona->persona->titulo }}
                                         {{ $rolePersona->persona->nombre }}
-
                                         {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}
-                                    </u></b>,
+                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
                                 SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
                                 LABORES, DESPUÉS DE HABER
-                                DISFRUTADO EL <b> <u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
+                                DISFRUTADO EL <b><u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
                                 <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                             </p>
                         @endif
@@ -287,8 +295,8 @@
                         'FECHA DE INGRESO A LA SEP' => !empty($personal->ingreso_sep)
                             ? date('d-m-Y', strtotime($personal->ingreso_sep))
                             : '---------',
-                        'FECHA DE INGRESO AL CENTRO DE TRABAJO' => !empty($personal->ingreso_seg)
-                            ? date('d-m-Y', strtotime($personal->ingreso_seg))
+                        'FECHA DE INGRESO AL CENTRO DE TRABAJO' => !empty($personal->ingreso_ct)
+                            ? date('d-m-Y', strtotime($personal->ingreso_ct))
                             : '---------',
                         'NOMBRE DEL C.T.' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
@@ -377,11 +385,13 @@
                         'C.P.',
                         'Téc.',
                         'Tec.',
+                        'DCE.',
+                        'D.C.E.',
                     ];
 
                     $texto = e($copias);
 
-                    // Patrón: encuentra " espacio + (título) " para poder reemplazar ese espacio por <br> (pero NO en el primero)
+                    // Inserta <br> antes de cada título desde el 2do en adelante
                     $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
                     $count = 0;
@@ -389,20 +399,42 @@
                         $patron,
                         function ($m) use (&$count) {
                             $count++;
-                            // 1er título: se queda con espacio normal
                             if ($count === 1) {
                                 return ' ' . $m[1];
                             }
-                            // del 2do en adelante: salto
                             return '<br>' . $m[1];
                         },
                         $texto,
                     );
+
+                    // ✅ Indentar desde la 2da línea (después del <br>)
+                    $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
+
+                    $copiasIndentado = '';
+                    foreach ($lineas as $i => $linea) {
+                        if ($i === 0) {
+                            $copiasIndentado .= $linea;
+                        } else {
+                            $copiasIndentado .= '<br><span class="ccp-indent">' . $linea . '</span>';
+                        }
+                    }
                 @endphp
 
-                <div class="ccp" style="margin-top: 0px;">
-                    <p style="font-size: 9px"><b>{!! $copiasFormateado !!}</b></p>
+                <style>
+                    .ccp-indent {
+                        display: inline-block;
+                        padding-left: 25px;
+                        /* ajusta este valor hasta que quede como en la imagen */
+                    }
+                </style>
+
+
+                <div class="ccp" style="margin-top: 8px;">
+                    <p style="font-size: 9px; margin:0;">
+                        <b>{!! $copiasIndentado !!}</b>
+                    </p>
                 </div>
+
 
 
             </div>
@@ -465,50 +497,35 @@
                     @foreach ($personal->persona->personaRoles as $rolePersona)
                         @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
                             <p
-                                style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 30px; line-height: 18px;">
+                                style="text-transform: uppercase; text-align: justify; font-size: 14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 30px; line-height: 19px;">
                                 EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
                                         {{ $rolePersona->persona->nombre }}
                                         {{ $rolePersona->persona->apellido_paterno }}
                                         {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER
+                                ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
+                                MIS LABORES, DESPUÉS DE HABER
                                 DISFRUTADO EL <b> <u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
                                 <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                             </p>
                         @else
                             <p
-                                style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 30px; line-height: 18px;">
+                                style="text-transform: uppercase; text-align: justify; font-size: 14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 30px; line-height: 19px;">
                                 EL (A) QUE SUSCRIBE C.
 
-                                <b><u>
-                                        @if (($rolePersona->persona->genero ?? null) === 'M')
-                                            Profra.
-                                        @else
-                                            Profr.
-                                        @endif
-
-                                        {{ $rolePersona->persona->nombre }}
-
+                                <b><u>{{ $rolePersona->persona->titulo }} {{ $rolePersona->persona->nombre }}
                                         {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}
-                                    </u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER
-                                DISFRUTADO EL <b> <u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
+                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
+                                ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
+                                MIS LABORES, DESPUÉS DE HABER
+                                DISFRUTADO EL <b><u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
                                 <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                             </p>
                         @endif
                     @endforeach
-
-
-
-
                 </div>
-
                 <p
                     style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
                     PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:</p>
-
                 @php
                     $nombreCompleto = trim(
                         $personal->persona->nombre .
@@ -517,7 +534,6 @@
                             ' ' .
                             $personal->persona->apellido_materno,
                     );
-
                     $datos = [
                         'NOMBRE' => mb_strtoupper($nombreCompleto),
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
@@ -593,26 +609,44 @@
                     SALUDO.</p>
 
                 <div class="firmas">
+
+
+
                     <table
                         style="width: 100%; margin:auto; font-size: 12px; text-align: center; font-family: Verdana, Geneva, Tahoma, sans-serif; text-transform: uppercase; font-weight: bold;">
                         <tr>
                             <td>
+
+
                                 ATENTAMENTE<br><br><br><br><br>
                                 ___________________________________<br>
-                                {{ $nombreDirectorPSNombre }} <br> RFC: {{ $directoraPS->rfc }} <br> CURP:
-                                {{ $directoraPS->curp }}
+                                {{ $rolePersona->persona->titulo }} {{ $nombreCompleto }} <br> RFC:
+                                {{ $rolePersona->persona->rfc }} <br> CURP:
+                                {{ $rolePersona->persona->curp }}
+
 
                             </td>
 
                             <td>
-                                Vo.Bo. <br>JEFE INMEDIATO <br>{{ $supervisorPrimaria->cargo }} <br><br><br>
-                                ___________________________________<br>
-                                {{ $supervisorPrimariaNombre }}<br> RFC:
-                                {{ $supervisorPrimaria->rfc }} <br> CURP: {{ $supervisorPrimaria->curp }}
+                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $supervisorPrimaria->cargo }} <br><br><br>
+                                    ___________________________________<br>
+                                    {{ $supervisorPrimariaNombre }}<br> RFC:
+                                    {{ $supervisorPrimaria->rfc }} <br> CURP: {{ $supervisorPrimaria->curp }}
+                                @else
+                                    Vo.Bo. <br>DIRECTORA <br><br><br><br>
+                                    ___________________________________<br>
+                                    {{ $nombreDirectorPSNombre }}<br> RFC:
+                                    {{ $directoraPS->rfc }} <br> CURP: {{ $directoraPS->curp }}
+                                @endif
+
+
 
                             </td>
                         </tr>
                     </table>
+
+
                 </div>
                 @php
                     $titulos = [
@@ -664,8 +698,259 @@
             <div class="page-break"></div>
         @endforeach
     @elseif ($nivel->slug == 'secundaria')
-        <img src="{{ public_path('storage/reanudacion_secundaria.jpg') }}" alt="fondo"
-            style="width: 100%; height: 100%;">
+        @foreach ($asignacionesNivel as $personal)
+            @php
+                $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
+                    ->locale('es')
+                    ->isoFormat('D [de] MMMM [de] YYYY');
+                \Carbon\Carbon::setLocale('es');
+                $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
+                    ->locale('es')
+                    ->isoFormat('D [de] MMMM [de] YYYY');
+            @endphp
+            <img class="fondo_secundaria" src="{{ public_path('storage/membrete_reanudacion_secundaria.png') }}"
+                alt="fondo" style="width: 100%;">
+
+            <div class="contenedor_secundaria" style="padding: 100px 60px 0">
+
+                <p style="text-align: right; font-size: 17px; line-height: 25px; "><b>ASUNTO:
+                        REANUDACIÓN
+                        DE
+                        LABORES</b> <br>
+                    @foreach ($personal->persona->personaRoles as $rolePersona)
+                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                            Cd. Altamirano,
+                            Gro.,
+                            {{ $fechaDirector }}.
+                        @else
+                            Cd.Altamirano, Gro., {{ $fechaDocente }}.
+                        @endif
+                    @endforeach
+                    <br> "{{ $escuela->lema }}"
+                </p>
+
+                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">
+                    <p style="width: 400px;"><b> {{ $delegado->titulo }} {{ $delegado->nombre }}
+                            {{ $delegado->apellido_paterno }}
+                            {{ $delegado->apellido_materno }} <br></b>
+
+                    </p>
+                    <p style="margin-top:-15px; width:320px"> {{ $delegado->cargo }}
+                    </p>
+                    <p><b>P R E S E N T E</b></p>
+
+                </div>
+
+                <div>
+
+                    @foreach ($personal->persona->personaRoles as $rolePersona)
+                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                            <p
+                                style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 20px;">
+                                EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
+                                        {{ $rolePersona->persona->nombre }}
+                                        {{ $rolePersona->persona->apellido_paterno }}
+                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
+                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                                LABORES, DESPUÉS DE HABER
+                                DISFRUTADO EL <b><u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
+                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
+                            </p>
+                        @else
+                            <p
+                                style="text-transform: uppercase; text-align: justify;  text-indent: 30px; line-height: 20px;">
+                                EL (A) QUE SUSCRIBE C.
+                                <b><u>{{ $rolePersona->persona->titulo }} {{ $rolePersona->persona->nombre }}
+                                        {{ $rolePersona->persona->apellido_paterno }}
+                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
+                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                                LABORES, DESPUÉS DE HABER
+                                DISFRUTADO EL <b><u>RECESO ESCOLAR</u></b>, CORRESPONDIENTE AL CICLO ESCOLAR
+                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
+                            </p>
+                        @endif
+                    @endforeach
+                </div>
+
+                @php
+                    $nombreCompleto = trim(
+                        $personal->persona->nombre .
+                            ' ' .
+                            $personal->persona->apellido_paterno .
+                            ' ' .
+                            $personal->persona->apellido_materno,
+                    );
+                    $datos = [
+                        'NOMBRE' => mb_strtoupper($nombreCompleto),
+                        'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
+                        'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
+                        'CLAVE (S) PRESUPUESTAL (S)' => 'S/C',
+                        'CARGO QUE DESEMPEÑA' => (function () use ($personal) {
+                            $roles = [];
+
+                            foreach ($personal->persona->personaRoles as $rolePersona) {
+                                $roles[] =
+                                    $rolePersona->rolePersona->nombre ?? ($rolePersona->rolePersona->slug ?? null);
+                            }
+
+                            $roles = array_values(array_filter($roles));
+
+                            return mb_strtoupper(!empty($roles) ? implode(', ', $roles) : '---------');
+                        })(),
+                        'FECHA DE INGRESO A LA SEP' => !empty($personal->ingreso_sep)
+                            ? mb_strtoupper(
+                                \Carbon\Carbon::parse($personal->ingreso_sep)
+                                    ->locale('es')
+                                    ->isoFormat('D [DE] MMMM [DEL] YYYY'),
+                            )
+                            : '---------',
+                        'FECHA DE INGRESO AL C.T.' => !empty($personal->ingreso_ct)
+                            ? mb_strtoupper(
+                                \Carbon\Carbon::parse($personal->ingreso_ct)
+                                    ->locale('es')
+                                    ->isoFormat('D [DE] MMMM [DEL] YYYY'),
+                            )
+                            : '---------',
+
+                        'NOMBRE DEL C.T.' => mb_strtoupper($escuela->nombre ?? '---------'),
+                        'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
+                        'UBICACIÓN' => 'FRACISCO I. MADERO OTE. 800 COL. ESQUIPULAS. CD ALTAMIRANO, GRO.',
+                    ];
+                @endphp
+
+                <div>
+                    @foreach ($datos as $key => $dato)
+                        <table style="width: 100%; line-height: 15px;">
+                            <tr>
+                                <td style="width: 250px;">
+                                    <b>{{ $key }}:</b>
+                                </td>
+                                <td style="border-bottom: 1px solid #000;">
+                                    {{ $dato }}
+                                </td>
+                            </tr>
+                        </table>
+                    @endforeach
+                </div>
+
+
+                <p style="text-align: justify;">SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO
+                    SALUDO.
+                    .</p>
+
+                <div class="firmas">
+
+
+
+                    <table
+                        style="width: 100%; margin:auto; font-size: 13px; text-align: center;  text-transform: uppercase; font-weight: bold;">
+                        <tr>
+                            <td>
+                                ATENTAMENTE<br>
+                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                                    DIRECTORA
+                                @else
+                                    {{ $rolePersona->rolePersona->nombre ?? '' }}
+                                @endif
+
+                                <br><br><br><br>
+                                ___________________________________<br>
+                                {{ $rolePersona->persona->titulo }} {{ $nombreCompleto }}
+
+
+                            </td>
+
+                            <td>
+                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $supervisorSecundaria->cargo }} <br><br><br>
+                                    ___________________________________<br>
+                                    {{ $supervisorSecundariaNombre }}
+                                @else
+                                    Vo.Bo. <br>DIRECTORA <br><br><br><br>
+                                    ___________________________________<br>
+                                    {{ $nombreDirectorPSNombre }}
+                                @endif
+
+
+
+                            </td>
+                        </tr>
+                    </table>
+
+
+                </div>
+                @php
+                    $titulos = [
+                        'Prof.',
+                        'Profr.',
+                        'Profa.',
+                        'Mtro.',
+                        'Mtra.',
+                        'Dr.',
+                        'Dra.',
+                        'Lic.',
+                        'L.A.E.',
+                        'Ing.',
+                        'Arq.',
+                        'Q.B.P.',
+                        'Q.F.B.',
+                        'C.P.',
+                        'Téc.',
+                        'Tec.',
+                    ];
+
+                    $texto = e($copias);
+
+                    // Inserta <br> antes de cada título desde el 2do en adelante
+                    $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
+
+                    $count = 0;
+                    $copiasFormateado = preg_replace_callback(
+                        $patron,
+                        function ($m) use (&$count) {
+                            $count++;
+                            if ($count === 1) {
+                                return ' ' . $m[1];
+                            }
+                            return '<br>' . $m[1];
+                        },
+                        $texto,
+                    );
+
+                    // ✅ Indentar desde la 2da línea (después del <br>)
+                    $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
+
+                    $copiasIndentado = '';
+                    foreach ($lineas as $i => $linea) {
+                        if ($i === 0) {
+                            $copiasIndentado .= $linea;
+                        } else {
+                            $copiasIndentado .= '<br><span class="ccp-indent">' . $linea . '</span>';
+                        }
+                    }
+                @endphp
+
+                <style>
+                    .ccp-indent {
+                        display: inline-block;
+                        padding-left: 29px;
+                        /* ajusta este valor hasta que quede como en la imagen */
+                    }
+                </style>
+
+
+                <div class="ccp" style="margin-top: 13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size: 9px; margin:0;">
+                        <b>{!! $copiasIndentado !!}</b>
+                    </p>
+                </div>
+
+            </div>
+            <div class="page-break"></div>
+        @endforeach
+
     @endif
     {{-- {{ $asignacionesNivel }} --}}
 

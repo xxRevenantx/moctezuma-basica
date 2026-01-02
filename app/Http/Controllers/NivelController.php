@@ -13,4 +13,7 @@ class NivelController extends Controller
     {
         return view("nivel.index");
     }
+
+
+
 }

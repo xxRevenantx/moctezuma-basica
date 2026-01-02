@@ -86,14 +86,30 @@ class PDFController extends Controller
                 'fontDir'     => public_path('/fonts'),
                 'fontCache'   => public_path('/fonts'),
             ]);
-             return $pdf->stream("OFICIOS_DE_REANUDACIONES_DE_RECESO_DE_CLASES.pdf");
+            $nombreArchivo = "OFICIOS_DE_REANUDACIONES_DE_RECESO_DE_CLASES_".mb_strtoupper($nivel->nombre)."_".$cicloEscolar->inicio_anio."-".$cicloEscolar->fin_anio.".pdf";
+
+             return $pdf->stream($nombreArchivo);
 
 
         } elseif($tipo_reanudacion == "2"){
             // REANUDACIÓN DE INVERNO
+               $pdf = Pdf::loadView('pdf.reanudaciones_invierno', $data)->setPaper('letter', 'portrait')
+                 ->setOption([
+                'fontDir'     => public_path('/fonts'),
+                'fontCache'   => public_path('/fonts'),
+            ]);
+            $nombreArchivo = "OFICIOS_DE_REANUDACIONES_DE_INVIERNO_".mb_strtoupper($nivel->nombre)."_".$cicloEscolar->inicio_anio."-".$cicloEscolar->fin_anio.".pdf";
+             return $pdf->stream($nombreArchivo);
 
         } elseif($tipo_reanudacion == "3"){
             // REANUDACIÓN DE PRIMAVERA
+                 $pdf = Pdf::loadView('pdf.reanudaciones_primavera', $data)->setPaper('letter', 'portrait')
+                 ->setOption([
+                'fontDir'     => public_path('/fonts'),
+                'fontCache'   => public_path('/fonts'),
+            ]);
+            $nombreArchivo = "OFICIOS_DE_REANUDACIONES_DE_PRIMAVERA_".mb_strtoupper($nivel->nombre)."_".$cicloEscolar->inicio_anio."-".$cicloEscolar->fin_anio.".pdf";
+             return $pdf->stream($nombreArchivo);
 
         }
 

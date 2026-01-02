@@ -17,18 +17,21 @@
 
             <flux:field>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
 
                     <flux:input label="Grado" placeholder="Primero, segundo, tercero" wire:model.live="nombre"
                         type="number" />
 
-                    <flux:select wire:model="nivel_id" label="Nivel educativo">
+                    <flux:select wire:model.live="nivel_id" label="Nivel educativo">
                         <flux:select.option value="">--Selecciona un nivel--</flux:select.option>
                         @foreach ($niveles as $nivel)
                             <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
                         @endforeach
                     </flux:select>
+
+                    <flux:input label="Slug" readonly variant="filled" placeholder="Ejem: primero_preescolar"
+                        wire:model.live="slug" type="text" />
 
 
 

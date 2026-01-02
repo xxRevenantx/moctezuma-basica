@@ -1,8 +1,9 @@
+{{-- resources/views/livewire/persona-nivel/crear-persona-nivel.blade.php --}}
 <div>
     <!-- Header -->
     <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Asignación del personal por nivel</h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Formulario para asignar nuevo personal.</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Plantilla</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Formulario para asignar la plantilla.</p>
     </div>
 
     <div x-data="{ open: false }" class="my-4">
@@ -13,7 +14,6 @@
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400
                    dark:focus:ring-offset-neutral-900">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-white/15">
-                <!-- ícono lápiz -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path
                         d="M5 19h4l10-10-4-4L5 15v4m14.7-11.3a1 1 0 000-1.4l-2-2a1 1 0 00-1.4 0l-1.6 1.6 3.4 3.4 1.6-1.6z" />
@@ -34,7 +34,6 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
             x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]" class="relative mt-4">
-
             <form wire:submit.prevent="asignarPersonalNivel" class="group">
                 <div
                     class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow-lg overflow-hidden">
@@ -60,19 +59,12 @@
                             </div>
                         </div>
 
-
-                        {{-- Grid de inputs --}}
                         <flux:field>
-
-
-
-                            {{-- ====== Datos personales ====== --}}
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
-                                <flux:select wire:model="persona_id" label="Seleccionar Personal">
-                                    <flux:select.option value="">
-                                        -- Seleccionar Personal --
-                                    </flux:select.option>
+                                {{-- PERSONAL (persona_roles.id) --}}
+                                <flux:select wire:model.live="persona_role_id" label="Seleccionar Personal">
+                                    <flux:select.option value="">-- Seleccionar Personal --</flux:select.option>
                                     @foreach ($PersonasRoles as $roles)
                                         <flux:select.option value="{{ $roles->id }}">
                                             {{ $roles->persona->titulo }} -
@@ -82,66 +74,50 @@
                                     @endforeach
                                 </flux:select>
 
-
+                                {{-- NIVEL --}}
                                 <flux:select wire:model.live="nivel_id" label="Seleccionar Nivel"
                                     placeholder="-- Seleccionar Nivel --" required>
-                                    <flux:select.option value="">
-                                        -- Seleccionar Nivel --
-                                    </flux:select.option>
+                                    <flux:select.option value="">-- Seleccionar Nivel --</flux:select.option>
                                     @foreach ($niveles as $nivel)
-                                        <flux:select.option value="{{ $nivel->id }}">
-                                            {{ $nivel->nombre }}
+                                        <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
 
-                                {{-- GRADOS --}}
+                                {{-- GRADO (solo si requiere) --}}
                                 <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
-                                    :disabled="!$nivel_id || $grados->isEmpty()">
-                                    <flux:select.option value="">
-                                        -- Seleccionar Grado --
-                                    </flux:select.option>
+                                    :disabled="!$nivel_id || $grados->isEmpty() || !$requiereGradoGrupo">
+                                    <flux:select.option value="">-- Seleccionar Grado --</flux:select.option>
                                     @foreach ($grados as $grado)
-                                        <flux:select.option value="{{ $grado->id }}">
-                                            {{ $grado->nombre }}
+                                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
 
-                                {{-- GRUPOS --}}
+                                {{-- GRUPO (solo si requiere) --}}
                                 <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
-                                    :disabled="!$grado_id || $grupos->isEmpty()">
-                                    <flux:select.option value="">
-                                        -- Seleccionar Grupo --
-                                    </flux:select.option>
+                                    :disabled="!$grado_id || $grupos->isEmpty() || !$requiereGradoGrupo">
+                                    <flux:select.option value="">-- Seleccionar Grupo --</flux:select.option>
                                     @foreach ($grupos as $grupo)
-                                        <flux:select.option value="{{ $grupo->id }}">
-                                            {{ $grupo->nombre }}
+                                        <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
 
-                                {{-- INGRESO SEG --}}
+                                @if (!$requiereGradoGrupo)
+                                    <p class="md:col-span-4 text-xs text-gray-500 dark:text-gray-400">
+                                        Para este rol, Grado y Grupo <span class="font-medium">no aplican</span>.
+                                    </p>
+                                @endif
+
                                 <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG" />
-
-                                {{-- INGRESO SEP --}}
                                 <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP" />
-
-                                {{-- INGRESO C.T. --}}
                                 <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso C.T." />
-
-
                             </div>
-
-
-
                         </flux:field>
 
-
-                        <!-- Divider -->
                         <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 
-                        <!-- Acciones (abajo de los inputs) -->
                         <div
                             class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
                             <button type="button" @click="open = false"
@@ -159,10 +135,6 @@
                             </flux:button>
                         </div>
                     </div>
-
-
-
-
 
                     <!-- Loader overlay -->
                     <div wire:loading.delay wire:target="asignarPersonalNivel"

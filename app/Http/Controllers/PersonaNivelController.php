@@ -9,7 +9,7 @@ use App\Http\Requests\UpdatePersonaNivelRequest;
 class PersonaNivelController extends Controller
 {
 
-    public function asignacionNiveles()
+    public function plantilla()
     {
         return view('persona_nivel.index');
     }

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             // WorldTableSeeder::class
             CicloEscolarSeeder::class,
             EscuelaSeeder::class,
+            AccionSeeder::class,
             DirectorSeeder::class,
             NivelSeeder::class,
             GradoSeeder::class,
@@ -32,7 +33,7 @@ class DatabaseSeeder extends Seeder
             PeriodoSeeder::class,
             RolePersonaSeeder::class, // DE PRUEBA
             GeneracionBasicaSeeder::class, // DE PRUEBA
-            GrupoSeeder::class, // DE PRUEBA
+            // GrupoSeeder::class, // DE PRUEBA
             PersonaSeeder::class, // DE PRUEBA
             PersonaRoleSeeder::class, // DE PRUEBA
             // PersonaNivelSeeder::class, // DE PRUEBA

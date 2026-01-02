@@ -52,4 +52,10 @@ class Nivel extends Model
     return $this->hasMany(\App\Models\PersonaNivel::class);
 }
 
+ // INSCRIPCIONES
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
+
 }

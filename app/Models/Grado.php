@@ -17,6 +17,7 @@ class Grado extends Model
     protected $fillable = [
         'nivel_id',
         'nombre',
+        'slug',
         'orden'
     ];
 
@@ -45,5 +46,10 @@ class Grado extends Model
         return $this->hasMany(PersonaNivel::class);
     }
 
+    // RELACION CON INSCRIPCIONES
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
 
 }

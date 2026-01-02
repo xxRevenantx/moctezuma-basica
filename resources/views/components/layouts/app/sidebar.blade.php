@@ -76,7 +76,7 @@
             </div>
 
             {{-- Botón + Nuevo --}}
-            <a href="#"
+            <a href="{{ route('misrutas.inscripcion') }}"
                 class="mt-2 inline-flex items-center justify-center rounded-xl bg-indigo-500 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-zinc-950">
                 <span class="text-base leading-none me-1">+</span>
                 <span>Nuevo Alumno</span>
@@ -119,9 +119,9 @@
                                 Roles
                             </flux:navlist.item>
 
-                            <flux:navlist.item icon="home" :href="route('misrutas.asignacion-niveles')"
-                                :current="request()->routeIs('misrutas.asignacion-niveles')" wire:navigate>
-                                Asignación
+                            <flux:navlist.item icon="home" :href="route('misrutas.plantilla')"
+                                :current="request()->routeIs('misrutas.plantilla')" wire:navigate>
+                                Plantilla
                             </flux:navlist.item>
 
 
@@ -179,9 +179,11 @@
 
                     </flux:sidebar.group>
 
-
-
                 </flux:navlist.group>
+
+                <livewire:nav-niveles />
+
+
             </flux:navlist>
         </div>
 
