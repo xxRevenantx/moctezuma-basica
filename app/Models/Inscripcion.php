@@ -48,11 +48,15 @@ class Inscripcion extends Model
         'grupo_id',
         'semestre_id',
 
+        'ciclo_id',
+
         // Foto
         'foto_path',
 
         // Control
         'activo',
+
+        'fecha_inscripcion',
     ];
 
     protected $casts = [
@@ -82,6 +86,16 @@ class Inscripcion extends Model
     public function grupo()
     {
         return $this->belongsTo(Grupo::class);
+    }
+    public function semestre()
+    {
+        return $this->belongsTo(Semestre::class);
+    }
+
+    //Relación con ciclo
+    public function ciclo()
+    {
+        return $this->belongsTo(Ciclo::class);
     }
 
 

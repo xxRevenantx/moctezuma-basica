@@ -2,170 +2,71 @@
 
 namespace App\Livewire\Personas;
 
+use App\Models\Persona;
 use App\Services\CurpService;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 class CrearPersonal extends Component
 {
-    public $titulo;
-    public $nombre;
-
-    public $apellido_paterno;
-
-    public $apellido_materno;
-
-    public $foto;
-
-    public $curp;
-
-    public $rfc;
-
-    public $correo;
-
-    public $telefono_movil;
-
-    public $telefono_fijo;
-
-    public $fecha_nacimiento;
-
-    public $genero;
-
-    public $grado_estudios;
-
-    public $especialidad;
-
-    public $status = true;
-
-    public $calle;
-
-    public $numero_exterior;
-
-    public $numero_interior;
-
-    public $colonia;
-
-    public $municipio;
-
-    public $estado;
-
-    public $codigo_postal;
-
-    public $datosCurp = [];
-
     use WithFileUploads;
 
-  public function updatedCurp($value)
-{
-    $curp = strtoupper(trim($value));
-    $this->curp = $curp;
+    // =========================
+    // Campos
+    // =========================
+    public ?string $titulo = null;
+    public ?string $nombre = null;
+    public ?string $apellido_paterno = null;
+    public ?string $apellido_materno = null;
 
-    // Limpia mientras escribe o si está incompleto
-    if (! $curp || strlen($curp) < 18) {
-        $this->reset([
+    public $foto = null;
 
-            'titulo',
-            'nombre',
-            'apellido_paterno',
-            'apellido_materno',
-            'fecha_nacimiento',
-            'genero',
-            'rfc',
-            'datosCurp',
-        ]);
-        return;
-    }
+    public ?string $curp = null;
+    public ?string $rfc = null;
 
-    // Si quieres: evita llamadas repetidas si pega el mismo valor
-    // if ($this->datosCurp && ($this->datosCurp['_curp'] ?? null) === $curp) return;
+    public ?string $correo = null;
+    public ?string $telefono_movil = null;
+    public ?string $telefono_fijo = null;
 
-    $this->consultarCurp();
-}
+    public ?string $fecha_nacimiento = null;
+    public ?string $genero = null;
 
-public function consultarCurp()
-{
-    // ✅ Resetea estado previo (opcional)
-    $this->datosCurp = [];
+    public ?string $grado_estudios = null;
+    public ?string $especialidad = null;
 
-    /** @var CurpService $servicio */
-    $servicio = app(CurpService::class);
+    public bool $status = true;
 
-    $data = $servicio->obtenerDatosPorCurp($this->curp);
+    // Dirección
+    public ?string $calle = null;
+    public ?string $numero_exterior = null;
+    public ?string $numero_interior = null;
+    public ?string $colonia = null;
+    public ?string $municipio = null;
+    public ?string $estado = null;
+    public ?string $codigo_postal = null;
 
-    // Guarda respuesta completa por si quieres debug
-    $this->datosCurp = $data;
-    // $this->datosCurp['_curp'] = $this->curp;
+    // =========================
+    // CURP UI/estado
+    // =========================
+    public ?string $curpError = null;
+    public ?string $ultimaCurpConsultada = null;
+    public array $datosCurp = [];
 
-    if (($data['error'] ?? false) === true) {
-        // Limpia campos si falló
-        $this->reset([
-            'titulo',
-            'nombre',
-            'apellido_paterno',
-            'apellido_materno',
-            'fecha_nacimiento',
-            'genero',
-            'rfc',
-        ]);
-
-        $this->dispatch('swal', [
-            'title' => $data['message'] ?? 'No se pudo consultar el CURP',
-            'text'  => $data['detail'] ?? null,
-            'icon'  => 'error',
-            'position' => 'top-end',
-        ]);
-
-        return;
-    }
-
-    // ✅ Según tu API, tú esperas: $data['response']['Solicitante']
-    $info = data_get($data, 'response.Solicitante', []);
-
-    // Si la API respondió "ok" pero no trajo solicitante
-    if (empty($info)) {
-        $this->dispatch('swal', [
-            'title' => 'Este CURP no se encuentra en RENAPO.',
-            'icon' => 'warning',
-            'position' => 'top-end',
-        ]);
-        return;
-    }
-
-    $this->nombre = $info['Nombres'] ?? '';
-    $this->apellido_paterno = $info['ApellidoPaterno'] ?? '';
-    $this->apellido_materno = $info['ApellidoMaterno'] ?? '';
-
-    $fecha = $info['FechaNacimiento'] ?? null;
-    $this->fecha_nacimiento = $fecha ? date('Y-m-d', strtotime($fecha)) : '';
-
-    $sexo = $info['ClaveSexo'] ?? null;
-    $this->genero = ($sexo === 'H' || $sexo === 'M') ? $sexo : null;
-
-    $this->rfc = substr($this->curp, 0, 10);
-
-    $this->dispatch('swal', [
-        'title' => 'CURP consultado correctamente',
-        'icon' => 'success',
-        'position' => 'top-end',
-        'timer' => 1200,
-        'showConfirmButton' => false,
-    ]);
-}
-
-    // CREAR PERSONA
-    public function crearPersonal()
+    protected function rules(): array
     {
-        $this->validate([
+        return [
             'titulo' => 'required|string|max:50',
             'nombre' => 'required|string|max:255',
             'apellido_paterno' => 'required|string|max:255',
             'apellido_materno' => 'nullable|string|max:255',
+
             'foto' => 'nullable|image|max:2048',
 
-            'curp' => 'required|string|size:18|unique:personas,curp',
-            'rfc' => 'nullable|string|size:13|unique:personas,rfc',
+            'curp' => ['required', 'string', 'size:18', Rule::unique('personas', 'curp')],
+            'rfc' => ['nullable', 'string', 'min:10', 'max:13', Rule::unique('personas', 'rfc')],
 
-            'correo' => 'nullable|email|max:150|unique:personas,correo',
+            'correo' => ['nullable', 'email', 'max:150', Rule::unique('personas', 'correo')],
             'telefono_movil' => 'nullable|string|size:10',
             'telefono_fijo' => 'nullable|string|size:10',
 
@@ -182,54 +83,201 @@ public function consultarCurp()
             'municipio' => 'nullable|string|max:255',
             'estado' => 'nullable|string|max:255',
             'codigo_postal' => 'nullable|string|max:10',
-        ], [
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
             'titulo.required' => 'El título es obligatorio.',
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
+
             'curp.required' => 'La CURP es obligatoria.',
             'curp.size' => 'La CURP debe tener 18 caracteres.',
             'curp.unique' => 'La CURP ya está registrada.',
+
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
-            'rfc.unique' => 'El RFC ya está registrado.',
-            'correo.unique' => 'El correo ya está registrado.',
-            'correo.email' => 'El correo no es válido.',
-            'foto.image' => 'La foto debe ser una imagen válida.',
-            'foto.max' => 'La foto no debe superar los 2MB.',
-            'telefono_movil.size' => 'El teléfono móvil debe tener 10 dígitos.',
-            'telefono_fijo.size' => 'El teléfono fijo debe tener 10 dígitos.',
             'genero.in' => 'El género seleccionado no es válido.',
 
-            'rfc.size' => 'El RFC debe tener 13 caracteres.',
-            'codigo_postal.max' => 'El código postal no debe superar los 10 caracteres.',
-            'fecha_nacimiento.date' => 'La fecha de nacimiento no es una fecha válida.',
-            'grado_estudios.max' => 'El grado de estudios no debe superar los 255 caracteres.',
-            'especialidad.max' => 'La especialidad no debe superar los 255 caracteres.',
-            'calle.max' => 'La calle no debe superar los 255 caracteres.',
-            'numero_exterior.max' => 'El número exterior no debe superar los 20 caracteres.',
-            'numero_interior.max' => 'El número interior no debe superar los 20 caracteres.',
-            'colonia.max' => 'La colonia no debe superar los 255 caracteres.',
-            'municipio.max' => 'El municipio no debe superar los 255 caracteres.',
-            'estado.max' => 'El estado no debe superar los 255 caracteres.',
+            'rfc.unique' => 'El RFC ya está registrado.',
+            'rfc.min' => 'El RFC debe tener al menos 10 caracteres.',
+            'rfc.max' => 'El RFC no debe superar 13 caracteres.',
 
-        ], []);
+            'correo.unique' => 'El correo ya está registrado.',
+            'correo.email' => 'El correo no es válido.',
 
+            'foto.image' => 'La foto debe ser una imagen válida.',
+            'foto.max' => 'La foto no debe superar los 2MB.',
 
-        // Código para guardar la persona en la base de datos aquí...
+            'telefono_movil.size' => 'El teléfono móvil debe tener 10 dígitos.',
+            'telefono_fijo.size' => 'El teléfono fijo debe tener 10 dígitos.',
+        ];
+    }
+
+    // =========================
+    // Helpers (Title Case español)
+    // =========================
+    private function titleCaseNombre(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        // Normaliza espacios múltiples
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        // RENAPO suele mandar MAYÚSCULAS. Convertimos a Title Case multibyte.
+        $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+
+        // Partículas comunes en minúscula (salvo inicio de cadena)
+        $lowerWords = [
+            'De', 'Del', 'La', 'Las', 'Los',
+            'Y', 'E',
+            'San', 'Santa',
+            'Van', 'Von',
+        ];
+
+        foreach ($lowerWords as $w) {
+            // en medio: " Carlos Del Río " => "Carlos del Río"
+            $value = preg_replace('/\b' . preg_quote($w, '/') . '\b/u', mb_strtolower($w, 'UTF-8'), $value) ?? $value;
+        }
+
+        // Si empieza con esas partículas, las volvemos a Title (ej. "Del Río")
+        // (normalmente nombres no inician así, pero por si acaso)
+        $value = preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
+            return mb_convert_case(mb_strtolower($m[0], 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+        }, $value) ?? $value;
+
+        return $value;
+    }
+
+    // =========================
+    // CURP live
+    // =========================
+    public function updatedCurp($value): void
+    {
+        $curp = strtoupper(trim((string) $value));
+        $this->curp = $curp;
+
+        $this->curpError = null;
+
+        // Mientras escribe o si lo borra: limpia autollenado
+        if (strlen($curp) < 18) {
+            $this->resetAutollenadoRenapo();
+            $this->ultimaCurpConsultada = null;
+            return;
+        }
+
+        // Ya está completa: si es la misma que ya consultamos, no repetimos
+        if ($this->ultimaCurpConsultada === $curp) {
+            return;
+        }
+
+        $this->consultarCurp();
+    }
+
+    private function resetAutollenadoRenapo(): void
+    {
+        $this->reset([
+            'nombre',
+            'apellido_paterno',
+            'apellido_materno',
+            'fecha_nacimiento',
+            'genero',
+            'rfc',
+            'datosCurp',
+        ]);
+    }
+
+    public function consultarCurp(): void
+    {
+        if (! $this->curp || strlen($this->curp) !== 18) {
+            return;
+        }
+
+        $this->datosCurp = [];
+        $this->curpError = null;
+
+        /** @var CurpService $servicio */
+        $servicio = app(CurpService::class);
+
+        $data = $servicio->obtenerDatosPorCurp($this->curp);
+        $this->datosCurp = is_array($data) ? $data : [];
+
+        if (($data['error'] ?? false) === true) {
+            $this->resetAutollenadoRenapo();
+
+            $this->curpError = $data['message'] ?? 'No se pudo consultar el CURP';
+
+            $this->dispatch('swal', [
+                'title' => $this->curpError,
+                'text'  => $data['detail'] ?? null,
+                'icon'  => 'error',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        $info = data_get($data, 'response.Solicitante', []);
+
+        if (empty($info)) {
+            $this->resetAutollenadoRenapo();
+
+            $this->curpError = 'Este CURP no se encuentra en RENAPO.';
+
+            $this->dispatch('swal', [
+                'title' => $this->curpError,
+                'icon'  => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        // ✅ Renapo manda mayúsculas -> Title Case bonito
+        $this->nombre = $this->titleCaseNombre($info['Nombres'] ?? '');
+        $this->apellido_paterno = $this->titleCaseNombre($info['ApellidoPaterno'] ?? '');
+        $this->apellido_materno = $this->titleCaseNombre($info['ApellidoMaterno'] ?? '');
+
+        $fecha = $info['FechaNacimiento'] ?? null;
+        $this->fecha_nacimiento = $fecha ? date('Y-m-d', strtotime($fecha)) : null;
+
+        $sexo = $info['ClaveSexo'] ?? null;
+        $this->genero = in_array($sexo, ['H', 'M'], true) ? $sexo : null;
+
+        // RFC base 10 (el usuario puede completar homoclave si quiere)
+        $this->rfc = strtoupper(substr($this->curp, 0, 10));
+
+        // Marca como ya consultada
+        $this->ultimaCurpConsultada = $this->curp;
+    }
+
+    // =========================
+    // Guardar
+    // =========================
+    public function crearPersonal(): void
+    {
+        $this->validate();
+
         $fotoPath = null;
         if ($this->foto) {
             $path = $this->foto->store('personal', 'public');
             $fotoPath = basename($path);
         }
 
-        \App\Models\Persona::create([
+        Persona::create([
             'titulo' => $this->titulo,
             'nombre' => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
             'foto' => $fotoPath,
-            'curp' => strtoupper(trim($this->curp)),
-            'rfc' => strtoupper(trim($this->rfc)),
+            'curp' => strtoupper(trim((string) $this->curp)),
+            'rfc' => $this->rfc ? strtoupper(trim((string) $this->rfc)) : null,
             'correo' => $this->correo,
             'telefono_movil' => $this->telefono_movil,
             'telefono_fijo' => $this->telefono_fijo,
@@ -247,38 +295,15 @@ public function consultarCurp()
             'codigo_postal' => $this->codigo_postal,
         ]);
 
-
-
         $this->dispatch('swal', [
             'title' => 'Personal creado exitosamente.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
 
-        $this->reset([
-            'titulo',
-            'nombre',
-            'apellido_paterno',
-            'apellido_materno',
-            'foto',
-            'curp',
-            'rfc',
-            'correo',
-            'telefono_movil',
-            'telefono_fijo',
-            'fecha_nacimiento',
-            'genero',
-            'grado_estudios',
-            'especialidad',
-            'status',
-            'calle',
-            'numero_exterior',
-            'numero_interior',
-            'colonia',
-            'municipio',
-            'estado',
-            'codigo_postal',
-        ]);
+        // Reset del form, dejando status en true
+        $this->reset();
+        $this->status = true;
 
         $this->dispatch('refreshPersonal');
     }

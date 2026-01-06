@@ -37,4 +37,12 @@ class Director extends Model
     {
         return $this->hasMany(Nivel::class, 'supervisor_id');
     }
+
+public function niveles()
+{
+    return $this->belongsToMany(\App\Models\Nivel::class, 'director_nivel', 'director_id', 'nivel_id')
+        ->withTimestamps();
+}
+
+
 }

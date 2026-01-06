@@ -62,9 +62,9 @@ class MostrarPersonal extends Component
                             ->orWhere('curp', 'like', '%' . $this->search . '%')
                             ->orWhere('rfc', 'like', '%' . $this->search . '%');
                     })
+                    ->orderBy('nombre', 'asc')
                     ->orderBy('apellido_paterno', 'asc')
                     ->orderBy('apellido_materno', 'asc')
-                    ->orderBy('nombre', 'asc')
                     ->paginate(10);
 
 

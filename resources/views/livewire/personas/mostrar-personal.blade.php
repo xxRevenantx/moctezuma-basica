@@ -103,10 +103,11 @@
                                     <tr>
                                         <th class="px-4 py-3 text-center font-semibold">#</th>
                                         <th class="px-4 py-3 text-left font-semibold">Foto</th>
+                                        <th class="px-4 py-3 text-left font-semibold">Título</th>
                                         <th class="px-4 py-3 text-left font-semibold">Nombre(s)</th>
                                         <th class="px-4 py-3 text-left font-semibold">Apellido Paterno</th>
                                         <th class="px-4 py-3 text-left font-semibold">Apellido Materno</th>
-                                        <th class="px-4 py-3 text-left font-semibold">CURP</th>
+                                        <th class="px-4 py-3 text-center font-semibold">CURP</th>
                                         <th class="px-4 py-3 text-center font-semibold">RFC</th>
                                         <th class="px-4 py-3 text-center font-semibold">Fecha de Nacimiento</th>
                                         <th class="px-4 py-3 text-center font-semibold">Género</th>
@@ -210,8 +211,28 @@
                                                     {{ $persona->fecha_nacimiento ? \Carbon\Carbon::parse($persona->fecha_nacimiento)->format('d/m/Y') : '---' }}
                                                 </td>
 
-                                                <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
-                                                    {{ ($persona->genero ?? null) === 'H' ? 'HOMBRE' : (($persona->genero ?? null) === 'M' ? 'MUJER' : '---') }}
+                                                <td class="px-4 py-3 text-center">
+                                                    @php($g = $persona->genero ?? null)
+
+                                                    @if ($g === 'H')
+                                                        <span
+                                                            class="inline-flex items-center gap-1 rounded-full border border-sky-300/60 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:border-sky-700/50 dark:bg-sky-900/20 dark:text-sky-300">
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                                                            HOMBRE
+                                                        </span>
+                                                    @elseif ($g === 'M')
+                                                        <span
+                                                            class="inline-flex items-center gap-1 rounded-full border border-fuchsia-300/60 bg-fuchsia-50 px-2.5 py-0.5 text-xs font-semibold text-fuchsia-700 dark:border-fuchsia-700/50 dark:bg-fuchsia-900/20 dark:text-fuchsia-300">
+                                                            <span
+                                                                class="h-1.5 w-1.5 rounded-full bg-fuchsia-500"></span>
+                                                            MUJER
+                                                        </span>
+                                                    @else
+                                                        <span
+                                                            class="inline-flex items-center gap-1 rounded-full border border-gray-300/60 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:border-neutral-700 dark:bg-neutral-900/30 dark:text-gray-300">
+                                                            ---
+                                                        </span>
+                                                    @endif
                                                 </td>
 
                                                 <td class="px-4 py-3 text-center">

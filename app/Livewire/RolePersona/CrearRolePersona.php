@@ -5,6 +5,7 @@ namespace App\Livewire\RolePersona;
 use Livewire\Component;
 use App\Models\Persona;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 
 class CrearRolePersona extends Component
 {
@@ -23,6 +24,11 @@ class CrearRolePersona extends Component
             'persona_id' => 'required|integer|exists:personas,id',
             // Ajusta el exists si tu tabla se llama diferente:
             'role_persona_id' => 'required|integer|exists:role_personas,id',
+        ],[
+            'persona_id.required' => 'Selecciona una persona.',
+            'persona_id.exists' => 'La persona seleccionada no es válida.',
+            'role_persona_id.required' => 'Selecciona un rol.',
+            'role_persona_id.exists' => 'El rol seleccionado no es válido.',
         ]);
 
         // ==========================
@@ -65,6 +71,7 @@ class CrearRolePersona extends Component
 
     }
 
+    #[On('rolCargadoEliminado')]
     public function render()
     {
         $personal = Persona::orderBy('apellido_paterno')->orderBy('apellido_materno')->orderBy('nombre')->get();

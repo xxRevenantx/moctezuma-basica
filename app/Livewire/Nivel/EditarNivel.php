@@ -82,13 +82,13 @@ class EditarNivel extends Component
 
 
         $nivel->update([
-            'nombre'      => $this->nombre,
-            'logo'        => $this->logo_actual,
-            'slug'        => $this->slug,
-            'cct'         => $this->cct,
-            'color'       => $this->color,
-            'director_id' => $this->director_id,
-            'supervisor_id' => $this->supervisor_id,
+            'nombre'        => $this->nombre,
+            'logo'          => $this->logo_actual,
+            'slug'          => $this->slug,
+            'cct'           => $this->cct,
+            'color'         => $this->color,
+            'director_id'   => $this->director_id ?: null,
+            'supervisor_id' => $this->supervisor_id ?: null,
         ]);
 
         $this->dispatch('swal', [

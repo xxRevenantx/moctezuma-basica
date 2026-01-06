@@ -57,24 +57,7 @@ class RolePersonaSeeder extends Seeder
         'descripcion' => 'Docente de computación',
 
     ],
-    [
-        'nombre' => 'Docente de Tecnologías (Adiestramiento)',
-        'slug' => 'docente_tecnologias_adiestramiento',
-        'descripcion' => 'Docente/encargado de tecnologías (adiestramiento)',
 
-    ],
-    [
-        'nombre' => 'Docente U.S.A.E.R.',
-        'slug' => 'docente_usaer',
-        'descripcion' => 'Docente de apoyo USAER',
-
-    ],
-    [
-        'nombre' => 'Docente UNICEF-MIA',
-        'slug' => 'docente_unicef_mia',
-        'descripcion' => 'Docente/figura vinculada a UNICEF-MIA (según aplique)',
-
-    ],
 
     // ====== Directivos ======
     [
@@ -107,12 +90,7 @@ class RolePersonaSeeder extends Seeder
         'descripcion' => 'Prefectura (secundaria/bachillerato)',
 
     ],
-    [
-        'nombre' => 'Mando medio o directivo en actividades administrativas',
-        'slug' => 'mando_medio_directivo_administrativo',
-        'descripcion' => 'Mando medio/directivo en actividades administrativas',
 
-    ],
     [
         'nombre' => 'Coordinador Académico',
         'slug' => 'coordinador_academico',
@@ -139,12 +117,7 @@ class RolePersonaSeeder extends Seeder
         'descripcion' => 'Administrativo enfocado a control escolar',
 
     ],
-    [
-        'nombre' => 'Captura de evaluaciones',
-        'slug' => 'captura_evaluaciones',
-        'descripcion' => 'Personal encargado de captura de evaluaciones',
 
-    ],
     [
         'nombre' => 'Control Escolar',
         'slug' => 'control_escolar',
@@ -152,13 +125,6 @@ class RolePersonaSeeder extends Seeder
 
     ],
 
-    // ====== Apoyo / Servicios ======
-    [
-        'nombre' => 'Apoyo a la labor educativa (laboratoristas, ayudantes, etc.)',
-        'slug' => 'apoyo_labor_educativa',
-        'descripcion' => 'Personal de apoyo a la labor educativa',
-
-    ],
     [
         'nombre' => 'Conserje',
         'slug' => 'conserje',
@@ -169,18 +135,6 @@ class RolePersonaSeeder extends Seeder
         'nombre' => 'Intendente',
         'slug' => 'intendente',
         'descripcion' => 'Limpieza / intendencia',
-
-    ],
-    [
-        'nombre' => 'Mantenimiento',
-        'slug' => 'mantenimiento',
-        'descripcion' => 'Mantenimiento general',
-
-    ],
-    [
-        'nombre' => 'Vigilancia',
-        'slug' => 'vigilancia',
-        'descripcion' => 'Seguridad / vigilancia',
 
     ],
 

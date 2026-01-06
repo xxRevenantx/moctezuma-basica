@@ -110,8 +110,8 @@
                                 class="grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $esBachillerato ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }}">
 
                                 {{-- NIVEL --}}
-                                <flux:select label="Selecciona un nivel" wire:model.live="nivel_id" wire:key="nivel"
-                                    placeholder="Selecciona nivel...">
+                                <flux:select label="Selecciona un nivel" badge="Requerido" wire:model.live="nivel_id"
+                                    wire:key="nivel" placeholder="Selecciona nivel...">
                                     <flux:select.option value="">---Selecciona nivel...</flux:select.option>
                                     @forelse ($niveles as $n)
                                         <flux:select.option value="{{ $n->id }}">{{ $n->nombre }}
@@ -124,7 +124,7 @@
                                 <flux:error name="nivel_id" />
 
                                 {{-- GRADO --}}
-                                <flux:select label="Selecciona un grado" wire:model.live="grado_id"
+                                <flux:select label="Selecciona un grado" badge="Requerido" wire:model.live="grado_id"
                                     wire:key="grado-{{ $nivel_id ?? 'x' }}"
                                     placeholder="{{ $nivel_id ? 'Selecciona grado...' : 'Primero selecciona nivel' }}"
                                     :disabled="!$nivel_id || ($grados->count() ?? 0) === 0">
@@ -140,7 +140,8 @@
                                 <flux:error name="grado_id" />
 
                                 {{-- GENERACIÓN --}}
-                                <flux:select label="Selecciona una generación" wire:model.live="generacion_id"
+                                <flux:select label="Selecciona una generación" badge="Requerido"
+                                    wire:model.live="generacion_id"
                                     wire:key="gen-{{ ($nivel_id ?? 'x') . '-' . ($grado_id ?? 'x') }}"
                                     placeholder="{{ $grado_id ? 'Selecciona generación...' : 'Primero selecciona grado' }}"
                                     :disabled="!$nivel_id || !$grado_id || ($generaciones->count() ?? 0) === 0">
@@ -157,7 +158,8 @@
 
                                 {{-- SEMESTRE (solo bachillerato) --}}
                                 @if ($esBachillerato)
-                                    <flux:select label="Selecciona un semestre" wire:model.live="semestre_id"
+                                    <flux:select label="Selecciona un semestre" badge="Requerido"
+                                        wire:model.live="semestre_id"
                                         wire:key="semestre-{{ ($nivel_id ?? 'x') . '-' . ($grado_id ?? 'x') . '-' . ($generacion_id ?? 'x') }}"
                                         placeholder="{{ $generacion_id ? 'Selecciona semestre...' : 'Primero selecciona generación' }}"
                                         :disabled="!$nivel_id || !$grado_id || !$generacion_id || ($semestres->count() ?? 0) === 0">
@@ -179,7 +181,7 @@
 
 
                                 {{-- GRUPO --}}
-                                <flux:select label="Selecciona el grupo" wire:model.live="grupo_id"
+                                <flux:select label="Selecciona el grupo" badge="Requerido" wire:model.live="grupo_id"
                                     wire:key="grupo-{{ ($nivel_id ?? 'x') . '-' . ($grado_id ?? 'x') . '-' . ($generacion_id ?? 'x') . '-' . ($semestre_id ?? 'x') }}"
                                     placeholder="{{ $generacion_id ? 'Selecciona grupo...' : 'Primero selecciona generación' }}"
                                     :disabled="!$nivel_id || !$grado_id || !$generacion_id || (count($grupos) === 0) || (
@@ -194,6 +196,29 @@
                                     @endforelse
                                 </flux:select>
                                 <flux:error name="grupo_id" />
+
+                                {{-- CICLO --}}
+                                <flux:select label="Selecciona ciclo de inscripción" badge="Requerido"
+                                    wire:model.live="ciclo_id" wire:key="ciclo" placeholder="Selecciona ciclo...">
+                                    <flux:select.option value="">---Selecciona ciclo...</flux:select.option>
+
+                                    @forelse ($ciclos as $c)
+                                        <flux:select.option value="{{ $c->id }}">
+                                            {{ $c->ciclo }}
+                                        </flux:select.option>
+                                    @empty
+                                        <flux:select.option value="" disabled>No hay ciclos disponibles
+                                        </flux:select.option>
+                                    @endforelse
+                                </flux:select>
+                                <flux:error name="ciclo_id" />
+
+                                {{-- FECHA INSCRIPCIÓN --}}
+                                <flux:field>
+                                    <flux:label>Fecha de inscripción <span class="text-red-600">*</span></flux:label>
+                                    <flux:input type="datetime-local" wire:model.defer="fecha_inscripcion" />
+                                    <flux:error name="fecha_inscripcion" />
+                                </flux:field>
                             </div>
 
 
@@ -243,7 +268,8 @@
                                     </div>
 
                                     <div class="flex-1">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div
+                                            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                             <div>
                                                 <div class="text-sm font-extrabold text-rose-700 dark:text-rose-200">
                                                     Hay {{ $errors->count() }} detalle(s) por corregir

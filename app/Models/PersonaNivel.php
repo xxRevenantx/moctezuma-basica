@@ -10,23 +10,23 @@ use Illuminate\Database\Eloquent\Model;
 #[ObservedBy(PersonaNivelObserver::class)]
 class PersonaNivel extends Model
 {
-     use HasFactory;
-
+    use HasFactory;
 
     protected $table = 'persona_nivel';
 
     protected $fillable = [
         'persona_id',
         'nivel_id',
-        'grado_id',
-        'grupo_id',
         'ingreso_seg',
         'ingreso_sep',
         'ingreso_ct',
         'orden',
     ];
 
-    // Relaciones
+    // =========================
+    // Relaciones base
+    // =========================
+
     public function persona()
     {
         return $this->belongsTo(Persona::class);
@@ -37,20 +37,11 @@ class PersonaNivel extends Model
         return $this->belongsTo(Nivel::class);
     }
 
-    // GRADOS
-    public function grado()
+    public function detalles()
     {
-        return $this->belongsTo(Grado::class);
+        return $this->hasMany(PersonaNivelDetalle::class, 'persona_nivel_id');
     }
 
-    // GRUPOS
-    public function grupo()
-    {
-        return $this->belongsTo(Grupo::class);
-    }
 
-    public function rolePersona()
-    {
-        return $this->belongsTo(RolePersona::class, 'role_persona_id');
-    }
+
 }

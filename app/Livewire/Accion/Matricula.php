@@ -7,6 +7,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\PersonaNivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -20,13 +21,13 @@ class Matricula extends Component
 
     public ?Nivel $nivel = null;
 
-    // ✅ Filtros: Generación + Grupo
+    // ✅ Filtros: Generación + Grupo (obligatorios)
     public ?int $generacion_id = null;
     public ?int $grupo_id = null;
 
     public string $search = '';
 
-    // ✅ Mostrar grado(s) asociado(s) a la generación seleccionada
+    // ✅ Mostrar grado(s) asociado(s) a la generación seleccionada (informativo)
     public ?string $gradoGeneracionLabel = null;
 
     // =========================
@@ -63,19 +64,15 @@ class Matricula extends Component
     {
         $this->selected = [];
         $this->selectPage = false;
-
-        // ✅ resetea el dropdown
         $this->nuevo_grado_id = null;
     }
 
     public function updatedSelected(): void
     {
-        // Si se desmarca y ya no coincide el "select page", lo bajamos
         if ($this->selectPage && $this->selectedCount < $this->perPage) {
             $this->selectPage = false;
         }
 
-        // ✅ si ya no hay seleccionados, limpia dropdown
         if ($this->selectedCount === 0) {
             $this->nuevo_grado_id = null;
         }
@@ -88,7 +85,8 @@ class Matricula extends Component
             return;
         }
 
-        if (!$this->generacion_id) {
+        // ✅ Si no están ambos filtros, no seleccionar nada
+        if (!$this->nivel || !$this->generacion_id || !$this->grupo_id) {
             $this->resetSelection();
             return;
         }
@@ -114,7 +112,9 @@ class Matricula extends Component
 
     public function updatedGeneracionId(): void
     {
+        // ✅ obliga a elegir grupo nuevamente
         $this->grupo_id = null;
+
         $this->search = '';
         $this->gradoGeneracionLabel = null;
 
@@ -160,8 +160,8 @@ class Matricula extends Component
 
     private function baseQuery(): Builder
     {
-        // ✅ REGLA: si no hay generación seleccionada, NO mostramos nada
-        if (!$this->generacion_id || !$this->nivel) {
+        // ✅ REGLA: si no hay generación + grupo, NO mostramos nada
+        if (!$this->nivel || !$this->generacion_id || !$this->grupo_id) {
             return Inscripcion::query()->whereRaw('1=0');
         }
 
@@ -189,7 +189,7 @@ class Matricula extends Component
             ->where('activo', 1)
             ->where('nivel_id', $this->nivel->id)
             ->where('generacion_id', $this->generacion_id)
-            ->when($this->grupo_id, fn ($q) => $q->where('grupo_id', $this->grupo_id))
+            ->where('grupo_id', $this->grupo_id)
             ->when($this->search !== '', function ($q) {
                 $s = trim($this->search);
 
@@ -231,7 +231,7 @@ class Matricula extends Component
                 ->whereIn('id', $this->selected)
                 ->update([
                     'grado_id' => $this->nuevo_grado_id,
-                    // 'grupo_id' => null, // recomendado
+                    // 'grupo_id' => null, // recomendado si quieres forzar re-asignación
                 ]);
         });
 
@@ -250,7 +250,6 @@ class Matricula extends Component
             ->orderByDesc('anio_ingreso')
             ->get()
             ->map(function ($gen) {
-                // grados únicos de esa generación (vía grupos)
                 $grados = Grado::query()
                     ->select('grados.nombre')
                     ->join('grupos', 'grupos.grado_id', '=', 'grados.id')
@@ -262,10 +261,7 @@ class Matricula extends Component
                     ->pluck('grados.nombre');
 
                 $gradoLabel = $grados->isEmpty() ? 'Sin grado' : $grados->implode(', ');
-
-                // ✅ label final para el option
                 $gen->label = "{$gen->anio_ingreso} - {$gen->anio_egreso} · {$gradoLabel}";
-
                 return $gen;
             });
 
@@ -287,12 +283,42 @@ class Matricula extends Component
             ->orderBy('nombre')
             ->get();
 
+        // ✅ Rows (solo si hay generación + grupo)
         $rows = $this->baseQuery()
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
 
-        // ✅ Stats
-        if (!$this->generacion_id) {
+        // ✅ Personal (persona_nivel) solo si hay generación + grupo
+        $personal = collect();
+        if ($this->nivel && $this->generacion_id && $this->grupo_id) {
+            $personal = PersonaNivel::query()
+                ->select([
+                    'id',
+                    'persona_id',
+                    'nivel_id',
+                    'grado_id',
+                    'grupo_id',
+                    'ingreso_seg',
+                    'ingreso_sep',
+                    'ingreso_ct',
+                    'orden',
+                ])
+                ->with([
+                    'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero',
+                    'nivel:id,nombre',
+                    'grado:id,nombre,nivel_id',
+                    'grupo:id,nombre,nivel_id,grado_id,generacion_id',
+                ])
+                ->where('nivel_id', $this->nivel->id)
+                ->where('grupo_id', $this->grupo_id)
+                ->whereHas('grupo', fn ($q) => $q->where('generacion_id', $this->generacion_id))
+                ->orderBy('orden')
+                ->orderBy('id')
+                ->get();
+        }
+
+        // ✅ Stats (dependen de ambos filtros)
+        if (!$this->generacion_id || !$this->grupo_id) {
             $total = 0;
             $hombres = 0;
             $mujeres = 0;
@@ -312,6 +338,7 @@ class Matricula extends Component
             'total' => $total,
             'hombres' => $hombres,
             'mujeres' => $mujeres,
+            'personal' => $personal,
         ]);
     }
 }

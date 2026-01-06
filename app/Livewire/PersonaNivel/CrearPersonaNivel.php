@@ -5,75 +5,92 @@ namespace App\Livewire\PersonaNivel;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
+use App\Models\Persona;
 use App\Models\PersonaNivel;
+use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaRole;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class CrearPersonaNivel extends Component
 {
-    // ✅ esto es persona_roles.id (porque el select manda $roles->id)
+    // Paso 1
+    public ?int $persona_id = null;
+
+    // Paso 2 (chip seleccionado)
     public ?int $persona_role_id = null;
 
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
     public ?int $grupo_id = null;
 
-    public $PersonasRoles = [];
-    public $niveles = [];
+    public $personas = [];
+    public $rolesPersona; // collection
 
+    public $niveles = [];
     public $grados;
     public $grupos;
 
+    // Fechas (CABECERA)
     public ?string $ingreso_seg = null;
     public ?string $ingreso_sep = null;
     public ?string $ingreso_ct  = null;
 
-    // ✅ UI + lógica
-    public bool $requiereGradoGrupo = false;
+    // UI informativa
     public ?string $rolSlugSeleccionado = null;
 
     public function mount(): void
     {
-        // ✅ NO usar unique('persona_id') si quieres seleccionar el rol exacto
-        $this->PersonasRoles = PersonaRole::with(['persona', 'rolePersona'])
-            ->orderBy('persona_id')
-            ->orderBy('role_persona_id')
+        $this->personas = Persona::query()
+            ->select('id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno')
+            ->orderBy('nombre')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
             ->get();
 
-        $this->niveles = Nivel::orderBy('id')->get();
+        $this->niveles = Nivel::query()
+            ->select('id', 'nombre', 'slug')
+            ->orderBy('id')
+            ->get();
 
+        $this->rolesPersona = collect();
         $this->grados = collect();
         $this->grupos = collect();
     }
 
-    public function updatedPersonaRoleId($value): void
+    public function updatedPersonaId($value): void
     {
+        $this->persona_role_id = null;
         $this->rolSlugSeleccionado = null;
 
-        $pr = $value
-            ? PersonaRole::with('rolePersona')->find((int) $value)
-            : null;
-
-        $slug = $pr?->rolePersona?->slug;
-        $this->rolSlugSeleccionado = $slug;
-
-        // ✅ SOLO maestro_frente_a_grupo y docente REQUIEREN grado/grupo
-        $this->requiereGradoGrupo = in_array($slug, ['maestro_frente_a_grupo', 'docente'], true);
-
-        // ✅ si NO aplica, limpia y quita errores rojos
-        if (! $this->requiereGradoGrupo) {
-            $this->grado_id = null;
-            $this->grupo_id = null;
-            $this->grados   = collect();
-            $this->grupos   = collect();
-
-            $this->resetValidation(['grado_id', 'grupo_id']);
+        if (! $value) {
+            $this->rolesPersona = collect();
+            return;
         }
 
-        // Si ya había nivel seleccionado y ahora sí requiere, recarga grados
-        if ($this->requiereGradoGrupo && $this->nivel_id) {
+        $this->rolesPersona = PersonaRole::query()
+            ->with('rolePersona')
+            ->where('persona_id', (int) $value)
+            ->orderBy('role_persona_id')
+            ->get();
+
+        $this->resetValidation(['persona_role_id']);
+    }
+
+    public function seleccionarRol(int $personaRoleId): void
+    {
+        $this->persona_role_id = $personaRoleId;
+        $this->updatedPersonaRoleId($personaRoleId);
+    }
+
+    public function updatedPersonaRoleId($value): void
+    {
+        $pr = $value ? PersonaRole::with('rolePersona')->find((int) $value) : null;
+        $this->rolSlugSeleccionado = $pr?->rolePersona?->slug;
+
+        // ✅ Ya NO forzamos ni limpiamos grado/grupo por rol.
+        // Solo si ya hay nivel seleccionado, aseguramos grados cargados.
+        if ($this->nivel_id && $this->grados->isEmpty()) {
             $this->grados = Grado::where('nivel_id', $this->nivel_id)->orderBy('nombre')->get();
         }
     }
@@ -84,7 +101,7 @@ class CrearPersonaNivel extends Component
         $this->grupo_id = null;
         $this->grupos = collect();
 
-        if (! $value || ! $this->requiereGradoGrupo) {
+        if (! $value) {
             $this->grados = collect();
             return;
         }
@@ -100,7 +117,7 @@ class CrearPersonaNivel extends Component
     {
         $this->grupo_id = null;
 
-        if (! $value || ! $this->requiereGradoGrupo) {
+        if (! $value) {
             $this->grupos = collect();
             return;
         }
@@ -114,102 +131,129 @@ class CrearPersonaNivel extends Component
 
     public function asignarPersonalNivel(): void
     {
-        // ✅ recalcular SIEMPRE el slug real (no confiar en banderas viejas)
-        $pr = $this->persona_role_id
-            ? PersonaRole::with('rolePersona')->find((int) $this->persona_role_id)
-            : null;
-
-        $slug = $pr?->rolePersona?->slug;
-        $requiereGradoGrupo = in_array($slug, ['maestro_frente_a_grupo', 'docente'], true);
-
         $this->validate([
-            'persona_role_id' => ['required', 'integer', 'exists:persona_role,id'],
+            'persona_id'      => ['required', 'integer', 'exists:personas,id'],
+            'persona_role_id' => ['required', 'integer', 'exists:persona_role,id'], // ajusta si tu tabla real es persona_roles
             'nivel_id'        => ['required', 'integer', 'exists:niveles,id'],
 
-            'grado_id'        => [
-                Rule::requiredIf($requiereGradoGrupo),
-                'nullable',
-                'integer',
-                'exists:grados,id',
-            ],
-            'grupo_id'        => [
-                Rule::requiredIf($requiereGradoGrupo),
-                'nullable',
-                'integer',
-                'exists:grupos,id',
-            ],
+            // ✅ NO obligatorios; pero si mandas uno, el otro también
+            'grado_id' => ['nullable', 'integer', 'exists:grados,id', 'required_with:grupo_id'],
+            'grupo_id' => ['nullable', 'integer', 'exists:grupos,id', 'required_with:grado_id'],
 
-            'ingreso_seg'     => ['nullable', 'date'],
-            'ingreso_sep'     => ['nullable', 'date'],
-            'ingreso_ct'      => ['nullable', 'date'],
+            'ingreso_seg' => ['nullable', 'date'],
+            'ingreso_sep' => ['nullable', 'date'],
+            'ingreso_ct'  => ['nullable', 'date'],
         ], [
-            'persona_role_id.required' => 'El campo Personal es obligatorio.',
-            'persona_role_id.exists'   => 'El personal seleccionado no es válido.',
-            'nivel_id.required'        => 'El campo Nivel es obligatorio.',
-            'nivel_id.exists'          => 'El nivel seleccionado no es válido.',
-            'grado_id.required'        => 'El campo Grado es obligatorio para este rol.',
-            'grupo_id.required'        => 'El campo Grupo es obligatorio para este rol.',
+            'persona_id.required'      => 'Selecciona una persona.',
+            'persona_role_id.required' => 'Selecciona una función.',
+            'nivel_id.required'        => 'Selecciona un nivel.',
+            'grado_id.required_with'   => 'Si seleccionas Grupo, también debes seleccionar Grado.',
+            'grupo_id.required_with'   => 'Si seleccionas Grado, también debes seleccionar Grupo.',
         ]);
 
-        // ✅ si NO requiere, fuerza null para evitar valores arrastrados
-        if (! $requiereGradoGrupo) {
-            $this->grado_id = null;
-            $this->grupo_id = null;
-        }
+        // ✅ Seguridad: persona_role pertenece a la persona seleccionada
+        $prOk = PersonaRole::where('id', $this->persona_role_id)
+            ->where('persona_id', $this->persona_id)
+            ->exists();
 
-        // ✅ persona_id real para guardar en persona_nivel
-        $personaRealId = (int) $pr->persona_id;
-
-        // ✅ existe asignación (considerando NULLs)
-        $qBase = PersonaNivel::query()
-            ->where('persona_id', $personaRealId)
-            ->where('nivel_id', $this->nivel_id)
-            ->when($this->grado_id === null, fn ($q) => $q->whereNull('grado_id'), fn ($q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->grupo_id === null, fn ($q) => $q->whereNull('grupo_id'), fn ($q) => $q->where('grupo_id', $this->grupo_id));
-
-        if ($qBase->exists()) {
-            $this->dispatch('swal', [
-                'title' => 'Esta persona ya está asignada a esta combinación (nivel/grado/grupo).',
-                'icon' => 'warning',
-                'position' => 'top',
-            ]);
+        if (! $prOk) {
+            $this->addError('persona_role_id', 'La función seleccionada no pertenece a esta persona.');
             return;
         }
 
-        // ✅ existe otro en el mismo slot (considerando NULLs)
-        $qSlot = PersonaNivel::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->when($this->grado_id === null, fn ($q) => $q->whereNull('grado_id'), fn ($q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->grupo_id === null, fn ($q) => $q->whereNull('grupo_id'), fn ($q) => $q->whereNull('grupo_id'), fn ($q) => $q->where('grupo_id', $this->grupo_id))
-            ->where('persona_id', '!=', $personaRealId);
-
-        if ($qSlot->exists()) {
-            $this->dispatch('swal', [
-                'title' => 'Ya existe otra persona asignada a esa combinación (nivel/grado/grupo).',
-                'icon' => 'warning',
-                'position' => 'top',
-            ]);
-            return;
-        }
-
-        DB::transaction(function () use ($personaRealId) {
-            $maxOrden = PersonaNivel::query()
+        // ✅ Pertenencia grado->nivel y grupo->grado (solo si vienen)
+        if ($this->grado_id) {
+            $gradoOk = Grado::where('id', $this->grado_id)
                 ->where('nivel_id', $this->nivel_id)
-                ->max('orden');
+                ->exists();
 
-            $nuevoOrden = ((int) ($maxOrden ?? 0)) + 1;
+            if (! $gradoOk) {
+                $this->addError('grado_id', 'El grado no pertenece al nivel.');
+                return;
+            }
+        }
 
-            PersonaNivel::create([
-                'persona_id'  => $personaRealId,
-                'nivel_id'    => $this->nivel_id,
-                'grado_id'    => $this->grado_id,
-                'grupo_id'    => $this->grupo_id,
-                'ingreso_seg' => $this->ingreso_seg,
-                'ingreso_sep' => $this->ingreso_sep,
-                'ingreso_ct'  => $this->ingreso_ct,
-                'orden'       => $nuevoOrden,
-            ]);
-        });
+        if ($this->grupo_id) {
+            $grupoOk = Grupo::where('id', $this->grupo_id)
+                ->where('grado_id', $this->grado_id)
+                ->exists();
+
+            if (! $grupoOk) {
+                $this->addError('grupo_id', 'El grupo no pertenece al grado.');
+                return;
+            }
+        }
+
+        try {
+            DB::transaction(function () {
+
+                // 1) CABECERA (una sola vez por persona+nivel)
+                $cabecera = PersonaNivel::firstOrCreate(
+                    [
+                        'persona_id' => $this->persona_id,
+                        'nivel_id'   => $this->nivel_id,
+                    ],
+                    [
+                        'ingreso_seg' => $this->ingreso_seg,
+                        'ingreso_sep' => $this->ingreso_sep,
+                        'ingreso_ct'  => $this->ingreso_ct,
+                    ]
+                );
+
+                // Rellenar fechas solo si están vacías
+                $updates = [];
+                if (empty($cabecera->ingreso_seg) && !empty($this->ingreso_seg)) $updates['ingreso_seg'] = $this->ingreso_seg;
+                if (empty($cabecera->ingreso_sep) && !empty($this->ingreso_sep)) $updates['ingreso_sep'] = $this->ingreso_sep;
+                if (empty($cabecera->ingreso_ct)  && !empty($this->ingreso_ct))  $updates['ingreso_ct']  = $this->ingreso_ct;
+
+                if (!empty($updates)) {
+                    $cabecera->update($updates);
+                }
+
+                // 2) DETALLE (rol + opcional grado/grupo)
+                $dup = PersonaNivelDetalle::query()
+                    ->where('persona_nivel_id', $cabecera->id)
+                    ->where('persona_role_id', $this->persona_role_id)
+                    ->when($this->grado_id === null,
+                        fn($q) => $q->whereNull('grado_id'),
+                        fn($q) => $q->where('grado_id', $this->grado_id)
+                    )
+                    ->when($this->grupo_id === null,
+                        fn($q) => $q->whereNull('grupo_id'),
+                        fn($q) => $q->where('grupo_id', $this->grupo_id)
+                    )
+                    ->exists();
+
+                if ($dup) {
+                    throw new \RuntimeException('DUPLICADO');
+                }
+
+                $maxOrden = PersonaNivelDetalle::query()
+                    ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $this->nivel_id))
+                    ->max('orden');
+
+                $nuevoOrden = ((int)($maxOrden ?? 0)) + 1;
+
+                PersonaNivelDetalle::create([
+                    'persona_nivel_id' => $cabecera->id,
+                    'persona_role_id'  => $this->persona_role_id,
+                    'grado_id'         => $this->grado_id, // puede ser null
+                    'grupo_id'         => $this->grupo_id, // puede ser null
+                    'orden'            => $nuevoOrden,
+                ]);
+            });
+
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'DUPLICADO') {
+                $this->dispatch('swal', [
+                    'title' => 'Esta asignación ya existe.',
+                    'icon' => 'warning',
+                    'position' => 'top',
+                ]);
+                return;
+            }
+            throw $e;
+        }
 
         $this->dispatch('swal', [
             'title' => 'Asignación exitosa',
@@ -219,20 +263,16 @@ class CrearPersonaNivel extends Component
 
         $this->dispatch('refreshPersonaNivelList');
 
-        $this->reset([
-            'persona_role_id', 'nivel_id', 'grado_id', 'grupo_id',
-            'ingreso_seg', 'ingreso_sep', 'ingreso_ct',
-        ]);
-
-        $this->requiereGradoGrupo = false;
+        // UX: limpiar solo detalle para seguir agregando roles
+        $this->reset(['persona_role_id', 'grado_id', 'grupo_id', 'ingreso_seg', 'ingreso_sep', 'ingreso_ct']);
         $this->rolSlugSeleccionado = null;
-
-        $this->grados = collect();
         $this->grupos = collect();
     }
 
     public function render()
     {
-        return view('livewire.persona-nivel.crear-persona-nivel');
+        return view('livewire.persona-nivel.crear-persona-nivel', [
+            'rolesPersona' => $this->rolesPersona,
+        ]);
     }
 }

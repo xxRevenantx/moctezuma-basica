@@ -8,14 +8,13 @@
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
-    <title>OFICIOS DE REANUDACIÓN DE RECESO DE CLASES
-    </title>
+    <title>OFICIOS DE REANUDACIÓN DE RECESO DE CLASES</title>
 </head>
+
 <style>
     @page {
         margin: 0px 0px 0px 0px;
     }
-
 
     .page-break {
         page-break-after: always;
@@ -37,7 +36,6 @@
         src: url('{{ public_path('fonts/times_new_roman.ttf') }}') format('truetype');
     }
 
-
     .fila-dato {
         display: flex;
         align-items: baseline;
@@ -52,12 +50,9 @@
 
     .fila-dato .value {
         flex: 1;
-        /* ocupa todo el ancho restante */
         border-bottom: 1px solid #000;
         padding-bottom: 2px;
-        /* separa texto de la línea */
         font-weight: 700;
-        /* negrita como en la imagen */
         text-transform: uppercase;
         line-height: 1.1;
     }
@@ -66,7 +61,6 @@
         font-size: 14px;
     }
 
-    /* PRIMARIA */
     .contenedor_primaria {
         font-size: 14px;
         margin-top: 20px;
@@ -77,11 +71,10 @@
         margin-top: 20px;
     }
 
-    .fondo_primaria {
-
+    .fondo_primaria,
+    .fondo_secundaria {
         background-size: cover;
         background-repeat: no-repeat;
-
         width: 100%;
         height: 100%;
         margin: 0;
@@ -91,201 +84,195 @@
         left: 0;
     }
 
-    .fondo_secundaria {
+    .ccp-indent {
+        display: inline-block;
+        padding-left: 25px;
+    }
 
-        background-size: cover;
-        background-repeat: no-repeat;
-
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        position: absolute;
-        top: 0;
-        left: 0;
+    .ccp-indent-sec {
+        display: inline-block;
+        padding-left: 29px;
     }
 </style>
 
 <body>
 
     @php
-        $nombreDirectorPreescolar = mb_strtoupper(
-            $directoraPreescolar->titulo .
-                ' ' .
-                $directoraPreescolar->nombre .
-                ' ' .
-                $directoraPreescolar->apellido_paterno .
-                ' ' .
-                $directoraPreescolar->apellido_materno,
-        );
+        // ✅ Orden PDF (persona_nivel.orden)
+        $asignacionesNivel = collect($asignacionesNivel ?? [])
+            ->sortBy(fn($p) => [(int) ($p->orden ?? 999999), (int) ($p->id ?? 0)])
+            ->values();
 
-        $nombreDirectorPSNombre = mb_strtoupper(
-            $directoraPS->titulo .
-                ' ' .
-                $directoraPS->nombre .
-                ' ' .
-                $directoraPS->apellido_paterno .
-                ' ' .
-                $directoraPS->apellido_materno,
-        );
+        // =========================
+        // HELPERS
+        // =========================
+        $formatearNombreCompleto = function ($persona) {
+            if (!$persona) {
+                return '---------';
+            }
 
-        $supervisorPreescolarNombre = mb_strtoupper(
-            $supervisorPreescolar->titulo .
-                ' ' .
-                $supervisorPreescolar->nombre .
-                ' ' .
-                $supervisorPreescolar->apellido_paterno .
-                ' ' .
-                $supervisorPreescolar->apellido_materno,
-        );
+            $partes = array_filter(
+                [
+                    $persona->titulo ?? null,
+                    $persona->nombre ?? null,
+                    $persona->apellido_paterno ?? null,
+                    $persona->apellido_materno ?? null,
+                ],
+                fn($v) => !empty($v),
+            );
 
-        $supervisorPrimariaNombre = mb_strtoupper(
-            $supervisorPrimaria->titulo .
-                ' ' .
-                $supervisorPrimaria->nombre .
-                ' ' .
-                $supervisorPrimaria->apellido_paterno .
-                ' ' .
-                $supervisorPrimaria->apellido_materno,
-        );
+            $nombre = trim(implode(' ', $partes));
+            return $nombre !== '' ? mb_strtoupper($nombre) : '---------';
+        };
 
-        $supervisorSecundariaNombre = mb_strtoupper(
-            $supervisorSecundaria->titulo .
-                ' ' .
-                $supervisorSecundaria->nombre .
-                ' ' .
-                $supervisorSecundaria->apellido_paterno .
-                ' ' .
-                $supervisorSecundaria->apellido_materno,
-        );
+        $nombreDirectorPreescolar = $formatearNombreCompleto($nivel->director ?? null);
+        $nombreDirectorPrimariaNombre = $formatearNombreCompleto($nivel->director ?? null);
+        $nombreDirectorSecundariaNombre = $formatearNombreCompleto($nivel->director ?? null);
 
-        $directorAdministracionNombre = mb_strtoupper(
-            $directorAdministracion->titulo .
-                ' ' .
-                $directorAdministracion->nombre .
-                ' ' .
-                $directorAdministracion->apellido_paterno .
-                ' ' .
-                $directorAdministracion->apellido_materno,
-        );
-        $directorMagisterioNombre = mb_strtoupper(
-            $directorMagisterio->titulo .
-                ' ' .
-                $directorMagisterio->nombre .
-                ' ' .
-                $directorMagisterio->apellido_paterno .
-                ' ' .
-                $directorMagisterio->apellido_materno,
-        );
+        $supervisorPreescolarNombre = $formatearNombreCompleto($nivel->supervisor ?? null);
+        $supervisorPrimariaNombre = $formatearNombreCompleto($nivel->supervisor ?? null);
+        $supervisorSecundariaNombre = $formatearNombreCompleto($nivel->supervisor ?? null);
+
+        $directorAdministracionNombre = $formatearNombreCompleto($directorAdministracion ?? null);
+        $directorMagisterioNombre = $formatearNombreCompleto($directorMagisterio ?? null);
+
+        \Carbon\Carbon::setLocale('es');
+
+        // Texto del documento
+        $TEXTO_RECESO = 'RECESO DE CLASES';
+
+        // ✅ Helper: cargos SOLO desde detalles (persona_nivel_detalles). Fallback a personaRoles si no hay detalles.
+        $resolverCargosDesdeDetalles = function ($personal, bool $conSaltos = true) {
+            $detallesOrdenados = collect($personal->detalles ?? [])
+                ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
+                ->values();
+
+            $cargos = $detallesOrdenados
+                ->map(fn($d) => mb_strtoupper(optional(optional($d->PersonaRole)->rolePersona)->nombre ?? ''))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if (empty($cargos)) {
+                $cargos = collect($personal->persona->personaRoles ?? [])
+                    ->map(fn($r) => mb_strtoupper(optional(optional($r)->rolePersona)->nombre ?? ''))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+
+            if (empty($cargos)) {
+                return '---------';
+            }
+
+            return $conSaltos ? implode('<br />', $cargos) : implode(', ', $cargos);
+        };
+
+        // ✅ Helper: rol principal desde detalles (para fecha/firma). Fallback a personaRoles si no hay detalles.
+        $resolverRolPrincipal = function ($personal) {
+            $detallesOrdenados = collect($personal->detalles ?? [])
+                ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
+                ->values();
+
+            $detallePrincipal =
+                $detallesOrdenados->first(
+                    fn($d) => optional(optional($d->PersonaRole)->rolePersona)->slug === 'director_sin_grupo',
+                ) ?? $detallesOrdenados->first();
+
+            $slug = optional(optional(optional($detallePrincipal)->PersonaRole)->rolePersona)->slug;
+            $nombre = optional(optional(optional($detallePrincipal)->PersonaRole)->rolePersona)->nombre;
+
+            if (!$slug && !$nombre) {
+                $rol =
+                    collect($personal->persona->personaRoles ?? [])->first(
+                        fn($r) => optional($r->rolePersona)->slug === 'director_sin_grupo',
+                    ) ?? collect($personal->persona->personaRoles ?? [])->first();
+
+                $slug = optional(optional($rol)->rolePersona)->slug;
+                $nombre = optional(optional($rol)->rolePersona)->nombre;
+            }
+
+            return [$slug, $nombre];
+        };
     @endphp
 
+    {{-- =========================
+    PREESCOLAR
+    ========================= --}}
     @if ($nivel->slug == 'preescolar')
+
         @foreach ($asignacionesNivel as $personal)
             @php
+                // ✅ Rol principal desde DETALLES
+                [$slugRolPrincipal, $nombreRolPrincipal] = $resolverRolPrincipal($personal);
+
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
-                \Carbon\Carbon::setLocale('es');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
 
+                $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
+
+                $nombreCompletoRaw = trim(
+                    ($personal->persona->nombre ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_paterno ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_materno ?? ''),
+                );
+                $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
+
+                // ✅ CARGO QUE DESEMPEÑA desde DETALLES (con saltos)
+                $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
             <img src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo" style="width: 100%;">
+
             <div class="contenedor_preescolar" style="padding: 10px 60px 0">
-                <p style="text-align: right; font-family:Arial, Helvetica, sans-serif;">ASUNTO: <b> REANUDACIÓN DE
-                        LABORES</b></p>
-                @foreach ($personal->persona->personaRoles as $rolePersona)
-                    @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                        <p style="text-align: right; margin-right:100px; text-transform: uppercase;">CIUDAD ALTAMIRANO,
-                            GRO. A
-                            {{ $fechaDirector }}.</p>
-                    @else
-                        <p style="text-align: right; margin-right:100px; text-transform: uppercase;">CIUDAD ALTAMIRANO,
-                            GRO. A {{ $fechaDocente }}.
-                        </p>
-                    @endif
-                @endforeach
-                <p style="text-align: right"><b>{{ $escuela->lema }}</b></p>
+                <p style="text-align:right; font-family:Arial, Helvetica, sans-serif;">
+                    ASUNTO: <b> REANUDACIÓN DE LABORES</b>
+                </p>
 
-                <div class="delegado" style="margin-top: 10px; text-transform: uppercase">
-                    <p style="width: 400px;"><b> {{ $delegado->titulo }} {{ $delegado->nombre }}
-                            {{ $delegado->apellido_paterno }}
-                            {{ $delegado->apellido_materno }} <br></b>
+                <p style="text-align:right; margin-right:100px; text-transform:uppercase;">
+                    CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
+                </p>
 
+                <p style="text-align:right"><b>{{ $escuela->lema }}</b></p>
+
+                <div class="delegado" style="margin-top:10px; text-transform:uppercase; font-size:15px;">
+                    <p style="width:400px;">
+                        <b>
+                            {{ $delegado->titulo }} {{ $delegado->nombre }} {{ $delegado->apellido_paterno }}
+                            {{ $delegado->apellido_materno }} <br>
+                        </b>
                     </p>
-                    <p style="margin-top:-15px; width:320px"> {{ $delegado->cargo }}
-                    </p>
+                    <p style="margin-top:-15px; width:320px">{{ $delegado->cargo }}</p>
                     <p><b>P R E S E N T E</b></p>
-
                 </div>
 
                 <div>
-
-                    @foreach ($personal->persona->personaRoles as $rolePersona)
-                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
-                                EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
-                                        {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                            </p>
-                        @else
-                            <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
-                                EL (A) QUE SUSCRIBE C.
-
-                                <b><u>{{ $rolePersona->persona->titulo }}
-                                        {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                            </p>
-                        @endif
-                    @endforeach
-
-
-
-
+                    <p style="text-transform:uppercase; text-align:justify; line-height:20px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
+                        CORRESPONDIENTE AL CICLO ESCOLAR
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                    </p>
                 </div>
 
                 <p>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:</p>
 
-
-
                 @php
-                    $nombreCompleto = trim(
-                        $personal->persona->nombre .
-                            ' ' .
-                            $personal->persona->apellido_paterno .
-                            ' ' .
-                            $personal->persona->apellido_materno,
-                    );
-
                     $datos = [
-                        'NOMBRE COMPLETO' => mb_strtoupper($nombreCompleto),
+                        'NOMBRE COMPLETO' => $nombreCompleto,
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
                         'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
                         'CLAVE (S) PRESUPUESTAL (ES)' => 'S/C',
-                        'CARGO QUE DESEMPEÑA' => (function () use ($personal) {
-                            $roles = [];
-
-                            foreach ($personal->persona->personaRoles as $rolePersona) {
-                                $roles[] =
-                                    $rolePersona->rolePersona->nombre ?? ($rolePersona->rolePersona->slug ?? null);
-                            }
-
-                            $roles = array_values(array_filter($roles));
-
-                            return mb_strtoupper(!empty($roles) ? implode(', ', $roles) : '---------');
-                        })(),
+                        'CARGO QUE DESEMPEÑA' => $cargosHtml, // ✅ detalles
                         'FECHA DE INGRESO A LA SEP' => !empty($personal->ingreso_sep)
                             ? date('d-m-Y', strtotime($personal->ingreso_sep))
                             : '---------',
@@ -301,47 +288,48 @@
                 <div>
                     @foreach ($datos as $key => $dato)
                         @php
-                            $contar = strlen($dato) + strlen($key);
+                            $contar = strlen(strip_tags($dato)) + strlen($key);
                             $espacioBlanco = '';
-
                             for ($i = $contar; $i < 60; $i++) {
                                 $espacioBlanco .= '&nbsp;&nbsp;';
                             }
                         @endphp
+
                         <div class="fila-dato">
-                            <div class="label">{{ $key }}:
-                                <b><u>{{ $dato }}{!! $espacioBlanco !!}</u></b>
+                            <div class="label">
+                                {{ $key }}:
+                                @if ($key === 'CARGO QUE DESEMPEÑA')
+                                    <b><u>{!! $dato !!}{!! $espacioBlanco !!}</u></b>
+                                @else
+                                    <b><u>{{ $dato }}{!! $espacioBlanco !!}</u></b>
+                                @endif
                             </div>
                         </div>
                     @endforeach
                 </div>
 
-
-                <p style="text-align: justify">SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO
-                    SALUDO.</p>
+                <p style="text-align:justify;">
+                    SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
+                </p>
 
                 <div class="firmas">
-
-
-                    <table style="width: 100%; margin:auto; text-align: center; text-transform: uppercase;">
+                    <table style="width:100%; margin:auto; text-align:center; text-transform:uppercase;">
                         <tr>
                             <td>
                                 ATENTAMENTE<br>
-                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
+                                @if ($slugRolPrincipal === 'director_sin_grupo')
                                     DIRECTORA
                                 @else
-                                    {{ $rolePersona->rolePersona->nombre ?? '' }}
+                                    {{ $nombreRolPrincipal ?? 'MAESTRO(A)' }}
                                 @endif
                                 <br><br><br><br>
                                 ___________________________________<br>
-                                {{ $rolePersona->persona->titulo }} {{ $nombreCompleto }}
-
+                                {{ $personal->persona->titulo }} {{ $nombreCompleto }}
                             </td>
 
-
                             <td>
-                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                                    Vo.Bo. <br>JEFE INMEDIATO <br> <br><br><br>
+                                @if ($slugRolPrincipal === 'director_sin_grupo')
+                                    Vo.Bo. <br>JEFE INMEDIATO <br><br><br>
                                     ___________________________________<br>
                                     {{ $supervisorPreescolarNombre }}
                                 @else
@@ -349,18 +337,12 @@
                                     ___________________________________<br>
                                     {{ $nombreDirectorPreescolar }}
                                 @endif
-                            <td>
-
-
                             </td>
-
-
                         </tr>
                     </table>
-
-
                 </div>
 
+                {{-- CCP igual que Invierno (con indent) --}}
                 @php
                     $titulos = [
                         'Prof.',
@@ -382,10 +364,7 @@
                         'DCE.',
                         'D.C.E.',
                     ];
-
                     $texto = e($copias);
-
-                    // Inserta <br> antes de cada título desde el 2do en adelante
                     $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
                     $count = 0;
@@ -393,145 +372,107 @@
                         $patron,
                         function ($m) use (&$count) {
                             $count++;
-                            if ($count === 1) {
-                                return ' ' . $m[1];
-                            }
-                            return '<br>' . $m[1];
+                            return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
                         },
                         $texto,
                     );
 
-                    // ✅ Indentar desde la 2da línea (después del <br>)
                     $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
-
                     $copiasIndentado = '';
                     foreach ($lineas as $i => $linea) {
-                        if ($i === 0) {
-                            $copiasIndentado .= $linea;
-                        } else {
-                            $copiasIndentado .= '<br><span class="ccp-indent">' . $linea . '</span>';
-                        }
+                        $copiasIndentado .= $i === 0 ? $linea : '<br><span class="ccp-indent">' . $linea . '</span>';
                     }
                 @endphp
 
-                <style>
-                    .ccp-indent {
-                        display: inline-block;
-                        padding-left: 25px;
-                        /* ajusta este valor hasta que quede como en la imagen */
-                    }
-                </style>
-
-
-                <div class="ccp" style="margin-top: 8px;">
-                    <p style="font-size: 9px; margin:0;">
+                <div class="ccp" style="margin-top:8px;">
+                    <p style="font-size:9px; margin:0;">
                         <b>{!! $copiasIndentado !!}</b>
                     </p>
                 </div>
-
-
-
             </div>
-            <div class="page-break"></div>
+
+            @if (!$loop->last)
+                <div class="page-break"></div>
+            @endif
         @endforeach
 
-        {{-- REANUDACIONES PRIMARIA --}}
+
+        {{-- =========================
+        PRIMARIA
+        ========================= --}}
     @elseif ($nivel->slug == 'primaria')
         @foreach ($asignacionesNivel as $personal)
             @php
+                // ✅ Rol principal desde DETALLES
+                [$slugRolPrincipal, $nombreRolPrincipal] = $resolverRolPrincipal($personal);
+
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
-                \Carbon\Carbon::setLocale('es');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
+
+                $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
+
+                $nombreCompletoRaw = trim(
+                    ($personal->persona->nombre ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_paterno ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_materno ?? ''),
+                );
+                $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
+
+                // ✅ CATEGORÍA y FUNCIÓN desde DETALLES (una sola línea, como tu formato)
+                $cargosLinea = $resolverCargosDesdeDetalles($personal, false);
             @endphp
+
             <img class="fondo_primaria" src="{{ public_path('storage/membrete_reanudacion_primaria.png') }}"
-                alt="fondo" style="width: 100%; ">
+                alt="fondo" style="width:100%;">
 
             <div class="contenedor_primaria" style="padding: 100px 60px 0">
-
-                <p style="text-align: right; font-size: 17px; line-height: 25px; "><b>ASUNTO: AVISO DE
-                        REANUDACIÓN
-                        DE
-                        LABORES</b> <br>
-                    @foreach ($personal->persona->personaRoles as $rolePersona)
-                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            Cd. Altamirano,
-                            Gro.,
-                            {{ $fechaDirector }}.
-                        @else
-                            Cd.Altamirano, Gro., {{ $fechaDocente }}.
-                        @endif
-                    @endforeach
-                    <br> "{{ $escuela->lema }}"
+                <p style="text-align:right; font-size:17px; line-height:25px;">
+                    <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
+                    Cd. Altamirano, Gro., {{ $fechaCarta }}. <br>
+                    "{{ $escuela->lema }}"
                 </p>
 
-                <div class="autoridades" style="margin-top: -10px; text-transform: uppercase">
+                <div class="autoridades" style="margin-top:-10px; text-transform:uppercase">
                     <table>
                         <tr>
                             <td style="width:350px">
                                 <b>{{ $directorAdministracionNombre }}</b><br>{{ $directorAdministracion->cargo }}
                             </td>
                         </tr>
-
                         <tr>
                             <td></td>
-                            <td style="width: 300px">
+                            <td style="width:300px">
                                 <b>AT'N. {{ $directorMagisterioNombre }}</b><br>{{ $directorMagisterio->cargo }}
                             </td>
                         </tr>
                     </table>
-
                 </div>
 
                 <div>
-
-                    @foreach ($personal->persona->personaRoles as $rolePersona)
-                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            <p
-                                style="text-transform: uppercase; text-align: justify; font-size: 14.5px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 35px; line-height: 19px;">
-                                EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
-                                        {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
-                                MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                                <br>
-                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
-                            </p>
-                        @else
-                            <p
-                                style="text-transform: uppercase; text-align: justify; font-size: 14.5px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 35px; line-height: 19px;">
-                                EL (A) QUE SUSCRIBE C.
-
-                                <b><u>{{ $rolePersona->persona->titulo }} {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
-                                MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                                <br>
-                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
-                            </p>
-                        @endif
-                    @endforeach
+                    <p
+                        style="text-transform:uppercase; text-align:justify; font-size:14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent:30px; line-height:19px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR MIS LABORES,
+                        DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
+                        CORRESPONDIENTE AL CICLO ESCOLAR
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                    </p>
                 </div>
 
+                <p
+                    style="text-transform:uppercase; text-align:justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
+                </p>
+
                 @php
-                    $nombreCompleto = trim(
-                        $personal->persona->nombre .
-                            ' ' .
-                            $personal->persona->apellido_paterno .
-                            ' ' .
-                            $personal->persona->apellido_materno,
-                    );
                     $datos = [
-                        'NOMBRE' => mb_strtoupper($nombreCompleto),
+                        'NOMBRE' => $nombreCompleto,
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
                         'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
                         'CLAVE PRESUPUESTAL' => 'S/C',
@@ -539,108 +480,75 @@
                             ? mb_strtoupper(
                                 \Carbon\Carbon::parse($personal->ingreso_seg)
                                     ->locale('es')
-                                    ->isoFormat('D [DE] MMMM [DEL] YYYY'),
+                                    ->isoFormat('DD [DE] MMMM [DEL] YYYY'),
                             )
                             : '---------',
                         'FECHA DE INGRESO AL C.T.' => !empty($personal->ingreso_ct)
                             ? mb_strtoupper(
                                 \Carbon\Carbon::parse($personal->ingreso_ct)
                                     ->locale('es')
-                                    ->isoFormat('D [DE] MMMM [DEL] YYYY'),
+                                    ->isoFormat('DD [DE] MMMM [DEL] YYYY'),
                             )
                             : '---------',
-                        'CATEGORÍA' => (function () use ($personal) {
-                            $roles = [];
-
-                            foreach ($personal->persona->personaRoles as $rolePersona) {
-                                $roles[] =
-                                    $rolePersona->rolePersona->nombre ?? ($rolePersona->rolePersona->slug ?? null);
-                            }
-
-                            $roles = array_values(array_filter($roles));
-
-                            return mb_strtoupper(!empty($roles) ? implode(', ', $roles) : '---------');
-                        })(),
-
+                        'CATEGORÍA' => $cargosLinea, // ✅ detalles
                         'NOMBRE DEL CENTRO DE TRABAJO' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
                         'LOCALIDAD' => 'CD. ' . mb_strtoupper($escuela->ciudad ?? '---------'),
                         'MUNICIPIO' => mb_strtoupper($escuela->municipio ?? '---------'),
-                        'FUNCIÓN QUE DESEMPEÑA' => (function () use ($personal) {
-                            $roles = [];
-
-                            foreach ($personal->persona->personaRoles as $rolePersona) {
-                                $roles[] =
-                                    $rolePersona->rolePersona->nombre ?? ($rolePersona->rolePersona->slug ?? null);
-                            }
-
-                            $roles = array_values(array_filter($roles));
-
-                            return mb_strtoupper(!empty($roles) ? implode(', ', $roles) : '---------');
-                        })(),
+                        'FUNCIÓN QUE DESEMPEÑA' => $cargosLinea, // ✅ detalles
                         'REGIÓN' => 'TIERRA CALIENTE',
-                        'ZONA ESCOLAR' => $supervisorPrimaria->zona_escolar ?? '---------',
+                        'ZONA ESCOLAR' => $nivel->supervisor->zona_escolar ?? '---------',
                     ];
                 @endphp
 
                 <div>
                     @foreach ($datos as $key => $dato)
-                        <table
-                            style="width: 100%; font-family: Verdana, Geneva, Tahoma, sans-serif; line-height: 13px;">
+                        <table style="width:100%; font-family: Verdana, Geneva, Tahoma, sans-serif; line-height:13px;">
                             <tr>
-                                <td style="width: 300px;">
-                                    <b>{{ $key }}:</b>
-                                </td>
-                                <td style="border-bottom: 1px solid #000;">
-                                    {{ $dato }}
-                                </td>
+                                <td style="width:300px;"><b>{{ $key }}:</b></td>
+                                <td style="border-bottom:1px solid #000;">{{ $dato }}</td>
                             </tr>
                         </table>
                     @endforeach
                 </div>
 
-
-                <p style="text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">SIN OTRO ASUNTO QUE
-                    TRATAR APROVECHO LA OCASIÓN PARA ENVIARLE UN CORDIAL
-                    SALUDO.</p>
+                <p style="text-align:justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    SIN OTRO ASUNTO QUE TRATAR APROVECHO LA OCASIÓN PARA ENVIARLE UN CORDIAL SALUDO.
+                </p>
 
                 <div class="firmas">
                     <table
-                        style="width: 100%; margin:auto; font-size: 12px; text-align: center; font-family: Verdana, Geneva, Tahoma, sans-serif; text-transform: uppercase; font-weight: bold;">
+                        style="width:100%; margin:auto; font-size:12px; text-align:center; font-family: Verdana, Geneva, Tahoma, sans-serif; text-transform:uppercase; font-weight:bold;">
                         <tr>
                             <td>
-
-
                                 ATENTAMENTE<br><br><br><br><br>
                                 ___________________________________<br>
-                                {{ $rolePersona->persona->titulo }} {{ $nombreCompleto }} <br> RFC:
-                                {{ $rolePersona->persona->rfc }} <br> CURP:
-                                {{ $rolePersona->persona->curp }}
-
-
+                                {{ $personal->persona->titulo }} {{ $nombreCompleto }} <br>
+                                RFC: {{ $personal->persona->rfc }} <br>
+                                CURP: {{ $personal->persona->curp }}
                             </td>
 
                             <td>
-                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $supervisorPrimaria->cargo }} <br><br><br>
+                                @if ($slugRolPrincipal === 'director_sin_grupo')
+                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $nivel->supervisor->cargo ?? '---------' }}
+                                    <br><br><br>
                                     ___________________________________<br>
-                                    {{ $supervisorPrimariaNombre }}<br> RFC:
-                                    {{ $supervisorPrimaria->rfc }} <br> CURP: {{ $supervisorPrimaria->curp }}
+                                    {{ $supervisorPrimariaNombre }}<br>
+                                    RFC: {{ $nivel->supervisor->rfc ?? '---------' }} <br>
+                                    CURP: {{ $nivel->supervisor->curp ?? '---------' }}
                                 @else
                                     Vo.Bo. <br>DIRECTORA <br><br><br><br>
                                     ___________________________________<br>
-                                    {{ $nombreDirectorPSNombre }}<br> RFC:
-                                    {{ $directoraPS->rfc }} <br> CURP: {{ $directoraPS->curp }}
+                                    {{ $nombreDirectorPrimariaNombre }}<br>
+                                    RFC: {{ $nivel->director->rfc ?? '---------' }} <br>
+                                    CURP: {{ $nivel->director->curp ?? '---------' }}
                                 @endif
-
-
-
                             </td>
                         </tr>
                     </table>
-
-
                 </div>
+
+                {{-- CCP igual que Invierno (primaria incluye patrón CCP + títulos) --}}
                 @php
                     $titulos = [
                         'Prof.',
@@ -660,17 +568,13 @@
                         'Téc.',
                         'Tec.',
                     ];
-
                     $texto = e($copias);
 
-                    // CCP: todas las combinaciones comunes
                     $patronCcp = '/\s*(\(?\s*(?:c\s*\.?\s*c\s*\.?\s*p|ccp)\s*\.?\s*\)?)/iu';
                     $texto = preg_replace($patronCcp, '<br>$1', $texto);
-                    $texto = preg_replace('/^(<br>\s*)+/u', '', $texto); // sin salto al inicio
+                    $texto = preg_replace('/^(<br>\s*)+/u', '', $texto);
 
-                    // Resto de títulos: NO romper el primero
                     $patronTitulos = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
-
                     $count = 0;
                     $copiasFormateado = preg_replace_callback(
                         $patronTitulos,
@@ -682,116 +586,111 @@
                     );
                 @endphp
 
-                <div class="ccp" style="margin-top: 0px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
-                    <p style="font-size: 8px">{!! $copiasFormateado !!}</p>
+                <div class="ccp" style="margin-top:0px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size:8px">{!! $copiasFormateado !!}</p>
                 </div>
-
-
             </div>
-            <div class="page-break"></div>
+
+            @if (!$loop->last)
+                <div class="page-break"></div>
+            @endif
         @endforeach
+
+
+        {{-- =========================
+        SECUNDARIA
+        ========================= --}}
     @elseif ($nivel->slug == 'secundaria')
         @foreach ($asignacionesNivel as $personal)
             @php
+                // (Secundaria ya la traías por detalles; la dejo igual pero ordenando detalles)
+
+                $rolPrincipal =
+                    collect($personal->persona->personaRoles ?? [])->first(
+                        fn($r) => optional($r->rolePersona)->slug === 'director_sin_grupo',
+                    ) ?? collect($personal->persona->personaRoles ?? [])->first();
+
+                $slugRolPrincipal = optional(optional($rolPrincipal)->rolePersona)->slug;
+
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
-                \Carbon\Carbon::setLocale('es');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
+                $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
+
+                $nombreCompletoRaw = trim(
+                    ($personal->persona->nombre ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_paterno ?? '') .
+                        ' ' .
+                        ($personal->persona->apellido_materno ?? ''),
+                );
+                $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
+
+                $detallesOrdenados = collect($personal->detalles ?? [])
+                    ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
+                    ->values();
+
+                $cargosDetalles = $detallesOrdenados
+                    ->map(function ($d) {
+                        $nombre = optional(optional($d->PersonaRole)->rolePersona)->nombre;
+                        $grado = optional($d->grado)->nombre;
+                        if (!$nombre) {
+                            return null;
+                        }
+                        return $grado ? mb_strtoupper('>' . $grado . '° ' . $nombre) : mb_strtoupper($nombre);
+                    })
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
+
             <img class="fondo_secundaria" src="{{ public_path('storage/membrete_reanudacion_secundaria.png') }}"
-                alt="fondo" style="width: 100%;">
+                alt="fondo" style="width:100%;">
 
             <div class="contenedor_secundaria" style="padding: 100px 60px 0">
 
-                <p style="text-align: right; font-size: 17px; line-height: 25px; "><b>ASUNTO:
-                        REANUDACIÓN
-                        DE
-                        LABORES</b> <br>
-                    @foreach ($personal->persona->personaRoles as $rolePersona)
-                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            Cd. Altamirano,
-                            Gro.,
-                            {{ $fechaDirector }}.
-                        @else
-                            Cd.Altamirano, Gro., {{ $fechaDocente }}.
-                        @endif
-                    @endforeach
-                    <br> "{{ $escuela->lema }}"
+                <p style="text-align:right; font-size:17px; line-height:25px;">
+                    <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>
+                    Cd. Altamirano, Gro., {{ $fechaCarta }}. <br>
+                    "{{ $escuela->lema }}"
                 </p>
 
-                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">
-                    <p style="width: 400px;"><b> {{ $delegado->titulo }} {{ $delegado->nombre }}
+                <div class="delegado" style="margin-top:10px; text-transform:uppercase; font-size:15px">
+                    <p style="width:400px;">
+                        <b>
+                            {{ $delegado->titulo }} {{ $delegado->nombre }}
                             {{ $delegado->apellido_paterno }}
-                            {{ $delegado->apellido_materno }} <br></b>
-
+                            {{ $delegado->apellido_materno }} <br>
+                        </b>
                     </p>
-                    <p style="margin-top:-15px; width:320px"> {{ $delegado->cargo }}
-                    </p>
+                    <p style="margin-top:-15px; width:320px">{{ $delegado->cargo }}</p>
                     <p><b>P R E S E N T E</b></p>
-
                 </div>
 
                 <div>
-
-                    @foreach ($personal->persona->personaRoles as $rolePersona)
-                        @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                            <p
-                                style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height:20px;">
-                                EL (A) QUE SUSCRIBE C. <b><u>{{ $rolePersona->persona->titulo }}
-                                        {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER DISFRUTADO LAS <b><u>VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
-                            </p>
-                        @else
-                            <p
-                                style="text-transform: uppercase; text-align: justify;  text-indent: 30px; line-height:20px;">
-                                EL (A) QUE SUSCRIBE C.
-                                <b><u>{{ $rolePersona->persona->titulo }} {{ $rolePersona->persona->nombre }}
-                                        {{ $rolePersona->persona->apellido_paterno }}
-                                        {{ $rolePersona->persona->apellido_materno }}</u></b>,
-                                SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                                LABORES, DESPUÉS DE HABER DISFRUTADO LAS <b><u>VACACIONES DE PRIMAVERA</u></b>,
-                                CORRESPONDIENTE AL CICLO ESCOLAR
-                                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
-                                PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
-                            </p>
-                        @endif
-                    @endforeach
+                    <p style="text-transform:uppercase; text-align:justify; text-indent:30px; line-height:20px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
+                        CORRESPONDIENTE AL CICLO ESCOLAR
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
+                    </p>
                 </div>
 
                 @php
-                    $nombreCompleto = trim(
-                        $personal->persona->nombre .
-                            ' ' .
-                            $personal->persona->apellido_paterno .
-                            ' ' .
-                            $personal->persona->apellido_materno,
-                    );
                     $datos = [
-                        'NOMBRE' => mb_strtoupper($nombreCompleto),
+                        'NOMBRE' => $nombreCompleto,
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
                         'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
                         'CLAVE (S) PRESUPUESTAL (S)' => 'S/C',
-                        'CARGO QUE DESEMPEÑA' => (function () use ($personal) {
-                            $roles = [];
-
-                            foreach ($personal->persona->personaRoles as $rolePersona) {
-                                $roles[] =
-                                    $rolePersona->rolePersona->nombre ?? ($rolePersona->rolePersona->slug ?? null);
-                            }
-
-                            $roles = array_values(array_filter($roles));
-
-                            return mb_strtoupper(!empty($roles) ? implode(', ', $roles) : '---------');
-                        })(),
+                        'CARGO QUE DESEMPEÑA' => $cargosHtml,
                         'FECHA DE INGRESO A LA SEP' => !empty($personal->ingreso_sep)
                             ? mb_strtoupper(
                                 \Carbon\Carbon::parse($personal->ingreso_sep)
@@ -806,7 +705,6 @@
                                     ->isoFormat('D [DE] MMMM [DEL] YYYY'),
                             )
                             : '---------',
-
                         'NOMBRE DEL C.T.' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
                         'UBICACIÓN' => 'FRACISCO I. MADERO OTE. 800 COL. ESQUIPULAS. CD ALTAMIRANO, GRO.',
@@ -815,65 +713,57 @@
 
                 <div>
                     @foreach ($datos as $key => $dato)
-                        <table style="width: 100%; line-height: 15px;">
+                        <table style="width:100%; line-height:15px;">
                             <tr>
-                                <td style="width: 250px;">
-                                    <b>{{ $key }}:</b>
-                                </td>
-                                <td style="border-bottom: 1px solid #000;">
-                                    {{ $dato }}
+                                <td style="width:250px;"><b>{{ $key }}:</b></td>
+                                <td style="border-bottom:1px solid #000;">
+                                    @if ($key === 'CARGO QUE DESEMPEÑA')
+                                        {!! $dato !!}
+                                    @else
+                                        {{ $dato }}
+                                    @endif
                                 </td>
                             </tr>
                         </table>
                     @endforeach
                 </div>
 
-
-                <p style="text-align: justify;">SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO
-                    SALUDO.
-                    .</p>
+                <p style="text-align:justify;">
+                    SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
+                </p>
 
                 <div class="firmas">
-
-
-
                     <table
-                        style="width: 100%; margin:auto; font-size: 13px; text-align: center;  text-transform: uppercase; font-weight: bold;">
+                        style="width:100%; margin:auto; font-size:13px; text-align:center; text-transform:uppercase; font-weight:bold;">
                         <tr>
                             <td>
                                 ATENTAMENTE<br>
-                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                                    DIRECTORA
-                                @else
-                                    {{ $rolePersona->rolePersona->nombre ?? '' }}
+                                @if ($slugRolPrincipal === 'director_sin_grupo')
+                                    DIRECTOR(A)
                                 @endif
-
                                 <br><br><br><br>
                                 ___________________________________<br>
-                                {{ $rolePersona->persona->titulo }} {{ $nombreCompleto }}
-
-
+                                {{ $personal->persona->titulo }} {{ $nombreCompleto }}
                             </td>
 
                             <td>
-                                @if ($rolePersona->rolePersona->slug == 'director_sin_grupo')
-                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $supervisorSecundaria->cargo }} <br><br><br>
+                                @if ($slugRolPrincipal === 'director_sin_grupo')
+                                    Vo.Bo. <br>
+                                    JEFE INMEDIATO <br>
+                                    {{ $nivel->supervisor->cargo ?? '---------' }} <br><br><br>
                                     ___________________________________<br>
                                     {{ $supervisorSecundariaNombre }}
                                 @else
-                                    Vo.Bo. <br>DIRECTORA <br><br><br><br>
+                                    Vo.Bo. <br>
+                                    DIRECTOR(A) <br><br><br><br>
                                     ___________________________________<br>
-                                    {{ $nombreDirectorPSNombre }}
+                                    {{ $nombreDirectorSecundariaNombre }}
                                 @endif
-
-
-
                             </td>
                         </tr>
                     </table>
-
-
                 </div>
+
                 @php
                     $titulos = [
                         'Prof.',
@@ -893,10 +783,7 @@
                         'Téc.',
                         'Tec.',
                     ];
-
                     $texto = e($copias);
-
-                    // Inserta <br> antes de cada título desde el 2do en adelante
                     $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
                     $count = 0;
@@ -904,49 +791,33 @@
                         $patron,
                         function ($m) use (&$count) {
                             $count++;
-                            if ($count === 1) {
-                                return ' ' . $m[1];
-                            }
-                            return '<br>' . $m[1];
+                            return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
                         },
                         $texto,
                     );
 
-                    // ✅ Indentar desde la 2da línea (después del <br>)
                     $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
-
                     $copiasIndentado = '';
                     foreach ($lineas as $i => $linea) {
-                        if ($i === 0) {
-                            $copiasIndentado .= $linea;
-                        } else {
-                            $copiasIndentado .= '<br><span class="ccp-indent">' . $linea . '</span>';
-                        }
+                        $copiasIndentado .=
+                            $i === 0 ? $linea : '<br><span class="ccp-indent-sec">' . $linea . '</span>';
                     }
                 @endphp
 
-                <style>
-                    .ccp-indent {
-                        display: inline-block;
-                        padding-left: 29px;
-                        /* ajusta este valor hasta que quede como en la imagen */
-                    }
-                </style>
-
-
-                <div class="ccp" style="margin-top: 13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
-                    <p style="font-size: 9px; margin:0;">
+                <div class="ccp" style="margin-top:13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size:9px; margin:0;">
                         <b>{!! $copiasIndentado !!}</b>
                     </p>
                 </div>
 
             </div>
-            <div class="page-break"></div>
+
+            @if (!$loop->last)
+                <div class="page-break"></div>
+            @endif
         @endforeach
 
     @endif
-    {{-- {{ $asignacionesNivel }} --}}
-
 
 </body>
 

@@ -16,27 +16,16 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
+
             $table->foreignId('nivel_id')
                 ->constrained('niveles')
                 ->cascadeOnDelete()
                 ->cascadeOnUpdate();
 
-            // ✅ Si siempre es obligatorio en tu UI, quítale nullable
-            $table->foreignId('grado_id')
-                ->nullable()
-                ->constrained('grados')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
-            // ✅ Si siempre es obligatorio en tu UI, quítale nullable
-            $table->foreignId('grupo_id')
-                 ->nullable()
-                ->constrained('grupos')
-                ->cascadeOnDelete()
-                ->cascadeOnUpdate();
-
             $table->date('ingreso_seg')->nullable();
+
             $table->date('ingreso_sep')->nullable();
+
             $table->date('ingreso_ct')->nullable();
             // ✅ default y unsigned (opcional), pero recomendado
             $table->unsignedInteger('orden')->default(1);

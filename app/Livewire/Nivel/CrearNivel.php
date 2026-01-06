@@ -77,8 +77,8 @@ class CrearNivel extends Component
             'slug'          => $this->slug,
             'cct'           => $this->cct,
             'color'         => $this->color,
-            'director_id'   => $this->director_id,
-            'supervisor_id' => $this->supervisor_id,
+            'director_id'   => $this->director_id ?: null,
+            'supervisor_id' => $this->supervisor_id ?: null,
         ]);
 
         $this->dispatch('swal', [

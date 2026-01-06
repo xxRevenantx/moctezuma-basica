@@ -6,14 +6,13 @@
     </div>
 
     <div x-data="{ open: false }" class="my-4">
-        <!-- Toggle (form-pro) -->
+        <!-- Toggle -->
         <button type="button" @click="open = !open" :aria-expanded="open" aria-controls="panel-personal"
             class="group inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
                    bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400
                    dark:focus:ring-offset-neutral-900">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-white/15">
-                <!-- ícono lápiz -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path
                         d="M5 19h4l10-10-4-4L5 15v4m14.7-11.3a1 1 0 000-1.4l-2-2a1 1 0 00-1.4 0l-1.6 1.6 3.4 3.4 1.6-1.6z" />
@@ -27,7 +26,31 @@
             </span>
         </button>
 
-        <!-- Panel (form-pro) -->
+        <!-- Loading overlay (para catálogos/guardar) -->
+        <div class="pointer-events-none relative" aria-live="polite">
+            <div wire:loading
+                class="pointer-events-auto absolute inset-0 z-30 rounded-3xl bg-white/60 backdrop-blur-sm
+                           dark:bg-neutral-950/50">
+                <div class="grid h-full place-items-center p-6">
+                    <div
+                        class="w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-5 shadow-xl
+                                    dark:border-neutral-800 dark:bg-neutral-900">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="h-10 w-10 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-neutral-900 dark:text-white">Cargando…</div>
+                                <div class="text-xs text-neutral-600 dark:text-neutral-400">Procesando información.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel -->
         <div id="panel-personal" x-show="open" x-cloak x-transition:enter="transition ease-out duration-250"
             x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
@@ -37,13 +60,12 @@
 
             <form wire:submit.prevent="crearPersonal" class="group">
                 <div
-                    class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow-lg overflow-hidden">
+                    class="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow-lg overflow-hidden">
                     <!-- Accent top -->
                     <div class="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500"></div>
 
-                    <!-- Content -->
                     <div class="p-5 sm:p-6 lg:p-8">
-                        <!-- Título interno -->
+
                         <div class="mb-5 flex items-center gap-3">
                             <div class="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 grid place-items-center">
                                 <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
@@ -59,188 +81,292 @@
                             </div>
                         </div>
 
-
-                        {{-- Grid de inputs --}}
                         <flux:field>
 
-                            {{-- ====== Foto ====== --}}
-                            <div class="mt-6">
-                                <flux:field>
-                                    <flux:label>Foto (opcional)</flux:label>
+                            {{-- ====== Foto (opcional) dentro de un collapse ====== --}}
+                            <div x-data="{ openFoto: false }" class="my-6">
+                                {{-- Toggle --}}
+                                <button type="button" @click="openFoto = !openFoto" :aria-expanded="openFoto"
+                                    aria-controls="panel-foto"
+                                    class="group inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm
+               hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/25
+               dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800/60">
+                                    <div class="flex items-center gap-3">
+                                        <span
+                                            class="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow ring-1 ring-white/15">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                                fill="currentColor">
+                                                <path fill-rule="evenodd"
+                                                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                        </span>
 
-                                    <div
-                                        class="mt-2 rounded-2xl border border-dashed border-zinc-300/70 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 p-4 sm:p-5 shadow-sm">
-                                        <div class="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-                                            {{-- Texto + icono --}}
-                                            <div class="flex items-start gap-3">
+                                        <div class="leading-tight">
+                                            <div class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                Fotografía</div>
+                                            <div class="text-xs text-neutral-600 dark:text-neutral-400">Sube una foto
+                                                (JPG/PNG). Opcional.</div>
+                                        </div>
+                                    </div>
+
+                                    <span class="flex items-center gap-2">
+                                        @if ($foto && method_exists($foto, 'temporaryUrl'))
+                                            <span
+                                                class="hidden sm:inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700
+                           dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                                Lista
+                                            </span>
+                                        @else
+                                            <span
+                                                class="hidden sm:inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[11px] font-semibold text-neutral-700
+                           dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-200">
+                                                <span class="h-2 w-2 rounded-full bg-neutral-400"></span>
+                                                Sin foto
+                                            </span>
+                                        @endif
+
+                                        <span class="transition-transform duration-200"
+                                            :class="openFoto ? 'rotate-180' : 'rotate-0'">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                class="h-5 w-5 text-neutral-700 dark:text-neutral-200"
+                                                viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 15.5l-6-6h12l-6 6z" />
+                                            </svg>
+                                        </span>
+                                    </span>
+                                </button>
+
+                                {{-- Panel --}}
+                                <div id="panel-foto" x-show="openFoto" x-cloak
+                                    x-transition:enter="transition ease-out duration-250"
+                                    x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
+                                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                    x-transition:leave="transition ease-in duration-200"
+                                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                                    x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]" class="mt-4">
+
+                                    <flux:field>
+                                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                            {{-- Dropzone / Uploader --}}
+                                            <div class="lg:col-span-2">
                                                 <div
-                                                    class="grid place-items-center h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 ring-1 ring-black/5 dark:ring-white/10">
-                                                    {{-- icon --}}
-                                                    <svg class="h-5 w-5 text-zinc-600 dark:text-zinc-300" fill="none"
-                                                        stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M3 16l4-4a3 3 0 014 0l1 1a3 3 0 004 0l4-4m-2 10a8 8 0 11-16 0 8 8 0 0116 0z" />
-                                                    </svg>
-                                                </div>
+                                                    class="relative overflow-hidden rounded-3xl border border-dashed border-neutral-300 bg-white p-6 shadow-sm
+                               dark:border-neutral-700 dark:bg-neutral-900">
 
-                                                <div>
-                                                    <p class="text-sm font-semibold text-zinc-900 dark:text-white">
-                                                        Sube una foto del personal
-                                                    </p>
-                                                    <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
-                                                        JPG o PNG. Recomendado: 600×600 o superior.
-                                                    </p>
-
-                                                    <div class="mt-2">
-                                                        <flux:input type="file" wire:model="foto"
-                                                            accept="image/png,image/jpeg,image/jpg" />
+                                                    {{-- Decoración (blobs) --}}
+                                                    <div class="absolute inset-0 pointer-events-none">
+                                                        <div
+                                                            class="absolute -top-20 -right-20 h-56 w-56 rounded-full bg-gradient-to-br from-indigo-500/20 via-violet-500/15 to-fuchsia-500/20 blur-2xl">
+                                                        </div>
+                                                        <div
+                                                            class="absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-gradient-to-tr from-sky-500/18 via-blue-600/12 to-indigo-600/18 blur-2xl">
+                                                        </div>
                                                     </div>
 
-                                                    <flux:error name="foto" />
+                                                    <div
+                                                        class="relative flex flex-col items-center justify-center text-center gap-3">
+                                                        <div
+                                                            class="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow ring-1 ring-white/15">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                                viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
+                                                                    clip-rule="evenodd" />
+                                                            </svg>
+                                                        </div>
+
+                                                        <div class="space-y-1">
+                                                            <div
+                                                                class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                                Arrastra y suelta tu imagen aquí
+                                                            </div>
+                                                            <div
+                                                                class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                                o selecciona un archivo desde tu equipo
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="w-full max-w-sm">
+                                                            <input type="file" wire:model="foto"
+                                                                accept="image/png,image/jpeg,image/jpg"
+                                                                class="block w-full cursor-pointer rounded-2xl border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-700 shadow-sm
+                                           file:mr-4 file:rounded-xl file:border-0 file:bg-neutral-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white
+                                           hover:file:bg-neutral-800
+                                           dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-white dark:file:text-neutral-900 dark:hover:file:bg-neutral-200" />
+
+                                                            <div
+                                                                class="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                                                                Formatos: JPG/PNG. Recomendado: 600×600+. Tamaño
+                                                                sugerido: ≤ 2MB.
+                                                            </div>
+
+                                                            <flux:error name="foto" />
+                                                        </div>
+
+                                                        {{-- Mini estado de carga --}}
+                                                        <div wire:loading wire:target="foto"
+                                                            class="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs text-neutral-700 shadow-sm
+                                       dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
+                                                            <span
+                                                                class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white"></span>
+                                                            Subiendo foto…
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Overlay de carga (tipo inscripción) --}}
+                                                    <div class="pointer-events-none relative" aria-live="polite">
+                                                        <div wire:loading wire:target="foto"
+                                                            class="pointer-events-auto absolute inset-0 z-30 rounded-3xl bg-white/60 backdrop-blur-sm dark:bg-neutral-950/50">
+                                                            <div class="grid h-full place-items-center p-6">
+                                                                <div
+                                                                    class="w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-5 shadow-xl
+                                               dark:border-neutral-800 dark:bg-neutral-900">
+                                                                    <div class="flex items-center gap-3">
+                                                                        <div
+                                                                            class="h-10 w-10 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
+                                                                        </div>
+                                                                        <div>
+                                                                            <div
+                                                                                class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                                                Cargando…
+                                                                            </div>
+                                                                            <div
+                                                                                class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                                                Subiendo fotografía.
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
                                                 </div>
                                             </div>
 
-                                            {{-- Loader al subir --}}
-                                            <div class="shrink-0">
-                                                <div wire:loading wire:target="foto"
-                                                    class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium
-                               bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 ring-1 ring-black/5 dark:ring-white/10">
-                                                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24"
-                                                        fill="none">
-                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                            stroke="currentColor" stroke-width="4"></circle>
-                                                        <path class="opacity-75" fill="currentColor"
-                                                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                                    </svg>
-                                                    Subiendo…
+                                            {{-- Preview --}}
+                                            <div class="lg:col-span-1">
+                                                <div
+                                                    class="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                                    <div class="flex items-center justify-between">
+                                                        <div
+                                                            class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                            Vista previa</div>
+
+                                                        @if ($foto && method_exists($foto, 'temporaryUrl'))
+                                                            <span
+                                                                class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700
+                                           dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                                                <span
+                                                                    class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                                                Lista
+                                                            </span>
+                                                        @else
+                                                            <span
+                                                                class="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[11px] font-semibold text-neutral-700
+                                           dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-200">
+                                                                <span
+                                                                    class="h-2 w-2 rounded-full bg-neutral-400"></span>
+                                                                Sin foto
+                                                            </span>
+                                                        @endif
+                                                    </div>
+
+                                                    <div class="mt-4">
+                                                        <div class="mx-auto w-32 sm:w-40">
+                                                            <div
+                                                                class="relative aspect-square overflow-hidden rounded-3xl bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-800/40 dark:ring-neutral-800">
+                                                                @if ($foto && method_exists($foto, 'temporaryUrl'))
+                                                                    <img src="{{ $foto->temporaryUrl() }}"
+                                                                        alt="Vista previa"
+                                                                        class="h-full w-full object-cover" />
+                                                                @else
+                                                                    <div
+                                                                        class="grid h-full place-items-center p-3 text-center">
+                                                                        <div class="space-y-2">
+                                                                            <div
+                                                                                class="mx-auto h-10 w-10 rounded-2xl bg-neutral-900 text-white grid place-items-center dark:bg-white dark:text-neutral-900">
+                                                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                                                    class="h-5 w-5"
+                                                                                    viewBox="0 0 20 20"
+                                                                                    fill="currentColor">
+                                                                                    <path fill-rule="evenodd"
+                                                                                        d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
+                                                                                        clip-rule="evenodd" />
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div
+                                                                                class="text-xs font-semibold text-neutral-900 dark:text-white">
+                                                                                Aún no hay imagen
+                                                                            </div>
+                                                                            <div
+                                                                                class="text-[11px] text-neutral-600 dark:text-neutral-400">
+                                                                                Cuando subas una foto, aquí verás la
+                                                                                vista previa.
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {{-- Preview --}}
-                                        @if ($foto && method_exists($foto, 'temporaryUrl'))
-                                            <div class="mt-4">
-                                                <div class="flex items-center gap-4">
-                                                    <div class="relative">
-                                                        <img src="{{ $foto->temporaryUrl() }}"
-                                                            class="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl object-cover ring-1 ring-black/10 dark:ring-white/10 shadow-sm" />
-
-                                                        <div
-                                                            class="absolute -bottom-2 -right-2 rounded-full bg-white dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 px-2 py-1 text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">
-                                                            Preview
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="min-w-0 flex-1">
-                                                        <p
-                                                            class="text-sm font-semibold text-zinc-900 dark:text-white truncate">
-                                                            Imagen seleccionada
-                                                        </p>
-                                                        <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
-                                                            Si no te gusta, puedes cambiarla o quitarla.
-                                                        </p>
-
-                                                        <div class="mt-3 flex flex-wrap gap-2">
-                                                            <button type="button"
-                                                                class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
-                                           bg-zinc-900 text-white dark:bg-white dark:text-zinc-900
-                                           hover:opacity-90 transition"
-                                                                onclick="document.querySelector('input[type=file][wire\\:model=&quot;foto&quot;], input[type=file][wire\\:model=&quot;foto&quot;]').click()">
-                                                                Cambiar
-                                                            </button>
-
-                                                            <button type="button" wire:click="$set('foto', null)"
-                                                                class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold
-                                           bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white
-                                           ring-1 ring-black/10 dark:ring-white/10 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition">
-                                                                Quitar
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @else
-                                            {{-- Estado vacío --}}
-                                            <div
-                                                class="mt-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 ring-1 ring-black/5 dark:ring-white/10 p-3">
-                                                <p class="text-xs text-zinc-600 dark:text-zinc-300">
-                                                    Aún no has seleccionado una imagen.
-                                                </p>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </flux:field>
+                                    </flux:field>
+                                </div>
                             </div>
-
-
 
 
 
                             {{-- ====== Datos personales ====== --}}
                             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+                                {{-- CURP --}}
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
+
                                     <div class="relative">
-                                        <flux:input wire:model.live.debounce.500ms="curp" maxlength="18"
-                                            class="uppercase pr-11" placeholder="18 caracteres" />
+                                        <flux:input wire:model.live.debounce.600ms="curp" maxlength="18"
+                                            class="uppercase" placeholder="18 caracteres" />
+
                                         <flux:error name="curp" />
 
-
-
-                                        {{-- Overlay sutil tipo “buscando datos” (solo sobre esta zona) --}}
-                                        <div wire:loading.delay wire:target="consultarCurp"
-                                            class="absolute inset-0 rounded-2xl bg-white/65 dark:bg-neutral-900/55 backdrop-blur-[2px]
-                   ring-1 ring-black/5 dark:ring-white/10">
-                                            <div class="h-full w-full grid place-items-center">
-                                                <div
-                                                    class="flex items-center gap-3 rounded-2xl px-4 py-3
-                            bg-white/80 dark:bg-neutral-900/80
-                            ring-1 ring-indigo-500/15 dark:ring-indigo-300/15 shadow">
-                                                    <div class="relative h-5 w-5">
-                                                        <span
-                                                            class="absolute inset-0 animate-ping rounded-full bg-indigo-500/30"></span>
-                                                        <span
-                                                            class="absolute inset-0 rounded-full bg-indigo-500/60"></span>
-                                                    </div>
-                                                    <div class="leading-tight">
-                                                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">
-                                                            Consultando RENAPO…</p>
-                                                        <p class="text-xs text-zinc-600 dark:text-zinc-300">Esto puede
-                                                            tardar unos segundos</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        @if ($curpError)
+                                            <p class="mt-1 text-xs font-medium text-rose-600">{{ $curpError }}</p>
+                                        @endif
                                     </div>
                                 </flux:field>
+
                                 <flux:field>
                                     <flux:label badge="Requerido">Título</flux:label>
-                                    <flux:input wire:model="titulo" placeholder="Ej. Lic, Profr, Dr" />
+                                    <flux:input wire:model.defer="titulo" placeholder="Ej. Lic, Profr, Dr" />
                                     <flux:error name="titulo" />
                                 </flux:field>
+
                                 <flux:field>
                                     <flux:label badge="Requerido">Nombre(s)</flux:label>
-                                    <flux:input wire:model.defer="nombre" placeholder="Ej. John" />
+                                    <flux:input wire:model.defer="nombre" placeholder="Ej. Juan" />
                                     <flux:error name="nombre" />
                                 </flux:field>
 
                                 <flux:field>
                                     <flux:label badge="Requerido">Apellido paterno</flux:label>
-                                    <flux:input wire:model.defer="apellido_paterno" placeholder="Ej. Doe" />
+                                    <flux:input wire:model.defer="apellido_paterno" placeholder="Ej. Pérez" />
                                     <flux:error name="apellido_paterno" />
                                 </flux:field>
 
                                 <flux:field>
                                     <flux:label badge="Opcional">Apellido materno</flux:label>
                                     <flux:input wire:model.defer="apellido_materno"
-                                        placeholder="Ej. Doe (opcional)" />
+                                        placeholder="Ej. López (opcional)" />
                                     <flux:error name="apellido_materno" />
                                 </flux:field>
-
-
                             </div>
-
 
                             {{-- ====== Documentos ====== --}}
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
@@ -260,14 +386,10 @@
                                     <flux:error name="genero" />
                                 </flux:field>
 
-
-
-
-
                                 <flux:field>
                                     <flux:label badge="Opcional">RFC</flux:label>
                                     <flux:input wire:model.defer="rfc" maxlength="13" class="uppercase"
-                                        placeholder="13 caracteres (opcional)" />
+                                        placeholder="RFC (10-13 caracteres)" />
                                     <flux:error name="rfc" />
                                 </flux:field>
                             </div>
@@ -277,7 +399,7 @@
                                 <flux:field>
                                     <flux:label badge="Opcional">Correo</flux:label>
                                     <flux:input type="email" wire:model.defer="correo"
-                                        placeholder="correo@dominio.com (opcional)" />
+                                        placeholder="correo@dominio.com" />
                                     <flux:error name="correo" />
                                 </flux:field>
 
@@ -312,7 +434,6 @@
                                     <flux:error name="especialidad" />
                                 </flux:field>
                             </div>
-
 
                             {{-- ====== Dirección ====== --}}
                             <div class="mt-8">
@@ -349,13 +470,13 @@
 
                                     <flux:field>
                                         <flux:label badge="Opcional">Municipio</flux:label>
-                                        <flux:input wire:model.defer="municipio" placeholder="Ej. Guadalajara" />
+                                        <flux:input wire:model.defer="municipio" placeholder="Ej. Pungarabato" />
                                         <flux:error name="municipio" />
                                     </flux:field>
 
                                     <flux:field>
                                         <flux:label badge="Opcional">Estado</flux:label>
-                                        <flux:input wire:model.defer="estado" placeholder="Ej. Jalisco" />
+                                        <flux:input wire:model.defer="estado" placeholder="Ej. Guerrero" />
                                         <flux:error name="estado" />
                                     </flux:field>
                                 </div>
@@ -364,28 +485,26 @@
                                     <flux:field>
                                         <flux:label badge="Opcional">Código postal</flux:label>
                                         <flux:input wire:model.defer="codigo_postal" maxlength="10"
-                                            placeholder="Ej. 44100" />
+                                            placeholder="Ej. 40662" />
                                         <flux:error name="codigo_postal" />
                                     </flux:field>
                                 </div>
                             </div>
-
 
                             {{-- Status --}}
                             <div class="mt-4 flex items-center justify-between">
                                 <span class="text-xs text-gray-500 dark:text-gray-400">
                                     Define si el personal estará activo en el sistema.
                                 </span>
-
                                 <flux:checkbox wire:model="status" :label="__('Activo')" />
                             </div>
-                        </flux:field>
 
+                        </flux:field>
 
                         <!-- Divider -->
                         <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 
-                        <!-- Acciones (abajo de los inputs) -->
+                        <!-- Acciones -->
                         <div
                             class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
                             <button type="button" @click="open = false"
@@ -398,14 +517,14 @@
 
                             <flux:button variant="primary" type="submit"
                                 class="w-full sm:w-auto cursor-pointer btn-gradient" wire:loading.attr="disabled"
-                                wire:target="crearDirectivo">
+                                wire:target="crearPersonal">
                                 {{ __('Guardar') }}
                             </flux:button>
                         </div>
                     </div>
 
-                    <!-- Loader overlay -->
-                    <div wire:loading.delay wire:target="crearDirectivo"
+                    <!-- Loader overlay Guardando -->
+                    <div wire:loading.delay wire:target="crearPersonal"
                         class="pointer-events-none absolute inset-0 grid place-items-center bg-white/60 dark:bg-neutral-900/60">
                         <div
                             class="flex items-center gap-3 rounded-xl bg-white/90 dark:bg-neutral-900/90 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-700 shadow">

@@ -79,6 +79,12 @@ return new class extends Migration
             ->cascadeOnUpdate()
             ->restrictOnDelete();
 
+        $table->foreignId('ciclo_id')
+            ->constrained('ciclos')
+            ->cascadeOnUpdate()
+            ->restrictOnDelete();
+
+
         /* =========================
          * FOTO
          * ========================= */
@@ -88,6 +94,8 @@ return new class extends Migration
          * CONTROL
          * ========================= */
         $table->boolean('activo')->default(true);
+
+        $table->dateTime('fecha_inscripcion');
 
         $table->timestamps();
         $table->softDeletes();

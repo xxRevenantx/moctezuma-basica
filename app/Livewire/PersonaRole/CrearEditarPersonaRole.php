@@ -116,6 +116,9 @@ class CrearEditarPersonaRole extends Component
         $this->dispatch('persona-role:saved', id: $rol->id);
         $this->dispatch('persona-role:select', id: $rol->id);
 
+
+$this->dispatch('rolCargadoEliminado');
+
         $this->open = false;
         $this->cerrarModal();
     }
@@ -160,6 +163,9 @@ class CrearEditarPersonaRole extends Component
 
     // avisar a otros componentes
     $this->dispatch('persona-role:deleted', id: $deletedId);
+
+    $this->dispatch('rolCargadoEliminado');
+   $this->roles = RolePersona::orderBy('nombre')->get();
 
     // opcional: cerrar
     // $this->open = false;

@@ -39,4 +39,10 @@ class Semestre extends Model
     {
         return $this->hasMany(PeriodosBachillerato::class);
     }
+
+    // RELACION CON INSCRIPCIONES
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
 }

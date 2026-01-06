@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // WorldTableSeeder::class
             CicloEscolarSeeder::class,
+            CicloSeeder::class,
             EscuelaSeeder::class,
             AccionSeeder::class,
             DirectorSeeder::class,
@@ -31,11 +32,11 @@ class DatabaseSeeder extends Seeder
             MesesBachilleratoSeeder::class,
             SemestreSeeder::class,
             PeriodoSeeder::class,
-            RolePersonaSeeder::class, // DE PRUEBA
-            GeneracionBasicaSeeder::class, // DE PRUEBA
+            // RolePersonaSeeder::class, // DE PRUEBAS
+            // GeneracionBasicaSeeder::class, // DE PRUEBA
             // GrupoSeeder::class, // DE PRUEBA
-            PersonaSeeder::class, // DE PRUEBA
-            PersonaRoleSeeder::class, // DE PRUEBA
+            // PersonaSeeder::class, // DE PRUEBA
+            // PersonaRoleSeeder::class, // DE PRUEBA
             // PersonaNivelSeeder::class, // DE PRUEBA
         ]);
     }

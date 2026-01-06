@@ -58,4 +58,11 @@ class Nivel extends Model
         return $this->hasMany(Inscripcion::class);
     }
 
+    public function directivos()
+{
+    return $this->belongsToMany(\App\Models\Director::class, 'director_nivel', 'nivel_id', 'director_id')
+        ->withTimestamps();
+}
+
+
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Inscripcion;
 
+use App\Models\Ciclo;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -9,7 +10,6 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\CurpService;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -38,6 +38,12 @@ class CrearInscripcion extends Component
     public ?string $apellido_materno = null;
     public ?string $fecha_nacimiento = null; // Y-m-d
     public ?string $genero = null; // H | M
+
+    // ✅ NUEVO: fecha inscripción
+    public ?string $fecha_inscripcion = null; // Y-m-d
+
+    // ✅ NUEVO: ciclo
+    public ?int $ciclo_id = null;
 
     // Nacimiento (opcionales)
     public ?string $pais_nacimiento = null;
@@ -76,6 +82,9 @@ class CrearInscripcion extends Component
     public Collection $semestresOptions;
     public array $gruposOptions = [];
 
+    // ✅ NUEVO: catálogos ciclos
+    public Collection $ciclosOptions;
+
     public function mount(): void
     {
         $this->niveles = $this->loadNivelesFromGrupos();
@@ -85,12 +94,53 @@ class CrearInscripcion extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
 
+        // ✅ ciclos
+        $this->ciclosOptions = $this->loadCiclos();
+
+        // ✅ default fecha inscripción (hoy)
+        $this->fecha_inscripcion = now()->toDateString();
+
         $this->matricula = '';
+    }
+
+    // =========================
+    // Helpers (Title Case español)
+    // =========================
+    private function titleCaseNombre(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        // RENAPO -> MAYÚSCULAS, convertimos a Title Case con acentos/Ñ
+        $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+
+        // Partículas comunes a minúscula cuando van en medio
+        $lowerWords = [
+            'De', 'Del', 'La', 'Las', 'Los',
+            'Y', 'E',
+            'San', 'Santa',
+            'Van', 'Von',
+        ];
+
+        foreach ($lowerWords as $w) {
+            $value = preg_replace('/\b' . preg_quote($w, '/') . '\b/u', mb_strtolower($w, 'UTF-8'), $value) ?? $value;
+        }
+
+        // Si inicia con esas partículas, lo regresamos a Title
+        $value = preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
+            return mb_convert_case(mb_strtolower($m[0], 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+        }, $value) ?? $value;
+
+        return $value;
     }
 
     // ==========================================================
     // MATRÍCULA (autogenerada cuando CURP es correcta + nivel slug)
-    // Formato: {ANIO}{NIVELCODE}{CURP4}{NN} (fallback a NNNN)
     // ==========================================================
     protected function nivelCodeBySlug(?string $slug): string
     {
@@ -105,13 +155,11 @@ class CrearInscripcion extends Component
 
     protected function anioInicioCiclo(): string
     {
-        // Ideal: Generacion->anio_ingreso
         if ($this->generacion_id) {
             $gen = Generacion::query()->find($this->generacion_id);
             if ($gen?->anio_ingreso) return (string) $gen->anio_ingreso;
         }
 
-        // Fallback: año actual
         return (string) now()->year;
     }
 
@@ -124,7 +172,6 @@ class CrearInscripcion extends Component
         $nivel = $this->nivelCodeBySlug($slug);
         $curp4 = strtoupper(substr($this->curp, 0, 4));
 
-        // intentos con 2 dígitos
         for ($i = 0; $i < 50; $i++) {
             $nn = str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT);
             $mat = "{$anio}{$nivel}{$curp4}{$nn}";
@@ -134,8 +181,6 @@ class CrearInscripcion extends Component
             }
         }
 
-
-        // fallback con 4 dígitos
         for ($i = 0; $i < 50; $i++) {
             $nnnn = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             $mat = "{$anio}{$nivel}{$curp4}{$nnnn}";
@@ -150,7 +195,6 @@ class CrearInscripcion extends Component
 
     protected function refrescarMatriculaSiPosible(): void
     {
-        // Requisito: CURP válida + nivel seleccionado
         if (!$this->nivel_id) {
             $this->matricula = '';
             return;
@@ -170,7 +214,6 @@ class CrearInscripcion extends Component
             $this->matricula = $mat;
             $this->resetValidation('matricula');
         } else {
-            // si no se pudo generar por colisiones extremas
             $this->matricula = '';
         }
     }
@@ -183,10 +226,9 @@ class CrearInscripcion extends Component
         $this->curp = strtoupper(trim($value));
         $this->curpError = null;
 
-        // No generar si aún no está completa
         if (strlen($this->curp) !== 18) {
             $this->ultimaCurpConsultada = null;
-            $this->matricula = ''; // ✅ limpia mientras escribe
+            $this->matricula = '';
             return;
         }
 
@@ -197,7 +239,6 @@ class CrearInscripcion extends Component
         }
 
         if ($this->ultimaCurpConsultada === $this->curp) {
-            // por si el usuario ya tenía nivel seleccionado y solo re-enfoca
             $this->refrescarMatriculaSiPosible();
             return;
         }
@@ -232,19 +273,15 @@ class CrearInscripcion extends Component
             return;
         }
 
-        // dd($sol);
-
-        $this->nombre = (string) data_get($sol, 'Nombres', $this->nombre);
-        $this->apellido_paterno = (string) data_get($sol, 'ApellidoPaterno', $this->apellido_paterno);
-        $this->apellido_materno = data_get($sol, 'ApellidoMaterno') ?: null;
+        // ✅ RENAPO mayúsculas -> Title Case bonito
+        $this->nombre = $this->titleCaseNombre((string) data_get($sol, 'Nombres', $this->nombre));
+        $this->apellido_paterno = $this->titleCaseNombre((string) data_get($sol, 'ApellidoPaterno', $this->apellido_paterno));
+        $am = data_get($sol, 'ApellidoMaterno');
+        $this->apellido_materno = $am ? $this->titleCaseNombre((string) $am) : null;
 
         $fechaApi = data_get($sol, 'FechaNacimiento');
         if (!empty($fechaApi)) {
-            try {
-                $this->fecha_nacimiento = $fechaApi;
-            } catch (\Throwable $e) {
-                // noop
-            }
+            $this->fecha_nacimiento = $fechaApi; // si viene Y-m-d ya está ok
         }
 
         $sexo = strtoupper((string) data_get($sol, 'ClaveSexo', ''));
@@ -256,9 +293,9 @@ class CrearInscripcion extends Component
         $this->estado_nacimiento = data_get($sol, 'EntidadNacimiento') ?: $this->estado_nacimiento;
         $this->lugar_nacimiento = data_get($sol, 'EntidadNacimiento') ?: $this->lugar_nacimiento;
 
+        // Limpia espacios, mayus curp/matricula, etc.
         $this->sanitizeStrings();
 
-        // ✅ AQUÍ: ya es CURP correcta → genera matrícula si nivel->slug existe
         $this->refrescarMatriculaSiPosible();
 
         $this->validateOnly('curp');
@@ -392,6 +429,14 @@ class CrearInscripcion extends Component
         })->values()->all();
     }
 
+    // ✅ ciclos
+    protected function loadCiclos(): Collection
+    {
+        return Ciclo::query()
+            ->orderBy('id')
+            ->get(['id', 'ciclo']);
+    }
+
     // =========================
     // Reactividad (selects)
     // =========================
@@ -421,7 +466,6 @@ class CrearInscripcion extends Component
 
         $this->gradosOptions = $this->loadGradosFromGrupos();
 
-        // ✅ si ya hay CURP correcta, al elegir nivel se genera matrícula
         $this->refrescarMatriculaSiPosible();
     }
 
@@ -457,7 +501,6 @@ class CrearInscripcion extends Component
         $this->resetValidation(['semestre_id', 'grupo_id']);
 
         if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) {
-            // por si el año depende de generación
             $this->refrescarMatriculaSiPosible();
             return;
         }
@@ -469,8 +512,6 @@ class CrearInscripcion extends Component
         }
 
         $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
-
-        // por si el año depende de generación
         $this->refrescarMatriculaSiPosible();
     }
 
@@ -500,6 +541,9 @@ class CrearInscripcion extends Component
             'apellido_materno' => ['nullable', 'string', 'max:255'],
             'fecha_nacimiento' => ['required', 'date'],
             'genero' => ['required', 'in:H,M'],
+
+            'fecha_inscripcion' => ['required', 'date'],
+            'ciclo_id' => ['required', 'exists:ciclos,id'],
 
             'pais_nacimiento' => ['nullable', 'string', 'max:255'],
             'estado_nacimiento' => ['nullable', 'string', 'max:255'],
@@ -537,6 +581,11 @@ class CrearInscripcion extends Component
             'curp.regex' => 'La CURP debe contener solo letras y números.',
             'matricula.required' => 'La matrícula es obligatoria.',
             'matricula.unique' => 'Esa matrícula ya existe.',
+
+            'fecha_inscripcion.required' => 'La fecha de inscripción es obligatoria.',
+            'ciclo_id.required' => 'Selecciona un ciclo.',
+            'ciclo_id.exists' => 'El ciclo seleccionado no es válido.',
+
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
@@ -615,7 +664,6 @@ class CrearInscripcion extends Component
     {
         $this->sanitizeStrings();
 
-        // ✅ Última verificación: si CURP es correcta y ya hay nivel, genera matrícula
         $this->refrescarMatriculaSiPosible();
 
         $data = $this->validate();
@@ -635,6 +683,9 @@ class CrearInscripcion extends Component
             'apellido_materno' => $data['apellido_materno'] ?? null,
             'fecha_nacimiento' => $data['fecha_nacimiento'],
             'genero' => $data['genero'],
+
+            'fecha_inscripcion' => $data['fecha_inscripcion'],
+            'ciclo_id' => (int) $data['ciclo_id'],
 
             'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
             'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
@@ -679,6 +730,8 @@ class CrearInscripcion extends Component
             'apellido_materno',
             'fecha_nacimiento',
             'genero',
+            'fecha_inscripcion',
+            'ciclo_id',
             'pais_nacimiento',
             'estado_nacimiento',
             'lugar_nacimiento',
@@ -709,6 +762,9 @@ class CrearInscripcion extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
         $this->esBachillerato = false;
+
+        $this->ciclosOptions = $this->loadCiclos();
+        $this->fecha_inscripcion = now()->toDateString();
     }
 
     public function render()
@@ -720,6 +776,7 @@ class CrearInscripcion extends Component
             'semestres' => $this->semestresOptions,
             'grupos' => $this->gruposOptions,
             'esBachillerato' => $this->esBachillerato,
+            'ciclos' => $this->ciclosOptions,
         ]);
     }
 }
