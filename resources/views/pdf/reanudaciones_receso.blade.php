@@ -241,7 +241,12 @@
                     CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
                 </p>
 
-                <p style="text-align: right"><b>{{ $escuela->lema }}</b></p>
+                <p style="text-align: right"><b>
+                        @if (empty(trim($escuela->lema ?? '')))
+                        @else
+                            "{{ $escuela->lema }}"
+                        @endif
+                    </b></p>
 
                 <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px;">
                     <p style="width: 400px;">
@@ -438,7 +443,11 @@
                 <p style="text-align: right; font-size: 17px; line-height: 25px; ">
                     <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
                     Cd. Altamirano, Gro., {{ $fechaCarta }}.
-                    <br> "{{ $escuela->lema }}"
+                    <br>
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}"
+                    @endif
                 </p>
 
                 <div class="autoridades" style="margin-top: -10px; text-transform: uppercase">
@@ -663,7 +672,11 @@
                 <p style="text-align: right; font-size: 17px; line-height: 25px; ">
                     <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>
                     Cd. Altamirano, Gro., {{ $fechaCarta }}.
-                    <br> "{{ $escuela->lema }}"
+                    <br>
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}"
+                    @endif
                 </p>
 
                 <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">

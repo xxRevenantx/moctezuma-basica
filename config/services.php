@@ -18,6 +18,11 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+    ],
+
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
@@ -34,5 +39,13 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'azure' => [
+        'docintel' => [
+            'endpoint' => env('AZURE_DOCINTEL_ENDPOINT'),
+            'key' => env('AZURE_DOCINTEL_KEY'),
+            'region' => env('AZURE_DOCINTEL_REGION'),
+        ],
+    ],
+
 
 ];

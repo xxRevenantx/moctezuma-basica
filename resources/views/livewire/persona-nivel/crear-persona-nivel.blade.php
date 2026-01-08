@@ -144,11 +144,45 @@
                     </div>
 
                     {{-- Fechas --}}
-                    <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG" />
-                        <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP" />
-                        <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso C.T." />
+                    <div class="mt-5">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">Fechas de ingreso</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    En secundaria, si el personal ya tiene registro, estas fechas quedan bloqueadas.
+                                </p>
+                            </div>
+
+                            @if ($bloquearFechasSecundaria)
+                                <span
+                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold
+                       bg-amber-50 text-amber-700 ring-1 ring-amber-200
+                       dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-800">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                    Fechas bloqueadas (Secundaria)
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG"
+                                :disabled="$bloquearFechasSecundaria" />
+                            <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP"
+                                :disabled="$bloquearFechasSecundaria" />
+                            <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso C.T."
+                                :disabled="$bloquearFechasSecundaria" />
+                        </div>
+
+                        @if ($bloquearFechasSecundaria)
+                            <div
+                                class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800
+                    dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                Este personal ya tiene registro en <b>Secundaria</b>. Para evitar inconsistencias, las
+                                fechas solo se editan desde la cabecera existente.
+                            </div>
+                        @endif
                     </div>
+
 
                     <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 

@@ -1,3 +1,4 @@
+{{-- resources/views/livewire/personas/crear-personal.blade.php --}}
 <div>
     <!-- Header -->
     <div class="flex flex-col gap-2">
@@ -14,8 +15,7 @@
                    dark:focus:ring-offset-neutral-900">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-white/15">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path
-                        d="M5 19h4l10-10-4-4L5 15v4m14.7-11.3a1 1 0 000-1.4l-2-2a1 1 0 00-1.4 0l-1.6 1.6 3.4 3.4 1.6-1.6z" />
+                    <path d="M12 6v12m6-6H6" />
                 </svg>
             </span>
             <span class="font-medium">{{ __('Nuevo Personal') }}</span>
@@ -25,30 +25,6 @@
                 </svg>
             </span>
         </button>
-
-        <!-- Loading overlay (para catálogos/guardar) -->
-        <div class="pointer-events-none relative" aria-live="polite">
-            <div wire:loading
-                class="pointer-events-auto absolute inset-0 z-30 rounded-3xl bg-white/60 backdrop-blur-sm
-                           dark:bg-neutral-950/50">
-                <div class="grid h-full place-items-center p-6">
-                    <div
-                        class="w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-5 shadow-xl
-                                    dark:border-neutral-800 dark:bg-neutral-900">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="h-10 w-10 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-neutral-900 dark:text-white">Cargando…</div>
-                                <div class="text-xs text-neutral-600 dark:text-neutral-400">Procesando información.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Panel -->
         <div id="panel-personal" x-show="open" x-cloak x-transition:enter="transition ease-out duration-250"
@@ -61,11 +37,9 @@
             <form wire:submit.prevent="crearPersonal" class="group">
                 <div
                     class="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow-lg overflow-hidden">
-                    <!-- Accent top -->
                     <div class="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500"></div>
 
                     <div class="p-5 sm:p-6 lg:p-8">
-
                         <div class="mb-5 flex items-center gap-3">
                             <div class="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 grid place-items-center">
                                 <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
@@ -82,270 +56,171 @@
                         </div>
 
                         <flux:field>
-
-                            {{-- ====== Foto (opcional) dentro de un collapse ====== --}}
-                            <div x-data="{ openFoto: false }" class="my-6">
-                                {{-- Toggle --}}
-                                <button type="button" @click="openFoto = !openFoto" :aria-expanded="openFoto"
-                                    aria-controls="panel-foto"
+                            {{-- ====== AUTOLLENADO SOLO CURP PDF ====== --}}
+                            <div x-data="{ openPdf: true }" class="my-6">
+                                <button type="button" @click="openPdf = !openPdf" :aria-expanded="openPdf"
                                     class="group inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm
-               hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/25
-               dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800/60">
+                                           hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/25
+                                           dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800/60">
                                     <div class="flex items-center gap-3">
                                         <span
-                                            class="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow ring-1 ring-white/15">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                            class="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 text-white shadow ring-1 ring-white/15">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24"
                                                 fill="currentColor">
-                                                <path fill-rule="evenodd"
-                                                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
-                                                    clip-rule="evenodd" />
+                                                <path d="M7 18h10v-2H7v2zm5-16l-5 5h3v6h4V7h3l-5-5z" />
                                             </svg>
                                         </span>
 
                                         <div class="leading-tight">
                                             <div class="text-sm font-semibold text-neutral-900 dark:text-white">
-                                                Fotografía</div>
-                                            <div class="text-xs text-neutral-600 dark:text-neutral-400">Sube una foto
-                                                (JPG/PNG). Opcional.</div>
+                                                Extraer desde CURP (PDF)
+                                            </div>
+                                            <div class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                Solo obtiene <b>CURP</b> y <b>Nombre</b> (PDF con texto seleccionable).
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <span class="flex items-center gap-2">
-                                        @if ($foto && method_exists($foto, 'temporaryUrl'))
-                                            <span
-                                                class="hidden sm:inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700
-                           dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
-                                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                                Lista
-                                            </span>
-                                        @else
-                                            <span
-                                                class="hidden sm:inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[11px] font-semibold text-neutral-700
-                           dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-200">
-                                                <span class="h-2 w-2 rounded-full bg-neutral-400"></span>
-                                                Sin foto
-                                            </span>
-                                        @endif
-
-                                        <span class="transition-transform duration-200"
-                                            :class="openFoto ? 'rotate-180' : 'rotate-0'">
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                class="h-5 w-5 text-neutral-700 dark:text-neutral-200"
-                                                viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 15.5l-6-6h12l-6 6z" />
-                                            </svg>
-                                        </span>
+                                    <span class="transition-transform duration-200"
+                                        :class="openPdf ? 'rotate-180' : 'rotate-0'">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                            class="h-5 w-5 text-neutral-700 dark:text-neutral-200" viewBox="0 0 24 24"
+                                            fill="currentColor">
+                                            <path d="M12 15.5l-6-6h12l-6 6z" />
+                                        </svg>
                                     </span>
                                 </button>
 
-                                {{-- Panel --}}
-                                <div id="panel-foto" x-show="openFoto" x-cloak
-                                    x-transition:enter="transition ease-out duration-250"
-                                    x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
-                                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                                    x-transition:leave="transition ease-in duration-200"
-                                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                                    x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]" class="mt-4">
-
-                                    <flux:field>
-                                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                            {{-- Dropzone / Uploader --}}
-                                            <div class="lg:col-span-2">
+                                <div x-show="openPdf" x-cloak class="mt-4">
+                                    <div
+                                        class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm p-4 sm:p-5">
+                                        <div class="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                                            <div class="flex items-start gap-3">
                                                 <div
-                                                    class="relative overflow-hidden rounded-3xl border border-dashed border-neutral-300 bg-white p-6 shadow-sm
-                               dark:border-neutral-700 dark:bg-neutral-900">
-
-                                                    {{-- Decoración (blobs) --}}
-                                                    <div class="absolute inset-0 pointer-events-none">
-                                                        <div
-                                                            class="absolute -top-20 -right-20 h-56 w-56 rounded-full bg-gradient-to-br from-indigo-500/20 via-violet-500/15 to-fuchsia-500/20 blur-2xl">
-                                                        </div>
-                                                        <div
-                                                            class="absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-gradient-to-tr from-sky-500/18 via-blue-600/12 to-indigo-600/18 blur-2xl">
-                                                        </div>
+                                                    class="mt-0.5 h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/25 grid place-items-center ring-1 ring-indigo-500/15">
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="h-5 w-5 text-indigo-600 dark:text-indigo-300"
+                                                        viewBox="0 0 24 24" fill="currentColor">
+                                                        <path
+                                                            d="M12 2a7 7 0 00-7 7v3a4 4 0 00-2 3v1a3 3 0 003 3h12a3 3 0 003-3v-1a4 4 0 00-2-3V9a7 7 0 00-7-7zm-5 10V9a5 5 0 0110 0v3H7z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <div class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                        Sube tu CURP (PDF)</div>
+                                                    <div class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                        Recomendado: CURP descargada de RENAPO con texto.
                                                     </div>
+                                                </div>
+                                            </div>
 
-                                                    <div
-                                                        class="relative flex flex-col items-center justify-center text-center gap-3">
+                                            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                                <label
+                                                    class="inline-flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-200">
+                                                    <input type="checkbox" wire:model="autollenar_forzar"
+                                                        class="rounded border-neutral-300 dark:border-neutral-700" />
+                                                    Sobrescribir campos ya llenos
+                                                </label>
+
+                                                <flux:button type="button" variant="primary" class="w-full sm:w-auto"
+                                                    wire:click="autollenarDesdeCurpPdf" wire:loading.attr="disabled"
+                                                    wire:target="autollenarDesdeCurpPdf,pdf_curp">
+                                                    Extraer CURP
+                                                </flux:button>
+                                            </div>
+                                        </div>
+
+                                        {{-- Dropzone visual --}}
+                                        <div class="mt-4">
+                                            <label class="block">
+                                                <div
+                                                    class="relative rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700
+                                                            bg-neutral-50/80 dark:bg-neutral-950/30 p-4 sm:p-5
+                                                            hover:bg-neutral-50 dark:hover:bg-neutral-900/40 transition">
+                                                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
                                                         <div
-                                                            class="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow ring-1 ring-white/15">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-                                                                viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fill-rule="evenodd"
-                                                                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
-                                                                    clip-rule="evenodd" />
+                                                            class="h-10 w-10 rounded-2xl bg-white dark:bg-neutral-900 grid place-items-center ring-1 ring-black/5 dark:ring-white/10 shadow-sm">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="h-5 w-5 text-neutral-700 dark:text-neutral-200"
+                                                                viewBox="0 0 24 24" fill="currentColor">
+                                                                <path
+                                                                    d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm1 7V3.5L19.5 9H15z" />
                                                             </svg>
                                                         </div>
 
-                                                        <div class="space-y-1">
+                                                        <div class="flex-1">
                                                             <div
-                                                                class="text-sm font-semibold text-neutral-900 dark:text-white">
-                                                                Arrastra y suelta tu imagen aquí
+                                                                class="text-sm font-medium text-neutral-900 dark:text-white">
+                                                                Selecciona el PDF de CURP
                                                             </div>
-                                                            <div
-                                                                class="text-xs text-neutral-600 dark:text-neutral-400">
-                                                                o selecciona un archivo desde tu equipo
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="w-full max-w-sm">
-                                                            <input type="file" wire:model="foto"
-                                                                accept="image/png,image/jpeg,image/jpg"
-                                                                class="block w-full cursor-pointer rounded-2xl border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-700 shadow-sm
-                                           file:mr-4 file:rounded-xl file:border-0 file:bg-neutral-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white
-                                           hover:file:bg-neutral-800
-                                           dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-white dark:file:text-neutral-900 dark:hover:file:bg-neutral-200" />
-
-                                                            <div
-                                                                class="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-                                                                Formatos: JPG/PNG. Recomendado: 600×600+. Tamaño
-                                                                sugerido: ≤ 2MB.
+                                                            <div class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                                Tamaño máx. 50MB • Formato PDF
                                                             </div>
 
-                                                            <flux:error name="foto" />
-                                                        </div>
-
-                                                        {{-- Mini estado de carga --}}
-                                                        <div wire:loading wire:target="foto"
-                                                            class="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs text-neutral-700 shadow-sm
-                                       dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-200">
-                                                            <span
-                                                                class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white"></span>
-                                                            Subiendo foto…
-                                                        </div>
-                                                    </div>
-
-                                                    {{-- Overlay de carga (tipo inscripción) --}}
-                                                    <div class="pointer-events-none relative" aria-live="polite">
-                                                        <div wire:loading wire:target="foto"
-                                                            class="pointer-events-auto absolute inset-0 z-30 rounded-3xl bg-white/60 backdrop-blur-sm dark:bg-neutral-950/50">
-                                                            <div class="grid h-full place-items-center p-6">
+                                                            @if ($pdf_curp)
                                                                 <div
-                                                                    class="w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-5 shadow-xl
-                                               dark:border-neutral-800 dark:bg-neutral-900">
-                                                                    <div class="flex items-center gap-3">
-                                                                        <div
-                                                                            class="h-10 w-10 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
-                                                                        </div>
-                                                                        <div>
-                                                                            <div
-                                                                                class="text-sm font-semibold text-neutral-900 dark:text-white">
-                                                                                Cargando…
-                                                                            </div>
-                                                                            <div
-                                                                                class="text-xs text-neutral-600 dark:text-neutral-400">
-                                                                                Subiendo fotografía.
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                                                    class="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1 text-xs text-emerald-700 dark:text-emerald-200 ring-1 ring-emerald-600/20">
+                                                                    <span
+                                                                        class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                                    Archivo seleccionado:
+                                                                    {{ $pdf_curp->getClientOriginalName() }}
                                                                 </div>
-                                                            </div>
+                                                            @endif
+                                                        </div>
+
+                                                        <div class="shrink-0">
+                                                            <span
+                                                                class="inline-flex items-center rounded-xl bg-neutral-900 text-white px-3 py-2 text-xs dark:bg-white dark:text-neutral-900">
+                                                                Buscar archivo
+                                                            </span>
                                                         </div>
                                                     </div>
 
+                                                    <input type="file" wire:model="pdf_curp"
+                                                        accept="application/pdf"
+                                                        class="absolute inset-0 opacity-0 cursor-pointer" />
                                                 </div>
-                                            </div>
+                                            </label>
 
-                                            {{-- Preview --}}
-                                            <div class="lg:col-span-1">
-                                                <div
-                                                    class="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                                                    <div class="flex items-center justify-between">
-                                                        <div
-                                                            class="text-sm font-semibold text-neutral-900 dark:text-white">
-                                                            Vista previa</div>
+                                            <flux:error name="pdf_curp" />
 
-                                                        @if ($foto && method_exists($foto, 'temporaryUrl'))
-                                                            <span
-                                                                class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700
-                                           dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
-                                                                <span
-                                                                    class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                                                Lista
-                                                            </span>
-                                                        @else
-                                                            <span
-                                                                class="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[11px] font-semibold text-neutral-700
-                                           dark:border-neutral-800 dark:bg-neutral-950/30 dark:text-neutral-200">
-                                                                <span
-                                                                    class="h-2 w-2 rounded-full bg-neutral-400"></span>
-                                                                Sin foto
-                                                            </span>
-                                                        @endif
-                                                    </div>
-
-                                                    <div class="mt-4">
-                                                        <div class="mx-auto w-32 sm:w-40">
-                                                            <div
-                                                                class="relative aspect-square overflow-hidden rounded-3xl bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-800/40 dark:ring-neutral-800">
-                                                                @if ($foto && method_exists($foto, 'temporaryUrl'))
-                                                                    <img src="{{ $foto->temporaryUrl() }}"
-                                                                        alt="Vista previa"
-                                                                        class="h-full w-full object-cover" />
-                                                                @else
-                                                                    <div
-                                                                        class="grid h-full place-items-center p-3 text-center">
-                                                                        <div class="space-y-2">
-                                                                            <div
-                                                                                class="mx-auto h-10 w-10 rounded-2xl bg-neutral-900 text-white grid place-items-center dark:bg-white dark:text-neutral-900">
-                                                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                    class="h-5 w-5"
-                                                                                    viewBox="0 0 20 20"
-                                                                                    fill="currentColor">
-                                                                                    <path fill-rule="evenodd"
-                                                                                        d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0015.586 3H4zm6 5a3 3 0 100 6 3 3 0 000-6z"
-                                                                                        clip-rule="evenodd" />
-                                                                                </svg>
-                                                                            </div>
-                                                                            <div
-                                                                                class="text-xs font-semibold text-neutral-900 dark:text-white">
-                                                                                Aún no hay imagen
-                                                                            </div>
-                                                                            <div
-                                                                                class="text-[11px] text-neutral-600 dark:text-neutral-400">
-                                                                                Cuando subas una foto, aquí verás la
-                                                                                vista previa.
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-
-                                                </div>
+                                            <div wire:loading wire:target="pdf_curp"
+                                                class="mt-2 text-xs text-neutral-500">
+                                                Subiendo CURP…
                                             </div>
                                         </div>
-                                    </flux:field>
+
+                                        <div wire:loading wire:target="autollenarDesdeCurpPdf"
+                                            class="mt-4 rounded-2xl border border-neutral-200 bg-white/70 p-4 text-sm shadow-sm
+                                                   dark:border-neutral-800 dark:bg-neutral-900/50">
+                                            <div class="flex items-center gap-3">
+                                                <div
+                                                    class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
+                                                </div>
+                                                Extrayendo datos del PDF…
+                                            </div>
+                                        </div>
+
+                                        @if ($autollenadoError)
+                                            <div
+                                                class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                                                {{ $autollenadoError }}
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
 
-
-
-                            {{-- ====== Datos personales ====== --}}
-                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-
-                                {{-- CURP --}}
+                            {{-- ====== DATOS PERSONALES ====== --}}
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
-
-                                    <div class="relative">
-                                        <flux:input wire:model.live.debounce.600ms="curp" maxlength="18"
-                                            class="uppercase" placeholder="18 caracteres" />
-
-                                        <flux:error name="curp" />
-
-                                        @if ($curpError)
-                                            <p class="mt-1 text-xs font-medium text-rose-600">{{ $curpError }}</p>
-                                        @endif
-                                    </div>
-                                </flux:field>
-
-                                <flux:field>
-                                    <flux:label badge="Requerido">Título</flux:label>
-                                    <flux:input wire:model.defer="titulo" placeholder="Ej. Lic, Profr, Dr" />
-                                    <flux:error name="titulo" />
+                                    <flux:input wire:model.live.debounce.600ms="curp" maxlength="18"
+                                        class="uppercase" placeholder="18 caracteres" />
+                                    <flux:error name="curp" />
+                                    @if ($curpError)
+                                        <p class="mt-1 text-xs font-medium text-rose-600">{{ $curpError }}</p>
+                                    @endif
                                 </flux:field>
 
                                 <flux:field>
@@ -368,7 +243,6 @@
                                 </flux:field>
                             </div>
 
-                            {{-- ====== Documentos ====== --}}
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                                 <flux:field>
                                     <flux:label badge="Requerido">Fecha de nacimiento</flux:label>
@@ -389,49 +263,8 @@
                                 <flux:field>
                                     <flux:label badge="Opcional">RFC</flux:label>
                                     <flux:input wire:model.defer="rfc" maxlength="13" class="uppercase"
-                                        placeholder="RFC (10-13 caracteres)" />
+                                        placeholder="RFC (12-13)" />
                                     <flux:error name="rfc" />
-                                </flux:field>
-                            </div>
-
-                            {{-- ====== Contacto ====== --}}
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                                <flux:field>
-                                    <flux:label badge="Opcional">Correo</flux:label>
-                                    <flux:input type="email" wire:model.defer="correo"
-                                        placeholder="correo@dominio.com" />
-                                    <flux:error name="correo" />
-                                </flux:field>
-
-                                <flux:field>
-                                    <flux:label badge="Opcional">Teléfono móvil</flux:label>
-                                    <flux:input wire:model.defer="telefono_movil" maxlength="10" inputmode="numeric"
-                                        placeholder="10 dígitos" />
-                                    <flux:error name="telefono_movil" />
-                                </flux:field>
-
-                                <flux:field>
-                                    <flux:label badge="Opcional">Teléfono fijo</flux:label>
-                                    <flux:input wire:model.defer="telefono_fijo" maxlength="10" inputmode="numeric"
-                                        placeholder="10 dígitos" />
-                                    <flux:error name="telefono_fijo" />
-                                </flux:field>
-                            </div>
-
-                            {{-- ====== Datos laborales ====== --}}
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                                <flux:field>
-                                    <flux:label badge="Opcional">Grado de estudios</flux:label>
-                                    <flux:input wire:model.defer="grado_estudios"
-                                        placeholder="Ej. Licenciatura, Maestría…" />
-                                    <flux:error name="grado_estudios" />
-                                </flux:field>
-
-                                <flux:field>
-                                    <flux:label badge="Opcional">Especialidad</flux:label>
-                                    <flux:input wire:model.defer="especialidad"
-                                        placeholder="Ej. Matemáticas, Español…" />
-                                    <flux:error name="especialidad" />
                                 </flux:field>
                             </div>
 
@@ -491,49 +324,39 @@
                                 </div>
                             </div>
 
-                            {{-- Status --}}
                             <div class="mt-4 flex items-center justify-between">
                                 <span class="text-xs text-gray-500 dark:text-gray-400">
                                     Define si el personal estará activo en el sistema.
                                 </span>
                                 <flux:checkbox wire:model="status" :label="__('Activo')" />
                             </div>
-
                         </flux:field>
 
-                        <!-- Divider -->
                         <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 
-                        <!-- Acciones -->
                         <div
                             class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
                             <button type="button" @click="open = false"
                                 class="inline-flex justify-center rounded-xl px-4 py-2.5 border border-neutral-200 dark:border-neutral-700
                                        bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-100
-                                       hover:bg-neutral-50 dark:hover:bg-neutral-700
-                                       focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-300 dark:focus:ring-offset-neutral-900">
+                                       hover:bg-neutral-50 dark:hover:bg-neutral-700">
                                 Cancelar
                             </button>
 
                             <flux:button variant="primary" type="submit"
                                 class="w-full sm:w-auto cursor-pointer btn-gradient" wire:loading.attr="disabled"
                                 wire:target="crearPersonal">
-                                {{ __('Guardar') }}
+                                Guardar
                             </flux:button>
                         </div>
                     </div>
 
-                    <!-- Loader overlay Guardando -->
                     <div wire:loading.delay wire:target="crearPersonal"
                         class="pointer-events-none absolute inset-0 grid place-items-center bg-white/60 dark:bg-neutral-900/60">
                         <div
                             class="flex items-center gap-3 rounded-xl bg-white/90 dark:bg-neutral-900/90 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-700 shadow">
-                            <svg class="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" viewBox="0 0 24 24"
-                                fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10"
-                                    stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                            </svg>
+                            <span
+                                class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white"></span>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Guardando…</span>
                         </div>
                     </div>

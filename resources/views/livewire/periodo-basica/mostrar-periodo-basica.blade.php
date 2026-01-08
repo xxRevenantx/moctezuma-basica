@@ -211,6 +211,13 @@
                                                             <flux:icon.square-pen class="w-3.5 h-3.5" />
                                                         </flux:button>
 
+                                                        {{-- Botón eliminar --}}
+                                                        <flux:button variant="danger"
+                                                            class="cursor-pointer bg-red-500 hover:bg-red-600 text-white px-2.5 py-1.5 text-xs"
+                                                            @click="eliminar({{ $periodoBasico->id }}, '{{ $periodoBasico->periodos->numero ?? ($periodoBasico->numero ?? 'Periodo') }}')">
+                                                            <flux:icon.trash class="w-3.5 h-3.5" />
+                                                        </flux:button>
+
 
                                                     </div>
                                                 </td>
@@ -267,6 +274,11 @@
                                                     Livewire.dispatch('editarModal', { id: {{ $periodoBasico->id }} });
                                                 ">
                                                 <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                            </flux:button>
+                                            <flux:button variant="danger"
+                                                class="cursor-pointer bg-red-500 hover:bg-red-600 text-white px-2.5 py-1.5 text-xs"
+                                                @click="eliminar({{ $periodoBasico->id }}, '{{ $periodoBasico->periodos->numero ?? ($periodoBasico->numero ?? 'Periodo') }}')">
+                                                <flux:icon.trash class="w-3.5 h-3.5" />
                                             </flux:button>
 
 

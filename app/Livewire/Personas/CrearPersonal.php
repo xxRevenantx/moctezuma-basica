@@ -4,9 +4,13 @@ namespace App\Livewire\Personas;
 
 use App\Models\Persona;
 use App\Services\CurpService;
+use App\Services\CurpPdfParser;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use App\Services\AzureDocumentIntelligence;
+
 
 class CrearPersonal extends Component
 {
@@ -15,7 +19,6 @@ class CrearPersonal extends Component
     // =========================
     // Campos
     // =========================
-    public ?string $titulo = null;
     public ?string $nombre = null;
     public ?string $apellido_paterno = null;
     public ?string $apellido_materno = null;
@@ -25,15 +28,8 @@ class CrearPersonal extends Component
     public ?string $curp = null;
     public ?string $rfc = null;
 
-    public ?string $correo = null;
-    public ?string $telefono_movil = null;
-    public ?string $telefono_fijo = null;
-
     public ?string $fecha_nacimiento = null;
     public ?string $genero = null;
-
-    public ?string $grado_estudios = null;
-    public ?string $especialidad = null;
 
     public bool $status = true;
 
@@ -47,16 +43,23 @@ class CrearPersonal extends Component
     public ?string $codigo_postal = null;
 
     // =========================
-    // CURP UI/estado
+    // CURP UI/estado (RENAPO)
     // =========================
     public ?string $curpError = null;
     public ?string $ultimaCurpConsultada = null;
     public array $datosCurp = [];
 
+    // =========================
+    // PDF para autollenado (SOLO CURP)
+    // =========================
+    public $pdf_curp = null;
+
+    public ?string $autollenadoError = null;
+    public bool $autollenar_forzar = false;
+
     protected function rules(): array
     {
         return [
-            'titulo' => 'required|string|max:50',
             'nombre' => 'required|string|max:255',
             'apellido_paterno' => 'required|string|max:255',
             'apellido_materno' => 'nullable|string|max:255',
@@ -64,17 +67,10 @@ class CrearPersonal extends Component
             'foto' => 'nullable|image|max:2048',
 
             'curp' => ['required', 'string', 'size:18', Rule::unique('personas', 'curp')],
-            'rfc' => ['nullable', 'string', 'min:10', 'max:13', Rule::unique('personas', 'rfc')],
-
-            'correo' => ['nullable', 'email', 'max:150', Rule::unique('personas', 'correo')],
-            'telefono_movil' => 'nullable|string|size:10',
-            'telefono_fijo' => 'nullable|string|size:10',
+            'rfc' => ['nullable', 'string', 'min:12', 'max:13', Rule::unique('personas', 'rfc')],
 
             'fecha_nacimiento' => 'required|date',
             'genero' => 'required|in:H,M',
-
-            'grado_estudios' => 'nullable|string|max:255',
-            'especialidad' => 'nullable|string|max:255',
 
             'calle' => 'nullable|string|max:255',
             'numero_exterior' => 'nullable|string|max:20',
@@ -83,13 +79,15 @@ class CrearPersonal extends Component
             'municipio' => 'nullable|string|max:255',
             'estado' => 'nullable|string|max:255',
             'codigo_postal' => 'nullable|string|max:10',
+
+            // PDF CURP (solo se valida cuando se usa el botón de autollenado)
+            'pdf_curp' => 'nullable|file|mimes:pdf|max:51200',
         ];
     }
 
     protected function messages(): array
     {
         return [
-            'titulo.required' => 'El título es obligatorio.',
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
 
@@ -102,61 +100,16 @@ class CrearPersonal extends Component
             'genero.in' => 'El género seleccionado no es válido.',
 
             'rfc.unique' => 'El RFC ya está registrado.',
-            'rfc.min' => 'El RFC debe tener al menos 10 caracteres.',
+            'rfc.min' => 'El RFC debe tener al menos 12 caracteres.',
             'rfc.max' => 'El RFC no debe superar 13 caracteres.',
-
-            'correo.unique' => 'El correo ya está registrado.',
-            'correo.email' => 'El correo no es válido.',
 
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe superar los 2MB.',
-
-            'telefono_movil.size' => 'El teléfono móvil debe tener 10 dígitos.',
-            'telefono_fijo.size' => 'El teléfono fijo debe tener 10 dígitos.',
         ];
     }
 
     // =========================
-    // Helpers (Title Case español)
-    // =========================
-    private function titleCaseNombre(?string $value): string
-    {
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return '';
-        }
-
-        // Normaliza espacios múltiples
-        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
-
-        // RENAPO suele mandar MAYÚSCULAS. Convertimos a Title Case multibyte.
-        $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
-
-        // Partículas comunes en minúscula (salvo inicio de cadena)
-        $lowerWords = [
-            'De', 'Del', 'La', 'Las', 'Los',
-            'Y', 'E',
-            'San', 'Santa',
-            'Van', 'Von',
-        ];
-
-        foreach ($lowerWords as $w) {
-            // en medio: " Carlos Del Río " => "Carlos del Río"
-            $value = preg_replace('/\b' . preg_quote($w, '/') . '\b/u', mb_strtolower($w, 'UTF-8'), $value) ?? $value;
-        }
-
-        // Si empieza con esas partículas, las volvemos a Title (ej. "Del Río")
-        // (normalmente nombres no inician así, pero por si acaso)
-        $value = preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
-            return mb_convert_case(mb_strtolower($m[0], 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
-        }, $value) ?? $value;
-
-        return $value;
-    }
-
-    // =========================
-    // CURP live
+    // CURP live (RENAPO)
     // =========================
     public function updatedCurp($value): void
     {
@@ -165,14 +118,12 @@ class CrearPersonal extends Component
 
         $this->curpError = null;
 
-        // Mientras escribe o si lo borra: limpia autollenado
         if (strlen($curp) < 18) {
             $this->resetAutollenadoRenapo();
             $this->ultimaCurpConsultada = null;
             return;
         }
 
-        // Ya está completa: si es la misma que ya consultamos, no repetimos
         if ($this->ultimaCurpConsultada === $curp) {
             return;
         }
@@ -188,16 +139,14 @@ class CrearPersonal extends Component
             'apellido_materno',
             'fecha_nacimiento',
             'genero',
-            'rfc',
             'datosCurp',
         ]);
     }
 
     public function consultarCurp(): void
     {
-        if (! $this->curp || strlen($this->curp) !== 18) {
+        if (!$this->curp || strlen($this->curp) !== 18)
             return;
-        }
 
         $this->datosCurp = [];
         $this->curpError = null;
@@ -210,36 +159,30 @@ class CrearPersonal extends Component
 
         if (($data['error'] ?? false) === true) {
             $this->resetAutollenadoRenapo();
-
             $this->curpError = $data['message'] ?? 'No se pudo consultar el CURP';
 
             $this->dispatch('swal', [
                 'title' => $this->curpError,
-                'text'  => $data['detail'] ?? null,
-                'icon'  => 'error',
+                'text' => $data['detail'] ?? null,
+                'icon' => 'error',
                 'position' => 'top-end',
             ]);
-
             return;
         }
 
         $info = data_get($data, 'response.Solicitante', []);
-
         if (empty($info)) {
             $this->resetAutollenadoRenapo();
-
             $this->curpError = 'Este CURP no se encuentra en RENAPO.';
 
             $this->dispatch('swal', [
                 'title' => $this->curpError,
-                'icon'  => 'warning',
+                'icon' => 'warning',
                 'position' => 'top-end',
             ]);
-
             return;
         }
 
-        // ✅ Renapo manda mayúsculas -> Title Case bonito
         $this->nombre = $this->titleCaseNombre($info['Nombres'] ?? '');
         $this->apellido_paterno = $this->titleCaseNombre($info['ApellidoPaterno'] ?? '');
         $this->apellido_materno = $this->titleCaseNombre($info['ApellidoMaterno'] ?? '');
@@ -250,12 +193,181 @@ class CrearPersonal extends Component
         $sexo = $info['ClaveSexo'] ?? null;
         $this->genero = in_array($sexo, ['H', 'M'], true) ? $sexo : null;
 
-        // RFC base 10 (el usuario puede completar homoclave si quiere)
-        $this->rfc = strtoupper(substr($this->curp, 0, 10));
-
-        // Marca como ya consultada
         $this->ultimaCurpConsultada = $this->curp;
     }
+
+    // =========================
+    // Autollenado desde CURP PDF (SOLO)
+    // =========================
+    public function autollenarDesdeCurpPdf(): void
+    {
+        $this->autollenadoError = null;
+
+        $this->validate([
+            'pdf_curp' => 'required|file|mimes:pdf|max:51200',
+        ], [
+            'pdf_curp.required' => 'Sube el PDF del CURP.',
+            'pdf_curp.mimes' => 'El archivo debe ser PDF.',
+        ]);
+
+        try {
+            Storage::disk('local')->makeDirectory('tmp/curp-extract');
+
+            $curpPath = $this->pdf_curp->store('tmp/curp-extract', 'local');
+            $absCurp = Storage::disk('local')->path($curpPath);
+
+            if (!file_exists($absCurp)) {
+                throw new \RuntimeException("No se encontró el PDF en disco: {$absCurp}");
+            }
+
+            /** @var AzureDocumentIntelligence $azure */
+            $azure = app(AzureDocumentIntelligence::class);
+
+            /** @var CurpPdfParser $curpParser */
+            $curpParser = app(CurpPdfParser::class);
+
+            // 1) OCR con Azure (texto)
+            $text = $azure->extractText($absCurp);
+
+            // 2) Parsear texto (CURP, nombres, etc.)
+            $data = $curpParser->parse($text);
+
+            // 3) Aplicar al formulario
+            $this->applyExtractedCurpToForm($data, $this->autollenar_forzar);
+
+            @unlink($absCurp);
+
+            $this->dispatch('swal', [
+                'title' => 'Datos extraídos del CURP PDF (Azure).',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (\Throwable $e) {
+            $this->autollenadoError = $e->getMessage();
+
+            $this->dispatch('swal', [
+                'title' => 'No se pudo extraer del CURP PDF',
+                'text' => $this->autollenadoError,
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
+
+    private function applyExtractedCurpToForm(array $data, bool $force = false): void
+    {
+        $set = function (string $prop, $value) use ($force) {
+            if ($value === null || $value === '')
+                return;
+
+            $current = $this->{$prop} ?? null;
+            $empty = is_string($current) ? trim($current) === '' : empty($current);
+
+            if ($force || $empty) {
+                $this->{$prop} = $value;
+            }
+        };
+
+        // CURP
+        $curp = $data['curp'] ?? null;
+        if ($curp) {
+            $set('curp', strtoupper(trim((string) $curp)));
+        }
+
+        // ✅ Si ya vienen partes (lo ideal)
+        $nombres = trim((string) ($data['nombres'] ?? ''));
+        $apPat = trim((string) ($data['apellido_paterno'] ?? ''));
+        $apMat = trim((string) ($data['apellido_materno'] ?? ''));
+
+        if ($nombres !== '' || $apPat !== '' || $apMat !== '') {
+            if ($nombres !== '')
+                $set('nombre', $this->titleCaseNombre($nombres));
+            if ($apPat !== '')
+                $set('apellido_paterno', $this->titleCaseNombre($apPat));
+            if ($apMat !== '')
+                $set('apellido_materno', $this->titleCaseNombre($apMat));
+            return;
+        }
+
+        // Fallback: nombre completo (si no hubo etiquetas)
+        $full = trim((string) ($data['nombre_completo'] ?? ($data['nombre'] ?? '')));
+        if ($full !== '') {
+            [$nombres2, $apPat2, $apMat2] = $this->splitNombreCompletoMxSmart($full);
+
+            $set('nombre', $this->titleCaseNombre($nombres2));
+            $set('apellido_paterno', $this->titleCaseNombre($apPat2));
+            $set('apellido_materno', $apMat2 ? $this->titleCaseNombre($apMat2) : null);
+        }
+    }
+
+
+    // =========================
+    // Helpers
+    // =========================
+    private function titleCaseNombre(?string $value): string
+    {
+        $value = trim((string) $value);
+        if ($value === '')
+            return '';
+
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        // Title Case multibyte
+        $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+
+        // Partículas comunes en minúscula (cuando van en medio)
+        foreach ([' De ', ' Del ', ' La ', ' Las ', ' Los ', ' Y ', ' E '] as $w) {
+            $value = str_replace($w, mb_strtolower($w, 'UTF-8'), $value);
+        }
+
+        return $value;
+    }
+
+    private function splitNombreCompletoMxSmart(string $full): array
+    {
+        $full = preg_replace('/\s+/', ' ', trim($full)) ?? trim($full);
+        if ($full === '')
+            return ['', '', null];
+
+        $tokens = preg_split('/\s+/', $full) ?: [];
+        if (count($tokens) < 3)
+            return [$full, '', null];
+
+        // partículas que pueden formar apellidos compuestos
+        $particles = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'Y', 'E', 'VON', 'VAN', 'MC', 'MAC'];
+
+        $takeSurname = function (&$arr) use ($particles) {
+            $surname = [];
+
+            // toma el último token como base
+            $surname[] = array_pop($arr);
+
+            // si antes hay partículas, también pertenecen al apellido (ej: "DE LA CRUZ")
+            while (!empty($arr)) {
+                $peek = strtoupper((string) end($arr));
+                if (in_array($peek, $particles, true)) {
+                    array_unshift($surname, array_pop($arr));
+                } else {
+                    break;
+                }
+            }
+
+            return implode(' ', $surname);
+        };
+
+        // Materno (al final)
+        $apMat = $takeSurname($tokens);
+
+        // Paterno (lo siguiente al final)
+        $apPat = $takeSurname($tokens);
+
+        // Resto -> nombres
+        $nombres = implode(' ', $tokens);
+
+        return [$nombres, $apPat, $apMat];
+    }
+
 
     // =========================
     // Guardar
@@ -271,21 +383,16 @@ class CrearPersonal extends Component
         }
 
         Persona::create([
-            'titulo' => $this->titulo,
             'nombre' => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
             'foto' => $fotoPath,
             'curp' => strtoupper(trim((string) $this->curp)),
             'rfc' => $this->rfc ? strtoupper(trim((string) $this->rfc)) : null,
-            'correo' => $this->correo,
-            'telefono_movil' => $this->telefono_movil,
-            'telefono_fijo' => $this->telefono_fijo,
             'fecha_nacimiento' => $this->fecha_nacimiento,
             'genero' => $this->genero,
-            'grado_estudios' => $this->grado_estudios,
-            'especialidad' => $this->especialidad,
             'status' => $this->status,
+
             'calle' => $this->calle,
             'numero_exterior' => $this->numero_exterior,
             'numero_interior' => $this->numero_interior,
@@ -301,7 +408,6 @@ class CrearPersonal extends Component
             'position' => 'top-end',
         ]);
 
-        // Reset del form, dejando status en true
         $this->reset();
         $this->status = true;
 

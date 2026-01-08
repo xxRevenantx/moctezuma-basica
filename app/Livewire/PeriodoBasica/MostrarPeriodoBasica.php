@@ -21,20 +21,41 @@ class MostrarPeriodoBasica extends Component
         $this->resetPage();
     }
 
+
+    public function eliminar($periodoId)
+    {
+        $periodo = Periodos_basico::find($periodoId);
+
+        if ($periodo) {
+            $periodo->delete();
+            $this->dispatch('swal', [
+                'title' => 'Periodo eliminado correctamente!',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } else {
+            $this->dispatch('swal', [
+                'title' => 'Error al eliminar el periodo.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
     #[On('refreshPeriodosBasica')]
     public function render()
     {
-        $periodosBasicos = Periodos_basico::with([ 'cicloEscolar', 'periodos' ])
+        $periodosBasicos = Periodos_basico::with(['cicloEscolar', 'periodos'])
             ->when($this->search, function ($query) {
-            $search = '%' . $this->search . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('parcial_inicio', 'like', $search)
-                ->orWhere('parcial_fin', 'like', $search)
-                ->orWhereHas('cicloEscolar', function ($q2) use ($search) {
-                    $q2->where('inicio_anio', 'like', $search)
-                       ->orWhere('fin_anio', 'like', $search);
+                $search = '%' . $this->search . '%';
+                $query->where(function ($q) use ($search) {
+                    $q->where('parcial_inicio', 'like', $search)
+                        ->orWhere('parcial_fin', 'like', $search)
+                        ->orWhereHas('cicloEscolar', function ($q2) use ($search) {
+                            $q2->where('inicio_anio', 'like', $search)
+                                ->orWhere('fin_anio', 'like', $search);
+                        });
                 });
-            });
             })
             ->paginate(10);
 
