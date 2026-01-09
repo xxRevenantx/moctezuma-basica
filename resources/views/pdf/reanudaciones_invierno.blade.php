@@ -626,12 +626,16 @@
                 $nombreRolPrincipal = optional(optional($rolPrincipal)->rolePersona)->nombre;
 
                 \Carbon\Carbon::setLocale('es');
-                $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
-                    ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
-                $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
-                    ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
+                $fechaDocente = mb_strtoupper(
+                    \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
+                        ->locale('es')
+                        ->isoFormat('D [DE] MMMM [DE] YYYY'),
+                );
+                $fechaDirector = mb_strtoupper(
+                    \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
+                        ->locale('es')
+                        ->isoFormat('D [DE] MMMM [DE] YYYY'),
+                );
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
                 $nombreCompletoRaw = trim(
@@ -672,14 +676,16 @@
 
             <div class="contenedor_secundaria" style="padding: 100px 60px 0">
 
-                <p style="text-align: right; font-size: 17px; line-height: 25px; ">
+                <p style="text-align: right; font-size: 17px; line-height: 25px; text-transform: uppercase;">
                     <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>
-                    Cd. Altamirano, Gro., {{ $fechaCarta }}.
+                    CD. ALTAMIRANO, GRO., A {{ $fechaCarta }}.
                     <br>
-                    @if (empty(trim($escuela->lema ?? '')))
-                    @else
-                        "{{ $escuela->lema }}"
-                    @endif
+                    <span style="font-size: 14px; font-weight: bold;">
+                        @if (empty(trim($escuela->lema ?? '')))
+                        @else
+                            "{{ $escuela->lema }}"
+                        @endif
+                    </span>
                 </p>
 
                 <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">
