@@ -234,12 +234,12 @@
                     CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
                 </p>
 
-                <p style="text-align: right"><b>
-                        @if (empty(trim($escuela->lema ?? '')))
-                        @else
-                            "{{ $escuela->lema }}"
-                        @endif
-                    </b></p>
+                <p style="text-align: right;">
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}"
+                    @endif
+                </p>
 
 
                 <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px;">
@@ -257,7 +257,11 @@
 
                 <div>
                     <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        EL (A) QUE SUSCRIBE <b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
                         SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
                         LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE INVIERNO</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
@@ -434,16 +438,16 @@
 
             <div class="contenedor_primaria" style="padding: 100px 60px 0">
 
-                <p style="text-align: right; font-size: 17px; line-height: 25px; ">
+                <p style="text-align: right; font-size: 17px; line-height: 25px;">
                     <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
                     Cd. Altamirano, Gro., {{ $fechaCarta }}.
                     <br>
-                <p style="text-align: right"><b>
-                        @if (empty(trim($escuela->lema ?? '')))
-                        @else
-                            "{{ $escuela->lema }}"
-                        @endif
-                    </b></p>
+                <p style="text-align: right; font-size: 17px; margin-top: -10px ">
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}"
+                    @endif
+                </p>
                 </p>
 
                 <div class="autoridades" style="margin-top: -10px; text-transform: uppercase">
@@ -465,17 +469,21 @@
 
                 <div>
                     <p
-                        style="text-transform: uppercase; text-align: justify; font-size: 14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 30px; line-height: 19px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        style="text-transform: uppercase; text-align: justify; font-size: 14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 50px; line-height: 19px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
                         ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
                         MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE INVIERNO</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
-                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}.</b>
                     </p>
                 </div>
 
                 <p
-                    style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif; margin-top: -10px;">
                     PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
                 </p>
 
@@ -704,7 +712,11 @@
 
                 <div>
                     <p style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                        EL (A) QUE SUSCRIBE C. <b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
                         SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
                         LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE INVIERNO</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR

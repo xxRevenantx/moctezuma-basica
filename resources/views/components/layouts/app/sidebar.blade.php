@@ -103,6 +103,11 @@
                             Ciclos Escolares
                         </flux:navlist.item>
 
+                        <flux:navlist.item icon="home" :href="route('misrutas.tutores')"
+                            :current="request()->routeIs('misrutas.tutores')" wire:navigate>
+                            Tutores
+                        </flux:navlist.item>
+
                         <flux:navlist.item icon="home" :href="route('misrutas.autoridades')"
                             :current="request()->routeIs('misrutas.autoridades')" wire:navigate>
                             Autoridades
