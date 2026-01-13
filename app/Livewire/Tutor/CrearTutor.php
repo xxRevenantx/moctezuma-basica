@@ -44,19 +44,19 @@ class CrearTutor extends Component
             'nombre' => ['required', 'string', 'max:255'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
             'apellido_materno' => ['nullable', 'string', 'max:255'],
-            'genero' => ['nullable', 'in:M,F,O'],
-            'fecha_nacimiento' => ['nullable', 'date'],
-            'ciudad_nacimiento' => ['nullable', 'string', 'max:255'],
-            'estado_nacimiento' => ['nullable', 'string', 'max:255'],
-            'municipio_nacimiento' => ['nullable', 'string', 'max:255'],
+            'genero' => ['required', 'in:M,F,O'],
+            'fecha_nacimiento' => ['required', 'date'],
+            'ciudad_nacimiento' => ['required', 'string', 'max:255'],
+            'estado_nacimiento' => ['required', 'string', 'max:255'],
+            'municipio_nacimiento' => ['required', 'string', 'max:255'],
 
-            'calle' => ['nullable', 'string', 'max:255'],
-            'colonia' => ['nullable', 'string', 'max:255'],
-            'ciudad' => ['nullable', 'string', 'max:255'],
-            'municipio' => ['nullable', 'string', 'max:255'],
-            'estado' => ['nullable', 'string', 'max:255'],
+            'calle' => ['required', 'string', 'max:255'],
+            'colonia' => ['required', 'string', 'max:255'],
+            'ciudad' => ['required', 'string', 'max:255'],
+            'municipio' => ['required', 'string', 'max:255'],
+            'estado' => ['required', 'string', 'max:255'],
             'numero' => ['nullable', 'string', 'max:20'],
-            'codigo_postal' => ['nullable', 'string', 'max:10'],
+            'codigo_postal' => ['required', 'string', 'max:10'],
 
             'telefono_casa' => ['nullable', 'string', 'max:20'],
             'telefono_celular' => ['nullable', 'string', 'max:20'],
@@ -66,10 +66,33 @@ class CrearTutor extends Component
 
     protected array $messages = [
         'curp.required' => 'La CURP es obligatoria.',
-        'curp.size' => 'La CURP debe tener 18 caracteres.',
-        'curp.unique' => 'Esta CURP ya está registrada.',
+        'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
+        'curp.unique' => 'La CURP ya está registrada.',
+
         'parentesco.required' => 'El parentesco es obligatorio.',
-        'correo_electronico.email' => 'El correo no tiene un formato válido.',
+
+        'nombre.required' => 'El nombre es obligatorio.',
+
+        'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
+
+        'genero.required' => 'El género es obligatorio.',
+        'genero.in' => 'El género seleccionado no es válido.',
+
+        'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
+        'fecha_nacimiento.date' => 'La fecha de nacimiento no es una fecha válida.',
+
+        'correo_electronico.email' => 'El correo electrónico no es válido.',
+
+        'codigo_postal.required' => 'El código postal es obligatorio.',
+        'calle.required' => 'La calle es obligatoria.',
+        'colonia.required' => 'La colonia es obligatoria.',
+        'ciudad.required' => 'La ciudad es obligatoria.',
+        'municipio.required' => 'El municipio es obligatorio.',
+        'estado.required' => 'El estado es obligatorio.',
+        'municipio_nacimiento.required' => 'El municipio de nacimiento es obligatorio.',
+        'ciudad_nacimiento.required' => 'La ciudad de nacimiento es obligatoria.',
+        'estado_nacimiento.required' => 'El estado de nacimiento es obligatorio.',
+
     ];
 
     public function guardar(): void
@@ -77,15 +100,36 @@ class CrearTutor extends Component
         $this->validate();
 
         // Aquí guarda tu modelo Tutor (ajusta el namespace/modelo según tu app)
-        // \App\Models\Tutor::create([...]);
+        \App\Models\Tutor::create([
+            'curp' => $this->curp,
+            'parentesco' => $this->parentesco,
+            'nombre' => $this->nombre,
+            'apellido_paterno' => $this->apellido_paterno,
+            'apellido_materno' => $this->apellido_materno,
+            'genero' => $this->genero,
+            'fecha_nacimiento' => $this->fecha_nacimiento,
+            'ciudad_nacimiento' => $this->ciudad_nacimiento,
+            'estado_nacimiento' => $this->estado_nacimiento,
+            'municipio_nacimiento' => $this->municipio_nacimiento,
+            'calle' => $this->calle,
+            'colonia' => $this->colonia,
+            'ciudad' => $this->ciudad,
+            'municipio' => $this->municipio,
+            'estado' => $this->estado,
+            'numero' => $this->numero,
+            'codigo_postal' => $this->codigo_postal,
+            'telefono_casa' => $this->telefono_casa,
+            'telefono_celular' => $this->telefono_celular,
+            'correo_electronico' => $this->correo_electronico,
+        ]);
 
-        $this->dispatch('notify', [
-            'type' => 'success',
-            'message' => 'Tutor registrado correctamente.'
+        $this->dispatch('swal', [
+            'title' => 'Tutor creado correctamente',
+            'icon' => 'success',
+            'position' => 'top-end',
         ]);
 
         $this->reset();
-        $this->dispatch('close-crear-tutor'); // opcional si lo usas en modal
     }
 
     public function limpiar(): void
@@ -94,18 +138,7 @@ class CrearTutor extends Component
         $this->resetValidation();
     }
 
-    public function autocompletarDemo(): void
-    {
-        // Solo para probar UI rápidamente
-        $this->parentesco = 'PADRE';
-        $this->nombre = 'JUAN';
-        $this->apellido_paterno = 'PÉREZ';
-        $this->apellido_materno = 'GARCÍA';
-        $this->genero = 'M';
-        $this->fecha_nacimiento = '1985-03-12';
-        $this->correo_electronico = 'juan.perez@email.com';
-        $this->telefono_celular = '7670000000';
-    }
+
 
     public function render()
     {
