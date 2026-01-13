@@ -203,10 +203,10 @@
                 \Carbon\Carbon::setLocale('es');
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
+                    ->isoFormat('DD [de] MMMM [de] YYYY');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
+                    ->isoFormat('DD [de] MMMM [de] YYYY');
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
                 $nombreCompletoRaw = trim(
@@ -222,24 +222,29 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <img src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo" style="width: 100%;">
+            <img class="fondo_preescolar" src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo"
+                style="width: 100%;">
 
-            <div class="contenedor_preescolar" style="padding: 10px 60px 0">
+            <div class="contenedor_preescolar" style="padding: 30px 120px 0">
 
-                <p style="text-align: right; font-family:Arial, Helvetica, sans-serif;">
-                    ASUNTO: <b> REANUDACIÓN DE LABORES</b>
-                </p>
 
-                <p style="text-align: right; margin-right:100px; text-transform: uppercase;">
+                <p style="text-align: right; text-transform: uppercase; font-size:16px">
                     CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
                 </p>
 
-                <p style="text-align: right;">
+
+                <p
+                    style="text-align: right; margin-right: 60px; font-size: 18px; margin-top:-15px; text-transform: uppercase;">
                     @if (empty(trim($escuela->lema ?? '')))
                     @else
                         "{{ $escuela->lema }}"
                     @endif
                 </p>
+
+                <p style="text-align: right; margin-right: 50px; font-size: 16px;">
+                    ASUNTO: REANUDACIÓN DE LABORES
+                </p>
+
 
 
                 <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px;">
@@ -252,12 +257,11 @@
                     <p style="margin-top:-15px; width:320px">
                         {{ $delegado->cargo }}
                     </p>
-                    <p><b>P R E S E N T E</b></p>
                 </div>
 
                 <div>
-                    <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
-                        EL (A) QUE SUSCRIBE <b><u>
+                    <p style="text-transform: uppercase; text-align: justify;">
+                        EL (A) QUE SUSCRIBE C.<b><u>
                                 @if ($personal->persona->titulo !== 'C.')
                                     {{ $personal->persona->titulo }}
                                 @endif{{ $nombreCompleto }}
@@ -266,10 +270,10 @@
                         LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE INVIERNO</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
                         <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        <br>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
                     </p>
                 </div>
 
-                <p>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:</p>
 
                 @php
                     $datos = [
@@ -290,7 +294,7 @@
                     ];
                 @endphp
 
-                <div>
+                <div style="line-height: 10px">
                     @foreach ($datos as $key => $dato)
                         @php
                             $contar = strlen(strip_tags($dato)) + strlen($key);
@@ -589,23 +593,29 @@
                         'Tec.',
                     ];
 
-                    $texto = e($copias);
+                    if (empty(trim($copias))) {
+                        $copiasFormateado =
+                            'C.C.P. JOSÉ ZAMORA ÁVILA, JEFE DE DEPARTAMENTO DE PRIMARIA ESTATAL<br>C.C.P. LIC. SABINO FLORES LEÒN. JEFE REGIONAL 01. REGION TIERRA CALIENTE. CD. ALTAMIRANO, GRO<br>C.C.P. PROFR (A) ADELFO MARTINEZ MARTINEZ - SUPERVISOR (A) ZONA ESCOLAR 030. CD ALTAMIRANO, GRO.<br>C.C.P. EL INTERESADO';
+                    } else {
+                        $texto = e($copias);
 
-                    $patronCcp = '/\s*(\(?\s*(?:c\s*\.?\s*c\s*\.?\s*p|ccp)\s*\.?\s*\)?)/iu';
-                    $texto = preg_replace($patronCcp, '<br>$1', $texto);
-                    $texto = preg_replace('/^(<br>\s*)+/u', '', $texto);
+                        $patronCcp = '/\s*(\(?\s*(?:c\s*\.?\s*c\s*\.?\s*p|ccp)\s*\.?\s*\)?)/iu';
+                        $texto = preg_replace($patronCcp, '<br>$1', $texto);
+                        $texto = preg_replace('/^(<br>\s*)+/u', '', $texto);
 
-                    $patronTitulos = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
+                        $patronTitulos =
+                            '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
-                    $count = 0;
-                    $copiasFormateado = preg_replace_callback(
-                        $patronTitulos,
-                        function ($m) use (&$count) {
-                            $count++;
-                            return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
-                        },
-                        $texto,
-                    );
+                        $count = 0;
+                        $copiasFormateado = preg_replace_callback(
+                            $patronTitulos,
+                            function ($m) use (&$count) {
+                                $count++;
+                                return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
+                            },
+                            $texto,
+                        );
+                    }
                 @endphp
 
                 <div class="ccp" style="margin-top: 0px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
@@ -637,12 +647,12 @@
                 $fechaDocente = mb_strtoupper(
                     \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                         ->locale('es')
-                        ->isoFormat('D [DE] MMMM [DE] YYYY'),
+                        ->isoFormat('DD [DE] MMMM [DE] YYYY'),
                 );
                 $fechaDirector = mb_strtoupper(
                     \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                         ->locale('es')
-                        ->isoFormat('D [DE] MMMM [DE] YYYY'),
+                        ->isoFormat('DD [DE] MMMM [DE] YYYY'),
                 );
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
