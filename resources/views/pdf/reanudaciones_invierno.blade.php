@@ -225,7 +225,7 @@
             <img class="fondo_preescolar" src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo"
                 style="width: 100%;">
 
-            <div class="contenedor_preescolar" style="padding: 30px 120px 0">
+            <div class="contenedor_preescolar" style="padding: 30px 115px 0">
 
 
                 <p style="text-align: right; text-transform: uppercase; font-size:16px">
@@ -260,14 +260,14 @@
                 </div>
 
                 <div>
-                    <p style="text-transform: uppercase; text-align: justify;">
+                    <p style="text-transform: uppercase; text-align: justify; font-size:15px">
                         EL (A) QUE SUSCRIBE C.<b><u>
                                 @if ($personal->persona->titulo !== 'C.')
                                     {{ $personal->persona->titulo }}
                                 @endif{{ $nombreCompleto }}
                             </u></b>,
-                        SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE INVIERNO</u></b>,
+                        SE DIRIGE A USTED PARA INFORMARLE QUE CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>EL PERIODO VACACIONAL DE INVIERNO,</u></b>
                         CORRESPONDIENTE AL CICLO ESCOLAR
                         <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                         <br>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
@@ -290,11 +290,11 @@
                             : '---------',
                         'NOMBRE DEL C.T.' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
-                        'UBICACIÓN' => 'FRACISCO I. MADERO OTE. 800 COL. ESQUIPULAS. CD ALTAMIRANO, GRO.',
+                        'UBICACIÓN' => 'FRANCISCO I. MADERO OTE. 800 COL. ESQUIPULA. CD. ALTAMIRANO, GRO.',
                     ];
                 @endphp
 
-                <div style="line-height: 10px">
+                <div style="line-height: 10px; font-size:15px">
                     @foreach ($datos as $key => $dato)
                         @php
                             $contar = strlen(strip_tags($dato)) + strlen($key);
@@ -303,11 +303,16 @@
                                 $espacioBlanco .= '&nbsp;&nbsp;';
                             }
                         @endphp
+
                         <div class="fila-dato">
                             <div class="label">
                                 {{ $key }}:
+
                                 @if ($key === 'CARGO QUE DESEMPEÑA')
                                     <b><u>{!! $dato !!}{!! $espacioBlanco !!}</u></b>
+                                @elseif ($key === 'UBICACIÓN')
+                                    <b><u><span style="font-size: 13px;">{{ $dato }}
+                                            </span>{!! $espacioBlanco !!}</u></b>
                                 @else
                                     <b><u>{{ $dato }}{!! $espacioBlanco !!}</u></b>
                                 @endif
@@ -316,7 +321,8 @@
                     @endforeach
                 </div>
 
-                <p style="text-align: justify">
+
+                <p style="text-align: justify; font-size:13px">
                     SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
                 </p>
 
@@ -351,6 +357,17 @@
                 </div>
 
                 @php
+                    // ✅ Copias por defecto (solo si no hay copias)
+                    $copiasDefault = "C.c.p. Profa. Maribel Carranza Vergara.- Subdirectora de Admón. y Finanzas. Región Tierra Caliente. Con igual fin.
+                        Profr. Mario Cuevas Rodríguez.- Jefe del Depto. de Personal. Con igual fin.
+                        C.P.- Hypatia López Rodríguez.- Jefa del Depto. de Distribución de Cheques y Nómina. Con igual fin.
+                        Lic. Francisco Alcántara Arzate.- Jefe de la Oficina de Archivo. Para anexar al expediente.
+                        Mtra. Lorena Sandoval Díaz.- Jefa de Sector 013. Para su conocimiento.
+                        Dra. Yamileth García Durán.- Supervisora de Zona 137. Para su conocimiento.";
+
+                    // ✅ Si $copias viene null, vacío o solo espacios => usar default
+                    $copias = trim((string) ($copias ?? '')) !== '' ? $copias : $copiasDefault;
+
                     $titulos = [
                         'Prof.',
                         'Profr.',
@@ -393,11 +410,12 @@
                     }
                 @endphp
 
-                <div class="ccp" style="margin-top: 8px;">
-                    <p style="font-size: 9px; margin:0;">
+                <div class="ccp" style="margin-top: 12px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size: 9.7px; margin:0;">
                         <b>{!! $copiasIndentado !!}</b>
                     </p>
                 </div>
+
 
             </div>
 
