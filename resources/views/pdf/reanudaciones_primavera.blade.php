@@ -8,7 +8,7 @@
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
-    <title>OFICIOS DE REANUDACIÓN DE RECESO DE CLASES</title>
+    <title>OFICIOS DE REANUDACIÓN DE PRIMAVERA</title>
 </head>
 
 <style>
@@ -98,14 +98,11 @@
 <body>
 
     @php
-        // ✅ Orden PDF (persona_nivel.orden)
+        // ✅ Asegurar el orden para el PDF (por persona_nivel.orden)
         $asignacionesNivel = collect($asignacionesNivel ?? [])
             ->sortBy(fn($p) => [(int) ($p->orden ?? 999999), (int) ($p->id ?? 0)])
             ->values();
 
-        // =========================
-        // HELPERS
-        // =========================
         $formatearNombreCompleto = function ($persona) {
             if (!$persona) {
                 return '---------';
@@ -136,26 +133,21 @@
         $directorAdministracionNombre = $formatearNombreCompleto($directorAdministracion ?? null);
         $directorMagisterioNombre = $formatearNombreCompleto($directorMagisterio ?? null);
 
-        \Carbon\Carbon::setLocale('es');
-
-        // Texto del documento
-        $TEXTO_RECESO = 'RECESO DE CLASES';
-
-        // ✅ Helper: cargos SOLO desde detalles (persona_nivel_detalles). Fallback a personaRoles si no hay detalles.
+        // ✅ Helper: roles SOLO desde detalles (persona_nivel_detalles). Fallback a personaRoles si no hay detalles.
         $resolverCargosDesdeDetalles = function ($personal, bool $conSaltos = true) {
             $detallesOrdenados = collect($personal->detalles ?? [])
                 ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
                 ->values();
 
-            $cargos = $detallesOrdenados
+            $cargosDetalles = $detallesOrdenados
                 ->map(fn($d) => mb_strtoupper(optional(optional($d->PersonaRole)->rolePersona)->nombre ?? ''))
                 ->filter()
                 ->unique()
                 ->values()
                 ->all();
 
-            if (empty($cargos)) {
-                $cargos = collect($personal->persona->personaRoles ?? [])
+            if (empty($cargosDetalles)) {
+                $cargosDetalles = collect($personal->persona->personaRoles ?? [])
                     ->map(fn($r) => mb_strtoupper(optional(optional($r)->rolePersona)->nombre ?? ''))
                     ->filter()
                     ->unique()
@@ -163,14 +155,14 @@
                     ->all();
             }
 
-            if (empty($cargos)) {
+            if (empty($cargosDetalles)) {
                 return '---------';
             }
 
-            return $conSaltos ? implode('<br />', $cargos) : implode(', ', $cargos);
+            return $conSaltos ? implode('<br />', $cargosDetalles) : implode(', ', $cargosDetalles);
         };
 
-        // ✅ Helper: rol principal desde detalles (para fecha/firma). Fallback a personaRoles si no hay detalles.
+        // ✅ Helper: rol principal SOLO desde detalles (para fecha/firma). Fallback a personaRoles si no hay detalles.
         $resolverRolPrincipal = function ($personal) {
             $detallesOrdenados = collect($personal->detalles ?? [])
                 ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
@@ -199,7 +191,7 @@
     @endphp
 
     {{-- =========================
-    PREESCOLAR
+        PREESCOLAR
     ========================= --}}
     @if ($nivel->slug == 'preescolar')
 
@@ -208,13 +200,13 @@
                 // ✅ Rol principal desde DETALLES
                 [$slugRolPrincipal, $nombreRolPrincipal] = $resolverRolPrincipal($personal);
 
+                \Carbon\Carbon::setLocale('es');
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
+                    ->isoFormat('DD [de] MMMM [de] YYYY');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
-
+                    ->isoFormat('DD [de] MMMM [de] YYYY');
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
                 $nombreCompletoRaw = trim(
@@ -226,50 +218,62 @@
                 );
                 $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
 
-                // ✅ CARGO QUE DESEMPEÑA desde DETALLES (con saltos)
+                // ✅ CARGO QUE DESEMPEÑA: SOLO desde detalles (con saltos)
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <img src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo" style="width: 100%;">
+            <img class="fondo_preescolar" src="{{ public_path('imagenes/reanudacion_preescolar.jpg') }}" alt="fondo"
+                style="width: 100%;">
 
-            <div class="contenedor_preescolar" style="padding: 10px 60px 0">
-                <p style="text-align:right; font-family:Arial, Helvetica, sans-serif;">
-                    ASUNTO: <b> REANUDACIÓN DE LABORES</b>
-                </p>
+            <div class="contenedor_preescolar" style="padding: 30px 115px 0">
 
-                <p style="text-align:right; margin-right:100px; text-transform:uppercase;">
+
+                <p style="text-align: right; text-transform: uppercase; font-size:16px">
                     CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
                 </p>
 
-                <p style="text-align:right"><b>
-                        @if (empty(trim($escuela->lema ?? '')))
-                        @else
-                            "{{ $escuela->lema }}"
-                        @endif
-                    </b></p>
 
-                <div class="delegado" style="margin-top:10px; text-transform:uppercase; font-size:15px;">
-                    <p style="width:400px;">
+                <p
+                    style="text-align: right; margin-right: 60px; font-size: 18px; margin-top:-15px; text-transform: uppercase;">
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}"
+                    @endif
+                </p>
+
+                <p style="text-align: right; margin-right: 50px; font-size: 16px;">
+                    ASUNTO: REANUDACIÓN DE LABORES
+                </p>
+
+
+
+                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px;">
+                    <p style="width: 400px;">
                         <b>
                             {{ $delegado->titulo }} {{ $delegado->nombre }} {{ $delegado->apellido_paterno }}
                             {{ $delegado->apellido_materno }} <br>
                         </b>
                     </p>
-                    <p style="margin-top:-15px; width:320px">{{ $delegado->cargo }}</p>
-                    <p><b>P R E S E N T E</b></p>
-                </div>
-
-                <div>
-                    <p style="text-transform:uppercase; text-align:justify; line-height:20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
-                        SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
-                        CORRESPONDIENTE AL CICLO ESCOLAR
-                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                    <p style="margin-top:-15px; width:320px">
+                        {{ $delegado->cargo }}
                     </p>
                 </div>
 
-                <p>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:</p>
+                <div>
+                    <p style="text-transform: uppercase; text-align: justify; font-size:15px">
+                        EL (A) QUE SUSCRIBE C.<b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
+                        SE DIRIGE A USTED PARA INFORMARLE QUE CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>EL PERIODO VACACIONAL DE PRIMAVERA,</u></b>
+                        CORRESPONDIENTE AL CICLO ESCOLAR
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        <br>PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
+                    </p>
+                </div>
+
 
                 @php
                     $datos = [
@@ -277,7 +281,7 @@
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
                         'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
                         'CLAVE (S) PRESUPUESTAL (ES)' => 'S/C',
-                        'CARGO QUE DESEMPEÑA' => $cargosHtml, // ✅ detalles
+                        'CARGO QUE DESEMPEÑA' => $cargosHtml, // ✅ desde detalles
                         'FECHA DE INGRESO A LA SEP' => !empty($personal->ingreso_sep)
                             ? date('d-m-Y', strtotime($personal->ingreso_sep))
                             : '---------',
@@ -286,11 +290,11 @@
                             : '---------',
                         'NOMBRE DEL C.T.' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
-                        'UBICACIÓN' => 'FRACISCO I. MADERO OTE. 800 COL. ESQUIPULAS. CD ALTAMIRANO, GRO.',
+                        'UBICACIÓN' => 'FRANCISCO I. MADERO OTE. 800 COL. ESQUIPULA. CD. ALTAMIRANO, GRO.',
                     ];
                 @endphp
 
-                <div>
+                <div style="line-height: 10px; font-size:15px">
                     @foreach ($datos as $key => $dato)
                         @php
                             $contar = strlen(strip_tags($dato)) + strlen($key);
@@ -303,8 +307,12 @@
                         <div class="fila-dato">
                             <div class="label">
                                 {{ $key }}:
+
                                 @if ($key === 'CARGO QUE DESEMPEÑA')
                                     <b><u>{!! $dato !!}{!! $espacioBlanco !!}</u></b>
+                                @elseif ($key === 'UBICACIÓN')
+                                    <b><u><span style="font-size: 13px;">{{ $dato }}
+                                            </span>{!! $espacioBlanco !!}</u></b>
                                 @else
                                     <b><u>{{ $dato }}{!! $espacioBlanco !!}</u></b>
                                 @endif
@@ -313,12 +321,13 @@
                     @endforeach
                 </div>
 
-                <p style="text-align:justify;">
+
+                <p style="text-align: justify; font-size:13px">
                     SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
                 </p>
 
                 <div class="firmas">
-                    <table style="width:100%; margin:auto; text-align:center; text-transform:uppercase;">
+                    <table style="width: 100%; margin:auto; text-align: center; text-transform: uppercase;">
                         <tr>
                             <td>
                                 ATENTAMENTE<br>
@@ -334,7 +343,7 @@
 
                             <td>
                                 @if ($slugRolPrincipal === 'director_sin_grupo')
-                                    Vo.Bo. <br>JEFE INMEDIATO <br><br><br>
+                                    Vo.Bo. <br>JEFE INMEDIATO <br> <br><br><br>
                                     ___________________________________<br>
                                     {{ $supervisorPreescolarNombre }}
                                 @else
@@ -347,8 +356,18 @@
                     </table>
                 </div>
 
-                {{-- CCP igual que Invierno (con indent) --}}
                 @php
+                    // ✅ Copias por defecto (solo si no hay copias)
+                    $copiasDefault = "C.c.p. Profa. Maribel Carranza Vergara.- Subdirectora de Admón. y Finanzas. Región Tierra Caliente. Con igual fin.
+                        Profr. Mario Cuevas Rodríguez.- Jefe del Depto. de Personal. Con igual fin.
+                        C.P.- Hypatia López Rodríguez.- Jefa del Depto. de Distribución de Cheques y Nómina. Con igual fin.
+                        Lic. Francisco Alcántara Arzate.- Jefe de la Oficina de Archivo. Para anexar al expediente.
+                        Mtra. Lorena Sandoval Díaz.- Jefa de Sector 013. Para su conocimiento.
+                        Dra. Yamileth García Durán.- Supervisora de Zona 137. Para su conocimiento.";
+
+                    // ✅ Si $copias viene null, vacío o solo espacios => usar default
+                    $copias = trim((string) ($copias ?? '')) !== '' ? $copias : $copiasDefault;
+
                     $titulos = [
                         'Prof.',
                         'Profr.',
@@ -369,6 +388,7 @@
                         'DCE.',
                         'D.C.E.',
                     ];
+
                     $texto = e($copias);
                     $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
@@ -383,17 +403,20 @@
                     );
 
                     $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
+
                     $copiasIndentado = '';
                     foreach ($lineas as $i => $linea) {
                         $copiasIndentado .= $i === 0 ? $linea : '<br><span class="ccp-indent">' . $linea . '</span>';
                     }
                 @endphp
 
-                <div class="ccp" style="margin-top:8px;">
-                    <p style="font-size:9px; margin:0;">
+                <div class="ccp" style="margin-top: 12px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size: 9.7px; margin:0;">
                         <b>{!! $copiasIndentado !!}</b>
                     </p>
                 </div>
+
+
             </div>
 
             @if (!$loop->last)
@@ -401,23 +424,22 @@
             @endif
         @endforeach
 
-
         {{-- =========================
         PRIMARIA
-        ========================= --}}
+    ========================= --}}
     @elseif ($nivel->slug == 'primaria')
         @foreach ($asignacionesNivel as $personal)
             @php
                 // ✅ Rol principal desde DETALLES
                 [$slugRolPrincipal, $nombreRolPrincipal] = $resolverRolPrincipal($personal);
 
+                \Carbon\Carbon::setLocale('es');
                 $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
                 $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
                     ->locale('es')
                     ->isoFormat('D [de] MMMM [de] YYYY');
-
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
                 $nombreCompletoRaw = trim(
@@ -429,33 +451,38 @@
                 );
                 $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
 
-                // ✅ CATEGORÍA y FUNCIÓN desde DETALLES (una sola línea, como tu formato)
-                $cargosLinea = $resolverCargosDesdeDetalles($personal, false);
+                // ✅ CATEGORÍA / FUNCIÓN: SOLO desde detalles (en una sola línea con comas)
+                $cargosHtml = $resolverCargosDesdeDetalles($personal, false);
             @endphp
 
-            <img class="fondo_primaria" src="{{ public_path('storage/membrete_reanudacion_primaria.png') }}"
-                alt="fondo" style="width:100%;">
+            <img class="fondo_primaria" src="{{ public_path('imagenes/membrete_reanudacion_primaria.png') }}"
+                alt="fondo" style="width: 100%; ">
 
             <div class="contenedor_primaria" style="padding: 100px 60px 0">
-                <p style="text-align:right; font-size:17px; line-height:25px;">
+
+                <p style="text-align: right; font-size: 17px; line-height: 25px;">
                     <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
-                    Cd. Altamirano, Gro., {{ $fechaCarta }}. <br>
+                    Cd. Altamirano, Gro., {{ $fechaCarta }}.
+                    <br>
+                <p style="text-align: right; font-size: 17px; margin-top: -10px ">
                     @if (empty(trim($escuela->lema ?? '')))
                     @else
                         "{{ $escuela->lema }}"
                     @endif
                 </p>
+                </p>
 
-                <div class="autoridades" style="margin-top:-10px; text-transform:uppercase">
+                <div class="autoridades" style="margin-top: -10px; text-transform: uppercase">
                     <table>
                         <tr>
                             <td style="width:350px">
                                 <b>{{ $directorAdministracionNombre }}</b><br>{{ $directorAdministracion->cargo }}
                             </td>
                         </tr>
+
                         <tr>
                             <td></td>
-                            <td style="width:300px">
+                            <td style="width: 300px">
                                 <b>AT'N. {{ $directorMagisterioNombre }}</b><br>{{ $directorMagisterio->cargo }}
                             </td>
                         </tr>
@@ -464,17 +491,21 @@
 
                 <div>
                     <p
-                        style="text-transform:uppercase; text-align:justify; font-size:14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent:30px; line-height:19px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
-                        ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR MIS LABORES,
-                        DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
+                        style="text-transform: uppercase; text-align: justify; font-size: 14.4px; font-family: Verdana, Geneva, Tahoma, sans-serif; text-indent: 50px; line-height: 19px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
+                        ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
+                        MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
-                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}.</b>
                     </p>
                 </div>
 
                 <p
-                    style="text-transform:uppercase; text-align:justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    style="text-transform: uppercase; text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif; margin-top: -10px;">
                     PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
                 </p>
 
@@ -498,12 +529,12 @@
                                     ->isoFormat('DD [DE] MMMM [DEL] YYYY'),
                             )
                             : '---------',
-                        'CATEGORÍA' => $cargosLinea, // ✅ detalles
+                        'CATEGORÍA' => $cargosHtml, // ✅ desde detalles
                         'NOMBRE DEL CENTRO DE TRABAJO' => mb_strtoupper($escuela->nombre ?? '---------'),
                         'C.C.T.' => mb_strtoupper($nivel->cct ?? '---------'),
                         'LOCALIDAD' => 'CD. ' . mb_strtoupper($escuela->ciudad ?? '---------'),
                         'MUNICIPIO' => mb_strtoupper($escuela->municipio ?? '---------'),
-                        'FUNCIÓN QUE DESEMPEÑA' => $cargosLinea, // ✅ detalles
+                        'FUNCIÓN QUE DESEMPEÑA' => $cargosHtml, // ✅ desde detalles
                         'REGIÓN' => 'TIERRA CALIENTE',
                         'ZONA ESCOLAR' => $nivel->supervisor->zona_escolar ?? '---------',
                     ];
@@ -511,22 +542,27 @@
 
                 <div>
                     @foreach ($datos as $key => $dato)
-                        <table style="width:100%; font-family: Verdana, Geneva, Tahoma, sans-serif; line-height:13px;">
+                        <table
+                            style="width: 100%; font-family: Verdana, Geneva, Tahoma, sans-serif; line-height: 13px;">
                             <tr>
-                                <td style="width:300px;"><b>{{ $key }}:</b></td>
-                                <td style="border-bottom:1px solid #000;">{{ $dato }}</td>
+                                <td style="width: 300px;">
+                                    <b>{{ $key }}:</b>
+                                </td>
+                                <td style="border-bottom: 1px solid #000;">
+                                    {{ $dato }}
+                                </td>
                             </tr>
                         </table>
                     @endforeach
                 </div>
 
-                <p style="text-align:justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                <p style="text-align: justify; font-family: Verdana, Geneva, Tahoma, sans-serif;">
                     SIN OTRO ASUNTO QUE TRATAR APROVECHO LA OCASIÓN PARA ENVIARLE UN CORDIAL SALUDO.
                 </p>
 
                 <div class="firmas">
                     <table
-                        style="width:100%; margin:auto; font-size:12px; text-align:center; font-family: Verdana, Geneva, Tahoma, sans-serif; text-transform:uppercase; font-weight:bold;">
+                        style="width: 100%; margin:auto; font-size: 12px; text-align: center; font-family: Verdana, Geneva, Tahoma, sans-serif; text-transform: uppercase; font-weight: bold;">
                         <tr>
                             <td>
                                 ATENTAMENTE<br><br><br><br><br>
@@ -538,25 +574,23 @@
 
                             <td>
                                 @if ($slugRolPrincipal === 'director_sin_grupo')
-                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $nivel->supervisor->cargo ?? '---------' }}
-                                    <br><br><br>
+                                    Vo.Bo. <br>JEFE INMEDIATO <br>{{ $nivel->supervisor->cargo }} <br><br><br>
                                     ___________________________________<br>
                                     {{ $supervisorPrimariaNombre }}<br>
-                                    RFC: {{ $nivel->supervisor->rfc ?? '---------' }} <br>
-                                    CURP: {{ $nivel->supervisor->curp ?? '---------' }}
+                                    RFC: {{ $nivel->supervisor->rfc }} <br>
+                                    CURP: {{ $nivel->supervisor->curp }}
                                 @else
                                     Vo.Bo. <br>DIRECTORA <br><br><br><br>
                                     ___________________________________<br>
                                     {{ $nombreDirectorPrimariaNombre }}<br>
-                                    RFC: {{ $nivel->director->rfc ?? '---------' }} <br>
-                                    CURP: {{ $nivel->director->curp ?? '---------' }}
+                                    RFC: {{ $nivel->director->rfc }} <br>
+                                    CURP: {{ $nivel->director->curp }}
                                 @endif
                             </td>
                         </tr>
                     </table>
                 </div>
 
-                {{-- CCP igual que Invierno (primaria incluye patrón CCP + títulos) --}}
                 @php
                     $titulos = [
                         'Prof.',
@@ -576,27 +610,36 @@
                         'Téc.',
                         'Tec.',
                     ];
-                    $texto = e($copias);
 
-                    $patronCcp = '/\s*(\(?\s*(?:c\s*\.?\s*c\s*\.?\s*p|ccp)\s*\.?\s*\)?)/iu';
-                    $texto = preg_replace($patronCcp, '<br>$1', $texto);
-                    $texto = preg_replace('/^(<br>\s*)+/u', '', $texto);
+                    if (empty(trim($copias))) {
+                        $copiasFormateado =
+                            'C.C.P. JOSÉ ZAMORA ÁVILA, JEFE DE DEPARTAMENTO DE PRIMARIA ESTATAL<br>C.C.P. LIC. SABINO FLORES LEÒN. JEFE REGIONAL 01. REGION TIERRA CALIENTE. CD. ALTAMIRANO, GRO<br>C.C.P. PROFR (A) ADELFO MARTINEZ MARTINEZ - SUPERVISOR (A) ZONA ESCOLAR 030. CD ALTAMIRANO, GRO.<br>C.C.P. EL INTERESADO';
+                    } else {
+                        $texto = e($copias);
 
-                    $patronTitulos = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
-                    $count = 0;
-                    $copiasFormateado = preg_replace_callback(
-                        $patronTitulos,
-                        function ($m) use (&$count) {
-                            $count++;
-                            return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
-                        },
-                        $texto,
-                    );
+                        $patronCcp = '/\s*(\(?\s*(?:c\s*\.?\s*c\s*\.?\s*p|ccp)\s*\.?\s*\)?)/iu';
+                        $texto = preg_replace($patronCcp, '<br>$1', $texto);
+                        $texto = preg_replace('/^(<br>\s*)+/u', '', $texto);
+
+                        $patronTitulos =
+                            '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
+
+                        $count = 0;
+                        $copiasFormateado = preg_replace_callback(
+                            $patronTitulos,
+                            function ($m) use (&$count) {
+                                $count++;
+                                return $count === 1 ? ' ' . $m[1] : '<br>' . $m[1];
+                            },
+                            $texto,
+                        );
+                    }
                 @endphp
 
-                <div class="ccp" style="margin-top:0px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
-                    <p style="font-size:8px">{!! $copiasFormateado !!}</p>
+                <div class="ccp" style="margin-top: 0px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size: 8px">{!! $copiasFormateado !!}</p>
                 </div>
+
             </div>
 
             @if (!$loop->last)
@@ -604,28 +647,31 @@
             @endif
         @endforeach
 
-
         {{-- =========================
         SECUNDARIA
-        ========================= --}}
+    ========================= --}}
     @elseif ($nivel->slug == 'secundaria')
         @foreach ($asignacionesNivel as $personal)
             @php
-                // (Secundaria ya la traías por detalles; la dejo igual pero ordenando detalles)
-
                 $rolPrincipal =
                     collect($personal->persona->personaRoles ?? [])->first(
                         fn($r) => optional($r->rolePersona)->slug === 'director_sin_grupo',
                     ) ?? collect($personal->persona->personaRoles ?? [])->first();
 
                 $slugRolPrincipal = optional(optional($rolPrincipal)->rolePersona)->slug;
+                $nombreRolPrincipal = optional(optional($rolPrincipal)->rolePersona)->nombre;
 
-                $fechaDocente = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
-                    ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
-                $fechaDirector = \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
-                    ->locale('es')
-                    ->isoFormat('D [de] MMMM [de] YYYY');
+                \Carbon\Carbon::setLocale('es');
+                $fechaDocente = mb_strtoupper(
+                    \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_docente)
+                        ->locale('es')
+                        ->isoFormat('DD [DE] MMMM [DE] YYYY'),
+                );
+                $fechaDirector = mb_strtoupper(
+                    \Carbon\Carbon::createFromFormat('Y-m-d', $fecha_director)
+                        ->locale('es')
+                        ->isoFormat('DD [DE] MMMM [DE] YYYY'),
+                );
                 $fechaCarta = $slugRolPrincipal === 'director_sin_grupo' ? $fechaDirector : $fechaDocente;
 
                 $nombreCompletoRaw = trim(
@@ -637,6 +683,7 @@
                 );
                 $nombreCompleto = $nombreCompletoRaw !== '' ? mb_strtoupper($nombreCompletoRaw) : '---------';
 
+                // ✅ IMPORTANTÍSIMO: ordenar detalles por orden antes de imprimir cargos
                 $detallesOrdenados = collect($personal->detalles ?? [])
                     ->sortBy(fn($d) => [(int) ($d->orden ?? 999999), (int) ($d->id ?? 0)])
                     ->values();
@@ -645,9 +692,11 @@
                     ->map(function ($d) {
                         $nombre = optional(optional($d->PersonaRole)->rolePersona)->nombre;
                         $grado = optional($d->grado)->nombre;
+
                         if (!$nombre) {
                             return null;
                         }
+
                         return $grado ? mb_strtoupper('>' . $grado . '° ' . $nombre) : mb_strtoupper($nombre);
                     })
                     ->filter()
@@ -658,37 +707,46 @@
                 $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
 
-            <img class="fondo_secundaria" src="{{ public_path('storage/membrete_reanudacion_secundaria.png') }}"
-                alt="fondo" style="width:100%;">
+            <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria.png') }}"
+                alt="fondo" style="width: 100%;">
 
             <div class="contenedor_secundaria" style="padding: 100px 60px 0">
 
-                <p style="text-align:right; font-size:17px; line-height:25px;">
+                <p style="text-align: right; font-size: 17px; line-height: 25px; text-transform: uppercase;">
                     <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>
-                    Cd. Altamirano, Gro., {{ $fechaCarta }}. <br>
-                    @if (empty(trim($escuela->lema ?? '')))
-                    @else
-                        "{{ $escuela->lema }}"
-                    @endif
+                    CD. ALTAMIRANO, GRO., A {{ $fechaCarta }}.
+                    <br>
+                    <span style="font-size: 14px; font-weight: bold;">
+                        @if (empty(trim($escuela->lema ?? '')))
+                        @else
+                            "{{ $escuela->lema }}"
+                        @endif
+                    </span>
                 </p>
 
-                <div class="delegado" style="margin-top:10px; text-transform:uppercase; font-size:15px">
-                    <p style="width:400px;">
+                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">
+                    <p style="width: 400px;">
                         <b>
                             {{ $delegado->titulo }} {{ $delegado->nombre }}
                             {{ $delegado->apellido_paterno }}
                             {{ $delegado->apellido_materno }} <br>
                         </b>
                     </p>
-                    <p style="margin-top:-15px; width:320px">{{ $delegado->cargo }}</p>
+                    <p style="margin-top:-15px; width:320px">
+                        {{ $delegado->cargo }}
+                    </p>
                     <p><b>P R E S E N T E</b></p>
                 </div>
 
                 <div>
-                    <p style="text-transform:uppercase; text-align:justify; text-indent:30px; line-height:20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                    <p style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 20px;">
+                        EL (A) QUE SUSCRIBE C. <b><u>
+                                @if ($personal->persona->titulo !== 'C.')
+                                    {{ $personal->persona->titulo }}
+                                @endif{{ $nombreCompleto }}
+                            </u></b>,
                         SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>{{ $TEXTO_RECESO }}</u></b>,
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
                         <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                         PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
@@ -724,10 +782,12 @@
 
                 <div>
                     @foreach ($datos as $key => $dato)
-                        <table style="width:100%; line-height:15px;">
+                        <table style="width: 100%; line-height: 15px;">
                             <tr>
-                                <td style="width:250px;"><b>{{ $key }}:</b></td>
-                                <td style="border-bottom:1px solid #000;">
+                                <td style="width: 250px;">
+                                    <b>{{ $key }}:</b>
+                                </td>
+                                <td style="border-bottom: 1px solid #000;">
                                     @if ($key === 'CARGO QUE DESEMPEÑA')
                                         {!! $dato !!}
                                     @else
@@ -739,13 +799,13 @@
                     @endforeach
                 </div>
 
-                <p style="text-align:justify;">
+                <p style="text-align: justify;">
                     SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
                 </p>
 
                 <div class="firmas">
                     <table
-                        style="width:100%; margin:auto; font-size:13px; text-align:center; text-transform:uppercase; font-weight:bold;">
+                        style="width: 100%; margin:auto; font-size: 13px; text-align: center; text-transform: uppercase; font-weight: bold;">
                         <tr>
                             <td>
                                 ATENTAMENTE<br>
@@ -794,6 +854,7 @@
                         'Téc.',
                         'Tec.',
                     ];
+
                     $texto = e($copias);
                     $patron = '/\s+(' . implode('|', array_map(fn($t) => preg_quote($t, '/'), $titulos)) . ')/u';
 
@@ -808,6 +869,7 @@
                     );
 
                     $lineas = array_values(array_filter(array_map('trim', preg_split('/<br>/', $copiasFormateado))));
+
                     $copiasIndentado = '';
                     foreach ($lineas as $i => $linea) {
                         $copiasIndentado .=
@@ -815,8 +877,8 @@
                     }
                 @endphp
 
-                <div class="ccp" style="margin-top:13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
-                    <p style="font-size:9px; margin:0;">
+                <div class="ccp" style="margin-top: 13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                    <p style="font-size: 9px; margin:0;">
                         <b>{!! $copiasIndentado !!}</b>
                     </p>
                 </div>

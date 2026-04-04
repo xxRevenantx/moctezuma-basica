@@ -91,7 +91,8 @@
                     </flux:modal.trigger>
 
                     <flux:modal name="reanudaciones" flyout variant="floating" class="md:w-lg">
-                        <form action="{{ route('misrutas.reanudaciones') }}" class="p-6" target="_blank">
+                        <form action="{{ route('misrutas.reanudaciones') }}" class="p-6" method="GET"
+                            target="_blank">
                             <div class="space-y-6">
                                 <flux:heading size="lg">Descarga los oficios de Reanudaciones de Labores
                                 </flux:heading>
@@ -131,9 +132,12 @@
 
                                 <div class="flex justify-end gap-2">
                                     <flux:modal.close>
-                                        <flux:button variant="filled">Cancelar</flux:button>
+                                        <flux:button variant="filled" type="button">Cancelar</flux:button>
                                     </flux:modal.close>
-                                    <flux:button type="submit" variant="primary">Generar</flux:button>
+
+                                    <flux:button type="submit" variant="primary">
+                                        Generar
+                                    </flux:button>
                                 </div>
                             </div>
                         </form>
@@ -268,8 +272,6 @@
                     {{-- ============ SECUNDARIA ============ --}}
                     @if ($isSecundaria)
                         @php
-                            // ✅ usa el nivelId real del collapse actual si está disponible
-                            // (normalmente nivelId será el de secundaria en este bloque)
                             $nivelSecId = $nivelId ?: $secundariaId;
                         @endphp
 
@@ -307,7 +309,6 @@
                                 </div>
                             </div>
 
-                            {{-- ✅ CONTENEDOR SORTABLE DE CARDS (usa cabecera_id) --}}
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" data-sortable="personas"
                                 data-nivel-id="{{ $nivelSecId }}">
 
@@ -329,7 +330,6 @@
                                         $materias = $profe['materias'] ?? collect();
                                         $detalles = $profe['detalles'] ?? collect();
 
-                                        // por si viene array
                                         if (is_array($materias)) {
                                             $materias = collect($materias);
                                         }
@@ -341,16 +341,13 @@
                                     <div class="persona-card rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
                                         data-id="{{ $cabId }}" wire:key="sec-card-{{ $cabId }}"
                                         data-profe="{{ $cabId }}">
-                                        {{-- top bar --}}
                                         <div
                                             class="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-blue-600 to-sky-500">
                                         </div>
 
-                                        {{-- header card --}}
                                         <div class="p-4 sm:p-5 flex items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <div class="flex items-center gap-2">
-                                                    {{-- ✅ handle de la card --}}
                                                     <button type="button" data-handle-card
                                                         class="inline-flex items-center justify-center h-9 w-9 rounded-2xl
                                                             border border-gray-200 dark:border-neutral-700
@@ -380,7 +377,6 @@
                                                     </div>
                                                 </div>
 
-                                                {{-- ✅ fechas debajo del nombre (SEP/SEG/CT) --}}
                                                 <div class="mt-3 flex flex-wrap gap-2">
                                                     <span
                                                         class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold
@@ -450,7 +446,6 @@
                                                         Editar Persona
                                                     </button>
 
-
                                                     <button type="button" @click="toggleProfe({{ $cabId }})"
                                                         class="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold
                                                         border border-gray-200 dark:border-neutral-700
@@ -466,15 +461,11 @@
                                                         </span>
                                                     </button>
                                                 </div>
-
-
                                             </div>
                                         </div>
 
-                                        {{-- body card --}}
                                         <div x-show="isProfeOpen({{ $cabId }})" x-cloak
                                             class="border-t border-gray-200 dark:border-neutral-800">
-                                            {{-- materias chips --}}
                                             <div class="p-4 sm:p-5">
                                                 <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     Materias
@@ -492,7 +483,6 @@
                                                 </div>
                                             </div>
 
-                                            {{-- tabla de asignaciones (sortable dentro del profe) --}}
                                             <div class="overflow-x-auto">
                                                 <table class="min-w-full text-sm">
                                                     <thead class="bg-gray-50 dark:bg-neutral-800/70">
@@ -605,7 +595,6 @@
                             </div>
                         </div>
                     @else
-                        {{-- ============ OTROS NIVELES (tabla + sortable) ============ --}}
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead class="bg-gray-50 dark:bg-neutral-800/70">
@@ -660,7 +649,6 @@
                                                         </svg>
                                                     </button>
 
-                                                    {{-- ✅ opcional: muestra el orden real guardado --}}
                                                     <span
                                                         class="text-xs font-semibold text-gray-500 dark:text-gray-300">
                                                         {{ (int) ($row->orden ?? 0) }}
@@ -784,7 +772,6 @@
                 function initSortableForAll() {
                     if (typeof Sortable === 'undefined') return;
 
-                    // ✅ Niveles (tabla), Secundaria (detalles) y Secundaria (cards)
                     document.querySelectorAll(
                         'tbody[data-sortable="nivel"], tbody[data-sortable="sec"], [data-sortable="personas"]'
                     ).forEach((el) => {
@@ -813,13 +800,11 @@
                                 const component = getLivewireComponentFrom(el);
                                 if (!component) return;
 
-                                // ✅ Ordenar PERSONAS (cards) por nivel (persona_nivel.orden)
                                 if (tipo === 'personas') {
                                     component.call('ordenarPersonasJs', nivelId, ids);
                                     return;
                                 }
 
-                                // ✅ Ordenar DETALLES dentro de un profesor en secundaria
                                 if (tipo === 'sec') {
                                     const cabeceraId = parseInt(el.dataset.cabeceraId || '0', 10);
                                     if (!cabeceraId) return;
@@ -827,7 +812,6 @@
                                     return;
                                 }
 
-                                // ✅ Ordenar filas (otros niveles)
                                 component.call('ordenarJs', nivelId, ids);
                             },
                         });

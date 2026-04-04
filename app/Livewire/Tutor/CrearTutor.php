@@ -130,6 +130,8 @@ class CrearTutor extends Component
         ]);
 
         $this->reset();
+
+        $this->dispatch('refreshTutor'); // Dispara un evento para que el componente de mostrar se actualice
     }
 
     public function limpiar(): void

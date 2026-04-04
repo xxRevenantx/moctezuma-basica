@@ -1,4 +1,14 @@
-<div class="p-4 sm:p-6">
+<div>
+
+    {{-- ENCABEZADO --}}
+    <div class="mb-6">
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+            Crear Nuevo Tutor
+        </h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Registra un nuevo tutor indicando sus datos generales, domicilio y contacto.
+        </p>
+    </div>
 
     <div x-data="{ open: false }" class="my-4">
         <!-- Toggle (form-pro) -->
@@ -46,21 +56,7 @@
                             </p>
                         </div>
 
-                        {{-- Botón desplegable (Acciones) --}}
-                        <div x-data="{ open: false }" class="relative">
-                            <flux:button type="button" variant="outline" @click="open=!open"
-                                @keydown.escape.window="open=false" class="rounded-xl">
-                                <span class="inline-flex items-center gap-2">
-                                    Acciones
-                                    <svg class="h-4 w-4 opacity-70" viewBox="0 0 20 20" fill="currentColor"
-                                        aria-hidden="true">
-                                        <path fill-rule="evenodd"
-                                            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.24 4.5a.75.75 0 0 1-1.08 0l-4.24-4.5a.75.75 0 0 1 .02-1.06Z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                </span>
-                            </flux:button>
-                        </div>
+
                     </div>
 
                     {{-- Form --}}
@@ -100,14 +96,14 @@
                             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP *</flux:label>
-                                    <flux:input wire:model.blur="curp" maxlength="18" class="uppercase tracking-wider"
+                                    <flux:input wire:model="curp" maxlength="18" class="uppercase tracking-wider"
                                         placeholder="Ej. NUPC950101HGRXXX09 (18 caracteres)" />
                                     <flux:error name="curp" />
                                 </flux:field>
 
                                 <flux:field>
                                     <flux:label badge="Requerido">Parentesco *</flux:label>
-                                    <flux:input wire:model.blur="parentesco" maxlength="50" class="uppercase"
+                                    <flux:input wire:model="parentesco" maxlength="50" class="uppercase"
                                         placeholder="Ej. PADRE, MADRE, TUTOR..." />
                                     <flux:error name="parentesco" />
                                 </flux:field>
@@ -154,21 +150,21 @@
                                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                         <flux:field>
                                             <flux:label badge="Requerido">Nombre *</flux:label>
-                                            <flux:input wire:model.blur="nombre" class="uppercase"
+                                            <flux:input wire:model="nombre" class="uppercase"
                                                 placeholder="Ej. CARLOS ALBERTO" />
                                             <flux:error name="nombre" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Apellido paterno *</flux:label>
-                                            <flux:input wire:model.blur="apellido_paterno" class="uppercase"
+                                            <flux:input wire:model="apellido_paterno" class="uppercase"
                                                 placeholder="Ej. NÚÑEZ" />
                                             <flux:error name="apellido_paterno" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Apellido materno</flux:label>
-                                            <flux:input wire:model.blur="apellido_materno" class="uppercase"
+                                            <flux:input wire:model="apellido_materno" class="uppercase"
                                                 placeholder="Ej. PÉREZ (opcional)" />
                                             <flux:error name="apellido_materno" />
                                         </flux:field>
@@ -182,22 +178,21 @@
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Ciudad nacimiento</flux:label>
-                                            <flux:input wire:model.blur="ciudad_nacimiento"
+                                            <flux:input wire:model="ciudad_nacimiento"
                                                 placeholder="Ej. CD ALTAMIRANO" />
                                             <flux:error name="ciudad_nacimiento" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Municipio nacimiento</flux:label>
-                                            <flux:input wire:model.blur="municipio_nacimiento"
+                                            <flux:input wire:model="municipio_nacimiento"
                                                 placeholder="Ej. PUNGARABATO" />
                                             <flux:error name="municipio_nacimiento" />
                                         </flux:field>
 
                                         <flux:field class="sm:col-span-3">
                                             <flux:label badge="Opcional">Estado nacimiento</flux:label>
-                                            <flux:input wire:model.blur="estado_nacimiento"
-                                                placeholder="Ej. GUERRERO" />
+                                            <flux:input wire:model="estado_nacimiento" placeholder="Ej. GUERRERO" />
                                             <flux:error name="estado_nacimiento" />
                                         </flux:field>
                                     </div>
@@ -230,44 +225,44 @@
                                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                         <flux:field class="sm:col-span-2">
                                             <flux:label badge="Requerido">Calle *</flux:label>
-                                            <flux:input wire:model.blur="calle"
+                                            <flux:input wire:model="calle"
                                                 placeholder="Ej. FRANCISCO I. MADERO ORIENTE" />
                                             <flux:error name="calle" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Número</flux:label>
-                                            <flux:input wire:model.blur="numero" placeholder="Ej. 800 / S/N" />
+                                            <flux:input wire:model="numero" placeholder="Ej. 800 / S/N" />
                                             <flux:error name="numero" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Colonia *</flux:label>
-                                            <flux:input wire:model.blur="colonia" placeholder="Ej. ESQUIPULA" />
+                                            <flux:input wire:model="colonia" placeholder="Ej. ESQUIPULA" />
                                             <flux:error name="colonia" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Ciudad *</flux:label>
-                                            <flux:input wire:model.blur="ciudad" placeholder="Ej. CD ALTAMIRANO" />
+                                            <flux:input wire:model="ciudad" placeholder="Ej. CD ALTAMIRANO" />
                                             <flux:error name="ciudad" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Municipio *</flux:label>
-                                            <flux:input wire:model.blur="municipio" placeholder="Ej. PUNGARABATO" />
+                                            <flux:input wire:model="municipio" placeholder="Ej. PUNGARABATO" />
                                             <flux:error name="municipio" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Estado *</flux:label>
-                                            <flux:input wire:model.blur="estado" placeholder="Ej. GUERRERO" />
+                                            <flux:input wire:model="estado" placeholder="Ej. GUERRERO" />
                                             <flux:error name="estado" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Código postal *</flux:label>
-                                            <flux:input wire:model.blur="codigo_postal" inputmode="numeric"
+                                            <flux:input wire:model="codigo_postal" inputmode="numeric"
                                                 placeholder="Ej. 40662" />
                                             <flux:error name="codigo_postal" />
                                         </flux:field>
@@ -300,21 +295,21 @@
                                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                         <flux:field>
                                             <flux:label badge="Opcional">Teléfono casa</flux:label>
-                                            <flux:input wire:model.blur="telefono_casa" inputmode="tel"
+                                            <flux:input wire:model="telefono_casa" inputmode="tel"
                                                 placeholder="Ej. 767 688 0000" />
                                             <flux:error name="telefono_casa" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Teléfono celular</flux:label>
-                                            <flux:input wire:model.blur="telefono_celular" inputmode="tel"
+                                            <flux:input wire:model="telefono_celular" inputmode="tel"
                                                 placeholder="Ej. 767 123 4567" />
                                             <flux:error name="telefono_celular" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Opcional">Correo</flux:label>
-                                            <flux:input type="email" wire:model.blur="correo_electronico"
+                                            <flux:input type="email" wire:model="correo_electronico"
                                                 placeholder="correo@dominio.com" />
                                             <flux:error name="correo_electronico" />
                                         </flux:field>

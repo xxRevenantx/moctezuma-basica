@@ -222,7 +222,7 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <img class="fondo_preescolar" src="{{ public_path('storage/reanudacion_preescolar.jpg') }}" alt="fondo"
+            <img class="fondo_preescolar" src="{{ public_path('imagenes/reanudacion_preescolar.jpg') }}" alt="fondo"
                 style="width: 100%;">
 
             <div class="contenedor_preescolar" style="padding: 30px 115px 0">
@@ -455,7 +455,7 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, false);
             @endphp
 
-            <img class="fondo_primaria" src="{{ public_path('storage/membrete_reanudacion_primaria.png') }}"
+            <img class="fondo_primaria" src="{{ public_path('imagenes/membrete_reanudacion_primaria.png') }}"
                 alt="fondo" style="width: 100%; ">
 
             <div class="contenedor_primaria" style="padding: 100px 60px 0">
@@ -707,7 +707,7 @@
                 $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
 
-            <img class="fondo_secundaria" src="{{ public_path('storage/membrete_reanudacion_secundaria.png') }}"
+            <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria.png') }}"
                 alt="fondo" style="width: 100%;">
 
             <div class="contenedor_secundaria" style="padding: 100px 60px 0">
