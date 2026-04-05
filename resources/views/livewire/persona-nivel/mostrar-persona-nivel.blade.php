@@ -48,7 +48,7 @@
             Personal asignado por nivel
         </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Secundaria: cards por profesor (drag & drop de cards + drag interno por asignaciones).
+            Cards por profesor (drag & drop de cards + drag interno por asignaciones).
             Los demás niveles: tabla + drag & drop.
         </p>
     </div>
@@ -249,6 +249,9 @@
                     </div>
 
                     <div class="flex items-center gap-2 shrink-0">
+
+
+
                         <span
                             class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
                                      bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
@@ -269,11 +272,22 @@
                 <div x-show="isLevelOpen('{{ $nivelKey }}')" x-cloak
                     class="border-t border-gray-200 dark:border-neutral-800">
 
+                    <flux:button variant="primary"
+                        class="cursor-pointer bg-green-700 my-2 flex items-center gap-2 text-white mx-4 px-3 py-2 rounded-2xl"
+                        wire:click="exportarPlantilla({{ $nivelId }})">
+                        <div class="flex justify-between gap-2">
+                            <flux:icon.download class="w-4 h-4" />
+                            Exportar Excel
+                        </div>
+                    </flux:button>
+
                     {{-- ============ SECUNDARIA ============ --}}
                     @if ($isSecundaria)
                         @php
                             $nivelSecId = $nivelId ?: $secundariaId;
                         @endphp
+
+
 
                         <div class="p-4 sm:p-5 space-y-4">
                             <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">

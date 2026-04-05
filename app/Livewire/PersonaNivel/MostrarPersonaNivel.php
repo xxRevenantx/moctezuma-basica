@@ -2,6 +2,7 @@
 
 namespace App\Livewire\PersonaNivel;
 
+use App\Exports\PlantillaExport;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\PersonaNivelDetalle;
@@ -9,6 +10,7 @@ use App\Models\CicloEscolar;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MostrarPersonaNivel extends Component
 {
@@ -48,11 +50,12 @@ class MostrarPersonaNivel extends Component
      */
     private function recalcularOrdenCabecerasPorDetalles(int $nivelId): void
     {
-        if (! $nivelId) return;
+        if (!$nivelId)
+            return;
 
         // Ordena cabeceras según el primer detalle que aparezca en el nivel
         $cabeceraIdsOrdenadas = PersonaNivelDetalle::query()
-            ->whereHas('cabecera', fn ($q) => $q->where('nivel_id', $nivelId))
+            ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $nivelId))
             ->orderBy('orden')
             ->orderBy('id')
             ->pluck('persona_nivel_id')
@@ -70,12 +73,12 @@ class MostrarPersonaNivel extends Component
     {
         $detalle = PersonaNivelDetalle::with('cabecera')->find($id);
 
-        if (! $detalle) {
+        if (!$detalle) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Registro no encontrado.']);
             return;
         }
 
-        $nivelId    = (int) ($detalle->cabecera?->nivel_id ?? 0);
+        $nivelId = (int) ($detalle->cabecera?->nivel_id ?? 0);
         $cabeceraId = (int) ($detalle->persona_nivel_id ?? 0);
 
         $detalle->delete();
@@ -83,7 +86,7 @@ class MostrarPersonaNivel extends Component
         // ✅ si cabecera se queda sin detalles, borrar cabecera
         if ($cabeceraId) {
             $tieneMas = PersonaNivelDetalle::where('persona_nivel_id', $cabeceraId)->exists();
-            if (! $tieneMas) {
+            if (!$tieneMas) {
                 PersonaNivel::whereKey($cabeceraId)->delete();
             }
         }
@@ -94,7 +97,7 @@ class MostrarPersonaNivel extends Component
 
                 // 1) normalizar detalles (1..N) del nivel
                 $all = PersonaNivelDetalle::query()
-                    ->whereHas('cabecera', fn ($q) => $q->where('nivel_id', $nivelId))
+                    ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $nivelId))
                     ->orderBy('orden')
                     ->orderBy('id')
                     ->pluck('id')
@@ -123,11 +126,12 @@ class MostrarPersonaNivel extends Component
      */
     public function ordenarJs(int $nivelId, array $ids): void
     {
-        $ids = collect($ids)->map(fn ($v) => (int) $v)->filter()->values();
-        if ($ids->isEmpty() || ! $nivelId) return;
+        $ids = collect($ids)->map(fn($v) => (int) $v)->filter()->values();
+        if ($ids->isEmpty() || !$nivelId)
+            return;
 
         $validIds = PersonaNivelDetalle::query()
-            ->whereHas('cabecera', fn ($q) => $q->where('nivel_id', $nivelId))
+            ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $nivelId))
             ->whereIn('id', $ids)
             ->pluck('id')
             ->all();
@@ -138,13 +142,14 @@ class MostrarPersonaNivel extends Component
             // 1) aplicar orden recibido
             $i = 1;
             foreach ($ids as $id) {
-                if (! isset($validSet[$id])) continue;
+                if (!isset($validSet[$id]))
+                    continue;
                 PersonaNivelDetalle::whereKey($id)->update(['orden' => $i++]);
             }
 
             // 2) normalizar consecutivo por nivel
             $all = PersonaNivelDetalle::query()
-                ->whereHas('cabecera', fn ($q) => $q->where('nivel_id', $nivelId))
+                ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $nivelId))
                 ->orderBy('orden')
                 ->orderBy('id')
                 ->pluck('id')
@@ -171,12 +176,13 @@ class MostrarPersonaNivel extends Component
      */
     public function ordenarSecJs(int $nivelId, int $cabeceraId, array $ids): void
     {
-        $ids = collect($ids)->map(fn ($v) => (int) $v)->filter()->values();
-        if ($ids->isEmpty() || ! $nivelId || ! $cabeceraId) return;
+        $ids = collect($ids)->map(fn($v) => (int) $v)->filter()->values();
+        if ($ids->isEmpty() || !$nivelId || !$cabeceraId)
+            return;
 
         $validIds = PersonaNivelDetalle::query()
             ->where('persona_nivel_id', $cabeceraId)
-            ->whereHas('cabecera', fn ($q) => $q->where('nivel_id', $nivelId))
+            ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $nivelId))
             ->whereIn('id', $ids)
             ->pluck('id')
             ->all();
@@ -186,7 +192,8 @@ class MostrarPersonaNivel extends Component
         DB::transaction(function () use ($cabeceraId, $ids, $validSet) {
             $i = 1;
             foreach ($ids as $id) {
-                if (! isset($validSet[$id])) continue;
+                if (!isset($validSet[$id]))
+                    continue;
                 PersonaNivelDetalle::whereKey($id)->update(['orden' => $i++]);
             }
 
@@ -213,8 +220,9 @@ class MostrarPersonaNivel extends Component
      */
     public function ordenarPersonasJs(int $nivelId, array $cabeceraIds): void
     {
-        $cabeceraIds = collect($cabeceraIds)->map(fn ($v) => (int) $v)->filter()->values();
-        if ($cabeceraIds->isEmpty() || ! $nivelId) return;
+        $cabeceraIds = collect($cabeceraIds)->map(fn($v) => (int) $v)->filter()->values();
+        if ($cabeceraIds->isEmpty() || !$nivelId)
+            return;
 
         $validIds = PersonaNivel::query()
             ->where('nivel_id', $nivelId)
@@ -228,7 +236,8 @@ class MostrarPersonaNivel extends Component
             // 1) aplica el orden drag dentro del nivel
             $i = 1;
             foreach ($cabeceraIds as $id) {
-                if (! isset($validSet[$id])) continue;
+                if (!isset($validSet[$id]))
+                    continue;
                 PersonaNivel::whereKey($id)->update(['orden' => $i++]);
             }
 
@@ -253,6 +262,74 @@ class MostrarPersonaNivel extends Component
         $this->dispatch('$refresh');
     }
 
+    // exportar a Excel (solo detalles, sin agrupar por nivel)
+    public function exportarPlantilla($nivelId)
+    {
+        $nivelId = (int) $nivelId;
+
+        $rows = PersonaNivelDetalle::query()
+            ->with([
+                'cabecera.persona',
+                'cabecera.nivel',
+                'grado',
+                'grupo',
+                'personaRole.rolePersona'
+            ])
+            ->whereHas('cabecera', function ($query) use ($nivelId) {
+                $query->where('nivel_id', $nivelId);
+            })
+            ->orderBy(
+                PersonaNivel::select('nivel_id')
+                    ->whereColumn('persona_nivel.id', 'persona_nivel_detalles.persona_nivel_id')
+                    ->limit(1)
+            )
+            ->orderBy('orden')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            $this->dispatch('toast', [
+                'type' => 'warning',
+                'message' => 'No hay registros para exportar en este nivel.'
+            ]);
+            return;
+        }
+
+        $nivelNombre = $rows->first()?->cabecera?->nivel?->nombre ?? 'nivel';
+
+        $data = $rows->map(function ($r, $index) {
+            return [
+                'no' => $index + 1,
+                'persona' => trim(
+                    ($r->cabecera?->persona?->nombre ?? '') . ' ' .
+                    ($r->cabecera?->persona?->apellido_paterno ?? '') . ' ' .
+                    ($r->cabecera?->persona?->apellido_materno ?? '')
+                ),
+                'nivel' => $r->cabecera?->nivel?->nombre ?? 'Sin nivel',
+                'grado' => $r->grado?->nombre ?? 'Sin grado',
+                'grupo' => $r->grupo?->nombre ?? 'Sin grupo',
+                'materia' => $r->personaRole?->rolePersona?->nombre ?? 'Sin función',
+                'ingreso_seg' => $r->cabecera?->ingreso_seg
+                    ? \Carbon\Carbon::parse($r->cabecera->ingreso_seg)->format('d/m/Y')
+                    : '',
+                'ingreso_sep' => $r->cabecera?->ingreso_sep
+                    ? \Carbon\Carbon::parse($r->cabecera->ingreso_sep)->format('d/m/Y')
+                    : '',
+                'ingreso_ct' => $r->cabecera?->ingreso_ct
+                    ? \Carbon\Carbon::parse($r->cabecera->ingreso_ct)->format('d/m/Y')
+                    : '',
+            ];
+        });
+
+        $nombreArchivo = 'plantilla_' . \Illuminate\Support\Str::slug($nivelNombre, '_') . '_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
+
+        return Excel::download(
+            new PlantillaExport($data, $nivelNombre),
+            $nombreArchivo
+        );
+    }
+
+
+
     public function render()
     {
         $rows = PersonaNivelDetalle::query()
@@ -274,10 +351,10 @@ class MostrarPersonaNivel extends Component
                             ->orWhere('apellido_materno', 'like', "%{$s}%")
                             ->orWhere('especialidad', 'like', "%{$s}%");
                     })
-                    ->orWhereHas('cabecera.nivel', fn ($n) => $n->where('nombre', 'like', "%{$s}%"))
-                    ->orWhereHas('grado', fn ($g) => $g->where('nombre', 'like', "%{$s}%"))
-                    ->orWhereHas('grupo', fn ($gr) => $gr->where('nombre', 'like', "%{$s}%"))
-                    ->orWhereHas('personaRole.rolePersona', fn ($r) => $r->where('nombre', 'like', "%{$s}%"));
+                        ->orWhereHas('cabecera.nivel', fn($n) => $n->where('nombre', 'like', "%{$s}%"))
+                        ->orWhereHas('grado', fn($g) => $g->where('nombre', 'like', "%{$s}%"))
+                        ->orWhereHas('grupo', fn($gr) => $gr->where('nombre', 'like', "%{$s}%"))
+                        ->orWhereHas('personaRole.rolePersona', fn($r) => $r->where('nombre', 'like', "%{$s}%"));
                 });
             })
             ->orderBy(
@@ -288,7 +365,7 @@ class MostrarPersonaNivel extends Component
             ->orderBy('orden')
             ->get();
 
-        $porNivel = $rows->groupBy(fn ($r) => $r->cabecera?->nivel?->nombre ?? 'Sin nivel');
+        $porNivel = $rows->groupBy(fn($r) => $r->cabecera?->nivel?->nombre ?? 'Sin nivel');
 
         $secundaria = Nivel::query()
             ->select('id', 'nombre', 'slug')
@@ -298,24 +375,25 @@ class MostrarPersonaNivel extends Component
         $rowsSec = $rows->filter(function ($r) use ($secundaria) {
             $nivelId = (int) ($r->cabecera?->nivel_id ?? 0);
 
-            if ($secundaria) return $nivelId === (int) $secundaria->id;
+            if ($secundaria)
+                return $nivelId === (int) $secundaria->id;
 
             $nombre = mb_strtolower((string) ($r->cabecera?->nivel?->nombre ?? ''));
             return str_contains($nombre, 'secund');
         });
 
         $profesoresSec = $rowsSec
-            ->groupBy(fn ($r) => (int) ($r->cabecera?->persona_id ?? 0))
+            ->groupBy(fn($r) => (int) ($r->cabecera?->persona_id ?? 0))
             ->map(function ($items) {
                 $cab = $items->first()?->cabecera;
-                $p   = $cab?->persona;
+                $p = $cab?->persona;
 
                 $nombreCompleto = trim(
                     ($p->nombre ?? '') . ' ' . ($p->apellido_paterno ?? '') . ' ' . ($p->apellido_materno ?? '')
                 );
 
                 $materias = $items
-                    ->map(fn ($r) => $r->personaRole?->rolePersona?->nombre)
+                    ->map(fn($r) => $r->personaRole?->rolePersona?->nombre)
                     ->filter()
                     ->unique()
                     ->values();
@@ -328,30 +406,30 @@ class MostrarPersonaNivel extends Component
                         'grupo' => $r->grupo?->nombre,
                         'ingreso_seg' => $cab?->ingreso_seg,
                         'ingreso_sep' => $cab?->ingreso_sep,
-                        'ingreso_ct'  => $cab?->ingreso_ct,
+                        'ingreso_ct' => $cab?->ingreso_ct,
                     ];
                 })->values();
 
                 return [
-                    'cabecera_id'    => (int) ($cab?->id ?? 0),
+                    'cabecera_id' => (int) ($cab?->id ?? 0),
                     'cabecera_orden' => (int) ($cab?->orden ?? 999999),
-                    'persona_id'     => (int) ($p->id ?? 0),
-                    'nombre'         => $nombreCompleto ?: 'Sin nombre',
-                    'especialidad'   => $p->especialidad ?? null,
-                    'ingreso_seg'    => $cab?->ingreso_seg,
-                    'ingreso_sep'    => $cab?->ingreso_sep,
-                    'ingreso_ct'     => $cab?->ingreso_ct,
+                    'persona_id' => (int) ($p->id ?? 0),
+                    'nombre' => $nombreCompleto ?: 'Sin nombre',
+                    'especialidad' => $p->especialidad ?? null,
+                    'ingreso_seg' => $cab?->ingreso_seg,
+                    'ingreso_sep' => $cab?->ingreso_sep,
+                    'ingreso_ct' => $cab?->ingreso_ct,
                     'total_asignaciones' => $items->count(),
-                    'total_materias'     => $materias->count(),
-                    'materias'       => $materias,
-                    'detalles'       => $detalles,
+                    'total_materias' => $materias->count(),
+                    'materias' => $materias,
+                    'detalles' => $detalles,
                 ];
             })
-            ->sortBy(fn ($x) => [$x['cabecera_orden'], $x['nombre']])
+            ->sortBy(fn($x) => [$x['cabecera_orden'], $x['nombre']])
             ->values();
 
         $niveles = Nivel::orderBy('id')->get();
-        $ciclos  = CicloEscolar::orderBy('id', 'desc')->get();
+        $ciclos = CicloEscolar::orderBy('id', 'desc')->get();
 
         return view('livewire.persona-nivel.mostrar-persona-nivel', compact(
             'porNivel',

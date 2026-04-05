@@ -1,571 +1,503 @@
-<div class="w-full space-y-6">
-
-    {{-- MEGA CARD: TODO integrado --}}
+{{-- resources/views/livewire/accion/matricula.blade.php --}}
+<div class="space-y-6">
+    {{-- Encabezado --}}
     <div
-        class="w-full relative overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-fuchsia-500"></div>
 
-        {{-- Background blobs --}}
-        <div class="absolute inset-0 pointer-events-none">
-            <div
-                class="absolute -top-32 -right-32 h-72 w-72 rounded-full bg-gradient-to-br from-sky-500/20 via-blue-600/15 to-indigo-600/20 blur-3xl">
-            </div>
-            <div
-                class="absolute -bottom-32 -left-32 h-72 w-72 rounded-full bg-gradient-to-tr from-violet-500/15 via-fuchsia-500/12 to-rose-500/15 blur-3xl">
-            </div>
-        </div>
-
-        {{-- Loader overlay (unificado) --}}
-        <div wire:loading.flex
-            wire:target="search, generacion_id, grupo_id, clearFilters, gotoPage, previousPage, nextPage, selectPage, selected, resetSelection, aplicarCambiarGrado"
-            class="absolute inset-0 z-20 items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-neutral-950/50">
-            <div
-                class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow dark:border-neutral-800 dark:bg-neutral-900">
-                <svg class="h-5 w-5 animate-spin text-neutral-600 dark:text-neutral-200"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
-                </svg>
-                <span class="text-sm text-neutral-700 dark:text-neutral-200">Cargando…</span>
-            </div>
-        </div>
-
-        <div class="relative p-6 sm:p-8 space-y-6">
-
-            {{-- HEADER + STATS --}}
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="min-w-0">
-                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                        Matrícula — {{ $nivel->nombre ?? 'Nivel' }}
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">
+                        Matrícula
                     </h1>
-                    <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-                        Selecciona una generación y un grupo para ver alumnos. Después puedes buscar y seleccionar
-                        filas.
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Consulta de alumnos y personal por nivel, generación y grupo.
                     </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <span
-                        class="inline-flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-2 text-sm text-neutral-700 shadow-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/40 dark:text-neutral-200">
-                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                        Total: <b>{{ $total }}</b>
-                    </span>
-
-                    <span
-                        class="inline-flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-2 text-sm text-neutral-700 shadow-sm backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/40 dark:text-neutral-200">
-                        H: <b>{{ $hombres }}</b> • M: <b>{{ $mujeres }}</b>
-                    </span>
-
-                    @if (($this->selectedCount ?? 0) > 0)
-                        <span
-                            class="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-                            Seleccionados: <b>{{ $this->selectedCount }}</b>
-                        </span>
-                    @endif
-                </div>
-            </div>
-
-            {{-- TOOLBAR --}}
-            <div class="grid w-full grid-cols-1 gap-3 lg:grid-cols-12">
-
-                {{-- Search --}}
-                <div class="lg:col-span-6">
-                    <label class="sr-only" for="search">Buscar</label>
-
-                    <div class="relative w-full">
-                        <span
-                            class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                fill="currentColor">
-                                <path fill-rule="evenodd"
-                                    d="M12.9 14.32a8 8 0 1 1 1.414-1.414l3.387 3.387a1 1 0 0 1-1.414 1.414l-3.387-3.387ZM14 8a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                        </span>
-
-                        <input id="search" type="text" wire:model.live.debounce.350ms="search"
-                            :disabled="@js(!$generacion_id || !$grupo_id)" placeholder="Buscar por matrícula, CURP o nombre…"
-                            class="w-full rounded-2xl border border-neutral-200 bg-white pl-10 pr-3 py-3 text-sm shadow-sm outline-none
-                                   focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white
-                                   disabled:opacity-60 disabled:cursor-not-allowed" />
-                    </div>
-
-                    @if (!$generacion_id || !$grupo_id)
-                        <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                            @if (!$generacion_id)
-                                Selecciona una generación para habilitar búsqueda.
-                            @else
-                                Selecciona un grupo para habilitar búsqueda.
-                            @endif
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div
+                        class="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/30">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                            Total
                         </p>
-                    @endif
-                </div>
+                        <p class="mt-1 text-2xl font-bold text-sky-900 dark:text-sky-100">
+                            {{ $total }}
+                        </p>
+                    </div>
 
-                {{-- Generación --}}
-                <div class="lg:col-span-3">
-                    <label class="sr-only" for="generacion_id">Generación</label>
-                    <select id="generacion_id" wire:model.live="generacion_id"
-                        class="w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm shadow-sm outline-none
-                               focus:ring-2 focus:ring-indigo-500/25 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">
-                        <option value="">— Selecciona una generación —</option>
-                        @foreach ($generaciones as $gen)
-                            <option value="{{ $gen->id }}">{{ $gen->label }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                    <div
+                        class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                            Hombres
+                        </p>
+                        <p class="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                            {{ $hombres }}
+                        </p>
+                    </div>
 
-                {{-- Grupo --}}
-                <div class="lg:col-span-2">
-                    <label class="sr-only" for="grupo_id">Grupo</label>
-                    <select id="grupo_id" wire:model.live="grupo_id" :disabled="@js(!$generacion_id)"
-                        class="w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm shadow-sm outline-none
-                               focus:ring-2 focus:ring-indigo-500/25 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white
-                               disabled:opacity-60 disabled:cursor-not-allowed">
-                        <option value="">— Grupo —</option>
-                        @foreach ($grupos as $gr)
-                            <option value="{{ $gr->id }}">{{ $gr->nombre }}</option>
-                        @endforeach
-                    </select>
-
-                    <p class="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                        @if (!$generacion_id)
-                            Selecciona una generación para habilitar grupo.
-                        @else
-                            @if ($grupos->count() === 0)
-                                No hay grupos para la generación seleccionada.
-                            @else
-                                Selecciona un grupo para ver alumnos.
-                            @endif
-                        @endif
-                    </p>
-                </div>
-
-                {{-- Acciones --}}
-                <div class="lg:col-span-1 flex gap-2 lg:justify-end">
-                    <flux:button variant="primary" wire:click="clearFilters">Limpiar</flux:button>
+                    <div
+                        class="rounded-2xl border border-pink-100 bg-pink-50 px-4 py-3 dark:border-pink-900/40 dark:bg-pink-950/30">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-pink-700 dark:text-pink-300">
+                            Mujeres
+                        </p>
+                        <p class="mt-1 text-2xl font-bold text-pink-900 dark:text-pink-100">
+                            {{ $mujeres }}
+                        </p>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            {{-- DIVIDER --}}
-            <div class="h-px w-full bg-neutral-200/70 dark:bg-neutral-800/80"></div>
+    {{-- Filtros --}}
+    <div
+        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+        <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
 
-            {{-- CONTEXTO + PERSONAL (dos columnas en desktop) --}}
-            @php
-                $genSel = $generacion_id ? $generaciones->firstWhere('id', (int) $generacion_id) : null;
-                $genText = $genSel ? $genSel->anio_ingreso . ' - ' . $genSel->anio_egreso : '—';
-                $grupoSel = $grupo_id ? $grupos->firstWhere('id', (int) $grupo_id) : null;
-                $grupoText = $grupoSel?->nombre ?? '—';
-            @endphp
-
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-
-                {{-- CONTEXTO --}}
-                <div class="lg:col-span-5">
+        <div class="p-5 sm:p-6">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Nivel
+                    </label>
                     <div
-                        class="rounded-3xl border border-neutral-200 bg-white/70 p-5 shadow-sm backdrop-blur
-                                dark:border-neutral-800 dark:bg-neutral-950/30">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div
-                                    class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                    Contexto seleccionado
-                                </div>
-                                <div class="mt-1 text-sm text-neutral-700 dark:text-neutral-200">
-                                    Generación, grado y grupo para la matrícula.
-                                </div>
-                            </div>
-
-                            <span
-                                class="inline-flex items-center rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 shadow-sm
-                                       dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-                                {{ $nivel->nombre ?? 'Nivel' }}
-                            </span>
-                        </div>
-
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <span
-                                class="inline-flex items-center rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800
-                                       dark:border-neutral-700 dark:bg-neutral-950/40 dark:text-neutral-200">
-                                {{ $genText }}
-                            </span>
-
-                            <span
-                                class="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700
-                                       dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-                                <span class="h-2 w-2 rounded-full bg-indigo-500"></span>
-                                Grado: <b>{{ $this->gradoGeneracionLabel ?: '—' }}</b>
-                            </span>
-
-                            <span
-                                class="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800
-                                       dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                Grupo: <b>{{ $grupoText }}</b>
-                            </span>
-                        </div>
-
-                        <div class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-                            Se calcula desde <b>grupos</b> (generación → grupos → grado).
-                        </div>
-
-                        @if ($generacion_id && !$this->gradoGeneracionLabel)
-                            <div class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                                No se encontró grado asociado (revisa grupos para esta generación).
-                            </div>
-                        @endif
+                        class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
+                        {{ $nivel?->nombre ?? '—' }}
                     </div>
                 </div>
 
-                {{-- PERSONAL --}}
-                <div class="lg:col-span-7">
-                    <div
-                        class="rounded-3xl border border-neutral-200 bg-white/70 p-5 shadow-sm backdrop-blur
-                                dark:border-neutral-800 dark:bg-neutral-950/30">
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <div
-                                    class="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                    Profesor asignado
-                                </div>
+                <div>
+                    <label for="generacion_id"
+                        class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Generación
+                    </label>
+                    <select id="generacion_id" wire:model.live="generacion_id"
+                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                        <option value="">Selecciona una generación</option>
+                        @foreach ($generaciones as $generacion)
+                            <option value="{{ $generacion->id }}">
+                                {{ $generacion->label }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-                            </div>
+                <div>
+                    <label for="grupo_id" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Grupo
+                    </label>
+                    <select id="grupo_id" wire:model.live="grupo_id" @disabled(!$generacion_id)
+                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                        <option value="">Selecciona un grupo</option>
+                        @foreach ($grupos as $grupo)
+                            <option value="{{ $grupo->id }}">
+                                {{ $grupo->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-                            <span
-                                class="inline-flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 shadow-sm
-                                       dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-                                Total: <b>{{ $generacion_id && $grupo_id ? $personal->count() : 0 }}</b>
-                            </span>
+                <div>
+                    <label for="search" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Buscar
+                    </label>
+                    <input id="search" type="text" wire:model.live.debounce.400ms="search"
+                        placeholder="Matrícula, CURP o nombre..." @disabled(!$generacion_id || !$grupo_id)
+                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                </div>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($gradoGeneracionLabel)
+                        <span
+                            class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
+                            Grado(s) de la generación: {{ $gradoGeneracionLabel }}
+                        </span>
+                    @endif
+
+                    @if ($generacion_id && $grupo_id)
+                        <span
+                            class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                            Filtros aplicados
+                        </span>
+                    @endif
+                </div>
+
+                <button type="button" wire:click="clearFilters"
+                    class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:bg-neutral-700">
+                    Limpiar filtros
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (!$generacion_id || !$grupo_id)
+        <div
+            class="rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-10 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/60">
+            <div class="mx-auto max-w-2xl">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white">
+                    Selecciona una generación y un grupo
+                </h2>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Primero elige ambos filtros para mostrar la matrícula y el personal relacionado.
+                </p>
+            </div>
+        </div>
+    @else
+        {{-- CARD ÚNICO --}}
+        <div
+            class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+            <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-emerald-500 to-fuchsia-500"></div>
+
+
+
+
+            <div class="p-5 sm:p-6">
+
+                {{-- Sección personal asignado --}}
+                <section class="mb-3">
+                    @if ($personal->isEmpty())
+                        <div
+                            class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
+                            No hay personal asignado para este grupo.
                         </div>
+                    @else
+                        <div class="space-y-3">
+                            @foreach ($personal as $p)
+                                @php
+                                    $per = $p->persona;
+                                    $detalle = $p->detalles->first();
 
-                        @if (!$generacion_id || !$grupo_id)
-                            <div
-                                class="mt-4 rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-                                Selecciona <b>generación</b> y <b>grupo</b> para ver el personal asignado.
-                            </div>
-                        @else
-                            @if ($personal->isEmpty())
+                                    $nombre = trim(
+                                        ($per?->titulo ? $per->titulo . ' ' : '') .
+                                            ($per?->nombre ?? '') .
+                                            ' ' .
+                                            ($per?->apellido_paterno ?? '') .
+                                            ' ' .
+                                            ($per?->apellido_materno ?? ''),
+                                    );
+
+                                    $gen = $per?->genero;
+                                @endphp
+
                                 <div
-                                    class="mt-4 rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-                                    No hay personal asignado a este grupo.
-                                </div>
-                            @else
-                                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    @foreach ($personal as $p)
-                                        @php
-                                            $per = $p->persona;
-                                            $nombre = trim(
-                                                ($per->titulo ? $per->titulo . ' ' : '') .
-                                                    $per->nombre .
-                                                    ' ' .
-                                                    $per->apellido_paterno .
-                                                    ' ' .
-                                                    $per->apellido_materno,
-                                            );
-                                            $gen = $per->genero ?? null;
-                                        @endphp
+                                    class="rounded-3xl border w-full border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900">
+                                    <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:flex-wrap">
+                                                <h3 class="truncate text-base font-bold text-slate-800 dark:text-white">
+                                                    {{ $nombre !== '' ? $nombre : 'Sin nombre' }}
+                                                </h3>
+
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    @if ($gen)
+                                                        <span
+                                                            class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $gen === 'H'
+                                                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
+                                                                : 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300' }}">
+                                                            {{ $gen === 'H' ? 'Hombre' : 'Mujer' }}
+                                                        </span>
+                                                    @endif
+
+
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         <div
-                                            class="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <div
-                                                        class="truncate text-sm font-bold text-neutral-900 dark:text-white">
-                                                        {{ $nombre }}
-                                                    </div>
-
-                                                    <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                                        Nivel: <b>{{ $p->nivel->nombre ?? '—' }}</b>
-                                                        @if ($p->grado)
-                                                            • Grado: <b>{{ $p->grado->nombre }}</b>
-                                                        @endif
-                                                        @if ($p->grupo)
-                                                            • Grupo: <b>{{ $p->grupo->nombre }}</b>
-                                                        @endif
-                                                    </div>
-                                                </div>
-
-                                                <span
-                                                    class="shrink-0 inline-flex items-center rounded-xl px-2.5 py-1 text-[11px] font-semibold border
-                                                    {{ $gen === 'H'
-                                                        ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:border-sky-500/30'
-                                                        : ($gen === 'M'
-                                                            ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:border-rose-500/30'
-                                                            : 'bg-neutral-50 text-neutral-700 border-neutral-200 dark:bg-neutral-500/10 dark:text-neutral-200 dark:border-neutral-500/30') }}">
-                                                    {{ $gen === 'H' ? 'H' : ($gen === 'M' ? 'M' : '—') }}
-                                                </span>
-                                            </div>
-
-
+                                            class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300 xl:flex-row xl:items-center xl:gap-6">
+                                            <p><span class="font-semibold">Nivel:</span>
+                                                {{ $p->nivel?->nombre ?? '—' }}</p>
+                                            <p><span class="font-semibold">Grado:</span>
+                                                {{ $detalle?->grado?->nombre ?? '—' }}</p>
+                                            <p><span class="font-semibold">Grupo:</span>
+                                                {{ $detalle?->grupo?->nombre ?? '—' }}</p>
                                         </div>
-                                    @endforeach
+                                    </div>
                                 </div>
-                            @endif
-                        @endif
-                    </div>
-                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </section>
 
-            </div>
+                {{-- Sección lista de alumnos --}}
+                <section>
+                    <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800 dark:text-white">
+                                Lista de alumnos
+                            </h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">
+                                Registros filtrados por nivel, generación y grupo.
+                            </p>
+                        </div>
 
-            {{-- DIVIDER --}}
-            <div class="h-px w-full bg-neutral-200/70 dark:bg-neutral-800/80"></div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <label
+                                class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
+                                <input type="checkbox" wire:model.live="selectPage"
+                                    class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                Seleccionar página
+                            </label>
 
-            {{-- TABLA (integrada) --}}
-            <div class="space-y-4">
-
-                @if (!$generacion_id || !$grupo_id)
-                    <div
-                        class="w-full rounded-2xl border border-dashed border-neutral-300 p-10 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-                        <div class="mx-auto max-w-md space-y-2">
-                            <div class="text-base font-semibold text-neutral-900 dark:text-white">
-                                @if (!$generacion_id)
-                                    Selecciona una generación para ver alumnos
-                                @else
-                                    Selecciona un grupo para ver alumnos
-                                @endif
-                            </div>
-                            <div class="text-sm text-neutral-600 dark:text-neutral-400">
-                                Después podrás buscar y seleccionar filas.
+                            <div
+                                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
+                                Seleccionados: <span class="font-bold">{{ $this->selectedCount }}</span>
                             </div>
                         </div>
                     </div>
-                @else
-                    {{-- Desktop --}}
-                    <div class="hidden md:block w-full overflow-x-auto">
-                        <table class="w-full min-w-[980px] text-sm">
-                            <thead class="text-left">
-                                <tr class="border-b border-neutral-200 dark:border-neutral-800">
-                                    <th class="py-3 pr-4 w-10">
-                                        <input type="checkbox" wire:model.live="selectPage"
-                                            class="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500/30 dark:border-neutral-700 dark:bg-neutral-950">
-                                    </th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">#</th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">
-                                        Matrícula</th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">Alumno
-                                    </th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">CURP
-                                    </th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">Género
-                                    </th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">Grado
-                                    </th>
-                                    <th class="py-3 pr-4 font-semibold text-neutral-700 dark:text-neutral-200">Grupo
-                                    </th>
-                                </tr>
-                            </thead>
 
-                            <tbody class="divide-y divide-neutral-200 dark:divide-neutral-800">
-                                @forelse ($rows as $r)
-                                    <tr class="hover:bg-neutral-50/70 dark:hover:bg-neutral-950/40">
-                                        <td class="py-3 pr-4">
-                                            <input type="checkbox" value="{{ $r->id }}"
-                                                wire:model.live="selected"
-                                                class="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500/30 dark:border-neutral-700 dark:bg-neutral-950">
-                                        </td>
+                    <div class="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
+                        <div class="flex flex-col gap-3 sm:flex-row">
+                            <div class="w-full sm:max-w-xs">
+                                <label for="nuevo_grado_id"
+                                    class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Cambiar grado a seleccionados
+                                </label>
+                                <select id="nuevo_grado_id" wire:model="nuevo_grado_id" @disabled($this->selectedCount === 0)
+                                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                                    <option value="">Selecciona un grado</option>
+                                    @foreach ($grados as $grado)
+                                        <option value="{{ $grado->id }}">
+                                            {{ $grado->nombre }}
+                                        </option>
+                                    @endforeach
+                                </select>
 
-                                        <td class="py-3 pr-4 text-neutral-500 dark:text-neutral-400">
-                                            {{ $loop->iteration + $rows->perPage() * ($rows->currentPage() - 1) }}
-                                        </td>
+                                @error('nuevo_grado_id')
+                                    <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
 
-                                        <td class="py-3 pr-4">
-                                            <span
-                                                class="inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-                                                {{ $r->matricula }}
-                                            </span>
-                                        </td>
+                        <div class="flex items-end">
 
-                                        <td class="py-3 pr-4">
-                                            <div class="font-semibold text-neutral-900 dark:text-white">
-                                                {{ trim($r->nombre . ' ' . $r->apellido_paterno . ' ' . $r->apellido_materno) }}
-                                            </div>
-                                            <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                Folio: {{ $r->folio ?? '—' }}
-                                            </div>
-                                        </td>
+                            <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
+                                wire:target="exportarMatricula"
+                                class="inline-flex items-center mr-3 justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                <span wire:loading.remove wire:target="exportarMatricula">
+                                    <div class="flex justify-between gap-2">
+                                        <flux:icon.download class="w-4 h-4" />
+                                        Exportar Excel
+                                    </div>
+                                </span>
 
-                                        <td class="py-3 pr-4 font-mono text-xs text-neutral-700 dark:text-neutral-200">
-                                            {{ $r->curp }}
-                                        </td>
+                                <span wire:loading wire:target="exportarMatricula">
+                                    Descargando...
+                                </span>
+                            </button>
 
-                                        <td class="py-3 pr-4">
-                                            @php $g = $r->genero; @endphp
-                                            <span
-                                                class="inline-flex items-center rounded-xl px-2.5 py-1 text-xs font-semibold border
-                                                {{ $g === 'H'
-                                                    ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:border-sky-500/30'
-                                                    : ($g === 'M'
-                                                        ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:border-rose-500/30'
-                                                        : 'bg-neutral-50 text-neutral-700 border-neutral-200 dark:bg-neutral-500/10 dark:text-neutral-200 dark:border-neutral-500/30') }}">
-                                                {{ $g === 'H' ? 'Hombre' : ($g === 'M' ? 'Mujer' : '—') }}
-                                            </span>
-                                        </td>
+                            <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
+                                wire:target="aplicarCambiarGrado"
+                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                <span wire:loading.remove wire:target="aplicarCambiarGrado">
+                                    Aplicar cambio
+                                </span>
 
-                                        <td class="py-3 pr-4">
-                                            <span
-                                                class="inline-flex items-center rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950/40 dark:text-neutral-200">
-                                                {{ $r->grado->nombre ?? '—' }}
-                                            </span>
-                                        </td>
+                                <span wire:loading wire:target="aplicarCambiarGrado">
+                                    Aplicando...
+                                </span>
+                            </button>
 
-                                        <td class="py-3 pr-4">
-                                            <span
-                                                class="inline-flex items-center rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950/40 dark:text-neutral-200">
-                                                {{ $r->grupo->nombre ?? '—' }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="8" class="py-10">
-                                            <div
-                                                class="rounded-2xl border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-                                                No hay alumnos con los filtros actuales.
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+
+
+                        </div>
+
+
+
+
                     </div>
 
-                    {{-- Mobile --}}
-                    <div class="md:hidden space-y-3">
-                        @forelse ($rows as $r)
-                            <div
-                                class="w-full rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="flex items-start gap-3 min-w-0">
-                                        <input type="checkbox" value="{{ $r->id }}"
-                                            wire:model.live="selected"
-                                            class="mt-1 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500/30 dark:border-neutral-700 dark:bg-neutral-950">
+                    <div
+                        class="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-neutral-800 xl:block">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200 dark:divide-neutral-800">
+                                <thead class="bg-slate-50/90 dark:bg-neutral-800/80">
+                                    <tr>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Sel.</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            #
+                                        </th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Foto
+                                        </th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Matrícula</th>
 
-                                        <div class="min-w-0">
-                                            <div class="truncate text-sm font-bold text-neutral-900 dark:text-white">
-                                                {{ trim($r->nombre . ' ' . $r->apellido_paterno . ' ' . $r->apellido_materno) }}
-                                            </div>
-                                            <div
-                                                class="mt-1 text-xs text-neutral-500 dark:text-neutral-400 font-mono break-all">
-                                                {{ $r->curp }}
-                                            </div>
-                                        </div>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Folio</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Apellido Paterno</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Apellido Materno</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Nombre(s)</th>
+
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            CURP</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Género</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Grado</th>
+                                        <th
+                                            class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Grupo</th>
+
+                                    </tr>
+                                </thead>
+
+                                <tbody
+                                    class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
+                                    @forelse ($rows as $row)
+                                        <tr class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
+                                            <td class="px-4 py-4 align-top">
+                                                <input type="checkbox" wire:model.live="selected"
+                                                    value="{{ $row->id }}"
+                                                    class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $loop->iteration + ($rows->currentPage() - 1) * $rows->perPage() }}
+                                            </td>
+
+
+                                            <td class="px-4 py-4 align-top">
+                                                @if ($row->foto_path)
+                                                    <img src="{{ asset('storage/' . $row->foto_path) }}"
+                                                        alt="Foto de {{ $row->nombre }}"
+                                                        class="h-10 w-10 rounded-full object-cover">
+                                                @else
+                                                    <div
+                                                        class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-medium text-slate-500 dark:bg-neutral-700 dark:text-slate-400">
+
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            <td
+                                                class="px-4 py-4 align-top font-semibold text-slate-800 dark:text-slate-100">
+                                                {{ $row->matricula ?: '—' }}
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->folio ?: '—' }}
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->apellido_paterno ?: '—' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->apellido_materno ?: '—' }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-4 align-top  text-sm  text-slate-600 dark:text-slate-300">
+                                                {{ trim($row->nombre) }}
+                                            </td>
+
+
+
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->curp ?: '—' }}
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top">
+                                                <span
+                                                    class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
+                                                    {{ $row->genero === 'H'
+                                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
+                                                        : 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300' }}">
+                                                    {{ $row->genero ?: '—' }}
+                                                </span>
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->grado?->nombre ?? '—' }}
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                {{ $row->grupo?->nombre ?? '—' }}
+                                            </td>
+
+
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="8"
+                                                class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                                                No se encontraron alumnos con los filtros actuales.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 xl:hidden">
+                        @forelse ($rows as $row)
+                            <div
+                                class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-base font-bold text-slate-800 dark:text-white">
+                                            {{ trim($row->nombre . ' ' . $row->apellido_paterno . ' ' . $row->apellido_materno) }}
+                                        </p>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            Matrícula: {{ $row->matricula ?: '—' }}
+                                        </p>
                                     </div>
 
-                                    <span
-                                        class="shrink-0 inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-                                        {{ $r->matricula }}
-                                    </span>
+                                    <input type="checkbox" wire:model.live="selected" value="{{ $row->id }}"
+                                        class="mt-1 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                                 </div>
 
-                                <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                    <div
-                                        class="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                                        <div class="text-neutral-500 dark:text-neutral-400">Género</div>
-                                        <div class="font-semibold text-neutral-800 dark:text-neutral-200">
-                                            {{ $r->genero === 'H' ? 'Hombre' : ($r->genero === 'M' ? 'Mujer' : '—') }}
-                                        </div>
+                                <div
+                                    class="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+                                    <div><span class="font-semibold">CURP:</span> {{ $row->curp ?: '—' }}</div>
+                                    <div><span class="font-semibold">Género:</span> {{ $row->genero ?: '—' }}</div>
+                                    <div><span class="font-semibold">Grado:</span> {{ $row->grado?->nombre ?? '—' }}
                                     </div>
-
-                                    <div
-                                        class="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                                        <div class="text-neutral-500 dark:text-neutral-400">Folio</div>
-                                        <div class="font-semibold text-neutral-800 dark:text-neutral-200">
-                                            {{ $r->folio ?? '—' }}
-                                        </div>
+                                    <div><span class="font-semibold">Grupo:</span> {{ $row->grupo?->nombre ?? '—' }}
                                     </div>
-
-                                    <div
-                                        class="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                                        <div class="text-neutral-500 dark:text-neutral-400">Grado</div>
-                                        <div class="font-semibold text-neutral-800 dark:text-neutral-200">
-                                            {{ $r->grado->nombre ?? '—' }}
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        class="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                                        <div class="text-neutral-500 dark:text-neutral-400">Grupo</div>
-                                        <div class="font-semibold text-neutral-800 dark:text-neutral-200">
-                                            {{ $r->grupo->nombre ?? '—' }}
-                                        </div>
-                                    </div>
+                                    <div><span class="font-semibold">Folio:</span> {{ $row->folio ?: '—' }}</div>
                                 </div>
                             </div>
                         @empty
                             <div
-                                class="w-full rounded-2xl border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-                                No hay alumnos con los filtros actuales.
+                                class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
+                                No se encontraron alumnos con los filtros actuales.
                             </div>
                         @endforelse
                     </div>
 
-                    {{-- Pagination --}}
-                    <div class="mt-5 w-full">
+                    <div class="mt-5">
                         {{ $rows->links() }}
                     </div>
+                </section>
 
-                    {{-- Cambiar grado --}}
-                    @if (($this->selectedCount ?? 0) > 0)
-                        <div class="mt-5 w-full">
-                            <div
-                                class="relative overflow-hidden rounded-3xl border border-indigo-200 bg-indigo-50/60 p-4 shadow-sm
-                                       dark:border-indigo-500/25 dark:bg-indigo-500/10">
-                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div class="min-w-0">
-                                        <div class="text-sm font-bold text-indigo-900 dark:text-indigo-100">
-                                            Cambiar grado a alumnos seleccionados
-                                        </div>
-                                        <div class="text-xs text-indigo-700/90 dark:text-indigo-200/90">
-                                            Seleccionados: <b>{{ $this->selectedCount }}</b>
-                                        </div>
-                                    </div>
+                {{-- Separador interno --}}
+                <div
+                    class="my-8 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
+                </div>
 
-                                    <div class="flex items-center gap-2">
-                                        <button type="button"
-                                            class="rounded-2xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700
-                                                   hover:bg-indigo-50 dark:border-indigo-500/25 dark:bg-neutral-950 dark:text-indigo-200 dark:hover:bg-neutral-900"
-                                            wire:click="resetSelection">
-                                            Limpiar selección
-                                        </button>
-                                    </div>
-                                </div>
 
-                                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-12">
-                                    <div class="sm:col-span-8">
-                                        <label class="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
-                                            Nuevo grado ({{ $nivel->nombre ?? 'Nivel' }})
-                                        </label>
-
-                                        <select wire:model.live="nuevo_grado_id"
-                                            class="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-3 py-3 text-sm shadow-sm outline-none
-                                                   focus:ring-2 focus:ring-indigo-500/25
-                                                   dark:border-indigo-500/25 dark:bg-neutral-950 dark:text-white">
-                                            <option value="">— Selecciona —</option>
-                                            @foreach ($grados as $g)
-                                                <option value="{{ $g->id }}">{{ $g->nombre }}</option>
-                                            @endforeach
-                                        </select>
-
-                                        @error('nuevo_grado_id')
-                                            <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}
-                                            </p>
-                                        @enderror
-                                    </div>
-
-                                    <div class="sm:col-span-4 flex items-end">
-                                        <button type="button"
-                                            class="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow
-                                                   hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                            wire:click="aplicarCambiarGrado" :disabled="@js(($this->selectedCount ?? 0) === 0)">
-                                            Aplicar cambio
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-
-                @endif
             </div>
         </div>
-    </div>
+    @endif
 </div>

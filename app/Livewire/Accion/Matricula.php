@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+use App\Exports\MatriculaExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Str;
+
 class Matricula extends Component
 {
     use WithPagination;
@@ -92,12 +96,14 @@ class Matricula extends Component
         }
 
         $paginator = $this->baseQuery()
-            ->orderBy('id', 'desc')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
             ->paginate($this->perPage);
 
         $this->selected = $paginator->getCollection()
             ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
     }
 
@@ -121,7 +127,8 @@ class Matricula extends Component
         $this->resetPage();
         $this->resetSelection();
 
-        if (!$this->generacion_id || !$this->nivel) return;
+        if (!$this->generacion_id || !$this->nivel)
+            return;
 
         // ✅ Grado(s) de la generación: desde GRUPOS (generacion_id + grado_id)
         $grados = Grado::query()
@@ -179,6 +186,7 @@ class Matricula extends Component
                 'grado_id',
                 'generacion_id',
                 'grupo_id',
+                'foto_path',
                 'activo',
             ])
             ->with([
@@ -208,7 +216,15 @@ class Matricula extends Component
     // =========================
     public function aplicarCambiarGrado(): void
     {
-        if ($this->selectedCount === 0) return;
+        if ($this->selectedCount === 0) {
+            $this->dispatch('toast', type: 'warning', message: 'Selecciona al menos un alumno.');
+            return;
+        }
+
+        if (!$this->nuevo_grado_id) {
+            $this->dispatch('toast', type: 'warning', message: 'Selecciona un grado.');
+            return;
+        }
 
         $this->validate([
             'nuevo_grado_id' => [
@@ -220,7 +236,9 @@ class Matricula extends Component
                         ->where('nivel_id', $this->nivel->id)
                         ->exists();
 
-                    if (!$ok) $fail('Selecciona un grado válido para este nivel.');
+                    if (!$ok) {
+                        $fail('Selecciona un grado válido para este nivel.');
+                    }
                 },
             ],
         ]);
@@ -231,14 +249,92 @@ class Matricula extends Component
                 ->whereIn('id', $this->selected)
                 ->update([
                     'grado_id' => $this->nuevo_grado_id,
-                    // 'grupo_id' => null, // recomendado si quieres forzar re-asignación
                 ]);
         });
 
         $this->resetSelection();
+        $this->nuevo_grado_id = null;
+        $this->resetPage();
 
         $this->dispatch('toast', type: 'success', message: 'Grado cambiado correctamente.');
     }
+
+
+
+    // DESCARGAR MATRICULA
+    public function exportarMatricula()
+    {
+        if (!$this->nivel || !$this->generacion_id || !$this->grupo_id) {
+            $this->dispatch('toast', type: 'warning', message: 'Selecciona generación y grupo para exportar.');
+            return;
+        }
+
+        $rows = Inscripcion::query()
+            ->with([
+                'grado:id,nombre,nivel_id',
+                'grupo:id,nombre,nivel_id,grado_id,generacion_id',
+                'generacion:id,nivel_id,anio_ingreso,anio_egreso',
+            ])
+            ->where('activo', 1)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grupo_id', $this->grupo_id)
+            ->when($this->search !== '', function ($q) {
+                $s = trim($this->search);
+
+                $q->where(function ($qq) use ($s) {
+                    $qq->where('matricula', 'like', "%{$s}%")
+                        ->orWhere('curp', 'like', "%{$s}%")
+                        ->orWhere('nombre', 'like', "%{$s}%")
+                        ->orWhere('apellido_paterno', 'like', "%{$s}%")
+                        ->orWhere('apellido_materno', 'like', "%{$s}%");
+                });
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            $this->dispatch('toast', type: 'warning', message: 'No hay alumnos para exportar con los filtros actuales.');
+            return;
+        }
+
+        $generacion = Generacion::query()
+            ->select('id', 'anio_ingreso', 'anio_egreso')
+            ->find($this->generacion_id);
+
+        $grupo = Grupo::query()
+            ->select('id', 'nombre')
+            ->find($this->grupo_id);
+
+        $nombreNivel = $this->nivel?->nombre ?? 'nivel';
+        $nombreGrupo = $grupo?->nombre ?? 'grupo';
+        $nombreGeneracion = $generacion
+            ? $generacion->anio_ingreso . '_' . $generacion->anio_egreso
+            : 'generacion';
+
+        $nombreArchivo = 'matricula_completa_' .
+            Str::slug($nombreNivel, '_') . '_' .
+            Str::slug($nombreGeneracion, '_') . '_' .
+            Str::slug($nombreGrupo, '_') . '_' .
+            now()->format('Y_m_d_H_i_s') . '.xlsx';
+
+        return Excel::download(
+            new MatriculaExport(
+                rows: $rows,
+                nivelNombre: $this->nivel?->nombre ?? '—',
+                generacionNombre: $generacion
+                ? $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso
+                : '—',
+                grupoNombre: $grupo?->nombre ?? '—',
+                search: $this->search
+            ),
+            $nombreArchivo
+        );
+    }
+
+
 
     public function render()
     {
@@ -285,19 +381,20 @@ class Matricula extends Component
 
         // ✅ Rows (solo si hay generación + grupo)
         $rows = $this->baseQuery()
-            ->orderBy('id', 'desc')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
             ->paginate($this->perPage);
 
         // ✅ Personal (persona_nivel) solo si hay generación + grupo
         $personal = collect();
+
         if ($this->nivel && $this->generacion_id && $this->grupo_id) {
             $personal = PersonaNivel::query()
                 ->select([
                     'id',
                     'persona_id',
                     'nivel_id',
-                    'grado_id',
-                    'grupo_id',
                     'ingreso_seg',
                     'ingreso_sep',
                     'ingreso_ct',
@@ -306,12 +403,31 @@ class Matricula extends Component
                 ->with([
                     'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero',
                     'nivel:id,nombre',
-                    'grado:id,nombre,nivel_id',
-                    'grupo:id,nombre,nivel_id,grado_id,generacion_id',
+                    'detalles' => function ($q) {
+                        $q->select([
+                            'id',
+                            'persona_nivel_id',
+                            'persona_role_id',
+                            'grado_id',
+                            'grupo_id',
+                            'orden',
+                        ])
+                            ->where('grupo_id', $this->grupo_id)
+                            ->with([
+                                'grado:id,nombre,nivel_id',
+                                'grupo:id,nombre,nivel_id,grado_id,generacion_id',
+                            ])
+                            ->orderBy('orden')
+                            ->orderBy('id');
+                    },
                 ])
                 ->where('nivel_id', $this->nivel->id)
-                ->where('grupo_id', $this->grupo_id)
-                ->whereHas('grupo', fn ($q) => $q->where('generacion_id', $this->generacion_id))
+                ->whereHas('detalles', function ($q) {
+                    $q->where('grupo_id', $this->grupo_id)
+                        ->whereHas('grupo', function ($qq) {
+                            $qq->where('generacion_id', $this->generacion_id);
+                        });
+                })
                 ->orderBy('orden')
                 ->orderBy('id')
                 ->get();
@@ -328,6 +444,9 @@ class Matricula extends Component
             $hombres = (clone $statsQuery)->where('genero', 'H')->count();
             $mujeres = (clone $statsQuery)->where('genero', 'M')->count();
         }
+
+
+
 
         return view('livewire.accion.matricula', [
             'nivel' => $this->nivel,
