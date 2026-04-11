@@ -53,6 +53,8 @@ class Inscripcion extends Model
         // Foto
         'foto_path',
 
+        'tutor_id',
+
         // Control
         'activo',
 
@@ -92,11 +94,18 @@ class Inscripcion extends Model
         return $this->belongsTo(Semestre::class);
     }
 
+
+
     //Relación con ciclo
     public function ciclo()
     {
         return $this->belongsTo(Ciclo::class);
     }
 
+
+    public function tutor()
+    {
+        return $this->belongsTo(Tutor::class);
+    }
 
 }

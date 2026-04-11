@@ -250,7 +250,6 @@
                             </span>
                         </div>
 
-                        {{-- ERRORES DE VALIDACIÓN --}}
                         {{-- ERRORES DE VALIDACIÓN ATRACTIVOS --}}
                         @if ($errors->any())
                             <div
@@ -309,6 +308,8 @@
 
                         <div class="mt-5 space-y-5">
                             {!! $Divider !!}
+
+
 
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 <flux:field>
@@ -408,6 +409,64 @@
 
                         <div class="mt-5 space-y-5">
                             {!! $Divider !!}
+
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <flux:select label="Selecciona un tutor" wire:model.live="tutor_id"
+                                    placeholder="Selecciona un tutor...">
+                                    <flux:select.option value="">---Selecciona un tutor...</flux:select.option>
+
+                                    @forelse ($tutores as $tutor)
+                                        <flux:select.option value="{{ $tutor->id }}">
+                                            {{ trim($tutor->nombre . ' ' . $tutor->apellido_paterno . ' ' . $tutor->apellido_materno) }}
+                                        </flux:select.option>
+                                    @empty
+                                        <flux:select.option value="" disabled>No hay tutores disponibles
+                                        </flux:select.option>
+                                    @endforelse
+                                </flux:select>
+
+                                <div class="sm:col-span-2 lg:col-span-2">
+                                    <div
+                                        class="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                        <div class="flex items-start gap-3">
+                                            <input type="checkbox" wire:model.live="copiar_direccion_tutor"
+                                                :disabled="!$tutor_id"
+                                                class="mt-1 h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800" />
+
+                                            <div class="space-y-1 flex-1">
+                                                <div class="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                    Llenar dirección del alumno con la dirección del tutor seleccionado
+                                                </div>
+
+                                                <p class="text-xs text-neutral-600 dark:text-neutral-400">
+                                                    Al activarlo, se copiarán calle, número, colonia, código postal,
+                                                    municipio, estado y ciudad.
+                                                </p>
+
+                                                @if (!$tutor_id)
+                                                    <p class="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                        Primero selecciona un tutor para habilitar esta opción.
+                                                    </p>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <div wire:loading.flex wire:target="copiar_direccion_tutor"
+                                            class="absolute inset-0 z-10 items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm dark:bg-neutral-950/70">
+                                            <div
+                                                class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                                                <div
+                                                    class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-600 dark:border-neutral-700 dark:border-t-blue-400">
+                                                </div>
+                                                <span
+                                                    class="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                                                    Cargando dirección del tutor...
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 <flux:field class="lg:col-span-2">

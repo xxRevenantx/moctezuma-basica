@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Models\Tutor;
 use App\Services\CurpService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -36,21 +37,18 @@ class CrearInscripcion extends Component
     public string $nombre = '';
     public string $apellido_paterno = '';
     public ?string $apellido_materno = null;
-    public ?string $fecha_nacimiento = null; // Y-m-d
-    public ?string $genero = null; // H | M
+    public ?string $fecha_nacimiento = null;
+    public ?string $genero = null;
 
-    // ✅ NUEVO: fecha inscripción
-    public ?string $fecha_inscripcion = null; // Y-m-d
-
-    // ✅ NUEVO: ciclo
+    public ?string $fecha_inscripcion = null;
     public ?int $ciclo_id = null;
 
-    // Nacimiento (opcionales)
+    // Nacimiento
     public ?string $pais_nacimiento = null;
     public ?string $estado_nacimiento = null;
     public ?string $lugar_nacimiento = null;
 
-    // Domicilio (opcionales)
+    // Dirección
     public ?string $calle = null;
     public ?string $numero_exterior = null;
     public ?string $numero_interior = null;
@@ -63,48 +61,50 @@ class CrearInscripcion extends Component
     public $foto = null;
 
     // =========================
+    // Select tutor para dirección
+    // =========================
+    public ?int $tutor_id = null;
+    public bool $copiar_direccion_tutor = false;
+
+    // =========================
     // Selects académicos
     // =========================
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
     public ?int $generacion_id = null;
-    public ?int $semestre_id = null; // ✅ solo Bachillerato
+    public ?int $semestre_id = null;
     public ?int $grupo_id = null;
 
     public bool $esBachillerato = false;
 
     // =========================
-    // Catálogos (derivados de grupos)
+    // Catálogos
     // =========================
     public Collection $niveles;
     public Collection $gradosOptions;
     public Collection $generacionesOptions;
     public Collection $semestresOptions;
     public array $gruposOptions = [];
-
-    // ✅ NUEVO: catálogos ciclos
     public Collection $ciclosOptions;
+    public Collection $tutores;
 
     public function mount(): void
     {
         $this->niveles = $this->loadNivelesFromGrupos();
-
         $this->gradosOptions = collect();
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
 
-        // ✅ ciclos
         $this->ciclosOptions = $this->loadCiclos();
+        $this->tutores = $this->loadTutores();
 
-        // ✅ default fecha inscripción (hoy)
         $this->fecha_inscripcion = now()->toDateString();
-
         $this->matricula = '';
     }
 
     // =========================
-    // Helpers (Title Case español)
+    // Helpers de texto
     // =========================
     private function titleCaseNombre(?string $value): string
     {
@@ -115,23 +115,26 @@ class CrearInscripcion extends Component
         }
 
         $value = preg_replace('/\s+/', ' ', $value) ?? $value;
-
-        // RENAPO -> MAYÚSCULAS, convertimos a Title Case con acentos/Ñ
         $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
 
-        // Partículas comunes a minúscula cuando van en medio
         $lowerWords = [
-            'De', 'Del', 'La', 'Las', 'Los',
-            'Y', 'E',
-            'San', 'Santa',
-            'Van', 'Von',
+            'De',
+            'Del',
+            'La',
+            'Las',
+            'Los',
+            'Y',
+            'E',
+            'San',
+            'Santa',
+            'Van',
+            'Von',
         ];
 
         foreach ($lowerWords as $w) {
             $value = preg_replace('/\b' . preg_quote($w, '/') . '\b/u', mb_strtolower($w, 'UTF-8'), $value) ?? $value;
         }
 
-        // Si inicia con esas partículas, lo regresamos a Title
         $value = preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
             return mb_convert_case(mb_strtolower($m[0], 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
         }, $value) ?? $value;
@@ -139,17 +142,17 @@ class CrearInscripcion extends Component
         return $value;
     }
 
-    // ==========================================================
-    // MATRÍCULA (autogenerada cuando CURP es correcta + nivel slug)
-    // ==========================================================
+    // =========================
+    // Matrícula automática
+    // =========================
     protected function nivelCodeBySlug(?string $slug): string
     {
         return match ($slug) {
-            'preescolar'   => 'PREES',
-            'primaria'     => 'PRIM',
-            'secundaria'   => 'SEC',
+            'preescolar' => 'PREES',
+            'primaria' => 'PRIM',
+            'secundaria' => 'SEC',
             'bachillerato' => 'BACHI',
-            default        => 'NIV',
+            default => 'NIV',
         };
     }
 
@@ -157,7 +160,10 @@ class CrearInscripcion extends Component
     {
         if ($this->generacion_id) {
             $gen = Generacion::query()->find($this->generacion_id);
-            if ($gen?->anio_ingreso) return (string) $gen->anio_ingreso;
+
+            if ($gen?->anio_ingreso) {
+                return (string) $gen->anio_ingreso;
+            }
         }
 
         return (string) now()->year;
@@ -165,28 +171,33 @@ class CrearInscripcion extends Component
 
     protected function generarMatriculaConSlug(string $slug): ?string
     {
-        if (strlen($this->curp) !== 18) return null;
-        if (!preg_match('/^[A-Z0-9]{18}$/', $this->curp)) return null;
+        if (strlen($this->curp) !== 18) {
+            return null;
+        }
 
-        $anio  = $this->anioInicioCiclo();
+        if (!preg_match('/^[A-Z0-9]{18}$/', $this->curp)) {
+            return null;
+        }
+
+        $anio = $this->anioInicioCiclo();
         $nivel = $this->nivelCodeBySlug($slug);
         $curp4 = strtoupper(substr($this->curp, 0, 4));
 
         for ($i = 0; $i < 50; $i++) {
             $nn = str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT);
-            $mat = "{$anio}{$nivel}{$curp4}{$nn}";
+            $matricula = "{$anio}{$nivel}{$curp4}{$nn}";
 
-            if (!Inscripcion::query()->where('matricula', $mat)->exists()) {
-                return $mat;
+            if (!Inscripcion::query()->where('matricula', $matricula)->exists()) {
+                return $matricula;
             }
         }
 
         for ($i = 0; $i < 50; $i++) {
             $nnnn = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            $mat = "{$anio}{$nivel}{$curp4}{$nnnn}";
+            $matricula = "{$anio}{$nivel}{$curp4}{$nnnn}";
 
-            if (!Inscripcion::query()->where('matricula', $mat)->exists()) {
-                return $mat;
+            if (!Inscripcion::query()->where('matricula', $matricula)->exists()) {
+                return $matricula;
             }
         }
 
@@ -208,10 +219,10 @@ class CrearInscripcion extends Component
             return;
         }
 
-        $mat = $this->generarMatriculaConSlug($slug);
+        $matricula = $this->generarMatriculaConSlug($slug);
 
-        if ($mat) {
-            $this->matricula = $mat;
+        if ($matricula) {
+            $this->matricula = $matricula;
             $this->resetValidation('matricula');
         } else {
             $this->matricula = '';
@@ -267,21 +278,22 @@ class CrearInscripcion extends Component
         }
 
         $sol = data_get($payload, 'response.Solicitante');
+
         if (!$sol || !is_array($sol)) {
             $this->curpError = 'No se pudieron obtener los datos de la CURP.';
             $this->matricula = '';
             return;
         }
 
-        // ✅ RENAPO mayúsculas -> Title Case bonito
         $this->nombre = $this->titleCaseNombre((string) data_get($sol, 'Nombres', $this->nombre));
         $this->apellido_paterno = $this->titleCaseNombre((string) data_get($sol, 'ApellidoPaterno', $this->apellido_paterno));
-        $am = data_get($sol, 'ApellidoMaterno');
-        $this->apellido_materno = $am ? $this->titleCaseNombre((string) $am) : null;
+
+        $apellidoMaterno = data_get($sol, 'ApellidoMaterno');
+        $this->apellido_materno = $apellidoMaterno ? $this->titleCaseNombre((string) $apellidoMaterno) : null;
 
         $fechaApi = data_get($sol, 'FechaNacimiento');
         if (!empty($fechaApi)) {
-            $this->fecha_nacimiento = $fechaApi; // si viene Y-m-d ya está ok
+            $this->fecha_nacimiento = $fechaApi;
         }
 
         $sexo = strtoupper((string) data_get($sol, 'ClaveSexo', ''));
@@ -293,16 +305,92 @@ class CrearInscripcion extends Component
         $this->estado_nacimiento = data_get($sol, 'EntidadNacimiento') ?: $this->estado_nacimiento;
         $this->lugar_nacimiento = data_get($sol, 'EntidadNacimiento') ?: $this->lugar_nacimiento;
 
-        // Limpia espacios, mayus curp/matricula, etc.
         $this->sanitizeStrings();
-
         $this->refrescarMatriculaSiPosible();
-
         $this->validateOnly('curp');
     }
 
     // =========================
-    // Fuentes desde tabla grupos
+    // Tutor y dirección
+    // =========================
+    protected function loadTutores(): Collection
+    {
+        return Tutor::query()
+            ->orderBy('nombre')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->get([
+                'id',
+                'nombre',
+                'apellido_paterno',
+                'apellido_materno',
+                'calle',
+                'numero',
+                'colonia',
+                'codigo_postal',
+                'municipio',
+                'estado',
+                'ciudad',
+            ]);
+    }
+
+    protected function llenarDireccionDesdeTutor(): void
+    {
+        if (!$this->tutor_id) {
+            return;
+        }
+
+        $tutor = Tutor::find($this->tutor_id);
+
+        if (!$tutor) {
+            return;
+        }
+
+        $this->calle = $tutor->calle ?: $this->calle;
+        $this->numero_exterior = $tutor->numero ?: $this->numero_exterior;
+        $this->colonia = $tutor->colonia ?: $this->colonia;
+        $this->codigo_postal = $tutor->codigo_postal ?: $this->codigo_postal;
+        $this->municipio = $tutor->municipio ?: $this->municipio;
+        $this->estado_residencia = $tutor->estado ?: $this->estado_residencia;
+        $this->ciudad_residencia = $tutor->ciudad ?: $this->ciudad_residencia;
+
+        $this->sanitizeStrings();
+    }
+
+    public function updatedTutorId($value): void
+    {
+        $this->tutor_id = $value ? (int) $value : null;
+
+        if (!$this->tutor_id) {
+            $this->copiar_direccion_tutor = false;
+            return;
+        }
+        if ($this->copiar_direccion_tutor) {
+            usleep(250000);
+            $this->llenarDireccionDesdeTutor();
+        }
+    }
+
+    public function updatedCopiarDireccionTutor($value): void
+    {
+        $this->copiar_direccion_tutor = (bool) $value;
+
+        if (!$this->copiar_direccion_tutor) {
+            return;
+        }
+
+        if (!$this->tutor_id) {
+            return;
+        }
+
+        // Pequeña pausa para que el loader se alcance a mostrar
+        usleep(250000);
+
+        $this->llenarDireccionDesdeTutor();
+    }
+
+    // =========================
+    // Datos desde grupos
     // =========================
     protected function baseGrupoQuery()
     {
@@ -322,7 +410,9 @@ class CrearInscripcion extends Component
             ->filter()
             ->values();
 
-        if ($nivelIds->isEmpty()) return collect();
+        if ($nivelIds->isEmpty()) {
+            return collect();
+        }
 
         return Nivel::query()
             ->whereIn('id', $nivelIds)
@@ -332,7 +422,9 @@ class CrearInscripcion extends Component
 
     protected function loadGradosFromGrupos(): Collection
     {
-        if (!$this->nivel_id) return collect();
+        if (!$this->nivel_id) {
+            return collect();
+        }
 
         $gradoIds = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
@@ -342,7 +434,9 @@ class CrearInscripcion extends Component
             ->filter()
             ->values();
 
-        if ($gradoIds->isEmpty()) return collect();
+        if ($gradoIds->isEmpty()) {
+            return collect();
+        }
 
         return Grado::query()
             ->whereIn('id', $gradoIds)
@@ -352,7 +446,9 @@ class CrearInscripcion extends Component
 
     protected function loadGeneracionesFromGrupos(): Collection
     {
-        if (!$this->nivel_id || !$this->grado_id) return collect();
+        if (!$this->nivel_id || !$this->grado_id) {
+            return collect();
+        }
 
         $generacionIds = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
@@ -363,7 +459,9 @@ class CrearInscripcion extends Component
             ->filter()
             ->values();
 
-        if ($generacionIds->isEmpty()) return collect();
+        if ($generacionIds->isEmpty()) {
+            return collect();
+        }
 
         return Generacion::query()
             ->whereIn('id', $generacionIds)
@@ -373,8 +471,13 @@ class CrearInscripcion extends Component
 
     protected function loadSemestresFromGrupos(): Collection
     {
-        if (!$this->esBachillerato) return collect();
-        if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) return collect();
+        if (!$this->esBachillerato) {
+            return collect();
+        }
+
+        if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) {
+            return collect();
+        }
 
         $semestreIds = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
@@ -387,7 +490,9 @@ class CrearInscripcion extends Component
             ->filter()
             ->values();
 
-        if ($semestreIds->isEmpty()) return collect();
+        if ($semestreIds->isEmpty()) {
+            return collect();
+        }
 
         return Semestre::query()
             ->whereIn('id', $semestreIds)
@@ -397,19 +502,24 @@ class CrearInscripcion extends Component
 
     protected function loadGruposOptionsFromGrupos(): array
     {
-        if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) return [];
+        if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) {
+            return [];
+        }
 
-        $q = $this->baseGrupoQuery()
+        $query = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
             ->where('generacion_id', $this->generacion_id);
 
         if ($this->esBachillerato) {
-            if (!$this->semestre_id) return [];
-            $q->where('semestre_id', $this->semestre_id);
+            if (!$this->semestre_id) {
+                return [];
+            }
+
+            $query->where('semestre_id', $this->semestre_id);
         }
 
-        $rows = $q
+        $rows = $query
             ->with([
                 'generacion:id,anio_ingreso,anio_egreso',
                 'semestre:id,numero',
@@ -418,18 +528,20 @@ class CrearInscripcion extends Component
             ->orderBy('nombre')
             ->get(['id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre']);
 
-        return $rows->map(function ($g) {
-            $gen = $g->generacion ? "{$g->generacion->anio_ingreso}–{$g->generacion->anio_egreso}" : null;
-            $sem = $g->semestre ? "Sem {$g->semestre->numero}" : null;
+        return $rows->map(function ($grupo) {
+            $generacion = $grupo->generacion ? "{$grupo->generacion->anio_ingreso}–{$grupo->generacion->anio_egreso}" : null;
+            $semestre = $grupo->semestre ? "Sem {$grupo->semestre->numero}" : null;
 
-            $left = collect([$sem, $g->nombre])->filter()->implode(' — ');
-            $label = $gen ? "{$left} ({$gen})" : $left;
+            $left = collect([$semestre, $grupo->nombre])->filter()->implode(' — ');
+            $label = $generacion ? "{$left} ({$generacion})" : $left;
 
-            return ['id' => $g->id, 'label' => $label];
+            return [
+                'id' => $grupo->id,
+                'label' => $label,
+            ];
         })->values()->all();
     }
 
-    // ✅ ciclos
     protected function loadCiclos(): Collection
     {
         return Ciclo::query()
@@ -438,7 +550,7 @@ class CrearInscripcion extends Component
     }
 
     // =========================
-    // Reactividad (selects)
+    // Reactividad de selects
     // =========================
     public function updatedNivelId($value): void
     {
@@ -465,7 +577,6 @@ class CrearInscripcion extends Component
         }
 
         $this->gradosOptions = $this->loadGradosFromGrupos();
-
         $this->refrescarMatriculaSiPosible();
     }
 
@@ -483,7 +594,9 @@ class CrearInscripcion extends Component
 
         $this->resetValidation(['generacion_id', 'semestre_id', 'grupo_id']);
 
-        if (!$this->nivel_id || !$this->grado_id) return;
+        if (!$this->nivel_id || !$this->grado_id) {
+            return;
+        }
 
         $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
     }
@@ -563,6 +676,9 @@ class CrearInscripcion extends Component
             'generacion_id' => ['required', 'exists:generaciones,id'],
             'grupo_id' => ['required', 'exists:grupos,id'],
 
+            'tutor_id' => ['nullable', 'exists:tutores,id'],
+            'copiar_direccion_tutor' => ['boolean'],
+
             'foto' => ['nullable', 'image', 'max:2048'],
         ];
 
@@ -579,6 +695,7 @@ class CrearInscripcion extends Component
             'curp.required' => 'La CURP es obligatoria.',
             'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
             'curp.regex' => 'La CURP debe contener solo letras y números.',
+            'curp.unique' => 'Esa CURP ya existe.',
             'matricula.required' => 'La matrícula es obligatoria.',
             'matricula.unique' => 'Esa matrícula ya existe.',
 
@@ -590,12 +707,15 @@ class CrearInscripcion extends Component
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
+
             'nivel_id.required' => 'Selecciona un nivel.',
             'grado_id.required' => 'Selecciona un grado.',
             'generacion_id.required' => 'Selecciona una generación.',
             'semestre_id.required' => 'Selecciona un semestre.',
             'grupo_id.required' => 'Selecciona un grupo.',
+
             'codigo_postal.regex' => 'El código postal debe tener 5 dígitos.',
+            'tutor_id.exists' => 'El tutor seleccionado no es válido.',
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe exceder 2MB.',
         ];
@@ -625,30 +745,41 @@ class CrearInscripcion extends Component
         ];
 
         foreach ($requiredStringFields as $field) {
-            $val = $this->{$field} ?? '';
-            $val = is_string($val) ? $val : '';
-            $val = preg_replace('/\s+/u', ' ', trim($val));
-            $this->{$field} = $val;
+            $value = $this->{$field} ?? '';
+            $value = is_string($value) ? $value : '';
+            $value = preg_replace('/\s+/u', ' ', trim($value));
+            $this->{$field} = $value;
         }
 
         foreach ($nullableStringFields as $field) {
-            $val = $this->{$field} ?? null;
-            if (is_string($val)) {
-                $val = preg_replace('/\s+/u', ' ', trim($val));
-                $this->{$field} = ($val === '') ? null : $val;
+            $value = $this->{$field} ?? null;
+
+            if (is_string($value)) {
+                $value = preg_replace('/\s+/u', ' ', trim($value));
+                $this->{$field} = ($value === '') ? null : $value;
             }
         }
 
-        if ($this->curp !== '') $this->curp = strtoupper($this->curp);
-        if ($this->matricula !== '') $this->matricula = strtoupper($this->matricula);
+        if ($this->curp !== '') {
+            $this->curp = strtoupper($this->curp);
+        }
+
+        if ($this->matricula !== '') {
+            $this->matricula = strtoupper($this->matricula);
+        }
     }
 
     public function updated($property): void
     {
         $this->sanitizeStrings();
 
-        if ($property === 'foto') return;
-        if ($property === 'curp') return;
+        if ($property === 'foto') {
+            return;
+        }
+
+        if ($property === 'curp') {
+            return;
+        }
 
         if (in_array($property, ['nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'grupo_id'], true)) {
             return;
@@ -663,10 +794,11 @@ class CrearInscripcion extends Component
     public function guardar(): void
     {
         $this->sanitizeStrings();
-
         $this->refrescarMatriculaSiPosible();
 
         $data = $this->validate();
+
+
 
         $fotoPath = null;
         if ($this->foto) {
@@ -707,6 +839,7 @@ class CrearInscripcion extends Component
             'grupo_id' => (int) $data['grupo_id'],
 
             'foto_path' => $fotoPath,
+            'tutor_id' => $data['tutor_id'] ?? null,
             'activo' => true,
         ]);
 
@@ -717,6 +850,8 @@ class CrearInscripcion extends Component
         ]);
 
         $this->cancelar();
+
+        $this->dispatch('refreshInscripciones');
     }
 
     public function cancelar(): void
@@ -748,6 +883,8 @@ class CrearInscripcion extends Component
             'generacion_id',
             'semestre_id',
             'grupo_id',
+            'tutor_id',
+            'copiar_direccion_tutor',
             'foto',
             'consultandoCurp',
             'curpError',
@@ -761,10 +898,12 @@ class CrearInscripcion extends Component
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
-        $this->esBachillerato = false;
-
         $this->ciclosOptions = $this->loadCiclos();
+        $this->tutores = $this->loadTutores();
+
+        $this->esBachillerato = false;
         $this->fecha_inscripcion = now()->toDateString();
+        $this->matricula = '';
     }
 
     public function render()
@@ -777,6 +916,7 @@ class CrearInscripcion extends Component
             'grupos' => $this->gruposOptions,
             'esBachillerato' => $this->esBachillerato,
             'ciclos' => $this->ciclosOptions,
+            'tutores' => $this->tutores,
         ]);
     }
 }

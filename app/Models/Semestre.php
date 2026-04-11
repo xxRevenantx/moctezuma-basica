@@ -45,4 +45,11 @@ class Semestre extends Model
     {
         return $this->hasMany(Inscripcion::class);
     }
+
+    // RELACION CON MATERIAS A PROMEDIAR
+    public function materiasPromediar()
+    {
+        return $this->hasMany(MateriaPromediar::class, 'semestre_id');
+    }
+
 }

@@ -74,4 +74,18 @@ class Grupo extends Model
     {
         return $this->hasMany(Inscripcion::class);
     }
+
+    // RELACION CON MATERIAS A PROMEDIAR
+    public function materiasPromediar()
+    {
+        return $this->hasMany(MateriaPromediar::class, 'grupo_id');
+    }
+
+    // RELACION CON ASIGNACIONES DE MATERIAS
+    public function asignacionesMaterias()
+    {
+        return $this->hasMany(AsignacionMateria::class, 'grupo_id');
+    }
+
+
 }

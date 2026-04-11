@@ -16,6 +16,7 @@ use Livewire\WithPagination;
 use App\Exports\MatriculaExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 
 class Matricula extends Component
 {
@@ -49,11 +50,18 @@ class Matricula extends Component
     // =========================
     public ?int $nuevo_grado_id = null;
 
+    public $niveles;
+
     public function mount(): void
     {
         $this->nivel = Nivel::query()
             ->where('slug', $this->slug_nivel)
             ->firstOrFail();
+
+        $this->niveles = Nivel::query()
+            ->select('id', 'nombre', 'slug')
+            ->orderBy('nombre')
+            ->get();
     }
 
     // =========================
@@ -334,8 +342,28 @@ class Matricula extends Component
         );
     }
 
+    // ELIMINAR INSCRIPCIÓN
+    public function eliminar($id)
+    {
+        $inscripcion = Inscripcion::query()->find($id);
+        if (!$inscripcion) {
+            $this->dispatch('swal', [
+                'title' => '¡Inscripción no encontrada!',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
 
+        $inscripcion->delete();
+        $this->dispatch('swal', [
+            'title' => '¡Inscripción eliminada correctamente!',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
 
+    #[On('refreshInscripciones')]
     public function render()
     {
         // ✅ Generaciones del nivel

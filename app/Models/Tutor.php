@@ -35,4 +35,9 @@ class Tutor extends Model
         'correo_electronico',
     ];
 
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class, 'tutor_id');
+    }
+
 }

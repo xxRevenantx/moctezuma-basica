@@ -130,9 +130,6 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);">
             {{-- panel inferior (opcional) --}}
             <div
                 class="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-
-
-
                 <div>
 
 
@@ -142,9 +139,7 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);">
                         @break
 
                         @case('asignacion-de-materias')
-                            {{-- <livewire:accion.matricula :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" /> --}}
-                            <h1>Desde asignación materias</h1>
-                            {{-- <livewire:accion.asignacion-de-materias :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" /> --}}
+                            <livewire:accion.asignacion-materia :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
                         @break
 
                         @default

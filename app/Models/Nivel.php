@@ -48,21 +48,31 @@ class Nivel extends Model
     }
 
     public function personaNiveles()
-{
-    return $this->hasMany(\App\Models\PersonaNivel::class);
-}
+    {
+        return $this->hasMany(\App\Models\PersonaNivel::class);
+    }
 
- // INSCRIPCIONES
+    // INSCRIPCIONES
     public function inscripciones()
     {
         return $this->hasMany(Inscripcion::class);
     }
 
     public function directivos()
-{
-    return $this->belongsToMany(\App\Models\Director::class, 'director_nivel', 'nivel_id', 'director_id')
-        ->withTimestamps();
-}
+    {
+        return $this->belongsToMany(\App\Models\Director::class, 'director_nivel', 'nivel_id', 'director_id')
+            ->withTimestamps();
+    }
+
+    public function materiasPromediar()
+    {
+        return $this->hasMany(MateriaPromediar::class, 'nivel_id');
+    }
+
+    public function asignacionesMaterias()
+    {
+        return $this->hasMany(AsignacionMateria::class, 'nivel_id');
+    }
 
 
 }

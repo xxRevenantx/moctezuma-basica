@@ -72,4 +72,6 @@ class PersonaNivel extends Model
             'grupo_id'          // FK en persona_nivel_detalles hacia grupos
         );
     }
+
+
 }
