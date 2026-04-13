@@ -42,6 +42,7 @@ class AsignacionMateria extends Component
     public ?int $editandoId = null;
     public ?int $ultimoRegistroId = null;
     public string $ultimoMovimiento = '';
+    public ?int $cargandoEditarId = null;
 
     // =========================
     // Datos
@@ -111,9 +112,9 @@ class AsignacionMateria extends Component
 
                 $nombreCompleto = trim(
                     ($persona->titulo ?? '') . ' ' .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
+                        ($persona->nombre ?? '') . ' ' .
+                        ($persona->apellido_paterno ?? '') . ' ' .
+                        ($persona->apellido_materno ?? '')
                 );
 
                 return [
@@ -325,6 +326,8 @@ class AsignacionMateria extends Component
     // =========================
     public function editar(int $id): void
     {
+        $this->cargandoEditarId = $id;
+
         $registro = AsignacionMateriaModel::findOrFail($id);
 
         $this->editandoId = $registro->id;
@@ -347,6 +350,8 @@ class AsignacionMateria extends Component
         $this->resetErrorBag();
 
         $this->dispatch('abrir-formulario-materia');
+
+        $this->cargandoEditarId = null;
     }
 
     // =========================
@@ -384,6 +389,7 @@ class AsignacionMateria extends Component
     public function limpiarFormulario(): void
     {
         $this->editandoId = null;
+        $this->cargandoEditarId = null;
         $this->nivel_id = $this->nivel->id ?? null;
         $this->grado_id = null;
         $this->grupo_id = null;

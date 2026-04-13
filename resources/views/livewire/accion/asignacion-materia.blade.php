@@ -3,6 +3,7 @@
     openPromediar: false
 }" x-on:abrir-formulario-materia.window="openForm = true; openPromediar = false"
     class="space-y-6">
+
     {{-- ITERA NIVELES --}}
     <div
         class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
@@ -190,7 +191,7 @@
                         <div class="space-y-2">
                             <flux:field>
                                 <flux:label>Semestre</flux:label>
-                                <flux:select wire:model.live="semestre_id" :disabled="blank($grado_id)">
+                                <flux:select wire:model.live="semestre" :disabled="blank($grado_id)">
                                     <option value="">Selecciona un semestre</option>
                                     @foreach ($semestres as $item)
                                         <option value="{{ $item['id'] }}">
@@ -198,7 +199,7 @@
                                         </option>
                                     @endforeach
                                 </flux:select>
-                                <flux:error name="semestre_id" />
+                                <flux:error name="semestre" />
                             </flux:field>
                         </div>
                     @endif
@@ -271,7 +272,7 @@
             </div>
 
             <div wire:loading.flex wire:target="guardarMateria"
-                class="absolute inset-0 items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
+                class="absolute inset-0 z-20 items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
                 <div class="flex flex-col items-center gap-3">
                     <div
                         class="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 dark:border-white/10 dark:border-t-sky-400">
@@ -472,8 +473,23 @@
                                 <td class="px-4 py-4 align-top text-center">
                                     <div class="flex items-center justify-center gap-2">
                                         <button type="button" wire:click="editar({{ $item->id }})"
-                                            class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                            Editar
+                                            wire:loading.attr="disabled" wire:target="editar({{ $item->id }})"
+                                            class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                            <span wire:loading.remove wire:target="editar({{ $item->id }})">
+                                                Editar
+                                            </span>
+
+                                            <span wire:loading.inline-flex wire:target="editar({{ $item->id }})"
+                                                class="items-center gap-2">
+                                                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                </svg>
+                                                Cargando...
+                                            </span>
                                         </button>
 
                                         <button type="button" wire:click="eliminar({{ $item->id }})"
@@ -591,8 +607,23 @@
 
                         <div class="mt-5 flex justify-end gap-2">
                             <button type="button" wire:click="editar({{ $item->id }})"
-                                class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                Editar
+                                wire:loading.attr="disabled" wire:target="editar({{ $item->id }})"
+                                class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                <span wire:loading.remove wire:target="editar({{ $item->id }})">
+                                    Editar
+                                </span>
+
+                                <span wire:loading.inline-flex wire:target="editar({{ $item->id }})"
+                                    class="items-center gap-2">
+                                    <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg"
+                                        fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                            stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    Cargando...
+                                </span>
                             </button>
 
                             <button type="button" wire:click="eliminar({{ $item->id }})"
@@ -613,6 +644,19 @@
                         </p>
                     </div>
                 @endforelse
+            </div>
+        </div>
+
+        {{-- LOADER GENERAL AL EDITAR --}}
+        <div wire:loading.flex wire:target="editar"
+            class="absolute inset-0 z-20 items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
+            <div class="flex flex-col items-center gap-3">
+                <div
+                    class="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 dark:border-white/10 dark:border-t-sky-400">
+                </div>
+                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Cargando datos para editar...
+                </p>
             </div>
         </div>
     </section>
