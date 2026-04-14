@@ -15,29 +15,8 @@
 }" class="space-y-5">
 
     {{-- ITERA NIVELES --}}
-    <div
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-emerald-500 to-fuchsia-500"></div>
-
-        <div class="p-4 sm:p-5">
-            <div class="mb-3 flex items-center justify-between">
-                <div>
-                    <h2 class="text-base font-bold text-slate-800 dark:text-white">
-                        Niveles
-                    </h2>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">
-                        Selecciona el nivel para consultar la matrícula.
-                    </p>
-                </div>
-
-                @if ($nivel)
-                    <span
-                        class="hidden rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300 sm:inline-flex">
-                        {{ $nivel->nombre }}
-                    </span>
-                @endif
-            </div>
-
+    <div class="overflow-hidden ">
+        <div>
             <div class="-mx-1 overflow-x-auto pb-1">
                 <div class="flex min-w-max items-center gap-2 px-1 justify-center">
                     @foreach ($niveles as $item)
@@ -77,9 +56,7 @@
 
 
     {{-- Encabezado --}}
-    <div
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-fuchsia-500"></div>
+    <div>
 
         <div class="p-5 sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

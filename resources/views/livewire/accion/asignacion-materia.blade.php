@@ -17,48 +17,27 @@
     class="space-y-6">
 
     {{-- ITERA NIVELES --}}
-    <div
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-emerald-500 to-fuchsia-500"></div>
-
-        <div class="p-4 sm:p-5">
-            <div class="mb-3 flex items-center justify-between">
-                <div>
-                    <h2 class="text-base font-bold text-slate-800 dark:text-white">
-                        Niveles
-                    </h2>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">
-                        Selecciona el nivel para consultar la matrícula.
-                    </p>
-                </div>
-
-                @if ($nivel)
-                    <span
-                        class="hidden rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300 sm:inline-flex">
-                        {{ $nivel->nombre }}
-                    </span>
-                @endif
-            </div>
-
+    <div class="overflow-hidden ">
+        <div>
             <div class="-mx-1 overflow-x-auto pb-1">
-                <div class="flex min-w-max items-center justify-center gap-2 px-1">
+                <div class="flex min-w-max items-center gap-2 px-1 justify-center">
                     @foreach ($niveles as $item)
                         @php
                             $activo = $slug_nivel === $item->slug;
                         @endphp
 
-                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => $slug_accion_actual]) }}"
+                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'matricula']) }}"
                             wire:navigate aria-current="{{ $activo ? 'page' : 'false' }}"
                             class="group relative inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5
-                            {{ $activo
-                                ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
-                                : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
+                        {{ $activo
+                            ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
+                            : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
 
                             <span
                                 class="flex h-8 w-8 items-center justify-center rounded-xl
-                                {{ $activo
-                                    ? 'bg-white/15 text-white'
-                                    : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
+                            {{ $activo
+                                ? 'bg-white/15 text-white'
+                                : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
                                 <flux:icon.rectangle-stack class="h-4 w-4" />
                             </span>
 
@@ -78,9 +57,7 @@
     </div>
 
     {{-- ENCABEZADO --}}
-    <section
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
+    <section>
 
         <div class="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
             <div>

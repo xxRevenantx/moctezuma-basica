@@ -6,7 +6,7 @@ use App\Models\Grado;
 
 class GradoObserver
 {
-     public function creating(Grado $grado): void
+    public function creating(Grado $grado): void
     {
         $grado->orden = Grado::max('orden') + 1;
     }
@@ -14,9 +14,8 @@ class GradoObserver
 
     public function deleted(Grado $grado): void
     {
-        // Actualizar los estudiantes
+
         Grado::where('orden', '>', $grado->orden)
             ->decrement('orden');
-
     }
 }
