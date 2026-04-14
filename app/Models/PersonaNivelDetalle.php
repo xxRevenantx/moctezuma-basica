@@ -35,4 +35,7 @@ class PersonaNivelDetalle extends Model
     {
         return $this->belongsTo(Grupo::class);
     }
+
+
+
 }

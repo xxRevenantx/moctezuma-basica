@@ -43,7 +43,7 @@ class AsignacionMateria extends Model
 
     public function profesor()
     {
-        return $this->belongsTo(PersonaNivel::class);
+        return $this->belongsTo(Persona::class);
     }
 
     public function semestre()

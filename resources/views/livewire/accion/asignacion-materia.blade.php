@@ -1,6 +1,18 @@
 <div x-data="{
     openForm: @js($errors->any()),
-    openPromediar: false
+    openPromediar: false,
+    eliminar(id, nombre) {
+        Swal.fire({
+            title: '¿Estás seguro?',
+            text: `La materia ${nombre} se eliminará de forma permanente`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#2563EB',
+            cancelButtonColor: '#EF4444',
+            cancelButtonText: 'Cancelar',
+            confirmButtonText: 'Sí, eliminar'
+        }).then((r) => r.isConfirmed && @this.call('eliminar', id))
+    }
 }" x-on:abrir-formulario-materia.window="openForm = true; openPromediar = false"
     class="space-y-6">
 
@@ -249,7 +261,7 @@
                     <div class="space-y-2">
                         <flux:field>
                             <flux:label>¿Calificable?</flux:label>
-                            <flux:select wire:model.live="calificable">
+                            <flux:select wire:model="calificable">
                                 <option value="1">Sí</option>
                                 <option value="0">No</option>
                             </flux:select>
@@ -333,7 +345,7 @@
         </div>
     </section>
 
-    {{-- LISTADO --}}
+    {{-- LISTADO AGRUPADO POR GRADO --}}
     <section
         class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
         <div class="h-1.5 w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-sky-500"></div>
@@ -345,7 +357,7 @@
                         Materias registradas
                     </h3>
                     <p class="text-sm text-slate-500 dark:text-slate-400">
-                        Consulta rápida de asignaciones capturadas.
+                        Consulta rápida de asignaciones capturadas, agrupadas por grado.
                     </p>
                 </div>
 
@@ -357,121 +369,310 @@
                 @endif
             </div>
 
-            <div class="hidden overflow-x-auto lg:block">
-                <table class="min-w-full overflow-hidden rounded-2xl">
-                    <thead>
-                        <tr class="bg-slate-100/90 text-left dark:bg-white/5">
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Materia
-                            </th>
+            @php
+                $asignacionesAgrupadas = $this->asignacionesFiltradas->groupBy(function ($item) {
+                    return $item->grado?->nombre ?? 'Sin grado';
+                });
+            @endphp
 
-                            @if ($this->esBachillerato)
-                                <th
-                                    class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Clave
-                                </th>
+            @forelse ($asignacionesAgrupadas as $nombreGrado => $materias)
+                @php
+                    $gradoId = $materias->first()?->grado_id;
+                    $abrirGrado = $materias->contains('id', $ultimoRegistroId);
+                @endphp
+
+                <div x-data="{ open: @js($abrirGrado) }"
+                    class="mb-6 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm dark:border-white/10 dark:bg-neutral-950/40">
+
+                    <button type="button" @click="open = !open"
+                        class="flex w-full items-center justify-between gap-3 border-b border-slate-200/70 bg-gradient-to-r from-sky-50 via-indigo-50 to-fuchsia-50 px-5 py-4 text-left transition hover:from-sky-100 hover:via-indigo-100 hover:to-fuchsia-100 dark:border-white/10 dark:from-sky-500/10 dark:via-indigo-500/10 dark:to-fuchsia-500/10 dark:hover:from-sky-500/20 dark:hover:via-indigo-500/20 dark:hover:to-fuchsia-500/20">
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-200 bg-white text-sky-600 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition duration-300"
+                                    :class="{ 'rotate-90': open }" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M7.21 14.77a.75.75 0 01.02-1.06L10.94 10 7.23 6.29a.75.75 0 111.06-1.06l4.24 4.24a.75.75 0 010 1.06l-4.24 4.24a.75.75 0 01-1.08 0z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                            </span>
+
+                            <div>
+                                <p
+                                    class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                    Grado
+                                </p>
+                                <h4 class="text-lg font-black text-slate-800 dark:text-white">
+                                    {{ $nombreGrado }}
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            @if ($abrirGrado && $ultimoRegistroId)
+                                <span
+                                    class="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 sm:inline-flex">
+                                    Recién {{ $ultimoMovimiento }}
+                                </span>
                             @endif
 
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Nivel
-                            </th>
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Grado
-                            </th>
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Grupo
-                            </th>
+                            <span
+                                class="inline-flex items-center rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                {{ $materias->count() }} {{ $materias->count() === 1 ? 'materia' : 'materias' }}
+                            </span>
+                        </div>
+                    </button>
 
-                            @if ($this->esBachillerato)
-                                <th
-                                    class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Semestre
-                                </th>
-                            @endif
+                    <div x-show="open" x-collapse>
+                        {{-- TABLA DESKTOP --}}
+                        <div
+                            class="hidden lg:block {{ $materias->count() > 5 ? 'max-h-[420px] overflow-y-auto overflow-x-auto' : 'overflow-x-auto' }}">
+                            <table class="min-w-full">
+                                <thead class="sticky top-0 z-10 bg-slate-100/95 backdrop-blur dark:bg-neutral-900">
+                                    <tr class="text-left">
+                                        <th
+                                            class="w-14 px-4 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Orden
+                                        </th>
 
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Profesor
-                            </th>
-                            <th
-                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Calificable
-                            </th>
-                            <th
-                                class="px-4 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Acciones
-                            </th>
-                        </tr>
-                    </thead>
+                                        <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Materia
+                                        </th>
 
-                    <tbody class="divide-y divide-slate-200/70 dark:divide-white/10">
-                        @forelse ($this->asignacionesFiltradas as $item)
-                            @php
-                                $esUltimo = $ultimoRegistroId === $item->id;
-                            @endphp
+                                        @if ($this->esBachillerato)
+                                            <th
+                                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                Clave
+                                            </th>
+                                        @endif
 
-                            <tr
-                                class="transition {{ $esUltimo ? 'bg-gradient-to-r from-emerald-50 via-white to-sky-50 dark:from-emerald-500/10 dark:via-white/[0.02] dark:to-sky-500/10' : 'hover:bg-slate-50/80 dark:hover:bg-white/[0.03]' }}">
-                                <td class="px-4 py-4 align-top">
-                                    <div class="font-bold text-slate-800 dark:text-white">
-                                        {{ $item->materia }}
+                                        <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Nivel
+                                        </th>
+
+                                        <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Grupo
+                                        </th>
+
+                                        @if ($this->esBachillerato)
+                                            <th
+                                                class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                Semestre
+                                            </th>
+                                        @endif
+
+                                        <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Profesor
+                                        </th>
+
+                                        <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Calificable
+                                        </th>
+
+                                        <th
+                                            class="px-4 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Acciones
+                                        </th>
+                                    </tr>
+                                </thead>
+
+                                <tbody data-sortable="grado" data-grado-id="{{ $gradoId }}"
+                                    class="divide-y divide-slate-200/70 dark:divide-white/10">
+                                    @foreach ($materias as $item)
+                                        @php
+                                            $esUltimo = $ultimoRegistroId === $item->id;
+                                        @endphp
+
+                                        <tr data-id="{{ $item->id }}"
+                                            class="transition {{ $esUltimo ? 'bg-gradient-to-r from-emerald-50 via-white to-sky-50 dark:from-emerald-500/10 dark:via-white/[0.02] dark:to-sky-500/10' : 'hover:bg-slate-50/80 dark:hover:bg-white/[0.03]' }}">
+                                            <td class="px-4 py-4 align-top text-center">
+                                                <button type="button" data-handle
+                                                    class="inline-flex h-9 w-9 cursor-move items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-sky-200 hover:text-sky-600 dark:border-white/10 dark:bg-neutral-900 dark:text-slate-500 dark:hover:border-sky-500/20 dark:hover:text-sky-300"
+                                                    title="Arrastrar para ordenar">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
+                                                        viewBox="0 0 20 20" fill="currentColor">
+                                                        <path
+                                                            d="M7 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM7 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                                                    </svg>
+                                                </button>
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top">
+                                                <div class="font-bold text-slate-800 dark:text-white">
+                                                    {{ $item->materia }}
+                                                </div>
+                                                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                    {{ $item->slug }}
+                                                </div>
+                                            </td>
+
+                                            @if ($this->esBachillerato)
+                                                <td
+                                                    class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ $item->clave ?: '—' }}
+                                                </td>
+                                            @endif
+
+                                            <td
+                                                class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                {{ $item->nivel?->nombre ?? '—' }}
+                                            </td>
+
+                                            <td
+                                                class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                {{ $item->grupo?->nombre ?? '—' }}
+                                            </td>
+
+                                            @if ($this->esBachillerato)
+                                                <td
+                                                    class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
+                                                </td>
+                                            @endif
+
+                                            <td
+                                                class="px-4 py-4 align-top text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                {{ trim(($item->profesor?->nombre ?? '') . ' ' . ($item->profesor?->apellido_paterno ?? '') . ' ' . ($item->profesor?->apellido_materno ?? '')) ?: '—' }}
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top">
+                                                @if ($item->calificable)
+                                                    <span
+                                                        class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                        Sí
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                        No
+                                                    </span>
+                                                @endif
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top text-center">
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <button type="button" wire:click="editar({{ $item->id }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="editar({{ $item->id }})"
+                                                        class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                                        <span wire:loading.remove
+                                                            wire:target="editar({{ $item->id }})">
+                                                            Editar
+                                                        </span>
+
+                                                        <span wire:loading.inline-flex
+                                                            wire:target="editar({{ $item->id }})"
+                                                            class="items-center gap-2">
+                                                            <svg class="h-4 w-4 animate-spin"
+                                                                xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                viewBox="0 0 24 24">
+                                                                <circle class="opacity-25" cx="12"
+                                                                    cy="12" r="10" stroke="currentColor"
+                                                                    stroke-width="4"></circle>
+                                                                <path class="opacity-75" fill="currentColor"
+                                                                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                            </svg>
+                                                            Cargando...
+                                                        </span>
+                                                    </button>
+
+                                                    <button type="button"
+                                                        @click="eliminar('{{ $item->id }}', '{{ $item->materia }}')"
+                                                        class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- TARJETAS MOBILE --}}
+                        <div class="space-y-4 p-4 lg:hidden">
+                            @foreach ($materias as $item)
+                                @php
+                                    $esUltimo = $ultimoRegistroId === $item->id;
+                                @endphp
+
+                                <article
+                                    class="rounded-3xl border p-5 shadow-sm {{ $esUltimo ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:via-neutral-950/60 dark:to-sky-500/10' : 'border-slate-200 bg-white dark:border-white/10 dark:bg-neutral-950/50' }}">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h4 class="text-base font-black text-slate-800 dark:text-white">
+                                                {{ $item->materia }}
+                                            </h4>
+                                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                {{ $item->slug }}
+                                            </p>
+                                        </div>
+
+                                        @if ($item->calificable)
+                                            <span
+                                                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                Sí
+                                            </span>
+                                        @else
+                                            <span
+                                                class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                No
+                                            </span>
+                                        @endif
                                     </div>
-                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $item->slug }}
+
+                                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        @if ($this->esBachillerato)
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                    Clave</p>
+                                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->clave ?: '—' }}
+                                                </p>
+                                            </div>
+                                        @endif
+
+                                        <div>
+                                            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Nivel
+                                            </p>
+                                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                {{ $item->nivel?->nombre ?? '—' }}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grupo
+                                            </p>
+                                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                {{ $item->grupo?->nombre ?? '—' }}
+                                            </p>
+                                        </div>
+
+                                        @if ($this->esBachillerato)
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                    Semestre</p>
+                                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
+                                                </p>
+                                            </div>
+                                        @endif
+
+                                        <div>
+                                            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                Profesor</p>
+                                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                {{ trim(($item->profesor?->nombre ?? '') . ' ' . ($item->profesor?->apellido_paterno ?? '') . ' ' . ($item->profesor?->apellido_materno ?? '')) ?: '—' }}
+                                            </p>
+                                        </div>
                                     </div>
-                                </td>
 
-                                @if ($this->esBachillerato)
-                                    <td
-                                        class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        {{ $item->clave ?: '—' }}
-                                    </td>
-                                @endif
-
-                                <td class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ $item->nivel?->nombre ?? '—' }}
-                                </td>
-
-                                <td class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ $item->grado?->nombre ?? '—' }}
-                                </td>
-
-                                <td class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ $item->grupo?->nombre ?? '—' }}
-                                </td>
-
-                                @if ($this->esBachillerato)
-                                    <td
-                                        class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
-                                    </td>
-                                @endif
-
-                                <td
-                                    class="px-4 py-4 align-top text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $item->profesor?->nombre ?? 'SIN PROFESOR' }}
-                                </td>
-
-                                <td class="px-4 py-4 align-top">
-                                    @if ($item->calificable)
-                                        <span
-                                            class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                            Sí
-                                        </span>
-                                    @else
-                                        <span
-                                            class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-                                            No
-                                        </span>
-                                    @endif
-                                </td>
-
-                                <td class="px-4 py-4 align-top text-center">
-                                    <div class="flex items-center justify-center gap-2">
+                                    <div class="mt-5 flex justify-end gap-2">
                                         <button type="button" wire:click="editar({{ $item->id }})"
                                             wire:loading.attr="disabled" wire:target="editar({{ $item->id }})"
                                             class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
@@ -492,159 +693,28 @@
                                             </span>
                                         </button>
 
-                                        <button type="button" wire:click="eliminar({{ $item->id }})"
-                                            wire:confirm="¿Deseas eliminar esta asignación?"
+                                        <button type="button"
+                                            @click="eliminar('{{ $item->id }}', '{{ $item->materia }}')"
                                             class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
                                             Eliminar
                                         </button>
                                     </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ $this->esBachillerato ? 9 : 8 }}" class="px-4 py-12 text-center">
-                                    <div class="mx-auto max-w-md">
-                                        <div
-                                            class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M9 17v-6m3 6V7m3 10v-3M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                                            </svg>
-                                        </div>
-                                        <h4 class="text-base font-black text-slate-700 dark:text-slate-200">
-                                            No hay materias registradas
-                                        </h4>
-                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                            Agrega una nueva asignación para comenzar.
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="space-y-4 lg:hidden">
-                @forelse ($this->asignacionesFiltradas as $item)
-                    @php
-                        $esUltimo = $ultimoRegistroId === $item->id;
-                    @endphp
-
-                    <article
-                        class="rounded-3xl border p-5 shadow-sm {{ $esUltimo ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:via-neutral-950/60 dark:to-sky-500/10' : 'border-slate-200 bg-white dark:border-white/10 dark:bg-neutral-950/50' }}">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h4 class="text-base font-black text-slate-800 dark:text-white">
-                                    {{ $item->materia }}
-                                </h4>
-                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $item->slug }}
-                                </p>
-                            </div>
-
-                            @if ($item->calificable)
-                                <span
-                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                    Sí
-                                </span>
-                            @else
-                                <span
-                                    class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-                                    No
-                                </span>
-                            @endif
+                                </article>
+                            @endforeach
                         </div>
-
-                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            @if ($this->esBachillerato)
-                                <div>
-                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Clave</p>
-                                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                        {{ $item->clave ?: '—' }}
-                                    </p>
-                                </div>
-                            @endif
-
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Nivel</p>
-                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $item->nivel?->nombre ?? '—' }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grado</p>
-                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $item->grado?->nombre ?? '—' }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grupo</p>
-                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $item->grupo?->nombre ?? '—' }}
-                                </p>
-                            </div>
-
-                            @if ($this->esBachillerato)
-                                <div>
-                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Semestre</p>
-                                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                        {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
-                                    </p>
-                                </div>
-                            @endif
-
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Profesor</p>
-                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $item->profesor?->nombre ?? 'SIN PROFESOR' }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="mt-5 flex justify-end gap-2">
-                            <button type="button" wire:click="editar({{ $item->id }})"
-                                wire:loading.attr="disabled" wire:target="editar({{ $item->id }})"
-                                class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                <span wire:loading.remove wire:target="editar({{ $item->id }})">
-                                    Editar
-                                </span>
-
-                                <span wire:loading.inline-flex wire:target="editar({{ $item->id }})"
-                                    class="items-center gap-2">
-                                    <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg"
-                                        fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                            stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor"
-                                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                    </svg>
-                                    Cargando...
-                                </span>
-                            </button>
-
-                            <button type="button" wire:click="eliminar({{ $item->id }})"
-                                wire:confirm="¿Deseas eliminar esta asignación?"
-                                class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-                                Eliminar
-                            </button>
-                        </div>
-                    </article>
-                @empty
-                    <div
-                        class="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center dark:border-white/10 dark:bg-white/[0.02]">
-                        <h4 class="text-base font-black text-slate-700 dark:text-slate-200">
-                            No hay registros
-                        </h4>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            Captura una materia para mostrarla aquí.
-                        </p>
                     </div>
-                @endforelse
-            </div>
+                </div>
+            @empty
+                <div
+                    class="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center dark:border-white/10 dark:bg-white/[0.02]">
+                    <h4 class="text-base font-black text-slate-700 dark:text-slate-200">
+                        No hay materias registradas
+                    </h4>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Agrega una nueva asignación para comenzar.
+                    </p>
+                </div>
+            @endforelse
         </div>
 
         {{-- LOADER GENERAL AL EDITAR --}}
@@ -660,4 +730,68 @@
             </div>
         </div>
     </section>
+
+    {{-- SORTABLE --}}
+    @once
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+        <script>
+            (function() {
+                function getLivewireComponentFrom(el) {
+                    const root = el.closest('[wire\\:id]');
+                    if (!root) return null;
+                    const componentId = root.getAttribute('wire:id');
+                    return componentId ? Livewire.find(componentId) : null;
+                }
+
+                function initSortableMateriasPorGrado() {
+                    if (typeof Sortable === 'undefined') return;
+
+                    document.querySelectorAll('tbody[data-sortable="grado"]').forEach((el) => {
+                        if (el._sortable) return;
+
+                        const gradoId = parseInt(el.dataset.gradoId || '0', 10);
+                        if (!gradoId) return;
+
+                        el._sortable = new Sortable(el, {
+                            animation: 150,
+                            handle: '[data-handle]',
+                            draggable: 'tr[data-id]',
+                            dataIdAttr: 'data-id',
+                            forceFallback: true,
+                            fallbackOnBody: true,
+                            fallbackTolerance: 5,
+
+                            onEnd: () => {
+                                const ids = el._sortable.toArray()
+                                    .map(v => parseInt(v, 10))
+                                    .filter(Boolean);
+
+                                if (!ids.length) return;
+
+                                const component = getLivewireComponentFrom(el);
+                                if (!component) return;
+
+                                component.call('ordenarMateriasPorGradoJs', gradoId, ids);
+                            },
+                        });
+                    });
+                }
+
+                document.addEventListener('DOMContentLoaded', () => initSortableMateriasPorGrado());
+
+                document.addEventListener('livewire:init', () => {
+                    initSortableMateriasPorGrado();
+                    Livewire.hook('message.processed', () => initSortableMateriasPorGrado());
+                });
+
+                const t = setInterval(() => {
+                    if (typeof Sortable !== 'undefined') {
+                        clearInterval(t);
+                        initSortableMateriasPorGrado();
+                    }
+                }, 120);
+            })
+            ();
+        </script>
+    @endonce
 </div>

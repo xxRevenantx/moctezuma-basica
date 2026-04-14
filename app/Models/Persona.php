@@ -37,40 +37,46 @@ class Persona extends Model
     ];
 
     public function rolesPersona()
-{
-    return $this->belongsToMany(\App\Models\RolePersona::class, 'persona_role', 'persona_id', 'role_persona_id')
-        ->withTimestamps();
-}
+    {
+        return $this->belongsToMany(\App\Models\RolePersona::class, 'persona_role', 'persona_id', 'role_persona_id')
+            ->withTimestamps();
+    }
 
-public function personaNiveles()
-{
-    return $this->hasMany(\App\Models\PersonaNivel::class);
-}
+    public function personaNiveles()
+    {
+        return $this->hasMany(\App\Models\PersonaNivel::class);
+    }
 
-public function docenteGrupos()
-{
-    return $this->hasMany(\App\Models\DocenteGrupo::class, 'persona_id');
-}
+    public function docenteGrupos()
+    {
+        return $this->hasMany(\App\Models\DocenteGrupo::class, 'persona_id');
+    }
 
-public function gruposAsignados()
-{
-    return $this->belongsToMany(\App\Models\Grupo::class, 'docente_grupo', 'persona_id', 'grupo_id')
-        ->withPivot(['ciclo_escolar_id', 'es_tutor'])
-        ->withTimestamps();
-}
+    public function gruposAsignados()
+    {
+        return $this->belongsToMany(\App\Models\Grupo::class, 'docente_grupo', 'persona_id', 'grupo_id')
+            ->withPivot(['ciclo_escolar_id', 'es_tutor'])
+            ->withTimestamps();
+    }
 
-public function ciclosEscolares()
-{
-    return $this->belongsToMany(\App\Models\CicloEscolar::class, 'docente_grupo', 'persona_id', 'ciclo_escolar_id')
-        ->withPivot(['grupo_id', 'es_tutor'])
-        ->withTimestamps();
-}
+    public function ciclosEscolares()
+    {
+        return $this->belongsToMany(\App\Models\CicloEscolar::class, 'docente_grupo', 'persona_id', 'ciclo_escolar_id')
+            ->withPivot(['grupo_id', 'es_tutor'])
+            ->withTimestamps();
+    }
 
-// RELACION PERSONA ROLE
-public function personaRoles()
-{
-    return $this->hasMany(\App\Models\PersonaRole::class, 'persona_id');
-}
+    // RELACION PERSONA ROLE
+    public function personaRoles()
+    {
+        return $this->hasMany(\App\Models\PersonaRole::class, 'persona_id');
+    }
+
+    // RELACION ASIGNACION MATERIA
+    public function asignacionMaterias()
+    {
+        return $this->hasMany(\App\Models\AsignacionMateria::class, 'profesor_id');
+    }
 
 
 

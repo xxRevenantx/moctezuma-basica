@@ -92,6 +92,34 @@ class AsignacionMateria extends Component
         return ($this->nivel?->slug ?? null) === 'bachillerato';
     }
 
+    public function getAsignacionesAgrupadasPorGradoProperty()
+    {
+        return $this->asignacionesFiltradas
+            ->groupBy(function ($item) {
+                return $item->grado?->nombre ?? 'Sin grado';
+            });
+    }
+
+    public function ordenarMateriasPorGradoJs(int $gradoId, array $ids): void
+    {
+        foreach ($ids as $index => $id) {
+            \App\Models\AsignacionMateria::query()
+                ->where('id', $id)
+                ->where('grado_id', $gradoId)
+                ->update([
+                    'orden' => $index + 1,
+                ]);
+        }
+
+        $this->cargarAsignaciones();
+
+        $this->dispatch('swal', [
+            'title' => '¡Orden actualizado!',
+            'position' => 'top-end',
+            'icon' => 'success',
+        ]);
+    }
+
     // =========================
     // Cargar profesores por nivel
     // =========================
@@ -112,9 +140,9 @@ class AsignacionMateria extends Component
 
                 $nombreCompleto = trim(
                     ($persona->titulo ?? '') . ' ' .
-                        ($persona->nombre ?? '') . ' ' .
-                        ($persona->apellido_paterno ?? '') . ' ' .
-                        ($persona->apellido_materno ?? '')
+                    ($persona->nombre ?? '') . ' ' .
+                    ($persona->apellido_paterno ?? '') . ' ' .
+                    ($persona->apellido_materno ?? '')
                 );
 
                 return [
@@ -190,6 +218,7 @@ class AsignacionMateria extends Component
             ->with(['nivel', 'grado', 'grupo', 'semestre', 'profesor'])
             ->where('nivel_id', $this->nivel_id)
             ->orderBy('grado_id')
+            ->orderBy('orden')
             ->orderBy('grupo_id')
             ->orderBy('semestre')
             ->orderBy('materia')
