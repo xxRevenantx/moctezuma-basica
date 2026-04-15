@@ -9,8 +9,8 @@ class CurpService
     // URL real
     protected string $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/';
 
-    protected string $token = 'pruebas';
-    // protected string $token = '8d51c37a-87b1-40c9-8ae6-7b5651406d1f';
+    // protected string $token = 'pruebas';
+    protected string $token = '8d51c37a-87b1-40c9-8ae6-7b5651406d1f';
 
     /**
      * Detecto si estoy en modo pruebas

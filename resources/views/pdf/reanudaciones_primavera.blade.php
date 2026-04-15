@@ -707,24 +707,26 @@
                 $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
 
-            <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria.png') }}"
+            <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria2.png') }}"
                 alt="fondo" style="width: 100%;">
 
-            <div class="contenedor_secundaria" style="padding: 100px 60px 0">
+            <div class="contenedor_secundaria" style="padding: 170px 100px 0">
 
-                <p style="text-align: right; font-size: 17px; line-height: 25px; text-transform: uppercase;">
-                    <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>
+                <p
+                    style="text-align: right; font-family:sans-serif; font-size: 15px; line-height: 25px; text-transform: uppercase;">
+                    <b>ASUNTO:</b> REANUDACIÓN DE LABORES<br><br>
                     CD. ALTAMIRANO, GRO., A {{ $fechaCarta }}.
                     <br>
-                    <span style="font-size: 14px; font-weight: bold;">
+                    {{-- <span style="font-size: 14px; font-weight: bold;">
                         @if (empty(trim($escuela->lema ?? '')))
                         @else
                             "{{ $escuela->lema }}"
                         @endif
-                    </span>
+                    </span> --}}
                 </p>
 
-                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px">
+                <div class="delegado"
+                    style="margin-top: 10px; text-transform: uppercase; line-height: 17px; font-size: 14px; font-family: sans-serif;">
                     <p style="width: 400px;">
                         <b>
                             {{ $delegado->titulo }} {{ $delegado->nombre }}
@@ -733,20 +735,21 @@
                         </b>
                     </p>
                     <p style="margin-top:-15px; width:320px">
-                        {{ $delegado->cargo }}
+                        <b>{{ $delegado->cargo }}</b>
                     </p>
-                    <p><b>P R E S E N T E</b></p>
+                    {{-- <p><b>P R E S E N T E</b></p> --}}
                 </div>
 
                 <div>
-                    <p style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>
+                    <p
+                        style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 18px; font-family: sans-serif; font-size:13px">
+                        EL(A) QUE SUSCRIBE C. <b><u>
                                 @if ($personal->persona->titulo !== 'C.')
                                     {{ $personal->persona->titulo }}
                                 @endif{{ $nombreCompleto }}
                             </u></b>,
                         SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>EL PERIODO VACACIONAL DE PRIMAVERA</u></b>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
                         <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                         PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
@@ -755,7 +758,7 @@
 
                 @php
                     $datos = [
-                        'NOMBRE' => $nombreCompleto,
+                        'NOMBRE COMPLETO' => $nombreCompleto,
                         'FILIACIÓN' => mb_strtoupper($personal->persona->rfc ?? '---------'),
                         'CURP' => mb_strtoupper($personal->persona->curp ?? '---------'),
                         'CLAVE (S) PRESUPUESTAL (S)' => 'S/C',
@@ -782,12 +785,13 @@
 
                 <div>
                     @foreach ($datos as $key => $dato)
-                        <table style="width: 100%; line-height: 15px;">
+                        <table style="line-height: 15px; font-family: sans-serif; font-size:13px; width: 100%;">
                             <tr>
+                                {{-- <td> --}}
                                 <td style="width: 250px;">
-                                    <b>{{ $key }}:</b>
+                                    {{ $key }}:
                                 </td>
-                                <td style="border-bottom: 1px solid #000;">
+                                <td style="border-bottom: 1px solid #000; font-family: sans-serif;">
                                     @if ($key === 'CARGO QUE DESEMPEÑA')
                                         {!! $dato !!}
                                     @else
@@ -799,7 +803,7 @@
                     @endforeach
                 </div>
 
-                <p style="text-align: justify;">
+                <p style="text-align: justify; font-family: sans-serif; font-size:13px">
                     SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
                 </p>
 
@@ -851,6 +855,7 @@
                         'Q.B.P.',
                         'Q.F.B.',
                         'C.P.',
+                        'C.p.',
                         'Téc.',
                         'Tec.',
                     ];

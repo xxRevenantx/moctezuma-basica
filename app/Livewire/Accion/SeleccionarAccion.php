@@ -6,48 +6,48 @@ use Livewire\Component;
 
 class SeleccionarAccion extends Component
 {
-    public $acciones; // Collection|array (viene del controller)
+    public $acciones;
 
     public ?string $slug_nivel = null;
     public ?string $slug_grado = null;
 
     public ?string $accionActual = null;
 
-    // badges opcionales (ej. bajas)
     public array $badges = [
         'bajas' => 0,
     ];
 
-    public function mount($acciones, $slug_nivel = null, $badges = null): void
+    public function mount($acciones, $slug_nivel = null, $slug_grado = null, $badges = null): void
     {
-        $this->acciones   = $acciones;
+        $this->acciones = $acciones;
         $this->slug_nivel = $slug_nivel;
-
+        $this->slug_grado = $slug_grado;
 
         if (is_array($badges)) {
             $this->badges = array_merge($this->badges, $badges);
         }
 
-        // acción actual desde ruta {accion} o query ?accion=
         $this->accionActual = request()->route('accion') ?? request('accion');
     }
 
     public function ir(string $accion): void
     {
-        // Guardamos estado activo (por si renderiza algo abajo inmediatamente)
         $this->accionActual = $accion;
 
-        // Navegación SPA (sin recarga) con Livewire v3
         if ($this->slug_nivel) {
-            $this->redirectRoute('submodulos.accion', [
+            $parametros = [
                 'slug_nivel' => $this->slug_nivel,
-                'accion'     => $accion,
-            ], navigate: true);
+                'accion' => $accion,
+            ];
 
+            if ($this->slug_grado) {
+                $parametros['slug_grado'] = $this->slug_grado;
+            }
+
+            $this->redirectRoute('submodulos.accion', $parametros, navigate: true);
             return;
         }
 
-        // Fallback: querystring
         $this->redirect(
             request()->fullUrlWithQuery(['accion' => $accion]),
             navigate: true

@@ -212,7 +212,13 @@
                             </div>
 
                             {{-- ====== DATOS PERSONALES ====== --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                <flux:field>
+                                    <flux:label badge="Requerido">Título</flux:label>
+                                    <flux:input wire:model="titulo" class="uppercase" placeholder="Título" />
+                                    <flux:error name="titulo" />
+
+                                </flux:field>
                                 <flux:field>
                                     <flux:label badge="Requerido">CURP</flux:label>
                                     <flux:input wire:model.live.debounce.600ms="curp" maxlength="18"

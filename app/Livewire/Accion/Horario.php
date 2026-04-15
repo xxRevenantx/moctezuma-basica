@@ -138,8 +138,7 @@ class Horario extends Component
 
         if ($this->esBachillerato()) {
             $semestres = Semestre::query()
-                ->where('nivel_id', $this->nivel->id)
-                ->orderBy('orden')
+                ->orderBy('orden_global')
                 ->get();
         }
 

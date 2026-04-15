@@ -191,7 +191,7 @@
                                                 <span>{{ $dia->dia }}</span>
                                                 <span
                                                     class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
-                                                    Orden {{ $dia->orden }}
+
                                                 </span>
                                             </div>
                                         </th>
@@ -213,7 +213,7 @@
 
                                                 <span
                                                     class="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
-                                                    Orden {{ $hora->orden }}
+
                                                 </span>
                                             </div>
                                         </td>
@@ -283,7 +283,7 @@
                             <div class="rounded-2xl bg-white px-4 py-3 dark:bg-neutral-950/50">
                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Semestre</p>
                                 <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ optional($semestres->firstWhere('id', $semestre_id))->semestre ?? (optional($semestres->firstWhere('id', $semestre_id))->nombre ?? 'No seleccionado') }}
+                                    {{ optional($semestres->firstWhere('id', $semestre_id))->numero ?? (optional($semestres->firstWhere('id', $semestre_id))->numero ?? 'No seleccionado') }}
                                 </p>
                             </div>
                         @endif

@@ -19,6 +19,7 @@ class CrearPersonal extends Component
     // =========================
     // Campos
     // =========================
+    public ?string $titulo = null;
     public ?string $nombre = null;
     public ?string $apellido_paterno = null;
     public ?string $apellido_materno = null;
@@ -60,6 +61,7 @@ class CrearPersonal extends Component
     protected function rules(): array
     {
         return [
+            'titulo' => 'required|string|max:10',
             'nombre' => 'required|string|max:255',
             'apellido_paterno' => 'required|string|max:255',
             'apellido_materno' => 'nullable|string|max:255',
@@ -88,6 +90,7 @@ class CrearPersonal extends Component
     protected function messages(): array
     {
         return [
+            'titulo.required' => 'El título es obligatorio.',
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
 
@@ -134,6 +137,7 @@ class CrearPersonal extends Component
     private function resetAutollenadoRenapo(): void
     {
         $this->reset([
+            'titulo',
             'nombre',
             'apellido_paterno',
             'apellido_materno',
@@ -383,6 +387,7 @@ class CrearPersonal extends Component
         }
 
         Persona::create([
+            'titulo' => $this->titulo,
             'nombre' => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
