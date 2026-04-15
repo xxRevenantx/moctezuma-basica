@@ -180,6 +180,8 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
 
                         @case('asignacion-de-materias')
                             <livewire:accion.asignacion-materia :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
+                        @break
+
                         @case('horarios')
                             <livewire:accion.horario :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
                         @break

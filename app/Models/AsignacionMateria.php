@@ -51,4 +51,9 @@ class AsignacionMateria extends Model
         return $this->belongsTo(Semestre::class, 'semestre', 'id');
     }
 
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class, 'asignacion_materia_id');
+    }
+
 }

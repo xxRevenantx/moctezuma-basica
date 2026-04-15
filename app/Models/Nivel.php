@@ -74,5 +74,16 @@ class Nivel extends Model
         return $this->hasMany(AsignacionMateria::class, 'nivel_id');
     }
 
+    // RELACION CON HORAS
+    public function horas()
+    {
+        return $this->hasMany(Hora::class);
+    }
+
+    // RELACION CON DIAS
+    public function dias()
+    {
+        return $this->hasMany(Dia::class);
+    }
 
 }
