@@ -7,7 +7,7 @@
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
 
-    <flux:sidebar sticky stashable class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 ">
+    <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 ">
         {{-- Toggle mobile --}}
         <flux:sidebar.toggle class="lg:hidden mb-2" icon="x-mark" />
 
@@ -91,7 +91,8 @@
                     </flux:navlist.item>
 
 
-                    <flux:sidebar.group expandable heading="ACADÉMICA" class="grid text-xs gap-1 text-zinc-300">
+                    <flux:sidebar.group expandable :expanded="false" heading="ACADÉMICA"
+                        class="grid text-xs gap-1 text-zinc-300">
 
                         <flux:navlist.item icon="home" :href="route('misrutas.escuela')"
                             :current="request()->routeIs('misrutas.escuela')" wire:navigate>
@@ -113,37 +114,35 @@
                             Autoridades
                         </flux:navlist.item>
 
-                        <flux:sidebar.group expandable heading="PERSONAL" class="grid text-xs gap-1 text-zinc-300">
-                            <flux:navlist.item icon="home" :href="route('misrutas.personal')"
-                                :current="request()->routeIs('misrutas.personal')" wire:navigate>
-                                Crear Persona
-                            </flux:navlist.item>
-
-                            <flux:navlist.item icon="home" :href="route('misrutas.role-persona')"
-                                :current="request()->routeIs('misrutas.role-persona')" wire:navigate>
-                                Roles
-                            </flux:navlist.item>
-
-                            <flux:navlist.item icon="home" :href="route('misrutas.plantilla')"
-                                :current="request()->routeIs('misrutas.plantilla')" wire:navigate>
-                                Plantilla
-                            </flux:navlist.item>
-
-
-
-
-
-                        </flux:sidebar.group>
-
-
-
                         <flux:navlist.item icon="home" :href="route('misrutas.niveles')"
                             :current="request()->routeIs('misrutas.niveles')" wire:navigate>
                             Niveles
                         </flux:navlist.item>
                     </flux:sidebar.group>
 
-                    <flux:sidebar.group expandable heading="ESTRUCTURA" class="grid text-xs gap-1 text-zinc-300">
+
+                    <flux:sidebar.group expandable="false" :expanded="false" heading="PERSONAL"
+                        class="grid text-xs gap-1 text-zinc-300">
+                        <flux:navlist.item icon="home" :href="route('misrutas.personal')"
+                            :current="request()->routeIs('misrutas.personal')" wire:navigate>
+                            Crear Persona
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.role-persona')"
+                            :current="request()->routeIs('misrutas.role-persona')" wire:navigate>
+                            Roles
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.plantilla')"
+                            :current="request()->routeIs('misrutas.plantilla')" wire:navigate>
+                            Plantilla
+                        </flux:navlist.item>
+
+                    </flux:sidebar.group>
+
+
+                    <flux:sidebar.group expandable :expanded="false" heading="ESTRUCTURA"
+                        class="grid text-xs gap-1 text-zinc-300">
 
                         <flux:navlist.item icon="home" :href="route('misrutas.grados')"
                             :current="request()->routeIs('misrutas.grados')" wire:navigate>
@@ -171,7 +170,8 @@
 
                     </flux:sidebar.group>
 
-                    <flux:sidebar.group expandable heading="MEDIA SUPERIOR" class="grid text-xs gap-1 text-zinc-300">
+                    <flux:sidebar.group expandable :expanded="false" heading="MEDIA SUPERIOR"
+                        class="grid text-xs gap-1 text-zinc-300">
 
                         <flux:navlist.item icon="home" :href="route('misrutas.semestres')"
                             :current="request()->routeIs('misrutas.semestres')" wire:navigate>

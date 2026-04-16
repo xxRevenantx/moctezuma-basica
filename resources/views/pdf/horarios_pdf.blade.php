@@ -9,8 +9,23 @@
             margin: 20px 24px;
         }
 
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+
+        }
+
+        /* arial bold */
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: bold;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
+        }
+
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: 'ARIAL', DejaVu Sans, sans-serif;
             font-size: 10px;
             color: #1e293b;
         }

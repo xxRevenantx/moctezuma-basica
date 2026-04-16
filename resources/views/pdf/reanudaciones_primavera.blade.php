@@ -237,7 +237,7 @@
                 src="{{ public_path('imagenes/membrete_reanudacion_preescolar_primavera.png') }}" alt="fondo"
                 style="width: 100%;">
 
-            <div class="contenedor_preescolar" style="padding: 155px 100px 0">
+            <div class="contenedor_preescolar" style="padding: 145px 100px 0">
 
                 <p
                     style="text-align: right;  font-size: 13px; line-height: 25px; text-transform: uppercase; font-family: ARIAL;">
@@ -441,10 +441,6 @@
             <div class="page-break"></div>
         @endif
     @endforeach
-
-    {{-- =========================
-        PRIMARIA
-    ========================= --}}
 @elseif ($nivel->slug == 'primaria')
     @foreach ($asignacionesNivel as $personal)
         @php
@@ -664,8 +660,8 @@
     @endforeach
 
     {{-- =========================
-        SECUNDARIA
-    ========================= --}}
+                SECUNDARIA
+            ========================= --}}
 @elseif ($nivel->slug == 'secundaria')
     @foreach ($asignacionesNivel as $personal)
         @php
@@ -726,23 +722,19 @@
         <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria_primavera.png') }}"
             alt="fondo" style="width: 100%;">
 
-        <div class="contenedor_secundaria" style="padding: 170px 100px 0">
+        <div class="contenedor_secundaria" style="padding: 160px 100px 0">
 
             <p
-                style="text-align: right; font-family:sans-serif; font-size: 15px; line-height: 25px; text-transform: uppercase;">
-                <b>ASUNTO:</b> REANUDACIÓN DE LABORES<br><br>
+                style="text-align: right; font-family:ARIAL; font-size: 15px; line-height: 25px; text-transform: uppercase;">
+                <b>ASUNTO:</b> REANUDACIÓN DE LABORES<br>
+            </p>
+            <p
+                style="text-align: right; font-family:ARIAL; margin-right: 50px; font-size: 13px; line-height: 25px; text-transform: uppercase;">
                 CD. ALTAMIRANO, GRO., A {{ $fechaCarta }}.
-                <br>
-                {{-- <span style="font-size: 14px; font-weight: bold;">
-                        @if (empty(trim($escuela->lema ?? '')))
-                        @else
-                            "{{ $escuela->lema }}"
-                        @endif
-                    </span> --}}
             </p>
 
             <div class="delegado"
-                style="margin-top: 10px; text-transform: uppercase; line-height: 17px; font-size: 14px; font-family: sans-serif;">
+                style="margin-top: 0px; text-transform: uppercase; line-height: 17px; font-size: 14px; font-family: ARIAL;">
                 <p style="width: 400px;">
                     <b>
                         {{ $delegado->titulo }} {{ $delegado->nombre }}
@@ -758,14 +750,15 @@
 
             <div>
                 <p
-                    style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 18px; font-family: sans-serif; font-size:13px">
+                    style="text-transform: uppercase; text-align: justify; text-indent: 30px; line-height: 15px; font-family: ARIAL; font-size:13px">
                     EL(A) QUE SUSCRIBE C. <b><u>
                             @if ($personal->persona->titulo !== 'C.')
                                 {{ $personal->persona->titulo }}
                             @endif{{ $nombreCompleto }}
                         </u></b>,
                     SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                    LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>EL PERIODO VACACIONAL DE PRIMAVERA</u></b>,
+                    LABORES, DESPUÉS DE HABER DISFRUTADO <b style="font-family: 'Times New Roman', Times, serif"><u>EL
+                            PERIODO VACACIONAL DE PRIMAVERA</u></b>,
                     CORRESPONDIENTE AL CICLO ESCOLAR
                     <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
                     PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
@@ -801,13 +794,13 @@
 
             <div>
                 @foreach ($datos as $key => $dato)
-                    <table style="line-height: 15px; font-family: sans-serif; font-size:13px; width: 100%;">
+                    <table style="line-height: 12px; font-family: ARIAL; font-size:13px; width: 100%;">
                         <tr>
                             {{-- <td> --}}
                             <td style="width: 250px;">
                                 {{ $key }}:
                             </td>
-                            <td style="border-bottom: 1px solid #000; font-family: sans-serif;">
+                            <td style="border-bottom: 1px solid #000; font-family: ARIAL;">
                                 @if ($key === 'CARGO QUE DESEMPEÑA')
                                     {!! $dato !!}
                                 @else
@@ -819,7 +812,7 @@
                 @endforeach
             </div>
 
-            <p style="text-align: justify; font-family: sans-serif; font-size:13px">
+            <p style="text-align: justify; font-family: ARIAL; font-size:13px">
                 SIN OTRO PARTICULAR, APROVECHO LA OCASIÓN PARA ENVIARLE UN AFECTUOSO SALUDO.
             </p>
 
@@ -832,7 +825,7 @@
                             @if ($slugRolPrincipal === 'director_sin_grupo')
                                 DIRECTOR(A)
                             @endif
-                            <br><br><br><br>
+                            <br><br><br>
                             ___________________________________<br>
                             {{ $personal->persona->titulo }} {{ $nombreCompleto }}
                         </td>
@@ -846,7 +839,7 @@
                                 {{ $supervisorSecundariaNombre }}
                             @else
                                 Vo.Bo. <br>
-                                DIRECTOR(A) <br><br><br><br>
+                                DIRECTOR(A) <br><br><br>
                                 ___________________________________<br>
                                 {{ $nombreDirectorSecundariaNombre }}
                             @endif
@@ -856,6 +849,16 @@
             </div>
 
             @php
+                // ✅ Copias por defecto (solo si no hay copias)
+                $copiasDefault = "C.c.p. Profr. Nahún Rivera Milián – Supervisor Escolar de Secundarias, Zona 02
+                                Profa. Maribel Carranza Vergara – subdirectora de Admón. y Finanzas. Región Tierra Caliente. Con igual fin
+                                Profr. Mario Cuevas Rodríguez. Jefe del Depto. De Personal. Con igual fin
+                                Lic. Porfirio Negrete Maldonado. Jefe del depto. De distribución de cheques y nómina. Con igual fin
+                                Lic. Francisco Alcántara Arzate. Jefe de la oficina de archivo. Para anexar al expediente.";
+
+                // ✅ Si $copias viene null, vacío o solo espacios => usar default
+                $copias = trim((string) ($copias ?? '')) !== '' ? $copias : $copiasDefault;
+
                 $titulos = [
                     'Prof.',
                     'Profr.',
@@ -874,6 +877,8 @@
                     'C.p.',
                     'Téc.',
                     'Tec.',
+                    'DCE.',
+                    'D.C.E.',
                 ];
 
                 $texto = e($copias);
@@ -893,12 +898,12 @@
 
                 $copiasIndentado = '';
                 foreach ($lineas as $i => $linea) {
-                    $copiasIndentado .= $i === 0 ? $linea : '<br><span class="ccp-indent-sec">' . $linea . '</span>';
+                    $copiasIndentado .= $i === 0 ? $linea : '<br><span class="ccp-indent">' . $linea . '</span>';
                 }
             @endphp
 
-            <div class="ccp" style="margin-top: 13px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
-                <p style="font-size: 9px; margin:0;">
+            <div class="ccp" style="margin-top: 12px; ">
+                <p style="font-size: 9.4px; margin:0; font-family: ARIAL">
                     <b>{!! $copiasIndentado !!}</b>
                 </p>
             </div>
