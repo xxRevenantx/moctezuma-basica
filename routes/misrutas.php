@@ -74,6 +74,8 @@ Route::get('/periodos-bachillerato', [PeriodosBachilleratoController::class, 'in
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
 
+Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
+
 
 Route::prefix('nivel')->group(function () {
 

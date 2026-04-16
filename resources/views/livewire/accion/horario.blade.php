@@ -78,6 +78,18 @@
                         class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
                         Días: {{ $dias->count() }}
                     </span>
+
+                    <a target="_blank" href="{{ $this->urlDescargaHorario }}" @class([
+                        'inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all duration-300' => true,
+                        'border border-emerald-200 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 hover:shadow-xl dark:border-emerald-700/50' =>
+                            $this->puedeDescargarHorario,
+                        'pointer-events-none cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-500' => !$this->puedeDescargarHorario,
+                    ])
+                        aria-disabled="{{ $this->puedeDescargarHorario ? 'false' : 'true' }}"
+                        title="{{ $this->puedeDescargarHorario ? 'Descargar horario' : 'Completa los filtros para habilitar la descarga' }}">
+                        <flux:icon.arrow-down-tray class="h-4 w-4" />
+                        <span>Descargar Horario</span>
+                    </a>
                 </div>
             </div>
 
@@ -189,10 +201,6 @@
                                             class="min-w-[180px] border-b border-r border-slate-200 px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-800 dark:text-slate-400">
                                             <div class="flex flex-col items-center gap-1">
                                                 <span>{{ $dia->dia }}</span>
-                                                <span
-                                                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
-
-                                                </span>
                                             </div>
                                         </th>
                                     @endforeach
@@ -210,11 +218,6 @@
                                                     -
                                                     {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('h:i A') }}
                                                 </p>
-
-                                                <span
-                                                    class="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
-
-                                                </span>
                                             </div>
                                         </td>
 
@@ -243,11 +246,37 @@
                                                     </flux:field>
 
                                                     @if ($horarioGuardado && $materiasDisponibles->firstWhere('id', $valorSeleccionado))
-                                                        <div
-                                                            class="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-center dark:border-violet-900/40 dark:bg-violet-950/20">
-                                                            <p
-                                                                class="text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-                                                                {{ $materiasDisponibles->firstWhere('id', $valorSeleccionado)?->materia }}
+                                                        @php
+                                                            $materiaSeleccionada = $materiasDisponibles->firstWhere(
+                                                                'id',
+                                                                $valorSeleccionado,
+                                                            );
+
+                                                            $profesor = $materiaSeleccionada?->profesor;
+
+                                                            $nombreProfesor = $profesor
+                                                                ? trim(
+                                                                    ($profesor->nombre ?? '') .
+                                                                        ' ' .
+                                                                        ($profesor->apellido_paterno ?? '') .
+                                                                        ' ' .
+                                                                        ($profesor->apellido_materno ?? ''),
+                                                                )
+                                                                : 'Sin profesor asignado';
+
+                                                            $estiloProfesor = $this->obtenerEstiloProfesor(
+                                                                $nombreProfesor,
+                                                            );
+                                                        @endphp
+
+                                                        <div class="rounded-2xl border px-3 py-2 text-center shadow-sm"
+                                                            style="
+                                                                background-color: {{ $estiloProfesor['background'] }};
+                                                                color: {{ $estiloProfesor['color'] }};
+                                                                border-color: {{ $estiloProfesor['border'] }};
+                                                            ">
+                                                            <p class="text-[11px] font-semibold">
+                                                                {{ $nombreProfesor }}
                                                             </p>
                                                         </div>
                                                     @endif
@@ -283,7 +312,7 @@
                             <div class="rounded-2xl bg-white px-4 py-3 dark:bg-neutral-950/50">
                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Semestre</p>
                                 <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ optional($semestres->firstWhere('id', $semestre_id))->numero ?? (optional($semestres->firstWhere('id', $semestre_id))->numero ?? 'No seleccionado') }}
+                                    {{ optional($semestres->firstWhere('id', $semestre_id))->semestre ?? (optional($semestres->firstWhere('id', $semestre_id))->nombre ?? 'No seleccionado') }}
                                 </p>
                             </div>
                         @endif
