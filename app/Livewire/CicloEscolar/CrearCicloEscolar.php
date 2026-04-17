@@ -92,6 +92,10 @@ class CrearCicloEscolar extends Component
             'title' => 'Ciclo escolar creado',
             'position' => 'top-end',
         ]);
+
+
+        $this->dispatch('refreshHeader');
+        $this->dispatch('refreshCiclos');
     }
 
     public function render()

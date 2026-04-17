@@ -42,6 +42,8 @@ class MostrarCicloEscolar extends Component
         ]);
 
         $this->refreshCiclos();
+
+        $this->dispatch('refreshHeader');
     }
 
     public function render()

@@ -44,4 +44,10 @@ class Generacion extends Model
     {
         return $this->hasMany(Inscripcion::class);
     }
+
+    // RELACIONES CON HORARIOS
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class);
+    }
 }

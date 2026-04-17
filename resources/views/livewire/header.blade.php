@@ -33,7 +33,8 @@
                         <div
                             class="rounded-xl px-3 py-2 border border-neutral-200 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-700/40 text-sm text-neutral-800 dark:text-neutral-100">
                             Ciclo escolar
-                            <flux:badge color="indigo" class="ml-2">{{ $dashboard->ciclo_escolar ?? '0' }}
+                            <flux:badge color="indigo" class="ml-2">
+                                {{ $cicloEscolar ? $cicloEscolar->inicio_anio . '-' . $cicloEscolar->fin_anio : '0' }}
                             </flux:badge>
                         </div>
 

@@ -86,4 +86,15 @@ class Nivel extends Model
         return $this->hasMany(Dia::class);
     }
 
+    // RELACION CON SEMESTRES
+    public function semestres()
+    {
+        return $this->hasMany(Semestre::class);
+    }
+
+    // RELACION CON HORARIOS
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class);
+    }
 }

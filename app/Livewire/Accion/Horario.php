@@ -87,11 +87,20 @@ class Horario extends Component
             return;
         }
 
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        if (!$grupo) {
+            return;
+        }
+
+        $generacionId = $grupo->generacion_id;
+
         $asignacionMateriaId = filled($asignacionMateriaId) ? (int) $asignacionMateriaId : null;
 
         $consulta = HorarioModel::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $generacionId)
             ->where('grupo_id', $this->grupo_id)
             ->where('hora_id', $horaId)
             ->where('dia_id', $diaId);
@@ -116,6 +125,7 @@ class Horario extends Component
         $datos = [
             'nivel_id' => $this->nivel->id,
             'grado_id' => $this->grado_id,
+            'generacion_id' => $generacionId,
             'grupo_id' => $this->grupo_id,
             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
             'hora_id' => $horaId,
@@ -125,6 +135,7 @@ class Horario extends Component
 
         if ($horarioExistente) {
             $horarioExistente->update([
+                'generacion_id' => $generacionId,
                 'asignacion_materia_id' => $asignacionMateriaId,
             ]);
         } else {
@@ -155,7 +166,6 @@ class Horario extends Component
             $parametros['semestre_id'] = $this->semestre_id;
         }
 
-        // Cambia esta ruta por la tuya si tiene otro nombre
         return route('misrutas.horarios.pdf', $parametros);
     }
 
@@ -227,6 +237,26 @@ class Horario extends Component
         return filled($this->grado_id) && filled($this->grupo_id);
     }
 
+    protected function filtrosMinimosParaMaterias(): bool
+    {
+        if ($this->esBachillerato) {
+            return filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
+        }
+
+        return filled($this->grado_id) && filled($this->grupo_id);
+    }
+
+    protected function obtenerGrupoSeleccionado(): ?Grupo
+    {
+        if (!$this->grupo_id) {
+            return null;
+        }
+
+        return Grupo::query()
+            ->select('id', 'grado_id', 'generacion_id', 'nombre')
+            ->find($this->grupo_id);
+    }
+
     protected function cargarGrados(): void
     {
         $this->grados = Grado::query()
@@ -251,7 +281,6 @@ class Horario extends Component
     {
         $this->horas = Hora::query()
             ->where('nivel_id', $this->nivel->id)
-            // ->when($this->grado_id, fn($query) => $query->where('grado_id', $this->grado_id))
             ->orderBy('orden')
             ->orderBy('hora_inicio')
             ->get();
@@ -308,12 +337,20 @@ class Horario extends Component
             return;
         }
 
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        if (!$grupo) {
+            $this->horariosGuardados = collect();
+            return;
+        }
+
         $horarios = HorarioModel::query()
             ->with([
                 'asignacionMateria.profesor',
             ])
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $grupo->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->when(
                 $this->esBachillerato,
@@ -325,15 +362,6 @@ class Horario extends Component
         $this->horariosGuardados = $horarios->keyBy(function ($horario) {
             return $horario->hora_id . '-' . $horario->dia_id;
         });
-    }
-
-    protected function filtrosMinimosParaMaterias(): bool
-    {
-        if ($this->esBachillerato) {
-            return filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
-        }
-
-        return filled($this->grado_id) && filled($this->grupo_id);
     }
 
     public function render()

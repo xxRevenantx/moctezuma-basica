@@ -22,6 +22,12 @@
             src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
         }
 
+        @font-face {
+            font-family: 'coolvetica';
+            font-style: regular;
+            src: url('{{ storage_path('fonts/Coolveticaregular.ttf') }}') format('truetype');
+        }
+
         body {
             font-family: 'ARIAL', DejaVu Sans, sans-serif;
             font-size: 10px;
@@ -71,10 +77,9 @@
         }
 
         .titulo-institucion {
-            font-size: 18px;
-            font-weight: 700;
+            font-size: 35px;
+            font-family: coolvetica;
             color: #53657d;
-            text-transform: uppercase;
             margin: 0;
             line-height: 1.1;
         }
@@ -205,9 +210,15 @@
         .celda-materia {
             background: #cfe0ef;
             color: #0f172a;
-            font-size: 9px;
-            line-height: 1.25;
-            height: 52px;
+            font-size: 12px;
+        }
+
+        /* Azul pastel */
+        .celda-no-calificable {
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .celda-receso {
@@ -276,7 +287,7 @@
         $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
         $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
 
-        $tituloGrupo = $nombreGrado . ', GRUPO: ' . $nombreGrupo;
+        $tituloGrupo = $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
         if ($esBachillerato && isset($semestre) && $semestre) {
             $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->nombre ?? ''), 'UTF-8');
@@ -295,6 +306,8 @@
         ];
 
         $slugsReceso = ['r', 'e', 'c', 's', 'o', 're', 'receso', 'receso-escolar', 'receso-general'];
+
+        $esPrimaria = (int) ($nivel->id ?? 0) === 2;
 
         $docentes = collect();
 
@@ -330,6 +343,7 @@
                     'docente' => $nombreProfesorTmp,
                     'slug' => $slugMateria,
                     'orden' => (int) ($asignacionTmp->orden ?? 999999),
+                    'calificable' => (int) ($asignacionTmp->calificable ?? 0),
                 ]);
             }
         }
@@ -353,10 +367,11 @@
                     </td>
 
                     <td class="centro">
-                        <p class="titulo-institucion">CENTRO UNIVERSITARIO MOCTEZUMA</p>
+                        <p class="titulo-institucion">Centro Universitario Moctezuma</p>
                         <div class="linea-titulo"></div>
                         <p class="titulo-principal">HORARIO DE CLASES</p>
-                        <p class="subtitulo-principal">CICLO ESCOLAR 2025-2026</p>
+                        <p class="subtitulo-principal">CICLO ESCOLAR
+                            {{ $ciclo_escolar->inicio_anio }}-{{ $ciclo_escolar->fin_anio }}</p>
                     </td>
 
                     <td class="logo-der">
@@ -423,6 +438,7 @@
 
                                 $textoMateria = $asignacion?->materia ?? null;
                                 $slugMateriaCelda = mb_strtolower(trim($asignacion?->slug ?? ''), 'UTF-8');
+                                $calificable = (int) ($asignacion?->calificable ?? 0);
 
                                 $esReceso = false;
 
@@ -447,11 +463,17 @@
                                         $esReceso = true;
                                     }
                                 }
+
+                                $claseCelda = 'celda-materia';
+
+                                if ($esPrimaria && !$esReceso && $calificable === 0) {
+                                    $claseCelda = 'celda-no-calificable';
+                                }
                             @endphp
 
                             @if ($esReceso)
                                 @php
-                                    $letrasReceso = ['R', 'E', 'C', 'E', 'S', 'O'];
+                                    $letrasReceso = ['RE', 'C', 'E', 'S', 'O'];
                                     $indice = $loop->index;
                                 @endphp
 
@@ -459,7 +481,7 @@
                                     {{ $letrasReceso[$indice] ?? '' }}
                                 </td>
                             @else
-                                <td class="celda-materia">
+                                <td class="{{ $claseCelda }}">
                                     @if ($textoMateria)
                                         {{ $textoMateria }}
                                     @else
@@ -489,6 +511,8 @@
                 </thead>
                 <tbody>
                     @foreach ($docentes as $item)
+                        @continue($esPrimaria && (int) $item['calificable'] === 1)
+
                         <tr>
                             <td>{{ mb_strtoupper($item['materia'], 'UTF-8') }}</td>
                             <td>{{ mb_strtoupper($item['docente'], 'UTF-8') }}</td>

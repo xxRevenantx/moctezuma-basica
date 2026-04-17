@@ -36,4 +36,29 @@ class Horario extends Model
     {
         return $this->belongsTo(Dia::class);
     }
+
+    public function generacion()
+    {
+        return $this->belongsTo(Generacion::class, 'generacion_id');
+    }
+
+    public function nivel()
+    {
+        return $this->belongsTo(Nivel::class);
+    }
+
+    public function grado()
+    {
+        return $this->belongsTo(Grado::class);
+    }
+
+    public function grupo()
+    {
+        return $this->belongsTo(Grupo::class);
+    }
+
+    public function semestre()
+    {
+        return $this->belongsTo(Semestre::class);
+    }
 }

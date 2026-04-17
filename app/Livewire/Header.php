@@ -10,6 +10,11 @@ class Header extends Component
     #[On('refreshHeader')]
     public function render()
     {
-        return view('livewire.header');
+        $cicloEscolar = \App\Models\CicloEscolar::query()
+            ->orderByDesc('id')
+            ->first();
+        return view('livewire.header', [
+            'cicloEscolar' => $cicloEscolar,
+        ]);
     }
 }

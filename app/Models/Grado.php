@@ -64,6 +64,9 @@ class Grado extends Model
         return $this->hasMany(AsignacionMateria::class, 'grado_id');
     }
 
-
-
+    // RELACION CON HORARIOS
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class, 'grado_id');
+    }
 }

@@ -52,4 +52,9 @@ class Semestre extends Model
         return $this->hasMany(MateriaPromediar::class, 'semestre_id');
     }
 
+    // RELACION CON HORARIOS
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class);
+    }
 }

@@ -2,5 +2,8 @@
     "arial": {
         "normal": "C:\\laragon\\www\\moctezuma-basica\\storage\\fonts\/arial_normal_d661c247fda660698475fe32cbcd315f",
         "bold": "arial_bold_efe7d97205fecabca41b3e78a2bbe25a"
+    },
+    "coolvetica": {
+        "normal": "coolvetica_normal_fd49d97bd223c3cd54b052cb0375ec54"
     }
 }

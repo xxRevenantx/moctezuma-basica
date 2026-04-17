@@ -722,7 +722,7 @@
         <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria_primavera.png') }}"
             alt="fondo" style="width: 100%;">
 
-        <div class="contenedor_secundaria" style="padding: 160px 100px 0">
+        <div class="contenedor_secundaria" style="padding: 125px 100px 0">
 
             <p
                 style="text-align: right; font-family:ARIAL; font-size: 15px; line-height: 25px; text-transform: uppercase;">
@@ -825,7 +825,7 @@
                             @if ($slugRolPrincipal === 'director_sin_grupo')
                                 DIRECTOR(A)
                             @endif
-                            <br><br><br>
+                            <br><br><br><br>
                             ___________________________________<br>
                             {{ $personal->persona->titulo }} {{ $nombreCompleto }}
                         </td>
@@ -839,7 +839,7 @@
                                 {{ $supervisorSecundariaNombre }}
                             @else
                                 Vo.Bo. <br>
-                                DIRECTOR(A) <br><br><br>
+                                DIRECTOR(A) <br><br><br><br>
                                 ___________________________________<br>
                                 {{ $nombreDirectorSecundariaNombre }}
                             @endif
@@ -850,11 +850,12 @@
 
             @php
                 // ✅ Copias por defecto (solo si no hay copias)
-                $copiasDefault = "C.c.p. Profr. Nahún Rivera Milián – Supervisor Escolar de Secundarias, Zona 02
-                                Profa. Maribel Carranza Vergara – subdirectora de Admón. y Finanzas. Región Tierra Caliente. Con igual fin
-                                Profr. Mario Cuevas Rodríguez. Jefe del Depto. De Personal. Con igual fin
-                                Lic. Porfirio Negrete Maldonado. Jefe del depto. De distribución de cheques y nómina. Con igual fin
-                                Lic. Francisco Alcántara Arzate. Jefe de la oficina de archivo. Para anexar al expediente.";
+                $copiasDefault = "C.c.p. Profa. Maribel Carranza Vergara.-Subdirectora de Admón. y Finanzas. Región Tierra Caliente. Con igual fin.
+                                    Profr. Mario Cuevas Rodríguez.- Jefe del Depto. De Personal.- Con igual fin.
+                                    C.p. Hypatia López Rodríguez.- Jefa del depto. de nómina y distribución de cheques. Con igual fin.
+                                    Lic. Francisco Alcántara Arzate.- Jefe de la oficina de archivo. Para anexar al expediente.
+                                    Mtra. Lorena Sandoval Díaz. Jefa de sector 013. Para su conocimiento.
+                                    Profr. Nahún Rivera Milián. Supervisor de la zona 02. Para su conocimiento.";
 
                 // ✅ Si $copias viene null, vacío o solo espacios => usar default
                 $copias = trim((string) ($copias ?? '')) !== '' ? $copias : $copiasDefault;
@@ -903,7 +904,7 @@
             @endphp
 
             <div class="ccp" style="margin-top: 12px; ">
-                <p style="font-size: 9.4px; margin:0; font-family: ARIAL">
+                <p style="font-size: 9.4px; margin:0; font-family: ARIAL; line-height: 10px;">
                     <b>{!! $copiasIndentado !!}</b>
                 </p>
             </div>
