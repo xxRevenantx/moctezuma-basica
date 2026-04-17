@@ -3,23 +3,21 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Horario</title>
+    <title>Horario escolar</title>
     <style>
         @page {
-            margin: 20px 24px;
+            margin: 18px 22px;
         }
 
         @font-face {
             font-family: 'ARIAL';
             font-style: normal;
             src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
-
         }
 
-        /* arial bold */
         @font-face {
             font-family: 'ARIAL';
-            font-style: bold;
+            font-style: normal;
             font-weight: 700;
             src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
         }
@@ -27,233 +25,482 @@
         body {
             font-family: 'ARIAL', DejaVu Sans, sans-serif;
             font-size: 10px;
-            color: #1e293b;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
         }
 
         * {
             box-sizing: border-box;
         }
 
+        .pagina {
+            width: 100%;
+        }
+
         .encabezado {
             width: 100%;
-            margin-bottom: 14px;
-            border-bottom: 2px solid #7c3aed;
-            padding-bottom: 10px;
+            margin-bottom: 10px;
         }
 
-        .titulo {
-            font-size: 18px;
-            font-weight: bold;
-            color: #4c1d95;
-            margin: 0 0 6px 0;
-        }
-
-        .subtitulo {
-            font-size: 10px;
-            color: #64748b;
-            margin: 0;
-        }
-
-        .bloque-info {
-            width: 100%;
-            margin-bottom: 14px;
-        }
-
-        .info-item {
-            display: inline-block;
-            width: 24%;
-            vertical-align: top;
-            margin-right: 1%;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 8px 10px;
-        }
-
-        .info-item:last-child {
-            margin-right: 0;
-        }
-
-        .info-label {
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #64748b;
-            margin-bottom: 3px;
-        }
-
-        .info-valor {
-            font-size: 11px;
-            font-weight: bold;
-            color: #0f172a;
-        }
-
-        table {
+        .tabla-encabezado {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
         }
 
-        thead th {
-            background: #ede9fe;
-            color: #4c1d95;
-            border: 1px solid #cbd5e1;
-            padding: 8px 6px;
+        .tabla-encabezado td {
+            border: none;
+            vertical-align: middle;
+        }
+
+        .logo-izq,
+        .logo-der {
+            width: 120px;
             text-align: center;
-            font-size: 10px;
         }
 
-        tbody td {
-            border: 1px solid #cbd5e1;
-            padding: 6px;
-            vertical-align: top;
+        .logo-izq img,
+        .logo-der img {
+            max-width: 95px;
+            max-height: 95px;
         }
 
-        .col-hora {
-            width: 110px;
-            background: #f8fafc;
-            font-weight: bold;
+        .centro {
+            text-align: center;
+            padding: 0 10px;
+        }
+
+        .titulo-institucion {
+            font-size: 18px;
+            font-weight: 700;
+            color: #53657d;
+            text-transform: uppercase;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .linea-titulo {
+            height: 2px;
+            background: #9aa7b8;
+            margin: 4px 0 8px 0;
+        }
+
+        .titulo-principal {
+            font-size: 16px;
+            font-weight: 700;
+            color: #000000;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .subtitulo-principal {
+            font-size: 16px;
+            font-weight: 700;
+            color: #000000;
+            margin: 2px 0 0 0;
+            text-transform: uppercase;
+        }
+
+        .franja-grupo {
+            margin-top: 8px;
+            border-top: 2px solid #3d95c8;
+            border-bottom: 2px solid #3d95c8;
+            padding: 6px 10px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0869a6;
+            text-transform: uppercase;
+        }
+
+        .tabla-horario {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 3px;
+            table-layout: fixed;
+            margin-top: 12px;
+        }
+
+        .tabla-horario th,
+        .tabla-horario td {
+            border: none;
             text-align: center;
             vertical-align: middle;
-            color: #334155;
+            padding: 8px 6px;
+            word-wrap: break-word;
         }
 
-        .celda {
-            min-height: 58px;
-        }
-
-        .materia {
-            display: block;
-            font-weight: bold;
+        .th-grado {
+            background: #f2616b;
+            color: #ffffff;
             font-size: 10px;
-            color: #1e293b;
-            margin-bottom: 5px;
-            text-align: center;
+            font-weight: 700;
+            text-transform: uppercase;
         }
 
-        .profesor {
-            display: block;
+        .th-horario {
+            background: #f4943b;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .th-lunes {
+            background: #ef5e72;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .th-martes {
+            background: #8a71b7;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .th-miercoles {
+            background: #36aebc;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .th-jueves {
+            background: #2f89c7;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .th-viernes {
+            background: #4caf67;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .columna-grado {
+            background: #24a7dc;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 14px;
+            line-height: 1.4;
+            text-transform: uppercase;
+        }
+
+        .columna-hora {
+            background: #c8d8ac;
+            color: #000000;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .celda-materia {
+            background: #cfe0ef;
+            color: #0f172a;
             font-size: 9px;
-            color: #475569;
-            line-height: 1.35;
-            text-align: center;
+            line-height: 1.25;
+            height: 52px;
         }
 
-        .vacio {
-            color: #94a3b8;
-            font-style: italic;
-            text-align: center;
+        .celda-receso {
+            background: #f2aa18;
+            color: #000000;
+            font-size: 14px;
+            font-weight: 700;
+            height: 42px;
+        }
+
+        .texto-grado {
+            margin-bottom: 12px;
+        }
+
+        .imagen-nina {
             margin-top: 10px;
         }
 
-        .pie {
-            margin-top: 12px;
+        .imagen-nina img {
+            width: 74px;
+            height: auto;
+        }
+
+        .tabla-docentes {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            table-layout: fixed;
+            font-size: 10px;
+        }
+
+        .tabla-docentes th {
+            background: #b9d0e2;
+            color: #0f172a;
+            border: 1px solid #7f96a8;
+            padding: 6px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .tabla-docentes td {
+            border: 1px solid #7f96a8;
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        .sin-registro {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .nota {
+            margin-top: 8px;
+            text-align: right;
             font-size: 9px;
             color: #64748b;
-            text-align: right;
         }
     </style>
 </head>
 
 <body>
-    <div class="encabezado">
-        <p class="titulo">Horario escolar</p>
-        <p class="subtitulo">
-            Documento generado el {{ $fecha_impresion->format('d/m/Y h:i A') }}
-        </p>
-    </div>
+    @php
+        use Carbon\Carbon;
 
-    <div class="bloque-info">
-        <div class="info-item">
-            <div class="info-label">Nivel</div>
-            <div class="info-valor">{{ $nivel->nombre }}</div>
-        </div>
+        $nombreNivel = mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8');
+        $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
+        $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
 
-        <div class="info-item">
-            <div class="info-label">Grado</div>
-            <div class="info-valor">{{ $grado->nombre }}</div>
-        </div>
+        $tituloGrupo = $nombreGrado . ', GRUPO: ' . $nombreGrupo;
 
-        <div class="info-item">
-            <div class="info-label">Grupo</div>
-            <div class="info-valor">{{ $grupo->nombre }}</div>
-        </div>
+        if ($esBachillerato && isset($semestre) && $semestre) {
+            $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->nombre ?? ''), 'UTF-8');
+        }
 
-        @if ($esBachillerato)
-            <div class="info-item">
-                <div class="info-label">Semestre</div>
-                <div class="info-valor">
-                    {{ $semestre->semestre ?? ($semestre->nombre ?? 'Sin semestre') }}
-                </div>
-            </div>
-        @endif
-    </div>
+        $profesorTitular = $profesor_titular ?? null;
 
-    <table>
-        <thead>
-            <tr>
-                <th class="col-hora">Hora</th>
-                @foreach ($dias as $dia)
-                    <th>{{ $dia->dia }}</th>
-                @endforeach
-            </tr>
-        </thead>
+        $diasOrdenados = $dias->values();
 
-        <tbody>
-            @forelse ($horas as $hora)
+        $encabezadosPorDia = [
+            0 => ['texto' => 'LUNES', 'class' => 'th-lunes'],
+            1 => ['texto' => 'MARTES', 'class' => 'th-martes'],
+            2 => ['texto' => 'MIÉRCOLES', 'class' => 'th-miercoles'],
+            3 => ['texto' => 'JUEVES', 'class' => 'th-jueves'],
+            4 => ['texto' => 'VIERNES', 'class' => 'th-viernes'],
+        ];
+
+        $slugsReceso = ['r', 'e', 'c', 's', 'o', 're', 'receso', 'receso-escolar', 'receso-general'];
+
+        $docentes = collect();
+
+        foreach ($horas as $horaTmp) {
+            foreach ($diasOrdenados as $diaTmp) {
+                $registroTmp = $horarioPorCelda->get($horaTmp->id . '-' . $diaTmp->id);
+                $asignacionTmp = $registroTmp?->asignacionMateria;
+
+                if (!$asignacionTmp) {
+                    continue;
+                }
+
+                $slugMateria = mb_strtolower(trim($asignacionTmp->slug ?? ''), 'UTF-8');
+
+                if (in_array($slugMateria, $slugsReceso, true)) {
+                    continue;
+                }
+
+                $profesorTmp = $asignacionTmp->profesor;
+
+                $nombreProfesorTmp = $profesorTmp
+                    ? trim(
+                        ($profesorTmp->nombre ?? '') .
+                            ' ' .
+                            ($profesorTmp->apellido_paterno ?? '') .
+                            ' ' .
+                            ($profesorTmp->apellido_materno ?? ''),
+                    )
+                    : 'Sin profesor asignado';
+
+                $docentes->push([
+                    'materia' => $asignacionTmp->materia ?? 'Sin materia',
+                    'docente' => $nombreProfesorTmp,
+                    'slug' => $slugMateria,
+                    'orden' => (int) ($asignacionTmp->orden ?? 999999),
+                ]);
+            }
+        }
+
+        $docentes = $docentes
+            ->unique(function ($item) {
+                return mb_strtoupper(trim($item['materia'] . '|' . $item['docente']), 'UTF-8');
+            })
+            ->sortBy([['orden', 'asc'], ['materia', 'asc']])
+            ->values();
+    @endphp
+
+    <div class="pagina">
+        <div class="encabezado">
+            <table class="tabla-encabezado">
                 <tr>
-                    <td class="col-hora">
-                        {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('h:i A') }}
-                        -
-                        {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('h:i A') }}
+                    <td class="logo-izq">
+                        @if (!empty($logo_izquierdo))
+                            <img src="{{ $logo_izquierdo }}" alt="Logo izquierdo">
+                        @endif
                     </td>
 
-                    @foreach ($dias as $dia)
+                    <td class="centro">
+                        <p class="titulo-institucion">CENTRO UNIVERSITARIO MOCTEZUMA</p>
+                        <div class="linea-titulo"></div>
+                        <p class="titulo-principal">HORARIO DE CLASES</p>
+                        <p class="subtitulo-principal">CICLO ESCOLAR 2025-2026</p>
+                    </td>
+
+                    <td class="logo-der">
+                        @if (!empty($logo_derecho))
+                            <img src="{{ $logo_derecho }}" alt="Logo derecho">
+                        @endif
+                    </td>
+                </tr>
+            </table>
+
+            <div class="franja-grupo">
+                {{ $tituloGrupo }}
+                @if ($profesorTitular)
+                    · PROFESOR(A): {{ mb_strtoupper($profesorTitular, 'UTF-8') }}
+                @endif
+            </div>
+        </div>
+
+        <table class="tabla-horario">
+            <thead>
+                <tr>
+                    <th class="th-grado" style="width: 125px;">GRADO</th>
+                    <th class="th-horario" style="width: 135px;">HORARIO</th>
+
+                    @foreach ($diasOrdenados as $index => $dia)
                         @php
-                            $registro = $horarioPorCelda->get($hora->id . '-' . $dia->id);
-                            $asignacion = $registro?->asignacionMateria;
-                            $profesor = $asignacion?->profesor;
-
-                            $nombreProfesor = $profesor
-                                ? trim(
-                                    ($profesor->nombre ?? '') .
-                                        ' ' .
-                                        ($profesor->apellido_paterno ?? '') .
-                                        ' ' .
-                                        ($profesor->apellido_materno ?? ''),
-                                )
-                                : null;
+                            $encabezado = $encabezadosPorDia[$index] ?? [
+                                'texto' => mb_strtoupper($dia->dia, 'UTF-8'),
+                                'class' => 'th-lunes',
+                            ];
                         @endphp
-
-                        <td>
-                            <div class="celda">
-                                @if ($asignacion)
-                                    <span class="materia">
-                                        {{ $asignacion->materia }}
-                                    </span>
-
-                                    <span class="profesor">
-                                        {{ $nombreProfesor ?: 'Sin profesor asignado' }}
-                                    </span>
-                                @else
-                                    <div class="vacio">Sin asignación</div>
-                                @endif
-                            </div>
-                        </td>
+                        <th class="{{ $encabezado['class'] }}">{{ $encabezado['texto'] }}</th>
                     @endforeach
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="{{ $dias->count() + 1 }}" style="text-align:center; padding: 18px;">
-                        No hay registros de horario para los filtros seleccionados.
-                    </td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
 
-    <div class="pie">
-        Centro Universitario Moctezuma
+            <tbody>
+                @forelse ($horas as $hora)
+                    <tr>
+                        @if ($loop->first)
+                            <td class="columna-grado" rowspan="{{ $horas->count() }}">
+                                <div class="texto-grado">
+                                    {{ $nombreGrado }}° GRADO DE <br>{{ $nombreNivel }}
+                                </div>
+
+                                @if (!empty($imagen_nivel))
+                                    <div class="imagen-nina">
+                                        <img src="{{ $imagen_nivel }}" alt="Imagen del nivel">
+                                    </div>
+                                @endif
+                            </td>
+                        @endif
+
+                        <td class="columna-hora">
+                            {{ Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('g:ia') }}
+                            -
+                            {{ Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('g:ia') }}
+                        </td>
+
+                        @foreach ($diasOrdenados as $dia)
+                            @php
+                                $registro = $horarioPorCelda->get($hora->id . '-' . $dia->id);
+                                $asignacion = $registro?->asignacionMateria;
+
+                                $textoMateria = $asignacion?->materia ?? null;
+                                $slugMateriaCelda = mb_strtolower(trim($asignacion?->slug ?? ''), 'UTF-8');
+
+                                $esReceso = false;
+
+                                if (in_array($slugMateriaCelda, $slugsReceso, true)) {
+                                    $esReceso = true;
+                                }
+
+                                if (!$esReceso && $textoMateria) {
+                                    $materiaNormalizada = mb_strtolower(trim($textoMateria), 'UTF-8');
+                                    $esReceso = in_array(
+                                        $materiaNormalizada,
+                                        ['receso', 'receso escolar', 'receso general'],
+                                        true,
+                                    );
+                                }
+
+                                if (!$esReceso) {
+                                    $horaInicio = Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('H:i');
+                                    $horaFin = Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('H:i');
+
+                                    if ($horaInicio === '10:00' && $horaFin === '10:30') {
+                                        $esReceso = true;
+                                    }
+                                }
+                            @endphp
+
+                            @if ($esReceso)
+                                @php
+                                    $letrasReceso = ['R', 'E', 'C', 'E', 'S', 'O'];
+                                    $indice = $loop->index;
+                                @endphp
+
+                                <td class="celda-receso">
+                                    {{ $letrasReceso[$indice] ?? '' }}
+                                </td>
+                            @else
+                                <td class="celda-materia">
+                                    @if ($textoMateria)
+                                        {{ $textoMateria }}
+                                    @else
+                                        <span class="sin-registro">Sin asignación</span>
+                                    @endif
+                                </td>
+                            @endif
+                        @endforeach
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="{{ $diasOrdenados->count() + 2 }}" style="padding: 18px; text-align: center;">
+                            No hay registros de horario para los filtros seleccionados.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+
+        @if ($docentes->count())
+            <table class="tabla-docentes">
+                <thead>
+                    <tr>
+                        <th style="width: 34%;">MATERIA</th>
+                        <th>DOCENTE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($docentes as $item)
+                        <tr>
+                            <td>{{ mb_strtoupper($item['materia'], 'UTF-8') }}</td>
+                            <td>{{ mb_strtoupper($item['docente'], 'UTF-8') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        <div class="nota">
+            Generado el {{ $fecha_impresion->format('d/m/Y h:i A') }}
+        </div>
     </div>
 </body>
 
