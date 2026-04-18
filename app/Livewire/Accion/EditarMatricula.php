@@ -642,6 +642,54 @@ class EditarMatricula extends Component
         $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
     }
 
+
+    protected function validarRelacionAcademica(array &$data): bool
+    {
+        $gradoValido = Grado::query()
+            ->where('id', (int) $data['grado_id'])
+            ->where('nivel_id', (int) $data['nivel_id'])
+            ->exists();
+
+        if (!$gradoValido) {
+            $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
+            return false;
+        }
+
+        $grupoQuery = Grupo::query()
+            ->where('id', (int) $data['grupo_id'])
+            ->where('nivel_id', (int) $data['nivel_id'])
+            ->where('grado_id', (int) $data['grado_id'])
+            ->where('generacion_id', (int) $data['generacion_id']);
+
+        if ($this->esBachillerato) {
+            $semestreValido = Grupo::query()
+                ->where('nivel_id', (int) $data['nivel_id'])
+                ->where('grado_id', (int) $data['grado_id'])
+                ->where('generacion_id', (int) $data['generacion_id'])
+                ->where('semestre_id', (int) $data['semestre_id'])
+                ->exists();
+
+            if (!$semestreValido) {
+                $this->addError('semestre_id', 'El semestre no pertenece a la selección actual.');
+                return false;
+            }
+
+            $grupoQuery->where('semestre_id', (int) $data['semestre_id']);
+        } else {
+            $data['semestre_id'] = null;
+            $grupoQuery->whereNull('semestre_id');
+        }
+
+        $grupoValido = $grupoQuery->exists();
+
+        if (!$grupoValido) {
+            $this->addError('grupo_id', 'El grupo no pertenece a la selección actual.');
+            return false;
+        }
+
+        return true;
+    }
+
     // =========================
     // Validación
     // =========================
@@ -830,7 +878,7 @@ class EditarMatricula extends Component
         $this->genero = $inscripcion->genero;
 
         $this->fecha_inscripcion = $inscripcion->fecha_inscripcion
-            ? \Carbon\Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d\TH:i')
+            ? \Carbon\Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
             : null;
         $this->ciclo_id = $inscripcion->ciclo_id ? (int) $inscripcion->ciclo_id : null;
 
@@ -886,6 +934,10 @@ class EditarMatricula extends Component
         $this->sanitizeStrings();
 
         $data = $this->validate();
+
+        if (!$this->validarRelacionAcademica($data)) {
+            return;
+        }
 
         $inscripcion = Inscripcion::findOrFail($this->InscripcionId);
 

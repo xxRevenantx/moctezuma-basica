@@ -365,6 +365,7 @@ class CrearInscripcion extends Component
             $this->copiar_direccion_tutor = false;
             return;
         }
+
         if ($this->copiar_direccion_tutor) {
             usleep(250000);
             $this->llenarDireccionDesdeTutor();
@@ -383,9 +384,7 @@ class CrearInscripcion extends Component
             return;
         }
 
-        // Pequeña pausa para que el loader se alcance a mostrar
         usleep(250000);
-
         $this->llenarDireccionDesdeTutor();
     }
 
@@ -638,6 +637,59 @@ class CrearInscripcion extends Component
         $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
     }
 
+    public function quitarFotoTemporal(): void
+    {
+        $this->reset('foto');
+        $this->dispatch('foto-limpiada');
+    }
+
+    protected function validarRelacionAcademica(array &$data): bool
+    {
+        $gradoValido = Grado::query()
+            ->where('id', (int) $data['grado_id'])
+            ->where('nivel_id', (int) $data['nivel_id'])
+            ->exists();
+
+        if (!$gradoValido) {
+            $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
+            return false;
+        }
+
+        $grupoQuery = Grupo::query()
+            ->where('id', (int) $data['grupo_id'])
+            ->where('nivel_id', (int) $data['nivel_id'])
+            ->where('grado_id', (int) $data['grado_id'])
+            ->where('generacion_id', (int) $data['generacion_id']);
+
+        if ($this->esBachillerato) {
+            $semestreValido = Grupo::query()
+                ->where('nivel_id', (int) $data['nivel_id'])
+                ->where('grado_id', (int) $data['grado_id'])
+                ->where('generacion_id', (int) $data['generacion_id'])
+                ->where('semestre_id', (int) $data['semestre_id'])
+                ->exists();
+
+            if (!$semestreValido) {
+                $this->addError('semestre_id', 'El semestre no pertenece a la selección actual.');
+                return false;
+            }
+
+            $grupoQuery->where('semestre_id', (int) $data['semestre_id']);
+        } else {
+            $data['semestre_id'] = null;
+            $grupoQuery->whereNull('semestre_id');
+        }
+
+        $grupoValido = $grupoQuery->exists();
+
+        if (!$grupoValido) {
+            $this->addError('grupo_id', 'El grupo no pertenece a la selección actual.');
+            return false;
+        }
+
+        return true;
+    }
+
     // =========================
     // Validación
     // =========================
@@ -798,9 +850,12 @@ class CrearInscripcion extends Component
 
         $data = $this->validate();
 
-
+        if (!$this->validarRelacionAcademica($data)) {
+            return;
+        }
 
         $fotoPath = null;
+
         if ($this->foto) {
             $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
         }
@@ -904,6 +959,8 @@ class CrearInscripcion extends Component
         $this->esBachillerato = false;
         $this->fecha_inscripcion = now()->toDateString();
         $this->matricula = '';
+
+        $this->dispatch('foto-limpiada');
     }
 
     public function render()

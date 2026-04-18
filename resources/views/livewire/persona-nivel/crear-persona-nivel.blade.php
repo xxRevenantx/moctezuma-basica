@@ -41,7 +41,6 @@
                         </div>
                     </div>
 
-                    {{-- Persona + Nivel + Grado + Grupo --}}
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <flux:select wire:model.live="persona_id" label="Seleccionar Personal">
                             <flux:select.option value="">-- Seleccionar Personal --</flux:select.option>
@@ -70,8 +69,11 @@
                         </flux:select>
 
                         <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
-                            :disabled="!$grado_id || $grupos->isEmpty()">
-                            <flux:select.option value="">-- Seleccionar Grupo (opcional) --</flux:select.option>
+                            :disabled="!$grado_id || $grupos->isEmpty() || (int) $nivel_id === 4">
+                            <flux:select.option value="">
+                                {{ (int) $nivel_id === 4 ? '-- No aplica para Bachillerato --' : '-- Seleccionar Grupo (opcional) --' }}
+                            </flux:select.option>
+
                             @foreach ($grupos as $grupo)
                                 <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
                                 </flux:select.option>
@@ -79,7 +81,6 @@
                         </flux:select>
                     </div>
 
-                    {{-- Chips de roles --}}
                     <div class="mt-5">
                         <div class="flex items-center justify-between gap-2">
                             <div>
@@ -143,7 +144,6 @@
                         </div>
                     </div>
 
-                    {{-- Fechas --}}
                     <div class="mt-5">
                         <div class="flex items-start justify-between gap-3 mb-2">
                             <div>
@@ -183,7 +183,6 @@
                         @endif
                     </div>
 
-
                     <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 
                     <div class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
@@ -203,7 +202,6 @@
                     </div>
                 </div>
 
-                <!-- Loader overlay -->
                 <div wire:loading.delay wire:target="asignarPersonalNivel"
                     class="pointer-events-none absolute inset-0 grid place-items-center bg-white/60 dark:bg-neutral-900/60">
                     <div

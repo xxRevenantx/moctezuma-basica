@@ -99,7 +99,7 @@
                             @endforeach
                         </flux:select>
 
-                        <!-- Roles (chips) -->
+                        <!-- Roles -->
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">
                                 Función / Rol
@@ -146,8 +146,10 @@
                             </flux:select>
 
                             <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
-                                :disabled="!$grado_id || $grupos->isEmpty()">
-                                <flux:select.option value="">-- Seleccionar Grupo --</flux:select.option>
+                                :disabled="!$grado_id || $grupos->isEmpty() || (int) $nivel_id === 4">
+                                <flux:select.option value="">
+                                    {{ (int) $nivel_id === 4 ? '-- No aplica para Bachillerato --' : '-- Seleccionar Grupo --' }}
+                                </flux:select.option>
                                 @foreach ($grupos as $grupo)
                                     <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
                                     </flux:select.option>
@@ -163,7 +165,15 @@
                             </div>
                         @endif
 
-                        {{-- ✅ FECHAS: SOLO SI NO ES SECUNDARIA --}}
+                        @error('grado_id')
+                            <p class="md:col-span-2 -mt-2 text-xs text-rose-600">{{ $message }}</p>
+                        @enderror
+
+                        @error('grupo_id')
+                            <p class="md:col-span-2 -mt-2 text-xs text-rose-600">{{ $message }}</p>
+                        @enderror
+
+                        {{-- Fechas: solo si no es secundaria --}}
                         @if (!$this->esSecundaria())
                             <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG" />
                             <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP" />

@@ -54,10 +54,8 @@
         </div>
     </div>
 
-
     {{-- Encabezado --}}
     <div>
-
         <div class="p-5 sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -110,7 +108,7 @@
         <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
 
         <div class="p-5 sm:p-6">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <div>
                     <flux:label>Nivel</flux:label>
                     <flux:input readonly variant="filled" value="{{ $nivel?->nombre ?? '—' }}" disabled />
@@ -122,15 +120,31 @@
                         <flux:select.option value="">Selecciona una generación</flux:select.option>
                         @foreach ($generaciones as $generacion)
                             <flux:select.option value="{{ $generacion->id }}">
-                                {{ $generacion->label }}
+                                {{ $generacion->label ?? $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
                 </div>
 
+                @if ($esBachillerato)
+                    <div>
+                        <flux:label>Semestre</flux:label>
+                        <flux:select id="semestre_id" wire:model.live="semestre_id"
+                            :disabled="!$generacion_id || $semestres->isEmpty()">
+                            <flux:select.option value="">Selecciona un semestre</flux:select.option>
+                            @foreach ($semestres as $semestre)
+                                <flux:select.option value="{{ $semestre->id }}">
+                                    Semestre {{ $semestre->numero }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+                @endif
+
                 <div>
                     <flux:label>Grupo</flux:label>
-                    <flux:select id="grupo_id" wire:model.live="grupo_id">
+                    <flux:select id="grupo_id" wire:model.live="grupo_id"
+                        :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || $grupos->isEmpty()">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ $grupo->id }}">
@@ -155,7 +169,9 @@
                         </span>
                     @endif
 
-                    @if ($generacion_id && $grupo_id)
+                    @if (
+                        (!$esBachillerato && $generacion_id && $grupo_id) ||
+                            ($esBachillerato && $generacion_id && $semestre_id && $grupo_id))
                         <span
                             class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
                             Filtros aplicados
@@ -171,20 +187,29 @@
         </div>
     </div>
 
-    @if (!$generacion_id || !$grupo_id)
+    @if (
+        (!$esBachillerato && (!$generacion_id || !$grupo_id)) ||
+            ($esBachillerato && (!$generacion_id || !$semestre_id || !$grupo_id)))
         <div
             class="rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-10 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/60">
             <div class="mx-auto max-w-2xl">
                 <h2 class="text-xl font-bold text-slate-800 dark:text-white">
-                    Selecciona una generación y un grupo
+                    @if ($esBachillerato)
+                        Selecciona una generación, un semestre y un grupo
+                    @else
+                        Selecciona una generación y un grupo
+                    @endif
                 </h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Primero elige ambos filtros para mostrar la matrícula y el personal relacionado.
+                    @if ($esBachillerato)
+                        Primero elige esos tres filtros para mostrar la matrícula y el personal relacionado.
+                    @else
+                        Primero elige ambos filtros para mostrar la matrícula y el personal relacionado.
+                    @endif
                 </p>
             </div>
         </div>
     @else
-        {{-- CARD ÚNICO --}}
         <div
             class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
             <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-emerald-500 to-fuchsia-500"></div>
@@ -193,10 +218,8 @@
                 {{-- Sección personal asignado --}}
                 <section class="mb-3">
                     <div class="relative">
-
-
                         <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="generacion_id,grupo_id,search">
+                            wire:target="generacion_id,semestre_id,grupo_id,search">
                             @if ($personal->isEmpty())
                                 <div
                                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
@@ -252,6 +275,11 @@
                                                         {{ $p->nivel?->nombre ?? '—' }}</p>
                                                     <p><span class="font-semibold">Grado:</span>
                                                         {{ $detalle?->grado?->nombre ?? '—' }}</p>
+                                                    @if ($esBachillerato)
+                                                        <p><span class="font-semibold">Semestre:</span>
+                                                            {{ $semestres->firstWhere('id', $semestre_id)?->numero ?? '—' }}
+                                                        </p>
+                                                    @endif
                                                     <p><span class="font-semibold">Grupo:</span>
                                                         {{ $detalle?->grupo?->nombre ?? '—' }}</p>
                                                 </div>
@@ -291,33 +319,64 @@
                         </div>
                     </div>
 
-                    <div class="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
-                        <div class="flex flex-col gap-3 sm:flex-row">
-                            <div class="w-full sm:max-w-xs">
-                                <label for="nuevo_grado_id"
-                                    class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    Cambiar grado a seleccionados
-                                </label>
-                                <select id="nuevo_grado_id" wire:model="nuevo_grado_id" @disabled($this->selectedCount === 0)
-                                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
-                                    <option value="">Selecciona un grado</option>
-                                    @foreach ($grados as $grado)
-                                        <option value="{{ $grado->id }}">
-                                            {{ $grado->nombre }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                    @if (!$esBachillerato)
+                        <div class="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
+                            <div class="flex flex-col gap-3 sm:flex-row">
+                                <div class="w-full sm:max-w-xs">
+                                    <label for="nuevo_grado_id"
+                                        class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        Cambiar grado a seleccionados
+                                    </label>
+                                    <select id="nuevo_grado_id" wire:model="nuevo_grado_id" @disabled($this->selectedCount === 0)
+                                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                                        <option value="">Selecciona un grado</option>
+                                        @foreach ($grados as $grado)
+                                            <option value="{{ $grado->id }}">
+                                                {{ $grado->nombre }}
+                                            </option>
+                                        @endforeach
+                                    </select>
 
-                                @error('nuevo_grado_id')
-                                    <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
-                                @enderror
+                                    @error('nuevo_grado_id')
+                                        <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="flex items-end">
+                                <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
+                                    wire:target="exportarMatricula"
+                                    class="mr-3 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                    <span wire:loading.remove wire:target="exportarMatricula">
+                                        <div class="flex justify-between gap-2">
+                                            <flux:icon.download class="h-4 w-4" />
+                                            Exportar Excel
+                                        </div>
+                                    </span>
+
+                                    <span wire:loading wire:target="exportarMatricula">
+                                        Descargando...
+                                    </span>
+                                </button>
+
+                                <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
+                                    wire:target="aplicarCambiarGrado"
+                                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                    <span wire:loading.remove wire:target="aplicarCambiarGrado">
+                                        Aplicar cambio
+                                    </span>
+
+                                    <span wire:loading wire:target="aplicarCambiarGrado">
+                                        Aplicando...
+                                    </span>
+                                </button>
                             </div>
                         </div>
-
-                        <div class="flex items-end">
+                    @else
+                        <div class="mb-5 flex justify-end">
                             <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
                                 wire:target="exportarMatricula"
-                                class="mr-3 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
                                 <span wire:loading.remove wire:target="exportarMatricula">
                                     <div class="flex justify-between gap-2">
                                         <flux:icon.download class="h-4 w-4" />
@@ -329,25 +388,12 @@
                                     Descargando...
                                 </span>
                             </button>
-
-                            <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
-                                wire:target="aplicarCambiarGrado"
-                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
-                                <span wire:loading.remove wire:target="aplicarCambiarGrado">
-                                    Aplicar cambio
-                                </span>
-
-                                <span wire:loading wire:target="aplicarCambiarGrado">
-                                    Aplicando...
-                                </span>
-                            </button>
                         </div>
-                    </div>
+                    @endif
 
                     <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="generacion_id,grupo_id,search">
-                        {{-- Loader premium tabla --}}
-                        <div wire:loading.flex wire:target="generacion_id,grupo_id,search"
+                        wire:target="generacion_id,semestre_id,grupo_id,search">
+                        <div wire:loading.flex wire:target="generacion_id,semestre_id,grupo_id,search"
                             class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">
@@ -431,6 +477,12 @@
                                                 class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                                 Grado
                                             </th>
+                                            @if ($esBachillerato)
+                                                <th
+                                                    class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                    Semestre
+                                                </th>
+                                            @endif
                                             <th
                                                 class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                                 Grupo
@@ -514,6 +566,13 @@
                                                     {{ $row->grado?->nombre ?? '—' }}
                                                 </td>
 
+                                                @if ($esBachillerato)
+                                                    <td
+                                                        class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                        {{ $row->semestre?->numero ?? '—' }}
+                                                    </td>
+                                                @endif
+
                                                 <td
                                                     class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
                                                     {{ $row->grupo?->nombre ?? '—' }}
@@ -538,7 +597,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="13"
+                                                <td colspan="{{ $esBachillerato ? 14 : 13 }}"
                                                     class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
                                                     No se encontraron alumnos con los filtros actuales.
                                                 </td>
@@ -578,6 +637,11 @@
                                         <div><span class="font-semibold">Grado:</span>
                                             {{ $row->grado?->nombre ?? '—' }}
                                         </div>
+                                        @if ($esBachillerato)
+                                            <div><span class="font-semibold">Semestre:</span>
+                                                {{ $row->semestre?->numero ?? '—' }}
+                                            </div>
+                                        @endif
                                         <div><span class="font-semibold">Grupo:</span>
                                             {{ $row->grupo?->nombre ?? '—' }}
                                         </div>
@@ -599,7 +663,6 @@
                     </div>
                 </section>
 
-                {{-- Separador interno --}}
                 <div
                     class="my-8 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
                 </div>

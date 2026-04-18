@@ -6,8 +6,8 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Persona;
-use App\Models\PersonaNivel;        // CABECERA
-use App\Models\PersonaNivelDetalle; // DETALLE
+use App\Models\PersonaNivel;
+use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaRole;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -54,8 +54,8 @@ class EditarPersonaNivel extends Component
     public bool $open = false;
 
     // Lógica grado/grupo
-    public bool $requiereGradoGrupo = false;        // por rol
-    public bool $forzarGradoGrupoPorNivel = false; // por nivel (Secundaria)
+    public bool $requiereGradoGrupo = false;
+    public bool $forzarGradoGrupoPorNivel = false;
     public ?string $rolSlugSeleccionado = null;
 
     // Roles que NUNCA usan grado/grupo
@@ -95,106 +95,106 @@ class EditarPersonaNivel extends Component
     }
 
     // =========================
+    // Helper: ¿nivel es Bachillerato?
+    // =========================
+    public function esBachillerato(): bool
+    {
+        return (int) $this->nivel_id === 4;
+    }
+
+    // =========================
     // Helper: mostrar grado/grupo
     // =========================
     public function debeMostrarGradoGrupo(): bool
     {
-        // Exclusión total
+        // Exclusión total por rol
         if ($this->rolSlugSeleccionado && in_array($this->rolSlugSeleccionado, $this->rolesSinGradoGrupo, true)) {
             return false;
+        }
+
+        // En bachillerato sí se mostrará el bloque, pero grupo quedará null
+        if ($this->esBachillerato()) {
+            return true;
         }
 
         return $this->requiereGradoGrupo || $this->forzarGradoGrupoPorNivel;
     }
 
     // =========================
-    // Abrir modal (carga DETALLE)
+    // Abrir modal
     // =========================
     #[On('editarModal')]
     public function editarModal(int $id): void
     {
-        $this->dispatch('abrir-modal-editar');
-
         $detalle = PersonaNivelDetalle::query()
             ->with([
-                'cabecera.persona',
-                'cabecera.nivel',
-                'personaRole.rolePersona',
-                'grado',
-                'grupo',
+                'cabecera.nivel:id,nombre,slug',
+                'cabecera.persona:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'role:id,nombre,slug',
+                'grado:id,nombre,nivel_id',
+                'grupo:id,nombre,grado_id',
             ])
             ->findOrFail($id);
 
         $cab = $detalle->cabecera;
+        $persona = $cab?->persona;
 
-        $this->detalleId = (int) $detalle->id;
+        $this->detalleId = $detalle->id;
 
-        // Paso 1
         $this->persona_id = (int) ($cab?->persona_id ?? 0) ?: null;
-
-        // Paso 2
         $this->persona_role_id = (int) ($detalle->persona_role_id ?? 0) ?: null;
-
-        // Nivel / Grado / Grupo
         $this->nivel_id = (int) ($cab?->nivel_id ?? 0) ?: null;
         $this->grado_id = $detalle->grado_id ? (int) $detalle->grado_id : null;
         $this->grupo_id = $detalle->grupo_id ? (int) $detalle->grupo_id : null;
 
-        // Fechas (CABECERA) -> se cargan, pero SOLO se editan si NO es secundaria (control en Blade + Guardado)
+        if ($this->esBachillerato()) {
+            $this->grupo_id = null;
+        }
+
         $this->ingreso_seg = $cab?->ingreso_seg;
         $this->ingreso_sep = $cab?->ingreso_sep;
         $this->ingreso_ct = $cab?->ingreso_ct;
 
-        // Roles disponibles (como Crear)
-        $this->rolesPersona = $this->persona_id
-            ? PersonaRole::query()
-                ->with('rolePersona')
-                ->where('persona_id', $this->persona_id)
-                ->orderBy('role_persona_id')
-                ->get()
-            : collect();
-
-        // Resolver slug del rol seleccionado
-        $pr = $this->persona_role_id
-            ? $this->rolesPersona->firstWhere('id', (int) $this->persona_role_id)
-            : null;
-
-        $this->rolSlugSeleccionado = $pr?->rolePersona?->slug;
-
-        // Roles que normalmente requieren grado/grupo
-        $this->requiereGradoGrupo = in_array($this->rolSlugSeleccionado, ['maestro_frente_a_grupo', 'docente'], true);
-
-        // Forzar por nivel (Secundaria)
-        $this->resolverForzarPorNivel();
-
-        // Cargar grados/grupos (si aplica)
-        if ($this->debeMostrarGradoGrupo()) {
-            $this->cargarGrados();
-            $this->cargarGrupos();
-        } else {
-            $this->grado_id = null;
-            $this->grupo_id = null;
-            $this->grados = collect();
-            $this->grupos = collect();
-        }
-
-        // Informativos
-        $p = $cab?->persona;
-        $this->nombrePersona = $p
-            ? trim(($p->nombre ?? '') . ' ' . ($p->apellido_paterno ?? '') . ' ' . ($p->apellido_materno ?? ''))
-            : null;
+        $this->nombrePersona = trim(
+            collect([
+                $persona?->titulo,
+                $persona?->nombre,
+                $persona?->apellido_paterno,
+                $persona?->apellido_materno,
+            ])->filter()->implode(' ')
+        );
 
         $this->nombreNivel = $cab?->nivel?->nombre;
         $this->nombreGrado = $detalle->grado?->nombre;
         $this->nombreGrupo = $detalle->grupo?->nombre;
+        $this->rolSlugSeleccionado = $detalle->role?->slug;
+
+        $this->cargarRolesPersona();
+
+        $this->resolverRequierePorRol();
+        $this->resolverForzarPorNivel();
+
+        if ($this->debeMostrarGradoGrupo()) {
+            $this->cargarGrados();
+
+            if ($this->grado_id && !$this->esBachillerato()) {
+                $this->cargarGrupos();
+            } else {
+                $this->grupos = collect();
+            }
+        } else {
+            $this->grados = collect();
+            $this->grupos = collect();
+        }
 
         $this->open = true;
 
+        $this->dispatch('abrir-modal-editar');
         $this->dispatch('editar-cargado');
     }
 
     // =========================
-    // Updates (misma lógica que Crear)
+    // Cambios reactivos
     // =========================
     public function updatedPersonaId($value): void
     {
@@ -202,52 +202,16 @@ class EditarPersonaNivel extends Component
         $this->rolSlugSeleccionado = null;
         $this->requiereGradoGrupo = false;
 
-        $this->grado_id = null;
-        $this->grupo_id = null;
-        $this->grupos = collect();
-
         if (!$value) {
             $this->rolesPersona = collect();
-            return;
-        }
-
-        $this->rolesPersona = PersonaRole::query()
-            ->with('rolePersona')
-            ->where('persona_id', (int) $value)
-            ->orderBy('role_persona_id')
-            ->get();
-
-        $this->resetValidation(['persona_role_id']);
-    }
-
-    public function seleccionarRol(int $personaRoleId): void
-    {
-        $this->persona_role_id = $personaRoleId;
-        $this->updatedPersonaRoleId($personaRoleId);
-    }
-
-    public function updatedPersonaRoleId($value): void
-    {
-        $this->rolSlugSeleccionado = null;
-
-        $pr = $value
-            ? PersonaRole::with('rolePersona')->find((int) $value)
-            : null;
-
-        $this->rolSlugSeleccionado = $pr?->rolePersona?->slug;
-
-        // roles que normalmente requieren grado/grupo
-        $this->requiereGradoGrupo = in_array($this->rolSlugSeleccionado, ['maestro_frente_a_grupo', 'docente'], true);
-
-        // Exclusión total
-        if ($this->rolSlugSeleccionado && in_array($this->rolSlugSeleccionado, $this->rolesSinGradoGrupo, true)) {
             $this->grado_id = null;
             $this->grupo_id = null;
             $this->grados = collect();
             $this->grupos = collect();
-            $this->resetValidation(['grado_id', 'grupo_id']);
             return;
         }
+
+        $this->cargarRolesPersona();
 
         if (!$this->debeMostrarGradoGrupo()) {
             $this->grado_id = null;
@@ -260,6 +224,40 @@ class EditarPersonaNivel extends Component
 
         if ($this->nivel_id) {
             $this->cargarGrados();
+        }
+    }
+
+    public function seleccionarRol(int $personaRoleId): void
+    {
+        $this->persona_role_id = $personaRoleId;
+        $this->updatedPersonaRoleId($personaRoleId);
+    }
+
+    public function updatedPersonaRoleId($value): void
+    {
+        $pr = $value
+            ? PersonaRole::query()->with('rolePersona')->find((int) $value)
+            : null;
+
+        $this->rolSlugSeleccionado = $pr?->rolePersona?->slug;
+        $this->resolverRequierePorRol();
+
+        if (!$this->debeMostrarGradoGrupo()) {
+            $this->grado_id = null;
+            $this->grupo_id = null;
+            $this->grados = collect();
+            $this->grupos = collect();
+            $this->resetValidation(['grado_id', 'grupo_id']);
+            return;
+        }
+
+        if ($this->nivel_id) {
+            $this->cargarGrados();
+
+            if ($this->esBachillerato()) {
+                $this->grupo_id = null;
+                $this->grupos = collect();
+            }
         }
     }
 
@@ -292,6 +290,12 @@ class EditarPersonaNivel extends Component
             $this->grados = collect();
         }
 
+        // En bachillerato no se usa grupo
+        if ((int) $value === 4) {
+            $this->grupo_id = null;
+            $this->grupos = collect();
+        }
+
         $this->resetValidation(['grado_id', 'grupo_id']);
     }
 
@@ -304,15 +308,66 @@ class EditarPersonaNivel extends Component
             return;
         }
 
+        // En bachillerato no cargar grupos
+        if ($this->esBachillerato()) {
+            $this->grupos = collect();
+            return;
+        }
+
         $this->cargarGrupos();
         $this->resetValidation(['grupo_id']);
     }
 
     // =========================
-    // Helpers: nivel/grado/grupo
+    // Helpers internos
     // =========================
+    private function cargarRolesPersona(): void
+    {
+        $this->rolesPersona = $this->persona_id
+            ? PersonaRole::query()
+            ->with('rolePersona')
+            ->where('persona_id', $this->persona_id)
+            ->orderBy('role_persona_id')
+            ->get()
+            : collect();
+    }
+
+    private function resolverRequierePorRol(): void
+    {
+        $this->requiereGradoGrupo = false;
+
+        if (!$this->persona_role_id) {
+            return;
+        }
+
+        $pr = PersonaRole::query()
+            ->with('rolePersona:id,nombre,slug')
+            ->find($this->persona_role_id);
+
+        $slug = $pr?->rolePersona?->slug;
+        $this->rolSlugSeleccionado = $slug;
+
+        if (!$slug) {
+            $this->requiereGradoGrupo = false;
+            return;
+        }
+
+        // Ajusta aquí los slugs que sí requieren grado/grupo
+        $rolesQueRequieren = [
+            'director_con_grupo',
+            'docente',
+            'docente_titular',
+            'docente_grupo',
+            'prefecto',
+            'coordinador_grupo',
+        ];
+
+        $this->requiereGradoGrupo = in_array($slug, $rolesQueRequieren, true);
+    }
+
     private function resolverForzarPorNivel(): void
     {
+        // Solo secundaria fuerza grado/grupo
         $this->forzarGradoGrupoPorNivel = $this->esSecundaria();
     }
 
@@ -335,10 +390,15 @@ class EditarPersonaNivel extends Component
     // =========================
     public function actualizarPersonal(): void
     {
+        // En bachillerato el grupo siempre debe quedar null
+        if ($this->esBachillerato()) {
+            $this->grupo_id = null;
+        }
+
         $rules = [
             'detalleId' => ['required', 'integer', 'exists:persona_nivel_detalles,id'],
             'persona_id' => ['required', 'integer', 'exists:personas,id'],
-            'persona_role_id' => ['required', 'integer', 'exists:persona_role,id'], // ajusta si tu tabla es persona_roles
+            'persona_role_id' => ['required', 'integer', 'exists:persona_role,id'],
             'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
 
             'grado_id' => [
@@ -346,14 +406,29 @@ class EditarPersonaNivel extends Component
                 'integer',
                 'exists:grados,id',
             ],
+
             'grupo_id' => [
-                $this->debeMostrarGradoGrupo() ? 'required' : 'nullable',
+                'nullable',
                 'integer',
                 'exists:grupos,id',
+                function ($attribute, $value, $fail) {
+                    if (!$this->debeMostrarGradoGrupo()) {
+                        return;
+                    }
+
+                    if ($this->esBachillerato() && !is_null($value)) {
+                        $fail('En bachillerato no se debe seleccionar grupo.');
+                        return;
+                    }
+
+                    if (!$this->esBachillerato() && !empty($this->grado_id) && empty($value)) {
+                        $fail('Selecciona un grupo.');
+                    }
+                },
             ],
         ];
 
-        // ✅ SOLO si NO es Secundaria: validar fechas (y permitir edición)
+        // Solo si NO es secundaria: validar fechas
         if (!$this->esSecundaria()) {
             $rules['ingreso_seg'] = ['nullable', 'date'];
             $rules['ingreso_sep'] = ['nullable', 'date'];
@@ -365,7 +440,6 @@ class EditarPersonaNivel extends Component
             'persona_role_id.required' => 'Selecciona una función.',
             'nivel_id.required' => 'Selecciona un nivel.',
             'grado_id.required' => 'Selecciona un grado.',
-            'grupo_id.required' => 'Selecciona un grupo.',
         ]);
 
         // Seguridad: persona_role pertenece a la persona
@@ -378,7 +452,7 @@ class EditarPersonaNivel extends Component
             return;
         }
 
-        // pertenencia grado->nivel y grupo->grado
+        // pertenencia grado -> nivel
         if ($this->grado_id) {
             $gradoOk = Grado::where('id', $this->grado_id)
                 ->where('nivel_id', $this->nivel_id)
@@ -390,7 +464,8 @@ class EditarPersonaNivel extends Component
             }
         }
 
-        if ($this->grupo_id) {
+        // pertenencia grupo -> grado
+        if (!$this->esBachillerato() && $this->grupo_id) {
             $grupoOk = Grupo::where('id', $this->grupo_id)
                 ->where('grado_id', $this->grado_id)
                 ->exists();
@@ -401,26 +476,31 @@ class EditarPersonaNivel extends Component
             }
         }
 
-        $esSec = $this->esSecundaria();
-
         try {
-            DB::transaction(function () use ($esSec) {
-                $detalle = PersonaNivelDetalle::with('cabecera')->lockForUpdate()->findOrFail($this->detalleId);
+            DB::transaction(function () {
+                $detalle = PersonaNivelDetalle::query()
+                    ->with('cabecera')
+                    ->findOrFail($this->detalleId);
 
                 $oldCabeceraId = (int) $detalle->persona_nivel_id;
                 $oldNivelId = (int) ($detalle->cabecera?->nivel_id ?? 0);
                 $newNivelId = (int) $this->nivel_id;
 
-                // 1) CABECERA destino (persona + nivel)
+                // 1) Buscar o crear nueva cabecera
                 $cabecera = PersonaNivel::firstOrCreate(
                     [
                         'persona_id' => $this->persona_id,
                         'nivel_id' => $this->nivel_id,
+                    ],
+                    [
+                        'ingreso_seg' => $this->ingreso_seg,
+                        'ingreso_sep' => $this->ingreso_sep,
+                        'ingreso_ct' => $this->ingreso_ct,
                     ]
                 );
 
-                // ✅ SOLO si NO es Secundaria: actualizar fechas
-                if (!$esSec) {
+                // 2) Si no es secundaria, actualizar fechas de cabecera
+                if (!$this->esSecundaria()) {
                     $cabecera->update([
                         'ingreso_seg' => $this->ingreso_seg,
                         'ingreso_sep' => $this->ingreso_sep,
@@ -428,17 +508,21 @@ class EditarPersonaNivel extends Component
                     ]);
                 }
 
-                // 2) Evitar duplicado exacto en DETALLES
+                // 3) Evitar duplicado
                 $dup = PersonaNivelDetalle::query()
                     ->where('persona_nivel_id', $cabecera->id)
                     ->where('persona_role_id', $this->persona_role_id)
                     ->when(
-                        $this->grado_id === null,
+                        $this->debeMostrarGradoGrupo()
+                            ? $this->grado_id === null
+                            : true,
                         fn($q) => $q->whereNull('grado_id'),
                         fn($q) => $q->where('grado_id', $this->grado_id)
                     )
                     ->when(
-                        $this->grupo_id === null,
+                        ($this->debeMostrarGradoGrupo() && !$this->esBachillerato())
+                            ? $this->grupo_id === null
+                            : true,
                         fn($q) => $q->whereNull('grupo_id'),
                         fn($q) => $q->where('grupo_id', $this->grupo_id)
                     )
@@ -449,7 +533,7 @@ class EditarPersonaNivel extends Component
                     throw new \RuntimeException('DUPLICADO');
                 }
 
-                // 3) Orden: si cambia de NIVEL, mandar al final del nuevo nivel
+                // 4) Orden: si cambia de nivel, mandar al final del nuevo nivel
                 $newOrden = (int) $detalle->orden;
 
                 if ($oldNivelId !== $newNivelId) {
@@ -460,24 +544,25 @@ class EditarPersonaNivel extends Component
                     $newOrden = ((int) ($maxOrden ?? 0)) + 1;
                 }
 
-                // 4) Update del DETALLE
+                // 5) Update del detalle
                 $detalle->update([
                     'persona_nivel_id' => $cabecera->id,
                     'persona_role_id' => $this->persona_role_id,
                     'grado_id' => $this->debeMostrarGradoGrupo() ? $this->grado_id : null,
-                    'grupo_id' => $this->debeMostrarGradoGrupo() ? $this->grupo_id : null,
+                    'grupo_id' => ($this->debeMostrarGradoGrupo() && !$this->esBachillerato()) ? $this->grupo_id : null,
                     'orden' => $newOrden,
                 ]);
 
-                // 5) Si cabecera anterior queda vacía, borrarla
+                // 6) Si la cabecera anterior queda vacía, borrarla
                 if ($oldCabeceraId !== (int) $cabecera->id) {
                     $tieneMas = PersonaNivelDetalle::where('persona_nivel_id', $oldCabeceraId)->exists();
+
                     if (!$tieneMas) {
                         PersonaNivel::whereKey($oldCabeceraId)->delete();
                     }
                 }
 
-                // 6) Normalizar orden por nivel (viejo y nuevo)
+                // 7) Normalizar orden por nivel
                 $nivelesAjustar = array_values(array_unique(array_filter([$oldNivelId, $newNivelId])));
 
                 foreach ($nivelesAjustar as $nivelId) {
