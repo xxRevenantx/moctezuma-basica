@@ -3,7 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Horario escolar</title>
+    @php
+        $nombreNivel = $nivel->nombre ?? 'NIVEL';
+        $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
+        $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
+
+        $tituloGrupo = $nombreGrado . '° grado de ' . $nombreNivel . ', grupo: ' . $nombreGrupo;
+    @endphp
+    <title>Horario escolar de {{ $tituloGrupo }}</title>
     <style>
         @page {
             margin: 18px 22px;
@@ -79,7 +86,7 @@
         .titulo-institucion {
             font-size: 35px;
             font-family: coolvetica;
-            color: #53657d;
+            color: #5790d9;
             margin: 0;
             line-height: 1.1;
         }
@@ -276,6 +283,24 @@
             font-size: 9px;
             color: #64748b;
         }
+
+        /* Footer */
+        footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 5px;
+            text-align: center;
+            font-size: 10px;
+            color: #475569;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 6px;
+        }
+
+        footer p {
+            margin: 0;
+            line-height: 1.25;
+        }
     </style>
 </head>
 
@@ -290,7 +315,7 @@
         $tituloGrupo = $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
         if ($esBachillerato && isset($semestre) && $semestre) {
-            $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->nombre ?? ''), 'UTF-8');
+            $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->numero ?? ''), 'UTF-8');
         }
 
         $profesorTitular = $profesor_titular ?? null;
@@ -522,9 +547,14 @@
             </table>
         @endif
 
-        <div class="nota">
-            Generado el {{ $fecha_impresion->format('d/m/Y h:i A') }}
-        </div>
+        <footer>
+            <strong>{{ $escuela->nombre }}</strong> — C.C.T. {{ $nivel->cct }}<br>
+            C. {{ $escuela->calle }} No.{{ $escuela->no_exterior }}, Col. {{ $escuela->colonia }}, C.P.
+            {{ $escuela->codigo_postal }},
+            {{ $escuela->ciudad }}, {{ $escuela->estado }}
+            · Tel. {{ $escuela->telefono }}<br>
+            <strong>Fecha de expedición:</strong> {{ Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
+        </footer>
     </div>
 </body>
 

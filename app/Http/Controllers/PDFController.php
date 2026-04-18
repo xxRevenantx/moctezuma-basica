@@ -132,6 +132,8 @@ class PDFController extends Controller
         $grupoId = $request->input('grupo_id');
         $semestreId = $request->input('semestre_id');
 
+        $escuela = \App\Models\Escuela::first();
+
         if (empty($slugNivel) || empty($gradoId) || empty($grupoId)) {
             abort(422, 'Los parámetros slug_nivel, grado_id y grupo_id son obligatorios.');
         }
@@ -286,9 +288,9 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($persona->titulo ? $persona->titulo . ' ' : '') .
-                        ($persona->nombre ?? '') . ' ' .
-                        ($persona->apellido_paterno ?? '') . ' ' .
-                        ($persona->apellido_materno ?? '')
+                    ($persona->nombre ?? '') . ' ' .
+                    ($persona->apellido_paterno ?? '') . ' ' .
+                    ($persona->apellido_materno ?? '')
                 );
             }
         }
@@ -325,14 +327,17 @@ class PDFController extends Controller
             'imagen_nivel' => $imagenNivel,
             'profesor_titular' => $profesorTitular,
             'ciclo_escolar' => $cicloEscolar,
+            'escuela' => $escuela,
         ])->setPaper('letter', 'portrait');
 
-        $nombreArchivo = 'horario-' .
-            ($nivel->slug ?? 'nivel') . '-' .
-            ($grado->id ?? 'grado') . '-' .
-            ($grupo->id ?? 'grupo') . '-' .
-            'generacion-' . $generacionId .
-            ($esBachillerato && $semestre ? '-semestre-' . $semestre->id : '') .
+
+
+        $nombreArchivo = 'Horario_de_' .
+            ($grado->nombre ?? 'grado') . '°_grado_' .
+            ($nivel->nombre ?? 'nivel') . '_' .
+            ($grupo->nombre ?? 'grupo') . '_' .
+            'Generacion_' . ($grupo->generacion->anio_ingreso ?? 'generacion') . '_' . ($grupo->generacion->anio_egreso ?? 'egreso') .
+            ($esBachillerato && $semestre ? '_semestre_' . $semestre->id : '') .
             '.pdf';
 
         return $pdf->stream($nombreArchivo);

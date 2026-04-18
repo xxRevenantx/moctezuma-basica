@@ -33,6 +33,25 @@ class Horario extends Component
 
     public bool $esBachillerato = false;
 
+    // =========================
+    // Estado visual por celda
+    // =========================
+    public array $seleccionesHorario = [];
+
+    // =========================
+    // Modal de confirmación
+    // =========================
+    public bool $mostrarModalTraslapeProfesor = false;
+
+    public array $pendienteHorario = [
+        'hora_id' => null,
+        'dia_id' => null,
+        'asignacion_materia_id' => null,
+        'clave_celda' => null,
+    ];
+
+    public array $conflictosProfesor = [];
+
     public function mount(): void
     {
         $this->nivel = Nivel::query()
@@ -53,6 +72,7 @@ class Horario extends Component
         $this->cargarSemestres();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
     }
 
     public function updatedGradoId(): void
@@ -63,39 +83,73 @@ class Horario extends Component
             $this->semestre_id = null;
         }
 
+        $this->resetEstadoTraslapeProfesor();
+        $this->cargarSemestres();
         $this->cargarGrupos();
         $this->cargarHoras();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
     }
 
     public function updatedGrupoId(): void
     {
+        $this->resetEstadoTraslapeProfesor();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
     }
 
     public function updatedSemestreId(): void
     {
+        $this->grupo_id = null;
+
+        $this->resetEstadoTraslapeProfesor();
+        $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
     }
 
-    public function guardarMateriaHorario(int $horaId, int $diaId, $asignacionMateriaId = null): void
+    /**
+     * Este método se dispara cuando cambia cualquier celda del horario.
+     * La llave llega con formato "horaId-diaId".
+     */
+    public function updatedSeleccionesHorario($value, $key): void
     {
         if (!$this->filtrosCompletos()) {
             return;
         }
 
+        if (!str_contains((string) $key, '-')) {
+            return;
+        }
+
+        [$horaId, $diaId] = array_map('intval', explode('-', (string) $key));
+
+        $this->procesarCambioHorario(
+            horaId: $horaId,
+            diaId: $diaId,
+            asignacionMateriaId: filled($value) ? (int) $value : null,
+            claveCelda: (string) $key
+        );
+    }
+
+    protected function procesarCambioHorario(
+        int $horaId,
+        int $diaId,
+        ?int $asignacionMateriaId,
+        string $claveCelda,
+        bool $forzar = false
+    ): void {
         $grupo = $this->obtenerGrupoSeleccionado();
 
         if (!$grupo) {
+            $this->sincronizarSeleccionesHorario();
             return;
         }
 
         $generacionId = $grupo->generacion_id;
-
-        $asignacionMateriaId = filled($asignacionMateriaId) ? (int) $asignacionMateriaId : null;
 
         $consulta = HorarioModel::query()
             ->where('nivel_id', $this->nivel->id)
@@ -113,36 +167,262 @@ class Horario extends Component
 
         $horarioExistente = $consulta->first();
 
+        // Si se limpió la celda
         if (blank($asignacionMateriaId)) {
             if ($horarioExistente) {
                 $horarioExistente->delete();
             }
 
+            $this->resetEstadoTraslapeProfesor();
             $this->cargarHorariosGuardados();
+            $this->sincronizarSeleccionesHorario();
             return;
         }
 
-        $datos = [
+        $asignacion = AsignacionMateria::query()
+            ->with('profesor')
+            ->find($asignacionMateriaId);
+
+        if (!$asignacion) {
+            $this->sincronizarSeleccionesHorario();
+            return;
+        }
+
+        if (blank($asignacion->profesor_id)) {
+            $this->guardarHorarioDirecto(
+                horaId: $horaId,
+                diaId: $diaId,
+                generacionId: $generacionId,
+                asignacionMateriaId: $asignacionMateriaId,
+                horarioExistente: $horarioExistente
+            );
+            return;
+        }
+
+        $horaActual = Hora::query()->find($horaId);
+
+        if (!$horaActual) {
+            $this->sincronizarSeleccionesHorario();
+            return;
+        }
+
+        $conflictos = $this->buscarConflictosProfesor(
+            profesorId: (int) $asignacion->profesor_id,
+            diaId: $diaId,
+            horaInicio: $horaActual->hora_inicio,
+            horaFin: $horaActual->hora_fin,
+            horarioActualId: $horarioExistente?->id
+        );
+
+        if (!$forzar && count($conflictos) > 0) {
+            $this->pendienteHorario = [
+                'hora_id' => $horaId,
+                'dia_id' => $diaId,
+                'asignacion_materia_id' => $asignacionMateriaId,
+                'clave_celda' => $claveCelda,
+            ];
+
+            $this->conflictosProfesor = $conflictos;
+            $this->mostrarModalTraslapeProfesor = true;
+
+            // Muy importante: regresa visualmente al valor guardado real
+            $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
+
+            return;
+        }
+
+        $this->guardarHorarioDirecto(
+            horaId: $horaId,
+            diaId: $diaId,
+            generacionId: $generacionId,
+            asignacionMateriaId: $asignacionMateriaId,
+            horarioExistente: $horarioExistente
+        );
+    }
+
+    protected function guardarHorarioDirecto(
+        int $horaId,
+        int $diaId,
+        int $generacionId,
+        int $asignacionMateriaId,
+        ?HorarioModel $horarioExistente = null
+    ): void {
+        $datosBusqueda = [
             'nivel_id' => $this->nivel->id,
             'grado_id' => $this->grado_id,
             'generacion_id' => $generacionId,
             'grupo_id' => $this->grupo_id,
-            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
             'hora_id' => $horaId,
             'dia_id' => $diaId,
-            'asignacion_materia_id' => $asignacionMateriaId,
+            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
         ];
 
         if ($horarioExistente) {
             $horarioExistente->update([
-                'generacion_id' => $generacionId,
                 'asignacion_materia_id' => $asignacionMateriaId,
+                'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
             ]);
         } else {
-            HorarioModel::create($datos);
+            HorarioModel::query()->create([
+                ...$datosBusqueda,
+                'asignacion_materia_id' => $asignacionMateriaId,
+            ]);
         }
 
+        $this->resetEstadoTraslapeProfesor();
         $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
+    }
+
+    protected function buscarConflictosProfesor(
+        int $profesorId,
+        int $diaId,
+        string $horaInicio,
+        string $horaFin,
+        ?int $horarioActualId = null
+    ): array {
+        $conflictos = HorarioModel::query()
+            ->with([
+                'hora',
+                'nivel',
+                'grado',
+                'grupo',
+                'dia',
+                'semestre',
+                'asignacionMateria.profesor',
+            ])
+            ->where('dia_id', $diaId)
+            ->when($horarioActualId, function ($query) use ($horarioActualId) {
+                $query->where('id', '!=', $horarioActualId);
+            })
+            ->whereHas('asignacionMateria', function ($query) use ($profesorId) {
+                $query->where('profesor_id', $profesorId);
+            })
+            ->whereHas('hora', function ($query) use ($horaInicio, $horaFin) {
+                $query->where('hora_inicio', '<', $horaFin)
+                    ->where('hora_fin', '>', $horaInicio);
+            })
+            ->get();
+
+        return $conflictos->map(function ($item) {
+            $profesor = $item->asignacionMateria?->profesor;
+
+            $nombreProfesor = trim(
+                ($profesor->nombre ?? '') . ' ' .
+                ($profesor->apellido_paterno ?? '') . ' ' .
+                ($profesor->apellido_materno ?? '')
+            );
+
+            return [
+                'id' => $item->id,
+                'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
+                'nivel' => $item->nivel->nombre ?? 'N/D',
+                'grado' => $item->grado->nombre ?? 'N/D',
+                'grupo' => $item->grupo->nombre ?? 'N/D',
+                'dia' => $item->dia->dia ?? 'N/D',
+                'hora_inicio' => $item->hora?->hora_inicio,
+                'hora_fin' => $item->hora?->hora_fin,
+                'semestre' => $item->semestre->semestre ?? ($item->semestre->nombre ?? null),
+                'materia' => $item->asignacionMateria->materia ?? 'N/D',
+            ];
+        })->toArray();
+    }
+
+    public function confirmarGuardarConTraslape(): void
+    {
+        if (
+            blank($this->pendienteHorario['hora_id']) ||
+            blank($this->pendienteHorario['dia_id']) ||
+            blank($this->pendienteHorario['asignacion_materia_id']) ||
+            blank($this->pendienteHorario['clave_celda'])
+        ) {
+            $this->resetEstadoTraslapeProfesor();
+            $this->sincronizarSeleccionesHorario();
+            return;
+        }
+
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        if (!$grupo) {
+            $this->resetEstadoTraslapeProfesor();
+            $this->sincronizarSeleccionesHorario();
+            return;
+        }
+
+        $generacionId = $grupo->generacion_id;
+
+        $consulta = HorarioModel::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $generacionId)
+            ->where('grupo_id', $this->grupo_id)
+            ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
+            ->where('dia_id', (int) $this->pendienteHorario['dia_id']);
+
+        if ($this->esBachillerato) {
+            $consulta->where('semestre_id', $this->semestre_id);
+        } else {
+            $consulta->whereNull('semestre_id');
+        }
+
+        $horarioExistente = $consulta->first();
+
+        $this->guardarHorarioDirecto(
+            horaId: (int) $this->pendienteHorario['hora_id'],
+            diaId: (int) $this->pendienteHorario['dia_id'],
+            generacionId: $generacionId,
+            asignacionMateriaId: (int) $this->pendienteHorario['asignacion_materia_id'],
+            horarioExistente: $horarioExistente
+        );
+    }
+
+    public function cancelarGuardarConTraslape(): void
+    {
+        $claveCelda = $this->pendienteHorario['clave_celda'] ?? null;
+
+        $this->resetEstadoTraslapeProfesor();
+        $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
+
+        if ($claveCelda) {
+            $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
+        }
+    }
+
+    protected function resetEstadoTraslapeProfesor(): void
+    {
+        $this->mostrarModalTraslapeProfesor = false;
+
+        $this->pendienteHorario = [
+            'hora_id' => null,
+            'dia_id' => null,
+            'asignacion_materia_id' => null,
+            'clave_celda' => null,
+        ];
+
+        $this->conflictosProfesor = [];
+    }
+
+    protected function sincronizarSeleccionesHorario(): void
+    {
+        $selecciones = [];
+
+        foreach ($this->horas as $hora) {
+            foreach ($this->dias as $dia) {
+                $clave = $hora->id . '-' . $dia->id;
+                $horario = $this->horariosGuardados->get($clave);
+
+                $selecciones[$clave] = $horario?->asignacion_materia_id;
+            }
+        }
+
+        $this->seleccionesHorario = $selecciones;
+    }
+
+    protected function restaurarCeldaDesdeHorarioGuardado(string $claveCelda): void
+    {
+        $horario = $this->horariosGuardados->get($claveCelda);
+        $this->seleccionesHorario[$claveCelda] = $horario?->asignacion_materia_id;
     }
 
     public function getPuedeDescargarHorarioProperty(): bool
@@ -150,64 +430,55 @@ class Horario extends Component
         return $this->filtrosCompletos();
     }
 
-    public function getUrlDescargaHorarioProperty(): ?string
+    public function getUrlDescargaHorarioProperty(): string
     {
         if (!$this->puedeDescargarHorario) {
-            return null;
+            return '#';
         }
 
-        $parametros = [
+        return route('misrutas.horarios.pdf', [
             'slug_nivel' => $this->slug_nivel,
             'grado_id' => $this->grado_id,
             'grupo_id' => $this->grupo_id,
-        ];
-
-        if ($this->esBachillerato) {
-            $parametros['semestre_id'] = $this->semestre_id;
-        }
-
-        return route('misrutas.horarios.pdf', $parametros);
+            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+        ]);
     }
 
-    public function obtenerColorPastel(?string $texto = null): string
+    protected function obtenerColorPastel(?string $texto = null): string
     {
-        $colores = [
-            '#FADADD',
-            '#FDE2C8',
-            '#FFF1B6',
-            '#DFF7E2',
-            '#D9F2E6',
-            '#D9ECFF',
-            '#E4D9FF',
-            '#F3D9FA',
-            '#E8EAF6',
-            '#FFE5EC',
-            '#E0F7FA',
-            '#F1F8E9',
+        $texto = filled($texto) ? $texto : 'sin-profesor';
+
+        $paleta = [
+            '#FDE68A',
+            '#BFDBFE',
+            '#C7D2FE',
+            '#A7F3D0',
+            '#FBCFE8',
+            '#DDD6FE',
+            '#FECACA',
+            '#BAE6FD',
+            '#D9F99D',
+            '#FED7AA',
+            '#E9D5FF',
+            '#99F6E4',
         ];
 
-        $texto = trim((string) $texto);
+        $indice = abs(crc32((string) $texto)) % count($paleta);
 
-        if ($texto === '') {
-            return $colores[0];
-        }
-
-        $indice = abs(crc32($texto)) % count($colores);
-
-        return $colores[$indice];
+        return $paleta[$indice];
     }
 
-    public function obtenerColorTexto(string $colorHex): string
+    protected function obtenerColorTexto(string $fondoHex): string
     {
-        $colorHex = ltrim($colorHex, '#');
+        $hex = ltrim($fondoHex, '#');
 
-        if (strlen($colorHex) !== 6) {
+        if (strlen($hex) !== 6) {
             return '#1F2937';
         }
 
-        $r = hexdec(substr($colorHex, 0, 2));
-        $g = hexdec(substr($colorHex, 2, 2));
-        $b = hexdec(substr($colorHex, 4, 2));
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
 
         $luminosidad = (($r * 299) + ($g * 587) + ($b * 114)) / 1000;
 
@@ -268,10 +539,18 @@ class Horario extends Component
     protected function cargarGrupos(): void
     {
         $this->grupos = Grupo::query()
+            ->where('nivel_id', $this->nivel->id)
             ->when($this->grado_id, function ($query) {
                 $query->where('grado_id', $this->grado_id);
             }, function ($query) {
                 $query->whereRaw('1 = 0');
+            })
+            ->when($this->esBachillerato, function ($query) {
+                if ($this->semestre_id) {
+                    $query->where('semestre_id', $this->semestre_id);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             })
             ->orderBy('nombre')
             ->get();
@@ -303,7 +582,21 @@ class Horario extends Component
             return;
         }
 
+        if (!$this->grado_id) {
+            $this->semestres = collect();
+            return;
+        }
+
+        $semestreIds = Grupo::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $this->grado_id)
+            ->whereNotNull('semestre_id')
+            ->pluck('semestre_id')
+            ->unique()
+            ->values();
+
         $this->semestres = Semestre::query()
+            ->whereIn('id', $semestreIds)
             ->orderBy('id')
             ->get();
     }
