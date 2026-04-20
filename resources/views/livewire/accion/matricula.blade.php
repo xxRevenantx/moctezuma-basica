@@ -582,8 +582,7 @@
                                                     <div class="flex items-center gap-2">
                                                         <flux:button variant="primary"
                                                             class="cursor-pointer bg-amber-500 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-amber-600 hover:shadow-md"
-                                                            @click="$dispatch('abrir-modal-editar');
-                                                            Livewire.dispatch('editarModal', { id: {{ $row->id }} });">
+                                                            x-on:click="window.open('{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}', '_blank')">
                                                             <flux:icon.square-pen class="h-3.5 w-3.5" />
                                                         </flux:button>
 
@@ -669,6 +668,4 @@
             </div>
         </div>
     @endif
-
-    <livewire:accion.editar-matricula />
 </div>

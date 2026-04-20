@@ -46,7 +46,7 @@
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                             Resultados:
                             <strong>
-                                {{ method_exists($periodosBachilleratos, 'total') ? $periodosBachilleratos->total() : $periodosBachilleratos->count() }}
+                                {{ method_exists($periodos, 'total') ? $periodos->total() : $periodos->count() }}
                             </strong>
                         </span>
                     </div>
@@ -113,7 +113,7 @@
                                 </thead>
 
                                 <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
-                                    @if ($periodosBachilleratos->isEmpty())
+                                    @if ($periodos->isEmpty())
                                         <tr>
                                             <td colspan="7"
                                                 class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
@@ -136,7 +136,7 @@
                                             $generacionActual = null;
                                         @endphp
 
-                                        @foreach ($periodosBachilleratos as $key => $periodoBachillerato)
+                                        @foreach ($periodos as $key => $periodoBachillerato)
                                             @php
                                                 $generacionId = optional($periodoBachillerato->generacion)->id;
                                             @endphp
@@ -180,7 +180,7 @@
                                                 <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
                                                     <span
                                                         class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-100 dark:ring-emerald-800">
-                                                        {{ $key + 1 + ($periodosBachilleratos->currentPage() - 1) * $periodosBachilleratos->perPage() }}
+                                                        {{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}
                                                     </span>
                                                 </td>
 
@@ -246,7 +246,7 @@
 
                     <!-- Tarjetas (mobile) -->
                     <div class="md:hidden space-y-3">
-                        @if ($periodosBachilleratos->isEmpty())
+                        @if ($periodos->isEmpty())
                             <div
                                 class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
                                 <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">
@@ -261,7 +261,7 @@
                                 $generacionActualMobile = null;
                             @endphp
 
-                            @foreach ($periodosBachilleratos as $key => $periodoBachillerato)
+                            @foreach ($periodos as $key => $periodoBachillerato)
                                 @php
                                     $generacionId = optional($periodoBachillerato->generacion)->id;
                                 @endphp
@@ -290,7 +290,7 @@
                                         <div class="space-y-2">
                                             <div
                                                 class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-sky-500 px-3 py-1 text-white text-xs font-medium shadow-sm">
-                                                <span>#{{ $key + 1 + ($periodosBachilleratos->currentPage() - 1) * $periodosBachilleratos->perPage() }}</span>
+                                                <span>#{{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}</span>
                                                 <span>
                                                     {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? 'Sin ciclo' }}
                                                     -
@@ -339,12 +339,12 @@
 
                 <!-- Paginación -->
                 <div class="mt-5">
-                    {{ $periodosBachilleratos->links() }}
+                    {{ $periodos->links() }}
                 </div>
             </div>
         </div>
 
         {{-- Modal editar periodo --}}
-        <livewire:periodo-bachillerato.editar-periodo-bachillerato />
+        {{-- <livewire:periodo.editar-periodo /> --}}
     </div>
 </div>

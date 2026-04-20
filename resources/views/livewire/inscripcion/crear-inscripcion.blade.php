@@ -75,7 +75,8 @@
                                     Automático
                                 </span>
                             </div>
-                            <flux:input wire:model="matricula" readonly placeholder="Se genera automáticamente" />
+                            <flux:input wire:model="matricula" variant="filled" readonly
+                                placeholder="Se genera automáticamente" />
                             @error('matricula')
                                 <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror

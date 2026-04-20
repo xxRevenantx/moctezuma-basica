@@ -18,9 +18,20 @@
                 </div>
 
                 {{-- Campos --}}
-                <div class="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {{-- Niveles --}}
+                    <div>
+                        <flux:select wire:model="nivel_id" label="Nivel">
+                            <flux:select.option value="">Selecciona un nivel</flux:select.option>
+                            @foreach ($niveles as $nivel)
+                                <flux:select.option value="{{ $nivel->id }}">
+                                    {{ $nivel->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
                     {{-- Ciclo Escolar --}}
-                    <div class="sm:col-span-3">
+                    <div>
                         <flux:select wire:model="ciclo_escolar_id" label="Ciclo Escolar">
                             <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
                             @foreach ($ciclosEscolares as $ciclo)
@@ -32,7 +43,7 @@
                     </div>
 
                     {{-- Generación --}}
-                    <div class="sm:col-span-3">
+                    <div>
                         <flux:select wire:model="generacion_id" label="Generación">
                             <flux:select.option value="">Selecciona una generación</flux:select.option>
                             @foreach ($generaciones as $generacion)
@@ -44,7 +55,7 @@
                     </div>
 
                     {{-- Semestre --}}
-                    <div class="sm:col-span-2">
+                    <div>
                         <flux:select wire:model="semestre_id" label="Semestre">
                             <flux:select.option value="">Selecciona un semestre</flux:select.option>
                             @foreach ($semestres as $semestre)
@@ -56,22 +67,23 @@
                     </div>
 
                     {{-- Meses --}}
-                    <div class="sm:col-span-2">
+                    <div>
                         <flux:select wire:model="mes_id" label="Mes del periodo">
                             <flux:select.option value="">Selecciona un mes</flux:select.option>
                             @foreach ($meses as $mes)
-                                <flux:select.option value="{{ $mes->id }}">{{ $mes->meses }}</flux:select.option>
+                                <flux:select.option value="{{ $mes->id }}">{{ $mes->meses }}
+                                </flux:select.option>
                             @endforeach
                         </flux:select>
                     </div>
 
                     {{-- Inicio de semestre --}}
-                    <div class="sm:col-span-1">
+                    <div>
                         <flux:input wire:model="fecha_inicio" type="date" label="Fecha inicio" />
                     </div>
 
                     {{-- Fin de semestre --}}
-                    <div class="sm:col-span-1">
+                    <div>
                         <flux:input wire:model="fecha_fin" type="date" label="Fecha fin" />
                     </div>
                 </div>

@@ -442,60 +442,60 @@ class Matricula extends Component
         $esBachillerato = $this->esBachillerato();
 
         return Excel::download(
-            new class($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
-                public function __construct(
-                    protected Collection $rows,
-                    protected bool $esBachillerato
-                ) {}
+            new class ($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
+            public function __construct(
+            protected Collection $rows,
+            protected bool $esBachillerato
+            ) {}
 
-                public function collection()
-                {
-                    return $this->rows;
+            public function collection()
+            {
+                return $this->rows;
+            }
+
+            public function headings(): array
+            {
+                $headings = [
+                'Matrícula',
+                'Folio',
+                'Apellido paterno',
+                'Apellido materno',
+                'Nombre(s)',
+                'CURP',
+                'Género',
+                'Grado',
+                ];
+
+                if ($this->esBachillerato) {
+                    $headings[] = 'Semestre';
                 }
 
-                public function headings(): array
-                {
-                    $headings = [
-                        'Matrícula',
-                        'Folio',
-                        'Apellido paterno',
-                        'Apellido materno',
-                        'Nombre(s)',
-                        'CURP',
-                        'Género',
-                        'Grado',
-                    ];
+                $headings[] = 'Grupo';
 
-                    if ($this->esBachillerato) {
-                        $headings[] = 'Semestre';
-                    }
+                return $headings;
+            }
 
-                    $headings[] = 'Grupo';
+            public function map($row): array
+            {
+                $data = [
+                    $row->matricula,
+                    $row->folio,
+                    $row->apellido_paterno,
+                    $row->apellido_materno,
+                    $row->nombre,
+                    $row->curp,
+                    $row->genero,
+                    $row->grado?->nombre,
+                ];
 
-                    return $headings;
+                if ($this->esBachillerato) {
+                    $data[] = $row->semestre?->numero;
                 }
 
-                public function map($row): array
-                {
-                    $data = [
-                        $row->matricula,
-                        $row->folio,
-                        $row->apellido_paterno,
-                        $row->apellido_materno,
-                        $row->nombre,
-                        $row->curp,
-                        $row->genero,
-                        $row->grado?->nombre,
-                    ];
+                $data[] = $row->grupo?->nombre;
 
-                    if ($this->esBachillerato) {
-                        $data[] = $row->semestre?->numero;
-                    }
-
-                    $data[] = $row->grupo?->nombre;
-
-                    return $data;
-                }
+                return $data;
+            }
             },
             'matricula.xlsx'
         );

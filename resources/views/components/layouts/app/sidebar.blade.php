@@ -160,9 +160,9 @@
                             Grupos
                         </flux:navlist.item>
 
-                        <flux:navlist.item icon="home" :href="route('misrutas.periodos-basica')"
-                            :current="request()->routeIs('misrutas.periodos-basica')" wire:navigate>
-                            Periodos Básica
+                        <flux:navlist.item icon="home" :href="route('misrutas.periodos')"
+                            :current="request()->routeIs('misrutas.periodos')" wire:navigate>
+                            Periodos
                         </flux:navlist.item>
 
 
@@ -176,10 +176,6 @@
                         <flux:navlist.item icon="home" :href="route('misrutas.semestres')"
                             :current="request()->routeIs('misrutas.semestres')" wire:navigate>
                             Semestres
-                        </flux:navlist.item>
-                        <flux:navlist.item icon="home" :href="route('misrutas.periodos-bachillerato')"
-                            :current="request()->routeIs('misrutas.periodos-bachillerato')" wire:navigate>
-                            Periodos Bachi
                         </flux:navlist.item>
 
                     </flux:sidebar.group>

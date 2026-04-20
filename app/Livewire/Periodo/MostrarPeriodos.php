@@ -1,13 +1,14 @@
 <?php
 
-namespace App\Livewire\PeriodoBachillerato;
+namespace App\Livewire\Periodo;
 
-use App\Models\PeriodosBachillerato;
+use App\Models\Periodos;
+
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-class MostrarPeriodosBachillerato extends Component
+class MostrarPeriodos extends Component
 {
     use WithPagination;
 
@@ -23,7 +24,7 @@ class MostrarPeriodosBachillerato extends Component
 
     public function eliminar($id)
     {
-        $periodo = PeriodosBachillerato::find($id);
+        $periodo = Periodos::find($id);
 
         if ($periodo) {
             $periodo->delete();
@@ -39,7 +40,7 @@ class MostrarPeriodosBachillerato extends Component
     #[On('refreshPeriodosBachillerato')]
     public function render()
     {
-        $periodosBachilleratos = \App\Models\PeriodosBachillerato::with([
+        $periodos = \App\Models\Periodos::with([
             'generacion',
             'semestre',
             'cicloEscolar',
@@ -75,8 +76,8 @@ class MostrarPeriodosBachillerato extends Component
             ->orderBy('ciclo_escolar_id')
             ->paginate(10);
 
-        return view('livewire.periodo-bachillerato.mostrar-periodos-bachillerato', [
-            'periodosBachilleratos' => $periodosBachilleratos,
+        return view('livewire.periodo.mostrar-periodos', [
+            'periodos' => $periodos,
         ]);
     }
 }

@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Livewire\PeriodoBachillerato;
+namespace App\Livewire\Periodo;
 
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\MesesBachillerato;
-use App\Models\PeriodosBachillerato;
+use App\Models\Periodos;
 use App\Models\Semestre;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
-class EditarPeriodoBachillerato extends Component
+class EditarPeriodo extends Component
 {
     public bool $open = false;
 

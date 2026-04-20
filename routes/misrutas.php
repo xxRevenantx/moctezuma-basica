@@ -4,6 +4,7 @@ use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\InscripcionController;
+use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\SubmoduloNivelController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
+use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\SeleccionarGradoController;
@@ -64,12 +66,12 @@ Route::get('/semestres', [SemestreController::class, 'index'])->name('misrutas.s
 Route::get('/grupos', [GrupoController::class, 'index'])->name('misrutas.grupos');
 
 
-// RUTAS DE PERIODOS BASICA
-Route::get('/periodos-basica', [PeriodosBasicoController::class, 'index'])->name('misrutas.periodos-basica');
+// RUTAS DE PERIODOS
+Route::get('/periodos', [PeriodosController::class, 'index'])->name('misrutas.periodos');
 
-// RUTAS DE PERIODOS BACHILLERATO
-Route::get('/periodos-bachillerato', [PeriodosBachilleratoController::class, 'index'])->name('misrutas.periodos-bachillerato');
 
+Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaController::class, 'editar'])
+    ->name('misrutas.matricula.editar');
 
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');

@@ -130,7 +130,7 @@ class EditarPersonaNivel extends Component
             ->with([
                 'cabecera.nivel:id,nombre,slug',
                 'cabecera.persona:id,titulo,nombre,apellido_paterno,apellido_materno',
-                'role:id,nombre,slug',
+                // 'role:id,nombre,slug',
                 'grado:id,nombre,nivel_id',
                 'grupo:id,nombre,grado_id',
             ])
@@ -325,10 +325,10 @@ class EditarPersonaNivel extends Component
     {
         $this->rolesPersona = $this->persona_id
             ? PersonaRole::query()
-            ->with('rolePersona')
-            ->where('persona_id', $this->persona_id)
-            ->orderBy('role_persona_id')
-            ->get()
+                ->with('rolePersona')
+                ->where('persona_id', $this->persona_id)
+                ->orderBy('role_persona_id')
+                ->get()
             : collect();
     }
 
@@ -514,15 +514,15 @@ class EditarPersonaNivel extends Component
                     ->where('persona_role_id', $this->persona_role_id)
                     ->when(
                         $this->debeMostrarGradoGrupo()
-                            ? $this->grado_id === null
-                            : true,
+                        ? $this->grado_id === null
+                        : true,
                         fn($q) => $q->whereNull('grado_id'),
                         fn($q) => $q->where('grado_id', $this->grado_id)
                     )
                     ->when(
                         ($this->debeMostrarGradoGrupo() && !$this->esBachillerato())
-                            ? $this->grupo_id === null
-                            : true,
+                        ? $this->grupo_id === null
+                        : true,
                         fn($q) => $q->whereNull('grupo_id'),
                         fn($q) => $q->where('grupo_id', $this->grupo_id)
                     )
