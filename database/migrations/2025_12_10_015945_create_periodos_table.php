@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -24,7 +25,7 @@ return new class extends Migration {
             $table->unsignedBigInteger('ciclo_escolar_id');
 
             // Meses de Bachillerato
-            $table->unsignedBigInteger('mes_bachillerato_id');
+            $table->unsignedBigInteger('mes_bachillerato_id')->nullable();
 
 
             // Fechas del periodo

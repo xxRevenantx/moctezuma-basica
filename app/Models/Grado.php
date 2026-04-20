@@ -69,4 +69,10 @@ class Grado extends Model
     {
         return $this->hasMany(Horario::class, 'grado_id');
     }
+
+    // RELACION CON CALIFICACIONES
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class, 'grado_id');
+    }
 }

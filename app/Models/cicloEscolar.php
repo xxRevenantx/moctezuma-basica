@@ -33,24 +33,28 @@ class cicloEscolar extends Model
     }
 
     public function docenteGrupos()
-{
-    return $this->hasMany(\App\Models\DocenteGrupo::class, 'ciclo_escolar_id');
-}
+    {
+        return $this->hasMany(\App\Models\DocenteGrupo::class, 'ciclo_escolar_id');
+    }
 
-// Obtener grupos del ciclo (si te sirve):
-public function grupos()
-{
-    return $this->belongsToMany(\App\Models\Grupo::class, 'docente_grupo', 'ciclo_escolar_id', 'grupo_id')
-        ->withPivot(['persona_id', 'es_tutor'])
-        ->withTimestamps();
-}
+    // Obtener grupos del ciclo (si te sirve):
+    public function grupos()
+    {
+        return $this->belongsToMany(\App\Models\Grupo::class, 'docente_grupo', 'ciclo_escolar_id', 'grupo_id')
+            ->withPivot(['persona_id', 'es_tutor'])
+            ->withTimestamps();
+    }
 
-// Obtener docentes del ciclo:
-public function docentes()
-{
-    return $this->belongsToMany(\App\Models\Persona::class, 'docente_grupo', 'ciclo_escolar_id', 'persona_id')
-        ->withPivot(['grupo_id', 'es_tutor'])
-        ->withTimestamps();
-}
+    // Obtener docentes del ciclo:
+    public function docentes()
+    {
+        return $this->belongsToMany(\App\Models\Persona::class, 'docente_grupo', 'ciclo_escolar_id', 'persona_id')
+            ->withPivot(['grupo_id', 'es_tutor'])
+            ->withTimestamps();
+    }
 
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class, 'ciclo_escolar_id');
+    }
 }

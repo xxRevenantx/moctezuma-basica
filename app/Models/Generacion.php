@@ -33,10 +33,10 @@ class Generacion extends Model
         return $this->hasMany(Grupo::class);
     }
 
-    // RELACIONES CON PERIODOS BACHILLERATO
+    // RELACIONES CON PERIODOS
     public function periodosBachillerato()
     {
-        return $this->hasMany(PeriodosBachillerato::class);
+        return $this->hasMany(Periodos::class);
     }
 
     // RELACIONES CON INSCRIPCIONES
@@ -49,5 +49,11 @@ class Generacion extends Model
     public function horarios()
     {
         return $this->hasMany(Horario::class);
+    }
+
+    // RELACIONES CON CALIFICACIONES
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class);
     }
 }

@@ -97,4 +97,16 @@ class Nivel extends Model
     {
         return $this->hasMany(Horario::class);
     }
+
+    // RELACION CON PERIODOS
+    public function periodos()
+    {
+        return $this->hasMany(Periodos::class);
+    }
+
+    // RELACION CON CALIFICACIONES
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class);
+    }
 }

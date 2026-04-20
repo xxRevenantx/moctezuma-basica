@@ -20,6 +20,13 @@ class Periodos extends Model
         "fecha_fin",
     ];
 
+
+    // RELACIONES CON NIVELES
+    public function nivel()
+    {
+        return $this->belongsTo(Nivel::class, 'nivel_id');
+    }
+
     // RELACIONES CON GENERACIONES
     public function generacion()
     {
@@ -42,5 +49,11 @@ class Periodos extends Model
     public function mesesBachillerato()
     {
         return $this->belongsTo(MesesBachillerato::class, 'mes_bachillerato_id');
+    }
+
+    // RELACIONES CON CALIFICACIONES
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class, 'periodo_id');
     }
 }

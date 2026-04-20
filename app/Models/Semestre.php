@@ -37,7 +37,7 @@ class Semestre extends Model
     // RELACION CON PERIODOS DE BACHILLERATO
     public function periodosBachillerato()
     {
-        return $this->hasMany(PeriodosBachillerato::class);
+        return $this->hasMany(Periodos::class);
     }
 
     // RELACION CON INSCRIPCIONES
@@ -56,5 +56,11 @@ class Semestre extends Model
     public function horarios()
     {
         return $this->hasMany(Horario::class);
+    }
+
+    // RELACION CON CALIFICACIONES
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class);
     }
 }

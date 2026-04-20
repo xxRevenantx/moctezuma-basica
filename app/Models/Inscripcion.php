@@ -108,4 +108,8 @@ class Inscripcion extends Model
         return $this->belongsTo(Tutor::class);
     }
 
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class);
+    }
 }

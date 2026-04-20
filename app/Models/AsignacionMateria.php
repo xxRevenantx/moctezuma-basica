@@ -56,4 +56,8 @@ class AsignacionMateria extends Model
         return $this->hasMany(Horario::class, 'asignacion_materia_id');
     }
 
+    public function calificaciones()
+    {
+        return $this->hasMany(Calificacion::class, 'asignacion_materia_id');
+    }
 }

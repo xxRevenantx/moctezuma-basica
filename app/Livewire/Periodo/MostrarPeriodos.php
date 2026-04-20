@@ -3,7 +3,6 @@
 namespace App\Livewire\Periodo;
 
 use App\Models\Periodos;
-
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -21,7 +20,6 @@ class MostrarPeriodos extends Component
         $this->resetPage();
     }
 
-
     public function eliminar($id)
     {
         $periodo = Periodos::find($id);
@@ -37,10 +35,11 @@ class MostrarPeriodos extends Component
         }
     }
 
-    #[On('refreshPeriodosBachillerato')]
+    #[On('refreshPeriodos')]
     public function render()
     {
-        $periodos = \App\Models\Periodos::with([
+        $periodos = Periodos::with([
+            'nivel',
             'generacion',
             'semestre',
             'cicloEscolar',
@@ -52,6 +51,9 @@ class MostrarPeriodos extends Component
                 $query->where(function ($q) use ($search) {
                     $q->where('fecha_inicio', 'like', $search)
                         ->orWhere('fecha_fin', 'like', $search)
+                        ->orWhereHas('nivel', function ($q1) use ($search) {
+                            $q1->where('nombre', 'like', $search);
+                        })
                         ->orWhereHas('generacion', function ($q2) use ($search) {
                             $q2->where('anio_ingreso', 'like', $search)
                                 ->orWhere('anio_egreso', 'like', $search);
@@ -71,9 +73,12 @@ class MostrarPeriodos extends Component
                 });
             })
 
-            // 👉 aquí forzamos el orden por generación, luego ciclo y luego por mes
+            // Ordeno por nivel, luego generación, luego ciclo, luego semestre y mes
+            ->orderBy('nivel_id')
             ->orderBy('generacion_id')
             ->orderBy('ciclo_escolar_id')
+            ->orderBy('semestre_id')
+            ->orderBy('mes_bachillerato_id')
             ->paginate(10);
 
         return view('livewire.periodo.mostrar-periodos', [

@@ -238,12 +238,7 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
                 @break
 
                 @case('calificaciones')
-                    <div
-                        class="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 p-8 text-center dark:border-neutral-700 dark:bg-neutral-800/40">
-                        <p class="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-                            Aquí puedes mostrar el contenido del módulo calificaciones.
-                        </p>
-                    </div>
+                    <livewire:accion.calificacion :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
                 @break
 
                 @case('bajas')

@@ -13,35 +13,38 @@
         }).then((r) => r.isConfirmed && @this.call('eliminar', id))
     }
 }" class="space-y-5">
-    <!-- Encabezado -->
+
+    {{-- Encabezado --}}
     <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Periodos Bachillerato</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Periodos
+        </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Busca, edita o elimina periodos bachillerato.
+            Busca, edita o elimina periodos agrupados por nivel.
         </p>
     </div>
 
-    <!-- Contenedor listado -->
+    {{-- Contenedor listado --}}
     <div
-        class="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 shadow">
-        <!-- Acabado superior -->
+        class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow dark:border-neutral-800 dark:bg-neutral-800">
+        {{-- Acabado superior --}}
         <div class="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500"></div>
 
-        <!-- Toolbar -->
+        {{-- Toolbar --}}
         <div class="p-4 sm:p-5 lg:p-6">
-            <div class="flex flex-col gap-3 lg:gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <!-- Buscador -->
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:gap-4">
+                {{-- Buscador --}}
                 <div class="w-full sm:max-w-xl">
-                    <label for="buscar-periodo-bachillerato" class="sr-only">Buscar Periodo Bachillerato</label>
-                    <flux:input id="buscar-periodo-bachillerato" type="text" wire:model.live="search"
-                        placeholder="Buscar por ciclo, generación, semestre, mes…" icon="magnifying-glass"
+                    <label for="buscar-periodo" class="sr-only">Buscar periodo</label>
+                    <flux:input id="buscar-periodo" type="text" wire:model.live="search"
+                        placeholder="Buscar por nivel, ciclo, generación, semestre o mes…" icon="magnifying-glass"
                         class="w-full" />
                 </div>
 
-                <!-- Resumen -->
+                {{-- Resumen --}}
                 <div class="flex items-center gap-3">
                     <div
-                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50 dark:bg-neutral-700">
+                        class="hidden items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 dark:border-neutral-800 dark:bg-neutral-700 sm:flex">
                         <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                             Resultados:
@@ -54,16 +57,16 @@
             </div>
         </div>
 
-        <!-- Área de resultados -->
+        {{-- Área de resultados --}}
         <div class="px-4 pb-4 sm:px-5 sm:pb-6 lg:px-6">
             <div class="relative">
 
-                <!-- Loader -->
+                {{-- Loader --}}
                 <div wire:loading.delay wire:target="search, eliminar"
-                    class="absolute inset-0 z-10 grid place-items-center rounded-xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
+                    class="absolute inset-0 z-10 grid place-items-center rounded-xl bg-white/70 backdrop-blur dark:bg-neutral-900/70"
                     aria-live="polite" aria-busy="true">
                     <div
-                        class="flex items-center gap-3 rounded-xl bg-white dark:bg-neutral-900 px-4 py-3 ring-1 ring-gray-200 dark:ring-neutral-800 shadow">
+                        class="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow ring-1 ring-gray-200 dark:bg-neutral-900 dark:ring-neutral-800">
                         <svg class="h-5 w-5 animate-spin text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
                             fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
@@ -74,39 +77,39 @@
                     </div>
                 </div>
 
-                <!-- Contenido que se desenfoca mientras carga -->
+                {{-- Contenido --}}
                 <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
 
-                    <!-- Tabla (desktop) -->
+                    {{-- Tabla desktop --}}
                     <div
-                        class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800">
-                        <div class="overflow-x-auto max-h-[65vh]">
+                        class="hidden overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-neutral-800 dark:bg-neutral-800 md:block">
+                        <div class="max-h-[65vh] overflow-x-auto">
                             <table class="min-w-full text-sm">
-                                <thead class="sticky top-0 z-10 table-gradient">
+                                <thead class="table-gradient sticky top-0 z-10">
                                     <tr>
                                         <th
-                                            class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide border-r border-white/10">
+                                            class="border-r border-white/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             #
                                         </th>
-                                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
-                                            Ciclo Escolar
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                                            Ciclo escolar
                                         </th>
-                                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Generación
                                         </th>
-                                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Semestre
                                         </th>
-                                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Mes
                                         </th>
-                                        <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
-                                            Inicio del semestre
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
+                                            Inicio
                                         </th>
-                                        <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
-                                            Fin del semestre
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
+                                            Fin
                                         </th>
-                                        <th class="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             Acciones
                                         </th>
                                     </tr>
@@ -115,14 +118,14 @@
                                 <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
                                     @if ($periodos->isEmpty())
                                         <tr>
-                                            <td colspan="7"
+                                            <td colspan="8"
                                                 class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                                                 <div class="mx-auto w-full max-w-md">
                                                     <div
-                                                        class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 bg-white/70 dark:bg-neutral-900/70">
+                                                        class="rounded-2xl border border-dashed border-gray-300 bg-white/70 p-6 dark:border-neutral-700 dark:bg-neutral-900/70">
                                                         <div
                                                             class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
-                                                            No hay periodos de bachillerato disponibles
+                                                            No hay periodos disponibles
                                                         </div>
                                                         <p class="text-sm text-gray-500 dark:text-gray-400">
                                                             Ajusta tu búsqueda.
@@ -133,105 +136,98 @@
                                         </tr>
                                     @else
                                         @php
-                                            $generacionActual = null;
+                                            $nivelActual = null;
                                         @endphp
 
-                                        @foreach ($periodos as $key => $periodoBachillerato)
+                                        @foreach ($periodos as $key => $periodo)
                                             @php
-                                                $generacionId = optional($periodoBachillerato->generacion)->id;
+                                                $nivelId = optional($periodo->nivel)->id;
                                             @endphp
 
-                                            {{-- Cabecera de grupo por GENERACIÓN --}}
-                                            @if ($generacionId !== $generacionActual)
+                                            {{-- Cabecera por NIVEL --}}
+                                            @if ($nivelId !== $nivelActual)
                                                 <tr>
-                                                    <td colspan="7" class="px-4 pt-4 pb-2">
+                                                    <td colspan="8" class="px-4 pb-2 pt-4">
                                                         <div
-                                                            class="inline-flex flex-wrap items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 shadow-sm ring-1 ring-emerald-100 dark:ring-emerald-900/60">
+                                                            class="inline-flex flex-wrap items-center gap-2 rounded-full bg-sky-50 px-3 py-1 shadow-sm ring-1 ring-sky-100 dark:bg-sky-950/40 dark:ring-sky-900/60">
                                                             <span
-                                                                class="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+                                                                class="h-2 w-2 rounded-full bg-sky-500 dark:bg-sky-400"></span>
                                                             <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
-                                                                GENERACIÓN:
-                                                                {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
-                                                                -
-                                                                {{ $periodoBachillerato->generacion->anio_egreso ?? '---' }}
-                                                            </span>
-                                                            <span
-                                                                class="text-xs font-medium text-gray-600 dark:text-gray-400">|</span>
-                                                            <span
-                                                                class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
-                                                                CICLO ESCOLAR:
-                                                                {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? '---' }}
-                                                                -
-                                                                {{ $periodoBachillerato->cicloEscolar->fin_anio ?? '---' }}
+                                                                class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-200">
+                                                                Nivel:
+                                                                {{ $periodo->nivel->nombre ?? '---' }}
                                                             </span>
                                                         </div>
                                                     </td>
                                                 </tr>
                                                 @php
-                                                    $generacionActual = $generacionId;
+                                                    $nivelActual = $nivelId;
                                                 @endphp
                                             @endif
 
-                                            {{-- Fila principal del periodo --}}
+                                            {{-- Fila del periodo --}}
                                             <tr
-                                                class="transition-colors duration-150 odd:bg-slate-50/80 even:bg-white dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40">
-                                                <!-- # -->
+                                                class="odd:bg-slate-50/80 even:bg-white transition-colors duration-150 hover:bg-emerald-50/80 dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 dark:hover:bg-emerald-950/40">
+                                                {{-- Número --}}
                                                 <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
                                                     <span
-                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-neutral-900 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-100 dark:ring-emerald-800">
+                                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-neutral-900 dark:text-emerald-300 dark:ring-emerald-800">
                                                         {{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}
                                                     </span>
                                                 </td>
 
-                                                <!-- Ciclo Escolar -->
+                                                {{-- Ciclo --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? '---' }}
+                                                    {{ $periodo->cicloEscolar->inicio_anio ?? '---' }}
                                                     -
-                                                    {{ $periodoBachillerato->cicloEscolar->fin_anio ?? '---' }}
+                                                    {{ $periodo->cicloEscolar->fin_anio ?? '---' }}
                                                 </td>
 
-                                                <!-- Generación -->
+                                                {{-- Generación --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
+                                                    {{ $periodo->generacion->anio_ingreso ?? '---' }}
                                                     -
-                                                    {{ $periodoBachillerato->generacion->anio_egreso ?? '---' }}
+                                                    {{ $periodo->generacion->anio_egreso ?? '---' }}
                                                 </td>
-                                                <!-- Semestre -->
+
+                                                {{-- Semestre --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodoBachillerato->semestre->numero ?? '---' }}° Semestre
+                                                    @if ($periodo->semestre)
+                                                        {{ $periodo->semestre->numero }}° Semestre
+                                                    @else
+                                                        ---
+                                                    @endif
                                                 </td>
 
-                                                <!-- Meses -->
+                                                {{-- Mes --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodoBachillerato->mesesBachillerato->meses ?? '---' }}
+                                                    {{ $periodo->mesesBachillerato->meses ?? '---' }}
                                                 </td>
 
-                                                <!-- Inicio de semestre -->
+                                                {{-- Inicio --}}
                                                 <td class="px-4 py-3 text-center text-gray-900 dark:text-white">
-                                                    {{ \Carbon\Carbon::parse($periodoBachillerato->fecha_inicio)?->format('d/m/Y') ?? '---' }}
+                                                    {{ $periodo->fecha_inicio ? \Carbon\Carbon::parse($periodo->fecha_inicio)->format('d/m/Y') : '---' }}
                                                 </td>
 
-                                                <!-- Fin de semestre -->
+                                                {{-- Fin --}}
                                                 <td class="px-4 py-3 text-center text-gray-900 dark:text-white">
-                                                    {{ \Carbon\Carbon::parse($periodoBachillerato->fecha_fin)?->format('d/m/Y') ?? '---' }}
+                                                    {{ $periodo->fecha_fin ? \Carbon\Carbon::parse($periodo->fecha_fin)->format('d/m/Y') : '---' }}
                                                 </td>
 
-                                                <!-- Acciones -->
+                                                {{-- Acciones --}}
                                                 <td class="px-4 py-3">
                                                     <div class="flex items-center justify-center gap-2">
                                                         <flux:button variant="primary"
-                                                            class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 text-xs"
+                                                            class="cursor-pointer bg-amber-500 px-2.5 py-1.5 text-xs text-white hover:bg-amber-600"
                                                             @click="$dispatch('abrir-modal-editar');
-                                                                Livewire.dispatch('editarModal', { id: {{ $periodoBachillerato->id }} });
-                                                            ">
-                                                            <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                                                Livewire.dispatch('editarModal', { id: {{ $periodo->id }} });">
+                                                            <flux:icon.square-pen class="h-3.5 w-3.5" />
                                                         </flux:button>
 
                                                         <flux:button variant="danger"
-                                                            class="cursor-pointer bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 text-xs"
-                                                            @click="eliminar({{ $periodoBachillerato->id }}, '{{ $periodoBachillerato->mesesBachillerato->meses ?? 'Periodo' }}')">
-                                                            <flux:icon.trash class="w-3.5 h-3.5" />
+                                                            class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
+                                                            @click="eliminar({{ $periodo->id }}, '{{ $periodo->mesesBachillerato->meses ?? 'Periodo' }}')">
+                                                            <flux:icon.trash class="h-3.5 w-3.5" />
                                                         </flux:button>
                                                     </div>
                                                 </td>
@@ -240,17 +236,16 @@
                                     @endif
                                 </tbody>
                             </table>
-
                         </div>
                     </div>
 
-                    <!-- Tarjetas (mobile) -->
-                    <div class="md:hidden space-y-3">
+                    {{-- Tarjetas mobile --}}
+                    <div class="space-y-3 md:hidden">
                         @if ($periodos->isEmpty())
                             <div
-                                class="rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 p-6 text-center">
+                                class="rounded-xl border border-dashed border-gray-300 p-6 text-center dark:border-neutral-700">
                                 <div class="mb-1 font-semibold text-gray-700 dark:text-gray-200">
-                                    No hay periodos bachillerato disponibles
+                                    No hay periodos disponibles
                                 </div>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">
                                     Ajusta tu búsqueda.
@@ -258,76 +253,88 @@
                             </div>
                         @else
                             @php
-                                $generacionActualMobile = null;
+                                $nivelActualMobile = null;
                             @endphp
 
-                            @foreach ($periodos as $key => $periodoBachillerato)
+                            @foreach ($periodos as $key => $periodo)
                                 @php
-                                    $generacionId = optional($periodoBachillerato->generacion)->id;
+                                    $nivelId = optional($periodo->nivel)->id;
                                 @endphp
 
-                                {{-- Header de generación también en mobile --}}
-                                @if ($generacionId !== $generacionActualMobile)
+                                {{-- Cabecera por nivel mobile --}}
+                                @if ($nivelId !== $nivelActualMobile)
                                     <div
-                                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 shadow-sm ring-1 ring-emerald-100 dark:ring-emerald-900/60">
-                                        <span class="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+                                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 shadow-sm ring-1 ring-sky-100 dark:bg-sky-950/40 dark:ring-sky-900/60">
+                                        <span class="h-2 w-2 rounded-full bg-sky-500 dark:bg-sky-400"></span>
                                         <span
-                                            class="text-xs font-semibold tracking-wide uppercase text-emerald-700 dark:text-emerald-200">
-                                            GENERACIÓN:
-                                            {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
-                                            -
-                                            {{ $periodoBachillerato->generacion->anio_egreso ?? '---' }}
+                                            class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-200">
+                                            Nivel:
+                                            {{ $periodo->nivel->nombre ?? '---' }}
                                         </span>
                                     </div>
+
                                     @php
-                                        $generacionActualMobile = $generacionId;
+                                        $nivelActualMobile = $nivelId;
                                     @endphp
                                 @endif
 
                                 <div
-                                    class="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 shadow-sm space-y-3">
+                                    class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="space-y-2">
                                             <div
-                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-sky-500 px-3 py-1 text-white text-xs font-medium shadow-sm">
+                                                class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-sky-500 px-3 py-1 text-xs font-medium text-white shadow-sm">
                                                 <span>#{{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}</span>
                                                 <span>
-                                                    {{ $periodoBachillerato->cicloEscolar->inicio_anio ?? 'Sin ciclo' }}
+                                                    {{ $periodo->cicloEscolar->inicio_anio ?? 'Sin ciclo' }}
                                                     -
-                                                    {{ $periodoBachillerato->cicloEscolar->fin_anio ?? 'Sin ciclo' }}
+                                                    {{ $periodo->cicloEscolar->fin_anio ?? 'Sin ciclo' }}
                                                 </span>
                                             </div>
+
                                             <div class="space-y-1">
                                                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">
-                                                    {{ $periodoBachillerato->mesesBachillerato->meses ?? 'Mes no asignado' }}
+                                                    {{ $periodo->mesesBachillerato->meses ?? 'Mes no asignado' }}
                                                 </h2>
+
                                                 <p class="text-xs text-gray-600 dark:text-gray-300">
                                                     Generación:
-                                                    {{ $periodoBachillerato->generacion->anio_ingreso ?? '---' }}
+                                                    {{ $periodo->generacion->anio_ingreso ?? '---' }}
                                                     -
-                                                    {{ $periodoBachillerato->generacion->anio_egreso ?? '---' }}
+                                                    {{ $periodo->generacion->anio_egreso ?? '---' }}
                                                 </p>
+
+                                                <p class="text-xs text-gray-600 dark:text-gray-300">
+                                                    Semestre:
+                                                    @if ($periodo->semestre)
+                                                        {{ $periodo->semestre->numero }}° Semestre
+                                                    @else
+                                                        ---
+                                                    @endif
+                                                </p>
+
                                                 <p class="text-xs text-gray-600 dark:text-gray-300">
                                                     Inicio:
-                                                    {{ optional($periodoBachillerato->fecha_inicio)->format('d/m/Y') ?? '---' }}
-                                                    · Fin:
-                                                    {{ optional($periodoBachillerato->fecha_fin)->format('d/m/Y') ?? '---' }}
+                                                    {{ $periodo->fecha_inicio ? \Carbon\Carbon::parse($periodo->fecha_inicio)->format('d/m/Y') : '---' }}
+                                                    ·
+                                                    Fin:
+                                                    {{ $periodo->fecha_fin ? \Carbon\Carbon::parse($periodo->fecha_fin)->format('d/m/Y') : '---' }}
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div class="flex flex-col items-center justify-center gap-2">
                                             <flux:button variant="primary"
-                                                class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 text-xs"
+                                                class="cursor-pointer bg-amber-500 px-2.5 py-1.5 text-xs text-white hover:bg-amber-600"
                                                 @click="$dispatch('abrir-modal-editar');
-                                                    Livewire.dispatch('editarModal', { id: {{ $periodoBachillerato->id }} });
-                                                ">
-                                                <flux:icon.square-pen class="w-3.5 h-3.5" />
+                                                    Livewire.dispatch('editarModal', { id: {{ $periodo->id }} });">
+                                                <flux:icon.square-pen class="h-3.5 w-3.5" />
                                             </flux:button>
+
                                             <flux:button variant="danger"
-                                                class="cursor-pointer bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 text-xs"
-                                                @click="eliminar({{ $periodoBachillerato->id }}, '{{ $periodoBachillerato->mesesBachillerato->meses ?? 'Periodo' }}')">
-                                                <flux:icon.trash class="w-3.5 h-3.5" />
+                                                class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
+                                                @click="eliminar({{ $periodo->id }}, '{{ $periodo->mesesBachillerato->meses ?? 'Periodo' }}')">
+                                                <flux:icon.trash class="h-3.5 w-3.5" />
                                             </flux:button>
                                         </div>
                                     </div>
@@ -337,14 +344,15 @@
                     </div>
                 </div>
 
-                <!-- Paginación -->
+                {{-- Paginación --}}
                 <div class="mt-5">
                     {{ $periodos->links() }}
                 </div>
             </div>
         </div>
-
-        {{-- Modal editar periodo --}}
-        {{-- <livewire:periodo.editar-periodo /> --}}
     </div>
+
+    <livewire:periodo.editar-periodo>
+
+
 </div>
