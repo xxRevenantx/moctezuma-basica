@@ -288,9 +288,9 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($persona->titulo ? $persona->titulo . ' ' : '') .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
+                        ($persona->nombre ?? '') . ' ' .
+                        ($persona->apellido_paterno ?? '') . ' ' .
+                        ($persona->apellido_materno ?? '')
                 );
             }
         }

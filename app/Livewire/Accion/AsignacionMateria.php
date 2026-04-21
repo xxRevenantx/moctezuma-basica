@@ -27,6 +27,7 @@ class AsignacionMateria extends Component
     public ?string $clave = null;
     public string $slug = '';
     public string $calificable = '1';
+    public string $extra = '1';
 
     // =========================
     // Campos extras
@@ -66,8 +67,7 @@ class AsignacionMateria extends Component
             ->firstOrFail();
 
         $this->niveles = Nivel::query()
-            ->select('id', 'nombre', 'slug')
-            ->orderBy('nombre')
+            ->orderBy('id')
             ->get();
 
         $accionActual = Accion::query()
@@ -81,6 +81,8 @@ class AsignacionMateria extends Component
 
         $this->cargarGrados();
         $this->cargarProfesores();
+        $this->cargarSemestres();
+        $this->cargarGrupos();
         $this->cargarAsignaciones();
     }
 
@@ -140,9 +142,9 @@ class AsignacionMateria extends Component
 
                 $nombreCompleto = trim(
                     ($persona->titulo ?? '') . ' ' .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
+                        ($persona->nombre ?? '') . ' ' .
+                        ($persona->apellido_paterno ?? '') . ' ' .
+                        ($persona->apellido_materno ?? '')
                 );
 
                 return [
@@ -184,9 +186,21 @@ class AsignacionMateria extends Component
             return;
         }
 
-        $this->grupos = Grupo::query()
+        $query = Grupo::query()
             ->where('nivel_id', $this->nivel_id)
-            ->where('grado_id', $this->grado_id)
+            ->where('grado_id', $this->grado_id);
+
+        // En bachillerato, primero se elige semestre y luego grupo
+        if ($this->esBachillerato) {
+            if ($this->semestre) {
+                $query->where('semestre_id', $this->semestre);
+            } else {
+                $this->grupos = [];
+                return;
+            }
+        }
+
+        $this->grupos = $query
             ->orderBy('nombre')
             ->get()
             ->toArray();
@@ -202,10 +216,27 @@ class AsignacionMateria extends Component
             return;
         }
 
-        $this->semestres = Semestre::query()
+        // Se toman solo los semestres realmente usados por grupos de ese grado
+        $semestreIds = Grupo::query()
+            ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
-            ->orderBy('numero')
+            ->whereNotNull('semestre_id')
+            ->pluck('semestre_id')
+            ->unique()
+            ->values();
+
+        $this->semestres = Semestre::query()
+            ->whereIn('id', $semestreIds)
+            ->orderBy('id')
             ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'numero' => $item->numero,
+                    'nombre' => $item->nombre,
+                    'semestre' => $item->semestre,
+                ];
+            })
             ->toArray();
     }
 
@@ -231,10 +262,23 @@ class AsignacionMateria extends Component
     public function updatedGradoId(): void
     {
         $this->grupo_id = null;
-        $this->semestre = null;
 
-        $this->cargarGrupos();
+        if ($this->esBachillerato) {
+            $this->semestre = null;
+        }
+
         $this->cargarSemestres();
+        $this->cargarGrupos();
+    }
+
+    public function updatedSemestre(): void
+    {
+        if (!$this->esBachillerato) {
+            return;
+        }
+
+        $this->grupo_id = null;
+        $this->cargarGrupos();
     }
 
     public function updatedMateria($value): void
@@ -257,6 +301,7 @@ class AsignacionMateria extends Component
             'materia' => 'required|string|max:255',
             'slug' => 'required|string|max:255',
             'calificable' => 'required|boolean',
+            'extra' => 'required|boolean',
             'materia_para_calificaciones' => 'required|in:si,no',
             'numero_materias_promediar' => 'nullable|integer|min:1',
         ];
@@ -293,6 +338,7 @@ class AsignacionMateria extends Component
             'clave.required' => 'La clave es obligatoria para bachillerato.',
             'slug.required' => 'El slug es obligatorio.',
             'calificable.required' => 'Debes indicar si la materia es calificable.',
+            'extra.required' => 'Debes indicar si la materia es extra.',
             'materia_para_calificaciones.required' => 'Selecciona si la materia aplica para calificaciones.',
         ];
     }
@@ -319,6 +365,7 @@ class AsignacionMateria extends Component
             'clave' => $this->clave,
             'slug' => $this->slug,
             'calificable' => (int) $this->calificable,
+            'extra' => (int) $this->extra,
             'numero_materias_promediar' => $this->numero_materias_promediar,
             'materia_para_calificaciones' => $this->materia_para_calificaciones,
         ];
@@ -355,27 +402,31 @@ class AsignacionMateria extends Component
     // =========================
     public function editar(int $id): void
     {
-
         $this->cargandoEditarId = $id;
 
         $registro = AsignacionMateriaModel::findOrFail($id);
-
-        // dd($registro);
 
         $this->editandoId = $registro->id;
         $this->nivel_id = $registro->nivel_id;
         $this->grado_id = $registro->grado_id;
 
-        $this->cargarGrupos();
+        // Primero cargo semestres del grado
         $this->cargarSemestres();
 
-        $this->grupo_id = $registro->grupo_id;
+        // Luego asigno semestre para que grupos respete ese filtro
         $this->semestre = $registro->semestre;
+
+        // Ahora sí cargo grupos ya filtrados por semestre
+        $this->cargarGrupos();
+
+        $this->grupo_id = $registro->grupo_id;
         $this->profesor_id = $registro->profesor_id;
         $this->materia = $registro->materia;
         $this->clave = $registro->clave;
         $this->slug = $registro->slug;
         $this->calificable = (string) $registro->calificable;
+        $this->extra = (string) $registro->extra;
+
         $this->numero_materias_promediar = $registro->numero_materias_promediar;
         $this->materia_para_calificaciones = $registro->materia_para_calificaciones ?? 'si';
 
@@ -432,13 +483,14 @@ class AsignacionMateria extends Component
         $this->clave = null;
         $this->slug = '';
         $this->calificable = '1';
+        $this->extra = '1';
 
         $this->numero_materias_promediar = null;
         $this->materia_para_calificaciones = 'si';
 
         $this->cargarGrados();
-        $this->grupos = [];
         $this->semestres = [];
+        $this->grupos = [];
         $this->cargarProfesores();
         $this->resetErrorBag();
     }
@@ -460,9 +512,8 @@ class AsignacionMateria extends Component
                 || str_contains(mb_strtolower($item->profesor?->nombre ?? ''), $buscar)
                 || str_contains(mb_strtolower($item->grado?->nombre ?? ''), $buscar)
                 || str_contains(mb_strtolower($item->grupo?->nombre ?? ''), $buscar)
-                || str_contains(mb_strtolower($item->clave ?? ''), $buscar)
-                || str_contains(mb_strtolower($item->slug ?? ''), $buscar);
-        })->values();
+                || str_contains(mb_strtolower($item->clave ?? ''), $buscar);
+        });
     }
 
     public function render()

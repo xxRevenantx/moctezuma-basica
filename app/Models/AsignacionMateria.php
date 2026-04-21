@@ -23,6 +23,7 @@ class AsignacionMateria extends Model
         'clave',
         'slug',
         'calificable',
+        'extra',
         'orden',
     ];
 

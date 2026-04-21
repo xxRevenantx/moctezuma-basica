@@ -153,12 +153,7 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
                                     @endif
                                 </div>
 
-                                <div class="relative mt-4">
-                                    <p
-                                        class="text-[10px] font-semibold uppercase tracking-[0.20em] text-neutral-400 dark:text-neutral-500">
-                                        módulo
-                                    </p>
-
+                                <div class="relative">
                                     <h3
                                         class="mt-1 line-clamp-2 min-h-[30px] text-[15px] font-bold tracking-tight text-neutral-800 dark:text-white">
                                         {{ $a->accion }}

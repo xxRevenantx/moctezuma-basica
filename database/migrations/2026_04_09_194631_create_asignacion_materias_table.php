@@ -21,6 +21,7 @@ return new class extends Migration {
             $table->string('clave')->nullable();
             $table->string('slug');
             $table->boolean('calificable')->default(true);
+            $table->boolean('extra')->default(true);
             $table->integer('orden')->default(0);
 
             $table->foreign('nivel_id')->references('id')->on('niveles')->onDelete('cascade');

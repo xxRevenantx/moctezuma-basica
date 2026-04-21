@@ -17,27 +17,27 @@
     class="space-y-6">
 
     {{-- ITERA NIVELES --}}
-    <div class="overflow-hidden ">
+    <div class="overflow-hidden">
         <div>
             <div class="-mx-1 overflow-x-auto pb-1">
-                <div class="flex min-w-max items-center gap-2 px-1 justify-center">
+                <div class="flex min-w-max items-center justify-center gap-2 px-1">
                     @foreach ($niveles as $item)
                         @php
                             $activo = $slug_nivel === $item->slug;
                         @endphp
 
-                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'matricula']) }}"
+                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'asignacion-de-materias']) }}"
                             wire:navigate aria-current="{{ $activo ? 'page' : 'false' }}"
                             class="group relative inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5
-                        {{ $activo
-                            ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
-                            : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
+                            {{ $activo
+                                ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
+                                : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
 
                             <span
                                 class="flex h-8 w-8 items-center justify-center rounded-xl
-                            {{ $activo
-                                ? 'bg-white/15 text-white'
-                                : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
+                                {{ $activo
+                                    ? 'bg-white/15 text-white'
+                                    : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
                                 <flux:icon.rectangle-stack class="h-4 w-4" />
                             </span>
 
@@ -163,19 +163,6 @@
                         </flux:field>
                     </div>
 
-                    <div class="space-y-2">
-                        <flux:field>
-                            <flux:label>Grupo</flux:label>
-                            <flux:select wire:model.live="grupo_id" :disabled="blank($grado_id)">
-                                <option value="">Selecciona un grupo</option>
-                                @foreach ($grupos as $item)
-                                    <option value="{{ $item['id'] }}">{{ $item['nombre'] }}</option>
-                                @endforeach
-                            </flux:select>
-                            <flux:error name="grupo_id" />
-                        </flux:field>
-                    </div>
-
                     @if ($this->esBachillerato)
                         <div class="space-y-2">
                             <flux:field>
@@ -192,6 +179,22 @@
                             </flux:field>
                         </div>
                     @endif
+
+                    <div class="space-y-2">
+                        <flux:field>
+                            <flux:label>Grupo</flux:label>
+                            <flux:select wire:model.live="grupo_id"
+                                :disabled="$this->esBachillerato ? (blank($grado_id) || blank($semestre)) : blank($grado_id)">
+                                <option value="">Selecciona un grupo</option>
+                                @foreach ($grupos as $item)
+                                    <option value="{{ $item['id'] }}">{{ $item['nombre'] }}</option>
+                                @endforeach
+                            </flux:select>
+                            <flux:error name="grupo_id" />
+                        </flux:field>
+                    </div>
+
+
 
                     <div
                         class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
@@ -238,11 +241,26 @@
                     <div class="space-y-2">
                         <flux:field>
                             <flux:label>¿Calificable?</flux:label>
+
                             <flux:select wire:model="calificable">
                                 <flux:select.option value="1">Sí</flux:select.option>
                                 <flux:select.option value="0">No</flux:select.option>
                             </flux:select>
                             <flux:error name="calificable" />
+                        </flux:field>
+                    </div>
+
+                    <div class="space-y-2">
+                        <flux:field>
+                            <flux:label>¿Extra? <span class="text-xs text-slate-500 dark:text-slate-400"> Las materias
+                                    extra no se toman en
+                                    cuenta para el promedio final, pero sí cuentan como asignadas.</span></flux:label>
+
+                            <flux:select wire:model="extra">
+                                <flux:select.option value="1">Sí</flux:select.option>
+                                <flux:select.option value="0">No</flux:select.option>
+                            </flux:select>
+                            <flux:error name="extra" />
                         </flux:field>
                     </div>
                 </div>
@@ -452,6 +470,11 @@
                                         </th>
 
                                         <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Extra
+                                        </th>
+
+                                        <th
                                             class="px-4 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                             Acciones
                                         </th>
@@ -519,6 +542,20 @@
 
                                             <td class="px-4 py-4 align-top">
                                                 @if ($item->calificable == 1)
+                                                    <span
+                                                        class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                        Sí
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                        No
+                                                    </span>
+                                                @endif
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top">
+                                                @if ($item->extra == 1)
                                                     <span
                                                         class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                                                         Sí

@@ -26,7 +26,7 @@ return new class extends Migration {
             $table->unsignedBigInteger('periodo_id')->nullable();
 
 
-            $table->unsignedTinyInteger('calificacion')->nullable();
+            $table->string('calificacion', 2)->nullable();
 
             $table->foreign('inscripcion_id')->references('id')->on('inscripciones')->onDelete('cascade');
             $table->foreign('asignacion_materia_id')->references('id')->on('asignacion_materias')->onDelete('cascade');

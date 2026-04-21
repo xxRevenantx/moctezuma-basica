@@ -61,8 +61,7 @@ class Horario extends Component
         $this->esBachillerato = str($this->nivel->slug)->lower()->contains('bachillerato');
 
         $this->niveles = Nivel::query()
-            ->select('id', 'nombre', 'slug')
-            ->orderBy('nombre')
+            ->orderBy('id')
             ->get();
 
         $this->cargarGrados();
@@ -309,8 +308,8 @@ class Horario extends Component
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
-                ($profesor->apellido_paterno ?? '') . ' ' .
-                ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
             );
 
             return [

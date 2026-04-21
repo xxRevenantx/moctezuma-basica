@@ -109,18 +109,6 @@
                         </flux:select>
                     </flux:field>
 
-                    <flux:field>
-                        <flux:label>Grupo</flux:label>
-                        <flux:select wire:model.live="grupo_id" :disabled="!$grado_id">
-                            <option value="">Selecciona un grupo</option>
-                            @foreach ($grupos as $grupo)
-                                <option value="{{ $grupo->id }}">
-                                    {{ $grupo->nombre }}
-                                </option>
-                            @endforeach
-                        </flux:select>
-                    </flux:field>
-
                     @if ($esBachillerato)
                         <flux:field>
                             <flux:label>Semestre</flux:label>
@@ -134,6 +122,20 @@
                             </flux:select>
                         </flux:field>
                     @endif
+
+                    <flux:field>
+                        <flux:label>Grupo</flux:label>
+                        <flux:select wire:model.live="grupo_id" :disabled="!$grado_id">
+                            <option value="">Selecciona un grupo</option>
+                            @foreach ($grupos as $grupo)
+                                <option value="{{ $grupo->id }}">
+                                    {{ $grupo->nombre }}
+                                </option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+
+
 
                     <div class="flex items-end">
                         <div
@@ -234,12 +236,13 @@
                                                     <flux:field>
                                                         <flux:select
                                                             wire:model.live="seleccionesHorario.{{ $claveCelda }}">
-                                                            <option value="">Selecciona una materia</option>
+                                                            <flux:select.option value="">Selecciona una materia
+                                                            </flux:select.option>
 
                                                             @foreach ($materiasDisponibles as $materia)
-                                                                <option value="{{ $materia->id }}">
+                                                                <flux:select.option value="{{ $materia->id }}">
                                                                     {{ $materia->materia }}
-                                                                </option>
+                                                                </flux:select.option>
                                                             @endforeach
                                                         </flux:select>
                                                     </flux:field>

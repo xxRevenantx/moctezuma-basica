@@ -80,7 +80,7 @@ input[type="checkbox"], input[type="radio"]{
     @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700;
 }
 .degradado{
-    @apply h-1.5 w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500;
+    @apply h-1.5 w-full bg-gradient-to-r from-green-700  to-blue-500;
 }
 input:checked + label{
     @apply bg-accent text-accent-foreground border-transparent;

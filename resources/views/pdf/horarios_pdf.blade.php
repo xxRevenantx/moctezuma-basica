@@ -336,6 +336,8 @@
 
         $docentes = collect();
 
+        $slugsExcluidosDocentes = ['calculo-mental', 'caligrafia', 'lectura'];
+
         foreach ($horas as $horaTmp) {
             foreach ($diasOrdenados as $diaTmp) {
                 $registroTmp = $horarioPorCelda->get($horaTmp->id . '-' . $diaTmp->id);
@@ -346,8 +348,25 @@
                 }
 
                 $slugMateria = mb_strtolower(trim($asignacionTmp->slug ?? ''), 'UTF-8');
+                $nombreMateria = mb_strtolower(trim($asignacionTmp->materia ?? ''), 'UTF-8');
 
+                // Quitar receso
                 if (in_array($slugMateria, $slugsReceso, true)) {
+                    continue;
+                }
+
+                // Quitar materias del cuadro rojo
+                if (in_array($slugMateria, $slugsExcluidosDocentes, true)) {
+                    continue;
+                }
+
+                // Solo extra = 1
+                if ((int) ($asignacionTmp->extra ?? 0) !== 1) {
+                    continue;
+                }
+
+                // Solo calificable diferente de 0
+                if ((int) ($asignacionTmp->calificable ?? 0) === 0) {
                     continue;
                 }
 
@@ -369,6 +388,7 @@
                     'slug' => $slugMateria,
                     'orden' => (int) ($asignacionTmp->orden ?? 999999),
                     'calificable' => (int) ($asignacionTmp->calificable ?? 0),
+                    'extra' => (int) ($asignacionTmp->extra ?? 0),
                 ]);
             }
         }
@@ -527,22 +547,19 @@
         </table>
 
 
-
         @if ($docentes->count())
             <table class="tabla-docentes">
                 <thead>
                     <tr>
-                        <th style="width: 34%;">MATERIA</th>
-                        <th>DOCENTE</th>
+                        <th style="width: 34%;">MATERIA EXTRAS</th>
+                        <th>DOCENTE EXTRA</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($docentes as $item)
-                        @continue($esPrimaria && (int) $item['calificable'] === 1)
-
                         <tr>
                             <td>{{ mb_strtoupper($item['materia'], 'UTF-8') }}</td>
-                            <td>{{ mb_strtoupper($item['docente'], 'UTF-8') }}</td>
+                            <td>{{ mb_strtoupper($item['docente'] ?? 'SIN DOCENTE', 'UTF-8') }}</td>
                         </tr>
                     @endforeach
                 </tbody>
