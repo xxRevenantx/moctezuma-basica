@@ -526,6 +526,8 @@
             </tbody>
         </table>
 
+
+
         @if ($docentes->count())
             <table class="tabla-docentes">
                 <thead>

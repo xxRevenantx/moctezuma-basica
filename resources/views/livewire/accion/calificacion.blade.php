@@ -22,16 +22,7 @@
     }
 }" class="w-full">
 
-    {{-- Encabezado --}}
-    <div class="sticky top-0 z-10">
-        <div
-            class="rounded-2xl border border-neutral-200/60 dark:border-neutral-700/60 bg-gradient-to-r from-[#E4F6FF] to-[#F2EFFF] dark:from-[#0b1220] dark:to-[#121a2a] shadow-lg p-5">
-            <h1 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Captura de Calificaciones</h1>
-            <p class="text-sm text-neutral-600 dark:text-neutral-300">
-                Captura calificaciones por nivel, grado, grupo, y periodo.
-            </p>
-        </div>
-    </div>
+
 
     {{-- Filtros --}}
     <div
@@ -40,79 +31,68 @@
 
             {{-- Nivel --}}
             <div>
-                <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Nivel</label>
-                <select wire:model.live="nivel_id"
-                    class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300">
-                    <option value="">-- Selecciona un nivel --</option>
+                <flux:select label="Nivel" wire:model.live="nivel_id">
+                    <flux:select.option value="">-- Selecciona un nivel --</flux:select.option>
                     @foreach ($niveles as $n)
-                        <option value="{{ $n->id }}">{{ $n->nombre }}</option>
+                        <flux:select.option value="{{ $n->id }}">{{ $n->nombre }}</flux:select.option>
                     @endforeach
-                </select>
+                </flux:select>
             </div>
 
             {{-- Grado --}}
             <div>
-                <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Grado</label>
-                <select wire:model.live="grado_id" @disabled(!$nivel_id)
-                    class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60">
-                    <option value="">-- Selecciona un grado --</option>
+                <flux:select label="Grado" wire:model.live="grado_id">
+                    <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
                     @foreach ($grados as $g)
-                        <option value="{{ $g->id }}">{{ $g->nombre }}</option>
+                        <flux:select.option value="{{ $g->id }}">{{ $g->nombre }}</flux:select.option>
                     @endforeach
-                </select>
+                </flux:select>
             </div>
 
             {{-- Semestre --}}
             @if ($this->esBachillerato)
                 <div>
-                    <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Semestre</label>
-                    <select wire:model.live="semestre_id" @disabled(!$grado_id)
-                        class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60">
-                        <option value="">-- Selecciona un semestre --</option>
+                    <flux:select label="Semestre" wire:model.live="semestre_id">
+                        <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
                         @foreach ($semestres as $s)
-                            <option value="{{ $s->id }}">{{ $s->nombre }}</option>
+                            <flux:select.option value="{{ $s->id }}">{{ $s->nombre }}</flux:select.option>
                         @endforeach
-                    </select>
+                    </flux:select>
                 </div>
             @endif
 
             {{-- Grupo --}}
             <div>
-                <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Grupo</label>
-                <select wire:model.live="grupo_id" @disabled(!$grado_id)
-                    class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60">
-                    <option value="">-- Selecciona un grupo --</option>
+                <flux:select label="Grupo" wire:model.live="grupo_id">
+                    <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
                     @foreach ($grupos as $gpo)
-                        <option value="{{ $gpo->id }}">{{ $gpo->nombre }}</option>
+                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
                     @endforeach
-                </select>
+                </flux:select>
             </div>
 
 
             {{-- Generación --}}
             @if ($this->esBachillerato)
                 <div>
-                    <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Generación</label>
-                    <select wire:model.live="generacion_id"
+                    <flux:select wire:model.live="generacion_id"
                         class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300">
-                        <option value="">-- Selecciona una generación --</option>
+                        <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
                         @foreach ($generaciones as $gen)
-                            <option value="{{ $gen->id }}">{{ $gen->generacion }}</option>
+                            <flux:select.option value="{{ $gen->id }}">{{ $gen->generacion }}</flux:select.option>
                         @endforeach
-                    </select>
+                    </flux:select>
                 </div>
             @endif
 
             {{-- Periodo --}}
             <div>
-                <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Periodo</label>
-                <select wire:model.live="periodo_id"
-                    class="mt-1 w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-60">
-                    <option value="">-- Selecciona un periodo --</option>
+                <flux:select label="Periodo" wire:model.live="periodo_id">
+                    <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
                     @foreach ($periodos as $p)
-                        <option value="{{ $p->id }}">{{ $p->etiqueta }}</option>
+                        <flux:select.option value="{{ $p['id'] }}">{{ $p['etiqueta'] }}</flux:select.option>
                     @endforeach
-                </select>
+                </flux:select>
             </div>
 
             {{-- Limpiar --}}
@@ -152,6 +132,113 @@
             </div>
         </div>
     </div>
+
+    @if ($this->periodoSeleccionado)
+        <div
+            class="mt-6 rounded-[28px] border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
+            <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500"></div>
+
+            <div class="p-6">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div class="flex items-start gap-4">
+                        <div
+                            class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8 7V3m8 4V3m-9 8h10m-13 9h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v11a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+
+                        <div>
+                            <h3 class="text-2xl  tracking-tight text-neutral-900 dark:text-neutral-100">
+                                {{ $this->esBachillerato ? 'PERIODO SEMESTRAL' : 'PERIODO ESCOLAR' }}
+                            </h3>
+
+                            <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+                                Información vigente del periodo académico seleccionado.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span
+                            class="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold {{ $this->claseEstadoPeriodo }}">
+                            {{ $this->estadoPeriodo }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div
+                        class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/50 p-5 shadow-sm">
+                        <div
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>
+                            Ciclo escolar
+                        </div>
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {{ $this->periodoSeleccionado['ciclo_escolar'] ?? 'Sin ciclo' }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/50 p-5 shadow-sm">
+                        <div
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                            Periodo escolar
+                        </div>
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {{ $this->nombrePeriodo }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/50 p-5 shadow-sm">
+                        <div
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                            Inicio de periodo
+                        </div>
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/50 p-5 shadow-sm">
+                        <div
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
+                            Término de periodo
+                        </div>
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <div
+                        class="mb-2 flex items-center justify-between text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                        <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') }}</span>
+                        <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') }}</span>
+                    </div>
+
+                    <div class="h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                        <div class="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 transition-all duration-500"
+                            style="width: {{ $this->porcentajePeriodo }}%">
+                        </div>
+                    </div>
+
+                    <div class="mt-2 text-right text-sm font-medium text-neutral-600 dark:text-neutral-300">
+                        Avance {{ $this->porcentajePeriodo }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Tabla --}}
     <div
@@ -198,20 +285,22 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-neutral-50 dark:bg-neutral-950/60">
+                <table class="min-w-full text-sm d">
+                    <thead class="bg-neutral-50 dark:bg-neutral-950/60 degradado">
                         <tr class="text-neutral-600 dark:text-neutral-300">
                             <th class="px-4 py-3 text-left font-semibold text-white">#</th>
                             <th class="px-4 py-3 text-left font-semibold text-white">MATRÍCULA</th>
                             <th class="px-4 py-3 text-left font-semibold text-white">ALUMNO</th>
 
                             @foreach ($materias as $m)
-                                <th class="px-4 py-2 text-center font-semibold text-white min-w-[160px]">
+                                <th class="px-4 py-2 text-center font-semibold text-white min-w-[180px]">
                                     <div class="text-white">
                                         {{ mb_strtoupper($m['materia']) }}
                                     </div>
-                                    <div class="text-[11px] font-normal text-neutral-300 dark:text-neutral-400 mt-1">
-                                        {{ $m['clave'] }}
+
+                                    <div
+                                        class="mt-1 text-[11px] font-normal text-neutral-200 dark:text-neutral-300 leading-tight">
+                                        {{ $m['profesor'] ?? 'SIN PROFESOR ASIGNADO' }}
                                     </div>
                                 </th>
                             @endforeach

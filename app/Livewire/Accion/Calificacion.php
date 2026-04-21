@@ -261,11 +261,14 @@ class Calificacion extends Component
 
     private function cargarPeriodos(): void
     {
+        $this->periodos = [];
+
         if (!$this->nivel_id) {
             return;
         }
 
         $query = Periodos::query()
+            ->with('cicloEscolar')
             ->where('nivel_id', $this->nivel_id);
 
         if ($this->esBachillerato) {
@@ -282,12 +285,123 @@ class Calificacion extends Component
             ->orderBy('fecha_inicio')
             ->get()
             ->map(function ($item) {
-                $inicio = $item->fecha_inicio ? date('d/m/Y', strtotime($item->fecha_inicio)) : 'Sin inicio';
-                $fin = $item->fecha_fin ? date('d/m/Y', strtotime($item->fecha_fin)) : 'Sin fin';
+                $fechaInicio = $item->fecha_inicio
+                    ? \Carbon\Carbon::parse($item->fecha_inicio)
+                    : null;
 
-                $item->etiqueta = $inicio . ' - ' . $fin;
-                return $item;
-            });
+                $fechaFin = $item->fecha_fin
+                    ? \Carbon\Carbon::parse($item->fecha_fin)
+                    : null;
+
+                $inicio = $fechaInicio ? $fechaInicio->format('d/m/Y') : 'Sin inicio';
+                $fin = $fechaFin ? $fechaFin->format('d/m/Y') : 'Sin fin';
+
+                return [
+                    'id' => (int) $item->id,
+                    'fecha_inicio' => $item->fecha_inicio,
+                    'fecha_fin' => $item->fecha_fin,
+                    'ciclo_escolar_id' => $item->ciclo_escolar_id ? (int) $item->ciclo_escolar_id : null,
+                    'ciclo_escolar' => $item->cicloEscolar
+                        ? $item->cicloEscolar->inicio_anio . '-' . $item->cicloEscolar->fin_anio
+                        : 'Sin ciclo escolar',
+                    'etiqueta' => $inicio . ' - ' . $fin,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        if ($this->periodo_id && !collect($this->periodos)->contains('id', (int) $this->periodo_id)) {
+            $this->periodo_id = null;
+        }
+    }
+
+    public function getPeriodoSeleccionadoProperty(): ?array
+    {
+        if (!$this->periodo_id || empty($this->periodos)) {
+            return null;
+        }
+
+        return collect($this->periodos)->firstWhere('id', (int) $this->periodo_id);
+    }
+
+    public function getNombrePeriodoProperty(): string
+    {
+        $periodo = $this->periodoSeleccionado;
+
+        if (
+            !$periodo ||
+            empty($periodo['fecha_inicio']) ||
+            empty($periodo['fecha_fin'])
+        ) {
+            return 'Periodo escolar';
+        }
+
+        $inicio = \Carbon\Carbon::parse($periodo['fecha_inicio'])->locale('es');
+        $fin = \Carbon\Carbon::parse($periodo['fecha_fin'])->locale('es');
+
+        $mesInicio = ucfirst($inicio->translatedFormat('F'));
+        $mesFin = ucfirst($fin->translatedFormat('F'));
+
+        return $mesInicio . ' - ' . $mesFin;
+    }
+
+    public function getEstadoPeriodoProperty(): string
+    {
+        $periodo = $this->periodoSeleccionado;
+
+        if (!$periodo || empty($periodo['fecha_inicio']) || empty($periodo['fecha_fin'])) {
+            return 'Sin definir';
+        }
+
+        $hoy = now()->startOfDay();
+        $inicio = \Carbon\Carbon::parse($periodo['fecha_inicio'])->startOfDay();
+        $fin = \Carbon\Carbon::parse($periodo['fecha_fin'])->startOfDay();
+
+        if ($hoy->lt($inicio)) {
+            return 'Próximo';
+        }
+
+        if ($hoy->gt($fin)) {
+            return 'Finalizado';
+        }
+
+        return 'En curso';
+    }
+
+    public function getClaseEstadoPeriodoProperty(): string
+    {
+        return match ($this->estadoPeriodo) {
+            'Finalizado' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'En curso' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300',
+            'Próximo' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
+            default => 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+        };
+    }
+
+    public function getPorcentajePeriodoProperty(): int
+    {
+        $periodo = $this->periodoSeleccionado;
+
+        if (!$periodo || empty($periodo['fecha_inicio']) || empty($periodo['fecha_fin'])) {
+            return 0;
+        }
+
+        $hoy = now()->startOfDay();
+        $inicio = \Carbon\Carbon::parse($periodo['fecha_inicio'])->startOfDay();
+        $fin = \Carbon\Carbon::parse($periodo['fecha_fin'])->startOfDay();
+
+        if ($hoy->lte($inicio)) {
+            return 0;
+        }
+
+        if ($hoy->gte($fin)) {
+            return 100;
+        }
+
+        $totalDias = max($inicio->diffInDays($fin), 1);
+        $diasTranscurridos = $inicio->diffInDays($hoy);
+
+        return (int) floor(($diasTranscurridos / $totalDias) * 100);
     }
 
     private function filtrosListos(): bool
@@ -328,10 +442,11 @@ class Calificacion extends Component
     private function cargarMaterias(): void
     {
         $query = AsignacionMateria::query()
+            ->with('profesor')
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
             ->where('grupo_id', $this->grupo_id)
-            ->where('calificable', true)
+            ->where('calificable', 1)
             ->orderBy('orden')
             ->orderBy('materia');
 
@@ -342,10 +457,22 @@ class Calificacion extends Component
         $asignaciones = $query->get();
 
         $this->materias = $asignaciones->map(function ($a) {
+            $nombreProfesor = 'SIN PROFESOR ASIGNADO';
+
+            if ($a->profesor) {
+                $nombreProfesor = trim(
+                    collect([
+                        $a->profesor->nombre ?? null,
+                        $a->profesor->apellido_paterno ?? null,
+                        $a->profesor->apellido_materno ?? null,
+                    ])->filter()->implode(' ')
+                );
+            }
+
             return [
                 'id' => (int) $a->id,
                 'materia' => $a->materia ?: 'MATERIA',
-                'clave' => $a->clave ?: '—',
+                'profesor' => $nombreProfesor,
                 'calificable' => (bool) $a->calificable,
             ];
         })->values()->toArray();
@@ -590,7 +717,19 @@ class Calificacion extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $periodoSeleccionado = collect($this->periodos)
+            ->firstWhere('id', (int) $this->periodo_id);
+
+        if (!$periodoSeleccionado || empty($periodoSeleccionado['ciclo_escolar_id'])) {
+            $this->dispatch('swal', [
+                'icon' => 'error',
+                'title' => 'El periodo seleccionado no tiene ciclo escolar asignado.',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        DB::transaction(function () use ($periodoSeleccionado) {
             foreach ($this->inscripciones as $fila) {
                 $insId = (int) $fila['inscripcion_id'];
 
@@ -637,6 +776,7 @@ class Calificacion extends Component
                             'generacion_id' => $inscripcion->generacion_id,
                             'semestre_id' => $inscripcion->semestre_id,
                             'periodo_id' => $this->periodo_id,
+                            'ciclo_escolar_id' => $periodoSeleccionado['ciclo_escolar_id'],
                         ],
                         [
                             'calificacion' => $valor,

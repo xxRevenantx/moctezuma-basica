@@ -26,7 +26,7 @@ class AsignacionMateria extends Component
     public string $materia = '';
     public ?string $clave = null;
     public string $slug = '';
-    public bool $calificable = true;
+    public string $calificable = '1';
 
     // =========================
     // Campos extras
@@ -318,7 +318,7 @@ class AsignacionMateria extends Component
             'materia' => $this->materia,
             'clave' => $this->clave,
             'slug' => $this->slug,
-            'calificable' => $this->calificable,
+            'calificable' => (int) $this->calificable,
             'numero_materias_promediar' => $this->numero_materias_promediar,
             'materia_para_calificaciones' => $this->materia_para_calificaciones,
         ];
@@ -355,9 +355,12 @@ class AsignacionMateria extends Component
     // =========================
     public function editar(int $id): void
     {
+
         $this->cargandoEditarId = $id;
 
         $registro = AsignacionMateriaModel::findOrFail($id);
+
+        // dd($registro);
 
         $this->editandoId = $registro->id;
         $this->nivel_id = $registro->nivel_id;
@@ -372,7 +375,7 @@ class AsignacionMateria extends Component
         $this->materia = $registro->materia;
         $this->clave = $registro->clave;
         $this->slug = $registro->slug;
-        $this->calificable = (bool) $registro->calificable;
+        $this->calificable = (string) $registro->calificable;
         $this->numero_materias_promediar = $registro->numero_materias_promediar;
         $this->materia_para_calificaciones = $registro->materia_para_calificaciones ?? 'si';
 
@@ -428,7 +431,7 @@ class AsignacionMateria extends Component
         $this->materia = '';
         $this->clave = null;
         $this->slug = '';
-        $this->calificable = true;
+        $this->calificable = '1';
 
         $this->numero_materias_promediar = null;
         $this->materia_para_calificaciones = 'si';

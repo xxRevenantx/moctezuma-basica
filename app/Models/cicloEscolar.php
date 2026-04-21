@@ -20,17 +20,14 @@ class cicloEscolar extends Model
     // Relación con Periodos_basico
     public function periodosBasicos()
     {
-        return $this->hasMany(Periodos_basico::class, 'ciclo_escolar_id');
+        return $this->hasMany(Periodos::class, 'ciclo_escolar_id');
     }
     public function periodos()
     {
-        return $this->hasMany(Periodo::class, 'ciclo_escolar_id');
+        return $this->hasMany(Periodos::class, 'ciclo_escolar_id');
     }
 
-    public function periodosBachillerato()
-    {
-        return $this->hasMany(PeriodosBachillerato::class, 'ciclo_escolar_id');
-    }
+
 
     public function docenteGrupos()
     {

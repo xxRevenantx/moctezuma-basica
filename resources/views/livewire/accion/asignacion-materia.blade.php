@@ -239,8 +239,8 @@
                         <flux:field>
                             <flux:label>¿Calificable?</flux:label>
                             <flux:select wire:model="calificable">
-                                <option value="1">Sí</option>
-                                <option value="0">No</option>
+                                <flux:select.option value="1">Sí</flux:select.option>
+                                <flux:select.option value="0">No</flux:select.option>
                             </flux:select>
                             <flux:error name="calificable" />
                         </flux:field>
@@ -518,7 +518,7 @@
                                             </td>
 
                                             <td class="px-4 py-4 align-top">
-                                                @if ($item->calificable)
+                                                @if ($item->calificable == 1)
                                                     <span
                                                         class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                                                         Sí
