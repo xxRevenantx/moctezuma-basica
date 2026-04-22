@@ -56,4 +56,10 @@ class Generacion extends Model
     {
         return $this->hasMany(Calificacion::class);
     }
+
+    // RELACIONES CON BITACORA DE CALIFICACIONES
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'generacion_id');
+    }
 }

@@ -27,11 +27,11 @@ class Matricula extends Component
     public ?Nivel $nivel = null;
     public Collection $niveles;
 
-    public ?int $generacion_id = null;
+    public ?int $grado_id = null;
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
+    public ?int $generacion_id = null;
 
-    public Collection $generaciones;
     public Collection $semestres;
     public Collection $grupos;
     public Collection $grados;
@@ -42,7 +42,7 @@ class Matricula extends Component
     public int $hombres = 0;
     public int $mujeres = 0;
 
-    public ?string $gradoGeneracionLabel = null;
+    public ?string $generacionGrupoLabel = null;
 
     public bool $selectPage = false;
     public array $selected = [];
@@ -66,14 +66,14 @@ class Matricula extends Component
             ->orderBy('id')
             ->get();
 
-        $this->generaciones = $this->loadGeneraciones();
-        $this->semestres = collect();
-        $this->grupos = collect();
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get(['id', 'nivel_id', 'nombre', 'orden']);
+
+        $this->semestres = collect();
+        $this->grupos = collect();
 
         $this->recalcularResumen();
     }
@@ -89,38 +89,17 @@ class Matricula extends Component
             ->where('nivel_id', $this->nivel->id);
     }
 
-    protected function loadGeneraciones(): Collection
-    {
-        $generacionIds = $this->baseGrupoQuery()
-            ->select('generacion_id')
-            ->distinct()
-            ->pluck('generacion_id')
-            ->filter()
-            ->values();
-
-        if ($generacionIds->isEmpty()) {
-            return collect();
-        }
-
-        return Generacion::query()
-            ->whereIn('id', $generacionIds)
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'anio_ingreso', 'anio_egreso']);
-    }
-
     protected function loadSemestres(): Collection
     {
-        if (!$this->esBachillerato() || !$this->generacion_id) {
+        if (!$this->esBachillerato() || !$this->grado_id) {
             return collect();
         }
 
         $semestreIds = $this->baseGrupoQuery()
-            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->grado_id)
             ->whereNotNull('semestre_id')
-            ->select('semestre_id')
-            ->distinct()
             ->pluck('semestre_id')
-            ->filter()
+            ->unique()
             ->values();
 
         if ($semestreIds->isEmpty()) {
@@ -135,12 +114,12 @@ class Matricula extends Component
 
     protected function loadGrupos(): Collection
     {
-        if (!$this->generacion_id) {
+        if (!$this->grado_id) {
             return collect();
         }
 
         $query = $this->baseGrupoQuery()
-            ->where('generacion_id', $this->generacion_id);
+            ->where('grado_id', $this->grado_id);
 
         if ($this->esBachillerato()) {
             if (!$this->semestre_id) {
@@ -152,7 +131,30 @@ class Matricula extends Component
 
         return $query
             ->orderBy('nombre')
-            ->get(['id', 'nombre', 'generacion_id', 'semestre_id']);
+            ->get(['id', 'nombre', 'generacion_id', 'semestre_id', 'grado_id']);
+    }
+
+    protected function obtenerGrupoSeleccionado(): ?Grupo
+    {
+        if (!$this->grupo_id) {
+            return null;
+        }
+
+        return $this->baseGrupoQuery()
+            ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
+            ->when(
+                $this->esBachillerato(),
+                fn($q) => $q->where('semestre_id', $this->semestre_id)
+            )
+            ->where('id', $this->grupo_id)
+            ->first(['id', 'nombre', 'generacion_id', 'grado_id', 'semestre_id']);
+    }
+
+    protected function actualizarGeneracionDesdeGrupo(): void
+    {
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        $this->generacion_id = $grupo?->generacion_id ? (int) $grupo->generacion_id : null;
     }
 
     protected function consultaInscripcionesBase(): Builder
@@ -165,18 +167,20 @@ class Matricula extends Component
             ])
             ->where('nivel_id', $this->nivel->id);
 
-        if ($this->generacion_id) {
-            $query->where('generacion_id', $this->generacion_id);
+        if ($this->grado_id) {
+            $query->where('grado_id', $this->grado_id);
         }
 
-        if ($this->esBachillerato()) {
-            if ($this->semestre_id) {
-                $query->where('semestre_id', $this->semestre_id);
-            }
+        if ($this->esBachillerato() && $this->semestre_id) {
+            $query->where('semestre_id', $this->semestre_id);
         }
 
         if ($this->grupo_id) {
             $query->where('grupo_id', $this->grupo_id);
+        }
+
+        if ($this->generacion_id) {
+            $query->where('generacion_id', $this->generacion_id);
         }
 
         if (trim($this->search) !== '') {
@@ -225,10 +229,10 @@ class Matricula extends Component
     protected function filtrosCompletos(): bool
     {
         if ($this->esBachillerato()) {
-            return !empty($this->generacion_id) && !empty($this->semestre_id) && !empty($this->grupo_id);
+            return !empty($this->grado_id) && !empty($this->semestre_id) && !empty($this->grupo_id);
         }
 
-        return !empty($this->generacion_id) && !empty($this->grupo_id);
+        return !empty($this->grado_id) && !empty($this->grupo_id);
     }
 
     protected function recalcularResumen(): void
@@ -239,48 +243,43 @@ class Matricula extends Component
         $this->hombres = (clone $query)->where('genero', 'H')->count();
         $this->mujeres = (clone $query)->where('genero', 'M')->count();
 
-        $this->gradoGeneracionLabel = $this->obtenerLabelGradosGeneracion();
+        $this->generacionGrupoLabel = $this->obtenerLabelGeneracionActual();
     }
 
-    protected function obtenerLabelGradosGeneracion(): ?string
+    protected function obtenerLabelGeneracionActual(): ?string
     {
         if (!$this->generacion_id) {
             return null;
         }
 
-        $nombres = $this->baseGrupoQuery()
-            ->where('generacion_id', $this->generacion_id)
-            ->with('grado:id,nombre')
-            ->get()
-            ->pluck('grado.nombre')
-            ->filter()
-            ->unique()
-            ->values();
+        $generacion = Generacion::query()
+            ->where('id', $this->generacion_id)
+            ->first(['id', 'anio_ingreso', 'anio_egreso']);
 
-        if ($nombres->isEmpty()) {
+        if (!$generacion) {
             return null;
         }
 
-        return $nombres->implode(', ');
+        return ($generacion->anio_ingreso ?? '—') . ' - ' . ($generacion->anio_egreso ?? '—');
     }
 
-    public function updatedGeneracionId($value): void
+    public function updatedGradoId($value): void
     {
-        $this->generacion_id = $value ? (int) $value : null;
+        $this->grado_id = $value ? (int) $value : null;
 
         $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->generacion_id = null;
+
         $this->selected = [];
         $this->selectPage = false;
 
         $this->semestres = collect();
         $this->grupos = collect();
 
-        if ($this->esBachillerato() && $this->generacion_id) {
+        if ($this->esBachillerato()) {
             $this->semestres = $this->loadSemestres();
-        }
-
-        if (!$this->esBachillerato() && $this->generacion_id) {
+        } elseif ($this->grado_id) {
             $this->grupos = $this->loadGrupos();
         }
 
@@ -293,6 +292,8 @@ class Matricula extends Component
         $this->semestre_id = $value ? (int) $value : null;
 
         $this->grupo_id = null;
+        $this->generacion_id = null;
+
         $this->selected = [];
         $this->selectPage = false;
 
@@ -308,6 +309,8 @@ class Matricula extends Component
 
         $this->selected = [];
         $this->selectPage = false;
+
+        $this->actualizarGeneracionDesdeGrupo();
 
         $this->resetPage();
         $this->recalcularResumen();
@@ -343,9 +346,10 @@ class Matricula extends Component
     public function clearFilters(): void
     {
         $this->reset([
-            'generacion_id',
+            'grado_id',
             'semestre_id',
             'grupo_id',
+            'generacion_id',
             'search',
             'selectPage',
             'selected',
@@ -442,60 +446,60 @@ class Matricula extends Component
         $esBachillerato = $this->esBachillerato();
 
         return Excel::download(
-            new class ($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
-            public function __construct(
-            protected Collection $rows,
-            protected bool $esBachillerato
-            ) {}
+            new class($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
+                public function __construct(
+                    protected Collection $rows,
+                    protected bool $esBachillerato
+                ) {}
 
-            public function collection()
-            {
-                return $this->rows;
-            }
-
-            public function headings(): array
-            {
-                $headings = [
-                'Matrícula',
-                'Folio',
-                'Apellido paterno',
-                'Apellido materno',
-                'Nombre(s)',
-                'CURP',
-                'Género',
-                'Grado',
-                ];
-
-                if ($this->esBachillerato) {
-                    $headings[] = 'Semestre';
+                public function collection()
+                {
+                    return $this->rows;
                 }
 
-                $headings[] = 'Grupo';
+                public function headings(): array
+                {
+                    $headings = [
+                        'Matrícula',
+                        'Folio',
+                        'Apellido paterno',
+                        'Apellido materno',
+                        'Nombre(s)',
+                        'CURP',
+                        'Género',
+                        'Grado',
+                    ];
 
-                return $headings;
-            }
+                    if ($this->esBachillerato) {
+                        $headings[] = 'Semestre';
+                    }
 
-            public function map($row): array
-            {
-                $data = [
-                    $row->matricula,
-                    $row->folio,
-                    $row->apellido_paterno,
-                    $row->apellido_materno,
-                    $row->nombre,
-                    $row->curp,
-                    $row->genero,
-                    $row->grado?->nombre,
-                ];
+                    $headings[] = 'Grupo';
 
-                if ($this->esBachillerato) {
-                    $data[] = $row->semestre?->numero;
+                    return $headings;
                 }
 
-                $data[] = $row->grupo?->nombre;
+                public function map($row): array
+                {
+                    $data = [
+                        $row->matricula,
+                        $row->folio,
+                        $row->apellido_paterno,
+                        $row->apellido_materno,
+                        $row->nombre,
+                        $row->curp,
+                        $row->genero,
+                        $row->grado?->nombre,
+                    ];
 
-                return $data;
-            }
+                    if ($this->esBachillerato) {
+                        $data[] = $row->semestre?->numero;
+                    }
+
+                    $data[] = $row->grupo?->nombre;
+
+                    return $data;
+                }
             },
             'matricula.xlsx'
         );

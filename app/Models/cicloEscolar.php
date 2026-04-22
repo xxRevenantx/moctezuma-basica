@@ -54,4 +54,10 @@ class cicloEscolar extends Model
     {
         return $this->hasMany(Calificacion::class, 'ciclo_escolar_id');
     }
+
+    // Relación con BitacoraCalificacion
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'ciclo_escolar_id');
+    }
 }

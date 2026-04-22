@@ -98,4 +98,9 @@ class Grupo extends Model
     {
         return $this->hasMany(Calificacion::class, 'grupo_id');
     }
+    // RELACION CON BITACORA DE CALIFICACIONES
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'grupo_id');
+    }
 }

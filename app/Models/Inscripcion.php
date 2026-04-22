@@ -112,4 +112,10 @@ class Inscripcion extends Model
     {
         return $this->hasMany(Calificacion::class);
     }
+
+    // Relación con bitácora de calificaciones
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class);
+    }
 }

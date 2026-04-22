@@ -63,7 +63,7 @@
                         Matrícula
                     </h1>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Consulta de alumnos y personal por nivel, generación y grupo.
+                        Consulta de alumnos y personal por nivel, grado y grupo.
                     </p>
                 </div>
 
@@ -115,12 +115,12 @@
                 </div>
 
                 <div>
-                    <flux:label>Generación</flux:label>
-                    <flux:select id="generacion_id" wire:model.live="generacion_id">
-                        <flux:select.option value="">Selecciona una generación</flux:select.option>
-                        @foreach ($generaciones as $generacion)
-                            <flux:select.option value="{{ $generacion->id }}">
-                                {{ $generacion->label ?? $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso }}
+                    <flux:label>Grado</flux:label>
+                    <flux:select id="grado_id" wire:model.live="grado_id">
+                        <flux:select.option value="">Selecciona un grado</flux:select.option>
+                        @foreach ($grados as $grado)
+                            <flux:select.option value="{{ $grado->id }}">
+                                {{ $grado->nombre }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
@@ -130,7 +130,7 @@
                     <div>
                         <flux:label>Semestre</flux:label>
                         <flux:select id="semestre_id" wire:model.live="semestre_id"
-                            :disabled="!$generacion_id || $semestres->isEmpty()">
+                            :disabled="!$grado_id || $semestres->isEmpty()">
                             <flux:select.option value="">Selecciona un semestre</flux:select.option>
                             @foreach ($semestres as $semestre)
                                 <flux:select.option value="{{ $semestre->id }}">
@@ -144,7 +144,7 @@
                 <div>
                     <flux:label>Grupo</flux:label>
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
-                        :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || $grupos->isEmpty()">
+                        :disabled="!$grado_id || ($esBachillerato && !$semestre_id) || $grupos->isEmpty()">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ $grupo->id }}">
@@ -162,16 +162,14 @@
 
             <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap items-center gap-2">
-                    @if ($gradoGeneracionLabel)
+                    @if ($generacionGrupoLabel)
                         <span
                             class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
-                            Grado(s) de la generación: {{ $gradoGeneracionLabel }}
+                            Generación del grupo: {{ $generacionGrupoLabel }}
                         </span>
                     @endif
 
-                    @if (
-                        (!$esBachillerato && $generacion_id && $grupo_id) ||
-                            ($esBachillerato && $generacion_id && $semestre_id && $grupo_id))
+                    @if ((!$esBachillerato && $grado_id && $grupo_id) || ($esBachillerato && $grado_id && $semestre_id && $grupo_id))
                         <span
                             class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
                             Filtros aplicados
@@ -188,16 +186,16 @@
     </div>
 
     @if (
-        (!$esBachillerato && (!$generacion_id || !$grupo_id)) ||
-            ($esBachillerato && (!$generacion_id || !$semestre_id || !$grupo_id)))
+        (!$esBachillerato && (!$grado_id || !$grupo_id)) ||
+            ($esBachillerato && (!$grado_id || !$semestre_id || !$grupo_id)))
         <div
             class="rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-10 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/60">
             <div class="mx-auto max-w-2xl">
                 <h2 class="text-xl font-bold text-slate-800 dark:text-white">
                     @if ($esBachillerato)
-                        Selecciona una generación, un semestre y un grupo
+                        Selecciona un grado, un semestre y un grupo
                     @else
-                        Selecciona una generación y un grupo
+                        Selecciona un grado y un grupo
                     @endif
                 </h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -219,7 +217,7 @@
                 <section class="mb-3">
                     <div class="relative">
                         <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="generacion_id,semestre_id,grupo_id,search">
+                            wire:target="grado_id,semestre_id,grupo_id,search">
                             @if ($personal->isEmpty())
                                 <div
                                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
@@ -300,7 +298,7 @@
                                 Lista de alumnos
                             </h2>
                             <p class="text-sm text-slate-500 dark:text-slate-400">
-                                Registros filtrados por nivel, generación y grupo.
+                                Registros filtrados por nivel, grado y grupo.
                             </p>
                         </div>
 
@@ -392,8 +390,8 @@
                     @endif
 
                     <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="generacion_id,semestre_id,grupo_id,search">
-                        <div wire:loading.flex wire:target="generacion_id,semestre_id,grupo_id,search"
+                        wire:target="grado_id,semestre_id,grupo_id,search">
+                        <div wire:loading.flex wire:target="grado_id,semestre_id,grupo_id,search"
                             class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">

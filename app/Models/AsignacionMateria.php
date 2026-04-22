@@ -61,4 +61,9 @@ class AsignacionMateria extends Model
     {
         return $this->hasMany(Calificacion::class, 'asignacion_materia_id');
     }
+
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'asignacion_materia_id');
+    }
 }

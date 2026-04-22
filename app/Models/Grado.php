@@ -75,4 +75,10 @@ class Grado extends Model
     {
         return $this->hasMany(Calificacion::class, 'grado_id');
     }
+
+    // RELACION CON BITACORA DE CALIFICACIONES
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'grado_id');
+    }
 }

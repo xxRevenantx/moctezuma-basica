@@ -79,6 +79,9 @@ Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('mis
 Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
 
 
+Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.pdf');
+
+
 Route::prefix('nivel')->group(function () {
 
     Route::get('{slug_nivel}', [SeleccionarNivelController::class, 'index'])->name('niveles.seleccionar-nivel');

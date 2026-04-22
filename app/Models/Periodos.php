@@ -56,4 +56,10 @@ class Periodos extends Model
     {
         return $this->hasMany(Calificacion::class, 'periodo_id');
     }
+
+    // RELACION CON BITACORA DE CALIFICACIONES
+    public function bitacoraCalificaciones()
+    {
+        return $this->hasMany(BitacoraCalificacion::class, 'periodo_id');
+    }
 }
