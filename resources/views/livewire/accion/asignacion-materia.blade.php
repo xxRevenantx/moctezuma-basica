@@ -531,7 +531,7 @@
                                             @if ($this->esBachillerato)
                                                 <td
                                                     class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                    {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
+                                                    {{ $item->semestre ? $item->semestre . '° semestre' : '—' }}
                                                 </td>
                                             @endif
 
@@ -672,7 +672,7 @@
                                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
                                                     Semestre</p>
                                                 <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                    {{ $item->semestre?->numero ? $item->semestre->numero . '° semestre' : '—' }}
+                                                    {{ $item->semestre ? $item->semestre . '° semestre' : '—' }}
                                                 </p>
                                             </div>
                                         @endif

@@ -63,19 +63,36 @@
     </div>
 
     {{-- Filtros --}}
-    <div
-        class="mt-6 rounded-2xl border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700 shadow-sm p-5">
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div>
+            <flux:select label="Nivel" wire:model.live="nivel_id">
+                <flux:select.option value="">-- Selecciona un nivel --</flux:select.option>
+                @foreach ($niveles as $n)
+                    <flux:select.option value="{{ $n->id }}">{{ $n->nombre }}</flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
 
+        @if ($this->esBachillerato)
             <div>
-                <flux:select label="Nivel" wire:model.live="nivel_id">
-                    <flux:select.option value="">-- Selecciona un nivel --</flux:select.option>
-                    @foreach ($niveles as $n)
-                        <flux:select.option value="{{ $n->id }}">{{ $n->nombre }}</flux:select.option>
+                <flux:select label="Generación" wire:model.live="generacion_id">
+                    <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
+                    @foreach ($generaciones as $gen)
+                        <flux:select.option value="{{ $gen->id }}">{{ $gen->anio_ingreso }} -
+                            {{ $gen->anio_egreso }}</flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
 
+            <div>
+                <flux:select label="Semestre" wire:model.live="semestre_id" :disabled="!$generacion_id">
+                    <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
+                    @foreach ($semestres as $sem)
+                        <flux:select.option value="{{ $sem->id }}">{{ $sem->numero }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+        @else
             <div>
                 <flux:select label="Grado" wire:model.live="grado_id">
                     <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
@@ -84,17 +101,6 @@
                     @endforeach
                 </flux:select>
             </div>
-
-            @if ($this->esBachillerato)
-                <div>
-                    <flux:select label="Semestre" wire:model.live="semestre_id">
-                        <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
-                        @foreach ($semestres as $s)
-                            <flux:select.option value="{{ $s->id }}">{{ $s->nombre }}</flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-            @endif
 
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id">
@@ -105,18 +111,6 @@
                 </flux:select>
             </div>
 
-            @if ($this->esBachillerato)
-                <div>
-                    <flux:select label="Generación" wire:model.live="generacion_id">
-                        <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
-                        @foreach ($generaciones as $gen)
-                            <flux:select.option value="{{ $gen->id }}">{{ $gen->generacion }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-            @endif
-
             <div>
                 <flux:select label="Periodo" wire:model.live="periodo_id">
                     <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
@@ -125,40 +119,13 @@
                     @endforeach
                 </flux:select>
             </div>
+        @endif
 
-            <div class="mt-7">
-                <button type="button" wire:click="limpiarFiltros"
-                    class="items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-95">
-                    Limpiar filtros
-                </button>
-            </div>
-        </div>
-
-        <div
-            class="mt-5 rounded-2xl border shadow-sm px-4 py-3 flex items-center justify-between gap-4
-            {{ $hayCambios
-                ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30'
-                : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40' }}">
-            <div class="flex items-center gap-3">
-                <span class="relative flex h-3 w-3">
-                    @if ($hayCambios)
-                        <span
-                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-600"></span>
-                    @else
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-600"></span>
-                    @endif
-                </span>
-
-                <div class="min-w-0">
-                    <div class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                        {{ $hayCambios ? 'Hay cambios por guardar' : 'No hay cambios por guardar' }}
-                    </div>
-                    <div class="text-xs text-neutral-600 dark:text-neutral-300">
-                        {{ $hayCambios ? 'Guarda para aplicar los cambios.' : 'Todo está al día.' }}
-                    </div>
-                </div>
-            </div>
+        <div class="mt-7">
+            <button type="button" wire:click="limpiarFiltros"
+                class="items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-95">
+                Limpiar filtros
+            </button>
         </div>
     </div>
 

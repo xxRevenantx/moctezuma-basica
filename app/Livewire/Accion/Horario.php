@@ -11,6 +11,7 @@ use App\Models\Horario as HorarioModel;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Horario extends Component
@@ -308,8 +309,8 @@ class Horario extends Component
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                ($profesor->apellido_paterno ?? '') . ' ' .
+                ($profesor->apellido_materno ?? '')
             );
 
             return [
@@ -656,6 +657,7 @@ class Horario extends Component
         });
     }
 
+    #[On('refrescarHorasDias')]
     public function render()
     {
         return view('livewire.accion.horario');

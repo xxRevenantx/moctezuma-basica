@@ -77,10 +77,10 @@ class MateriaPromediar extends Component
         $this->promediar_grupos = [];
         $this->promediar_semestres = [];
 
-        $this->cargarGruposPromediar();
-
         if ($this->esBachillerato) {
             $this->cargarSemestresPromediar();
+        } else {
+            $this->cargarGruposPromediar();
         }
 
         $this->cargarRegistroExistente();
@@ -94,7 +94,10 @@ class MateriaPromediar extends Component
 
     public function updatedPromediarSemestreId(): void
     {
+        $this->promediar_grupo_id = null;
         $this->promediar_numero_materias = null;
+
+        $this->cargarGruposPromediar();
         $this->cargarRegistroExistente();
     }
 
@@ -126,6 +129,13 @@ class MateriaPromediar extends Component
         $this->promediar_grupos = Grupo::query()
             ->where('nivel_id', $this->promediar_nivel_id)
             ->where('grado_id', $this->promediar_grado_id)
+            ->when($this->esBachillerato, function ($query) {
+                if ($this->promediar_semestre_id) {
+                    $query->where('semestre_id', $this->promediar_semestre_id);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            })
             ->orderBy('nombre')
             ->get()
             ->toArray();
@@ -133,15 +143,36 @@ class MateriaPromediar extends Component
 
     public function cargarSemestresPromediar(): void
     {
-        if (!$this->esBachillerato || !$this->promediar_grado_id) {
+        if (!$this->esBachillerato) {
             $this->promediar_semestres = [];
             return;
         }
 
-        $this->promediar_semestres = Semestre::query()
+        if (!$this->promediar_grado_id) {
+            $this->promediar_semestres = [];
+            return;
+        }
+
+        $semestreIds = Grupo::query()
+            ->where('nivel_id', $this->promediar_nivel_id)
             ->where('grado_id', $this->promediar_grado_id)
-            ->orderBy('numero')
+            ->whereNotNull('semestre_id')
+            ->pluck('semestre_id')
+            ->unique()
+            ->values();
+
+        $this->promediar_semestres = Semestre::query()
+            ->whereIn('id', $semestreIds)
+            ->orderBy('id')
             ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'numero' => $item->numero,
+                    'nombre' => $item->nombre,
+                    'semestre' => $item->semestre,
+                ];
+            })
             ->toArray();
     }
 

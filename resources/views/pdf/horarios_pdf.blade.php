@@ -333,6 +333,8 @@
         $slugsReceso = ['r', 'e', 'c', 's', 'o', 're', 'receso', 'receso-escolar', 'receso-general'];
 
         $esPrimaria = (int) ($nivel->id ?? 0) === 2;
+        $esSecundaria = (int) ($nivel->id ?? 0) === 3;
+        $esBachillerato = (int) ($nivel->id ?? 0) === 4;
 
         $docentes = collect();
 
@@ -348,26 +350,42 @@
                 }
 
                 $slugMateria = mb_strtolower(trim($asignacionTmp->slug ?? ''), 'UTF-8');
-                $nombreMateria = mb_strtolower(trim($asignacionTmp->materia ?? ''), 'UTF-8');
 
-                // Quitar receso
+                // Quitar receso en todos los niveles
                 if (in_array($slugMateria, $slugsReceso, true)) {
                     continue;
                 }
 
-                // Quitar materias del cuadro rojo
-                if (in_array($slugMateria, $slugsExcluidosDocentes, true)) {
-                    continue;
-                }
+                /*
+            |--------------------------------------------------------------------------
+            | SECUNDARIA Y BACHILLERATO
+            | Mostrar todas las materias/docentes con calificable = 1
+            |--------------------------------------------------------------------------
+            */
+                if ($esSecundaria || $esBachillerato) {
+                    if ((int) ($asignacionTmp->calificable ?? 0) !== 1) {
+                        continue;
+                    }
+                } else {
+                    /*
+                |--------------------------------------------------------------------------
+                | PRIMARIA Y DEMÁS NIVELES
+                | - excluir materias específicas
+                | - solo extra = 1
+                | - calificable diferente de 0
+                |--------------------------------------------------------------------------
+                */
+                    if (in_array($slugMateria, $slugsExcluidosDocentes, true)) {
+                        continue;
+                    }
 
-                // Solo extra = 1
-                if ((int) ($asignacionTmp->extra ?? 0) !== 1) {
-                    continue;
-                }
+                    if ((int) ($asignacionTmp->extra ?? 0) !== 1) {
+                        continue;
+                    }
 
-                // Solo calificable diferente de 0
-                if ((int) ($asignacionTmp->calificable ?? 0) === 0) {
-                    continue;
+                    if ((int) ($asignacionTmp->calificable ?? 0) === 0) {
+                        continue;
+                    }
                 }
 
                 $profesorTmp = $asignacionTmp->profesor;
@@ -400,6 +418,7 @@
             ->sortBy([['orden', 'asc'], ['materia', 'asc']])
             ->values();
     @endphp
+
 
     <div class="pagina">
         <div class="encabezado">
@@ -546,13 +565,17 @@
             </tbody>
         </table>
 
-
         @if ($docentes->count())
             <table class="tabla-docentes">
                 <thead>
                     <tr>
-                        <th style="width: 34%;">MATERIA EXTRAS</th>
-                        <th>DOCENTE EXTRA</th>
+                        @if ($esSecundaria || $esBachillerato)
+                            <th style="width: 34%;">MATERIA</th>
+                            <th>DOCENTE</th>
+                        @else
+                            <th style="width: 34%;">MATERIA EXTRAS</th>
+                            <th>DOCENTE EXTRA</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>

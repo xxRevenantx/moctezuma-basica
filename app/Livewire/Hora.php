@@ -66,6 +66,8 @@ class Hora extends Component
 
         $this->limpiarHora();
 
+        $this->dispatch('refrescarHorasDias');
+
         session()->flash(
             'success_hora',
             $esEdicion ? 'La hora se actualizó correctamente.' : 'La hora se guardó correctamente.'
@@ -81,6 +83,7 @@ class Hora extends Component
         $this->hora_id = $hora->id;
         $this->hora_inicio = substr((string) $hora->hora_inicio, 0, 5);
         $this->hora_fin = substr((string) $hora->hora_fin, 0, 5);
+        $this->dispatch('refrescarHorasDias');
     }
 
     public function eliminarHora(int $id): void
@@ -96,6 +99,8 @@ class Hora extends Component
         }
 
         session()->flash('success_hora', 'La hora se eliminó correctamente.');
+
+        $this->dispatch('refrescarHorasDias');
     }
 
     public function cancelarHora(): void

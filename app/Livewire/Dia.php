@@ -55,6 +55,7 @@ class Dia extends Component
         );
 
         $this->limpiarDia();
+        $this->dispatch('refrescarHorasDias');
 
         session()->flash(
             'success_dia',
@@ -70,6 +71,7 @@ class Dia extends Component
 
         $this->dia_id = $dia->id;
         $this->dia = $dia->dia;
+        $this->dispatch('refrescarHorasDias');
     }
 
     public function eliminarDia(int $id): void
@@ -85,6 +87,7 @@ class Dia extends Component
         }
 
         session()->flash('success_dia', 'El día se eliminó correctamente.');
+        $this->dispatch('refrescarHorasDias');
     }
 
     public function cancelarDia(): void
