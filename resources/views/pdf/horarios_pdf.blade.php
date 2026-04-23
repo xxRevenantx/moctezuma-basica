@@ -220,7 +220,6 @@
             font-size: 12px;
         }
 
-        /* Azul pastel */
         .celda-no-calificable {
             background: #dbeafe;
             color: #1d4ed8;
@@ -277,14 +276,6 @@
             font-style: italic;
         }
 
-        .nota {
-            margin-top: 8px;
-            text-align: right;
-            font-size: 9px;
-            color: #64748b;
-        }
-
-        /* Footer */
         footer {
             position: fixed;
             left: 0;
@@ -314,6 +305,11 @@
 
         $tituloGrupo = $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
+        $esPreescolar = (int) ($nivel->id ?? 0) === 1;
+        $esPrimaria = (int) ($nivel->id ?? 0) === 2;
+        $esSecundaria = (int) ($nivel->id ?? 0) === 3;
+        $esBachillerato = (int) ($nivel->id ?? 0) === 4;
+
         if ($esBachillerato && isset($semestre) && $semestre) {
             $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->numero ?? ''), 'UTF-8');
         }
@@ -331,10 +327,14 @@
         ];
 
         $slugsReceso = ['r', 'e', 'c', 's', 'o', 're', 'receso', 'receso-escolar', 'receso-general'];
+        $letrasReceso = ['RE', 'C', 'E', 'S', 'O'];
 
-        $esPrimaria = (int) ($nivel->id ?? 0) === 2;
-        $esSecundaria = (int) ($nivel->id ?? 0) === 3;
-        $esBachillerato = (int) ($nivel->id ?? 0) === 4;
+        $partesColacion = ['co', 'l', 'a', 'ci', 'ón'];
+        $partesColacionSinAcento = ['co', 'l', 'a', 'ci', 'on'];
+        $letrasColacion = ['CO', 'L', 'A', 'CI', 'ÓN'];
+
+        $partesComida = ['co', 'm', 'i', 'd', 'a'];
+        $letrasComida = ['CO', 'M', 'I', 'D', 'A'];
 
         $docentes = collect();
 
@@ -351,30 +351,29 @@
 
                 $slugMateria = mb_strtolower(trim($asignacionTmp->slug ?? ''), 'UTF-8');
 
-                // Quitar receso en todos los niveles
                 if (in_array($slugMateria, $slugsReceso, true)) {
                     continue;
                 }
 
-                /*
-            |--------------------------------------------------------------------------
-            | SECUNDARIA Y BACHILLERATO
-            | Mostrar todas las materias/docentes con calificable = 1
-            |--------------------------------------------------------------------------
-            */
+                // En preescolar oculto también colación y comida de la tabla de docentes
+                if ($esPreescolar) {
+                    if (
+                        in_array($slugMateria, $partesColacion, true) ||
+                        in_array($slugMateria, $partesColacionSinAcento, true)
+                    ) {
+                        continue;
+                    }
+
+                    if (in_array($slugMateria, $partesComida, true)) {
+                        continue;
+                    }
+                }
+
                 if ($esSecundaria || $esBachillerato) {
                     if ((int) ($asignacionTmp->calificable ?? 0) !== 1) {
                         continue;
                     }
                 } else {
-                    /*
-                |--------------------------------------------------------------------------
-                | PRIMARIA Y DEMÁS NIVELES
-                | - excluir materias específicas
-                | - solo extra = 1
-                | - calificable diferente de 0
-                |--------------------------------------------------------------------------
-                */
                     if (in_array($slugMateria, $slugsExcluidosDocentes, true)) {
                         continue;
                     }
@@ -418,7 +417,6 @@
             ->sortBy([['orden', 'asc'], ['materia', 'asc']])
             ->values();
     @endphp
-
 
     <div class="pagina">
         <div class="encabezado">
@@ -505,18 +503,11 @@
                                 $calificable = (int) ($asignacion?->calificable ?? 0);
 
                                 $esReceso = false;
+                                $esColacion = false;
+                                $esComida = false;
 
                                 if (in_array($slugMateriaCelda, $slugsReceso, true)) {
                                     $esReceso = true;
-                                }
-
-                                if (!$esReceso && $textoMateria) {
-                                    $materiaNormalizada = mb_strtolower(trim($textoMateria), 'UTF-8');
-                                    $esReceso = in_array(
-                                        $materiaNormalizada,
-                                        ['receso', 'receso escolar', 'receso general'],
-                                        true,
-                                    );
                                 }
 
                                 if (!$esReceso) {
@@ -528,21 +519,39 @@
                                     }
                                 }
 
+                                if ($esPreescolar && !$esReceso) {
+                                    if (
+                                        in_array($slugMateriaCelda, $partesColacion, true) ||
+                                        in_array($slugMateriaCelda, $partesColacionSinAcento, true)
+                                    ) {
+                                        $esColacion = true;
+                                    }
+
+                                    if (in_array($slugMateriaCelda, $partesComida, true)) {
+                                        $esComida = true;
+                                    }
+                                }
+
                                 $claseCelda = 'celda-materia';
 
-                                if ($esPrimaria && !$esReceso && $calificable === 0) {
+                                if ($esPrimaria && !$esReceso && !$esColacion && !$esComida && $calificable === 0) {
                                     $claseCelda = 'celda-no-calificable';
                                 }
+
+                                $indiceDia = $loop->index;
                             @endphp
 
                             @if ($esReceso)
-                                @php
-                                    $letrasReceso = ['RE', 'C', 'E', 'S', 'O'];
-                                    $indice = $loop->index;
-                                @endphp
-
                                 <td class="celda-receso">
-                                    {{ $letrasReceso[$indice] ?? '' }}
+                                    {{ $letrasReceso[$indiceDia] ?? '' }}
+                                </td>
+                            @elseif ($esColacion)
+                                <td class="celda-receso">
+                                    {{ $letrasColacion[$indiceDia] ?? '' }}
+                                </td>
+                            @elseif ($esComida)
+                                <td class="celda-receso">
+                                    {{ $letrasComida[$indiceDia] ?? '' }}
                                 </td>
                             @else
                                 <td class="{{ $claseCelda }}">

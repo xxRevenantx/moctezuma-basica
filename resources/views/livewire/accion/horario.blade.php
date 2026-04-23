@@ -47,8 +47,31 @@
 
     {{-- TABLA BASE DEL HORARIO --}}
     <section
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+        class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
         <div class="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"></div>
+
+        <div wire:loading.flex wire:target="refrescarHorasDias"
+            class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-black/50">
+            <div
+                class="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 px-6 py-5 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900/90">
+                <svg class="h-8 w-8 animate-spin text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z">
+                    </path>
+                </svg>
+
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Actualizando sección de horarios...
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Espera un momento
+                    </p>
+                </div>
+            </div>
+        </div>
 
         <div class="space-y-5 p-5 sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -92,6 +115,13 @@
                     </a>
                 </div>
             </div>
+
+            @if ($mensajeActualizacionHorario === 'Horario actualizado correctamente.')
+                <div
+                    class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/30 dark:text-emerald-300">
+                    {{ $mensajeActualizacionHorario }}
+                </div>
+            @endif
 
             {{-- FILTROS --}}
             <div
@@ -326,9 +356,10 @@
 
     {{-- MODAL TRASLAPE PROFESOR --}}
     <div x-data="{ open: @entangle('mostrarModalTraslapeProfesor').live }" x-cloak>
-        <div x-show="open" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        <div x-show="open" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
             class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
             wire:click="cancelarGuardarConTraslape">
             <div x-show="open" x-transition:enter="transition ease-out duration-300"

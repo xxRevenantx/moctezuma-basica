@@ -16,6 +16,7 @@ use Livewire\Component;
 
 class Horario extends Component
 {
+    public string $mensajeActualizacionHorario = '';
     public string $slug_nivel;
 
     public ?Nivel $nivel = null;
@@ -87,6 +88,7 @@ class Horario extends Component
         $this->cargarSemestres();
         $this->cargarGrupos();
         $this->cargarHoras();
+        $this->cargarDias();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
         $this->sincronizarSeleccionesHorario();
@@ -109,6 +111,19 @@ class Horario extends Component
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
         $this->sincronizarSeleccionesHorario();
+    }
+
+    #[On('refrescarHorasDias')]
+    public function refrescarHorasDias(): void
+    {
+        $this->mensajeActualizacionHorario = 'Actualizando horarios...';
+
+        $this->cargarHoras();
+        $this->cargarDias();
+        $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
+
+        $this->mensajeActualizacionHorario = 'Horario actualizado correctamente.';
     }
 
     /**
@@ -657,7 +672,6 @@ class Horario extends Component
         });
     }
 
-    #[On('refrescarHorasDias')]
     public function render()
     {
         return view('livewire.accion.horario');
