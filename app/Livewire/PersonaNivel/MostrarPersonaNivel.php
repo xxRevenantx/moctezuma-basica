@@ -301,8 +301,8 @@ class MostrarPersonaNivel extends Component
                 'no' => $index + 1,
                 'persona' => trim(
                     ($r->cabecera?->persona?->nombre ?? '') . ' ' .
-                    ($r->cabecera?->persona?->apellido_paterno ?? '') . ' ' .
-                    ($r->cabecera?->persona?->apellido_materno ?? '')
+                        ($r->cabecera?->persona?->apellido_paterno ?? '') . ' ' .
+                        ($r->cabecera?->persona?->apellido_materno ?? '')
                 ),
                 'nivel' => $r->cabecera?->nivel?->nombre ?? 'Sin nivel',
                 'grado' => $r->grado?->nombre ?? 'Sin grado',
@@ -330,6 +330,7 @@ class MostrarPersonaNivel extends Component
 
 
 
+    #[On('refreshPersonaNivelList')]
     public function render()
     {
         $rows = PersonaNivelDetalle::query()

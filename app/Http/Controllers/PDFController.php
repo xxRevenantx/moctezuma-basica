@@ -127,15 +127,20 @@ class PDFController extends Controller
     // HORARIO PDF
     public function horario_pdf(Request $request)
     {
-        $slugNivel = $request->input('slug_nivel');
+        $slugNivel = (string) $request->input('slug_nivel');
+        $generacionId = $request->input('generacion_id');
         $gradoId = $request->input('grado_id');
         $grupoId = $request->input('grupo_id');
         $semestreId = $request->input('semestre_id');
 
-        $escuela = \App\Models\Escuela::first();
+        if (blank($slugNivel) || blank($generacionId) || blank($gradoId) || blank($grupoId)) {
+            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
+        }
 
-        if (empty($slugNivel) || empty($gradoId) || empty($grupoId)) {
-            abort(422, 'Los parámetros slug_nivel, grado_id y grupo_id son obligatorios.');
+        $escuela = \App\Models\Escuela::query()->first();
+
+        if (!$escuela) {
+            abort(404, 'No se encontró la escuela.');
         }
 
         $nivel = \App\Models\Nivel::query()
@@ -146,58 +151,66 @@ class PDFController extends Controller
             abort(404, 'Nivel no encontrado.');
         }
 
-        $grado = \App\Models\Grado::query()->find($gradoId);
+        $generacion = \App\Models\Generacion::query()
+            ->where('id', $generacionId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
+
+        if (!$generacion) {
+            abort(404, 'Generación no encontrada o no pertenece al nivel seleccionado.');
+        }
+
+        $grado = \App\Models\Grado::query()
+            ->where('id', $gradoId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
 
         if (!$grado) {
-            abort(404, 'Grado no encontrado.');
+            abort(404, 'Grado no encontrado o no pertenece al nivel seleccionado.');
         }
 
         $grupo = \App\Models\Grupo::query()
-            ->with('generacion')
-            ->find($grupoId);
+            ->with(['generacion', 'grado', 'semestre'])
+            ->where('id', $grupoId)
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('generacion_id', $generacion->id)
+            ->first();
 
         if (!$grupo) {
-            abort(404, 'Grupo no encontrado.');
+            abort(404, 'Grupo no encontrado o no pertenece a la generación y grado seleccionados.');
         }
 
-        if ((int) $grupo->grado_id !== (int) $grado->id) {
-            abort(422, 'El grupo seleccionado no pertenece al grado indicado.');
-        }
-
-        $generacionId = $grupo->generacion_id;
-
-        if (empty($generacionId)) {
-            abort(422, 'El grupo seleccionado no tiene una generación asignada.');
-        }
-
-        $slugNivelNormalizado = mb_strtolower(trim($nivel->slug ?? ''), 'UTF-8');
-        $esBachillerato = $slugNivelNormalizado === 'bachillerato';
+        $esBachillerato = (int) $nivel->id === 4;
 
         $semestre = null;
 
         if ($esBachillerato) {
-            if (empty($semestreId)) {
+            if (blank($semestreId)) {
                 abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
             }
 
-            $semestre = \App\Models\Semestre::query()->find($semestreId);
+            $semestre = \App\Models\Semestre::query()
+                ->where('id', $semestreId)
+                ->where('grado_id', $grado->id)
+                ->first();
 
             if (!$semestre) {
-                abort(404, 'Semestre no encontrado.');
+                abort(404, 'Semestre no encontrado o no pertenece al grado seleccionado.');
+            }
+
+            if ((int) $grupo->semestre_id !== (int) $semestre->id) {
+                abort(422, 'El grupo seleccionado no pertenece al semestre indicado.');
             }
         }
 
         $cicloEscolar = \App\Models\CicloEscolar::query()
-            ->orderByDesc('id')
+            ->latest('id')
             ->first();
 
-        $dias = \App\Models\Dia::query()
-            ->where('nivel_id', $nivel->id)
-            ->orderBy('orden')
-            ->orderBy('id')
-            ->get()
-            ->unique('dia')
-            ->values();
+        if (!$cicloEscolar) {
+            abort(404, 'No se encontró el ciclo escolar.');
+        }
 
         $horas = \App\Models\Hora::query()
             ->where('nivel_id', $nivel->id)
@@ -205,92 +218,56 @@ class PDFController extends Controller
             ->orderBy('hora_inicio')
             ->get();
 
-        $consultaHorarios = \App\Models\Horario::query()
+        $dias = \App\Models\Dia::query()
+            ->where('nivel_id', $nivel->id)
+            ->orderBy('orden')
+            ->get()
+            ->unique('dia')
+            ->values();
+
+        $queryHorarios = \App\Models\Horario::query()
             ->with([
                 'dia',
                 'hora',
-                'generacion',
-                'asignacionMateria',
                 'asignacionMateria.profesor',
             ])
             ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id)
-            ->where('generacion_id', $generacionId)
             ->where('grupo_id', $grupo->id);
 
         if ($esBachillerato) {
-            $consultaHorarios->where('semestre_id', $semestre->id);
+            $queryHorarios->where('semestre_id', $semestre->id);
         } else {
-            $consultaHorarios->whereNull('semestre_id');
+            $queryHorarios->whereNull('semestre_id');
         }
 
-        $horarios = $consultaHorarios->get();
+        $horarios = $queryHorarios->get();
 
         $horarioPorCelda = $horarios->keyBy(function ($item) {
             return $item->hora_id . '-' . $item->dia_id;
         });
 
-
         $profesorTitular = null;
 
-        $mostrarProfesorTitular = in_array(
-            $slugNivelNormalizado,
-            ['preescolar', 'primaria'],
-            true
-        );
-
-        if ($mostrarProfesorTitular) {
-            $personalGrupo = \App\Models\PersonaNivel::query()
-                ->select([
-                    'id',
-                    'persona_id',
-                    'nivel_id',
-                    'ingreso_seg',
-                    'ingreso_sep',
-                    'ingreso_ct',
-                    'orden',
-                ])
-                ->with([
-                    'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero',
-                    'detalles' => function ($q) use ($grupo) {
-                        $q->select([
-                            'id',
-                            'persona_nivel_id',
-                            'persona_role_id',
-                            'grado_id',
-                            'grupo_id',
-                            'orden',
-                        ])
-                            ->where('grupo_id', $grupo->id)
-                            ->with([
-                                'grado:id,nombre,nivel_id',
-                                'grupo:id,nombre,nivel_id,grado_id,generacion_id',
-                            ])
-                            ->orderBy('orden')
-                            ->orderBy('id');
-                    },
-                ])
+        if (!$esBachillerato) {
+            $primeraMateriaConProfesor = \App\Models\AsignacionMateria::query()
+                ->with('profesor')
                 ->where('nivel_id', $nivel->id)
-                ->whereHas('detalles', function ($q) use ($grupo, $generacionId) {
-                    $q->where('grupo_id', $grupo->id)
-                        ->whereHas('grupo', function ($qq) use ($generacionId) {
-                            $qq->where('generacion_id', $generacionId);
-                        });
-                })
+                ->where('grado_id', $grado->id)
+                ->where('grupo_id', $grupo->id)
+                ->whereNull('semestre')
+                ->whereNotNull('profesor_id')
                 ->orderBy('orden')
-                ->orderBy('id')
-                ->get();
+                ->first();
 
-            $personalTitular = $personalGrupo->first();
-
-            if ($personalTitular && $personalTitular->persona) {
-                $persona = $personalTitular->persona;
+            if ($primeraMateriaConProfesor?->profesor) {
+                $profesor = $primeraMateriaConProfesor->profesor;
 
                 $profesorTitular = trim(
-                    ($persona->titulo ? $persona->titulo . ' ' : '') .
-                        ($persona->nombre ?? '') . ' ' .
-                        ($persona->apellido_paterno ?? '') . ' ' .
-                        ($persona->apellido_materno ?? '')
+                    ($profesor->nombre ?? '') . ' ' .
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -305,39 +282,36 @@ class PDFController extends Controller
             'bachillerato' => public_path('imagenes/personajes_bachillerato.png'),
         ];
 
+        $slugNivelNormalizado = mb_strtolower((string) $nivel->slug, 'UTF-8');
         $imagenNivel = $imagenesPorNivel[$slugNivelNormalizado] ?? null;
 
         $logoIzquierdo = file_exists($logoIzquierdo) ? $logoIzquierdo : null;
-        $logoDerecho = file_exists($logoDerecho) ? $logoDerecho : 'storage/logos/' . $nivel->logo;
+        $logoDerecho = file_exists($logoDerecho) ? $logoDerecho : null;
         $imagenNivel = ($imagenNivel && file_exists($imagenNivel)) ? $imagenNivel : null;
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.horarios_pdf', [
+            'escuela' => $escuela,
             'nivel' => $nivel,
+            'generacion' => $generacion,
             'grado' => $grado,
             'grupo' => $grupo,
-            'generacion_id' => $generacionId,
             'semestre' => $semestre,
-            'esBachillerato' => $esBachillerato,
-            'dias' => $dias,
+            'ciclo_escolar' => $cicloEscolar,
             'horas' => $horas,
+            'dias' => $dias,
             'horarioPorCelda' => $horarioPorCelda,
-            'fecha_impresion' => now(),
+            'profesor_titular' => $profesorTitular,
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,
-            'profesor_titular' => $profesorTitular,
-            'ciclo_escolar' => $cicloEscolar,
-            'escuela' => $escuela,
-        ])->setPaper('letter', 'portrait');
+        ])->setPaper('letter', 'landscape');
 
-
-
-        $nombreArchivo = 'Horario_de_' .
-            ($grado->nombre ?? 'grado') . '°_grado_' .
-            ($nivel->nombre ?? 'nivel') . '_' .
-            ($grupo->nombre ?? 'grupo') . '_' .
-            'Generacion_' . ($grupo->generacion->anio_ingreso ?? 'generacion') . '_' . ($grupo->generacion->anio_egreso ?? 'egreso') .
-            ($esBachillerato && $semestre ? '_semestre_' . $semestre->id : '') .
+        $nombreArchivo = 'HORARIO_' .
+            mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') . '_' .
+            'GEN_' . ($generacion->anio_ingreso ?? 'GEN') . '-' . ($generacion->anio_egreso ?? 'GEN') . '_' .
+            'GRADO_' . ($grado->nombre ?? 'GRADO') . '_' .
+            'GRUPO_' . ($grupo->nombre ?? 'GRUPO') .
+            ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? '') : '') .
             '.pdf';
 
         return $pdf->stream($nombreArchivo);

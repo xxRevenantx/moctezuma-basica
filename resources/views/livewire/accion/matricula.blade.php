@@ -63,7 +63,7 @@
                         Matrícula
                     </h1>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Consulta de alumnos y personal por nivel, grado y grupo.
+                        Consulta de alumnos y personal por generación, grado y grupo.
                     </p>
                 </div>
 
@@ -108,10 +108,22 @@
         <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
 
         <div class="p-5 sm:p-6">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
                 <div>
                     <flux:label>Nivel</flux:label>
                     <flux:input readonly variant="filled" value="{{ $nivel?->nombre ?? '—' }}" disabled />
+                </div>
+
+                <div>
+                    <flux:label>Generación</flux:label>
+                    <flux:select id="generacion_id" wire:model.live="generacion_id">
+                        <flux:select.option value="">Selecciona una generación</flux:select.option>
+                        @foreach ($generaciones as $generacion)
+                            <flux:select.option value="{{ $generacion->id }}">
+                                {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
                 </div>
 
                 <div>
@@ -144,7 +156,9 @@
                 <div>
                     <flux:label>Grupo</flux:label>
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
-                        :disabled="!$grado_id || ($esBachillerato && !$semestre_id) || $grupos->isEmpty()">
+                        :disabled="$esBachillerato
+                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ $grupo->id }}">
@@ -165,11 +179,13 @@
                     @if ($generacionGrupoLabel)
                         <span
                             class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
-                            Generación del grupo: {{ $generacionGrupoLabel }}
+                            Generación: {{ $generacionGrupoLabel }}
                         </span>
                     @endif
 
-                    @if ((!$esBachillerato && $grado_id && $grupo_id) || ($esBachillerato && $grado_id && $semestre_id && $grupo_id))
+                    @if (
+                        (!$esBachillerato && $generacion_id && $grado_id && $grupo_id) ||
+                            ($esBachillerato && $generacion_id && $grado_id && $semestre_id && $grupo_id))
                         <span
                             class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
                             Filtros aplicados
@@ -186,23 +202,23 @@
     </div>
 
     @if (
-        (!$esBachillerato && (!$grado_id || !$grupo_id)) ||
-            ($esBachillerato && (!$grado_id || !$semestre_id || !$grupo_id)))
+        (!$esBachillerato && (!$generacion_id || !$grado_id || !$grupo_id)) ||
+            ($esBachillerato && (!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id)))
         <div
             class="rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-10 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/60">
             <div class="mx-auto max-w-2xl">
                 <h2 class="text-xl font-bold text-slate-800 dark:text-white">
                     @if ($esBachillerato)
-                        Selecciona un grado, un semestre y un grupo
+                        Selecciona una generación, un grado, un semestre y un grupo
                     @else
-                        Selecciona un grado y un grupo
+                        Selecciona una generación, un grado y un grupo
                     @endif
                 </h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     @if ($esBachillerato)
-                        Primero elige esos tres filtros para mostrar la matrícula y el personal relacionado.
+                        Primero elige esos cuatro filtros para mostrar la matrícula y el personal relacionado.
                     @else
-                        Primero elige ambos filtros para mostrar la matrícula y el personal relacionado.
+                        Primero elige esos tres filtros para mostrar la matrícula y el personal relacionado.
                     @endif
                 </p>
             </div>
@@ -217,7 +233,7 @@
                 <section class="mb-3">
                     <div class="relative">
                         <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="grado_id,semestre_id,grupo_id,search">
+                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search">
                             @if ($personal->isEmpty())
                                 <div
                                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
@@ -298,7 +314,7 @@
                                 Lista de alumnos
                             </h2>
                             <p class="text-sm text-slate-500 dark:text-slate-400">
-                                Registros filtrados por nivel, grado y grupo.
+                                Registros filtrados por generación, grado y grupo.
                             </p>
                         </div>
 
@@ -390,8 +406,8 @@
                     @endif
 
                     <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="grado_id,semestre_id,grupo_id,search">
-                        <div wire:loading.flex wire:target="grado_id,semestre_id,grupo_id,search"
+                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,search">
+                        <div wire:loading.flex wire:target="generacion_id,grado_id,semestre_id,grupo_id,search"
                             class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">
@@ -470,6 +486,10 @@
                                             <th
                                                 class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                                 Género
+                                            </th>
+                                            <th
+                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                Generación
                                             </th>
                                             <th
                                                 class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -561,6 +581,11 @@
 
                                                 <td
                                                     class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                                    {{ $row->generacion ? $row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso : '—' }}
+                                                </td>
+
+                                                <td
+                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
                                                     {{ $row->grado?->nombre ?? '—' }}
                                                 </td>
 
@@ -594,7 +619,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="{{ $esBachillerato ? 14 : 13 }}"
+                                                <td colspan="{{ $esBachillerato ? 15 : 14 }}"
                                                     class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
                                                     No se encontraron alumnos con los filtros actuales.
                                                 </td>
@@ -626,24 +651,21 @@
 
                                     <div
                                         class="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-                                        <div><span class="font-semibold">CURP:</span> {{ $row->curp ?: '—' }}
+                                        <div><span class="font-semibold">CURP:</span> {{ $row->curp ?: '—' }}</div>
+                                        <div><span class="font-semibold">Género:</span> {{ $row->genero ?: '—' }}
                                         </div>
-                                        <div><span class="font-semibold">Género:</span>
-                                            {{ $row->genero ?: '—' }}
+                                        <div><span class="font-semibold">Generación:</span>
+                                            {{ $row->generacion ? $row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso : '—' }}
                                         </div>
                                         <div><span class="font-semibold">Grado:</span>
-                                            {{ $row->grado?->nombre ?? '—' }}
-                                        </div>
+                                            {{ $row->grado?->nombre ?? '—' }}</div>
                                         @if ($esBachillerato)
                                             <div><span class="font-semibold">Semestre:</span>
-                                                {{ $row->semestre?->numero ?? '—' }}
-                                            </div>
+                                                {{ $row->semestre?->numero ?? '—' }}</div>
                                         @endif
                                         <div><span class="font-semibold">Grupo:</span>
-                                            {{ $row->grupo?->nombre ?? '—' }}
-                                        </div>
-                                        <div><span class="font-semibold">Folio:</span>
-                                            {{ $row->folio ?: '—' }}</div>
+                                            {{ $row->grupo?->nombre ?? '—' }}</div>
+                                        <div><span class="font-semibold">Folio:</span> {{ $row->folio ?: '—' }}</div>
                                     </div>
                                 </div>
                             @empty

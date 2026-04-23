@@ -5,10 +5,21 @@
     <meta charset="UTF-8">
     @php
         $nombreNivel = $nivel->nombre ?? 'NIVEL';
+        $nombreGeneracion = isset($generacion)
+            ? ($generacion->anio_ingreso ?? '') . '-' . ($generacion->anio_egreso ?? '')
+            : 'GENERACIÓN';
         $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
         $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
 
-        $tituloGrupo = $nombreGrado . '° grado de ' . $nombreNivel . ', grupo: ' . $nombreGrupo;
+        $tituloGrupo =
+            'GENERACIÓN: ' .
+            $nombreGeneracion .
+            ' · ' .
+            $nombreGrado .
+            '° grado de ' .
+            $nombreNivel .
+            ', grupo: ' .
+            $nombreGrupo;
     @endphp
     <title>Horario escolar de {{ $tituloGrupo }}</title>
     <style>
@@ -300,10 +311,13 @@
         use Carbon\Carbon;
 
         $nombreNivel = mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8');
+        $nombreGeneracion = isset($generacion)
+            ? ($generacion->anio_ingreso ?? '') . '-' . ($generacion->anio_egreso ?? '')
+            : 'GENERACIÓN';
         $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
         $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
 
-        $tituloGrupo = $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
+        $tituloGrupo = 'GENERACIÓN: ' . $nombreGeneracion . ' · ' . $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
         $esPreescolar = (int) ($nivel->id ?? 0) === 1;
         $esPrimaria = (int) ($nivel->id ?? 0) === 2;
@@ -311,7 +325,7 @@
         $esBachillerato = (int) ($nivel->id ?? 0) === 4;
 
         if ($esBachillerato && isset($semestre) && $semestre) {
-            $tituloGrupo .= ' · SEMESTRE: ' . mb_strtoupper($semestre->semestre ?? ($semestre->numero ?? ''), 'UTF-8');
+            $tituloGrupo .= ' · SEMESTRE: ' . ($semestre->numero ?? '');
         }
 
         $profesorTitular = $profesor_titular ?? null;
@@ -355,7 +369,6 @@
                     continue;
                 }
 
-                // En preescolar oculto también colación y comida de la tabla de docentes
                 if ($esPreescolar) {
                     if (
                         in_array($slugMateria, $partesColacion, true) ||
@@ -432,8 +445,9 @@
                         <p class="titulo-institucion">Centro Universitario Moctezuma</p>
                         <div class="linea-titulo"></div>
                         <p class="titulo-principal">HORARIO DE CLASES</p>
-                        <p class="subtitulo-principal">CICLO ESCOLAR
-                            {{ $ciclo_escolar->inicio_anio }}-{{ $ciclo_escolar->fin_anio }}</p>
+                        <p class="subtitulo-principal">
+                            CICLO ESCOLAR {{ $ciclo_escolar->inicio_anio }}-{{ $ciclo_escolar->fin_anio }}
+                        </p>
                     </td>
 
                     <td class="logo-der">
@@ -477,6 +491,8 @@
                             <td class="columna-grado" rowspan="{{ $horas->count() }}">
                                 <div class="texto-grado">
                                     {{ $nombreGrado }}° GRADO DE <br>{{ $nombreNivel }}
+                                    <br><br>
+                                    GENERACIÓN {{ $nombreGeneracion }}
                                 </div>
 
                                 @if (!empty($imagen_nivel))

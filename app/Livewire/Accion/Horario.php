@@ -4,6 +4,7 @@ namespace App\Livewire\Accion;
 
 use App\Models\AsignacionMateria;
 use App\Models\Dia;
+use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Hora;
@@ -21,6 +22,7 @@ class Horario extends Component
 
     public ?Nivel $nivel = null;
     public Collection $niveles;
+    public Collection $generaciones;
     public Collection $grados;
     public Collection $grupos;
     public Collection $horas;
@@ -29,20 +31,17 @@ class Horario extends Component
     public Collection $materiasDisponibles;
     public Collection $horariosGuardados;
 
+    public ?int $generacion_id = null;
     public ?int $grado_id = null;
     public ?int $grupo_id = null;
     public ?int $semestre_id = null;
 
     public bool $esBachillerato = false;
 
-    // =========================
     // Estado visual por celda
-    // =========================
     public array $seleccionesHorario = [];
 
-    // =========================
     // Modal de confirmación
-    // =========================
     public bool $mostrarModalTraslapeProfesor = false;
 
     public array $pendienteHorario = [
@@ -60,17 +59,39 @@ class Horario extends Component
             ->where('slug', $this->slug_nivel)
             ->firstOrFail();
 
-        $this->esBachillerato = str($this->nivel->slug)->lower()->contains('bachillerato');
+        // Bachillerato es nivel 4
+        $this->esBachillerato = (int) $this->nivel->id === 4;
 
         $this->niveles = Nivel::query()
             ->orderBy('id')
             ->get();
 
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->horas = collect();
+        $this->dias = collect();
+        $this->semestres = collect();
+        $this->materiasDisponibles = collect();
+        $this->horariosGuardados = collect();
+
+        $this->cargarGeneraciones();
         $this->cargarGrados();
+        $this->cargarSemestres();
         $this->cargarGrupos();
         $this->cargarHoras();
         $this->cargarDias();
-        $this->cargarSemestres();
+        $this->cargarMateriasDisponibles();
+        $this->cargarHorariosGuardados();
+        $this->sincronizarSeleccionesHorario();
+    }
+
+    public function updatedGeneracionId(): void
+    {
+        $this->grupo_id = null;
+
+        $this->resetEstadoTraslapeProfesor();
+        $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
         $this->sincronizarSeleccionesHorario();
@@ -87,8 +108,6 @@ class Horario extends Component
         $this->resetEstadoTraslapeProfesor();
         $this->cargarSemestres();
         $this->cargarGrupos();
-        $this->cargarHoras();
-        $this->cargarDias();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
         $this->sincronizarSeleccionesHorario();
@@ -126,10 +145,6 @@ class Horario extends Component
         $this->mensajeActualizacionHorario = 'Horario actualizado correctamente.';
     }
 
-    /**
-     * Este método se dispara cuando cambia cualquier celda del horario.
-     * La llave llega con formato "horaId-diaId".
-     */
     public function updatedSeleccionesHorario($value, $key): void
     {
         if (!$this->filtrosCompletos()) {
@@ -164,12 +179,10 @@ class Horario extends Component
             return;
         }
 
-        $generacionId = $grupo->generacion_id;
-
         $consulta = HorarioModel::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $generacionId)
+            ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->where('hora_id', $horaId)
             ->where('dia_id', $diaId);
@@ -182,7 +195,7 @@ class Horario extends Component
 
         $horarioExistente = $consulta->first();
 
-        // Si se limpió la celda
+        // Si se limpia la celda, se elimina el horario
         if (blank($asignacionMateriaId)) {
             if ($horarioExistente) {
                 $horarioExistente->delete();
@@ -207,7 +220,6 @@ class Horario extends Component
             $this->guardarHorarioDirecto(
                 horaId: $horaId,
                 diaId: $diaId,
-                generacionId: $generacionId,
                 asignacionMateriaId: $asignacionMateriaId,
                 horarioExistente: $horarioExistente
             );
@@ -240,7 +252,6 @@ class Horario extends Component
             $this->conflictosProfesor = $conflictos;
             $this->mostrarModalTraslapeProfesor = true;
 
-            // Muy importante: regresa visualmente al valor guardado real
             $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
 
             return;
@@ -249,7 +260,6 @@ class Horario extends Component
         $this->guardarHorarioDirecto(
             horaId: $horaId,
             diaId: $diaId,
-            generacionId: $generacionId,
             asignacionMateriaId: $asignacionMateriaId,
             horarioExistente: $horarioExistente
         );
@@ -258,14 +268,13 @@ class Horario extends Component
     protected function guardarHorarioDirecto(
         int $horaId,
         int $diaId,
-        int $generacionId,
         int $asignacionMateriaId,
         ?HorarioModel $horarioExistente = null
     ): void {
         $datosBusqueda = [
             'nivel_id' => $this->nivel->id,
             'grado_id' => $this->grado_id,
-            'generacion_id' => $generacionId,
+            'generacion_id' => $this->generacion_id,
             'grupo_id' => $this->grupo_id,
             'hora_id' => $horaId,
             'dia_id' => $diaId,
@@ -324,8 +333,8 @@ class Horario extends Component
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
-                ($profesor->apellido_paterno ?? '') . ' ' .
-                ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
             );
 
             return [
@@ -337,7 +346,7 @@ class Horario extends Component
                 'dia' => $item->dia->dia ?? 'N/D',
                 'hora_inicio' => $item->hora?->hora_inicio,
                 'hora_fin' => $item->hora?->hora_fin,
-                'semestre' => $item->semestre->semestre ?? ($item->semestre->nombre ?? null),
+                'semestre' => $item->semestre?->numero ? $item->semestre->numero . '° semestre' : null,
                 'materia' => $item->asignacionMateria->materia ?? 'N/D',
             ];
         })->toArray();
@@ -356,20 +365,10 @@ class Horario extends Component
             return;
         }
 
-        $grupo = $this->obtenerGrupoSeleccionado();
-
-        if (!$grupo) {
-            $this->resetEstadoTraslapeProfesor();
-            $this->sincronizarSeleccionesHorario();
-            return;
-        }
-
-        $generacionId = $grupo->generacion_id;
-
         $consulta = HorarioModel::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $generacionId)
+            ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
             ->where('dia_id', (int) $this->pendienteHorario['dia_id']);
@@ -385,7 +384,6 @@ class Horario extends Component
         $this->guardarHorarioDirecto(
             horaId: (int) $this->pendienteHorario['hora_id'],
             diaId: (int) $this->pendienteHorario['dia_id'],
-            generacionId: $generacionId,
             asignacionMateriaId: (int) $this->pendienteHorario['asignacion_materia_id'],
             horarioExistente: $horarioExistente
         );
@@ -453,6 +451,7 @@ class Horario extends Component
 
         return route('misrutas.horarios.pdf', [
             'slug_nivel' => $this->slug_nivel,
+            'generacion_id' => $this->generacion_id,
             'grado_id' => $this->grado_id,
             'grupo_id' => $this->grupo_id,
             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
@@ -517,19 +516,19 @@ class Horario extends Component
     protected function filtrosCompletos(): bool
     {
         if ($this->esBachillerato) {
-            return filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
+            return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
         }
 
-        return filled($this->grado_id) && filled($this->grupo_id);
+        return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id);
     }
 
     protected function filtrosMinimosParaMaterias(): bool
     {
         if ($this->esBachillerato) {
-            return filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
+            return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
         }
 
-        return filled($this->grado_id) && filled($this->grupo_id);
+        return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id);
     }
 
     protected function obtenerGrupoSeleccionado(): ?Grupo
@@ -539,15 +538,24 @@ class Horario extends Component
         }
 
         return Grupo::query()
-            ->select('id', 'grado_id', 'generacion_id', 'nombre')
+            ->select('id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre')
             ->find($this->grupo_id);
+    }
+
+    protected function cargarGeneraciones(): void
+    {
+        $this->generaciones = Generacion::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('status', 1)
+            ->orderBy('anio_ingreso')
+            ->get();
     }
 
     protected function cargarGrados(): void
     {
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
-            ->orderBy('nombre')
+            ->orderBy('orden')
             ->get();
     }
 
@@ -555,6 +563,11 @@ class Horario extends Component
     {
         $this->grupos = Grupo::query()
             ->where('nivel_id', $this->nivel->id)
+            ->when($this->generacion_id, function ($query) {
+                $query->where('generacion_id', $this->generacion_id);
+            }, function ($query) {
+                $query->whereRaw('1 = 0');
+            })
             ->when($this->grado_id, function ($query) {
                 $query->where('grado_id', $this->grado_id);
             }, function ($query) {
@@ -602,17 +615,9 @@ class Horario extends Component
             return;
         }
 
-        $semestreIds = Grupo::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('grado_id', $this->grado_id)
-            ->whereNotNull('semestre_id')
-            ->pluck('semestre_id')
-            ->unique()
-            ->values();
-
         $this->semestres = Semestre::query()
-            ->whereIn('id', $semestreIds)
-            ->orderBy('id')
+            ->where('grado_id', $this->grado_id)
+            ->orderBy('numero')
             ->get();
     }
 
@@ -645,20 +650,13 @@ class Horario extends Component
             return;
         }
 
-        $grupo = $this->obtenerGrupoSeleccionado();
-
-        if (!$grupo) {
-            $this->horariosGuardados = collect();
-            return;
-        }
-
         $horarios = HorarioModel::query()
             ->with([
                 'asignacionMateria.profesor',
             ])
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $grupo->generacion_id)
+            ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->when(
                 $this->esBachillerato,

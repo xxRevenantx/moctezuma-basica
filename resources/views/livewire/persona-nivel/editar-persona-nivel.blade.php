@@ -54,8 +54,11 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <flux:badge color="indigo" size="sm">👤 {{ $nombrePersona ?? '—' }}</flux:badge>
                         <flux:badge color="violet" size="sm">📚 {{ $nombreNivel ?? '—' }}</flux:badge>
-                        <flux:badge color="purple" size="sm">🎓 {{ $nombreGrado ?? '—' }}</flux:badge>
-                        <flux:badge color="fuchsia" size="sm">👥 {{ $nombreGrupo ?? '—' }}</flux:badge>
+
+                        @if ((int) $nivel_id !== 4)
+                            <flux:badge color="purple" size="sm">🎓 {{ $nombreGrado ?? '—' }}</flux:badge>
+                            <flux:badge color="fuchsia" size="sm">👥 {{ $nombreGrupo ?? '—' }}</flux:badge>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -136,25 +139,33 @@
 
                         {{-- Grado/Grupo solo si aplica --}}
                         @if ($this->debeMostrarGradoGrupo())
-                            <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
-                                :disabled="!$nivel_id || $grados->isEmpty()">
-                                <flux:select.option value="">-- Seleccionar Grado --</flux:select.option>
-                                @foreach ($grados as $grado)
-                                    <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
-                                    </flux:select.option>
-                                @endforeach
-                            </flux:select>
+                            @if ((int) $nivel_id !== 4)
+                                <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
+                                    :disabled="!$nivel_id || $grados->isEmpty()">
+                                    <flux:select.option value="">-- Seleccionar Grado --</flux:select.option>
+                                    @foreach ($grados as $grado)
+                                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
 
-                            <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
-                                :disabled="!$grado_id || $grupos->isEmpty() || (int) $nivel_id === 4">
-                                <flux:select.option value="">
-                                    {{ (int) $nivel_id === 4 ? '-- No aplica para Bachillerato --' : '-- Seleccionar Grupo --' }}
-                                </flux:select.option>
-                                @foreach ($grupos as $grupo)
-                                    <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
-                                    </flux:select.option>
-                                @endforeach
-                            </flux:select>
+                                <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
+                                    :disabled="!$grado_id || $grupos->isEmpty()">
+                                    <flux:select.option value="">-- Seleccionar Grupo --</flux:select.option>
+                                    @foreach ($grupos as $grupo)
+                                        <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                            @else
+                                <div
+                                    class="md:col-span-2 rounded-2xl border border-dashed border-zinc-300/70 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 p-4">
+                                    <p class="text-sm text-zinc-700 dark:text-zinc-200">
+                                        En <b>Bachillerato</b> esta asignación se guardará solo con <b>Nivel</b> y
+                                        <b>Rol</b>.
+                                    </p>
+                                </div>
+                            @endif
                         @else
                             <div
                                 class="md:col-span-2 rounded-2xl border border-dashed border-zinc-300/70 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 p-4">

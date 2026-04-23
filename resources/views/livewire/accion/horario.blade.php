@@ -50,7 +50,8 @@
         class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
         <div class="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"></div>
 
-        <div wire:loading.flex wire:target="refrescarHorasDias"
+        {{-- Loader --}}
+        <div wire:loading.flex wire:target="refrescarHorasDias,generacion_id,grado_id,grupo_id,semestre_id"
             class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-black/50">
             <div
                 class="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 px-6 py-5 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900/90">
@@ -64,7 +65,7 @@
 
                 <div class="text-center">
                     <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        Actualizando sección de horarios...
+                        Cargando sección de horario...
                     </p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
                         Espera un momento
@@ -86,7 +87,7 @@
                             Sección de horario
                         </h3>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            Filtra por grado, grupo y semestre para preparar la asignación del horario.
+                            Filtra por generación, grado, grupo y semestre para preparar la asignación del horario.
                         </p>
                     </div>
                 </div>
@@ -126,7 +127,19 @@
             {{-- FILTROS --}}
             <div
                 class="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/50">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <flux:field>
+                        <flux:label>Generación</flux:label>
+                        <flux:select wire:model.live="generacion_id">
+                            <option value="">Selecciona una generación</option>
+                            @foreach ($generaciones as $generacion)
+                                <option value="{{ $generacion->id }}">
+                                    {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                                </option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+
                     <flux:field>
                         <flux:label>Grado</flux:label>
                         <flux:select wire:model.live="grado_id">
@@ -142,11 +155,11 @@
                     @if ($esBachillerato)
                         <flux:field>
                             <flux:label>Semestre</flux:label>
-                            <flux:select wire:model.live="semestre_id">
+                            <flux:select wire:model.live="semestre_id" :disabled="!$grado_id">
                                 <option value="">Selecciona un semestre</option>
                                 @foreach ($semestres as $semestre)
                                     <option value="{{ $semestre->id }}">
-                                        {{ $semestre->semestre ?? ($semestre->nombre ?? 'Semestre ' . $semestre->id) }}
+                                        {{ $semestre->numero }}° semestre
                                     </option>
                                 @endforeach
                             </flux:select>
@@ -155,7 +168,9 @@
 
                     <flux:field>
                         <flux:label>Grupo</flux:label>
-                        <flux:select wire:model.live="grupo_id" :disabled="!$grado_id">
+                        <flux:select wire:model.live="grupo_id"
+                            :disabled="$esBachillerato ? (!$generacion_id || !$grado_id || !$semestre_id) : (!$generacion_id || !
+                                $grado_id)">
                             <option value="">Selecciona un grupo</option>
                             @foreach ($grupos as $grupo)
                                 <option value="{{ $grupo->id }}">
@@ -165,12 +180,10 @@
                         </flux:select>
                     </flux:field>
 
-
-
                     <div class="flex items-end">
                         <div
                             class="w-full rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-3 text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-950/40 dark:text-slate-400">
-                            @if ($grado_id || $grupo_id || $semestre_id)
+                            @if ($generacion_id || $grado_id || $grupo_id || $semestre_id)
                                 <span class="font-semibold text-slate-700 dark:text-slate-200">Filtros activos.</span>
                                 La tabla ya está lista para conectar la asignación.
                             @else
@@ -197,7 +210,7 @@
                         Primero agrega al menos una hora y un día para mostrar la tabla del horario.
                     </p>
                 </div>
-            @elseif (!$grado_id || !$grupo_id || ($esBachillerato && !$semestre_id))
+            @elseif (!$generacion_id || !$grado_id || !$grupo_id || ($esBachillerato && !$semestre_id))
                 <div
                     class="rounded-3xl border border-dashed border-violet-300 bg-violet-50/70 px-6 py-10 text-center dark:border-violet-900/40 dark:bg-violet-950/20">
                     <div
@@ -211,9 +224,9 @@
 
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                         @if ($esBachillerato)
-                            Selecciona grado, grupo y semestre para mostrar la tabla del horario.
+                            Selecciona generación, grado, semestre y grupo para mostrar la tabla del horario.
                         @else
-                            Selecciona grado y grupo para mostrar la tabla del horario.
+                            Selecciona generación, grado y grupo para mostrar la tabla del horario.
                         @endif
                     </p>
                 </div>
@@ -257,7 +270,6 @@
                                             @php
                                                 $claveCelda = $hora->id . '-' . $dia->id;
                                                 $horarioGuardado = $horariosGuardados->get($claveCelda);
-                                                $valorSeleccionado = $seleccionesHorario[$claveCelda] ?? null;
                                             @endphp
 
                                             <td
@@ -322,10 +334,20 @@
                     </div>
                 </div>
 
-                {{-- RESUMEN DE FILTROS --}}
+                {{-- RESUMEN --}}
                 <div
                     class="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/50">
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div class="rounded-2xl bg-white px-4 py-3 dark:bg-neutral-950/50">
+                            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Generación</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                @php
+                                    $generacionSeleccionada = $generaciones->firstWhere('id', $generacion_id);
+                                @endphp
+                                {{ $generacionSeleccionada ? $generacionSeleccionada->anio_ingreso . ' - ' . $generacionSeleccionada->anio_egreso : 'No seleccionado' }}
+                            </p>
+                        </div>
+
                         <div class="rounded-2xl bg-white px-4 py-3 dark:bg-neutral-950/50">
                             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grado</p>
                             <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -344,7 +366,10 @@
                             <div class="rounded-2xl bg-white px-4 py-3 dark:bg-neutral-950/50">
                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Semestre</p>
                                 <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ optional($semestres->firstWhere('id', $semestre_id))->semestre ?? (optional($semestres->firstWhere('id', $semestre_id))->nombre ?? 'No seleccionado') }}
+                                    @php
+                                        $semestreSeleccionado = $semestres->firstWhere('id', $semestre_id);
+                                    @endphp
+                                    {{ $semestreSeleccionado ? $semestreSeleccionado->numero . '° semestre' : 'No seleccionado' }}
                                 </p>
                             </div>
                         @endif
