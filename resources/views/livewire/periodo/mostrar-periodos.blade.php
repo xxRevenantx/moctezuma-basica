@@ -27,18 +27,21 @@
     {{-- Contenedor listado --}}
     <div
         class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow dark:border-neutral-800 dark:bg-neutral-800">
+
         {{-- Acabado superior --}}
         <div class="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500"></div>
 
         {{-- Toolbar --}}
         <div class="p-4 sm:p-5 lg:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:gap-4">
+
                 {{-- Buscador --}}
                 <div class="w-full sm:max-w-xl">
                     <label for="buscar-periodo" class="sr-only">Buscar periodo</label>
+
                     <flux:input id="buscar-periodo" type="text" wire:model.live="search"
-                        placeholder="Buscar por nivel, ciclo, generación, semestre o mes…" icon="magnifying-glass"
-                        class="w-full" />
+                        placeholder="Buscar por nivel, ciclo, generación, semestre, mes o parcial…"
+                        icon="magnifying-glass" class="w-full" />
                 </div>
 
                 {{-- Resumen --}}
@@ -67,13 +70,19 @@
                     aria-live="polite" aria-busy="true">
                     <div
                         class="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow ring-1 ring-gray-200 dark:bg-neutral-900 dark:ring-neutral-800">
+
                         <svg class="h-5 w-5 animate-spin text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
                             fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z">
+                            </path>
                         </svg>
-                        <span class="text-sm text-gray-700 dark:text-gray-200">Cargando…</span>
+
+                        <span class="text-sm text-gray-700 dark:text-gray-200">
+                            Cargando…
+                        </span>
                     </div>
                 </div>
 
@@ -91,24 +100,35 @@
                                             class="border-r border-white/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             #
                                         </th>
+
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Ciclo escolar
                                         </th>
+
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Generación
                                         </th>
+
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Semestre
                                         </th>
+
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Mes
                                         </th>
+
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                                            Parcial
+                                        </th>
+
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             Inicio
                                         </th>
+
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             Fin
                                         </th>
+
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
                                             Acciones
                                         </th>
@@ -118,7 +138,7 @@
                                 <tbody class="divide-y divide-gray-100/70 dark:divide-neutral-800">
                                     @if ($periodos->isEmpty())
                                         <tr>
-                                            <td colspan="8"
+                                            <td colspan="9"
                                                 class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                                                 <div class="mx-auto w-full max-w-md">
                                                     <div
@@ -144,10 +164,10 @@
                                                 $nivelId = optional($periodo->nivel)->id;
                                             @endphp
 
-                                            {{-- Cabecera por NIVEL --}}
+                                            {{-- Cabecera por nivel --}}
                                             @if ($nivelId !== $nivelActual)
                                                 <tr>
-                                                    <td colspan="8" class="px-4 pb-2 pt-4">
+                                                    <td colspan="9" class="px-4 pb-2 pt-4">
                                                         <div
                                                             class="inline-flex flex-wrap items-center gap-2 rounded-full bg-sky-50 px-3 py-1 shadow-sm ring-1 ring-sky-100 dark:bg-sky-950/40 dark:ring-sky-900/60">
                                                             <span
@@ -160,6 +180,7 @@
                                                         </div>
                                                     </td>
                                                 </tr>
+
                                                 @php
                                                     $nivelActual = $nivelId;
                                                 @endphp
@@ -168,6 +189,7 @@
                                             {{-- Fila del periodo --}}
                                             <tr
                                                 class="odd:bg-slate-50/80 even:bg-white transition-colors duration-150 hover:bg-emerald-50/80 dark:odd:bg-neutral-900/60 dark:even:bg-neutral-800/60 dark:hover:bg-emerald-950/40">
+
                                                 {{-- Número --}}
                                                 <td class="px-4 py-3 text-center text-gray-800 dark:text-gray-200">
                                                     <span
@@ -185,14 +207,18 @@
 
                                                 {{-- Generación --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodo->generacion->anio_ingreso ?? '---' }}
-                                                    -
-                                                    {{ $periodo->generacion->anio_egreso ?? '---' }}
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        {{ $periodo->generacion->anio_ingreso ?? '---' }}
+                                                        -
+                                                        {{ $periodo->generacion->anio_egreso ?? '---' }}
+                                                    @else
+                                                        ---
+                                                    @endif
                                                 </td>
 
                                                 {{-- Semestre --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    @if ($periodo->semestre)
+                                                    @if ((int) $periodo->nivel_id === 4 && $periodo->semestre)
                                                         {{ $periodo->semestre->numero }}° Semestre
                                                     @else
                                                         ---
@@ -201,7 +227,30 @@
 
                                                 {{-- Mes --}}
                                                 <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                    {{ $periodo->mesesBachillerato->meses ?? '---' }}
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        {{ $periodo->mesesBachillerato->meses ?? '---' }}
+                                                    @else
+                                                        ---
+                                                    @endif
+                                                </td>
+
+                                                {{-- Parcial --}}
+                                                <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        @if ($periodo->parcialBachillerato)
+                                                            {{-- Cambiado a parcialBachillerato --}}
+                                                            <span
+                                                                class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-900/60">
+                                                                {{ $periodo->parcialBachillerato->descripcion }}
+                                                            </span>
+                                                        @else
+                                                            <span class="text-xs text-amber-600 dark:text-amber-400">
+                                                                Sin parcial
+                                                            </span>
+                                                        @endif
+                                                    @else
+                                                        ---
+                                                    @endif
                                                 </td>
 
                                                 {{-- Inicio --}}
@@ -226,7 +275,10 @@
 
                                                         <flux:button variant="danger"
                                                             class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
-                                                            @click="eliminar({{ $periodo->id }}, '{{ $periodo->mesesBachillerato->meses ?? 'Periodo' }}')">
+                                                            @click="eliminar(
+                                                                {{ $periodo->id }},
+                                                                '{{ $periodo->mesesBachillerato->meses ?? ($periodo->cicloEscolar->inicio_anio ?? 'Periodo') }}'
+                                                            )">
                                                             <flux:icon.trash class="h-3.5 w-3.5" />
                                                         </flux:button>
                                                     </div>
@@ -284,7 +336,9 @@
                                         <div class="space-y-2">
                                             <div
                                                 class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-sky-500 px-3 py-1 text-xs font-medium text-white shadow-sm">
-                                                <span>#{{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}</span>
+                                                <span>
+                                                    #{{ $key + 1 + ($periodos->currentPage() - 1) * $periodos->perPage() }}
+                                                </span>
                                                 <span>
                                                     {{ $periodo->cicloEscolar->inicio_anio ?? 'Sin ciclo' }}
                                                     -
@@ -294,20 +348,58 @@
 
                                             <div class="space-y-1">
                                                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">
-                                                    {{ $periodo->mesesBachillerato->meses ?? 'Mes no asignado' }}
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        {{ $periodo->mesesBachillerato->meses ?? 'Mes no asignado' }}
+                                                    @else
+                                                        {{ $periodo->nivel->nombre ?? 'Periodo' }}
+                                                    @endif
                                                 </h2>
 
                                                 <p class="text-xs text-gray-600 dark:text-gray-300">
                                                     Generación:
-                                                    {{ $periodo->generacion->anio_ingreso ?? '---' }}
-                                                    -
-                                                    {{ $periodo->generacion->anio_egreso ?? '---' }}
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        {{ $periodo->generacion->anio_ingreso ?? '---' }}
+                                                        -
+                                                        {{ $periodo->generacion->anio_egreso ?? '---' }}
+                                                    @else
+                                                        ---
+                                                    @endif
                                                 </p>
 
                                                 <p class="text-xs text-gray-600 dark:text-gray-300">
                                                     Semestre:
-                                                    @if ($periodo->semestre)
+                                                    @if ((int) $periodo->nivel_id === 4 && $periodo->semestre)
                                                         {{ $periodo->semestre->numero }}° Semestre
+                                                    @else
+                                                        ---
+                                                    @endif
+                                                </p>
+
+                                                <p class="text-xs text-gray-600 dark:text-gray-300">
+                                                    Mes:
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        {{ $periodo->mesesBachillerato->meses ?? '---' }}
+                                                    @else
+                                                        ---
+                                                    @endif
+                                                </p>
+
+
+
+                                                <p class="text-xs text-gray-600 dark:text-gray-300">
+                                                    Parcial:
+                                                    @if ((int) $periodo->nivel_id === 4)
+                                                        @if ($periodo->parcialBachillerato)
+                                                            {{-- Cambiado a parcialBachillerato --}}
+                                                            <span
+                                                                class="font-semibold text-indigo-700 dark:text-indigo-300">
+                                                                {{ $periodo->parcialBachillerato->descripcion }}
+                                                            </span>
+                                                        @else
+                                                            <span class="text-amber-600 dark:text-amber-400">
+                                                                Sin parcial
+                                                            </span>
+                                                        @endif
                                                     @else
                                                         ---
                                                     @endif
@@ -333,7 +425,10 @@
 
                                             <flux:button variant="danger"
                                                 class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
-                                                @click="eliminar({{ $periodo->id }}, '{{ $periodo->mesesBachillerato->meses ?? 'Periodo' }}')">
+                                                @click="eliminar(
+                                                    {{ $periodo->id }},
+                                                    '{{ $periodo->mesesBachillerato->meses ?? ($periodo->cicloEscolar->inicio_anio ?? 'Periodo') }}'
+                                                )">
                                                 <flux:icon.trash class="h-3.5 w-3.5" />
                                             </flux:button>
                                         </div>
@@ -352,7 +447,6 @@
         </div>
     </div>
 
-    <livewire:periodo.editar-periodo>
-
+    <livewire:periodo.editar-periodo />
 
 </div>

@@ -71,10 +71,22 @@
     </div>
 
     {{-- Filtros --}}
-    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div
+        class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-4' }}">
 
         <div>
-            <flux:select label="Grado" wire:model.live="grado_id">
+            <flux:select label="Generación" wire:model.live="generacion_id">
+                <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
+                @foreach ($generaciones as $generacion)
+                    <flux:select.option value="{{ $generacion->id }}">
+                        {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
+
+        <div>
+            <flux:select label="Grado" wire:model.live="grado_id" :disabled="!$generacion_id">
                 <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
                 @foreach ($grados as $g)
                     <flux:select.option value="{{ $g->id }}">{{ $g->nombre }}</flux:select.option>
@@ -84,7 +96,7 @@
 
         @if ($this->esBachillerato)
             <div>
-                <flux:select label="Semestre" wire:model.live="semestre_id" :disabled="!$grado_id">
+                <flux:select label="Semestre" wire:model.live="semestre_id" :disabled="!$generacion_id || !$grado_id">
                     <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
                     @foreach ($semestres as $sem)
                         <flux:select.option value="{{ $sem->id }}">{{ $sem->numero }}</flux:select.option>
@@ -93,16 +105,8 @@
             </div>
 
             <div>
-                <flux:select label="Grupo" wire:model.live="grupo_id" :disabled="!$grado_id || !$semestre_id">
-                    <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
-                    @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-        @else
-            <div>
-                <flux:select label="Grupo" wire:model.live="grupo_id" :disabled="!$grado_id">
+                <flux:select label="Grupo" wire:model.live="grupo_id"
+                    :disabled="!$generacion_id || !$grado_id || !$semestre_id">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
                     @foreach ($grupos as $gpo)
                         <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
@@ -110,6 +114,26 @@
                 </flux:select>
             </div>
 
+            <div>
+                <flux:select label="Parcial" wire:model.live="parcial_bachillerato_id"
+                    :disabled="!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id">
+                    <flux:select.option value="">-- Selecciona un parcial --</flux:select.option>
+                    @foreach ($parciales as $parcial)
+                        <flux:select.option value="{{ $parcial->id }}">
+                            {{ $parcial->descripcion }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+        @else
+            <div>
+                <flux:select label="Grupo" wire:model.live="grupo_id" :disabled="!$generacion_id || !$grado_id">
+                    <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
+                    @foreach ($grupos as $gpo)
+                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
         @endif
 
         <div class="mt-7">
@@ -156,7 +180,8 @@
                     </div>
                 </div>
 
-                <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div
+                    class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-4' }}">
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -173,6 +198,21 @@
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
                             class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
+                            Generación
+                        </div>
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            @php
+                                $generacionSeleccionada = collect($generaciones)->firstWhere('id', $generacion_id);
+                            @endphp
+                            {{ $generacionSeleccionada ? $generacionSeleccionada->anio_ingreso . ' - ' . $generacionSeleccionada->anio_egreso : 'Sin generación' }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
+                        <div
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                             <span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                             Periodo escolar
                         </div>
@@ -180,6 +220,20 @@
                             {{ $this->nombrePeriodo }}
                         </div>
                     </div>
+
+                    @if ($this->esBachillerato)
+                        <div
+                            class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
+                            <div
+                                class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                                <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
+                                Parcial
+                            </div>
+                            <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                                {{ $this->periodoSeleccionado['parcial'] ?? 'Sin parcial' }}
+                            </div>
+                        </div>
+                    @endif
 
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
@@ -233,7 +287,7 @@
         <div class="relative">
 
             <div wire:loading.flex
-                wire:target="nivel_id,grado_id,grupo_id,semestre_id,busqueda,limpiarFiltros,guardarCalificaciones"
+                wire:target="nivel_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,busqueda,limpiarFiltros,guardarCalificaciones"
                 class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-950/60">
                 <div
                     class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-950">
@@ -359,7 +413,9 @@
                                             No hay datos para mostrar
                                         </div>
                                         <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                            Selecciona los filtros para cargar alumnos y materias.
+                                            {{ $this->esBachillerato
+                                                ? 'Selecciona grado, semestre, grupo y parcial para cargar alumnos y materias.'
+                                                : 'Selecciona los filtros para cargar alumnos y materias.' }}
                                         </div>
                                     </div>
                                 </td>
@@ -406,7 +462,7 @@
                             @endif
                         </div>
 
-                        <div class="flex items-center justify-end gap-3">
+                        <div class="flex flex-wrap items-center justify-end gap-3">
                             @if ($this->mostrarBotonBitacora)
                                 <button type="button" wire:click="abrirModalBitacora" wire:loading.attr="disabled"
                                     wire:target="abrirModalBitacora"
@@ -443,15 +499,17 @@
                                 </span>
                             </button>
 
-                            <button type="button" @disabled(!$this->puedeExportarPdf)
+                            <button type="button" @if (!$this->puedeExportarPdf) disabled @endif
                                 x-on:click="window.open('{{ route(
                                     'misrutas.calificaciones.pdf',
                                     array_filter([
                                         'slug_nivel' => $slug_nivel,
+                                        'generacion_id' => $generacion_id,
                                         'grado_id' => $grado_id,
                                         'grupo_id' => $grupo_id,
                                         'busqueda' => $busqueda ?: null,
                                         'semestre_id' => $this->esBachillerato ? $semestre_id : null,
+                                        'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
                                     ]),
                                 ) }}', '_blank')"
                                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/40 dark:bg-neutral-900 dark:text-rose-300 dark:hover:bg-rose-950/20">
@@ -460,7 +518,7 @@
                             </button>
 
                             <button type="button" wire:click="guardarCalificaciones"
-                                {{ $this->puedeGuardar ? '' : 'disabled' }} class="{{ $this->claseGuardar }}">
+                                @if (!$this->puedeGuardar) disabled @endif class="{{ $this->claseGuardar }}">
                                 Guardar calificaciones
                             </button>
                         </div>
@@ -469,7 +527,6 @@
             </div>
         </div>
     </div>
-
 
     <div x-data="{ show: @entangle('mostrarModalBitacora').live }" x-cloak>
         <div x-show="show" x-transition.opacity.duration.200ms
@@ -550,6 +607,7 @@
                                             'semestre' => $semestre_id,
                                             'generacion' => $generacion_id,
                                             'periodo' => $periodo_id,
+                                            'parcial' => $parcial_bachillerato_id,
                                             'modal' => $mostrarModalBitacora,
                                         ]),
                                     )" />
@@ -565,6 +623,5 @@
             </div>
         </div>
     </div>
-
 
 </div>

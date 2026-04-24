@@ -24,7 +24,7 @@ return new class extends Migration {
             $table->foreignId('generacion_id')->nullable()->constrained('generaciones')->nullOnDelete();
             $table->foreignId('semestre_id')->nullable()->constrained('semestres')->nullOnDelete();
             $table->foreignId('periodo_id')->nullable()->constrained('periodos')->nullOnDelete();
-            $table->foreignId('ciclo_escolar_id')->nullable()->constrained('ciclos_escolares')->nullOnDelete();
+            $table->foreignId('ciclo_escolar_id')->nullable()->constrained('ciclo_escolares')->nullOnDelete();
 
             // Valores del cambio
             $table->string('calificacion_anterior', 10)->nullable();
@@ -38,10 +38,6 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            // Índices para consultas rápidas
-            $table->index(['inscripcion_id', 'asignacion_materia_id']);
-            $table->index(['grupo_id', 'periodo_id']);
-            $table->index(['user_id', 'created_at']);
         });
     }
 

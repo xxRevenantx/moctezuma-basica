@@ -28,20 +28,20 @@
                     </h2>
 
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        La generación, semestre y mes del periodo solo aplican para bachillerato.
+                        La generación, semestre, mes y parcial solo aplican para bachillerato.
                     </p>
 
                     @if ((int) $nivel_id === 4)
                         <div
                             class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-300">
                             <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                            Bachillerato seleccionado: generación, semestre y mes habilitados
+                            Bachillerato seleccionado: generación, semestre, mes y parcial habilitados
                         </div>
                     @elseif (!empty($nivel_id))
                         <div
                             class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
                             <span class="h-2 w-2 rounded-full bg-slate-400"></span>
-                            Nivel distinto de bachillerato: generación, semestre y mes deshabilitados
+                            Nivel distinto de bachillerato: generación, semestre, mes y parcial deshabilitados
                         </div>
                     @endif
                 </div>
@@ -51,6 +51,7 @@
                     <div>
                         <flux:select wire:model.live="nivel_id" label="Nivel">
                             <flux:select.option value="">Selecciona un nivel</flux:select.option>
+
                             @foreach ($niveles as $nivel)
                                 <flux:select.option value="{{ $nivel->id }}">
                                     {{ $nivel->nombre }}
@@ -63,6 +64,7 @@
                     <div>
                         <flux:select wire:model="ciclo_escolar_id" label="Ciclo escolar">
                             <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
+
                             @foreach ($ciclosEscolares as $ciclo)
                                 <flux:select.option value="{{ $ciclo->id }}">
                                     {{ $ciclo->inicio_anio }} - {{ $ciclo->fin_anio }}
@@ -75,6 +77,7 @@
                     <div class="{{ (int) $nivel_id !== 4 ? 'opacity-60' : '' }}">
                         <flux:select wire:model="generacion_id" label="Generación" :disabled="(int) $nivel_id !== 4">
                             <flux:select.option value="">Selecciona una generación</flux:select.option>
+
                             @foreach ($generaciones as $generacion)
                                 <flux:select.option value="{{ $generacion->id }}">
                                     {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
@@ -93,6 +96,7 @@
                     <div class="{{ (int) $nivel_id !== 4 ? 'opacity-60' : '' }}">
                         <flux:select wire:model="semestre_id" label="Semestre" :disabled="(int) $nivel_id !== 4">
                             <flux:select.option value="">Selecciona un semestre</flux:select.option>
+
                             @foreach ($semestres as $semestre)
                                 <flux:select.option value="{{ $semestre->id }}">
                                     {{ $semestre->numero }}° Semestre
@@ -112,9 +116,30 @@
                         <flux:select wire:model="mes_bachillerato_id" label="Mes del periodo"
                             :disabled="(int) $nivel_id !== 4">
                             <flux:select.option value="">Selecciona un mes</flux:select.option>
+
                             @foreach ($meses as $mes)
                                 <flux:select.option value="{{ $mes->id }}">
                                     {{ $mes->meses }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        @if ((int) $nivel_id !== 4)
+                            <p class="mt-1 text-xs text-slate-400">
+                                Este campo solo aplica para bachillerato.
+                            </p>
+                        @endif
+                    </div>
+
+                    {{-- Parcial --}}
+                    <div class="{{ (int) $nivel_id !== 4 ? 'opacity-60' : '' }}">
+                        <flux:select wire:model="parcial_bachillerato_id" label="Parcial"
+                            :disabled="(int) $nivel_id !== 4">
+                            <flux:select.option value="">Selecciona un parcial</flux:select.option>
+
+                            @foreach ($parciales as $parcial)
+                                <flux:select.option value="{{ $parcial->id }}">
+                                    {{ $parcial->descripcion }}
                                 </flux:select.option>
                             @endforeach
                         </flux:select>

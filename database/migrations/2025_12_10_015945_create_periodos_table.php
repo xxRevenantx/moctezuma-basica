@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -27,6 +26,9 @@ return new class extends Migration {
             // Meses de Bachillerato
             $table->unsignedBigInteger('mes_bachillerato_id')->nullable();
 
+            // Parciales de Bachillerato
+            $table->unsignedBigInteger('parcial_bachillerato_id')->nullable();
+
 
             // Fechas del periodo
             $table->date('fecha_inicio')->nullable();
@@ -40,7 +42,7 @@ return new class extends Migration {
             $table->foreign('semestre_id')->references('id')->on('semestres')->onDelete('cascade');
             $table->foreign('ciclo_escolar_id')->references('id')->on('ciclo_escolares')->onDelete('cascade');
             $table->foreign('mes_bachillerato_id')->references('id')->on('meses_bachilleratos')->onDelete('cascade');
-
+            $table->foreign('parcial_bachillerato_id')->references('id')->on('parciales')->onDelete('cascade');
 
             $table->timestamps();
         });
