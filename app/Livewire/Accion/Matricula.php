@@ -432,65 +432,119 @@ class Matricula extends Component
         $esBachillerato = $this->esBachillerato();
 
         return Excel::download(
-            new class($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
-                public function __construct(
-                    protected Collection $rows,
-                    protected bool $esBachillerato
-                ) {}
+            new class ($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
+            public function __construct(
+            protected Collection $rows,
+            protected bool $esBachillerato
+            ) {}
 
-                public function collection()
-                {
-                    return $this->rows;
+            public function collection()
+            {
+                return $this->rows;
+            }
+
+            public function headings(): array
+            {
+                $headings = [
+                'Matrícula',
+                'Folio',
+                'Apellido paterno',
+                'Apellido materno',
+                'Nombre(s)',
+                'CURP',
+                'Género',
+                'Generación',
+                'Grado',
+                ];
+
+                if ($this->esBachillerato) {
+                    $headings[] = 'Semestre';
                 }
 
-                public function headings(): array
-                {
-                    $headings = [
-                        'Matrícula',
-                        'Folio',
-                        'Apellido paterno',
-                        'Apellido materno',
-                        'Nombre(s)',
-                        'CURP',
-                        'Género',
-                        'Generación',
-                        'Grado',
-                    ];
+                $headings[] = 'Grupo';
 
-                    if ($this->esBachillerato) {
-                        $headings[] = 'Semestre';
-                    }
+                return $headings;
+            }
 
-                    $headings[] = 'Grupo';
+            public function map($row): array
+            {
+                $data = [
+                    $row->matricula,
+                    $row->folio,
+                    $row->apellido_paterno,
+                    $row->apellido_materno,
+                    $row->nombre,
+                    $row->curp,
+                    $row->genero,
+                    $row->generacion ? ($row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso) : null,
+                    $row->grado?->nombre,
+                ];
 
-                    return $headings;
+                if ($this->esBachillerato) {
+                    $data[] = $row->semestre?->numero;
                 }
 
-                public function map($row): array
-                {
-                    $data = [
-                        $row->matricula,
-                        $row->folio,
-                        $row->apellido_paterno,
-                        $row->apellido_materno,
-                        $row->nombre,
-                        $row->curp,
-                        $row->genero,
-                        $row->generacion ? ($row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso) : null,
-                        $row->grado?->nombre,
-                    ];
+                $data[] = $row->grupo?->nombre;
 
-                    if ($this->esBachillerato) {
-                        $data[] = $row->semestre?->numero;
-                    }
-
-                    $data[] = $row->grupo?->nombre;
-
-                    return $data;
-                }
+                return $data;
+            }
             },
             'matricula.xlsx'
         );
+    }
+    public function restaurarFiltrosMatricula(array $filtros): void
+    {
+        // Se restauran los filtros en el mismo orden de dependencia de los selects.
+        $this->generacion_id = !empty($filtros['generacion_id'])
+            ? (int) $filtros['generacion_id']
+            : null;
+
+        $this->grado_id = !empty($filtros['grado_id'])
+            ? (int) $filtros['grado_id']
+            : null;
+
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->selected = [];
+        $this->selectPage = false;
+        $this->nuevo_grado_id = null;
+
+        // Primero se reconstruyen los semestres si el nivel es bachillerato.
+        $this->semestres = $this->esBachillerato()
+            ? $this->loadSemestres()
+            : collect();
+
+        if ($this->esBachillerato()) {
+            $semestreId = !empty($filtros['semestre_id'])
+                ? (int) $filtros['semestre_id']
+                : null;
+
+            $semestreExiste = $semestreId
+                ? $this->semestres->contains('id', $semestreId)
+                : false;
+
+            $this->semestre_id = $semestreExiste ? $semestreId : null;
+        }
+
+        // Después se reconstruyen los grupos con generación, grado y semestre ya definidos.
+        $this->grupos = $this->loadGrupos();
+
+        $grupoId = !empty($filtros['grupo_id'])
+            ? (int) $filtros['grupo_id']
+            : null;
+
+        $grupoExiste = $grupoId
+            ? $this->grupos->contains('id', $grupoId)
+            : false;
+
+        $this->grupo_id = $grupoExiste ? $grupoId : null;
+
+        $this->search = isset($filtros['search'])
+            ? trim((string) $filtros['search'])
+            : '';
+
+        $this->resetPage();
+        $this->recalcularResumen();
     }
 
     public function render()

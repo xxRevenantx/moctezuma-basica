@@ -39,7 +39,8 @@ class MostrarGrupos extends Component
             ->with(['nivel', 'grado', 'generacion', 'semestre'])
             ->where('nombre', 'like', '%' . $this->search . '%')
             ->orderBy('nivel_id', 'asc')
-            ->orderBy('nombre', 'asc')
+            ->orderBy('grado_id', 'asc')
+            ->orderBy('generacion_id', 'asc')
             ->paginate(12);
 
         // Colección de la página actual
@@ -50,16 +51,16 @@ class MostrarGrupos extends Component
             return optional($g->nivel)->nombre ?? 'Sin nivel asignado';
         });
 
-        $totalGrupos    = $grupos->total();
-        $totalNiveles   = $collection->pluck('nivel_id')->filter()->unique()->count();
+        $totalGrupos = $grupos->total();
+        $totalNiveles = $collection->pluck('nivel_id')->filter()->unique()->count();
         $gruposSinNivel = $collection->whereNull('nivel_id')->count();
 
         return view('livewire.grupo.mostrar-grupos', [
-            'grupos'          => $grupos,
-            'groupedByNivel'  => $groupedByNivel,
-            'totalGrupos'     => $totalGrupos,
-            'totalNiveles'    => $totalNiveles,
-            'gruposSinNivel'  => $gruposSinNivel,
+            'grupos' => $grupos,
+            'groupedByNivel' => $groupedByNivel,
+            'totalGrupos' => $totalGrupos,
+            'totalNiveles' => $totalNiveles,
+            'gruposSinNivel' => $gruposSinNivel,
         ]);
     }
 }

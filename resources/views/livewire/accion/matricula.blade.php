@@ -1,5 +1,125 @@
 <div x-data="{
     openRow: null,
+    filaResaltada: null,
+    filtrosRestaurados: false,
+    editandoAlumno: false,
+
+    init() {
+        this.$nextTick(() => {
+            this.restaurarFiltros();
+            this.resaltarFilaEditada();
+        });
+
+        document.addEventListener('livewire:navigated', () => {
+            this.$nextTick(() => {
+                this.restaurarFiltros();
+                this.resaltarFilaEditada();
+            });
+        });
+    },
+
+    llaveFiltros() {
+        return 'matricula_filtros_' + @js($slug_nivel);
+    },
+
+    guardarFiltros() {
+        const filtros = {
+            slug_nivel: @js($slug_nivel),
+            generacion_id: this.$wire.get('generacion_id'),
+            grado_id: this.$wire.get('grado_id'),
+            semestre_id: this.$wire.get('semestre_id'),
+            grupo_id: this.$wire.get('grupo_id'),
+            search: this.$wire.get('search'),
+        };
+
+        localStorage.setItem(this.llaveFiltros(), JSON.stringify(filtros));
+    },
+
+    restaurarFiltros() {
+        if (this.filtrosRestaurados) {
+            return;
+        }
+
+        const idResaltado = localStorage.getItem('matricula_highlight_id');
+
+        if (!idResaltado) {
+            return;
+        }
+
+        const raw = localStorage.getItem(this.llaveFiltros());
+
+        if (!raw) {
+            return;
+        }
+
+        let filtros = null;
+
+        try {
+            filtros = JSON.parse(raw);
+        } catch (e) {
+            localStorage.removeItem(this.llaveFiltros());
+            return;
+        }
+
+        if (!filtros || filtros.slug_nivel !== @js($slug_nivel)) {
+            return;
+        }
+
+        this.filtrosRestaurados = true;
+
+        @this.call('restaurarFiltrosMatricula', filtros).then(() => {
+            this.$nextTick(() => {
+                this.resaltarFilaEditada();
+            });
+        });
+    },
+
+    prepararEdicion(id, url) {
+        this.editandoAlumno = true;
+
+        this.guardarFiltros();
+
+        localStorage.setItem('matricula_return_url', window.location.href);
+        localStorage.setItem('matricula_highlight_id', id);
+
+        setTimeout(() => {
+            window.location.href = url;
+        }, 300);
+    },
+
+    resaltarFilaEditada() {
+        const id = localStorage.getItem('matricula_highlight_id');
+
+        if (!id) {
+            return;
+        }
+
+        this.filaResaltada = id;
+
+        setTimeout(() => {
+            const fila = document.getElementById('alumno-fila-' + id) ||
+                document.getElementById('alumno-card-' + id);
+
+            if (fila) {
+                fila.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+            }
+        }, 900);
+
+        setTimeout(() => {
+            this.filaResaltada = null;
+            localStorage.removeItem('matricula_highlight_id');
+        }, 4500);
+    },
+
+    limpiarFiltrosGuardados() {
+        localStorage.removeItem(this.llaveFiltros());
+        localStorage.removeItem('matricula_return_url');
+        localStorage.removeItem('matricula_highlight_id');
+    },
+
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
@@ -14,8 +134,42 @@
     }
 }" class="space-y-5">
 
+    {{-- LOADER AL DAR CLIC EN EDITAR --}}
+    <div x-cloak x-show="editandoAlumno" x-transition.opacity
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-md dark:bg-neutral-950/80">
+        <div
+            class="mx-4 w-full max-w-sm rounded-[28px] border border-sky-100 bg-white/95 p-7 text-center shadow-2xl shadow-sky-500/20 dark:border-sky-900/40 dark:bg-neutral-900/95">
+            <div class="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center">
+                <div class="absolute inset-0 rounded-full border-4 border-sky-100 dark:border-sky-900/40"></div>
+                <div
+                    class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-sky-500 border-r-indigo-500">
+                </div>
+                <div
+                    class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/30">
+                    <flux:icon.square-pen class="h-5 w-5" />
+                </div>
+            </div>
+
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white">
+                Abriendo edición
+            </h3>
+
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Preparando los datos del alumno...
+            </p>
+
+            <div class="mt-5 flex items-center justify-center gap-1.5">
+                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500 [animation-delay:-0.3s]"></span>
+                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
+                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500"></span>
+            </div>
+        </div>
+    </div>
+
+    {{-- AQUÍ DEJAS TODO EL RESTO DE TU CÓDIGO ACTUAL DE MATRÍCULA --}}
+
     {{-- ITERA NIVELES --}}
-    <div class="overflow-hidden ">
+    <div class="overflow-hidden">
         <div>
             <div class="-mx-1 overflow-x-auto pb-1">
                 <div class="flex min-w-max items-center gap-2 px-1 justify-center">
@@ -156,12 +310,13 @@
                 <div>
                     <flux:label>Grupo</flux:label>
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
+                        wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                         :disabled="$esBachillerato
-                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
-                            <flux:select.option value="{{ $grupo->id }}">
+                            <flux:select.option value="{{ (string) $grupo->id }}">
                                 {{ $grupo->nombre }}
                             </flux:select.option>
                         @endforeach
@@ -193,7 +348,7 @@
                     @endif
                 </div>
 
-                <button type="button" wire:click="clearFilters"
+                <button type="button" x-on:click="limpiarFiltrosGuardados(); @this.call('clearFilters')"
                     class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:bg-neutral-700">
                     Limpiar filtros
                 </button>
@@ -341,7 +496,8 @@
                                         class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
                                         Cambiar grado a seleccionados
                                     </label>
-                                    <select id="nuevo_grado_id" wire:model="nuevo_grado_id" @disabled($this->selectedCount === 0)
+                                    <select id="nuevo_grado_id" wire:model="nuevo_grado_id"
+                                        @disabled($this->selectedCount === 0)
                                         class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
                                         <option value="">Selecciona un grado</option>
                                         @foreach ($grados as $grado)
@@ -441,6 +597,7 @@
                             </div>
                         </div>
 
+                        {{-- TABLA ESCRITORIO --}}
                         <div
                             class="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-neutral-800 xl:block">
                             <div class="overflow-x-auto">
@@ -515,7 +672,11 @@
                                     <tbody
                                         class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
                                         @forelse ($rows as $row)
-                                            <tr class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
+                                            <tr id="alumno-fila-{{ $row->id }}"
+                                                class="transition-all duration-500"
+                                                :class="filaResaltada == '{{ $row->id }}' ?
+                                                    'bg-emerald-100 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 dark:bg-emerald-950/40 dark:ring-emerald-500' :
+                                                    'hover:bg-slate-50 dark:hover:bg-neutral-800/60'">
                                                 <td class="px-4 py-4 align-top">
                                                     <input type="checkbox" wire:model.live="selected"
                                                         value="{{ $row->id }}"
@@ -605,7 +766,10 @@
                                                     <div class="flex items-center gap-2">
                                                         <flux:button variant="primary"
                                                             class="cursor-pointer bg-amber-500 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-amber-600 hover:shadow-md"
-                                                            x-on:click="window.open('{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}', '_blank')">
+                                                            x-on:click="prepararEdicion(
+                                                                '{{ $row->id }}',
+                                                                '{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}'
+                                                            )">
                                                             <flux:icon.square-pen class="h-3.5 w-3.5" />
                                                         </flux:button>
 
@@ -630,10 +794,14 @@
                             </div>
                         </div>
 
+                        {{-- TARJETAS MÓVIL --}}
                         <div class="space-y-4 xl:hidden">
                             @forelse ($rows as $row)
-                                <div
-                                    class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                <div id="alumno-card-{{ $row->id }}"
+                                    class="rounded-3xl border p-4 shadow-sm transition-all duration-500"
+                                    :class="filaResaltada == '{{ $row->id }}' ?
+                                        'border-emerald-300 bg-emerald-100 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 dark:border-emerald-700 dark:bg-emerald-950/40 dark:ring-emerald-500' :
+                                        'border-slate-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'">
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="text-base font-bold text-slate-800 dark:text-white">
@@ -666,6 +834,25 @@
                                         <div><span class="font-semibold">Grupo:</span>
                                             {{ $row->grupo?->nombre ?? '—' }}</div>
                                         <div><span class="font-semibold">Folio:</span> {{ $row->folio ?: '—' }}</div>
+                                    </div>
+
+                                    <div class="mt-4 flex justify-end gap-2">
+                                        <flux:button variant="primary"
+                                            class="cursor-pointer bg-amber-500 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-amber-600 hover:shadow-md"
+                                            x-on:click="prepararEdicion(
+                                                '{{ $row->id }}',
+                                                '{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}'
+                                            )">
+                                            <flux:icon.square-pen class="h-3.5 w-3.5" />
+                                            Editar
+                                        </flux:button>
+
+                                        <flux:button variant="danger"
+                                            class="cursor-pointer bg-rose-600 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-rose-700 hover:shadow-md"
+                                            @click="eliminar({{ $row->id }}, '{{ $row->nombre }}')">
+                                            <flux:icon.trash-2 class="h-3.5 w-3.5" />
+                                            Eliminar
+                                        </flux:button>
                                     </div>
                                 </div>
                             @empty
