@@ -11,6 +11,7 @@ use App\Models\PersonaNivel;
 use App\Models\Semestre;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -47,7 +48,13 @@ class Matricula extends Component
 
     public bool $selectPage = false;
     public array $selected = [];
+
     public ?int $nuevo_grado_id = null;
+    public ?int $nuevo_semestre_id = null;
+    public ?int $nuevo_grupo_id = null;
+
+    public Collection $nuevosSemestres;
+    public Collection $nuevosGrupos;
 
     public int $perPage = 10;
 
@@ -81,6 +88,8 @@ class Matricula extends Component
 
         $this->semestres = collect();
         $this->grupos = collect();
+        $this->nuevosSemestres = collect();
+        $this->nuevosGrupos = collect();
 
         $this->recalcularResumen();
     }
@@ -108,6 +117,18 @@ class Matricula extends Component
             ->get(['id', 'grado_id', 'numero']);
     }
 
+    protected function loadSemestresDestino(): Collection
+    {
+        if (!$this->esBachillerato() || !$this->nuevo_grado_id) {
+            return collect();
+        }
+
+        return Semestre::query()
+            ->where('grado_id', $this->nuevo_grado_id)
+            ->orderBy('numero')
+            ->get(['id', 'grado_id', 'numero']);
+    }
+
     protected function loadGrupos(): Collection
     {
         if (!$this->grado_id || !$this->generacion_id) {
@@ -131,6 +152,31 @@ class Matricula extends Component
         return $query
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'generacion_id', 'grado_id', 'semestre_id']);
+    }
+
+    protected function loadGruposDestino(): Collection
+    {
+        if (!$this->nivel || !$this->generacion_id || !$this->nuevo_grado_id) {
+            return collect();
+        }
+
+        $query = $this->baseGrupoQuery()
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->nuevo_grado_id);
+
+        if ($this->esBachillerato()) {
+            if (!$this->nuevo_semestre_id) {
+                return collect();
+            }
+
+            $query->where('semestre_id', $this->nuevo_semestre_id);
+        } else {
+            $query->whereNull('semestre_id');
+        }
+
+        return $query
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'nivel_id', 'generacion_id', 'grado_id', 'semestre_id']);
     }
 
     protected function consultaInscripcionesBase(): Builder
@@ -239,13 +285,28 @@ class Matricula extends Component
         }
     }
 
+    protected function limpiarSeleccion(): void
+    {
+        $this->selected = [];
+        $this->selectPage = false;
+    }
+
+    protected function limpiarDestinoCambio(): void
+    {
+        $this->nuevo_grado_id = null;
+        $this->nuevo_semestre_id = null;
+        $this->nuevo_grupo_id = null;
+        $this->nuevosSemestres = collect();
+        $this->nuevosGrupos = collect();
+    }
+
     public function updatedGeneracionId($value): void
     {
         $this->generacion_id = $value ? (int) $value : null;
 
         $this->grupo_id = null;
-        $this->selected = [];
-        $this->selectPage = false;
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
 
         $this->grupos = $this->loadGrupos();
 
@@ -260,8 +321,8 @@ class Matricula extends Component
         $this->semestre_id = null;
         $this->grupo_id = null;
 
-        $this->selected = [];
-        $this->selectPage = false;
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
 
         $this->semestres = collect();
         $this->grupos = collect();
@@ -282,8 +343,8 @@ class Matricula extends Component
 
         $this->grupo_id = null;
 
-        $this->selected = [];
-        $this->selectPage = false;
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
 
         $this->grupos = $this->loadGrupos();
 
@@ -295,8 +356,8 @@ class Matricula extends Component
     {
         $this->grupo_id = $value ? (int) $value : null;
 
-        $this->selected = [];
-        $this->selectPage = false;
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
 
         $this->resetPage();
         $this->recalcularResumen();
@@ -304,11 +365,51 @@ class Matricula extends Component
 
     public function updatedSearch(): void
     {
-        $this->selected = [];
-        $this->selectPage = false;
+        $this->limpiarSeleccion();
 
         $this->resetPage();
         $this->recalcularResumen();
+    }
+
+    public function updatedNuevoGradoId($value): void
+    {
+        $this->nuevo_grado_id = $value ? (int) $value : null;
+        $this->nuevo_semestre_id = null;
+        $this->nuevo_grupo_id = null;
+
+        $this->resetValidation([
+            'nuevo_grado_id',
+            'nuevo_semestre_id',
+            'nuevo_grupo_id',
+        ]);
+
+        $this->nuevosSemestres = $this->esBachillerato()
+            ? $this->loadSemestresDestino()
+            : collect();
+
+        $this->nuevosGrupos = $this->esBachillerato()
+            ? collect()
+            : $this->loadGruposDestino();
+    }
+
+    public function updatedNuevoSemestreId($value): void
+    {
+        $this->nuevo_semestre_id = $value ? (int) $value : null;
+        $this->nuevo_grupo_id = null;
+
+        $this->resetValidation([
+            'nuevo_semestre_id',
+            'nuevo_grupo_id',
+        ]);
+
+        $this->nuevosGrupos = $this->loadGruposDestino();
+    }
+
+    public function updatedNuevoGrupoId($value): void
+    {
+        $this->nuevo_grupo_id = $value ? (int) $value : null;
+
+        $this->resetValidation('nuevo_grupo_id');
     }
 
     public function updatedSelectPage($value): void
@@ -340,10 +441,14 @@ class Matricula extends Component
             'selectPage',
             'selected',
             'nuevo_grado_id',
+            'nuevo_semestre_id',
+            'nuevo_grupo_id',
         ]);
 
         $this->semestres = collect();
         $this->grupos = collect();
+        $this->nuevosSemestres = collect();
+        $this->nuevosGrupos = collect();
 
         $this->resetPage();
         $this->recalcularResumen();
@@ -371,29 +476,35 @@ class Matricula extends Component
 
     public function aplicarCambiarGrado(): void
     {
-        if ($this->esBachillerato()) {
-            $this->dispatch('swal', [
-                'title' => 'En bachillerato este cambio masivo se debe controlar con semestre y grupo.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-            return;
-        }
-
-        $this->validate([
-            'nuevo_grado_id' => ['required', 'integer', 'exists:grados,id'],
-        ], [
-            'nuevo_grado_id.required' => 'Selecciona un grado.',
-        ]);
-
         if (empty($this->selected)) {
             $this->dispatch('swal', [
                 'title' => 'Selecciona al menos un alumno.',
                 'icon' => 'warning',
                 'position' => 'top-end',
             ]);
+
             return;
         }
+
+        if (!$this->generacion_id) {
+            $this->addError('nuevo_grado_id', 'Primero filtra una generación.');
+
+            return;
+        }
+
+        if ($this->esBachillerato()) {
+            $this->aplicarCambiarBachillerato();
+
+            return;
+        }
+
+        $this->validate([
+            'nuevo_grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'nuevo_grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+        ], [
+            'nuevo_grado_id.required' => 'Selecciona el grado destino.',
+            'nuevo_grupo_id.required' => 'Selecciona el grupo destino.',
+        ]);
 
         $gradoValido = Grado::query()
             ->where('id', $this->nuevo_grado_id)
@@ -401,25 +512,160 @@ class Matricula extends Component
             ->exists();
 
         if (!$gradoValido) {
-            $this->addError('nuevo_grado_id', 'El grado no pertenece al nivel.');
+            $this->addError('nuevo_grado_id', 'El grado destino no pertenece al nivel actual.');
+
             return;
         }
 
-        Inscripcion::query()
-            ->whereIn('id', $this->selected)
+        $grupoDestino = Grupo::query()
+            ->where('id', $this->nuevo_grupo_id)
             ->where('nivel_id', $this->nivel->id)
-            ->update([
-                'grado_id' => $this->nuevo_grado_id,
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->nuevo_grado_id)
+            ->whereNull('semestre_id')
+            ->first(['id', 'nombre', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
+
+        if (!$grupoDestino) {
+            $this->addError('nuevo_grupo_id', 'El grupo destino no pertenece al nivel, generación y grado seleccionados.');
+
+            return;
+        }
+
+        $ids = collect($this->selected)
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $alumnosValidos = Inscripcion::query()
+            ->whereIn('id', $ids)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->whereNull('semestre_id')
+            ->pluck('id');
+
+        if ($alumnosValidos->count() !== $ids->count()) {
+            $this->dispatch('swal', [
+                'title' => 'Hay alumnos seleccionados que no pertenecen al nivel o generación filtrada.',
+                'icon' => 'warning',
+                'position' => 'top-end',
             ]);
 
-        $this->selected = [];
-        $this->selectPage = false;
-        $this->nuevo_grado_id = null;
+            return;
+        }
 
+        DB::transaction(function () use ($alumnosValidos, $grupoDestino) {
+            Inscripcion::query()
+                ->whereIn('id', $alumnosValidos)
+                ->update([
+                    'grado_id' => (int) $this->nuevo_grado_id,
+                    'grupo_id' => (int) $grupoDestino->id,
+                    'semestre_id' => null,
+                ]);
+        });
+
+        $totalActualizados = $alumnosValidos->count();
+
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
         $this->recalcularResumen();
 
         $this->dispatch('swal', [
-            'title' => 'Grado actualizado correctamente',
+            'title' => "{$totalActualizados} alumno(s) actualizados al grado y grupo destino.",
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    protected function aplicarCambiarBachillerato(): void
+    {
+        $this->validate([
+            'nuevo_grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'nuevo_semestre_id' => ['required', 'integer', 'exists:semestres,id'],
+            'nuevo_grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+        ], [
+            'nuevo_grado_id.required' => 'Selecciona el grado destino.',
+            'nuevo_semestre_id.required' => 'Selecciona el semestre destino.',
+            'nuevo_grupo_id.required' => 'Selecciona el grupo destino.',
+        ]);
+
+        $gradoValido = Grado::query()
+            ->where('id', $this->nuevo_grado_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->exists();
+
+        if (!$gradoValido) {
+            $this->addError('nuevo_grado_id', 'El grado destino no pertenece a bachillerato.');
+
+            return;
+        }
+
+        $semestreValido = Semestre::query()
+            ->where('id', $this->nuevo_semestre_id)
+            ->where('grado_id', $this->nuevo_grado_id)
+            ->exists();
+
+        if (!$semestreValido) {
+            $this->addError('nuevo_semestre_id', 'El semestre destino no pertenece al grado seleccionado.');
+
+            return;
+        }
+
+        $grupoDestino = Grupo::query()
+            ->where('id', $this->nuevo_grupo_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->nuevo_grado_id)
+            ->where('semestre_id', $this->nuevo_semestre_id)
+            ->first(['id', 'nombre', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
+
+        if (!$grupoDestino) {
+            $this->addError('nuevo_grupo_id', 'El grupo destino no pertenece al nivel, generación, grado y semestre seleccionados.');
+
+            return;
+        }
+
+        $ids = collect($this->selected)
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $alumnosValidos = Inscripcion::query()
+            ->whereIn('id', $ids)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->whereNotNull('semestre_id')
+            ->pluck('id');
+
+        if ($alumnosValidos->count() !== $ids->count()) {
+            $this->dispatch('swal', [
+                'title' => 'Hay alumnos seleccionados que no pertenecen al nivel o generación filtrada.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($alumnosValidos, $grupoDestino) {
+            Inscripcion::query()
+                ->whereIn('id', $alumnosValidos)
+                ->update([
+                    'grado_id' => (int) $this->nuevo_grado_id,
+                    'semestre_id' => (int) $this->nuevo_semestre_id,
+                    'grupo_id' => (int) $grupoDestino->id,
+                ]);
+        });
+
+        $totalActualizados = $alumnosValidos->count();
+
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
+        $this->recalcularResumen();
+
+        $this->dispatch('swal', [
+            'title' => "{$totalActualizados} alumno(s) actualizados al grado, semestre y grupo destino.",
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -492,6 +738,7 @@ class Matricula extends Component
             'matricula.xlsx'
         );
     }
+
     public function restaurarFiltrosMatricula(array $filtros): void
     {
         // Se restauran los filtros en el mismo orden de dependencia de los selects.
@@ -505,9 +752,8 @@ class Matricula extends Component
 
         $this->semestre_id = null;
         $this->grupo_id = null;
-        $this->selected = [];
-        $this->selectPage = false;
-        $this->nuevo_grado_id = null;
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
 
         // Primero se reconstruyen los semestres si el nivel es bachillerato.
         $this->semestres = $this->esBachillerato()
@@ -556,6 +802,8 @@ class Matricula extends Component
             'rows' => $rows,
             'personal' => $personal,
             'esBachillerato' => $this->esBachillerato(),
+            'nuevosSemestres' => $this->nuevosSemestres,
+            'nuevosGrupos' => $this->nuevosGrupos,
         ]);
     }
 }

@@ -312,8 +312,8 @@
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
                         wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                         :disabled="$esBachillerato
-                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ (string) $grupo->id }}">
@@ -388,7 +388,7 @@
                 <section class="mb-3">
                     <div class="relative">
                         <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search">
+                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
                             @if ($personal->isEmpty())
                                 <div
                                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
@@ -488,18 +488,35 @@
                         </div>
                     </div>
 
-                    @if (!$esBachillerato)
-                        <div class="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
-                            <div class="flex flex-col gap-3 sm:flex-row">
-                                <div class="w-full sm:max-w-xs">
+                    <div
+                        class="mb-5 overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+                        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
+
+                        <div class="p-5 sm:p-6">
+                            <div class="mb-4 flex flex-col gap-1">
+                                <h3 class="text-sm font-bold text-slate-800 dark:text-white">
+                                    {{ $esBachillerato ? 'Cambio masivo de grado, semestre y grupo' : 'Cambio masivo de grado y grupo' }}
+                                </h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    {{ $esBachillerato
+                                        ? 'Para bachillerato se actualiza el grado, semestre y grupo destino para evitar inconsistencias.'
+                                        : 'Para básica se actualiza el grado y también el grupo destino para evitar inconsistencias.' }}
+                                </p>
+                            </div>
+
+                            <div
+                                class="grid grid-cols-1 gap-3 {{ $esBachillerato ? 'xl:grid-cols-[1fr_1fr_1fr_auto_auto]' : 'xl:grid-cols-[1fr_1fr_auto_auto]' }} xl:items-end">
+                                <div>
                                     <label for="nuevo_grado_id"
                                         class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                        Cambiar grado a seleccionados
+                                        Grado destino
                                     </label>
-                                    <select id="nuevo_grado_id" wire:model="nuevo_grado_id"
-                                        @disabled($this->selectedCount === 0)
+
+                                    <select id="nuevo_grado_id" wire:model.live="nuevo_grado_id"
+                                        @disabled($this->selectedCount === 0 || !$generacion_id)
                                         class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
                                         <option value="">Selecciona un grado</option>
+
                                         @foreach ($grados as $grado)
                                             <option value="{{ $grado->id }}">
                                                 {{ $grado->nombre }}
@@ -511,12 +528,75 @@
                                         <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
                                     @enderror
                                 </div>
-                            </div>
 
-                            <div class="flex items-end">
+                                @if ($esBachillerato)
+                                    <div>
+                                        <label for="nuevo_semestre_id"
+                                            class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                            Semestre destino
+                                        </label>
+
+                                        <select id="nuevo_semestre_id" wire:model.live="nuevo_semestre_id"
+                                            @disabled($this->selectedCount === 0 || !$generacion_id || !$nuevo_grado_id || $nuevosSemestres->isEmpty())
+                                            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-violet-900/40">
+                                            <option value="">Selecciona un semestre</option>
+
+                                            @foreach ($nuevosSemestres as $semestreDestino)
+                                                <option value="{{ $semestreDestino->id }}">
+                                                    Semestre {{ $semestreDestino->numero }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+
+                                        @error('nuevo_semestre_id')
+                                            <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+                                        @enderror
+
+                                        @if ($nuevo_grado_id && $nuevosSemestres->isEmpty())
+                                            <p class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                No hay semestres registrados para ese grado.
+                                            </p>
+                                        @endif
+                                    </div>
+                                @endif
+
+                                <div>
+                                    <label for="nuevo_grupo_id"
+                                        class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        Grupo destino
+                                    </label>
+
+                                    <select id="nuevo_grupo_id" wire:model.live="nuevo_grupo_id"
+                                        @disabled(
+                                            $this->selectedCount === 0 ||
+                                                !$generacion_id ||
+                                                !$nuevo_grado_id ||
+                                                ($esBachillerato && !$nuevo_semestre_id) ||
+                                                $nuevosGrupos->isEmpty())
+                                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
+                                        <option value="">Selecciona un grupo</option>
+
+                                        @foreach ($nuevosGrupos as $grupoDestino)
+                                            <option value="{{ $grupoDestino->id }}">
+                                                Grupo {{ $grupoDestino->nombre }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @error('nuevo_grupo_id')
+                                        <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+                                    @enderror
+
+                                    @if ($generacion_id && $nuevo_grado_id && (!$esBachillerato || $nuevo_semestre_id) && $nuevosGrupos->isEmpty())
+                                        <p class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                            No hay grupos registrados para el destino seleccionado.
+                                        </p>
+                                    @endif
+                                </div>
+
                                 <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
                                     wire:target="exportarMatricula"
-                                    class="mr-3 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
                                     <span wire:loading.remove wire:target="exportarMatricula">
                                         <div class="flex justify-between gap-2">
                                             <flux:icon.download class="h-4 w-4" />
@@ -530,7 +610,12 @@
                                 </button>
 
                                 <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
-                                    wire:target="aplicarCambiarGrado"
+                                    wire:target="aplicarCambiarGrado" @disabled(
+                                        $this->selectedCount === 0 ||
+                                            !$generacion_id ||
+                                            !$nuevo_grado_id ||
+                                            ($esBachillerato && !$nuevo_semestre_id) ||
+                                            !$nuevo_grupo_id)
                                     class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
                                     <span wire:loading.remove wire:target="aplicarCambiarGrado">
                                         Aplicar cambio
@@ -541,29 +626,19 @@
                                     </span>
                                 </button>
                             </div>
-                        </div>
-                    @else
-                        <div class="mb-5 flex justify-end">
-                            <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
-                                wire:target="exportarMatricula"
-                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
-                                <span wire:loading.remove wire:target="exportarMatricula">
-                                    <div class="flex justify-between gap-2">
-                                        <flux:icon.download class="h-4 w-4" />
-                                        Exportar Excel
-                                    </div>
-                                </span>
 
-                                <span wire:loading wire:target="exportarMatricula">
-                                    Descargando...
-                                </span>
-                            </button>
+                            @if (!$generacion_id)
+                                <p class="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    Selecciona una generación para poder cargar los destinos disponibles.
+                                </p>
+                            @endif
                         </div>
-                    @endif
+                    </div>
 
                     <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,search">
-                        <div wire:loading.flex wire:target="generacion_id,grado_id,semestre_id,grupo_id,search"
+                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
+                        <div wire:loading.flex
+                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado"
                             class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">
