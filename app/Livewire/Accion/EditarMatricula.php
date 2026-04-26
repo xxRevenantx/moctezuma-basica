@@ -81,6 +81,8 @@ class EditarMatricula extends Component
     public Collection $ciclosOptions;
     public Collection $tutores;
 
+    public bool $activo = true;
+
     public function mount(string $slug_nivel, Inscripcion $inscripcion): void
     {
         $this->slug_nivel = $slug_nivel;
@@ -139,6 +141,8 @@ class EditarMatricula extends Component
         $this->grupo_id = $inscripcion->grupo_id ? (int) $inscripcion->grupo_id : null;
         $this->foto_actual = $inscripcion->foto_path;
         $this->foto = null;
+
+        $this->activo = (bool) $inscripcion->activo;
 
         $this->esBachillerato = $this->nivelEsBachillerato($this->nivel_id);
 
@@ -826,6 +830,7 @@ class EditarMatricula extends Component
             'grupo_id' => ['required', 'integer', 'exists:grupos,id'],
             'tutor_id' => ['nullable', 'integer', 'exists:tutores,id'],
             'copiar_direccion_tutor' => ['boolean'],
+            'activo' => ['required', 'boolean'],
             'foto' => ['nullable', 'image', 'max:2048'],
         ];
 
@@ -864,7 +869,17 @@ class EditarMatricula extends Component
             'tutor_id.exists' => 'El tutor seleccionado no es válido.',
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe exceder 2MB.',
+            'activo.required' => 'El estado de activo es obligatorio.',
+            'activo.boolean' => 'El estado de activo debe ser verdadero o falso.',
         ];
+    }
+
+    public function updatedActivo($value): void
+    {
+        // Normalizo el valor del switch a booleano.
+        $this->activo = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+
+        $this->validateOnly('activo');
     }
 
     protected function sanitizeStrings(): void
@@ -968,6 +983,7 @@ class EditarMatricula extends Component
             'grupo_id' => (int) $data['grupo_id'],
             'foto_path' => $fotoPath,
             'tutor_id' => $data['tutor_id'] ? (int) $data['tutor_id'] : null,
+            'activo' => (bool) $data['activo'],
         ]);
 
         $this->foto = null;

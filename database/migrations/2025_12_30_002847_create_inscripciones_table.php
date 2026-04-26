@@ -103,7 +103,14 @@ return new class extends Migration {
              * ========================= */
             $table->boolean('activo')->default(true);
 
-            $table->dateTime('fecha_inscripcion');
+            $table->dateTime('fecha_baja')->nullable();
+
+            $table->string('motivo_baja')->nullable();
+
+
+            $table->string('observaciones_baja')->nullable();
+
+            $table->dateTime('fecha_inscripcion')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

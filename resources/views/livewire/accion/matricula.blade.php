@@ -312,8 +312,8 @@
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
                         wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                         :disabled="$esBachillerato
-                                                                                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ (string) $grupo->id }}">
@@ -464,14 +464,7 @@
                 {{-- Sección lista de alumnos --}}
                 <section>
                     <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-800 dark:text-white">
-                                Lista de alumnos
-                            </h2>
-                            <p class="text-sm text-slate-500 dark:text-slate-400">
-                                Registros filtrados por generación, grado y grupo.
-                            </p>
-                        </div>
+
 
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                             <label
@@ -493,15 +486,20 @@
                         <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
 
                         <div class="p-5 sm:p-6">
-                            <div class="mb-4 flex flex-col gap-1">
-                                <h3 class="text-sm font-bold text-slate-800 dark:text-white">
-                                    {{ $esBachillerato ? 'Cambio masivo de grado, semestre y grupo' : 'Cambio masivo de grado y grupo' }}
-                                </h3>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $esBachillerato
-                                        ? 'Para bachillerato se actualiza el grado, semestre y grupo destino para evitar inconsistencias.'
-                                        : 'Para básica se actualiza el grado y también el grupo destino para evitar inconsistencias.' }}
-                                </p>
+                            <div class="mb-5 flex flex-col gap-4">
+                                <div class="flex flex-col gap-1">
+                                    <h3 class="text-sm font-bold text-slate-800 dark:text-white">
+                                        {{ $esBachillerato ? 'Cambio masivo de grado, semestre y grupo' : 'Cambio masivo de grado y grupo' }}
+                                    </h3>
+
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $esBachillerato
+                                            ? 'Para bachillerato se actualiza el grado, semestre y grupo destino para evitar inconsistencias.'
+                                            : 'Para básica se actualiza el grado y también el grupo destino para evitar inconsistencias.' }}
+                                    </p>
+                                </div>
+
+
                             </div>
 
                             <div
@@ -632,6 +630,118 @@
                                     Selecciona una generación para poder cargar los destinos disponibles.
                                 </p>
                             @endif
+                        </div>
+                    </div>
+
+                    {{-- BADGES DE ESTADÍSTICA SEGÚN FILTRO DE MATRÍCULA --}}
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 my-4">
+                        {{-- Total --}}
+                        <div
+                            class="group relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-800">
+
+                            <div
+                                class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-slate-300/20 blur-2xl dark:bg-slate-500/10">
+                            </div>
+
+                            <div class="relative flex items-center justify-between gap-3">
+                                <div>
+                                    <p
+                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                        Total filtrado
+                                    </p>
+
+                                    <p class="mt-1 text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+                                        {{ $total }}
+                                    </p>
+
+                                    <p class="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        Alumnos encontrados
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-neutral-900">
+                                    <flux:icon.users class="h-6 w-6" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Hombres --}}
+                        <div
+                            class="group relative overflow-hidden rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-blue-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/30 dark:via-neutral-900 dark:to-blue-950/30">
+
+                            <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-400/20 blur-2xl">
+                            </div>
+
+                            <div class="relative flex items-center justify-between gap-3">
+                                <div>
+                                    <p
+                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                                        Hombres
+                                    </p>
+
+                                    <div class="mt-1 flex items-end gap-2">
+                                        <p class="text-3xl font-black tracking-tight text-sky-900 dark:text-sky-100">
+                                            {{ $hombres }}
+                                        </p>
+
+                                        @if ($total > 0)
+                                            <span
+                                                class="mb-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">
+                                                {{ number_format(($hombres / $total) * 100, 1) }}%
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <p class="mt-1 text-xs font-medium text-sky-700/70 dark:text-sky-300/70">
+                                        Según matrícula filtrada
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25">
+                                    <flux:icon.user class="h-6 w-6" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Mujeres --}}
+                        <div
+                            class="group relative overflow-hidden rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 via-white to-fuchsia-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-pink-500/10 dark:border-pink-900/40 dark:from-pink-950/30 dark:via-neutral-900 dark:to-fuchsia-950/30">
+
+                            <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-pink-400/20 blur-2xl">
+                            </div>
+
+                            <div class="relative flex items-center justify-between gap-3">
+                                <div>
+                                    <p
+                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-pink-700 dark:text-pink-300">
+                                        Mujeres
+                                    </p>
+
+                                    <div class="mt-1 flex items-end gap-2">
+                                        <p class="text-3xl font-black tracking-tight text-pink-900 dark:text-pink-100">
+                                            {{ $mujeres }}
+                                        </p>
+
+                                        @if ($total > 0)
+                                            <span
+                                                class="mb-1 rounded-full bg-pink-100 px-2 py-0.5 text-[11px] font-bold text-pink-700 dark:bg-pink-950/60 dark:text-pink-300">
+                                                {{ number_format(($mujeres / $total) * 100, 1) }}%
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <p class="mt-1 text-xs font-medium text-pink-700/70 dark:text-pink-300/70">
+                                        Según matrícula filtrada
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/25">
+                                    <flux:icon.user-round class="h-6 w-6" />
+                                </div>
+                            </div>
                         </div>
                     </div>
 

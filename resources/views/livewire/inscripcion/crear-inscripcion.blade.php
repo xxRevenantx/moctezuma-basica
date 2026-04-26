@@ -31,6 +31,26 @@
                     </div>
                 </div>
 
+                @if ($curpSuccess)
+                    <div x-data="{ mostrar: true }" x-init="setTimeout(() => {
+                        mostrar = false
+                    
+                        setTimeout(() => {
+                            $wire.dispatch('limpiar-curp-success')
+                        }, 500)
+                    }, 2000)" x-show="mostrar"
+                        x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave="transition ease-in duration-500"
+                        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+                        class="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        <p class="font-semibold">CURP encontrada</p>
+                        <p class="mt-1">{{ $curpSuccess }}</p>
+                    </div>
+                @endif
+
                 {{-- DATOS PERSONALES --}}
                 <section class="space-y-5">
                     <div class="flex items-center gap-3">
@@ -38,6 +58,7 @@
                             class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                             <flux:icon.user class="h-5 w-5" />
                         </div>
+
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 dark:text-white">
                                 Datos personales
@@ -57,8 +78,22 @@
                                     Obligatorio
                                 </span>
                             </div>
-                            <flux:input wire:model.live.debounce.500ms="curp" maxlength="18"
-                                placeholder="Ingresa la CURP" />
+                            <flux:input wire:model.live="curp" maxlength="18" placeholder="Ingresa la CURP" />
+                            @if ($curpAdvertencia)
+                                <div
+                                    class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                    <p class="font-semibold">Advertencia sobre la CURP</p>
+                                    <p class="mt-1">{{ $curpAdvertencia }}</p>
+                                </div>
+                            @endif
+
+                            @if ($curpError)
+                                <div
+                                    class="mt-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                                    <p class="font-semibold">Error en la CURP</p>
+                                    <p class="mt-1">{{ $curpError }}</p>
+                                </div>
+                            @endif
                             @error('curp')
                                 <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror

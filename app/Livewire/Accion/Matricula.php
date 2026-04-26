@@ -83,7 +83,7 @@ class Matricula extends Component
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('status', 1)
-            ->orderBy('anio_ingreso')
+            ->orderBy('anio_ingreso', 'desc')
             ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
 
         $this->semestres = collect();
@@ -188,7 +188,9 @@ class Matricula extends Component
                 'semestre:id,numero',
                 'generacion:id,anio_ingreso,anio_egreso',
             ])
-            ->where('nivel_id', $this->nivel->id);
+            ->where('nivel_id', $this->nivel->id)
+            ->where('activo', 1)
+        ;
 
         if ($this->generacion_id) {
             $query->where('generacion_id', $this->generacion_id);

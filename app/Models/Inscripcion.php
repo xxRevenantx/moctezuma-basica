@@ -58,6 +58,9 @@ class Inscripcion extends Model
         // Control
         'activo',
 
+        'fecha_baja',
+        'motivo_baja',
+        'observaciones_baja',
         'fecha_inscripcion',
     ];
 
