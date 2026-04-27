@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -28,6 +29,8 @@ class EditarMatricula extends Component
     // CURP API
     public bool $consultandoCurp = false;
     public ?string $curpError = null;
+    public ?string $curpAdvertencia = null;
+    public ?string $curpSuccess = null;
     public ?string $ultimaCurpConsultada = null;
 
     // Datos personales
@@ -98,7 +101,6 @@ class EditarMatricula extends Component
         $this->cargarInscripcion($inscripcion);
     }
 
-    // Este método carga la inscripción actual y prepara los selects sin romper su relación.
     protected function cargarInscripcion(Inscripcion $inscripcion): void
     {
         $this->InscripcionId = (int) $inscripcion->id;
@@ -109,13 +111,17 @@ class EditarMatricula extends Component
         $this->nombre = (string) $inscripcion->nombre;
         $this->apellido_paterno = (string) $inscripcion->apellido_paterno;
         $this->apellido_materno = $inscripcion->apellido_materno;
+
         $this->fecha_nacimiento = $inscripcion->fecha_nacimiento
             ? Carbon::parse($inscripcion->fecha_nacimiento)->format('Y-m-d')
             : null;
+
         $this->genero = $inscripcion->genero;
+
         $this->fecha_inscripcion = $inscripcion->fecha_inscripcion
             ? Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
             : null;
+
         $this->ciclo_id = $inscripcion->ciclo_id ? (int) $inscripcion->ciclo_id : null;
 
         $this->pais_nacimiento = $inscripcion->pais_nacimiento;
@@ -139,6 +145,7 @@ class EditarMatricula extends Component
         $this->generacion_id = $inscripcion->generacion_id ? (int) $inscripcion->generacion_id : null;
         $this->semestre_id = $inscripcion->semestre_id ? (int) $inscripcion->semestre_id : null;
         $this->grupo_id = $inscripcion->grupo_id ? (int) $inscripcion->grupo_id : null;
+
         $this->foto_actual = $inscripcion->foto_path;
         $this->foto = null;
 
@@ -152,9 +159,18 @@ class EditarMatricula extends Component
         $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
 
         $this->curpError = null;
+        $this->curpAdvertencia = null;
+        $this->curpSuccess = null;
         $this->ultimaCurpConsultada = $this->curp;
         $this->consultandoCurp = false;
+
         $this->resetValidation();
+    }
+
+    #[On('limpiar-curp-success')]
+    public function limpiarCurpSuccess(): void
+    {
+        $this->curpSuccess = null;
     }
 
     private function titleCaseNombre(?string $value): string
@@ -171,7 +187,11 @@ class EditarMatricula extends Component
         $palabrasMinusculas = ['De', 'Del', 'La', 'Las', 'Los', 'Y', 'E', 'San', 'Santa', 'Van', 'Von'];
 
         foreach ($palabrasMinusculas as $palabra) {
-            $value = preg_replace('/\b' . preg_quote($palabra, '/') . '\b/u', mb_strtolower($palabra, 'UTF-8'), $value) ?? $value;
+            $value = preg_replace(
+                '/\b' . preg_quote($palabra, '/') . '\b/u',
+                mb_strtolower($palabra, 'UTF-8'),
+                $value
+            ) ?? $value;
         }
 
         return preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
@@ -203,16 +223,39 @@ class EditarMatricula extends Component
         return (string) now()->year;
     }
 
-    protected function generarMatriculaConSlug(string $slug): ?string
+    protected function claveParaMatricula(): string
     {
-        if (strlen($this->curp) !== 18 || !preg_match('/^[A-Z0-9]{18}$/', $this->curp)) {
-            return null;
+        $curpLimpia = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $this->curp));
+
+        if ($curpLimpia !== '') {
+            return str_pad(substr($curpLimpia, 0, 4), 4, 'X');
         }
 
+        $iniciales = '';
+
+        $partes = [
+            $this->nombre,
+            $this->apellido_paterno,
+            $this->apellido_materno,
+        ];
+
+        foreach ($partes as $parte) {
+            $parte = trim((string) $parte);
+
+            if ($parte !== '') {
+                $iniciales .= mb_substr($parte, 0, 1);
+            }
+        }
+
+        $iniciales = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $iniciales));
+
+        return str_pad(substr($iniciales ?: 'ALUM', 0, 4), 4, 'X');
+    }
+
+    protected function generarMatriculaConSlug(string $slug): ?string
+    {
         $actual = $this->InscripcionId ? Inscripcion::query()->find($this->InscripcionId) : null;
 
-        // Se conserva la matrícula si no cambió la CURP, el nivel ni la generación.
-        // Si cambia la asignación escolar principal, se genera otra para evitar prefijos inconsistentes.
         if (
             $actual
             && $actual->curp === $this->curp
@@ -225,11 +268,11 @@ class EditarMatricula extends Component
 
         $anio = $this->anioInicioCiclo();
         $nivel = $this->nivelCodeBySlug($slug);
-        $curp4 = strtoupper(substr($this->curp, 0, 4));
+        $clave = $this->claveParaMatricula();
 
         for ($i = 0; $i < 50; $i++) {
             $nn = str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT);
-            $matricula = "{$anio}{$nivel}{$curp4}{$nn}";
+            $matricula = "{$anio}{$nivel}{$clave}{$nn}";
 
             $existe = Inscripcion::query()
                 ->where('matricula', $matricula)
@@ -243,7 +286,7 @@ class EditarMatricula extends Component
 
         for ($i = 0; $i < 50; $i++) {
             $nnnn = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            $matricula = "{$anio}{$nivel}{$curp4}{$nnnn}";
+            $matricula = "{$anio}{$nivel}{$clave}{$nnnn}";
 
             $existe = Inscripcion::query()
                 ->where('matricula', $matricula)
@@ -285,14 +328,27 @@ class EditarMatricula extends Component
     {
         $this->curp = strtoupper(trim($value));
         $this->curpError = null;
+        $this->curpAdvertencia = null;
+        $this->curpSuccess = null;
 
-        if (strlen($this->curp) !== 18) {
+        $this->curp = preg_replace('/\s+/', '', $this->curp) ?? $this->curp;
+
+        if ($this->curp === '') {
             $this->ultimaCurpConsultada = null;
+            $this->matricula = '';
             return;
         }
 
-        if (!preg_match('/^[A-Z0-9]{18}$/', $this->curp)) {
-            $this->curpError = 'Formato de CURP inválido.';
+        if (!preg_match('/^[A-Z0-9]{1,18}$/', $this->curp)) {
+            $this->curpError = 'La CURP solo debe contener letras y números.';
+            return;
+        }
+
+        if (strlen($this->curp) < 18) {
+            $this->ultimaCurpConsultada = null;
+            $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. No se consultó en RENAPO, pero puedes continuar y llenar la matrícula.';
+            $this->refrescarMatriculaSiPosible();
+            $this->resetValidation('curp');
             return;
         }
 
@@ -311,21 +367,29 @@ class EditarMatricula extends Component
             $payload = $curpService->obtenerDatosPorCurp($this->curp);
         } catch (\Throwable $e) {
             $this->consultandoCurp = false;
-            $this->curpError = 'Error al consultar la CURP. Intenta nuevamente.';
+            $this->curpAdvertencia = 'No fue posible consultar la CURP en RENAPO. Puedes continuar capturando la información manualmente.';
+            $this->refrescarMatriculaSiPosible();
             return;
         }
 
         $this->consultandoCurp = false;
 
         if (!isset($payload['error']) || $payload['error'] === true) {
-            $this->curpError = $payload['error_msg'] ?? $payload['message'] ?? 'CURP inválido o error de conexión.';
+            $this->curpAdvertencia = $payload['error_msg']
+                ?? $payload['message']
+                ?? 'La CURP no existe en RENAPO o no fue posible validarla. Puedes continuar capturando la información manualmente.';
+
+            $this->refrescarMatriculaSiPosible();
+            $this->resetValidation('curp');
+
             return;
         }
 
         $solicitante = data_get($payload, 'response.Solicitante');
 
         if (!$solicitante || !is_array($solicitante)) {
-            $this->curpError = 'No se pudieron obtener los datos de la CURP.';
+            $this->curpAdvertencia = 'La CURP fue consultada, pero RENAPO no regresó datos completos. Puedes continuar capturando la información manualmente.';
+            $this->refrescarMatriculaSiPosible();
             return;
         }
 
@@ -336,11 +400,13 @@ class EditarMatricula extends Component
         $this->apellido_materno = $apellidoMaterno ? $this->titleCaseNombre((string) $apellidoMaterno) : null;
 
         $fechaApi = data_get($solicitante, 'FechaNacimiento');
+
         if (!empty($fechaApi)) {
             $this->fecha_nacimiento = $fechaApi;
         }
 
         $sexo = strtoupper((string) data_get($solicitante, 'ClaveSexo', ''));
+
         if (in_array($sexo, ['H', 'M'], true)) {
             $this->genero = $sexo;
         }
@@ -351,7 +417,9 @@ class EditarMatricula extends Component
 
         $this->sanitizeStrings();
         $this->refrescarMatriculaSiPosible();
-        $this->validateOnly('curp');
+
+        $this->curpSuccess = 'La CURP se cargó correctamente y se encuentra registrada en RENAPO.';
+        $this->resetValidation('curp');
     }
 
     protected function loadTutores(): Collection
@@ -584,9 +652,13 @@ class EditarMatricula extends Component
             ->get(['id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre']);
 
         return $rows->map(function ($grupo) {
-            $generacion = $grupo->generacion ? "{$grupo->generacion->anio_ingreso}–{$grupo->generacion->anio_egreso}" : null;
+            $generacion = $grupo->generacion
+                ? "{$grupo->generacion->anio_ingreso}–{$grupo->generacion->anio_egreso}"
+                : null;
+
             $semestre = $grupo->semestre ? "Semestre {$grupo->semestre->numero}" : null;
             $grado = $grupo->grado ? "Grado {$grupo->grado->nombre}" : null;
+
             $partes = $this->esBachillerato
                 ? collect([$semestre, "Grupo {$grupo->nombre}"])->filter()->implode(' — ')
                 : collect([$grado, "Grupo {$grupo->nombre}"])->filter()->implode(' — ');
@@ -615,6 +687,7 @@ class EditarMatricula extends Component
         $this->generacion_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+
         $this->gradosOptions = collect();
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
@@ -642,6 +715,7 @@ class EditarMatricula extends Component
         $this->generacion_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
@@ -660,6 +734,7 @@ class EditarMatricula extends Component
         $this->generacion_id = $value ? (int) $value : null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
 
@@ -690,7 +765,9 @@ class EditarMatricula extends Component
     {
         $this->semestre_id = $value ? (int) $value : null;
         $this->grupo_id = null;
+
         $this->resetValidation(['grupo_id']);
+
         $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
     }
 
@@ -796,8 +873,8 @@ class EditarMatricula extends Component
             'curp' => [
                 'required',
                 'string',
-                'size:18',
-                'regex:/^[A-Z0-9]{18}$/i',
+                'max:18',
+                'regex:/^[A-Z0-9]{1,18}$/i',
                 Rule::unique('inscripciones', 'curp')->ignore($this->InscripcionId),
             ],
             'matricula' => [
@@ -814,9 +891,11 @@ class EditarMatricula extends Component
             'genero' => ['required', 'in:H,M'],
             'fecha_inscripcion' => ['required', 'date'],
             'ciclo_id' => ['required', 'integer', 'exists:ciclos,id'],
+
             'pais_nacimiento' => ['nullable', 'string', 'max:255'],
             'estado_nacimiento' => ['nullable', 'string', 'max:255'],
             'lugar_nacimiento' => ['nullable', 'string', 'max:255'],
+
             'calle' => ['nullable', 'string', 'max:255'],
             'numero_exterior' => ['nullable', 'string', 'max:20'],
             'numero_interior' => ['nullable', 'string', 'max:20'],
@@ -825,9 +904,11 @@ class EditarMatricula extends Component
             'municipio' => ['nullable', 'string', 'max:255'],
             'estado_residencia' => ['nullable', 'string', 'max:255'],
             'ciudad_residencia' => ['nullable', 'string', 'max:255'],
+
             'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
             'generacion_id' => ['required', 'integer', 'exists:generaciones,id'],
             'grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+
             'tutor_id' => ['nullable', 'integer', 'exists:tutores,id'],
             'copiar_direccion_tutor' => ['boolean'],
             'activo' => ['required', 'boolean'],
@@ -849,26 +930,32 @@ class EditarMatricula extends Component
     {
         return [
             'curp.required' => 'La CURP es obligatoria.',
-            'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
-            'curp.regex' => 'La CURP debe contener solo letras y números.',
+            'curp.max' => 'La CURP no debe tener más de 18 caracteres.',
+            'curp.regex' => 'La CURP solo debe contener letras y números.',
             'curp.unique' => 'Esa CURP ya existe.',
+
             'matricula.required' => 'La matrícula es obligatoria.',
             'matricula.unique' => 'Esa matrícula ya existe.',
+
             'nombre.required' => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
             'fecha_inscripcion.required' => 'La fecha de inscripción es obligatoria.',
             'ciclo_id.required' => 'Selecciona un ciclo.',
+
             'nivel_id.required' => 'Selecciona un nivel.',
             'grado_id.required' => 'Selecciona un grado.',
             'generacion_id.required' => 'Selecciona una generación.',
             'semestre_id.required' => 'Selecciona un semestre.',
             'grupo_id.required' => 'Selecciona un grupo.',
+
             'codigo_postal.regex' => 'El código postal debe tener 5 dígitos.',
             'tutor_id.exists' => 'El tutor seleccionado no es válido.',
+
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe exceder 2MB.',
+
             'activo.required' => 'El estado de activo es obligatorio.',
             'activo.boolean' => 'El estado de activo debe ser verdadero o falso.',
         ];
@@ -876,15 +963,14 @@ class EditarMatricula extends Component
 
     public function updatedActivo($value): void
     {
-        // Normalizo el valor del switch a booleano.
         $this->activo = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-
         $this->validateOnly('activo');
     }
 
     protected function sanitizeStrings(): void
     {
         $requiredStringFields = ['curp', 'matricula', 'nombre', 'apellido_paterno'];
+
         $nullableStringFields = [
             'folio',
             'apellido_materno',
@@ -917,7 +1003,7 @@ class EditarMatricula extends Component
             }
         }
 
-        $this->curp = strtoupper($this->curp);
+        $this->curp = strtoupper(preg_replace('/\s+/', '', $this->curp) ?? $this->curp);
         $this->matricula = strtoupper($this->matricula);
     }
 
@@ -965,9 +1051,11 @@ class EditarMatricula extends Component
             'genero' => $data['genero'],
             'fecha_inscripcion' => $data['fecha_inscripcion'],
             'ciclo_id' => (int) $data['ciclo_id'],
+
             'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
             'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
             'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
+
             'calle' => $data['calle'] ?? null,
             'numero_exterior' => $data['numero_exterior'] ?? null,
             'numero_interior' => $data['numero_interior'] ?? null,
@@ -976,17 +1064,20 @@ class EditarMatricula extends Component
             'municipio' => $data['municipio'] ?? null,
             'estado_residencia' => $data['estado_residencia'] ?? null,
             'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
+
             'nivel_id' => (int) $data['nivel_id'],
             'grado_id' => (int) $data['grado_id'],
             'generacion_id' => (int) $data['generacion_id'],
             'semestre_id' => $data['semestre_id'] ? (int) $data['semestre_id'] : null,
             'grupo_id' => (int) $data['grupo_id'],
+
             'foto_path' => $fotoPath,
             'tutor_id' => $data['tutor_id'] ? (int) $data['tutor_id'] : null,
             'activo' => (bool) $data['activo'],
         ]);
 
         $this->foto = null;
+
         $inscripcion->refresh();
         $this->cargarInscripcion($inscripcion);
 

@@ -200,6 +200,26 @@
                     </div>
                 </div>
 
+                @if (!empty($curpSuccess ?? null))
+                    <div x-data="{ mostrar: true }" x-init="setTimeout(() => {
+                        mostrar = false
+                    
+                        setTimeout(() => {
+                            $wire.dispatch('limpiar-curp-success')
+                        }, 500)
+                    }, 2000)" x-show="mostrar"
+                        x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave="transition ease-in duration-500"
+                        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+                        class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        <p class="font-semibold">CURP encontrada</p>
+                        <p class="mt-1">{{ $curpSuccess ?? '' }}</p>
+                    </div>
+                @endif
+
                 {{-- DATOS PERSONALES --}}
                 <section class="space-y-5">
                     <div
@@ -237,13 +257,25 @@
                             <flux:input wire:model.live.debounce.500ms="curp" maxlength="18"
                                 placeholder="Ingresa la CURP" />
 
+                            @if (!empty($curpAdvertencia ?? null))
+                                <div
+                                    class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                    <p class="font-semibold">Advertencia sobre la CURP</p>
+                                    <p class="mt-1">{{ $curpAdvertencia ?? '' }}</p>
+                                </div>
+                            @endif
+
+                            @if (!empty($curpError ?? null))
+                                <div
+                                    class="mt-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                                    <p class="font-semibold">Error en la CURP</p>
+                                    <p class="mt-1">{{ $curpError ?? '' }}</p>
+                                </div>
+                            @endif
+
                             @error('curp')
                                 <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror
-
-                            @if ($curpError)
-                                <p class="mt-2 text-xs font-semibold text-amber-600">{{ $curpError }}</p>
-                            @endif
                         </div>
 
                         <div>
@@ -424,14 +456,22 @@
                                 <h2 class="text-lg font-bold text-slate-800 dark:text-white">
                                     Asignación escolar
                                 </h2>
+
                                 <p class="text-sm text-slate-500 dark:text-slate-400">
-                                    En bachillerato el grupo depende de la generación y el semestre.
+                                    @if ($esBachillerato)
+                                        En bachillerato el grupo depende de la generación y el semestre.
+                                    @else
+                                        Selecciona el nivel, grado, generación y grupo del alumno.
+                                    @endif
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <div
+                        class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $esBachillerato ? 'xl:grid-cols-4' : 'xl:grid-cols-5' }}">
+
+                        {{-- NIVEL --}}
                         <div>
                             <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Nivel</flux:label>
@@ -441,7 +481,8 @@
                                 </span>
                             </div>
 
-                            <flux:select wire:model.live="nivel_id">
+                            <flux:select wire:model.live="nivel_id"
+                                wire:key="nivel-select-{{ $nivel_id ?? 'sin-nivel' }}">
                                 <flux:select.option value="">Selecciona un nivel</flux:select.option>
 
                                 @foreach ($niveles as $nivel)
@@ -456,30 +497,37 @@
                             @enderror
                         </div>
 
-                        <div>
-                            <div class="mb-1 flex items-center gap-2">
-                                <flux:label>Grado</flux:label>
-                                <span
-                                    class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                    Obligatorio
-                                </span>
+                        {{-- GRADO SOLO PARA PREESCOLAR, PRIMARIA Y SECUNDARIA --}}
+                        @if (!$esBachillerato)
+                            <div>
+                                <div class="mb-1 flex items-center gap-2">
+                                    <flux:label>Grado</flux:label>
+                                    <span
+                                        class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                        Obligatorio
+                                    </span>
+                                </div>
+
+                                <flux:select wire:model.live="grado_id"
+                                    wire:key="grado-select-{{ $nivel_id ?? 'sin-nivel' }}"
+                                    :disabled="!$nivel_id || $grados->isEmpty()">
+
+                                    <flux:select.option value="">Selecciona un grado</flux:select.option>
+
+                                    @foreach ($grados as $grado)
+                                        <flux:select.option value="{{ $grado->id }}">
+                                            {{ $grado->nombre }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+
+                                @error('grado_id')
+                                    <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                                @enderror
                             </div>
+                        @endif
 
-                            <flux:select wire:model.live="grado_id" :disabled="!$nivel_id || $grados->isEmpty()">
-                                <flux:select.option value="">Selecciona un grado</flux:select.option>
-
-                                @foreach ($grados as $grado)
-                                    <flux:select.option value="{{ $grado->id }}">
-                                        {{ $grado->nombre }}
-                                    </flux:select.option>
-                                @endforeach
-                            </flux:select>
-
-                            @error('grado_id')
-                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
+                        {{-- GENERACIÓN --}}
                         <div>
                             <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Generación</flux:label>
@@ -490,7 +538,9 @@
                             </div>
 
                             <flux:select wire:model.live="generacion_id"
-                                :disabled="!$grado_id || $generaciones->isEmpty()">
+                                wire:key="generacion-select-{{ $nivel_id ?? 'sin-nivel' }}-{{ $grado_id ?? 'sin-grado' }}-{{ $esBachillerato ? 'bachillerato' : 'basica' }}"
+                                :disabled="!$nivel_id || (!$esBachillerato && !$grado_id) || $generaciones->isEmpty()">
+
                                 <flux:select.option value="">Selecciona una generación</flux:select.option>
 
                                 @foreach ($generaciones as $generacion)
@@ -505,6 +555,7 @@
                             @enderror
                         </div>
 
+                        {{-- SEMESTRE SOLO PARA BACHILLERATO --}}
                         @if ($esBachillerato)
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
@@ -516,7 +567,9 @@
                                 </div>
 
                                 <flux:select wire:model.live="semestre_id"
+                                    wire:key="semestre-select-{{ $nivel_id ?? 'sin-nivel' }}-{{ $generacion_id ?? 'sin-generacion' }}"
                                     :disabled="!$generacion_id || $semestres->isEmpty()">
+
                                     <flux:select.option value="">Selecciona un semestre</flux:select.option>
 
                                     @foreach ($semestres as $semestre)
@@ -532,6 +585,7 @@
                             </div>
                         @endif
 
+                        {{-- GRUPO --}}
                         <div>
                             <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Grupo</flux:label>
@@ -542,7 +596,10 @@
                             </div>
 
                             <flux:select wire:model.live="grupo_id"
-                                :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || empty($grupos)">
+                                wire:key="grupo-select-{{ $nivel_id ?? 'sin-nivel' }}-{{ $grado_id ?? 'sin-grado' }}-{{ $generacion_id ?? 'sin-generacion' }}-{{ $semestre_id ?? 'sin-semestre' }}"
+                                :disabled="!$generacion_id || (!$esBachillerato && !$grado_id) || ($esBachillerato && !
+                                    $semestre_id) || empty($grupos)">
+
                                 <flux:select.option value="">Selecciona un grupo</flux:select.option>
 
                                 @foreach ($grupos as $grupo)
@@ -561,8 +618,9 @@
                     @if ($esBachillerato)
                         <div
                             class="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                            En bachillerato primero se selecciona la <b>generación</b>, después el <b>semestre</b> y
-                            al final el <b>grupo</b>.
+                            En bachillerato primero se selecciona la <b>generación</b>, después el <b>semestre</b> y al
+                            final el <b>grupo</b>.
+                            El grado se toma automáticamente del grupo seleccionado.
                         </div>
                     @endif
                 </section>
@@ -837,6 +895,7 @@
                 </div>
 
                 {{-- FOTO --}}
+                {{-- FOTO --}}
                 <section class="space-y-5">
                     <div
                         class="rounded-[26px] border border-pink-200 bg-pink-50/70 p-4 dark:border-pink-900/40 dark:bg-pink-950/20">
@@ -850,6 +909,7 @@
                                 <h2 class="text-lg font-bold text-slate-800 dark:text-white">
                                     Fotografía
                                 </h2>
+
                                 <p class="text-sm text-slate-500 dark:text-slate-400">
                                     Sube una foto del alumno si la tienes disponible.
                                 </p>
@@ -857,9 +917,24 @@
                         </div>
                     </div>
 
+                    @php
+                        /*
+            Se toma la foto guardada en la columna foto_path.
+            Ejemplo: inscripciones/fotos/archivo.jpg
+        */
+                        $fotoActualUrl = null;
+
+                        if (!empty($foto_actual)) {
+                            $fotoActualUrl = Storage::disk('public')->exists($foto_actual)
+                                ? Storage::url($foto_actual)
+                                : asset('storage/' . ltrim($foto_actual, '/'));
+                        }
+                    @endphp
+
                     <div x-data="{
                         preview: null,
                         nombreArchivo: '',
+                    
                         usarTemporal(event) {
                             const file = event.target.files[0];
                     
@@ -877,6 +952,7 @@
                     
                             reader.readAsDataURL(file);
                         },
+                    
                         limpiar() {
                             this.preview = null;
                             this.nombreArchivo = '';
@@ -912,6 +988,7 @@
                                 <div class="flex items-center justify-center">
                                     <div class="relative">
 
+                                        {{-- Loader al subir foto --}}
                                         <div wire:loading.flex wire:target="foto"
                                             class="absolute inset-0 z-20 hidden items-center justify-center rounded-[26px] bg-white/70 backdrop-blur-sm dark:bg-neutral-950/70">
 
@@ -932,21 +1009,34 @@
                                             </div>
                                         </div>
 
+                                        {{-- Preview / foto guardada --}}
                                         <div
                                             class="group relative h-52 w-52 overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900">
 
+                                            {{-- Vista previa inmediata con Alpine --}}
                                             <template x-if="preview">
-                                                <img :src="preview" alt="Vista previa"
+                                                <img :src="preview" alt="Vista previa de la fotografía"
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                                             </template>
 
+                                            {{-- Foto temporal de Livewire --}}
                                             @if (!empty($foto) && is_object($foto))
-                                                <img src="{{ $foto->temporaryUrl() }}" alt="Vista previa temporal"
+                                                <img src="{{ $foto->temporaryUrl() }}"
+                                                    alt="Fotografía temporal del alumno"
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                                                     x-show="!preview">
+
+                                                {{-- Foto guardada en BD --}}
+                                            @elseif (!empty($fotoActualUrl))
+                                                <img src="{{ $fotoActualUrl }}" alt="Fotografía actual del alumno"
+                                                    class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                                    x-show="!preview">
+
+                                                {{-- Estado vacío --}}
                                             @else
                                                 <div x-show="!preview"
                                                     class="flex h-full w-full flex-col items-center justify-center px-4 text-center">
+
                                                     <div
                                                         class="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-md dark:bg-neutral-800">
                                                         <flux:icon.camera
@@ -968,6 +1058,13 @@
                                                 class="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
                                                 Foto
                                             </div>
+
+                                            @if (!empty($fotoActualUrl))
+                                                <div class="absolute bottom-3 left-3 right-3 rounded-2xl bg-emerald-500/90 px-3 py-2 text-center text-[11px] font-bold text-white shadow-lg backdrop-blur-sm"
+                                                    x-show="!preview">
+                                                    Foto guardada
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -1007,6 +1104,14 @@
                                         </div>
                                     </div>
 
+                                    @if (!empty($foto_actual))
+                                        <div
+                                            class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-slate-300">
+                                            <span class="font-bold">Ruta actual:</span>
+                                            <span class="break-all">{{ $foto_actual }}</span>
+                                        </div>
+                                    @endif
+
                                     <div class="mt-5 flex flex-wrap gap-3">
                                         <label for="foto"
                                             class="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01]">
@@ -1017,7 +1122,7 @@
                                         <button type="button" @click="limpiar()" wire:click="quitarFotoTemporal"
                                             class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:bg-neutral-700">
                                             <flux:icon.trash-2 class="mr-2 h-4 w-4" />
-                                            Quitar
+                                            Quitar selección
                                         </button>
                                     </div>
 

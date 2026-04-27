@@ -56,7 +56,7 @@ class Matricula extends Component
     public Collection $nuevosSemestres;
     public Collection $nuevosGrupos;
 
-    public int $perPage = 10;
+    public int $perPage = 20;
 
     protected $paginationTheme = 'tailwind';
 

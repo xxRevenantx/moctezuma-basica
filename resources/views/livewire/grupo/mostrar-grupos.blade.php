@@ -16,9 +16,12 @@
 
     <!-- Encabezado -->
     <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Grupos</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Grupos
+        </h1>
+
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Busca, edita o elimina grupos.
+            Busca, filtra, edita o elimina grupos por nivel, generación, grado o semestre.
         </p>
     </div>
 
@@ -32,25 +35,190 @@
         <!-- Toolbar -->
         <div
             class="p-4 sm:p-5 lg:p-6 border-b border-gray-100/80 dark:border-neutral-800/80 bg-gradient-to-r from-slate-50 via-white to-sky-50 dark:from-neutral-900 dark:via-neutral-950 dark:to-sky-950/20">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+            <div class="grid gap-4 xl:grid-cols-[1.2fr_2fr_auto] xl:items-end">
+
                 <!-- Buscador -->
-                <div class="w-full sm:max-w-xl">
-                    <label for="buscar-grupo" class="sr-only">Buscar Grupo</label>
-                    <flux:input id="buscar-grupo" type="text" wire:model.live="search" placeholder="Buscar…"
-                        icon="magnifying-glass" class="w-full" />
+                <div>
+                    <label for="buscar-grupo"
+                        class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Buscar grupo
+                    </label>
+
+                    <flux:input id="buscar-grupo" type="text" wire:model.live="search"
+                        placeholder="Buscar por nombre del grupo..." icon="magnifying-glass" class="w-full" />
+                </div>
+
+                <!-- Filtros -->
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+                    <!-- Nivel -->
+                    <div>
+                        <label
+                            class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Nivel
+                        </label>
+
+                        <flux:select wire:model.live="nivel_id" placeholder="Todos los niveles">
+                            <flux:select.option value="">
+                                Todos los niveles
+                            </flux:select.option>
+
+                            @foreach ($niveles as $nivel)
+                                <flux:select.option value="{{ $nivel->id }}">
+                                    {{ $nivel->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    <!-- Generación -->
+                    <div>
+                        <label
+                            class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Generación
+                        </label>
+
+                        <flux:select wire:model.live="generacion_id" placeholder="Todas las generaciones"
+                            :disabled="!$nivel_id">
+                            <flux:select.option value="">
+                                Todas las generaciones
+                            </flux:select.option>
+
+                            @foreach ($generaciones as $generacion)
+                                <flux:select.option value="{{ $generacion->id }}">
+                                    {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                                    @if ((int) $generacion->status === 0)
+                                        / Inactiva
+                                    @endif
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    <!-- Grado -->
+                    @if (!$esBachillerato)
+                        <div>
+                            <label
+                                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Grado
+                            </label>
+
+                            <flux:select wire:model.live="grado_id" placeholder="Todos los grados"
+                                :disabled="!$nivel_id">
+                                <flux:select.option value="">
+                                    Todos los grados
+                                </flux:select.option>
+
+                                @foreach ($grados as $grado)
+                                    <flux:select.option value="{{ $grado->id }}">
+                                        {{ $grado->nombre }}°
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                    @endif
+
+                    <!-- Semestre para bachillerato -->
+                    @if ($esBachillerato)
+                        <div>
+                            <label
+                                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Semestre
+                            </label>
+
+                            <flux:select wire:model.live="semestre_id" placeholder="Todos los semestres"
+                                :disabled="!$nivel_id">
+                                <flux:select.option value="">
+                                    Todos los semestres
+                                </flux:select.option>
+
+                                @foreach ($semestres as $semestre)
+                                    <flux:select.option value="{{ $semestre->id }}">
+                                        {{ $semestre->numero }}° semestre
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                    @endif
+
+                    <!-- Limpieza -->
+                    <div class="flex items-end">
+                        <flux:button type="button" variant="ghost" wire:click="limpiarFiltros"
+                            class="w-full cursor-pointer border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-gray-200 dark:hover:bg-neutral-800">
+                            <flux:icon.x-mark class="mr-1.5 h-4 w-4" />
+                            Limpiar
+                        </flux:button>
+                    </div>
                 </div>
 
                 <!-- Resumen -->
-                <div class="flex items-center gap-3 justify-between sm:justify-end">
+                <div class="flex items-center gap-3 justify-between xl:justify-end">
                     <div
-                        class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-white/70 dark:bg-neutral-900/70 shadow-sm">
+                        class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-2 bg-white/70 dark:bg-neutral-900/70 shadow-sm">
                         <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                             Resultados:
                             <strong>{{ $totalGrupos }}</strong>
                         </span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Filtros activos -->
+            <div class="mt-4 flex flex-wrap gap-2">
+                @if ($search)
+                    <span
+                        class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900/60">
+                        Búsqueda: {{ $search }}
+                    </span>
+                @endif
+
+                @if ($nivel_id)
+                    @php
+                        $nivelActivo = $niveles->firstWhere('id', $nivel_id);
+                    @endphp
+
+                    <span
+                        class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-200 dark:ring-indigo-900/60">
+                        Nivel: {{ $nivelActivo?->nombre ?? 'Seleccionado' }}
+                    </span>
+                @endif
+
+                @if ($generacion_id)
+                    @php
+                        $generacionActiva = $generaciones->firstWhere('id', $generacion_id);
+                    @endphp
+
+                    <span
+                        class="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/40 dark:text-sky-200 dark:ring-sky-900/60">
+                        Generación:
+                        {{ $generacionActiva?->anio_ingreso }} - {{ $generacionActiva?->anio_egreso }}
+                    </span>
+                @endif
+
+                @if ($grado_id && !$esBachillerato)
+                    @php
+                        $gradoActivo = $grados->firstWhere('id', $grado_id);
+                    @endphp
+
+                    <span
+                        class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/40 dark:text-violet-200 dark:ring-violet-900/60">
+                        Grado: {{ $gradoActivo?->nombre }}°
+                    </span>
+                @endif
+
+                @if ($semestre_id && $esBachillerato)
+                    @php
+                        $semestreActivo = $semestres->firstWhere('id', $semestre_id);
+                    @endphp
+
+                    <span
+                        class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60">
+                        Semestre: {{ $semestreActivo?->numero }}°
+                    </span>
+                @endif
             </div>
         </div>
 
@@ -59,7 +227,8 @@
             <div class="relative">
 
                 <!-- Loader -->
-                <div wire:loading.delay wire:target="search, eliminar"
+                <div wire:loading.delay
+                    wire:target="search,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar"
                     class="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
                     aria-live="polite" aria-busy="true">
                     <div
@@ -70,12 +239,16 @@
                                 stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                         </svg>
-                        <span class="text-sm text-gray-700 dark:text-gray-200">Cargando…</span>
+
+                        <span class="text-sm text-gray-700 dark:text-gray-200">
+                            Cargando…
+                        </span>
                     </div>
                 </div>
 
                 <!-- Contenido -->
-                <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
+                <div class="transition filter duration-200" wire:loading.class="blur-sm"
+                    wire:target="search,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar">
 
                     @if ($groupedByNivel->isEmpty())
                         <!-- Estado vacío -->
@@ -85,34 +258,41 @@
                                 class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-950">
                                 <flux:icon.search class="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
                             </div>
+
                             <div class="mb-1 text-base font-semibold text-gray-800 dark:text-gray-100">
                                 No hay grupos disponibles
                             </div>
+
                             <p class="text-sm text-gray-500 dark:text-gray-400">
-                                Ajusta tu búsqueda o registra un nuevo grupo.
+                                Ajusta tu búsqueda o modifica los filtros.
                             </p>
                         </div>
                     @else
                         <!-- Cards resumen arriba -->
                         <div class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+
                             <!-- Total grupos -->
                             <div
                                 class="relative overflow-hidden rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-600 via-sky-500 to-blue-600 text-white shadow-sm">
                                 <div
                                     class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
                                 </div>
+
                                 <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
                                     <div>
                                         <p class="text-xs font-medium uppercase tracking-wide text-indigo-100/90">
                                             Total de grupos
                                         </p>
+
                                         <p class="mt-1 text-2xl font-bold leading-tight">
                                             {{ $totalGrupos }}
                                         </p>
+
                                         <p class="mt-1 text-[11px] text-indigo-100/90">
                                             Coinciden con el filtro actual.
                                         </p>
                                     </div>
+
                                     <div
                                         class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
                                         <flux:icon.layout-grid class="w-5 h-5" />
@@ -126,18 +306,22 @@
                                 <div
                                     class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
                                 </div>
+
                                 <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
                                     <div>
                                         <p class="text-xs font-medium uppercase tracking-wide text-emerald-50/90">
                                             Niveles encontrados
                                         </p>
+
                                         <p class="mt-1 text-2xl font-bold leading-tight">
                                             {{ $totalNiveles }}
                                         </p>
+
                                         <p class="mt-1 text-[11px] text-emerald-50/90">
                                             Niveles con al menos un grupo.
                                         </p>
                                     </div>
+
                                     <div
                                         class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
                                         <flux:icon.layers class="w-5 h-5" />
@@ -151,18 +335,22 @@
                                 <div
                                     class="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_#ffffff_0,_transparent_55%)]">
                                 </div>
+
                                 <div class="relative p-4 sm:p-5 flex items-center justify-between gap-3">
                                     <div>
                                         <p class="text-xs font-medium uppercase tracking-wide text-amber-50/90">
                                             Grupos sin nivel
                                         </p>
+
                                         <p class="mt-1 text-2xl font-bold leading-tight">
                                             {{ $gruposSinNivel }}
                                         </p>
+
                                         <p class="mt-1 text-[11px] text-amber-50/90">
                                             Revisa su asignación de nivel.
                                         </p>
                                     </div>
+
                                     <div
                                         class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm">
                                         <flux:icon.triangle-alert class="w-5 h-5" />
@@ -171,7 +359,7 @@
                             </div>
                         </div>
 
-                        <!-- TABLA -->
+                        <!-- Tabla -->
                         <div
                             class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
                             <div class="overflow-x-auto">
@@ -182,22 +370,27 @@
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                                 Grupo
                                             </th>
+
                                             <th
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                                 Grado
                                             </th>
+
                                             <th
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                                 Semestre
                                             </th>
+
                                             <th
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                                 Generación
                                             </th>
+
                                             <th
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                                 Nivel
                                             </th>
+
                                             <th
                                                 class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide">
                                                 Acciones
@@ -208,7 +401,6 @@
                                     <tbody class="divide-y divide-gray-100 dark:divide-neutral-800">
                                         @foreach ($groupedByNivel as $nivelNombre => $items)
                                             @php
-                                                // ✅ Agrupar dentro del nivel por generación + status
                                                 $groupedByGeneracion = $items->groupBy(function ($g) {
                                                     if ($g->generacion) {
                                                         return $g->generacion->anio_ingreso .
@@ -217,6 +409,7 @@
                                                             '||' .
                                                             (int) $g->generacion->status;
                                                     }
+
                                                     return 'Sin generación asignada||1';
                                                 });
 
@@ -224,7 +417,7 @@
                                                 $nivelLabel = $nivelNombre ?: 'Sin nivel asignado';
                                             @endphp
 
-                                            <!-- HEADER NIVEL -->
+                                            <!-- Header nivel -->
                                             <tr class="bg-slate-50/80 dark:bg-neutral-900/70">
                                                 <td colspan="6" class="px-4 py-3">
                                                     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -256,11 +449,12 @@
                                                         2,
                                                         '1',
                                                     );
+
                                                     $genStatus = (int) $genStatus;
                                                     $genIsInactive = $genStatus === 0;
                                                 @endphp
 
-                                                <!-- SUBHEADER GENERACIÓN -->
+                                                <!-- Subheader generación -->
                                                 <tr class="bg-white dark:bg-neutral-950">
                                                     <td colspan="6" class="px-4 py-2">
                                                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -271,6 +465,7 @@
                                                                         ? 'bg-rose-50 text-rose-800 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-200 dark:ring-rose-900/60'
                                                                         : 'bg-sky-50 text-sky-800 ring-sky-100 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-800' }}">
                                                                     <flux:icon.calendar-clock class="h-3.5 w-3.5" />
+
                                                                     {{ $genNombre }}
 
                                                                     @if ($genIsInactive)
@@ -293,6 +488,7 @@
                                                 @foreach ($gruposGen as $grupo)
                                                     @php
                                                         $rowInactive = optional($grupo->generacion)->status === 0;
+
                                                         $rowGenLabel =
                                                             optional($grupo->generacion)->anio_ingreso &&
                                                             optional($grupo->generacion)->anio_egreso
@@ -300,10 +496,8 @@
                                                                     ' - ' .
                                                                     optional($grupo->generacion)->anio_egreso
                                                                 : 'Sin generación asignada';
-                                                    @endphp
 
-                                                    @php
-                                                        $rowInactive = optional($grupo->generacion)->status === 0;
+                                                        $gradoNombre = $grupo->grado?->nombre;
                                                     @endphp
 
                                                     <tr
@@ -318,14 +512,9 @@
                                                                 class="font-semibold {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-900 dark:text-white' }}">
                                                                 {{ $grupo->nombre ?: '---' }}
                                                             </div>
-
                                                         </td>
 
                                                         <td class="px-4 py-3">
-                                                            @php
-                                                                $gradoNombre = $grupo->grado?->nombre;
-                                                            @endphp
-
                                                             <span
                                                                 class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1
                                                                 {{ $rowInactive
@@ -342,24 +531,22 @@
                                                                     {{ $grupo->semestre->numero }}° semestre
                                                                 </span>
                                                             @else
-                                                                <span
-                                                                    class=" text-gray-500 dark:text-gray-400">—</span>
+                                                                <span class="text-gray-500 dark:text-gray-400">
+                                                                    —
+                                                                </span>
                                                             @endif
                                                         </td>
 
-                                                        <!-- ✅ Generación en rojo si status=0 -->
                                                         <td class="px-4 py-3">
                                                             <span
-                                                                class="font-medium
-                                                                {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
+                                                                class="font-medium {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
                                                                 {{ $rowGenLabel }}
                                                             </span>
                                                         </td>
 
                                                         <td class="px-4 py-3">
                                                             <span
-                                                                class="font-medium
-                                                                {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
+                                                                class="font-medium {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
                                                                 {{ $nivelLabel }}
                                                             </span>
                                                         </td>
@@ -389,7 +576,6 @@
                                 </table>
                             </div>
                         </div>
-
                     @endif
                 </div>
 

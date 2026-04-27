@@ -212,12 +212,7 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
         <div class="p-4 sm:p-5 lg:p-6">
             @switch($accionActual)
                 @case('generales')
-                    <div
-                        class="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 p-8 text-center dark:border-neutral-700 dark:bg-neutral-800/40">
-                        <p class="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-                            Aquí puedes mostrar el contenido del módulo generales.
-                        </p>
-                    </div>
+                    <livewire:accion.generales :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
                 @break
 
                 @case('matricula')
