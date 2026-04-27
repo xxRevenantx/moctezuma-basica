@@ -5,15 +5,22 @@ namespace App\Http\Controllers;
 use App\Models\cicloEscolar;
 use App\Models\Dia;
 use App\Models\Director;
-use App\Models\Grado;
-use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Horario;
-use App\Models\Nivel;
 use App\Models\PersonaNivel;
+use App\Models\AsignacionMateria;
+use App\Models\Generacion;
+use App\Models\Grado;
+use App\Models\Grupo;
+use App\Models\Inscripcion;
+use App\Models\Nivel;
+use App\Models\Persona;
 use App\Models\Semestre;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+
 
 class PDFController extends Controller
 {
@@ -590,5 +597,289 @@ class PDFController extends Controller
             '.pdf';
 
         return $pdf->stream($nombreArchivo);
+    }
+
+
+    // LISTAS PDF
+    public function lista_pdf(Request $request, string $slug_nivel)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Recibo los filtros seleccionados
+        |--------------------------------------------------------------------------
+        */
+
+        $generacion_id = $request->integer('generacion_id');
+        $grado_id = $request->integer('grado_id');
+        $grupo_id = $request->integer('grupo_id');
+        $semestre_id = $request->integer('semestre_id');
+
+        $tipo_descarga = $request->input('tipo_descarga', 'evaluacion');
+        $opcion_descarga = $request->input('opcion_descarga', 'primer_periodo');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Primero se genera únicamente lista de evaluación
+        |--------------------------------------------------------------------------
+        */
+
+        if ($tipo_descarga !== 'evaluacion') {
+            abort(404, 'Este formato todavía no está disponible.');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Busco la información principal
+        |--------------------------------------------------------------------------
+        */
+
+        $nivel = Nivel::query()
+            ->where('slug', $slug_nivel)
+            ->firstOrFail();
+
+        $esBachillerato = $this->esBachillerato($nivel);
+
+        $generacion = Generacion::query()
+            ->where('id', $generacion_id)
+            ->where('nivel_id', $nivel->id)
+            ->firstOrFail();
+
+        $grado = Grado::query()
+            ->where('id', $grado_id)
+            ->where('nivel_id', $nivel->id)
+            ->firstOrFail();
+
+        $grupoQuery = Grupo::query()
+            ->where('id', $grupo_id)
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id);
+
+        if ($esBachillerato) {
+            $grupoQuery->where('semestre_id', $semestre_id);
+        } else {
+            $grupoQuery->whereNull('semestre_id');
+        }
+
+        $grupo = $grupoQuery->firstOrFail();
+
+        $semestre = null;
+
+        if ($esBachillerato && $semestre_id) {
+            $semestre = Semestre::query()
+                ->where('id', $semestre_id)
+                ->where('grado_id', $grado->id)
+                ->firstOrFail();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Busco los alumnos activos
+        |--------------------------------------------------------------------------
+        */
+
+        $alumnosQuery = Inscripcion::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id)
+            ->where('activo', 1);
+
+        if ($esBachillerato) {
+            $alumnosQuery->where('semestre_id', $semestre_id);
+        } else {
+            $alumnosQuery->whereNull('semestre_id');
+        }
+
+        $alumnos = $alumnosQuery
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Busco las materias calificables
+        |--------------------------------------------------------------------------
+        */
+
+        $materiasQuery = AsignacionMateria::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id)
+            ->where('calificable', 1);
+
+        if ($esBachillerato) {
+            $materiasQuery->where('semestre', $semestre_id);
+        } else {
+            $materiasQuery->whereNull('semestre');
+        }
+
+        $materias = $materiasQuery
+            ->orderBy('orden')
+            ->orderBy('id')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Busco el docente principal
+        |--------------------------------------------------------------------------
+        | Se toma el profesor que más se repite en las materias del grupo.
+        */
+
+        $profesor_id = $materias
+            ->pluck('profesor_id')
+            ->filter()
+            ->countBy()
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        $docente = null;
+
+        if ($profesor_id) {
+            $docente = Persona::query()
+                ->where('id', $profesor_id)
+                ->first();
+        }
+
+        $nombreDocente = $docente
+            ? $this->nombrePersona($docente)
+            : '____________________________';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Obtengo escuela
+        |--------------------------------------------------------------------------
+        */
+
+        $escuela = DB::table('escuela')->first();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Armo datos del periodo
+        |--------------------------------------------------------------------------
+        */
+
+        $periodoNumero = $this->numeroPeriodoEvaluacion($opcion_descarga);
+        $periodoTexto = $this->textoPeriodoEvaluacion($opcion_descarga);
+
+        $cicloEscolar = $generacion->anio_ingreso . '-' . $generacion->anio_egreso;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Logos e imagen de marca de agua
+        |--------------------------------------------------------------------------
+        | Si tus archivos están en otra ruta, solo cambia los nombres.
+        */
+
+        $logoIzquierdo = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
+        $logoDerecho = $this->imagenBase64Publica('imagenes/logo-letra.png');
+        $marcaAgua = $this->imagenBase64Publica('imagenes/logo-letra.png');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Datos para la vista
+        |--------------------------------------------------------------------------
+        */
+
+        $data = [
+            'escuela' => $escuela,
+            'nivel' => $nivel,
+            'generacion' => $generacion,
+            'grado' => $grado,
+            'grupo' => $grupo,
+            'semestre' => $semestre,
+
+            'alumnos' => $alumnos,
+            'materias' => $materias,
+
+            'nombreDocente' => $nombreDocente,
+            'periodoNumero' => $periodoNumero,
+            'periodoTexto' => $periodoTexto,
+            'cicloEscolar' => $cicloEscolar,
+
+            'logoIzquierdo' => $logoIzquierdo,
+            'logoDerecho' => $logoDerecho,
+            'marcaAgua' => $marcaAgua,
+
+            'turno' => $request->input('turno', 'Matutino'),
+            'fechaInicio' => $request->input('fecha_inicio'),
+            'fechaFin' => $request->input('fecha_fin'),
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Genero el PDF
+        |--------------------------------------------------------------------------
+        */
+
+        $nombreArchivo = 'lista-evaluacion-'
+            . $nivel->slug
+            . '-grado-' . $grado->id
+            . '-grupo-' . $grupo->nombre
+            . '.pdf';
+
+        return Pdf::loadView('pdf.lista_evaluacion', $data)
+            ->setPaper('letter', 'landscape')
+            ->stream($nombreArchivo);
+    }
+
+    private function esBachillerato($nivel): bool
+    {
+        return (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
+    }
+
+    private function numeroPeriodoEvaluacion(string $opcion): int
+    {
+        return match ($opcion) {
+            'primer_periodo' => 1,
+            'segundo_periodo' => 2,
+            'tercer_periodo' => 3,
+            default => 1,
+        };
+    }
+
+    private function textoPeriodoEvaluacion(string $opcion): string
+    {
+        return match ($opcion) {
+            'primer_periodo' => 'PRIMER PERIODO',
+            'segundo_periodo' => 'SEGUNDO PERIODO',
+            'tercer_periodo' => 'TERCER PERIODO',
+            default => 'PRIMER PERIODO',
+        };
+    }
+
+    private function nombrePersona($persona): string
+    {
+        return trim(
+            ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
+        );
+    }
+
+    private function imagenBase64Publica(?string $ruta): ?string
+    {
+        if (!$ruta) {
+            return null;
+        }
+
+        $path = public_path($ruta);
+
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        $mime = match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => 'image/png',
+        };
+
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
     }
 }
