@@ -212,13 +212,20 @@
         }
 
         .materia-vertical {
-            writing-mode: vertical-rl;
+            /* writing-mode: vertical-rl;
             transform: rotate(180deg);
             white-space: nowrap;
             display: inline-block;
             font-size: 8px;
             line-height: 1;
-            max-height: 155px;
+            max-height: 155px; */
+            /* writing-mode: vertical-rl;
+            transform: rotate(-90deg);
+            display: inline-block;
+            font-size: 10px;
+            width: 40px;
+            height: 100px;
+            line-height: 10px; */
         }
 
         .col-promedio {
@@ -415,7 +422,7 @@
 
                             @foreach ($materias as $materia)
                                 <th class="col-materia">
-                                    <div style="text-align:center;  text-transform:uppercase" class="rotate">
+                                    <div style="text-align:center;  text-transform:uppercase" class="materia-vertical">
                                         {{ $materia->materia }}
                                     </div>
 

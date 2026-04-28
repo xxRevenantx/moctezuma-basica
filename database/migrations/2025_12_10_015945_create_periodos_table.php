@@ -23,11 +23,20 @@ return new class extends Migration {
             // Ciclo escolar al que pertenece el periodo
             $table->unsignedBigInteger('ciclo_escolar_id');
 
+            //Meses de Basica
+            $table->unsignedBigInteger('mes_basica_id')->nullable();
+
+            //Periodo de basica
+            $table->unsignedBigInteger('periodo_basica_id')->nullable();
+
             // Meses de Bachillerato
             $table->unsignedBigInteger('mes_bachillerato_id')->nullable();
 
+
             // Parciales de Bachillerato
             $table->unsignedBigInteger('parcial_bachillerato_id')->nullable();
+
+
 
 
             // Fechas del periodo
@@ -43,6 +52,9 @@ return new class extends Migration {
             $table->foreign('ciclo_escolar_id')->references('id')->on('ciclo_escolares')->onDelete('cascade');
             $table->foreign('mes_bachillerato_id')->references('id')->on('meses_bachilleratos')->onDelete('cascade');
             $table->foreign('parcial_bachillerato_id')->references('id')->on('parciales')->onDelete('cascade');
+
+            $table->foreign('mes_basica_id')->references('id')->on('meses_basica')->onDelete('cascade');
+            $table->foreign('periodo_basica_id')->references('id')->on('periodos_basica')->onDelete('cascade');
 
             $table->timestamps();
         });

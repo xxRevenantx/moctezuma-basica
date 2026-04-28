@@ -17,6 +17,8 @@ class Periodos extends Model
         "ciclo_escolar_id",
         "mes_bachillerato_id",
         "parcial_bachillerato_id",
+        "mes_basica_id",
+        "periodo_basica_id",
         "fecha_inicio",
         "fecha_fin",
     ];
@@ -56,6 +58,18 @@ class Periodos extends Model
     public function parcialBachillerato()
     {
         return $this->belongsTo(Parcial::class, 'parcial_bachillerato_id');
+    }
+
+    // RELACIONES CON MESES BASICA
+    public function mesesBasica()
+    {
+        return $this->belongsTo(MesesBasica::class, 'mes_basica_id');
+    }
+
+    // RELACIONES CON PERIODOS BASICA
+    public function periodoBasica()
+    {
+        return $this->belongsTo(PeriodosBasica::class, 'periodo_basica_id');
     }
 
     // RELACIONES CON CALIFICACIONES

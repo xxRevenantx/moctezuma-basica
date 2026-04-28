@@ -273,8 +273,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -605,7 +605,7 @@ class PDFController extends Controller
     {
         /*
         |--------------------------------------------------------------------------
-        | Recibo los filtros seleccionados
+        | Recibo los filtros enviados desde Livewire
         |--------------------------------------------------------------------------
         */
 
@@ -619,17 +619,58 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Primero se genera únicamente lista de evaluación
+        | Valido tipo y opción de descarga
         |--------------------------------------------------------------------------
         */
 
-        if ($tipo_descarga !== 'evaluacion') {
-            abort(404, 'Este formato todavía no está disponible.');
+        $tiposPermitidos = [
+            'evaluacion',
+            'asistencia',
+            'grupo',
+            'formatos',
+        ];
+
+        if (!in_array($tipo_descarga, $tiposPermitidos)) {
+            abort(404, 'El tipo de descarga no es válido.');
+        }
+
+        $opcionesPermitidas = match ($tipo_descarga) {
+            'evaluacion' => [
+                'primer_periodo',
+                'segundo_periodo',
+                'tercer_periodo',
+            ],
+
+            'asistencia' => [
+                'primer_periodo',
+                'segundo_periodo',
+                'tercer_periodo',
+            ],
+
+            'grupo' => [
+                'primer_periodo',
+                'segundo_periodo',
+                'tercer_periodo',
+            ],
+
+            'formatos' => [
+                'sece',
+                'sece_interna',
+                'lista_boletas',
+                'personalizadores',
+                'etiquetas',
+            ],
+
+            default => [],
+        };
+
+        if (!in_array($opcion_descarga, $opcionesPermitidas)) {
+            abort(404, 'La opción de descarga no es válida.');
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Busco la información principal
+        | Consulto información principal
         |--------------------------------------------------------------------------
         */
 
@@ -674,7 +715,7 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Busco los alumnos activos
+        | Consulto alumnos activos
         |--------------------------------------------------------------------------
         */
 
@@ -699,8 +740,10 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Busco las materias calificables
+        | Consulto materias calificables
         |--------------------------------------------------------------------------
+        | Estas materias solo se usan para lista de evaluación.
+        | En asistencia, grupo y formatos no estorban porque van disponibles en $data.
         */
 
         $materiasQuery = AsignacionMateria::query()
@@ -722,9 +765,9 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Busco el docente principal
+        | Busco docente principal
         |--------------------------------------------------------------------------
-        | Se toma el profesor que más se repite en las materias del grupo.
+        | Se toma el docente que más se repite en las materias del grupo.
         */
 
         $profesor_id = $materias
@@ -749,7 +792,7 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Obtengo escuela
+        | Escuela
         |--------------------------------------------------------------------------
         */
 
@@ -757,20 +800,27 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Armo datos del periodo
+        | Periodo, mes y ciclo escolar
         |--------------------------------------------------------------------------
         */
 
-        $periodoNumero = $this->numeroPeriodoEvaluacion($opcion_descarga);
-        $periodoTexto = $this->textoPeriodoEvaluacion($opcion_descarga);
+        if ($tipo_descarga === 'asistencia') {
+            $periodoNumero = $this->numeroPeriodoAsistencia($opcion_descarga);
+            $periodoTexto = $this->textoPeriodoAsistencia($opcion_descarga);
+            $mesAsistencia = $this->mesPeriodoAsistencia($opcion_descarga);
+        } else {
+            $periodoNumero = $this->numeroPeriodoEvaluacion($opcion_descarga);
+            $periodoTexto = $this->textoPeriodoEvaluacion($opcion_descarga);
+            $mesAsistencia = null;
+        }
 
         $cicloEscolar = $generacion->anio_ingreso . '-' . $generacion->anio_egreso;
 
         /*
         |--------------------------------------------------------------------------
-        | Logos e imagen de marca de agua
+        | Imágenes para PDF
         |--------------------------------------------------------------------------
-        | Si tus archivos están en otra ruta, solo cambia los nombres.
+        | Cambia estas rutas si tus logos están en otra carpeta.
         */
 
         $logoIzquierdo = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
@@ -779,7 +829,7 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Datos para la vista
+        | Datos compartidos para todas las vistas PDF
         |--------------------------------------------------------------------------
         */
 
@@ -797,6 +847,7 @@ class PDFController extends Controller
             'nombreDocente' => $nombreDocente,
             'periodoNumero' => $periodoNumero,
             'periodoTexto' => $periodoTexto,
+            'mesAsistencia' => $mesAsistencia,
             'cicloEscolar' => $cicloEscolar,
 
             'logoIzquierdo' => $logoIzquierdo,
@@ -806,24 +857,81 @@ class PDFController extends Controller
             'turno' => $request->input('turno', 'Matutino'),
             'fechaInicio' => $request->input('fecha_inicio'),
             'fechaFin' => $request->input('fecha_fin'),
+
+            'tipo_descarga' => $tipo_descarga,
+            'opcion_descarga' => $opcion_descarga,
         ];
 
         /*
         |--------------------------------------------------------------------------
-        | Genero el PDF
+        | Selecciono la vista PDF según el tipo de descarga
         |--------------------------------------------------------------------------
         */
 
-        $nombreArchivo = 'lista-evaluacion-'
-            . $nivel->slug
+        $vistaPdf = match ($tipo_descarga) {
+            'evaluacion' => 'pdf.lista_evaluacion',
+            'asistencia' => 'pdf.lista_asistencia',
+            'grupo' => 'pdf.lista_grupo',
+
+            'formatos' => match ($opcion_descarga) {
+                    'sece' => 'pdf.listas.formatos.sece',
+                    'sece_interna' => 'pdf.listas.formatos.sece-interna',
+                    'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
+                    'personalizadores' => 'pdf.listas.formatos.personalizadores',
+                    'etiquetas' => 'pdf.listas.formatos.etiquetas',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
+
+            default => abort(404, 'El tipo de descarga seleccionado no existe.'),
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Nombre del archivo PDF
+        |--------------------------------------------------------------------------
+        */
+
+        $nombreTipo = match ($tipo_descarga) {
+            'evaluacion' => 'lista-evaluacion',
+            'asistencia' => 'lista-asistencia',
+            'grupo' => 'lista-grupo',
+
+            'formatos' => match ($opcion_descarga) {
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'lista_boletas' => 'lista-boletas',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
+
+            default => 'lista',
+        };
+
+        $nombreArchivo = $nombreTipo
+            . '-' . $nivel->slug
             . '-grado-' . $grado->id
             . '-grupo-' . $grupo->nombre
             . '.pdf';
 
-        return Pdf::loadView('pdf.lista_evaluacion', $data)
+        /*
+        |--------------------------------------------------------------------------
+        | Genero PDF
+        |--------------------------------------------------------------------------
+        */
+
+        return Pdf::loadView($vistaPdf, $data)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
     }
+
+
+
+
+
+
+
+
 
     private function esBachillerato($nivel): bool
     {
@@ -850,12 +958,42 @@ class PDFController extends Controller
         };
     }
 
+    private function numeroPeriodoAsistencia(string $opcion): int
+    {
+        return match ($opcion) {
+            'primer_periodo' => 1,
+            'segundo_periodo' => 2,
+            'tercer_periodo' => 3,
+            default => 1,
+        };
+    }
+
+    private function textoPeriodoAsistencia(string $opcion): string
+    {
+        return match ($opcion) {
+            'primer_periodo' => 'PRIMER PERIODO',
+            'segundo_periodo' => 'SEGUNDO PERIODO',
+            'tercer_periodo' => 'TERCER PERIODO',
+            default => 'PRIMER PERIODO',
+        };
+    }
+
+    private function mesPeriodoAsistencia(string $opcion): string
+    {
+        return match ($opcion) {
+            'primer_periodo' => 'Agosto',
+            'segundo_periodo' => 'Noviembre',
+            'tercer_periodo' => 'Febrero',
+            default => 'Agosto',
+        };
+    }
+
     private function nombrePersona($persona): string
     {
         return trim(
             ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 
