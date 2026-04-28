@@ -273,8 +273,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -326,17 +326,26 @@ class PDFController extends Controller
 
     // CALIFICACIONES PDF
 
-    public function calificaciones_pdf(Request $request)
+    public function calificaciones_pdf(\Illuminate\Http\Request $request)
     {
         $slugNivel = $request->input('slug_nivel');
+        $generacionId = $request->input('generacion_id');
         $gradoId = $request->input('grado_id');
         $grupoId = $request->input('grupo_id');
+
+        /*
+     * El PDF puede recibir periodo_id directo.
+     * Para básica también puede llegar periodo_basica_id.
+     */
         $periodoId = $request->input('periodo_id');
+        $periodoBasicaId = $request->input('periodo_basica_id');
+        $parcialBachilleratoId = $request->input('parcial_bachillerato_id');
         $semestreId = $request->input('semestre_id');
+
         $busqueda = trim((string) $request->input('busqueda', ''));
 
-        if (empty($slugNivel) || empty($gradoId) || empty($grupoId) || empty($periodoId)) {
-            abort(422, 'Los parámetros slug_nivel, grado_id, grupo_id y periodo_id son obligatorios.');
+        if (empty($slugNivel) || empty($generacionId) || empty($gradoId) || empty($grupoId)) {
+            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
         }
 
         $escuela = \App\Models\Escuela::first();
@@ -348,6 +357,9 @@ class PDFController extends Controller
         if (!$nivel) {
             abort(404, 'Nivel no encontrado.');
         }
+
+        $slugNivelNormalizado = mb_strtolower((string) $nivel->slug);
+        $esBachillerato = $slugNivelNormalizado === 'bachillerato';
 
         $grado = \App\Models\Grado::query()->find($gradoId);
 
@@ -367,22 +379,15 @@ class PDFController extends Controller
             abort(422, 'El grupo seleccionado no pertenece al grado indicado.');
         }
 
-        $periodo = \App\Models\Periodos::query()
-            ->with('cicloEscolar')
-            ->find($periodoId);
-
-        if (!$periodo) {
-            abort(404, 'Periodo no encontrado.');
-        }
-
-        $esBachillerato = (int) $nivel->id === 4 || mb_strtolower((string) $nivel->slug) === 'bachillerato';
-
         $semestre = null;
-        $generacionId = $grupo->generacion_id ? (int) $grupo->generacion_id : null;
 
         if ($esBachillerato) {
             if (empty($semestreId)) {
                 abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
+            }
+
+            if (empty($periodoId) && empty($parcialBachilleratoId)) {
+                abort(422, 'El parámetro periodo_id o parcial_bachillerato_id es obligatorio para bachillerato.');
             }
 
             $semestre = \App\Models\Semestre::query()->find($semestreId);
@@ -391,25 +396,104 @@ class PDFController extends Controller
                 abort(404, 'Semestre no encontrado.');
             }
 
-            if ((int) $grupo->semestre_id !== (int) $semestre->id) {
+            if (!empty($grupo->semestre_id) && (int) $grupo->semestre_id !== (int) $semestre->id) {
                 abort(422, 'El grupo seleccionado no pertenece al semestre indicado.');
+            }
+        } else {
+            if (empty($periodoId) && empty($periodoBasicaId)) {
+                abort(422, 'El parámetro periodo_id o periodo_basica_id es obligatorio para básica.');
             }
         }
 
-        // Materias
+        /*
+     * Obtiene el periodo.
+     */
+        $queryPeriodo = \App\Models\Periodos::query()
+            ->with([
+                'cicloEscolar',
+                'periodoBasica',
+                'parcialBachillerato',
+                'mesesBasica',
+                'mesesBachillerato',
+            ])
+            ->where('nivel_id', $nivel->id);
+
+        if (!empty($periodoId)) {
+            $queryPeriodo->where('id', $periodoId);
+        } else {
+            if ($esBachillerato) {
+                $queryPeriodo
+                    ->where('generacion_id', $generacionId)
+                    ->where('semestre_id', $semestreId)
+                    ->where('parcial_bachillerato_id', $parcialBachilleratoId);
+            } else {
+                $queryPeriodo->where('periodo_basica_id', $periodoBasicaId);
+            }
+        }
+
+        $periodo = $queryPeriodo
+            ->latest('id')
+            ->first();
+
+        if (!$periodo) {
+            abort(404, 'Periodo no encontrado.');
+        }
+
+        $periodoId = $periodo->id;
+        $cicloEscolarId = $periodo->ciclo_escolar_id;
+
+        if (blank($cicloEscolarId)) {
+            $ultimoCiclo = \App\Models\CicloEscolar::query()
+                ->latest('id')
+                ->first();
+
+            $cicloEscolarId = $ultimoCiclo?->id;
+        }
+
+        /*
+     * Nombre visible del periodo seleccionado.
+     */
+        $nombrePeriodo = 'Periodo seleccionado';
+
+        if (!$esBachillerato && $periodo?->periodoBasica?->descripcion) {
+            $nombrePeriodo = $periodo->periodoBasica->descripcion;
+        }
+
+        if ($esBachillerato && $periodo?->parcialBachillerato?->descripcion) {
+            $nombrePeriodo = $periodo->parcialBachillerato->descripcion;
+        }
+
+        /*
+     * Materias calificables.
+     */
         $queryMaterias = \App\Models\AsignacionMateria::query()
             ->where('nivel_id', $nivel->id)
             ->where('grupo_id', $grupo->id)
-            ->where('calificable', 1)
-            ->orderBy('orden')
-            ->orderBy('materia');
+            ->where('calificable', 1);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'grado_id')) {
+            $queryMaterias->where('grado_id', $grado->id);
+        }
 
         if ($esBachillerato) {
-            $queryMaterias->where('semestre', $semestre->id);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                $queryMaterias->where('semestre_id', $semestre->id);
+            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre')) {
+                $queryMaterias->where('semestre', $semestre->id);
+            }
         } else {
-            $queryMaterias->where('grado_id', $grado->id)
-                ->whereNull('semestre');
+            if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                $queryMaterias->whereNull('semestre_id');
+            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre')) {
+                $queryMaterias->whereNull('semestre');
+            }
         }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'orden')) {
+            $queryMaterias->orderBy('orden');
+        }
+
+        $queryMaterias->orderBy('materia');
 
         $materias = $queryMaterias->get()
             ->map(function ($item) {
@@ -422,22 +506,37 @@ class PDFController extends Controller
             ->values()
             ->toArray();
 
-        // Inscripciones
+        /*
+     * Inscripciones.
+     */
         $queryInscripciones = \App\Models\Inscripcion::query()
             ->with(['grado:id,nombre', 'grupo:id,nombre', 'semestre:id,numero'])
             ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacionId)
             ->where('grado_id', $grado->id)
             ->where('grupo_id', $grupo->id);
 
         if ($esBachillerato) {
-            $queryInscripciones->where('semestre_id', $semestre->id)
-                ->where('generacion_id', $generacionId);
+            $queryInscripciones->where('semestre_id', $semestre->id);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('inscripciones', 'activo')) {
+            $queryInscripciones->where('activo', 1);
         }
 
         if ($busqueda !== '') {
-            $queryInscripciones->where(function ($q) use ($busqueda) {
-                $q->where('matricula', 'like', "%{$busqueda}%")
-                    ->orWhere(\Illuminate\Support\Facades\DB::raw("TRIM(CONCAT(nombre,' ',IFNULL(apellido_paterno,''),' ',IFNULL(apellido_materno,'')))"), 'like', "%{$busqueda}%");
+            $queryInscripciones->where(function ($query) use ($busqueda) {
+                $query->where('matricula', 'like', "%{$busqueda}%")
+                    ->orWhere('nombre', 'like', "%{$busqueda}%")
+                    ->orWhere('apellido_paterno', 'like', "%{$busqueda}%")
+                    ->orWhere('apellido_materno', 'like', "%{$busqueda}%")
+                    ->orWhere(
+                        \Illuminate\Support\Facades\DB::raw(
+                            "TRIM(CONCAT(nombre,' ',IFNULL(apellido_paterno,''),' ',IFNULL(apellido_materno,'')))"
+                        ),
+                        'like',
+                        "%{$busqueda}%"
+                    );
             });
         }
 
@@ -450,7 +549,11 @@ class PDFController extends Controller
                 return [
                     'inscripcion_id' => (int) $item->id,
                     'matricula' => $item->matricula ?: '—',
-                    'alumno' => trim($item->nombre . ' ' . ($item->apellido_paterno ?? '') . ' ' . ($item->apellido_materno ?? '')) ?: '—',
+                    'alumno' => trim(
+                        ($item->nombre ?? '') . ' ' .
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
+                    ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
                     'semestre' => $item->semestre?->numero ?? '—',
@@ -459,58 +562,91 @@ class PDFController extends Controller
             ->values()
             ->toArray();
 
-        // Calificaciones guardadas
         $idsInscripciones = collect($inscripciones)->pluck('inscripcion_id')->values()->all();
         $idsMaterias = collect($materias)->pluck('id')->values()->all();
 
+        /*
+     * Calificaciones guardadas.
+     */
         $calificaciones = [];
 
         if (!empty($idsInscripciones) && !empty($idsMaterias)) {
             $queryCalificaciones = \App\Models\Calificacion::query()
                 ->whereIn('inscripcion_id', $idsInscripciones)
                 ->whereIn('asignacion_materia_id', $idsMaterias)
-                ->where('nivel_id', $nivel->id)
-                ->where('grado_id', $grado->id)
-                ->where('grupo_id', $grupo->id)
-                ->where('periodo_id', $periodo->id);
+                ->where('periodo_id', $periodoId);
 
-            if ($esBachillerato) {
-                $queryCalificaciones->where('semestre_id', $semestre->id)
-                    ->where('generacion_id', $generacionId);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'nivel_id')) {
+                $queryCalificaciones->where('nivel_id', $nivel->id);
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'generacion_id')) {
+                $queryCalificaciones->where('generacion_id', $generacionId);
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'grado_id')) {
+                $queryCalificaciones->where('grado_id', $grado->id);
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'grupo_id')) {
+                $queryCalificaciones->where('grupo_id', $grupo->id);
+            }
+
+            if (!blank($cicloEscolarId) && \Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'ciclo_escolar_id')) {
+                $queryCalificaciones->where('ciclo_escolar_id', $cicloEscolarId);
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'semestre_id')) {
+                if ($esBachillerato) {
+                    $queryCalificaciones->where('semestre_id', $semestre->id);
+                } else {
+                    $queryCalificaciones->whereNull('semestre_id');
+                }
             }
 
             $calificaciones = $queryCalificaciones->get()
                 ->mapWithKeys(function ($item) {
                     $clave = $item->inscripcion_id . '-' . $item->asignacion_materia_id;
-                    return [$clave => strtoupper(trim((string) $item->calificacion))];
+
+                    return [
+                        $clave => strtoupper(trim((string) $item->calificacion)),
+                    ];
                 })
                 ->toArray();
         }
 
-        // Número de materias para promediar
-        $numeroMateriasPromediar = 0;
+        /*
+     * Número de materias para promediar.
+     */
+        $queryMateriaPromediar = \App\Models\MateriaPromediar::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id);
 
         if ($esBachillerato) {
-            $registroPromedio = \App\Models\MateriaPromediar::query()
-                ->where('nivel_id', $nivel->id)
-                ->where('grado_id', $grado->id)
-                ->where('grupo_id', $grupo->id)
-                ->where('semestre_id', $semestre->id)
-                ->first();
-
-            $numeroMateriasPromediar = (int) ($registroPromedio?->numero_materias ?? 0);
+            $queryMateriaPromediar->where('semestre_id', $semestre->id);
         } else {
-            $registroPromedio = \App\Models\MateriaPromediar::query()
-                ->where('nivel_id', $nivel->id)
-                ->where('grado_id', $grado->id)
-                ->where('grupo_id', $grupo->id)
-                ->whereNull('semestre_id')
-                ->first();
-
-            $numeroMateriasPromediar = (int) ($registroPromedio?->numero_materias ?? 0);
+            $queryMateriaPromediar->whereNull('semestre_id');
         }
 
-        // Promedios
+        $registroPromedio = $queryMateriaPromediar->first();
+
+        $numeroMateriasPromediar = (int) ($registroPromedio?->numero_materias ?? 0);
+
+        /*
+     * Si no existe configuración, usa las materias normales que no son extra.
+     */
+        if ($numeroMateriasPromediar <= 0) {
+            $numeroMateriasPromediar = collect($materias)
+                ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
+                ->count();
+        }
+
+        /*
+     * Promedios por alumno.
+     * Solo toma calificaciones numéricas de 0 a 10.
+     * Trunca a un decimal, no redondea.
+     */
         $promedios = [];
 
         foreach ($inscripciones as $fila) {
@@ -537,23 +673,137 @@ class PDFController extends Controller
 
                 $valor = strtoupper(trim((string) $valor));
 
-                if (is_numeric($valor)) {
-                    $numero = (int) $valor;
+                if (!is_numeric($valor)) {
+                    continue;
+                }
 
-                    if ($numero >= 0 && $numero <= 10) {
-                        $suma += $numero;
-                    }
+                $numero = (float) $valor;
+
+                if ($numero >= 0 && $numero <= 10) {
+                    $suma += $numero;
                 }
             }
 
             $promedio = $suma / $numeroMateriasPromediar;
-            $promedios[$inscripcionId] = number_format($promedio, 1);
+            $promedioTruncado = floor($promedio * 10) / 10;
+
+            $promedios[$inscripcionId] = number_format($promedioTruncado, 1);
         }
 
-        $slugNivelNormalizado = mb_strtolower((string) $nivel->slug);
+        /*
+     * Promedios por materia.
+     */
+        $promediosPorMateria = [];
 
-        $logoIzquierdo = public_path('imagenes/logo-letra.png');
-        $logoDerecho = public_path('imagenes/logo-secundario-moctezuma.png');
+        foreach ($materias as $materia) {
+            $sumaMateria = 0;
+            $totalMateria = 0;
+
+            foreach ($inscripciones as $fila) {
+                $clave = $fila['inscripcion_id'] . '-' . $materia['id'];
+                $valor = $calificaciones[$clave] ?? null;
+
+                if ($valor === null || $valor === '') {
+                    continue;
+                }
+
+                $valor = strtoupper(trim((string) $valor));
+
+                if (!is_numeric($valor)) {
+                    continue;
+                }
+
+                $numero = (float) $valor;
+
+                if ($numero < 0 || $numero > 10) {
+                    continue;
+                }
+
+                $sumaMateria += $numero;
+                $totalMateria++;
+            }
+
+            $promedioMateria = $totalMateria > 0
+                ? floor(($sumaMateria / $totalMateria) * 10) / 10
+                : null;
+
+            $promediosPorMateria[] = [
+                'id' => $materia['id'],
+                'materia' => $materia['materia'],
+                'promedio' => $promedioMateria !== null ? number_format($promedioMateria, 1) : '—',
+                'porcentaje' => $promedioMateria !== null ? min(100, $promedioMateria * 10) : 0,
+                'total_capturadas' => $totalMateria,
+            ];
+        }
+
+        /*
+     * Promedio general del grupo.
+     */
+        $promediosNumericosGrupo = collect($promedios)
+            ->filter(fn($valor) => is_numeric($valor))
+            ->map(fn($valor) => (float) $valor)
+            ->values();
+
+        $promedioGeneralGrupo = $promediosNumericosGrupo->isNotEmpty()
+            ? floor($promediosNumericosGrupo->avg() * 10) / 10
+            : null;
+
+        $promedioGeneralGrupoTexto = $promedioGeneralGrupo !== null
+            ? number_format($promedioGeneralGrupo, 1)
+            : '—';
+
+        $porcentajePromedioGeneral = $promedioGeneralGrupo !== null
+            ? min(100, $promedioGeneralGrupo * 10)
+            : 0;
+
+        /*
+     * Estadísticas generales.
+     */
+        $totalAlumnos = count($inscripciones);
+
+        $totalAprobados = collect($promedios)
+            ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 6)
+            ->count();
+
+        $totalReprobados = collect($promedios)
+            ->filter(fn($valor) => is_numeric($valor) && (float) $valor < 6)
+            ->count();
+
+        $totalSinPromedio = collect($promedios)
+            ->filter(fn($valor) => !is_numeric($valor))
+            ->count();
+
+        $porcentajeAprobacion = $totalAlumnos > 0
+            ? round(($totalAprobados / $totalAlumnos) * 100)
+            : 0;
+
+        /*
+     * Periodos por materia.
+     * Como este PDF corresponde a un periodo seleccionado,
+     * se muestra ese periodo aplicado a cada materia calificable.
+     */
+        $periodosPorMateria = collect($materias)
+            ->map(function ($materia) use ($periodo, $nombrePeriodo, $esBachillerato) {
+                return [
+                    'materia' => $materia['materia'],
+                    'periodo' => $nombrePeriodo,
+                    'tipo' => $esBachillerato ? 'Parcial bachillerato' : 'Periodo básica',
+                    'fecha_inicio' => $periodo?->fecha_inicio
+                        ? \Carbon\Carbon::parse($periodo->fecha_inicio)->format('d/m/Y')
+                        : '—',
+                    'fecha_fin' => $periodo?->fecha_fin
+                        ? \Carbon\Carbon::parse($periodo->fecha_fin)->format('d/m/Y')
+                        : '—',
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        /*
+     * Logos e imagen por nivel.
+     */
+        $logoIzquierdo = public_path('storage/logos' . $nivel->logo);
+        $logoDerecho = public_path('imagenes/logo-letra.png');
 
         $imagenesPorNivel = [
             'preescolar' => public_path('imagenes/personajes_preescolar.png'),
@@ -577,11 +827,24 @@ class PDFController extends Controller
             'semestre' => $semestre,
             'esBachillerato' => $esBachillerato,
             'periodo' => $periodo,
+            'nombrePeriodo' => $nombrePeriodo,
             'busqueda' => $busqueda,
+
             'materias' => $materias,
             'inscripciones' => $inscripciones,
             'calificaciones' => $calificaciones,
             'promedios' => $promedios,
+
+            'promediosPorMateria' => $promediosPorMateria,
+            'promedioGeneralGrupo' => $promedioGeneralGrupoTexto,
+            'porcentajePromedioGeneral' => $porcentajePromedioGeneral,
+            'totalAlumnos' => $totalAlumnos,
+            'totalAprobados' => $totalAprobados,
+            'totalReprobados' => $totalReprobados,
+            'totalSinPromedio' => $totalSinPromedio,
+            'porcentajeAprobacion' => $porcentajeAprobacion,
+            'periodosPorMateria' => $periodosPorMateria,
+
             'fecha_impresion' => now(),
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
@@ -874,13 +1137,13 @@ class PDFController extends Controller
             'grupo' => 'pdf.lista_grupo',
 
             'formatos' => match ($opcion_descarga) {
-                    'sece' => 'pdf.listas.formatos.sece',
-                    'sece_interna' => 'pdf.listas.formatos.sece-interna',
-                    'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
-                    'personalizadores' => 'pdf.listas.formatos.personalizadores',
-                    'etiquetas' => 'pdf.listas.formatos.etiquetas',
-                    default => abort(404, 'El formato seleccionado no existe.'),
-                },
+                'sece' => 'pdf.listas.formatos.sece',
+                'sece_interna' => 'pdf.listas.formatos.sece-interna',
+                'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
+                'personalizadores' => 'pdf.listas.formatos.personalizadores',
+                'etiquetas' => 'pdf.listas.formatos.etiquetas',
+                default => abort(404, 'El formato seleccionado no existe.'),
+            },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -897,13 +1160,13 @@ class PDFController extends Controller
             'grupo' => 'lista-grupo',
 
             'formatos' => match ($opcion_descarga) {
-                    'sece' => 'formato-sece',
-                    'sece_interna' => 'formato-sece-interna',
-                    'lista_boletas' => 'lista-boletas',
-                    'personalizadores' => 'personalizadores',
-                    'etiquetas' => 'etiquetas',
-                    default => 'formato',
-                },
+                'sece' => 'formato-sece',
+                'sece_interna' => 'formato-sece-interna',
+                'lista_boletas' => 'lista-boletas',
+                'personalizadores' => 'personalizadores',
+                'etiquetas' => 'etiquetas',
+                default => 'formato',
+            },
 
             default => 'lista',
         };
@@ -926,7 +1189,359 @@ class PDFController extends Controller
     }
 
 
+    public function boleta_calificaciones_pdf(\Illuminate\Http\Request $request)
+    {
+        $slugNivel = $request->input('slug_nivel');
+        $generacionId = $request->input('generacion_id');
+        $gradoId = $request->input('grado_id');
+        $grupoId = $request->input('grupo_id');
+        $periodoId = $request->input('periodo_id');
+        $inscripcionId = $request->input('inscripcion_id');
 
+        $periodoBasicaId = $request->input('periodo_basica_id');
+        $parcialBachilleratoId = $request->input('parcial_bachillerato_id');
+        $semestreId = $request->input('semestre_id');
+
+        if (
+            empty($slugNivel) ||
+            empty($generacionId) ||
+            empty($gradoId) ||
+            empty($grupoId) ||
+            empty($periodoId) ||
+            empty($inscripcionId)
+        ) {
+            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id, grupo_id, periodo_id e inscripcion_id son obligatorios.');
+        }
+
+        $escuela = \App\Models\Escuela::first();
+
+        $nivel = \App\Models\Nivel::query()
+            ->where('slug', $slugNivel)
+            ->first();
+
+        if (!$nivel) {
+            abort(404, 'Nivel no encontrado.');
+        }
+
+        $slugNivelNormalizado = mb_strtolower((string) $nivel->slug);
+        $esBachillerato = $slugNivelNormalizado === 'bachillerato';
+
+        $grado = \App\Models\Grado::query()->find($gradoId);
+
+        if (!$grado) {
+            abort(404, 'Grado no encontrado.');
+        }
+
+        $grupo = \App\Models\Grupo::query()->find($grupoId);
+
+        if (!$grupo) {
+            abort(404, 'Grupo no encontrado.');
+        }
+
+        $semestre = null;
+
+        if ($esBachillerato) {
+            if (empty($semestreId)) {
+                abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
+            }
+
+            $semestre = \App\Models\Semestre::query()->find($semestreId);
+
+            if (!$semestre) {
+                abort(404, 'Semestre no encontrado.');
+            }
+        }
+
+        $periodo = \App\Models\Periodos::query()
+            ->with([
+                'cicloEscolar',
+                'periodoBasica',
+                'parcialBachillerato',
+                'mesesBasica',
+                'mesesBachillerato',
+            ])
+            ->where('id', $periodoId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
+
+        if (!$periodo) {
+            abort(404, 'Periodo no encontrado.');
+        }
+
+        $nombrePeriodo = 'Periodo seleccionado';
+
+        if (!$esBachillerato && $periodo?->periodoBasica?->descripcion) {
+            $nombrePeriodo = $periodo->periodoBasica->descripcion;
+        }
+
+        if ($esBachillerato && $periodo?->parcialBachillerato?->descripcion) {
+            $nombrePeriodo = $periodo->parcialBachillerato->descripcion;
+        }
+
+        $cicloEscolarTexto = $periodo->cicloEscolar
+            ? ($periodo->cicloEscolar->inicio_anio . '-' . $periodo->cicloEscolar->fin_anio)
+            : '—';
+
+        $inscripcionQuery = \App\Models\Inscripcion::query()
+            ->with([
+                'grado:id,nombre',
+                'grupo:id,nombre',
+                'semestre:id,numero',
+            ])
+            ->where('id', $inscripcionId)
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacionId)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id);
+
+        if ($esBachillerato) {
+            $inscripcionQuery->where('semestre_id', $semestre->id);
+        }
+
+        $inscripcion = $inscripcionQuery->first();
+
+        if (!$inscripcion) {
+            abort(404, 'Inscripción no encontrada para el contexto seleccionado.');
+        }
+
+        $nombreAlumno = trim(
+            ($inscripcion->nombre ?? '') . ' ' .
+                ($inscripcion->apellido_paterno ?? '') . ' ' .
+                ($inscripcion->apellido_materno ?? '')
+        );
+
+        /*
+     * Materias calificables del grupo.
+     */
+        $queryMaterias = \App\Models\AsignacionMateria::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('grupo_id', $grupo->id)
+            ->where('calificable', 1);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'grado_id')) {
+            $queryMaterias->where('grado_id', $grado->id);
+        }
+
+        if ($esBachillerato) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                $queryMaterias->where('semestre_id', $semestre->id);
+            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre')) {
+                $queryMaterias->where('semestre', $semestre->id);
+            }
+        } else {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                $queryMaterias->whereNull('semestre_id');
+            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'semestre')) {
+                $queryMaterias->whereNull('semestre');
+            }
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('asignacion_materias', 'orden')) {
+            $queryMaterias->orderBy('orden');
+        }
+
+        $queryMaterias->orderBy('materia');
+
+        $materias = $queryMaterias->get();
+
+        $idsMaterias = $materias->pluck('id')->values()->all();
+
+        /*
+     * Calificaciones del alumno en el periodo/parcial seleccionado.
+     */
+        $queryCalificaciones = \App\Models\Calificacion::query()
+            ->where('inscripcion_id', $inscripcion->id)
+            ->whereIn('asignacion_materia_id', $idsMaterias)
+            ->where('periodo_id', $periodo->id);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'nivel_id')) {
+            $queryCalificaciones->where('nivel_id', $nivel->id);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'generacion_id')) {
+            $queryCalificaciones->where('generacion_id', $generacionId);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'grado_id')) {
+            $queryCalificaciones->where('grado_id', $grado->id);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'grupo_id')) {
+            $queryCalificaciones->where('grupo_id', $grupo->id);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('calificaciones', 'semestre_id')) {
+            if ($esBachillerato) {
+                $queryCalificaciones->where('semestre_id', $semestre->id);
+            } else {
+                $queryCalificaciones->whereNull('semestre_id');
+            }
+        }
+
+        $calificacionesMap = $queryCalificaciones->get()
+            ->keyBy('asignacion_materia_id');
+
+        /*
+     * Número de materias para promediar.
+     */
+        $queryMateriaPromediar = \App\Models\MateriaPromediar::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id);
+
+        if ($esBachillerato) {
+            $queryMateriaPromediar->where('semestre_id', $semestre->id);
+        } else {
+            $queryMateriaPromediar->whereNull('semestre_id');
+        }
+
+        $registroPromedio = $queryMateriaPromediar->first();
+
+        $numeroMateriasPromediar = (int) ($registroPromedio?->numero_materias ?? 0);
+
+        if ($numeroMateriasPromediar <= 0) {
+            $numeroMateriasPromediar = $materias
+                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0)
+                ->count();
+        }
+
+        $filasMaterias = [];
+        $suma = 0;
+        $capturadasNumericas = 0;
+        $especiales = 0;
+        $reprobadas = 0;
+        $aprobadas = 0;
+
+        foreach ($materias as $materia) {
+            $registro = $calificacionesMap->get($materia->id);
+
+            $valor = $registro
+                ? strtoupper(trim((string) $registro->calificacion))
+                : '';
+
+            $observacion = $registro?->observacion;
+
+            $esNumerica = is_numeric($valor);
+            $valorNumerico = null;
+            $estado = 'Sin captura';
+            $porcentaje = 0;
+
+            if ($esNumerica) {
+                $numero = (float) $valor;
+
+                if ($numero >= 0 && $numero <= 10) {
+                    $valorNumerico = $numero;
+                    $porcentaje = min(100, $numero * 10);
+                    $capturadasNumericas++;
+
+                    if ((int) ($materia->extra ?? 0) === 0) {
+                        $suma += $numero;
+                    }
+
+                    if ($numero < 6) {
+                        $estado = 'En riesgo';
+                        $reprobadas++;
+                    } elseif ($numero < 8) {
+                        $estado = 'Regular';
+                        $aprobadas++;
+                    } else {
+                        $estado = 'Aprobado';
+                        $aprobadas++;
+                    }
+                }
+            } elseif ($valor !== '') {
+                $estado = 'Especial';
+                $especiales++;
+            }
+
+            $filasMaterias[] = [
+                'materia' => $materia->materia ?: 'Materia',
+                'calificacion' => $valor !== '' ? $valor : '—',
+                'estado' => $estado,
+                'porcentaje' => $porcentaje,
+                'observacion' => $observacion ?: '—',
+                'extra' => (int) ($materia->extra ?? 0),
+            ];
+        }
+
+        $promedio = '—';
+        $promedioNumero = null;
+        $porcentajePromedio = 0;
+        $estadoPromedio = 'Sin datos';
+
+        if ($numeroMateriasPromediar > 0) {
+            $promedioCalculado = $suma / $numeroMateriasPromediar;
+            $promedioTruncado = floor($promedioCalculado * 10) / 10;
+
+            $promedioNumero = $promedioTruncado;
+            $promedio = number_format($promedioTruncado, 1);
+            $porcentajePromedio = min(100, $promedioTruncado * 10);
+
+            if ($promedioTruncado < 6) {
+                $estadoPromedio = 'Reprobado';
+            } elseif ($promedioTruncado < 8) {
+                $estadoPromedio = 'Regular';
+            } else {
+                $estadoPromedio = 'Aprobado';
+            }
+        }
+
+        $totalMaterias = count($filasMaterias);
+        $pendientes = collect($filasMaterias)
+            ->filter(fn($fila) => $fila['calificacion'] === '—')
+            ->count();
+
+        $porcentajeCaptura = $totalMaterias > 0
+            ? round((($totalMaterias - $pendientes) / $totalMaterias) * 100)
+            : 0;
+
+        $tipoBoleta = $esBachillerato ? 'BOLETA PARCIAL' : 'BOLETA DE PERIODO';
+
+        /*
+     * Logos.
+     */
+        $logoIzquierdo = public_path('imagenes/logo-letra.png');
+        $logoDerecho = public_path('imagenes/logo-secundario-moctezuma.png');
+
+        $logoIzquierdo = file_exists($logoIzquierdo) ? $logoIzquierdo : null;
+        $logoDerecho = file_exists($logoDerecho) ? $logoDerecho : null;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.boleta_calificaciones_pdf', [
+            'titulo' => $tipoBoleta,
+            'escuela' => $escuela,
+            'nivel' => $nivel,
+            'grado' => $grado,
+            'grupo' => $grupo,
+            'semestre' => $semestre,
+            'esBachillerato' => $esBachillerato,
+            'periodo' => $periodo,
+            'nombrePeriodo' => $nombrePeriodo,
+            'cicloEscolarTexto' => $cicloEscolarTexto,
+            'inscripcion' => $inscripcion,
+            'nombreAlumno' => $nombreAlumno,
+            'filasMaterias' => $filasMaterias,
+            'promedio' => $promedio,
+            'promedioNumero' => $promedioNumero,
+            'porcentajePromedio' => $porcentajePromedio,
+            'estadoPromedio' => $estadoPromedio,
+            'totalMaterias' => $totalMaterias,
+            'pendientes' => $pendientes,
+            'especiales' => $especiales,
+            'aprobadas' => $aprobadas,
+            'reprobadas' => $reprobadas,
+            'porcentajeCaptura' => $porcentajeCaptura,
+            'fecha_impresion' => now(),
+            'logo_izquierdo' => $logoIzquierdo,
+            'logo_derecho' => $logoDerecho,
+        ])->setPaper('letter', 'portrait');
+
+        $nombreArchivo = 'BOLETA_' .
+            str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) .
+            '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
+            '.pdf';
+
+        return $pdf->stream($nombreArchivo);
+    }
 
 
 
@@ -992,8 +1607,8 @@ class PDFController extends Controller
     {
         return trim(
             ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 

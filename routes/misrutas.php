@@ -82,6 +82,9 @@ Route::get('/nivel/{slug_nivel}/listas/pdf', [PDFController::class, 'lista_pdf']
 
 Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.pdf');
 
+Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificaciones_pdf'])
+    ->name('misrutas.boleta.calificaciones.pdf');
+
 
 Route::prefix('nivel')->group(function () {
 
