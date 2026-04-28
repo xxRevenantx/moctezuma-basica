@@ -5,9 +5,11 @@ namespace App\Livewire\Periodo;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\MesesBachillerato;
+use App\Models\MesesBasica;
 use App\Models\Nivel;
 use App\Models\Parcial;
 use App\Models\Periodos;
+use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -15,42 +17,99 @@ use Livewire\Component;
 class EditarPeriodo extends Component
 {
     public $periodo_id = null;
-    public $periodo_nombre = null;
 
     public $nivel_id = null;
     public $generacion_id = null;
     public $semestre_id = null;
     public $ciclo_escolar_id = null;
+
+    public $mes_basica_id = null;
+    public $periodo_basica_id = null;
+
     public $mes_bachillerato_id = null;
     public $parcial_bachillerato_id = null;
+
     public $fecha_inicio = null;
     public $fecha_fin = null;
+
+    public string $periodo_nombre = '';
 
     public function getEsBachilleratoProperty(): bool
     {
         return (int) $this->nivel_id === 4;
     }
 
-    /**
-     * Cuando cambia el nivel, se limpian los campos que solo aplican para bachillerato.
-     */
-    public function updatedNivelId($value): void
+    public function getEsBasicaProperty(): bool
     {
-        if ((int) $value !== 4) {
-            $this->generacion_id = null;
-            $this->semestre_id = null;
-            $this->mes_bachillerato_id = null;
-            $this->parcial_bachillerato_id = null;
-        } else {
-            $this->generacion_id = null;
-            $this->semestre_id = null;
-            $this->mes_bachillerato_id = null;
-            $this->parcial_bachillerato_id = null;
+        return !empty($this->nivel_id) && (int) $this->nivel_id !== 4;
+    }
+
+    #[On('editarModal')]
+    public function editarModal($id): void
+    {
+        $periodo = Periodos::query()
+            ->with([
+                'nivel',
+                'generacion',
+                'semestre',
+                'cicloEscolar',
+                'mesesBasica',
+                'periodoBasica',
+                'mesesBachillerato',
+                'parcialBachillerato',
+            ])
+            ->find($id);
+
+        if (!$periodo) {
+            $this->dispatch('cerrar-modal-editar');
+
+            $this->dispatch('swal', [
+                'title' => 'Periodo no encontrado',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+
+            return;
         }
+
+        $this->resetValidation();
+
+        $this->periodo_id = $periodo->id;
+        $this->nivel_id = $periodo->nivel_id;
+        $this->generacion_id = $periodo->generacion_id;
+        $this->semestre_id = $periodo->semestre_id;
+        $this->ciclo_escolar_id = $periodo->ciclo_escolar_id;
+
+        $this->mes_basica_id = $periodo->mes_basica_id;
+        $this->periodo_basica_id = $periodo->periodo_basica_id;
+
+        $this->mes_bachillerato_id = $periodo->mes_bachillerato_id;
+        $this->parcial_bachillerato_id = $periodo->parcial_bachillerato_id;
+
+        $this->fecha_inicio = $periodo->fecha_inicio;
+        $this->fecha_fin = $periodo->fecha_fin;
+
+        $this->periodo_nombre = $this->obtenerNombrePeriodo($periodo);
+
+        $this->dispatch('editar-cargado');
+    }
+
+    public function updatedNivelId(): void
+    {
+        $this->reset([
+            'generacion_id',
+            'semestre_id',
+            'mes_basica_id',
+            'periodo_basica_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
 
         $this->resetValidation([
             'generacion_id',
             'semestre_id',
+            'mes_basica_id',
+            'periodo_basica_id',
             'mes_bachillerato_id',
             'parcial_bachillerato_id',
         ]);
@@ -70,7 +129,15 @@ class EditarPeriodo extends Component
             $rules['semestre_id'] = 'required|exists:semestres,id';
             $rules['mes_bachillerato_id'] = 'required|exists:meses_bachilleratos,id';
             $rules['parcial_bachillerato_id'] = 'required|exists:parciales,id';
-        } else {
+
+            $rules['mes_basica_id'] = 'nullable';
+            $rules['periodo_basica_id'] = 'nullable';
+        }
+
+        if ($this->esBasica) {
+            $rules['mes_basica_id'] = 'required|exists:meses_basica,id';
+            $rules['periodo_basica_id'] = 'required|exists:periodos_basica,id';
+
             $rules['generacion_id'] = 'nullable';
             $rules['semestre_id'] = 'nullable';
             $rules['mes_bachillerato_id'] = 'nullable';
@@ -95,11 +162,17 @@ class EditarPeriodo extends Component
             'semestre_id.required' => 'El semestre es obligatorio para bachillerato.',
             'semestre_id.exists' => 'El semestre seleccionado no es válido.',
 
-            'mes_bachillerato_id.required' => 'El mes del periodo es obligatorio para bachillerato.',
-            'mes_bachillerato_id.exists' => 'El mes seleccionado no es válido.',
+            'mes_bachillerato_id.required' => 'El mes de bachillerato es obligatorio.',
+            'mes_bachillerato_id.exists' => 'El mes de bachillerato seleccionado no es válido.',
 
-            'parcial_bachillerato_id.required' => 'El parcial es obligatorio para bachillerato.',
+            'parcial_bachillerato_id.required' => 'El parcial de bachillerato es obligatorio.',
             'parcial_bachillerato_id.exists' => 'El parcial seleccionado no es válido.',
+
+            'mes_basica_id.required' => 'El mes de básica es obligatorio.',
+            'mes_basica_id.exists' => 'El mes de básica seleccionado no es válido.',
+
+            'periodo_basica_id.required' => 'El periodo de básica es obligatorio.',
+            'periodo_basica_id.exists' => 'El periodo de básica seleccionado no es válido.',
 
             'fecha_inicio.date' => 'La fecha de inicio no es válida.',
             'fecha_fin.date' => 'La fecha de fin no es válida.',
@@ -107,43 +180,24 @@ class EditarPeriodo extends Component
         ];
     }
 
-    #[On('editarModal')]
-    public function editarModal($id): void
-    {
-        $periodo = Periodos::with([
-            'mesesBachillerato',
-            'cicloEscolar',
-            'parcialBachillerato',
-        ])->findOrFail($id);
-
-        $this->periodo_id = $periodo->id;
-        $this->nivel_id = $periodo->nivel_id;
-        $this->generacion_id = $periodo->generacion_id;
-        $this->semestre_id = $periodo->semestre_id;
-        $this->ciclo_escolar_id = $periodo->ciclo_escolar_id;
-        $this->mes_bachillerato_id = $periodo->mes_bachillerato_id;
-        $this->parcial_bachillerato_id = $periodo->parcial_bachillerato_id;
-        $this->fecha_inicio = $periodo->fecha_inicio;
-        $this->fecha_fin = $periodo->fecha_fin;
-
-        $this->periodo_nombre = $periodo->mesesBachillerato->meses
-            ?? ($periodo->cicloEscolar->inicio_anio ?? 'Periodo');
-
-        $this->resetValidation();
-
-        $this->dispatch('editar-cargado');
-    }
-
-    public function actualizarPeriodoBachillerato(): void
+    public function actualizarPeriodo(): void
     {
         $this->validate();
 
-        $periodo = Periodos::findOrFail($this->periodo_id);
+        $periodo = Periodos::find($this->periodo_id);
 
-        /**
-         * Se valida que la generación pertenezca al nivel seleccionado.
-         * Solo aplica para bachillerato.
-         */
+        if (!$periodo) {
+            $this->dispatch('cerrar-modal-editar');
+
+            $this->dispatch('swal', [
+                'title' => 'Periodo no encontrado',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
         if ($this->esBachillerato) {
             $generacionValida = Generacion::query()
                 ->where('id', $this->generacion_id)
@@ -154,12 +208,7 @@ class EditarPeriodo extends Component
                 $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
                 return;
             }
-        }
 
-        /**
-         * Para bachillerato se evita duplicar el mismo periodo con el mismo parcial.
-         */
-        if ($this->esBachillerato) {
             $existe = Periodos::query()
                 ->where('id', '!=', $this->periodo_id)
                 ->where('nivel_id', $this->nivel_id)
@@ -171,18 +220,38 @@ class EditarPeriodo extends Component
                 ->exists();
 
             if ($existe) {
-                $this->addError('parcial_bachillerato_id', 'El periodo para este parcial ya existe.');
+                $this->addError('parcial_bachillerato_id', 'Ya existe un periodo con estos datos de bachillerato.');
+                return;
+            }
+        }
+
+        if ($this->esBasica) {
+            $existe = Periodos::query()
+                ->where('id', '!=', $this->periodo_id)
+                ->where('nivel_id', $this->nivel_id)
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->where('mes_basica_id', $this->mes_basica_id)
+                ->where('periodo_basica_id', $this->periodo_basica_id)
+                ->exists();
+
+            if ($existe) {
+                $this->addError('periodo_basica_id', 'Ya existe un periodo de básica con estos datos.');
                 return;
             }
         }
 
         $periodo->update([
             'nivel_id' => $this->nivel_id,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
+
             'generacion_id' => $this->esBachillerato ? $this->generacion_id : null,
             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
-            'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'mes_bachillerato_id' => $this->esBachillerato ? $this->mes_bachillerato_id : null,
             'parcial_bachillerato_id' => $this->esBachillerato ? $this->parcial_bachillerato_id : null,
+
+            'mes_basica_id' => $this->esBasica ? $this->mes_basica_id : null,
+            'periodo_basica_id' => $this->esBasica ? $this->periodo_basica_id : null,
+
             'fecha_inicio' => $this->fecha_inicio ?: null,
             'fecha_fin' => $this->fecha_fin ?: null,
         ]);
@@ -203,18 +272,35 @@ class EditarPeriodo extends Component
     {
         $this->reset([
             'periodo_id',
-            'periodo_nombre',
             'nivel_id',
             'generacion_id',
             'semestre_id',
             'ciclo_escolar_id',
+            'mes_basica_id',
+            'periodo_basica_id',
             'mes_bachillerato_id',
             'parcial_bachillerato_id',
             'fecha_inicio',
             'fecha_fin',
+            'periodo_nombre',
         ]);
 
         $this->resetValidation();
+    }
+
+    private function obtenerNombrePeriodo(Periodos $periodo): string
+    {
+        if ((int) $periodo->nivel_id === 4) {
+            $mes = $periodo->mesesBachillerato->meses ?? 'Sin mes';
+            $parcial = $periodo->parcialBachillerato->descripcion ?? 'Sin parcial';
+
+            return $mes . ' - ' . $parcial;
+        }
+
+        $mes = $periodo->mesesBasica->meses ?? 'Sin mes';
+        $periodoBasica = $periodo->periodoBasica->descripcion ?? 'Sin periodo';
+
+        return $mes . ' - ' . $periodoBasica;
     }
 
     public function render()
@@ -229,12 +315,35 @@ class EditarPeriodo extends Component
             ->get();
 
         return view('livewire.periodo.editar-periodo', [
-            'niveles' => Nivel::query()->orderBy('nombre')->get(),
+            'niveles' => Nivel::query()
+                ->orderBy('nombre')
+                ->get(),
+
             'generaciones' => $generaciones,
-            'semestres' => Semestre::query()->orderBy('numero')->get(),
-            'ciclosEscolares' => CicloEscolar::query()->orderBy('inicio_anio', 'desc')->get(),
-            'meses' => MesesBachillerato::query()->orderBy('id')->get(),
-            'parciales' => Parcial::query()->orderBy('parcial')->get(),
+
+            'semestres' => Semestre::query()
+                ->orderBy('numero')
+                ->get(),
+
+            'ciclosEscolares' => CicloEscolar::query()
+                ->orderBy('inicio_anio', 'desc')
+                ->get(),
+
+            'mesesBasica' => MesesBasica::query()
+                ->orderBy('id')
+                ->get(),
+
+            'periodosBasica' => PeriodosBasica::query()
+                ->orderBy('periodo')
+                ->get(),
+
+            'mesesBachillerato' => MesesBachillerato::query()
+                ->orderBy('id')
+                ->get(),
+
+            'parciales' => Parcial::query()
+                ->orderBy('parcial')
+                ->get(),
         ]);
     }
 }

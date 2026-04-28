@@ -23,9 +23,13 @@
         const nextAsigId = this.asigIds[nextColIndex];
 
         const el = document.getElementById(`cal-${nextInsId}-${nextAsigId}`);
+
         if (el) {
             el.focus();
-            if (typeof el.select === 'function') el.select();
+
+            if (typeof el.select === 'function') {
+                el.select();
+            }
         }
     }
 }" class="w-full">
@@ -61,6 +65,7 @@
                                 <span class="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold text-white">
                                     Activo
                                 </span>
+
                                 <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-white/80"></span>
                             @endif
                         </a>
@@ -72,11 +77,13 @@
 
     {{-- Filtros --}}
     <div
-        class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-4' }}">
+        class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
 
+        {{-- Generación --}}
         <div>
             <flux:select label="Generación" wire:model.live="generacion_id">
                 <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
+
                 @foreach ($generaciones as $generacion)
                     <flux:select.option value="{{ $generacion->id }}">
                         {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
@@ -85,39 +92,53 @@
             </flux:select>
         </div>
 
+        {{-- Grado --}}
         <div>
             <flux:select label="Grado" wire:model.live="grado_id" :disabled="!$generacion_id">
                 <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
+
                 @foreach ($grados as $g)
-                    <flux:select.option value="{{ $g->id }}">{{ $g->nombre }}</flux:select.option>
+                    <flux:select.option value="{{ $g->id }}">
+                        {{ $g->nombre }}
+                    </flux:select.option>
                 @endforeach
             </flux:select>
         </div>
 
         @if ($this->esBachillerato)
+            {{-- Semestre --}}
             <div>
                 <flux:select label="Semestre" wire:model.live="semestre_id" :disabled="!$generacion_id || !$grado_id">
                     <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
+
                     @foreach ($semestres as $sem)
-                        <flux:select.option value="{{ $sem->id }}">{{ $sem->numero }}</flux:select.option>
+                        <flux:select.option value="{{ $sem->id }}">
+                            {{ $sem->numero }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
 
+            {{-- Grupo --}}
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
                     :disabled="!$generacion_id || !$grado_id || !$semestre_id">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
+
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
+                        <flux:select.option value="{{ $gpo->id }}">
+                            {{ $gpo->nombre }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
 
+            {{-- Parcial bachillerato --}}
             <div>
                 <flux:select label="Parcial" wire:model.live="parcial_bachillerato_id"
                     :disabled="!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id">
                     <flux:select.option value="">-- Selecciona un parcial --</flux:select.option>
+
                     @foreach ($parciales as $parcial)
                         <flux:select.option value="{{ $parcial->id }}">
                             {{ $parcial->descripcion }}
@@ -126,16 +147,35 @@
                 </flux:select>
             </div>
         @else
+            {{-- Grupo básica --}}
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id" :disabled="!$generacion_id || !$grado_id">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
+
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
+                        <flux:select.option value="{{ $gpo->id }}">
+                            {{ $gpo->nombre }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+
+            {{-- Periodo básica --}}
+            <div>
+                <flux:select label="Periodo" wire:model.live="periodo_basica_id"
+                    :disabled="!$generacion_id || !$grado_id || !$grupo_id">
+                    <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
+
+                    @foreach ($periodosBasica as $periodoBasica)
+                        <flux:select.option value="{{ $periodoBasica->id }}">
+                            {{ $periodoBasica->descripcion }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
         @endif
 
+        {{-- Limpiar filtros --}}
         <div class="mt-7">
             <button type="button" wire:click="limpiarFiltros"
                 class="items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:opacity-95">
@@ -144,6 +184,7 @@
         </div>
     </div>
 
+    {{-- Tarjeta del periodo seleccionado --}}
     @if ($this->periodoSeleccionado)
         <div
             class="mt-6 overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -181,7 +222,9 @@
                 </div>
 
                 <div
-                    class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-4' }}">
+                    class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
+
+                    {{-- Ciclo escolar --}}
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -189,11 +232,13 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>
                             Ciclo escolar
                         </div>
+
                         <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
                             {{ $this->periodoSeleccionado['ciclo_escolar'] ?? 'Sin ciclo' }}
                         </div>
                     </div>
 
+                    {{-- Generación --}}
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -201,14 +246,17 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
                             Generación
                         </div>
+
                         <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
                             @php
                                 $generacionSeleccionada = collect($generaciones)->firstWhere('id', $generacion_id);
                             @endphp
+
                             {{ $generacionSeleccionada ? $generacionSeleccionada->anio_ingreso . ' - ' . $generacionSeleccionada->anio_egreso : 'Sin generación' }}
                         </div>
                     </div>
 
+                    {{-- Periodo escolar --}}
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -216,25 +264,27 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                             Periodo escolar
                         </div>
+
                         <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
                             {{ $this->nombrePeriodo }}
                         </div>
                     </div>
 
-                    @if ($this->esBachillerato)
+                    {{-- Parcial / Periodo --}}
+                    <div
+                        class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
-                            class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
-                            <div
-                                class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
-                                Parcial
-                            </div>
-                            <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                                {{ $this->periodoSeleccionado['parcial'] ?? 'Sin parcial' }}
-                            </div>
+                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
+                            {{ $this->esBachillerato ? 'Parcial' : 'Periodo' }}
                         </div>
-                    @endif
 
+                        <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {{ $this->periodoSeleccionado['parcial'] ?? ($this->esBachillerato ? 'Sin parcial' : 'Sin periodo') }}
+                        </div>
+                    </div>
+
+                    {{-- Fecha inicio --}}
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -242,11 +292,13 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                             Inicio de periodo
                         </div>
+
                         <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                            {{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') }}
+                            {{ !empty($this->periodoSeleccionado['fecha_inicio']) ? \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') : 'Sin fecha' }}
                         </div>
                     </div>
 
+                    {{-- Fecha fin --}}
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
                         <div
@@ -254,29 +306,32 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
                             Término de periodo
                         </div>
+
                         <div class="mt-2 text-1xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                            {{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') }}
+                            {{ !empty($this->periodoSeleccionado['fecha_fin']) ? \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') : 'Sin fecha' }}
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-6">
-                    <div
-                        class="mb-2 flex items-center justify-between text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                        <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') }}</span>
-                        <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') }}</span>
-                    </div>
+                @if (!empty($this->periodoSeleccionado['fecha_inicio']) && !empty($this->periodoSeleccionado['fecha_fin']))
+                    <div class="mt-6">
+                        <div
+                            class="mb-2 flex items-center justify-between text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                            <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->format('d/m/Y') }}</span>
+                            <span>{{ \Carbon\Carbon::parse($this->periodoSeleccionado['fecha_fin'])->format('d/m/Y') }}</span>
+                        </div>
 
-                    <div class="h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-                        <div class="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 transition-all duration-500"
-                            style="width: {{ $this->porcentajePeriodo }}%">
+                        <div class="h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                            <div class="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 transition-all duration-500"
+                                style="width: {{ $this->porcentajePeriodo }}%">
+                            </div>
+                        </div>
+
+                        <div class="mt-2 text-right text-sm font-medium text-neutral-600 dark:text-neutral-300">
+                            Avance {{ $this->porcentajePeriodo }}%
                         </div>
                     </div>
-
-                    <div class="mt-2 text-right text-sm font-medium text-neutral-600 dark:text-neutral-300">
-                        Avance {{ $this->porcentajePeriodo }}%
-                    </div>
-                </div>
+                @endif
             </div>
         </div>
     @endif
@@ -286,24 +341,30 @@
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="relative">
 
+            {{-- Loader --}}
             <div wire:loading.flex
-                wire:target="nivel_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,busqueda,limpiarFiltros,guardarCalificaciones"
+                wire:target="nivel_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,periodo_basica_id,busqueda,limpiarFiltros,guardarCalificaciones"
                 class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-950/60">
                 <div
                     class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-950">
                     <div
                         class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
                     </div>
-                    <div class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Cargando…</div>
+
+                    <div class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                        Cargando…
+                    </div>
                 </div>
             </div>
 
+            {{-- Buscador --}}
             <div class="border-b border-neutral-200 p-4 dark:border-neutral-800">
                 <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-2">
                     <div>
                         <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                             Buscar alumno o matrícula
                         </label>
+
                         <input type="text" wire:model.live.debounce.300ms="busqueda"
                             placeholder="Escribe nombre o matrícula..."
                             class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
@@ -315,6 +376,7 @@
                             <div class="font-semibold text-neutral-900 dark:text-neutral-100">
                                 {{ count($inscripciones) }} alumno(s)
                             </div>
+
                             <div class="text-xs text-neutral-500 dark:text-neutral-400">
                                 {{ count($materias) }} materia(s) calificable(s)
                             </div>
@@ -323,17 +385,20 @@
                 </div>
             </div>
 
+            {{-- Tabla de calificaciones --}}
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="degradado sticky top-0 z-20 bg-neutral-50 dark:bg-neutral-950/60">
                         <tr class="text-neutral-600 dark:text-neutral-300">
                             <th class="px-4 py-3 text-left font-semibold text-white">#</th>
+
                             <th
-                                class="sticky left-0 z-20 bg-sky-600 px-4 py-3 text-left font-semibold text-white min-w-[140px]">
+                                class="sticky left-0 z-20 min-w-[140px] bg-sky-600 px-4 py-3 text-left font-semibold text-white">
                                 MATRÍCULA
                             </th>
+
                             <th
-                                class="sticky left-[140px] z-20 bg-sky-700 px-4 py-3 text-left font-semibold text-white min-w-[260px]">
+                                class="sticky left-[140px] z-20 min-w-[260px] bg-sky-700 px-4 py-3 text-left font-semibold text-white">
                                 ALUMNO
                             </th>
 
@@ -350,7 +415,9 @@
                                 </th>
                             @endforeach
 
-                            <th class="min-w-[110px] px-4 py-3 text-center font-semibold text-white">PROMEDIO</th>
+                            <th class="min-w-[110px] px-4 py-3 text-center font-semibold text-white">
+                                PROMEDIO
+                            </th>
                         </tr>
                     </thead>
 
@@ -412,10 +479,11 @@
                                         <div class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                                             No hay datos para mostrar
                                         </div>
+
                                         <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                                             {{ $this->esBachillerato
-                                                ? 'Selecciona grado, semestre, grupo y parcial para cargar alumnos y materias.'
-                                                : 'Selecciona los filtros para cargar alumnos y materias.' }}
+                                                ? 'Selecciona generación, grado, semestre, grupo y parcial para cargar alumnos y materias.'
+                                                : 'Selecciona generación, grado, grupo y periodo para cargar alumnos y materias.' }}
                                         </div>
                                     </div>
                                 </td>
@@ -425,6 +493,7 @@
                 </table>
             </div>
 
+            {{-- Footer --}}
             <div class="border-t border-neutral-200 p-5 dark:border-neutral-800">
                 @error('calificaciones')
                     <div
@@ -437,14 +506,18 @@
                     <div class="w-full md:w-2/3">
                         <div class="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-300">
                             <span>
-                                Calificaciones introducidas: {{ $this->celdasCapturadas }} de {{ $this->totalCeldas }}
+                                Calificaciones introducidas:
+                                {{ $this->celdasCapturadas }}
+                                de
+                                {{ $this->totalCeldas }}
                                 ({{ $this->porcentajeCaptura }}%)
                             </span>
                         </div>
 
                         <div class="mt-2 h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-950">
                             <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
-                                style="width: {{ $this->porcentajeCaptura }}%"></div>
+                                style="width: {{ $this->porcentajeCaptura }}%">
+                            </div>
                         </div>
                     </div>
 
@@ -467,6 +540,7 @@
                                 <button type="button" wire:click="abrirModalBitacora" wire:loading.attr="disabled"
                                     wire:target="abrirModalBitacora"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-fuchsia-200 bg-white px-5 py-3 text-sm font-semibold text-fuchsia-700 shadow-sm transition hover:bg-fuchsia-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-fuchsia-900/40 dark:bg-neutral-900 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/20">
+
                                     <span wire:loading.remove wire:target="abrirModalBitacora"
                                         class="inline-flex items-center gap-2">
                                         <flux:icon.clock class="h-4 w-4" />
@@ -485,6 +559,7 @@
                             <button type="button" wire:click="exportarCalificaciones" wire:loading.attr="disabled"
                                 wire:target="exportarCalificaciones"
                                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900/40 dark:bg-neutral-900 dark:text-emerald-300 dark:hover:bg-emerald-950/20">
+
                                 <span wire:loading.remove wire:target="exportarCalificaciones"
                                     class="inline-flex items-center gap-2">
                                     <flux:icon.arrow-down-tray class="h-4 w-4" />
@@ -510,6 +585,7 @@
                                         'busqueda' => $busqueda ?: null,
                                         'semestre_id' => $this->esBachillerato ? $semestre_id : null,
                                         'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
+                                        'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
                                     ]),
                                 ) }}', '_blank')"
                                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/40 dark:bg-neutral-900 dark:text-rose-300 dark:hover:bg-rose-950/20">
@@ -528,6 +604,7 @@
         </div>
     </div>
 
+    {{-- Modal bitácora --}}
     <div x-data="{ show: @entangle('mostrarModalBitacora').live }" x-cloak>
         <div x-show="show" x-transition.opacity.duration.200ms
             class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -555,6 +632,7 @@
                                 <h3 class="text-lg font-bold text-slate-800 dark:text-white">
                                     Bitácora de calificaciones
                                 </h3>
+
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                     Historial de movimientos del contexto seleccionado.
                                 </p>
@@ -571,15 +649,18 @@
                         {{-- Loader al montar el modal --}}
                         <div wire:loading.flex wire:target="abrirModalBitacora"
                             class="absolute inset-0 z-20 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
+
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">
                                 <div class="relative mb-4 flex h-16 w-16 items-center justify-center">
                                     <div
                                         class="absolute inset-0 rounded-full border-4 border-sky-200 dark:border-sky-900/40">
                                     </div>
+
                                     <div
                                         class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-sky-500 border-r-indigo-500">
                                     </div>
+
                                     <div
                                         class="h-8 w-8 rounded-full bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 shadow-lg shadow-sky-500/30">
                                     </div>
@@ -608,6 +689,7 @@
                                             'generacion' => $generacion_id,
                                             'periodo' => $periodo_id,
                                             'parcial' => $parcial_bachillerato_id,
+                                            'periodo_basica' => $periodo_basica_id,
                                             'modal' => $mostrarModalBitacora,
                                         ]),
                                     )" />
@@ -623,5 +705,4 @@
             </div>
         </div>
     </div>
-
 </div>
