@@ -163,8 +163,8 @@
                                 <flux:select id="grupo_id" wire:model.live="grupo_id"
                                     wire:key="lista-grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                                     :disabled="$this->esBachillerato()
-                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
 
                                     <flux:select.option value="">
                                         Selecciona un grupo
@@ -222,6 +222,30 @@
 
                                 <flux:error name="opcion_descarga" />
                             </flux:field>
+
+                            @if ($tipo_descarga === 'grupo')
+                                <div
+                                    class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 shadow-sm
+               dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                                    <label class="flex cursor-pointer items-start gap-3">
+                                        <input type="checkbox" wire:model.live="mostrar_motivo"
+                                            class="mt-1 h-5 w-5 rounded border-indigo-300 text-indigo-600 shadow-sm
+                       focus:ring-2 focus:ring-indigo-500 dark:border-indigo-700">
+
+                                        <span>
+                                            <span
+                                                class="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                                Agregar columna de motivo
+                                            </span>
+
+                                            <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                                                Al activar esta opción, la lista de grupo incluirá una columna adicional
+                                                para escribir el motivo.
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mt-5 flex flex-wrap items-center gap-2">

@@ -28,6 +28,8 @@ class Listas extends Component
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
 
+    public bool $mostrar_motivo = false;
+
     public string $tipo_descarga = 'evaluacion';
     public string $opcion_descarga = 'primer_periodo';
 
@@ -110,6 +112,11 @@ class Listas extends Component
         $opciones = $this->opcionesDescarga();
 
         $this->opcion_descarga = array_key_first($opciones) ?? '';
+
+        // Limpio el checkbox si ya no estoy en Lista de grupo.
+        if ($this->tipo_descarga !== 'grupo') {
+            $this->mostrar_motivo = false;
+        }
     }
 
     public function cargarSemestresPorGrado(): void
@@ -202,6 +209,8 @@ class Listas extends Component
         $this->opcion_descarga = 'primer_periodo';
 
         $this->grupos = collect();
+
+        $this->mostrar_motivo = false;
         $this->semestres = $this->cargarSemestresIniciales();
     }
 
@@ -289,6 +298,9 @@ class Listas extends Component
             'grupo_id' => $this->grupo_id,
             'tipo_descarga' => $this->tipo_descarga,
             'opcion_descarga' => $this->opcion_descarga,
+
+            // Solo mando motivo cuando la descarga sea Lista de grupo.
+            'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
         ]);
     }
 

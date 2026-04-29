@@ -274,8 +274,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -552,8 +552,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
@@ -867,11 +867,6 @@ class PDFController extends Controller
     // LISTAS PDF
     public function lista_pdf(Request $request, string $slug_nivel)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Recibo los filtros enviados desde Livewire
-        |--------------------------------------------------------------------------
-        */
 
         $generacion_id = $request->integer('generacion_id');
         $grado_id = $request->integer('grado_id');
@@ -880,6 +875,8 @@ class PDFController extends Controller
 
         $tipo_descarga = $request->input('tipo_descarga', 'evaluacion');
         $opcion_descarga = $request->input('opcion_descarga', 'primer_periodo');
+
+        $mostrarMotivo = $tipo_descarga === 'grupo' && $request->boolean('mostrar_motivo');
 
         /*
         |--------------------------------------------------------------------------
@@ -977,12 +974,6 @@ class PDFController extends Controller
                 ->firstOrFail();
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Consulto alumnos activos
-        |--------------------------------------------------------------------------
-        */
-
         $alumnosQuery = Inscripcion::query()
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -1002,14 +993,6 @@ class PDFController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Consulto materias calificables
-        |--------------------------------------------------------------------------
-        | Estas materias solo se usan para lista de evaluación.
-        | En asistencia, grupo y formatos no estorban porque van disponibles en $data.
-        */
-
         $materiasQuery = AsignacionMateria::query()
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $grado->id)
@@ -1026,13 +1009,6 @@ class PDFController extends Controller
             ->orderBy('orden')
             ->orderBy('id')
             ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Busco docente principal
-        |--------------------------------------------------------------------------
-        | Se toma el docente que más se repite en las materias del grupo.
-        */
 
         $profesor_id = $materias
             ->pluck('profesor_id')
@@ -1054,22 +1030,9 @@ class PDFController extends Controller
             ? $this->nombrePersona($docente)
             : '____________________________';
 
-        /*
-        |--------------------------------------------------------------------------
-        | Escuela
-        |--------------------------------------------------------------------------
-        */
-
         $escuela = DB::table('escuela')->first();
 
-
         $cicloEscolar = CicloEscolar::orderBy('id', 'desc')->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Periodo, mes y ciclo escolar
-        |--------------------------------------------------------------------------
-        */
 
 
         $periodo = Periodos::with(['periodoBasica', 'parcialBachillerato'])
@@ -1089,22 +1052,9 @@ class PDFController extends Controller
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Imágenes para PDF
-        |--------------------------------------------------------------------------
-        | Cambia estas rutas si tus logos están en otra carpeta.
-        */
-
         $logoIzquierdo = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
         $logoDerecho = $this->imagenBase64Publica('imagenes/logo-letra.png');
         $marcaAgua = $this->imagenBase64Publica('imagenes/logo-letra.png');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Datos compartidos para todas las vistas PDF
-        |--------------------------------------------------------------------------
-        */
 
         $data = [
             'escuela' => $escuela,
@@ -1133,6 +1083,8 @@ class PDFController extends Controller
 
             'tipo_descarga' => $tipo_descarga,
             'opcion_descarga' => $opcion_descarga,
+
+            'mostrarMotivo' => $mostrarMotivo,
         ];
 
         /*
@@ -1147,22 +1099,17 @@ class PDFController extends Controller
             'grupo' => 'pdf.lista_grupo',
 
             'formatos' => match ($opcion_descarga) {
-                    'sece' => 'pdf.listas.formatos.sece',
-                    'sece_interna' => 'pdf.listas.formatos.sece-interna',
-                    'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
-                    'personalizadores' => 'pdf.listas.formatos.personalizadores',
-                    'etiquetas' => 'pdf.listas.formatos.etiquetas',
-                    default => abort(404, 'El formato seleccionado no existe.'),
-                },
+                'sece' => 'pdf.listas.formatos.sece',
+                'sece_interna' => 'pdf.listas.formatos.sece-interna',
+                'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
+                'personalizadores' => 'pdf.listas.formatos.personalizadores',
+                'etiquetas' => 'pdf.listas.formatos.etiquetas',
+                default => abort(404, 'El formato seleccionado no existe.'),
+            },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
 
-        /*
-        |--------------------------------------------------------------------------
-        | Nombre del archivo PDF
-        |--------------------------------------------------------------------------
-        */
 
         $nombreTipo = match ($tipo_descarga) {
             'evaluacion' => 'lista-evaluacion',
@@ -1170,20 +1117,22 @@ class PDFController extends Controller
             'grupo' => 'lista-grupo',
 
             'formatos' => match ($opcion_descarga) {
-                    'sece' => 'formato-sece',
-                    'sece_interna' => 'formato-sece-interna',
-                    'lista_boletas' => 'lista-boletas',
-                    'personalizadores' => 'personalizadores',
-                    'etiquetas' => 'etiquetas',
-                    default => 'formato',
-                },
+                'sece' => 'formato-sece',
+                'sece_interna' => 'formato-sece-interna',
+                'lista_boletas' => 'lista-boletas',
+                'personalizadores' => 'personalizadores',
+                'etiquetas' => 'etiquetas',
+                default => 'formato',
+            },
 
             default => 'lista',
         };
 
+        $nombreGrado = Grado::query()->where('id', $grado_id)->value('nombre') ?? 'grado';
+
         $nombreArchivo = $nombreTipo
             . '-' . $nivel->slug
-            . '-grado-' . $grado->id
+            . '-grado-' . $grado->nombre
             . '-grupo-' . $grupo->nombre
             . '.pdf';
 
@@ -1193,8 +1142,29 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        // Defino la orientación del PDF según el tipo y opción seleccionada.
+        $orientacionPdf = match (true) {
+            // Lista de grupo como la imagen que mandaste.
+            $tipo_descarga === 'grupo' => 'portrait',
+
+            // Evaluación por periodo.
+            $tipo_descarga === 'evaluacion' => 'landscape',
+
+            // Asistencia por periodo.
+            $tipo_descarga === 'asistencia' => 'landscape',
+
+            // Formatos específicos.
+            $tipo_descarga === 'formatos' && $opcion_descarga === 'sece' => 'landscape',
+            $tipo_descarga === 'formatos' && $opcion_descarga === 'sece_interna' => 'landscape',
+            $tipo_descarga === 'formatos' && $opcion_descarga === 'lista_boletas' => 'portrait',
+            $tipo_descarga === 'formatos' && $opcion_descarga === 'personalizadores' => 'portrait',
+            $tipo_descarga === 'formatos' && $opcion_descarga === 'etiquetas' => 'portrait',
+
+            default => 'portrait',
+        };
+
         return Pdf::loadView($vistaPdf, $data)
-            ->setPaper('letter', 'landscape')
+            ->setPaper('letter', $orientacionPdf)
             ->stream($nombreArchivo);
     }
 
@@ -1316,8 +1286,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->nombre ?? '') . ' ' .
-            ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '')
+                ($inscripcion->apellido_paterno ?? '') . ' ' .
+                ($inscripcion->apellido_materno ?? '')
         );
 
         /*
@@ -1619,8 +1589,8 @@ class PDFController extends Controller
     {
         return trim(
             ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 
