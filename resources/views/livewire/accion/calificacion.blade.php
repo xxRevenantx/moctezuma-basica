@@ -2,6 +2,126 @@
     insIds: @js(collect($inscripcionesTabla)->pluck('inscripcion_id')->values()->all()),
     asigIds: @js(collect($materias)->pluck('id')->values()->all()),
 
+    storageKey: 'calificaciones_filtros_{{ $slug_nivel }}',
+
+    guardandoFiltros: false,
+    restaurandoFiltros: false,
+
+    async iniciarFiltrosGuardados() {
+        await this.restaurarFiltros();
+
+        this.$watch('$wire.generacion_id', () => this.guardarFiltros());
+        this.$watch('$wire.grado_id', () => this.guardarFiltros());
+        this.$watch('$wire.semestre_id', () => this.guardarFiltros());
+        this.$watch('$wire.grupo_id', () => this.guardarFiltros());
+        this.$watch('$wire.parcial_bachillerato_id', () => this.guardarFiltros());
+        this.$watch('$wire.periodo_basica_id', () => this.guardarFiltros());
+        this.$watch('$wire.busqueda', () => this.guardarFiltros());
+        this.$watch('$wire.filtro_estado', () => this.guardarFiltros());
+        this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
+    },
+
+    async restaurarFiltros() {
+        const filtrosGuardados = localStorage.getItem(this.storageKey);
+
+        if (!filtrosGuardados) {
+            return;
+        }
+
+        let filtros = null;
+
+        try {
+            filtros = JSON.parse(filtrosGuardados);
+        } catch (error) {
+            localStorage.removeItem(this.storageKey);
+            return;
+        }
+
+        this.restaurandoFiltros = true;
+
+        /*
+            Restauro los filtros en orden para evitar que Livewire limpie selects dependientes.
+            Primero generación, luego grado, luego semestre/grupo y finalmente periodo/parcial.
+        */
+        if (filtros.generacion_id) {
+            await this.$wire.set('generacion_id', filtros.generacion_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.grado_id) {
+            await this.$wire.set('grado_id', filtros.grado_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.semestre_id) {
+            await this.$wire.set('semestre_id', filtros.semestre_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.grupo_id) {
+            await this.$wire.set('grupo_id', filtros.grupo_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.parcial_bachillerato_id) {
+            await this.$wire.set('parcial_bachillerato_id', filtros.parcial_bachillerato_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.periodo_basica_id) {
+            await this.$wire.set('periodo_basica_id', filtros.periodo_basica_id);
+            await this.esperar(250);
+        }
+
+        if (filtros.busqueda !== undefined) {
+            await this.$wire.set('busqueda', filtros.busqueda);
+        }
+
+        if (filtros.filtro_estado !== undefined) {
+            await this.$wire.set('filtro_estado', filtros.filtro_estado);
+        }
+
+        if (filtros.boleta_inscripcion_id) {
+            await this.$wire.set('boleta_inscripcion_id', filtros.boleta_inscripcion_id);
+        }
+
+        this.restaurandoFiltros = false;
+    },
+
+    guardarFiltros() {
+        if (this.restaurandoFiltros || this.guardandoFiltros) {
+            return;
+        }
+
+        this.guardandoFiltros = true;
+
+        const filtros = {
+            generacion_id: this.$wire.generacion_id || '',
+            grado_id: this.$wire.grado_id || '',
+            semestre_id: this.$wire.semestre_id || '',
+            grupo_id: this.$wire.grupo_id || '',
+            parcial_bachillerato_id: this.$wire.parcial_bachillerato_id || '',
+            periodo_basica_id: this.$wire.periodo_basica_id || '',
+            busqueda: this.$wire.busqueda || '',
+            filtro_estado: this.$wire.filtro_estado || '',
+            boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
+        };
+
+        localStorage.setItem(this.storageKey, JSON.stringify(filtros));
+
+        setTimeout(() => {
+            this.guardandoFiltros = false;
+        }, 100);
+    },
+
+    limpiarFiltrosGuardados() {
+        localStorage.removeItem(this.storageKey);
+    },
+
+    esperar(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
     move(insId, asigId, direction) {
         const rowIndex = this.insIds.indexOf(insId);
         const colIndex = this.asigIds.indexOf(asigId);
@@ -28,7 +148,7 @@
             if (typeof el.select === 'function') el.select();
         }
     }
-}" class="w-full">
+}" x-init="iniciarFiltrosGuardados()" class="w-full">
 
     {{-- Niveles --}}
     <div class="overflow-hidden">
@@ -141,7 +261,7 @@
         @endif
 
         <div class="mt-7">
-            <button type="button" wire:click="limpiarFiltros"
+            <button type="button" x-on:click="limpiarFiltrosGuardados()" wire:click="limpiarFiltros"
                 class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:opacity-95">
                 Limpiar filtros
             </button>
@@ -461,17 +581,7 @@
                                                     {{ $message }}</div>
                                             @enderror
 
-                                            <button type="button"
-                                                x-on:click="$dispatch('abrir-observacion-calificacion', {
-                                                    inscripcion: {{ $insId }},
-                                                    materia: {{ $asigId }},
-                                                    alumno: @js($fila['alumno']),
-                                                    nombreMateria: @js($m['materia']),
-                                                    valor: $wire.get('observaciones.{{ $insId }}.{{ $asigId }}') || ''
-                                                })"
-                                                class="mt-1 inline-flex text-[11px] font-semibold text-sky-600 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200">
-                                                Observación
-                                            </button>
+
                                         </div>
                                     </td>
                                 @endforeach
@@ -677,54 +787,7 @@
         </div>
     @endif
 
-    {{-- Modal observación --}}
-    <div x-data="{
-        show: false,
-        inscripcion: null,
-        materia: null,
-        alumno: '',
-        nombreMateria: '',
-        texto: '',
-        abrir(event) {
-            this.inscripcion = event.detail.inscripcion;
-            this.materia = event.detail.materia;
-            this.alumno = event.detail.alumno;
-            this.nombreMateria = event.detail.nombreMateria;
-            this.texto = event.detail.valor || '';
-            this.show = true;
-        },
-        guardar() {
-            if (this.inscripcion && this.materia) {
-                $wire.set(`observaciones.${this.inscripcion}.${this.materia}`, this.texto);
-            }
-            this.show = false;
-        }
-    }" x-on:abrir-observacion-calificacion.window="abrir($event)" x-cloak>
-        <div x-show="show" x-transition.opacity.duration.200ms
-            class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-            @click.self="show = false" @keydown.escape.window="show = false">
-            <div x-show="show" x-transition
-                class="w-full max-w-xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900">
-                <div class="h-1.5 bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500"></div>
-                <div class="p-6">
-                    <h3 class="text-lg font-black text-neutral-900 dark:text-white">Observación de calificación</h3>
-                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400"><span x-text="alumno"></span> ·
-                        <span x-text="nombreMateria"></span>
-                    </p>
-                    <textarea x-model="texto" rows="5"
-                        class="mt-5 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
-                        placeholder="Escribe una observación..."></textarea>
-                    <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" x-on:click="show = false"
-                            class="rounded-2xl border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">Cancelar</button>
-                        <button type="button" x-on:click="guardar()"
-                            class="rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:opacity-95">Guardar
-                            observación</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 
     {{-- Modal revisión --}}
     <div x-data="{ show: @entangle('mostrarModalRevision').live }" x-cloak>

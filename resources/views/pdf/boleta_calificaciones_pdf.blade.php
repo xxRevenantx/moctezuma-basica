@@ -7,7 +7,7 @@
 
     <style>
         @page {
-            margin: 20px 18px 18px 18px;
+            margin: 20px 50px 18px;
         }
 
         @font-face {
@@ -46,13 +46,13 @@
         }
 
         .logo {
-            width: 78px;
+            width: 100px;
             text-align: center;
         }
 
         .logo img {
-            max-width: 62px;
-            max-height: 62px;
+            width: 90px;
+
         }
 
         .title-wrap {
@@ -180,7 +180,7 @@
             color: #1e3a8a;
             border: 1px solid #ffffff;
             padding: 7px 5px;
-            font-size: 8.5px;
+            font-size: 13px;
             text-align: center;
             font-weight: bold;
         }
@@ -188,7 +188,7 @@
         .tabla td {
             border: 1px solid #e2e8f0;
             padding: 6px 5px;
-            font-size: 8.5px;
+            font-size: 12px;
             vertical-align: middle;
         }
 
@@ -342,6 +342,8 @@
         </table>
     </div>
 
+
+
     <table class="student-card">
         <tr>
             <td class="label">Alumno</td>
@@ -363,6 +365,8 @@
             <td class="label">Grupo</td>
             <td>{{ $grupo->nombre ?? '—' }}</td>
         </tr>
+
+
 
         @if ($esBachillerato)
             <tr>
@@ -412,35 +416,17 @@
         </tr>
     </table>
 
-    <div class="global-box">
-        <div class="global-title">Gráfica de promedio general</div>
-        <div class="bar-bg">
-            @php
-                $claseBarraPromedio = 'bar-risk';
 
-                if (is_numeric($promedio)) {
-                    if ((float) $promedio >= 8) {
-                        $claseBarraPromedio = 'bar-ok';
-                    } elseif ((float) $promedio >= 6) {
-                        $claseBarraPromedio = 'bar-regular';
-                    }
-                }
-            @endphp
-
-            <div class="bar {{ $claseBarraPromedio }}" style="width: {{ $porcentajePromedio }}%;"></div>
-        </div>
-    </div>
-
-    <div class="section-title">Detalle de calificaciones</div>
 
     <table class="tabla">
         <thead>
             <tr>
-                <th style="width: 36%;">Materia</th>
+                @if ($esBachillerato)
+                    <th style="width: 13%;">Clave</th>
+                @endif
+                <th style="width: 25%;">Materia</th>
                 <th style="width: 13%;">Calificación</th>
                 <th style="width: 15%;">Estado</th>
-                <th style="width: 22%;">Avance visual</th>
-                <th style="width: 14%;">Observación</th>
             </tr>
         </thead>
 
@@ -466,6 +452,9 @@
                 @endphp
 
                 <tr>
+                    @if ($esBachillerato)
+                        <td class="text-center">{{ $fila['clave'] }}</td>
+                    @endif
                     <td class="materia">
                         {{ $fila['materia'] }}
                         @if ($fila['extra'])
@@ -481,13 +470,6 @@
                         <span class="badge {{ $badgeClass }}">{{ $fila['estado'] }}</span>
                     </td>
 
-                    <td>
-                        <div class="bar-bg">
-                            <div class="bar {{ $barClass }}" style="width: {{ $fila['porcentaje'] }}%;"></div>
-                        </div>
-                    </td>
-
-                    <td>{{ $fila['observacion'] }}</td>
                 </tr>
             @empty
                 <tr>

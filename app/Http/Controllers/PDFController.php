@@ -14,6 +14,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -273,8 +274,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -334,9 +335,9 @@ class PDFController extends Controller
         $grupoId = $request->input('grupo_id');
 
         /*
-     * El PDF puede recibir periodo_id directo.
-     * Para básica también puede llegar periodo_basica_id.
-     */
+         * El PDF puede recibir periodo_id directo.
+         * Para básica también puede llegar periodo_basica_id.
+         */
         $periodoId = $request->input('periodo_id');
         $periodoBasicaId = $request->input('periodo_basica_id');
         $parcialBachilleratoId = $request->input('parcial_bachillerato_id');
@@ -406,8 +407,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Obtiene el periodo.
-     */
+         * Obtiene el periodo.
+         */
         $queryPeriodo = \App\Models\Periodos::query()
             ->with([
                 'cicloEscolar',
@@ -451,8 +452,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Nombre visible del periodo seleccionado.
-     */
+         * Nombre visible del periodo seleccionado.
+         */
         $nombrePeriodo = 'Periodo seleccionado';
 
         if (!$esBachillerato && $periodo?->periodoBasica?->descripcion) {
@@ -464,8 +465,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Materias calificables.
-     */
+         * Materias calificables.
+         */
         $queryMaterias = \App\Models\AsignacionMateria::query()
             ->where('nivel_id', $nivel->id)
             ->where('grupo_id', $grupo->id)
@@ -507,8 +508,8 @@ class PDFController extends Controller
             ->toArray();
 
         /*
-     * Inscripciones.
-     */
+         * Inscripciones.
+         */
         $queryInscripciones = \App\Models\Inscripcion::query()
             ->with(['grado:id,nombre', 'grupo:id,nombre', 'semestre:id,numero'])
             ->where('nivel_id', $nivel->id)
@@ -551,8 +552,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
@@ -566,8 +567,8 @@ class PDFController extends Controller
         $idsMaterias = collect($materias)->pluck('id')->values()->all();
 
         /*
-     * Calificaciones guardadas.
-     */
+         * Calificaciones guardadas.
+         */
         $calificaciones = [];
 
         if (!empty($idsInscripciones) && !empty($idsMaterias)) {
@@ -616,8 +617,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Número de materias para promediar.
-     */
+         * Número de materias para promediar.
+         */
         $queryMateriaPromediar = \App\Models\MateriaPromediar::query()
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $grado->id)
@@ -634,8 +635,8 @@ class PDFController extends Controller
         $numeroMateriasPromediar = (int) ($registroPromedio?->numero_materias ?? 0);
 
         /*
-     * Si no existe configuración, usa las materias normales que no son extra.
-     */
+         * Si no existe configuración, usa las materias normales que no son extra.
+         */
         if ($numeroMateriasPromediar <= 0) {
             $numeroMateriasPromediar = collect($materias)
                 ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
@@ -643,10 +644,10 @@ class PDFController extends Controller
         }
 
         /*
-     * Promedios por alumno.
-     * Solo toma calificaciones numéricas de 0 a 10.
-     * Trunca a un decimal, no redondea.
-     */
+         * Promedios por alumno.
+         * Solo toma calificaciones numéricas de 0 a 10.
+         * Trunca a un decimal, no redondea.
+         */
         $promedios = [];
 
         foreach ($inscripciones as $fila) {
@@ -691,8 +692,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Promedios por materia.
-     */
+         * Promedios por materia.
+         */
         $promediosPorMateria = [];
 
         foreach ($materias as $materia) {
@@ -737,8 +738,8 @@ class PDFController extends Controller
         }
 
         /*
-     * Promedio general del grupo.
-     */
+         * Promedio general del grupo.
+         */
         $promediosNumericosGrupo = collect($promedios)
             ->filter(fn($valor) => is_numeric($valor))
             ->map(fn($valor) => (float) $valor)
@@ -757,8 +758,8 @@ class PDFController extends Controller
             : 0;
 
         /*
-     * Estadísticas generales.
-     */
+         * Estadísticas generales.
+         */
         $totalAlumnos = count($inscripciones);
 
         $totalAprobados = collect($promedios)
@@ -778,10 +779,10 @@ class PDFController extends Controller
             : 0;
 
         /*
-     * Periodos por materia.
-     * Como este PDF corresponde a un periodo seleccionado,
-     * se muestra ese periodo aplicado a cada materia calificable.
-     */
+         * Periodos por materia.
+         * Como este PDF corresponde a un periodo seleccionado,
+         * se muestra ese periodo aplicado a cada materia calificable.
+         */
         $periodosPorMateria = collect($materias)
             ->map(function ($materia) use ($periodo, $nombrePeriodo, $esBachillerato) {
                 return [
@@ -800,8 +801,8 @@ class PDFController extends Controller
             ->toArray();
 
         /*
-     * Logos e imagen por nivel.
-     */
+         * Logos e imagen por nivel.
+         */
         $logoIzquierdo = public_path('storage/logos' . $nivel->logo);
         $logoDerecho = public_path('imagenes/logo-letra.png');
 
@@ -1061,23 +1062,32 @@ class PDFController extends Controller
 
         $escuela = DB::table('escuela')->first();
 
+
+        $cicloEscolar = CicloEscolar::orderBy('id', 'desc')->first();
+
         /*
         |--------------------------------------------------------------------------
         | Periodo, mes y ciclo escolar
         |--------------------------------------------------------------------------
         */
 
+
+        $periodo = Periodos::with(['periodoBasica', 'parcialBachillerato'])
+            ->where('nivel_id', $nivel->id)
+            ->where('periodo_basica_id', $this->numeroPeriodoAsistencia($opcion_descarga))
+            ->first();
+
+
         if ($tipo_descarga === 'asistencia') {
             $periodoNumero = $this->numeroPeriodoAsistencia($opcion_descarga);
             $periodoTexto = $this->textoPeriodoAsistencia($opcion_descarga);
             $mesAsistencia = $this->mesPeriodoAsistencia($opcion_descarga);
         } else {
-            $periodoNumero = $this->numeroPeriodoEvaluacion($opcion_descarga);
+            $periodoNumero = $periodo;
             $periodoTexto = $this->textoPeriodoEvaluacion($opcion_descarga);
             $mesAsistencia = null;
         }
 
-        $cicloEscolar = $generacion->anio_ingreso . '-' . $generacion->anio_egreso;
 
         /*
         |--------------------------------------------------------------------------
@@ -1137,13 +1147,13 @@ class PDFController extends Controller
             'grupo' => 'pdf.lista_grupo',
 
             'formatos' => match ($opcion_descarga) {
-                'sece' => 'pdf.listas.formatos.sece',
-                'sece_interna' => 'pdf.listas.formatos.sece-interna',
-                'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
-                'personalizadores' => 'pdf.listas.formatos.personalizadores',
-                'etiquetas' => 'pdf.listas.formatos.etiquetas',
-                default => abort(404, 'El formato seleccionado no existe.'),
-            },
+                    'sece' => 'pdf.listas.formatos.sece',
+                    'sece_interna' => 'pdf.listas.formatos.sece-interna',
+                    'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
+                    'personalizadores' => 'pdf.listas.formatos.personalizadores',
+                    'etiquetas' => 'pdf.listas.formatos.etiquetas',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -1160,13 +1170,13 @@ class PDFController extends Controller
             'grupo' => 'lista-grupo',
 
             'formatos' => match ($opcion_descarga) {
-                'sece' => 'formato-sece',
-                'sece_interna' => 'formato-sece-interna',
-                'lista_boletas' => 'lista-boletas',
-                'personalizadores' => 'personalizadores',
-                'etiquetas' => 'etiquetas',
-                default => 'formato',
-            },
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'lista_boletas' => 'lista-boletas',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
 
             default => 'lista',
         };
@@ -1306,13 +1316,13 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->nombre ?? '') . ' ' .
-                ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '')
+            ($inscripcion->apellido_paterno ?? '') . ' ' .
+            ($inscripcion->apellido_materno ?? '')
         );
 
         /*
-     * Materias calificables del grupo.
-     */
+         * Materias calificables del grupo.
+         */
         $queryMaterias = \App\Models\AsignacionMateria::query()
             ->where('nivel_id', $nivel->id)
             ->where('grupo_id', $grupo->id)
@@ -1347,8 +1357,8 @@ class PDFController extends Controller
         $idsMaterias = $materias->pluck('id')->values()->all();
 
         /*
-     * Calificaciones del alumno en el periodo/parcial seleccionado.
-     */
+         * Calificaciones del alumno en el periodo/parcial seleccionado.
+         */
         $queryCalificaciones = \App\Models\Calificacion::query()
             ->where('inscripcion_id', $inscripcion->id)
             ->whereIn('asignacion_materia_id', $idsMaterias)
@@ -1382,8 +1392,8 @@ class PDFController extends Controller
             ->keyBy('asignacion_materia_id');
 
         /*
-     * Número de materias para promediar.
-     */
+         * Número de materias para promediar.
+         */
         $queryMateriaPromediar = \App\Models\MateriaPromediar::query()
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $grado->id)
@@ -1456,6 +1466,7 @@ class PDFController extends Controller
 
             $filasMaterias[] = [
                 'materia' => $materia->materia ?: 'Materia',
+                'clave' => $materia->clave ?: '—',
                 'calificacion' => $valor !== '' ? $valor : '—',
                 'estado' => $estado,
                 'porcentaje' => $porcentaje,
@@ -1498,8 +1509,8 @@ class PDFController extends Controller
         $tipoBoleta = $esBachillerato ? 'BOLETA PARCIAL' : 'BOLETA DE PERIODO';
 
         /*
-     * Logos.
-     */
+         * Logos.
+         */
         $logoIzquierdo = public_path('imagenes/logo-letra.png');
         $logoDerecho = public_path('imagenes/logo-secundario-moctezuma.png');
 
@@ -1575,6 +1586,7 @@ class PDFController extends Controller
 
     private function numeroPeriodoAsistencia(string $opcion): int
     {
+
         return match ($opcion) {
             'primer_periodo' => 1,
             'segundo_periodo' => 2,
@@ -1607,8 +1619,8 @@ class PDFController extends Controller
     {
         return trim(
             ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 

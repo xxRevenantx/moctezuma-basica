@@ -368,19 +368,17 @@
                     </td>
 
                     <td class="titulo-centro">
-                        <div class="nombre-escuela">
+                        <div class="nombre-escuela" style="font-family: ARIAL">
                             {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
                         </div>
 
-                        <div class="titulo-lista">
-                            LISTA DE EVALUACIÓN
+                        <div class="titulo-lista" style="font-size: 20px">
+                            LISTA DE ASISTENCIA
                         </div>
 
-                        <div class="ciclo">
-                            CICLO ESCOLAR: {{ $cicloEscolar }}
-                        </div>
 
-                        <div class="direccion">
+
+                        <div class="direccion" style="font-size: 12px; width:500px; margin: auto;">
                             {{ $escuela->calle ?? 'Francisco I. Madero Ote.' }}
                             @if (!empty($escuela->no_exterior))
                                 #{{ $escuela->no_exterior }},
@@ -430,7 +428,7 @@
 
                     <td style="width: 135px;">
                         <span class="campo campo-ciclo">
-                            {{ $cicloEscolar }}
+                            {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
                         </span>
                     </td>
 
@@ -440,7 +438,7 @@
 
                     <td style="width: 120px;">
                         <span class="campo campo-corto">
-                            {{ $grado->nombre }}
+                            {{ $grado->nombre }} ° "{{ $grupo->nombre }}"
                         </span>
                     </td>
                 </tr>

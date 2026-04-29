@@ -278,6 +278,52 @@
 
         }
 
+        .leyenda-calificaciones {
+            margin-top: 8px;
+            width: 100%;
+            border: 1px solid #94a3b8;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        .leyenda-calificaciones td {
+            border: 1px solid #94a3b8;
+            padding: 5px 6px;
+            text-align: center;
+        }
+
+        .leyenda-titulo {
+            background: #dbeafe;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #1e3a8a;
+            letter-spacing: 0.4px;
+        }
+
+        .leyenda-clave {
+            display: inline-block;
+            min-width: 22px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #001333;
+        }
+
+        .leyenda-ac {
+            background: #bbf7d0;
+            color: #166534;
+        }
+
+        .leyenda-ed {
+            background: #fde68a;
+            color: #92400e;
+        }
+
+        .leyenda-ra {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
         footer {
             position: fixed;
             left: 0;
@@ -324,7 +370,7 @@
                         </div>
 
                         <div class="ciclo">
-                            CICLO ESCOLAR: {{ $cicloEscolar }}
+                            CICLO ESCOLAR: {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
                         </div>
 
                         <div class="direccion">
@@ -374,7 +420,7 @@
             <div class="linea-centro">
                 <span>
                     Periodo No:
-                    <span class="subrayado">{{ $periodoNumero }}</span>
+                    <span class="subrayado">{{ $periodoNumero->periodoBasica->periodo }}</span>
                 </span>
 
                 <span>
@@ -395,13 +441,10 @@
 
             <div class="fechas">
                 que comprende las fechas
-                <span class="linea-fecha">
-                    {{ $fechaInicio ?? '' }}
-                </span>
+                <u>{{ $periodoNumero->fecha_inicio ? \Carbon\Carbon::parse($periodoNumero->fecha_inicio)->locale('es')->translatedFormat('j \\de F  Y') : '' }}</u>
                 al
-                <span class="linea-fecha">
-                    {{ $fechaFin ?? '' }}
-                </span>
+                <u>{{ $periodoNumero->fecha_fin ? \Carbon\Carbon::parse($periodoNumero->fecha_fin)->locale('es')->translatedFormat('j \\de F  Y') : '' }}</u>
+
             </div>
 
             @if ($materias->isEmpty())
@@ -444,7 +487,7 @@
                                     {{ $loop->iteration }}
                                 </td>
 
-                                <td class="tbody-alumno">
+                                <td class="tbody-alumno" style="text-transform: uppercase">
                                     {{ $alumno->apellido_paterno }}
                                     {{ $alumno->apellido_materno }}
                                     {{ $alumno->nombre }}
@@ -466,6 +509,30 @@
 
 
                     </tbody>
+                </table>
+
+                <table class="leyenda-calificaciones">
+                    <tr>
+                        <td colspan="3" class="leyenda-titulo">
+                            Leyenda de evaluación
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: #f0fdf4;">
+                            <span class="leyenda-clave leyenda-ac">AC</span>
+                            Acreditado
+                        </td>
+
+                        <td style="background: #fffbeb;">
+                            <span class="leyenda-clave leyenda-ed">ED</span>
+                            En desarrollo
+                        </td>
+
+                        <td style="background: #fef2f2;">
+                            <span class="leyenda-clave leyenda-ra">RA</span>
+                            Requiere apoyo
+                        </td>
+                    </tr>
                 </table>
             @endif
 
