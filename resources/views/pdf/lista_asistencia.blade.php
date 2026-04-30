@@ -28,6 +28,8 @@
 
         $diasSemana = ['L', 'M', 'M', 'J', 'V'];
 
+        $totalAlumnos = $alumnos->count() < 15 ? '10px' : '13px';
+
         $totalDias = 20;
         $totalColumnas = 2 + $totalDias + 3;
     @endphp
@@ -260,9 +262,9 @@
         }
 
         .fila-alumno td {
-            height: 20px;
-            background: #ffffff;
-            width: 20px;
+            /* height: 20px; */
+            /* background: #ffffff; */
+            width: {{ $totalAlumnos }};
         }
 
         .numero {

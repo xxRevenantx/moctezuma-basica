@@ -274,8 +274,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -552,8 +552,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
@@ -888,6 +888,7 @@ class PDFController extends Controller
             'evaluacion',
             'asistencia',
             'grupo',
+            'boletas',
             'formatos',
         ];
 
@@ -913,11 +914,15 @@ class PDFController extends Controller
                 'segundo_periodo',
                 'tercer_periodo',
             ],
+            'boletas' => [
+                'primer_periodo',
+                'segundo_periodo',
+                'tercer_periodo',
+            ],
 
             'formatos' => [
                 'sece',
                 'sece_interna',
-                'lista_boletas',
                 'personalizadores',
                 'etiquetas',
             ],
@@ -1097,15 +1102,15 @@ class PDFController extends Controller
             'evaluacion' => 'pdf.lista_evaluacion',
             'asistencia' => 'pdf.lista_asistencia',
             'grupo' => 'pdf.lista_grupo',
+            'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcion_descarga) {
-                'sece' => 'pdf.listas.formatos.sece',
-                'sece_interna' => 'pdf.listas.formatos.sece-interna',
-                'lista_boletas' => 'pdf.listas.formatos.lista-boletas',
-                'personalizadores' => 'pdf.listas.formatos.personalizadores',
-                'etiquetas' => 'pdf.listas.formatos.etiquetas',
-                default => abort(404, 'El formato seleccionado no existe.'),
-            },
+                    'sece' => 'pdf.lista.sece',
+                    'sece_interna' => 'pdf.sece_interna',
+                    'personalizadores' => 'pdf.personalizadores',
+                    'etiquetas' => 'pdf.etiquetas',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -1117,13 +1122,13 @@ class PDFController extends Controller
             'grupo' => 'lista-grupo',
 
             'formatos' => match ($opcion_descarga) {
-                'sece' => 'formato-sece',
-                'sece_interna' => 'formato-sece-interna',
-                'lista_boletas' => 'lista-boletas',
-                'personalizadores' => 'personalizadores',
-                'etiquetas' => 'etiquetas',
-                default => 'formato',
-            },
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'lista_boletas' => 'lista-boletas',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
 
             default => 'lista',
         };
@@ -1286,8 +1291,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->nombre ?? '') . ' ' .
-                ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '')
+            ($inscripcion->apellido_paterno ?? '') . ' ' .
+            ($inscripcion->apellido_materno ?? '')
         );
 
         /*
@@ -1589,8 +1594,8 @@ class PDFController extends Controller
     {
         return trim(
             ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 

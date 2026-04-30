@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>Lista de grupo</title>
+    <title>Lista de boletas</title>
 
     @php
         $slugNivel = $nivel->slug ?? '';
@@ -31,7 +31,7 @@
 
         $turnoTexto = $turno ?? 'Matutino';
 
-        $totalAlumnos = $alumnos->count() > 15 ? '25px' : '45px';
+        $totalAlumnos = $alumnos->count() > 15 ? '35px' : '43px';
 
     @endphp
 
@@ -134,11 +134,12 @@
         }
 
         .titulo-lista {
-            font-size: 20px;
+            font-size: 17px;
             font-weight: 700;
             margin-top: 2px;
             color: #111827;
             text-transform: uppercase;
+            line-height: 18px;
         }
 
         .direccion {
@@ -154,7 +155,6 @@
             width: 100%;
             text-align: center;
             margin-top: 8px;
-            margin-bottom: 54px;
             font-size: 16px;
             color: #020617;
         }
@@ -175,7 +175,7 @@
 
         .tabla-grupo {
             width: 100%;
-            margin: -30px auto;
+            margin: 10px auto;
             border-collapse: collapse;
 
             font-size: 12px;
@@ -290,8 +290,9 @@
                         </div>
 
                         <div class="titulo-lista">
-                            LISTA DE GRUPO<br>
-                            C.C.T. {{ $nivel->cct ?? '—' }}
+                            FIRMA DE BOLETAS<br>
+                            C.C.T. {{ $nivel->cct ?? '—' }} <br>
+                            CICLO ESCOLAR: {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
                         </div>
 
                         <div class="direccion">
@@ -365,17 +366,31 @@
                 </span>
             </div>
 
+
+            <div class="datos-grupo">
+                <span>
+                    <span class="valor">{{ $periodoNumero->periodoBasica->periodo }}° Periodo de evaluación</span>
+                </span>
+
+
+
+                <span>
+                    <span class="valor">Fechas:
+                        <u>{{ $periodoNumero->fecha_inicio ? \Carbon\Carbon::parse($periodoNumero->fecha_inicio)->locale('es')->translatedFormat('j \\de F  Y') : '' }}</u>
+                        al
+                        {{ $periodoNumero->fecha_fin ? \Carbon\Carbon::parse($periodoNumero->fecha_fin)->locale('es')->translatedFormat('j \\de F  Y') : '' }}
+                    </span>
+                </span>
+            </div>
+
             <table class="tabla-grupo">
                 <thead>
                     <tr>
-                        <th class="col-numero">No.</th>
-                        <th class="col-nombre">Nombre</th>
-                        <th class="col-apellido">Apellido Paterno</th>
-                        <th class="col-apellido">Apellido Materno</th>
-
-                        @if ($mostrarMotivo)
-                            <th class="col-motivo">Observaciones</th>
-                        @endif
+                        <th class="col-numero">NO.</th>
+                        <th class="col-nombre">NOMBRE</th>
+                        <th class="col-apellido">APELLIDO PATERNO</th>
+                        <th class="col-apellido">APELLIDO MATERNO</th>
+                        <th class="col-motivo">FIRMA DEL PADRE/MADRE O TUTOR</th>
                     </tr>
                 </thead>
 
@@ -395,12 +410,10 @@
                             </td>
 
                             <td class="alumno">
-                                {{ $alumno->apellido_materno }}
+                                {{ $alumno->apellido_materno ?: '----------------' }}
                             </td>
 
-                            @if ($mostrarMotivo)
-                                <td class="motivo"></td>
-                            @endif
+                            <td class="alumno"></td>
                         </tr>
                     @empty
                         <tr>
@@ -419,10 +432,8 @@
                             <td class="alumno"></td>
                             <td class="alumno"></td>
                             <td class="alumno"></td>
+                            <td class="alumno"></td>
 
-                            @if ($mostrarMotivo)
-                                <td class="motivo"></td>
-                            @endif
                         </tr>
                     @endfor
                 </tbody>

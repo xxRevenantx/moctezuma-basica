@@ -6,6 +6,12 @@
 
     <title>Lista de evaluación</title>
 
+
+
+    @php
+        $totalAlumnos = $alumnos->count() > 15 ? '1px' : '2px';
+    @endphp
+
     <style>
         @page {
             margin: 15px 26px 0;
@@ -194,7 +200,7 @@
         }
 
         .col-numero {
-            width: 5px;
+            /* width: 5px; */
             text-align: center;
 
         }
@@ -202,6 +208,7 @@
         .col-alumno {
             text-align: center;
             width: 300px;
+            font-size: 10px;
         }
 
         .col-materia {
@@ -241,7 +248,8 @@
 
         .tbody-alumno {
             /* text-align: left; */
-            font-size: 14px;
+            font-size: 12px;
+            padding: {{ $totalAlumnos }} 2px;
             /* white-space: nowrap; */
             overflow: hidden;
         }

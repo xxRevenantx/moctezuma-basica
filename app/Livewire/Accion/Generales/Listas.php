@@ -220,6 +220,7 @@ class Listas extends Component
             'evaluacion' => 'Lista de evaluación',
             'asistencia' => 'Lista de asistencias',
             'grupo' => 'Lista de grupo',
+            'boletas' => 'Lista de boletas',
             'formatos' => 'Formatos',
         ];
     }
@@ -244,11 +245,15 @@ class Listas extends Component
                 'segundo_periodo' => 'SEGUNDO PERIODO',
                 'tercer_periodo' => 'TERCER PERIODO',
             ],
+            'boletas' => [
+                'primer_periodo' => 'PRIMER PERIODO',
+                'segundo_periodo' => 'SEGUNDO PERIODO',
+                'tercer_periodo' => 'TERCER PERIODO',
+            ],
 
             'formatos' => [
                 'sece' => 'SECE',
                 'sece_interna' => 'SECE interna',
-                'lista_boletas' => 'Lista de boletas',
                 'personalizadores' => 'Personalizadores',
                 'etiquetas' => 'Etiquetas',
             ],
