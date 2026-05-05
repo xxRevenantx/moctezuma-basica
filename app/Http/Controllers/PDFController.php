@@ -280,8 +280,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -562,8 +562,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
@@ -1054,8 +1054,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1518,8 +1518,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1765,8 +1765,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $item->grupo?->nombre ?? '—',
@@ -1947,9 +1947,46 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        /*
+|--------------------------------------------------------------------------
+| Logos y datos institucionales del diploma
+|--------------------------------------------------------------------------
+| Se usan imágenes en base64 porque Dompdf suele fallar con rutas relativas.
+| Las imágenes deben estar dentro de public/.
+*/
+
         $logoIzquierdo = $this->imagenBase64Publica('imagenes/logo-letra.png');
-        $logoDerecho = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
+
+        $logoDerecho = $this->imagenBase64Publica('imagenes/logo-edu.png');
+
         $marcaAgua = $this->imagenBase64Publica('imagenes/logo-letra.png');
+
+        /*
+|
+| Datos según el nivel
+|--------------------------------------------------------------------------
+| Se arma el encabezado de acuerdo al nivel seleccionado.
+*/
+
+        $nombreNivel = mb_strtolower($nivel->nombre ?? '');
+
+        $secretariaTexto = 'SECRETARÍA DE EDUCACIÓN GUERRERO';
+
+        $nombreEscuelaDiploma = match (true) {
+            str_contains($nombreNivel, 'preescolar') => 'JARDÍN DE NIÑOS PART. CENTRO UNIVERSITARIO MOCTEZUMA',
+            str_contains($nombreNivel, 'primaria') => 'ESC.PRIM.PART. CENTRO UNIVERSITARIO MOCTEZUMA',
+            str_contains($nombreNivel, 'secundaria') => 'ESC.SEC.PART. CENTRO UNIVERSITARIO MOCTEZUMA',
+            str_contains($nombreNivel, 'bachillerato') => 'BACHILLERATO GENERAL CENTRO UNIVERSITARIO MOCTEZUMA',
+            default => mb_strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA'),
+        };
+
+        $cctDiploma = match (true) {
+            str_contains($nombreNivel, 'preescolar') => data_get($nivel, 'cct') ?: 'C.C.T. 12PJN0226W',
+            str_contains($nombreNivel, 'primaria') => data_get($nivel, 'cct') ?: 'C.C.T. 12PPR0070B',
+            str_contains($nombreNivel, 'secundaria') => data_get($nivel, 'cct') ?: 'C.C.T. 12PES0105U',
+            str_contains($nombreNivel, 'bachillerato') => data_get($nivel, 'cct') ?: 'C.C.T. 12PBH0071R',
+            default => data_get($nivel, 'cct') ?: data_get($escuela, 'cct') ?: 'C.C.T. NO EXISTE',
+        };
 
         /*
         |--------------------------------------------------------------------------
@@ -1971,6 +2008,10 @@ class PDFController extends Controller
         $data = [
             'titulo' => $tipoDiploma,
             'escuela' => $escuela,
+
+            'secretariaTexto' => $secretariaTexto,
+            'nombreEscuelaDiploma' => $nombreEscuelaDiploma,
+            'cctDiploma' => $cctDiploma,
 
             'nivel' => $nivel,
             'grado' => $grado,
@@ -2510,12 +2551,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'pdf.lista.sece',
-                    'sece_interna' => 'pdf.sece_interna',
-                    'personalizadores' => 'pdf.personalizadores',
-                    'etiquetas' => 'pdf.etiquetas_pdf',
-                    default => abort(404, 'El formato seleccionado no existe.'),
-                },
+                'sece' => 'pdf.lista.sece',
+                'sece_interna' => 'pdf.sece_interna',
+                'personalizadores' => 'pdf.personalizadores',
+                'etiquetas' => 'pdf.etiquetas_pdf',
+                default => abort(404, 'El formato seleccionado no existe.'),
+            },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2533,12 +2574,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'formato-sece',
-                    'sece_interna' => 'formato-sece-interna',
-                    'personalizadores' => 'personalizadores',
-                    'etiquetas' => 'etiquetas',
-                    default => 'formato',
-                },
+                'sece' => 'formato-sece',
+                'sece_interna' => 'formato-sece-interna',
+                'personalizadores' => 'personalizadores',
+                'etiquetas' => 'etiquetas',
+                default => 'formato',
+            },
 
             default => 'lista',
         };
@@ -2688,9 +2729,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-            ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 
@@ -2906,15 +2947,15 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                ?? $periodo?->parcialBachillerato?->descripcion
-                ?? 'PARCIAL'
+                    ?? $periodo?->parcialBachillerato?->descripcion
+                    ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-            ?? $periodo?->periodoBasica?->descripcion
-            ?? 'PERIODO'
+                ?? $periodo?->periodoBasica?->descripcion
+                ?? 'PERIODO'
         );
     }
     private function imagenBase64Publica(?string $ruta): ?string

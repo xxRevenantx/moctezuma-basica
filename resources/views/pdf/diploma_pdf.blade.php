@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>{{ $titulo }}</title>
+
+    <title>{{ $titulo ?? 'Diploma' }}</title>
 
     <style>
         @font-face {
@@ -48,7 +49,7 @@
         body {
             font-family: 'calibri', 'ARIAL', sans-serif;
             background: #ffffff;
-            color: #1e293b;
+            color: #071846;
         }
 
         .diploma {
@@ -56,198 +57,301 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-
             background-image: url("{{ public_path('imagenes/diploma.jpg') }}");
             background-size: 100% 100%;
             background-position: center center;
             background-repeat: no-repeat;
         }
 
-        .contenido {
-            position: relative;
-            z-index: 5;
+        .logo-izquierdo {
+            position: absolute;
+            top: 104px;
+            left: 118px;
+            width: 100px;
+
             text-align: center;
+            z-index: 5;
         }
 
-        .fecha {
+        .logo-izquierdo img {
+            max-width: 100px;
+        }
+
+        .logo-derecho {
             position: absolute;
-            right: 58px;
-            top: 48px;
+            top: 112px;
+            right: 135px;
+            width: 180px;
+            text-align: center;
+            z-index: 5;
+        }
+
+        .logo-derecho img {
+            max-width: 180px;
+        }
+
+        .encabezado {
+            position: absolute;
+            top: 95px;
+            left: 300px;
+            right: 300px;
+            text-align: center;
             z-index: 6;
-            font-size: 11px;
-            color: #64748b;
         }
 
-        .marca {
+        .secretaria {
+            font-family: 'ARIAL', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .escuela {
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #c98626;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .cct {
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .otorga {
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .titulo-diploma {
             position: absolute;
-            left: 50%;
-            bottom: 110px;
-            transform: translateX(-50%);
-            z-index: 3;
-            font-size: 78px;
-            font-weight: bold;
-            color: #f8fafc;
-            letter-spacing: 5px;
-        }
-
-        .etiqueta {
-            display: inline-block;
-            padding: 7px 18px;
-            border-radius: 999px;
-            background: #fffbeb;
-            border: 1px solid #fcd34d;
-            color: #92400e;
-            font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 2px;
+            top: 232px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 110px;
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #08265f;
             text-transform: uppercase;
+            text-shadow: 5px 5px 0 #efa56f;
         }
 
-        .titulo {
-            margin-top: 22px;
-            font-size: 46px;
-            font-weight: bold;
-            color: #92400e;
-            letter-spacing: 1px;
+        .adorno-izquierdo {
+            position: absolute;
+            top: 306px;
+            left: 164px;
+            width: 95px;
+            height: 1.5px;
+            background: #b5792f;
+            z-index: 6;
+        }
+
+        .adorno-derecho {
+            position: absolute;
+            top: 306px;
+            right: 164px;
+            width: 95px;
+            height: 1.5px;
+            background: #b5792f;
+            z-index: 6;
+        }
+
+        .a-texto {
+            position: absolute;
+            top: 374px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #071846;
             text-transform: uppercase;
-        }
-
-        .subtitulo {
-            margin-top: 6px;
-            font-size: 15px;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-        }
-
-        .texto {
-            margin-top: 34px;
-            font-size: 17px;
-            line-height: 1.8;
-            color: #334155;
         }
 
         .alumno {
-            margin: 22px auto 0 auto;
-            max-width: 850px;
-            padding: 16px 20px;
-            border-bottom: 3px solid #f59e0b;
-            font-size: 34px;
-            font-weight: bold;
-            color: #0f172a;
-            letter-spacing: .5px;
-        }
-
-        .detalle {
-            margin: 24px auto 0 auto;
-            max-width: 850px;
-            font-size: 15px;
-            line-height: 1.7;
-            color: #334155;
-        }
-
-        .detalle strong {
-            color: #0f172a;
-        }
-
-        .promedio-box {
-            margin: 26px auto 0 auto;
-            width: 180px;
-            border-radius: 24px;
-            background: #ecfdf5;
-            border: 2px solid #86efac;
-            padding: 12px 18px;
-        }
-
-        .promedio-label {
-            font-size: 11px;
-            font-weight: bold;
+            position: absolute;
+            top: 420px;
+            left: 145px;
+            right: 145px;
+            z-index: 6;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 40px;
+            font-weight: 700;
+            color: #071846;
             text-transform: uppercase;
-            color: #047857;
+            letter-spacing: .6px;
         }
 
-        .promedio {
-            margin-top: 4px;
-            font-size: 34px;
-            font-weight: bold;
-            color: #065f46;
+        .linea-alumno {
+            position: absolute;
+            top: 480px;
+            left: 145px;
+            right: 145px;
+            z-index: 6;
+            height: 3px;
+            background: #eba55f;
         }
 
-        .info {
-            margin-top: 28px;
-            width: 100%;
+        .descripcion {
+            position: absolute;
+            top: 490px;
+            left: 150px;
+            right: 150px;
+            z-index: 6;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 16px;
+            line-height: 1;
+            color: #071846;
+        }
+
+        .descripcion strong {
+            font-weight: 700;
+            color: #071846;
+        }
+
+        .datos-extra {
+            position: absolute;
+            top: 550px;
+            left: 150px;
+            right: 150px;
+            z-index: 6;
+            width: calc(100% - 300px);
             border-collapse: collapse;
         }
 
-        .info td {
-            padding: 7px 10px;
-            font-size: 12px;
-            color: #475569;
+        .datos-extra td {
+            width: 33.33%;
             text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 15px;
+            color: #071846;
+            padding: 2px 8px;
         }
 
-        .info strong {
-            color: #0f172a;
+        .datos-extra strong {
+            color: #071846;
+            font-weight: 700;
+        }
+
+        .promedio-box {
+            position: absolute;
+            top: 550px;
+            left: 50%;
+            margin-left: -80px;
+            width: 160px;
+            z-index: 6;
+            text-align: center;
+            border: 1.5px solid #c98626;
+            border-radius: 12px;
+            padding: 5px 5px;
+            background: rgba(255, 255, 255, .85);
+        }
+
+        .promedio-label {
+            font-family: 'ARIAL', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #c98626;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .promedio {
+            margin-top: 1px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: #071846;
+        }
+
+        .lugar-box {
+            position: absolute;
+            top: 635px;
+            right: 200px;
+            width: 145px;
+            z-index: 6;
+            text-align: center;
+            border: 1.5px solid #c98626;
+            border-radius: 12px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, .85);
+        }
+
+        .lugar-label {
+            font-family: 'ARIAL', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #c98626;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .lugar {
+            margin-top: 1px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #071846;
         }
 
         .firmas {
             position: absolute;
-            left: 70px;
-            right: 70px;
-            bottom: 48px;
+            left: 150px;
+            right: 150px;
+            bottom: 62px;
             z-index: 6;
-            width: calc(100% - 140px);
+            width: calc(100% - 300px);
             border-collapse: collapse;
         }
 
         .firmas td {
-            width: 50%;
+            width: 10%;
             text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
             font-size: 11px;
-            color: #475569;
-            padding: 0 40px;
+            color: #071846;
+            padding: 0 55px;
         }
 
-        .linea {
-            border-top: 1.5px solid #334155;
-            padding-top: 8px;
-            font-weight: bold;
-            color: #0f172a;
-        }
-
-        .leyenda {
-            margin-top: 16px;
-            font-size: 11px;
-            color: #64748b;
-        }
-
-        .lugar-box {
-            margin: 16px auto 0 auto;
-            width: 210px;
-            border-radius: 24px;
-            background: #fffbeb;
-            border: 2px solid #facc15;
-            padding: 12px 18px;
-        }
-
-        .lugar-label {
-            font-size: 11px;
-            font-weight: bold;
+        .linea-firma {
+            border-top: 1.5px solid #071846;
+            padding-top: 7px;
+            font-weight: 700;
             text-transform: uppercase;
-            color: #92400e;
         }
 
-        .lugar {
-            margin-top: 4px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #78350f;
-        }
-
-        .logo-izquierdo img,
-        .logo-derecho img {
-            max-width: 120px;
-            max-height: 120px;
+        .cargo {
+            margin-top: 2px;
+            font-size: 10px;
+            font-weight: 400;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -255,126 +359,117 @@
 <body>
     <div class="diploma">
 
-
-        <div class="contenido">
-
-            <table class="encabezado">
-                <tr>
-                    <td class="logo-izquierdo">
-                        @if ($logoIzquierdo)
-                            <img src=" {{ $logoIzquierdo }}" alt="">
-                        @endif
-                    </td>
-
-                    <td class="titulo-centro">
-                        <div class="nombre-escuela">
-                            {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
-                        </div>
-
-
-
-                    </td>
-
-                    <td class="logo-derecho">
-                        @if ($logoDerecho)
-                            <img src="{{ $logoDerecho }}" alt="">
-                        @endif
-                    </td>
-                </tr>
-            </table>
-
-
-
-            <div class="titulo">
-                Diploma
-            </div>
-
-            <div class="subtitulo">
-                De aprovechamiento académico
-            </div>
-
-            <div class="texto">
-                Se otorga el presente reconocimiento a:
-            </div>
-
-            <div class="alumno">
-                {{ $alumnoNombre }}
-            </div>
-
-            <div class="detalle">
-                Por su desempeño académico durante el
-                <strong>{{ mb_strtoupper($nombrePeriodo) }}</strong>,
-                correspondiente al nivel
-                <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
-                grado
-                <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>,
-                grupo
-                <strong>{{ mb_strtoupper($grupo->nombre ?? 'GRUPO') }}</strong>.
-
-                @if ($esBachillerato && $semestre)
-                    <br>
-                    Semestre:
-                    <strong>{{ $semestre->numero }}</strong>
-                @endif
-            </div>
-
-            <div class="promedio-box">
-                <div class="promedio-label">Promedio</div>
-
-                <div class="promedio">
-                    {{ $promedio ?? '—' }}
-                </div>
-            </div>
-
-            @if (!empty($lugarAlumno))
-                <div class="lugar-box">
-                    <div class="lugar-label">Lugar obtenido</div>
-
-                    <div class="lugar">
-                        {{ $textoLugarAlumno }}
-                    </div>
-                </div>
+        <div class="logo-izquierdo">
+            @if (!empty($logoIzquierdo))
+                <img src="{{ $logoIzquierdo }}" alt="Logo Centro Universitario Moctezuma">
             @endif
-
-            <table class="info">
-                <tr>
-                    <td>
-                        <strong>Generación:</strong>
-                        {{ $generacion->anio_ingreso ?? '—' }} - {{ $generacion->anio_egreso ?? '—' }}
-                    </td>
-
-                    <td>
-                        <strong>{{ $esBachillerato ? 'Parcial:' : 'Periodo:' }}</strong>
-                        {{ $nombrePeriodo }}
-                    </td>
-
-                    <td>
-                        <strong>Ciclo escolar:</strong>
-                        {{ $periodo?->cicloEscolar?->inicio_anio ?? '—' }}-{{ $periodo?->cicloEscolar?->fin_anio ?? '—' }}
-                    </td>
-                </tr>
-            </table>
-
-            <div class="leyenda">
-                Documento generado automáticamente por el Sistema Web de Control Escolar.
-            </div>
         </div>
 
-        <table class="firmas">
+        <div class="logo-derecho">
+            @if (!empty($logoDerecho))
+                <img src="{{ $logoDerecho }}" alt="Logo Secretaría de Educación Guerrero">
+            @endif
+        </div>
+
+        <div class="encabezado">
+            <div class="secretaria">
+                {{ mb_strtoupper($secretariaTexto ?? 'SECRETARÍA DE EDUCACIÓN GUERRERO') }}
+            </div>
+
+            <div class="escuela">
+                {{ mb_strtoupper($nombreEscuelaDiploma ?? ($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA')) }}
+            </div>
+
+            <div class="cct">
+                {{ mb_strtoupper($cctDiploma ?? 'C.C.T. PENDIENTE') }}
+            </div>
+
+            <div class="otorga">
+                Otorga el presente
+            </div>
+
+
+        </div>
+
+
+
+        <div class="adorno-izquierdo"></div>
+        <div class="adorno-derecho"></div>
+
+        <div class="titulo-diploma">
+            Diploma
+        </div>
+
+        <div class="a-texto">
+            A:
+        </div>
+
+        <div class="alumno">
+            {{ $alumnoNombre ?? 'NOMBRE DEL ALUMNO' }}
+        </div>
+
+        <div class="linea-alumno"></div>
+
+        <div class="descripcion">
+            Por haber obtenido el @if (!empty($lugarAlumno))
+                <b><u> {{ $textoLugarAlumno ?? '—' }} </u></b>
+            @endif en aprovechamiento acádemico durante el
+            <strong> {{ $nombrePeriodo ?? '—' }}° {{ !empty($esBachillerato) ? 'Parcial' : 'Periodo' }}</strong>,
+            correspondiente al nivel
+            <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
+            <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>° grado
+            ,
+            grupo
+            <strong>{{ mb_strtoupper($grupo->nombre ?? 'GRUPO') }}</strong>.
+
+            @if (!empty($esBachillerato) && !empty($semestre))
+                <br>
+                Semestre:
+                <strong>{{ $semestre->numero ?? '—' }}</strong>
+            @endif
+        </div>
+
+        <table class="datos-extra">
             <tr>
                 <td>
-                    <div class="linea">
-                        Control Escolar
-                    </div>
+                    <strong>Generación:</strong>
+                    {{ $generacion->anio_ingreso ?? '—' }} - {{ $generacion->anio_egreso ?? '—' }}
                 </td>
 
                 <td>
-                    <div class="linea">
+                    <strong>Ciclo escolar:</strong>
+                    {{ $cicloEscolarTexto ?? '—' }}
+                </td>
+            </tr>
+        </table>
+
+        <div class="promedio-box">
+            <div class="promedio-label">
+                Promedio
+            </div>
+
+            <div class="promedio">
+                {{ $promedio ?? '—' }}
+            </div>
+        </div>
+
+
+
+        <table class="firmas">
+            <tr>
+
+                <td>
+                    <div class="linea-firma">
+                        {{ mb_strtoupper($director->director->nombre_completo ?? ($director->director->nombre ?? 'DIRECCIÓN ACADÉMICA')) }}
+                    </div>
+
+                    <div class="cargo">
                         Dirección Académica
                     </div>
                 </td>
             </tr>
         </table>
+
     </div>
 </body>
 
