@@ -8,6 +8,7 @@ use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\SubmoduloNivelController;
+use App\Http\Controllers\WordController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
@@ -84,6 +85,14 @@ Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])-
 
 Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificaciones_pdf'])
     ->name('misrutas.boleta.calificaciones.pdf');
+
+
+Route::get('/calificaciones/diploma/pdf', [PDFController::class, 'diploma_calificaciones_pdf'])
+    ->name('misrutas.diploma.calificaciones.pdf');
+
+// WORD
+Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
+    ->name('lista.evaluacion.word');
 
 
 Route::prefix('nivel')->group(function () {

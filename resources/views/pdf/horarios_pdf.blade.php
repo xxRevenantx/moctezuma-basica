@@ -79,14 +79,13 @@
 
         .logo-izq,
         .logo-der {
-            width: 120px;
+            width: 95px;
             text-align: center;
         }
 
         .logo-izq img,
         .logo-der img {
             max-width: 95px;
-            max-height: 95px;
         }
 
         .centro {

@@ -19,6 +19,7 @@
         this.$watch('$wire.busqueda', () => this.guardarFiltros());
         this.$watch('$wire.filtro_estado', () => this.guardarFiltros());
         this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
+        this.$watch('$wire.diploma_inscripcion_id', () => this.guardarFiltros());
     },
 
     async restaurarFiltros() {
@@ -39,10 +40,6 @@
 
         this.restaurandoFiltros = true;
 
-        /*
-            Restauro los filtros en orden para evitar que Livewire limpie selects dependientes.
-            Primero generación, luego grado, luego semestre/grupo y finalmente periodo/parcial.
-        */
         if (filtros.generacion_id) {
             await this.$wire.set('generacion_id', filtros.generacion_id);
             await this.esperar(250);
@@ -85,6 +82,10 @@
             await this.$wire.set('boleta_inscripcion_id', filtros.boleta_inscripcion_id);
         }
 
+        if (filtros.diploma_inscripcion_id) {
+            await this.$wire.set('diploma_inscripcion_id', filtros.diploma_inscripcion_id);
+        }
+
         this.restaurandoFiltros = false;
     },
 
@@ -105,6 +106,7 @@
             busqueda: this.$wire.busqueda || '',
             filtro_estado: this.$wire.filtro_estado || '',
             boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
+            diploma_inscripcion_id: this.$wire.diploma_inscripcion_id || '',
         };
 
         localStorage.setItem(this.storageKey, JSON.stringify(filtros));
@@ -145,7 +147,10 @@
 
         if (el) {
             el.focus();
-            if (typeof el.select === 'function') el.select();
+
+            if (typeof el.select === 'function') {
+                el.select();
+            }
         }
     }
 }" x-init="iniciarFiltrosGuardados()" class="w-full">
@@ -466,61 +471,163 @@
                             <flux:select.option value="cambios">Con cambios</flux:select.option>
                         </flux:select>
                     </div>
+                </div>
+                <div
+                    class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3 dark:border-sky-900/40 dark:bg-sky-950/20">
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-neutral-900 dark:text-sky-300">
+                            <flux:icon.document-text class="h-5 w-5" />
+                        </div>
 
-                    <div
-                        class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3 dark:border-sky-900/40 dark:bg-sky-950/20">
-                        <div class="flex items-start gap-3">
-                            <div
-                                class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-neutral-900 dark:text-sky-300">
-                                <flux:icon.document-text class="h-5 w-5" />
-                            </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
-                            <div class="min-w-0 flex-1">
-                                <flux:select
-                                    label="{{ $this->esBachillerato ? 'Boleta parcial por alumno' : 'Boleta de periodo por alumno' }}"
-                                    wire:model.live="boleta_inscripcion_id"
-                                    :disabled="count($inscripciones) === 0 || !$periodo_id">
+                                {{-- Boleta por alumno --}}
+                                <div
+                                    class="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300">
+                                            <flux:icon.document-arrow-down class="h-5 w-5" />
+                                        </div>
 
-                                    <flux:select.option value="">
-                                        -- Selecciona un alumno --
-                                    </flux:select.option>
+                                        <div class="min-w-0 flex-1">
+                                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                                Descargar boleta
+                                            </h4>
 
-                                    @foreach ($inscripciones as $alumnoBoleta)
-                                        <flux:select.option value="{{ $alumnoBoleta['inscripcion_id'] }}">
-                                            {{ $alumnoBoleta['matricula'] }} - {{ $alumnoBoleta['alumno'] }}
-                                        </flux:select.option>
-                                    @endforeach
-                                </flux:select>
+                                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                                Selecciona un alumno para descargar su boleta del
+                                                {{ $this->esBachillerato ? 'parcial' : 'periodo' }} seleccionado.
+                                            </p>
 
-                                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                                                <div class="flex-1">
+                                                    <flux:select
+                                                        label="{{ $this->esBachillerato ? 'Boleta parcial por alumno' : 'Boleta de periodo por alumno' }}"
+                                                        wire:model.live="boleta_inscripcion_id"
+                                                        :disabled="count($inscripciones) === 0 || !$periodo_id">
 
+                                                        <flux:select.option value="">
+                                                            -- Selecciona un alumno --
+                                                        </flux:select.option>
 
-                                    <button type="button" @if (!$this->puedeExportarBoleta) disabled @endif
-                                        x-on:click="window.open('{{ route(
-                                            'misrutas.boleta.calificaciones.pdf',
-                                            array_filter([
-                                                'slug_nivel' => $slug_nivel,
-                                                'generacion_id' => $generacion_id,
-                                                'grado_id' => $grado_id,
-                                                'grupo_id' => $grupo_id,
-                                                'periodo_id' => $periodo_id,
-                                                'inscripcion_id' => $boleta_inscripcion_id,
-                                                'semestre_id' => $this->esBachillerato ? $semestre_id : null,
-                                                'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
-                                                'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
-                                            ]),
-                                        ) }}', '_blank')"
-                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                        <flux:icon.document-arrow-down class="h-4 w-4" />
-                                        Descargar boleta
-                                    </button>
+                                                        @foreach ($inscripciones as $alumnoBoleta)
+                                                            <flux:select.option
+                                                                value="{{ $alumnoBoleta['inscripcion_id'] }}">
+                                                                {{ $alumnoBoleta['matricula'] }} -
+                                                                {{ $alumnoBoleta['alumno'] }}
+                                                            </flux:select.option>
+                                                        @endforeach
+                                                    </flux:select>
+                                                </div>
+
+                                                <button type="button"
+                                                    @if (!$this->puedeExportarBoleta) disabled @endif
+                                                    x-on:click="window.open('{{ route(
+                                                        'misrutas.boleta.calificaciones.pdf',
+                                                        array_filter([
+                                                            'slug_nivel' => $slug_nivel,
+                                                            'generacion_id' => $generacion_id,
+                                                            'grado_id' => $grado_id,
+                                                            'grupo_id' => $grupo_id,
+                                                            'periodo_id' => $periodo_id,
+                                                            'inscripcion_id' => $boleta_inscripcion_id,
+                                                            'semestre_id' => $this->esBachillerato ? $semestre_id : null,
+                                                            'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
+                                                            'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
+                                                        ]),
+                                                    ) }}', '_blank')"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
+                                                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                                                    Descargar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {{-- Diploma por alumno --}}
+                                <div
+                                    class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-neutral-900 dark:to-orange-950/20">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm dark:bg-neutral-900 dark:text-amber-300">
+                                            <flux:icon.trophy class="h-5 w-5" />
+                                        </div>
+
+                                        <div class="min-w-0 flex-1">
+                                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                                Descargar diploma
+                                            </h4>
+
+                                            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                                                Selecciona un alumno para descargar su diploma del
+                                                {{ $this->esBachillerato ? 'parcial' : 'periodo' }} seleccionado.
+                                            </p>
+
+                                            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                                                <div class="flex-1">
+                                                    <flux:select
+                                                        label="{{ $this->esBachillerato ? 'Diploma por parcial' : 'Diploma por periodo' }}"
+                                                        wire:model.live="diploma_inscripcion_id"
+                                                        :disabled="count($inscripciones) === 0 || !$periodo_id">
+
+                                                        <flux:select.option value="">
+                                                            -- Selecciona un alumno --
+                                                        </flux:select.option>
+
+                                                        @foreach ($inscripciones as $alumnoDiploma)
+                                                            <flux:select.option
+                                                                value="{{ $alumnoDiploma['inscripcion_id'] }}">
+                                                                {{ $alumnoDiploma['matricula'] }} -
+                                                                {{ $alumnoDiploma['alumno'] }}
+                                                            </flux:select.option>
+                                                        @endforeach
+                                                    </flux:select>
+                                                </div>
+
+                                                <button type="button"
+                                                    @if (!$this->puedeExportarDiploma) disabled @endif
+                                                    x-on:click="window.open('{{ route(
+                                                        'misrutas.diploma.calificaciones.pdf',
+                                                        array_filter([
+                                                            'slug_nivel' => $slug_nivel,
+                                                            'generacion_id' => $generacion_id,
+                                                            'grado_id' => $grado_id,
+                                                            'grupo_id' => $grupo_id,
+                                                            'periodo_id' => $periodo_id,
+                                                            'inscripcion_id' => $diploma_inscripcion_id,
+                                                            'semestre_id' => $this->esBachillerato ? $semestre_id : null,
+                                                            'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
+                                                            'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
+                                                        ]),
+                                                    ) }}', '_blank')"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-amber-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
+                                                    <flux:icon.trophy class="h-4 w-4" />
+                                                    Diploma
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
+
+                            @if (!$periodo_id)
+                                <div
+                                    class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                                    Primero selecciona {{ $this->esBachillerato ? 'un parcial' : 'un periodo' }}
+                                    para habilitar las descargas por alumno.
+                                </div>
+                            @endif
                         </div>
                     </div>
-
-
                 </div>
+
+
+
             </div>
 
             <div class="overflow-x-auto">
@@ -556,7 +663,7 @@
                                     class="sticky left-0 z-10 min-w-[140px] bg-white px-4 py-3 font-medium text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
                                     {{ $fila['matricula'] }}</td>
                                 <td
-                                    class="sticky left-[140px] z-10 min-w-[260px] bg-white px-4 py-3 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                                    class="sticky left-[140px] z-10 min-w-[260px] bg-white px-4 py-3 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 uppercase">
                                     {{ $fila['alumno'] }}</td>
 
                                 @foreach ($materias as $m)

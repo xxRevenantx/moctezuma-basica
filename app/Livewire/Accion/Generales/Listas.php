@@ -6,6 +6,7 @@ use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
+use App\Models\Parcial;
 use App\Models\Semestre;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +23,7 @@ class Listas extends Component
     public Collection $grados;
     public Collection $grupos;
     public Collection $semestres;
+    public Collection $parciales;
 
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
@@ -56,7 +58,22 @@ class Listas extends Component
 
         $this->semestres = $this->cargarSemestresIniciales();
 
+        $this->parciales = $this->cargarParciales();
+
         $this->grupos = collect();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Valores iniciales según el nivel
+        |--------------------------------------------------------------------------
+        | En básica inicio con Lista de evaluación.
+        | En bachillerato oculto evaluación/asistencia y arranco con Lista de grupo.
+        */
+        $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
+
+        $opciones = $this->opcionesDescarga();
+
+        $this->opcion_descarga = array_key_first($opciones) ?? '';
     }
 
     private function cargarSemestresIniciales(): Collection
@@ -84,6 +101,17 @@ class Listas extends Component
             ->get($columnas);
     }
 
+    private function cargarParciales(): Collection
+    {
+        if (!$this->esBachillerato()) {
+            return collect();
+        }
+
+        return Parcial::query()
+            ->orderBy('id')
+            ->get(['id', 'parcial', 'descripcion']);
+    }
+
     public function updatedGeneracionId(): void
     {
         $this->grupo_id = null;
@@ -109,20 +137,18 @@ class Listas extends Component
 
     public function updatedTipoDescarga(): void
     {
-        $opciones = $this->opcionesDescarga();
-
-        $this->opcion_descarga = array_key_first($opciones) ?? '';
-
-        // Limpio el checkbox si ya no estoy en Lista de grupo.
-        if ($this->tipo_descarga !== 'grupo') {
-            $this->mostrar_motivo = false;
+        if (($this->esBachillerato() || $this->esSecundaria()) && in_array($this->tipo_descarga, ['evaluacion', 'asistencia'])) {
+            $this->tipo_descarga = 'grupo';
         }
+
+        $this->opcion_descarga = array_key_first($this->opcionesDescarga()) ?? '';
     }
 
     public function cargarSemestresPorGrado(): void
     {
         if (!$this->esBachillerato()) {
             $this->semestres = collect();
+
             return;
         }
 
@@ -142,7 +168,12 @@ class Listas extends Component
 
         $query = Semestre::query();
 
-        // Si la tabla tiene grado_id, filtro los semestres por el grado seleccionado.
+        /*
+        |--------------------------------------------------------------------------
+        | Filtro de semestres
+        |--------------------------------------------------------------------------
+        | Si la tabla tiene grado_id, filtro los semestres por el grado seleccionado.
+        */
         if ($this->grado_id && Schema::hasColumn('semestres', 'grado_id')) {
             $query->where('grado_id', $this->grado_id);
         }
@@ -205,28 +236,54 @@ class Listas extends Component
         $this->semestre_id = null;
         $this->grupo_id = null;
 
-        $this->tipo_descarga = 'evaluacion';
-        $this->opcion_descarga = 'primer_periodo';
+        $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
+
+        $opciones = $this->opcionesDescarga();
+
+        $this->opcion_descarga = array_key_first($opciones) ?? '';
 
         $this->grupos = collect();
 
         $this->mostrar_motivo = false;
         $this->semestres = $this->cargarSemestresIniciales();
+        $this->parciales = $this->cargarParciales();
     }
 
     public function tiposDescarga(): array
     {
-        return [
+        $tipos = [
             'evaluacion' => 'Lista de evaluación',
-            'asistencia' => 'Lista de asistencias',
+            'asistencia' => 'Lista de asistencia',
             'grupo' => 'Lista de grupo',
-            'boletas' => 'Lista de boletas',
             'formatos' => 'Formatos',
         ];
+
+        if ($this->esBachillerato() || $this->esSecundaria()) {
+            unset($tipos['evaluacion'], $tipos['asistencia']);
+        }
+
+        return $tipos;
     }
 
     public function opcionesDescarga(): array
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Opciones para bachillerato
+        |--------------------------------------------------------------------------
+        | En bachillerato ya no uso periodos. Uso parciales.
+        | Se genera la llave como parcial_ID para validar fácil en el controlador.
+        */
+        if ($this->esBachillerato() && $this->tipo_descarga !== 'formatos') {
+            return $this->parciales
+                ->mapWithKeys(function ($parcial) {
+                    return [
+                        'parcial_' . $parcial->id => $this->textoParcial($parcial),
+                    ];
+                })
+                ->toArray();
+        }
+
         return match ($this->tipo_descarga) {
             'evaluacion' => [
                 'primer_periodo' => 'PRIMER PERIODO',
@@ -245,6 +302,7 @@ class Listas extends Component
                 'segundo_periodo' => 'SEGUNDO PERIODO',
                 'tercer_periodo' => 'TERCER PERIODO',
             ],
+
             'boletas' => [
                 'primer_periodo' => 'PRIMER PERIODO',
                 'segundo_periodo' => 'SEGUNDO PERIODO',
@@ -289,13 +347,9 @@ class Listas extends Component
     }
 
     #[Computed]
-    public function urlPdf(): ?string
+    public function parametrosDescarga(): array
     {
-        if (!$this->puedeDescargar) {
-            return null;
-        }
-
-        return route('accion.generales.listas.pdf', [
+        return [
             'slug_nivel' => $this->slug_nivel,
             'generacion_id' => $this->generacion_id,
             'grado_id' => $this->grado_id,
@@ -304,9 +358,75 @@ class Listas extends Component
             'tipo_descarga' => $this->tipo_descarga,
             'opcion_descarga' => $this->opcion_descarga,
 
-            // Solo mando motivo cuando la descarga sea Lista de grupo.
+            /*
+            |--------------------------------------------------------------------------
+            | Columna motivo
+            |--------------------------------------------------------------------------
+            | Solo se manda cuando el documento seleccionado sea Lista de grupo.
+            */
             'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
-        ]);
+        ];
+    }
+
+    #[Computed]
+    public function urlPdf(): ?string
+    {
+        if (!$this->puedeDescargar) {
+            return null;
+        }
+
+        return route('accion.generales.listas.pdf', $this->parametrosDescarga);
+    }
+
+    #[Computed]
+    public function urlWord(): ?string
+    {
+        if (!$this->puedeDescargar) {
+            return null;
+        }
+
+        return route('lista.evaluacion.word', $this->parametrosDescarga);
+    }
+
+    #[Computed]
+    public function urlDescarga(): ?string
+    {
+        if (!$this->puedeDescargar) {
+            return null;
+        }
+
+        if ($this->esWordPreescolarEvaluacion) {
+            return $this->urlWord;
+        }
+
+        return $this->urlPdf;
+    }
+
+    #[Computed]
+    public function esWordPreescolarEvaluacion(): bool
+    {
+        return $this->esPreescolar()
+            && $this->tipo_descarga === 'evaluacion';
+    }
+
+    #[Computed]
+    public function extensionDescarga(): string
+    {
+        return $this->esWordPreescolarEvaluacion ? 'WORD' : 'PDF';
+    }
+
+    #[Computed]
+    public function textoBotonDescarga(): string
+    {
+        return $this->esWordPreescolarEvaluacion ? 'Descargar Word' : 'Descargar PDF';
+    }
+
+    #[Computed]
+    public function textoModoDescarga(): string
+    {
+        return $this->esWordPreescolarEvaluacion
+            ? 'Este documento se generará en Word porque corresponde a evaluación de preescolar.'
+            : 'Este documento se generará en PDF.';
     }
 
     #[Computed]
@@ -361,6 +481,15 @@ class Listas extends Component
         return $this->opcionesDescarga()[$this->opcion_descarga] ?? '—';
     }
 
+    public function etiquetaOpcionDescarga(): string
+    {
+        if ($this->tipo_descarga === 'formatos') {
+            return 'Formato';
+        }
+
+        return $this->esBachillerato() ? 'Parcial' : 'Periodo';
+    }
+
     public function textoSemestre($semestre): string
     {
         if (!$semestre) {
@@ -378,9 +507,39 @@ class Listas extends Component
         return 'Semestre ' . $semestre->id;
     }
 
+    public function textoParcial($parcial): string
+    {
+        if (!$parcial) {
+            return '—';
+        }
+
+        if (!empty($parcial->parcial)) {
+            return mb_strtoupper($parcial->parcial);
+        }
+
+        if (!empty($parcial->descripcion)) {
+            return mb_strtoupper($parcial->descripcion);
+        }
+
+        return 'PARCIAL ' . $parcial->id;
+    }
+
+    public function esPreescolar(): bool
+    {
+        return ((int) ($this->nivel?->id ?? 0) === 1)
+            || ($this->nivel?->slug === 'preescolar');
+    }
+
     public function esBachillerato(): bool
     {
-        return (int) $this->nivel->id === 4 || $this->nivel->slug === 'bachillerato';
+        return ((int) ($this->nivel?->id ?? 0) === 4)
+            || ($this->nivel?->slug === 'bachillerato');
+    }
+
+    public function esSecundaria(): bool
+    {
+        return ((int) ($this->nivel?->id ?? 0) === 3)
+            || ($this->nivel?->slug === 'secundaria');
     }
 
     public function render()

@@ -33,11 +33,12 @@
     }
 
     table {
-        width: 80%;
+        width: 15.4cm;
+        height: 1cm;
         margin: 10px auto;
         border-collapse: collapse;
 
-        font-size: 12px;
+        font-size: 11px;
         color: #000;
 
     }
@@ -45,7 +46,6 @@
     table th,
     table td {
         border: 1px solid #000;
-        padding: 0 8px;
         vertical-align: middle;
         padding: 8px 7px;
     }
@@ -62,18 +62,26 @@
     @endphp
 
 
+
+
     <table>
         @forelse ($alumnos as $alumno)
             <tr>
-                <td style="width:320px">
-                    {{ $alumno->nombre }} {{ $alumno->apellido_paterno }} {{ $alumno->apellido_materno }}
+                <td style="width:260px">
+                    {{ $alumno->apellido_paterno }} {{ $alumno->apellido_materno }} {{ $alumno->nombre }}
                 </td>
 
                 <td>
-                    {{ $nombreGrado }}°GRADO DE {{ $nombreNivel }}, GRUPO: {{ $nombreGrupo }}
+                    @if ($esBachillerato)
+                        {{ $nombreNivel }}, GRUPO: {{ $nombreGrupo }}
+                    @else
+                        {{ $nombreGrado }}° DE {{ $nombreNivel }}, GRUPO: {{ $nombreGrupo }}
+                    @endif
+
+
                 </td>
                 <td>
-                    GEN:
+                    GEN: {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
                 </td>
             </tr>
         @empty

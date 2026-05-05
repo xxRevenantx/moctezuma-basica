@@ -16,6 +16,6 @@ class Parcial extends Model
     // RELACIONES CON PERIODOS
     public function periodos()
     {
-        return $this->hasMany(Periodos::class, 'parcial_id');
+        return $this->hasMany(Periodos::class, 'parcial_bachillerato_id');
     }
 }

@@ -76,7 +76,7 @@
             top: 155px;
             left: 88px;
             width: 610px;
-            opacity: 0.08;
+            opacity: 0.06;
             z-index: 1;
         }
 
@@ -153,7 +153,7 @@
         .datos-grupo {
             width: 100%;
             text-align: center;
-            margin-top: 8px;
+            margin-top: 15px;
             margin-bottom: 54px;
             font-size: 16px;
             color: #020617;
@@ -264,6 +264,13 @@
             margin: 0;
             line-height: 1.25;
         }
+
+        .firmas {
+            width: 100%;
+            margin-top: 60px;
+            font-size: 14px;
+            color: #000;
+        }
     </style>
 </head>
 
@@ -348,6 +355,19 @@
                     </span>
                 </span>
 
+                @if ($esBachillerato)
+                    <span>
+                        <span class="label">Semestre:</span>
+                        <span class="valor">
+                            @if (!empty($semestre))
+                                {{ $semestre->numero }}° SEMESTRE
+                            @else
+                                —
+                            @endif
+                        </span>
+                    </span>
+                @endif
+
                 <span>
                     <span class="label">Grupo:</span>
                     <span class="valor">
@@ -359,10 +379,12 @@
                     </span>
                 </span>
 
-                <span>
-                    <span class="label">Turno:</span>
-                    <span class="valor">{{ $turnoTexto }}</span>
-                </span>
+                @if (!$esBachillerato)
+                    <span>
+                        <span class="label">Turno:</span>
+                        <span class="valor">{{ $turnoTexto }}</span>
+                    </span>
+                @endif
             </div>
 
             <table class="tabla-grupo">
@@ -410,24 +432,57 @@
                         </tr>
                     @endforelse
 
-                    @for ($i = $alumnos->count() + 1; $i <= $totalFilasMinimas; $i++)
-                        <tr>
-                            <td class="numero">
-                                {{ $i }}
-                            </td>
-
-                            <td class="alumno"></td>
-                            <td class="alumno"></td>
-                            <td class="alumno"></td>
-
-                            @if ($mostrarMotivo)
-                                <td class="motivo"></td>
-                            @endif
-                        </tr>
-                    @endfor
                 </tbody>
             </table>
         </div>
+
+
+
+
+
+
+        @if (!$esBachillerato && !$esSecundaria)
+            <table class="firmas">
+                <tr>
+                    <td style="width: 50%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($docente)->titulo ?? '') . ' ' . (optional($docente)->nombre ?? '') . ' ' . (optional($docente)->apellido_paterno ?? '') . ' ' . (optional($docente)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if (optional($docente)->genero === 'M')
+                            Firma de la profesora de grupo
+                        @else
+                            Firma de profesor de grupo
+                        @endif
+
+
+                    </td>
+
+                    <td style="width: 50%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if ($director->director->genero === 'F')
+                            Firma de la directora de la escuela
+                        @else
+                            Firma del director de la escuela
+                        @endif
+                    </td>
+                </tr>
+            </table>
+        @else
+            <table class="firmas">
+                <tr>
+
+                    <td style="width: 100%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if ($director->director->genero === 'F')
+                            Firma de la directora de la escuela
+                        @else
+                            Firma del director de la escuela
+                        @endif
+                    </td>
+                </tr>
+            </table>
+
+        @endif
+
+
     </div>
 
     <div class="footer">

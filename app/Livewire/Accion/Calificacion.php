@@ -58,6 +58,8 @@ class Calificacion extends Component
     public array $resumenRevision = [];
     public string $motivo_guardado = '';
 
+    public $diploma_inscripcion_id = '';
+
     public Collection $niveles;
     public Collection $generaciones;
     public Collection $grados;
@@ -90,6 +92,16 @@ class Calificacion extends Component
         $this->periodosBasica = collect();
 
         $this->cargarCatalogos();
+    }
+
+    public function getPuedeExportarDiplomaProperty()
+    {
+        return !empty($this->diploma_inscripcion_id)
+            && !empty($this->periodo_id)
+            && !empty($this->generacion_id)
+            && !empty($this->grado_id)
+            && !empty($this->grupo_id)
+            && (!$this->esBachillerato || !empty($this->semestre_id));
     }
 
     public function getEsBachilleratoProperty(): bool
@@ -248,9 +260,11 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'diploma_inscripcion_id',
         ]);
 
         $this->boleta_inscripcion_id = '';
+        $this->diploma_inscripcion_id = '';
 
         $this->grados = collect();
         $this->grupos = collect();
@@ -980,13 +994,13 @@ class Calificacion extends Component
                     'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
                     'cambios' => collect($this->calificaciones[$inscripcionId] ?? [])
                         ->contains(function ($valor, $materiaId) use ($inscripcionId) {
-                            $nuevo = $this->normalizarCalificacion($valor);
-                            $anterior = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$materiaId] ?? null);
-                            $obsNueva = trim((string) ($this->observaciones[$inscripcionId][$materiaId] ?? ''));
-                            $obsAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$materiaId] ?? ''));
+                                $nuevo = $this->normalizarCalificacion($valor);
+                                $anterior = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$materiaId] ?? null);
+                                $obsNueva = trim((string) ($this->observaciones[$inscripcionId][$materiaId] ?? ''));
+                                $obsAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$materiaId] ?? ''));
 
-                            return $nuevo !== $anterior || $obsNueva !== $obsAnterior;
-                        }),
+                                return $nuevo !== $anterior || $obsNueva !== $obsAnterior;
+                            }),
                     default => true,
                 };
             })

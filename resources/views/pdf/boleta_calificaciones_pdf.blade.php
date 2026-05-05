@@ -23,54 +23,88 @@
             src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
         }
 
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         body {
-            font-family: 'ARIAL', sans-serif;
+            font-family: 'calibri';
             font-size: 10px;
             color: #334155;
             background: #ffffff;
         }
 
-        .header {
-            border-bottom: 3px solid #93c5fd;
-            padding-bottom: 10px;
-            margin-bottom: 12px;
-        }
-
-        .header-table {
+        .encabezado {
             width: 100%;
             border-collapse: collapse;
         }
 
-        .header-table td {
-            vertical-align: middle;
+        .encabezado td {
+            border: none;
+            vertical-align: top;
         }
 
-        .logo {
+        .logo-izquierdo {
+            width: 92px;
+            text-align: left;
+        }
+
+        .logo-izquierdo img {
+            width: 92px;
+            object-fit: contain;
+        }
+
+        .logo-derecho {
             width: 100px;
+            text-align: right;
+        }
+
+        .logo-derecho img {
+            width: 100px;
+            object-fit: contain;
+        }
+
+        .titulo-centro {
             text-align: center;
         }
 
-        .logo img {
-            width: 90px;
-
+        .nombre-escuela {
+            display: inline-block;
+            color: #4b5563;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #9ca3af;
+            border-bottom: 1px solid #9ca3af;
+            padding: 0 10px 2px 10px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
         }
 
-        .title-wrap {
-            text-align: center;
-        }
-
-        .title {
-            margin: 0;
+        .titulo-lista {
             font-size: 20px;
-            font-weight: bold;
-            color: #0f172a;
-            letter-spacing: .5px;
+            font-weight: 700;
+            margin-top: 2px;
+            color: #111827;
+            text-transform: uppercase;
         }
 
-        .subtitle {
-            margin: 4px 0 0 0;
-            font-size: 10px;
-            color: #64748b;
+        .direccion {
+            width: 500px;
+            margin: 4px auto 0 auto;
+            font-size: 11px;
+            line-height: 1.25;
+            color: #334155;
+            text-align: center;
         }
 
         .pill {
@@ -88,11 +122,13 @@
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
+            margin-top: 10px;
+            font-size: 13px;
         }
 
         .student-card td {
             border: 1px solid #dbeafe;
-            padding: 7px 8px;
+            padding: 2px 8px;
         }
 
         .label {
@@ -116,7 +152,7 @@
 
         .card {
             border-radius: 14px;
-            padding: 9px 10px;
+            padding: 3px 10px;
             border: 1px solid #e2e8f0;
         }
 
@@ -187,7 +223,7 @@
 
         .tabla td {
             border: 1px solid #e2e8f0;
-            padding: 6px 5px;
+            padding: 3px 5px;
             font-size: 12px;
             vertical-align: middle;
         }
@@ -209,7 +245,7 @@
             display: inline-block;
             padding: 3px 8px;
             border-radius: 999px;
-            font-size: 8px;
+            font-size: 10px;
             font-weight: bold;
         }
 
@@ -283,17 +319,72 @@
             margin-bottom: 6px;
         }
 
-        .signatures {
+        /*
+         * Leyenda de calificaciones cualitativas.
+         * Se usa para explicar AC, ED y RA en la boleta.
+         */
+        .leyenda-cualitativa {
             width: 100%;
-            margin-top: 28px;
             border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 10px;
+            border: 1px solid #cbd5e1;
         }
 
-        .signatures td {
-            width: 50%;
+        .leyenda-cualitativa td {
+            border: 1px solid #cbd5e1;
+            padding: 2px 2px;
             text-align: center;
-            padding-top: 28px;
-            color: #334155;
+        }
+
+        .leyenda-titulo {
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            line-height: 10px;
+        }
+
+        .leyenda-nota {
+            display: block;
+            margin-top: 2px;
+            font-size: 8.5px;
+            font-weight: normal;
+            color: #475569;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .leyenda-clave {
+            display: inline-block;
+            min-width: 24px;
+            padding: 3px 3px;
+            border-radius: 999px;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .leyenda-ac {
+            background: #bbf7d0;
+            color: #166534;
+        }
+
+        .leyenda-ed {
+            background: #fde68a;
+            color: #92400e;
+        }
+
+        .leyenda-ra {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        .firmas {
+            width: 100%;
+            margin-top: 20px;
+            font-size: 15px;
+            color: #000000;
         }
 
         .line {
@@ -303,46 +394,54 @@
         }
 
         .footer {
-            margin-top: 14px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 6px;
-            text-align: right;
+            position: fixed;
+            left: 18px;
+            right: 18px;
+            bottom: 5px;
+            text-align: center;
             font-size: 8px;
-            color: #64748b;
+            color: #475569;
+            border-top: 1px solid #94a3b8;
+            padding-top: 3px;
+        }
+
+        .footer p {
+            margin: 0;
+            line-height: 1.2;
         }
     </style>
 </head>
 
 <body>
     <div class="header">
-        <table class="header-table">
+
+        <table class="encabezado">
             <tr>
-                <td class="logo">
-                    @if ($logo_izquierdo)
-                        <img src="{{ $logo_izquierdo }}" alt="Logo izquierdo">
+                <td class="logo-izquierdo">
+                    @if (!empty($logo_izquierdo))
+                        <img src="{{ $logo_izquierdo }}" alt="">
                     @endif
                 </td>
 
-                <td class="title-wrap">
-                    <p class="title">{{ $titulo }}</p>
-                    <p class="subtitle">{{ $escuela?->nombre ?? 'Centro escolar' }}</p>
-                    <span class="pill">
-                        {{ $nivel->nombre ?? 'Nivel' }} ·
-                        {{ $nombrePeriodo }} ·
-                        Ciclo {{ $cicloEscolarTexto }}
-                    </span>
+                <td class="titulo-centro">
+                    <div class="nombre-escuela">
+                        {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
+                    </div>
+
+                    <div class="titulo-lista">
+                        BOLETA DE CALIFICACIONES<br>
+                        C.C.T. {{ $nivel->cct ?? '—' }}
+                    </div>
                 </td>
 
-                <td class="logo">
-                    @if ($logo_derecho)
-                        <img src="{{ $logo_derecho }}" alt="Logo derecho">
+                <td class="logo-derecho">
+                    @if (!empty($logo_derecho))
+                        <img src="{{ $logo_derecho }}" alt="">
                     @endif
                 </td>
             </tr>
         </table>
     </div>
-
-
 
     <table class="student-card">
         <tr>
@@ -365,8 +464,6 @@
             <td class="label">Grupo</td>
             <td>{{ $grupo->nombre ?? '—' }}</td>
         </tr>
-
-
 
         @if ($esBachillerato)
             <tr>
@@ -416,14 +513,13 @@
         </tr>
     </table>
 
-
-
     <table class="tabla">
         <thead>
             <tr>
                 @if ($esBachillerato)
                     <th style="width: 13%;">Clave</th>
                 @endif
+
                 <th style="width: 25%;">Materia</th>
                 <th style="width: 13%;">Calificación</th>
                 <th style="width: 15%;">Estado</th>
@@ -455,8 +551,10 @@
                     @if ($esBachillerato)
                         <td class="text-center">{{ $fila['clave'] }}</td>
                     @endif
+
                     <td class="materia">
                         {{ $fila['materia'] }}
+
                         @if ($fila['extra'])
                             <span style="font-size: 7px; color:#64748b;">(Extra)</span>
                         @endif
@@ -469,11 +567,10 @@
                     <td class="text-center">
                         <span class="badge {{ $badgeClass }}">{{ $fila['estado'] }}</span>
                     </td>
-
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="text-center">
+                    <td colspan="{{ $esBachillerato ? 4 : 3 }}" class="text-center">
                         No hay materias para mostrar.
                     </td>
                 </tr>
@@ -481,22 +578,114 @@
         </tbody>
     </table>
 
-    <table class="signatures">
-        <tr>
-            <td>
-                <div class="line"></div>
-                Control escolar
-            </td>
+    @php
+        /*
+         * Se muestra la leyenda cuando existan calificaciones cualitativas.
+         * También se puede dejar siempre visible en preescolar o primaria.
+         */
+        $mostrarLeyendaCualitativa = collect($filasMaterias)->contains(function ($fila) {
+            return in_array(mb_strtoupper((string) ($fila['calificacion'] ?? '')), ['AC', 'ED', 'RA'], true);
+        });
 
-            <td>
-                <div class="line"></div>
-                Padre, madre o tutor
-            </td>
-        </tr>
-    </table>
+        if (!$esBachillerato && !$esSecundaria) {
+            $mostrarLeyendaCualitativa = true;
+        }
+    @endphp
+
+    @if ($mostrarLeyendaCualitativa)
+        <table class="leyenda-cualitativa">
+            <tr>
+                <td colspan="3" class="leyenda-titulo">
+                    Leyenda de evaluación cualitativa
+                    <span class="leyenda-nota">
+                        Las claves AC, ED y RA se utilizan para materias evaluadas de forma cualitativa.
+                    </span>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="background: #f0fdf4;">
+                    <span class="leyenda-clave leyenda-ac">AC * Acreditado</span>
+
+                </td>
+
+                <td style="background: #fffbeb;">
+                    <span class="leyenda-clave leyenda-ed">ED * En desarrollo</span>
+
+                </td>
+
+                <td style="background: #fef2f2;">
+                    <span class="leyenda-clave leyenda-ra">RA *Requiere apoyo</span>
+
+                </td>
+            </tr>
+        </table>
+    @endif
+
+    @if (!$esBachillerato && !$esSecundaria)
+        <table class="firmas">
+            <tr>
+                <td style="width: 50%; padding-top: 60px; text-align: center;">
+                    <u>{{ mb_strtoupper(trim((optional($docente)->titulo ?? '') . ' ' . (optional($docente)->nombre ?? '') . ' ' . (optional($docente)->apellido_paterno ?? '') . ' ' . (optional($docente)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+
+                    @if (optional($docente)->genero === 'M')
+                        Firma de la profesora de grupo
+                    @else
+                        Firma de profesor de grupo
+                    @endif
+                </td>
+
+                <td style="width: 50%; padding-top: 60px; text-align: center;">
+                    <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+
+                    @if ($director->director->genero === 'F')
+                        Firma de la directora de la escuela
+                    @else
+                        Firma del director de la escuela
+                    @endif
+                </td>
+            </tr>
+        </table>
+    @else
+        <table class="firmas">
+            <tr>
+                <td style="width: 100%; padding-top: 60px; text-align: center;">
+                    <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+
+                    @if ($director->director->genero === 'F')
+                        Firma de la directora de la escuela
+                    @else
+                        Firma del director de la escuela
+                    @endif
+                </td>
+            </tr>
+        </table>
+    @endif
 
     <div class="footer">
-        Generado el {{ \Carbon\Carbon::parse($fecha_impresion)->format('d/m/Y h:i A') }}
+        <p>
+            {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
+            · C.C.T. {{ $nivel->cct ?? '—' }}
+        </p>
+
+        <p>
+            C.
+            {{ $escuela->calle ?? '' }}
+            No.
+            {{ $escuela->no_exterior ?? '' }},
+            Col.
+            {{ $escuela->colonia ?? '' }},
+            C.P.
+            {{ $escuela->codigo_postal ?? '' }},
+            Cd.
+            {{ $escuela->ciudad ?? '' }},
+            {{ $escuela->estado ?? '' }}.
+        </p>
+
+        <p>
+            Fecha de expedición:
+            {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
+        </p>
     </div>
 </body>
 

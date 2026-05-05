@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>Lista de boletas</title>
+    <title>Lista interna SECE</title>
 
     @php
         $slugNivel = $nivel->slug ?? '';
@@ -14,13 +14,15 @@
         $esPastel = in_array($slugNivel, ['preescolar', 'primaria']);
 
         $mostrarMotivo = $mostrarMotivo ?? false;
-        $esBachillerato = $esBachillerato ?? false;
 
         $colorPrincipal = $esPastel ? '#9AC457' : '#94a3b8';
         $colorTexto = '#001f3f';
         $colorBorde = '#1f2937';
+        $colorFondoFila = '#ffffff';
 
-        $totalColumnas = 5;
+        $totalColumnas = $mostrarMotivo ? 5 : 4;
+
+        $totalFilasMinimas = 13;
 
         $nombreNivel = strtoupper($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL'));
 
@@ -29,41 +31,8 @@
 
         $turnoTexto = $turno ?? 'Matutino';
 
-        $altoFila = $alumnos->count() > 15 ? '35px' : '43px';
+        $totalAlumnos = $alumnos->count() > 15 ? '25px' : '35px';
 
-        /*
-        |--------------------------------------------------------------------------
-        | Texto de periodo / parcial
-        |--------------------------------------------------------------------------
-        | Básica usa periodo.
-        | Bachillerato usa parcial.
-        */
-        $textoPeriodoParcial = $periodoTexto ?? '';
-
-        if (!$textoPeriodoParcial && $esBachillerato) {
-            if (!empty($parcialSeleccionado?->parcial)) {
-                $textoPeriodoParcial = strtoupper($parcialSeleccionado->parcial);
-            } elseif (!empty($parcialSeleccionado?->descripcion)) {
-                $textoPeriodoParcial = strtoupper($parcialSeleccionado->descripcion);
-            } elseif (!empty($periodo?->parcialBachillerato?->parcial)) {
-                $textoPeriodoParcial = strtoupper($periodo->parcialBachillerato->parcial);
-            } else {
-                $textoPeriodoParcial = 'PARCIAL';
-            }
-        }
-
-        if (!$textoPeriodoParcial && !$esBachillerato) {
-            if (!empty($periodo?->periodoBasica?->periodo)) {
-                $textoPeriodoParcial = $periodo->periodoBasica->periodo . '° PERIODO';
-            } else {
-                $textoPeriodoParcial = 'PERIODO';
-            }
-        }
-
-        $labelPeriodoParcial = $esBachillerato ? 'Parcial' : 'Periodo de evaluación';
-
-        $fechaInicioPeriodo = $periodo?->fecha_inicio ?? null;
-        $fechaFinPeriodo = $periodo?->fecha_fin ?? null;
     @endphp
 
     <style>
@@ -119,6 +88,7 @@
         .encabezado {
             width: 100%;
             border-collapse: collapse;
+            /* margin-bottom: 8px; */
         }
 
         .encabezado td {
@@ -164,12 +134,11 @@
         }
 
         .titulo-lista {
-            font-size: 17px;
+            font-size: 20px;
             font-weight: 700;
             margin-top: 2px;
             color: #111827;
             text-transform: uppercase;
-            line-height: 18px;
         }
 
         .direccion {
@@ -185,6 +154,7 @@
             width: 100%;
             text-align: center;
             margin-top: 15px;
+            margin-bottom: 54px;
             font-size: 16px;
             color: #020617;
         }
@@ -203,32 +173,11 @@
             text-decoration: underline;
         }
 
-        .datos-periodo {
-            width: 100%;
-            text-align: center;
-            margin-top: 8px;
-            font-size: 15px;
-            color: #020617;
-        }
-
-        .datos-periodo span {
-            display: inline-block;
-            margin: 0 8px;
-        }
-
-        .datos-periodo .label {
-            font-weight: 400;
-        }
-
-        .datos-periodo .valor {
-            font-weight: 700;
-            text-decoration: underline;
-        }
-
         .tabla-grupo {
             width: 100%;
-            margin: 10px auto;
+            margin: -30px auto;
             border-collapse: collapse;
+
             font-size: 12px;
             color: {{ $colorTexto }};
         }
@@ -241,19 +190,22 @@
         }
 
         .tabla-grupo thead th {
+
             height: 30px;
             background: {{ $colorPrincipal }};
             color: #000000;
             font-size: 12px;
             font-weight: 400;
             text-align: center;
+
+
         }
 
         .tabla-grupo tbody td {
-            height: {{ $altoFila }};
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 400;
             text-transform: uppercase;
+            height: {{ $totalAlumnos }};
         }
 
         .col-numero {
@@ -269,8 +221,8 @@
             width: 108px;
         }
 
-        .col-firma {
-            width: 220px;
+        .col-motivo {
+            /* width: 365px; */
         }
 
         .numero {
@@ -279,6 +231,10 @@
         }
 
         .alumno {
+            text-align: left;
+        }
+
+        .motivo {
             text-align: left;
         }
 
@@ -307,6 +263,12 @@
             margin: 0;
             line-height: 1.25;
         }
+
+        .firmas {
+            width: 100%;
+            margin-top: 60px;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -333,15 +295,8 @@
                         </div>
 
                         <div class="titulo-lista">
-                            FIRMA DE BOLETAS<br>
-                            C.C.T. {{ $nivel->cct ?? '—' }} <br>
-
-                            @if (!empty($cicloEscolar))
-                                CICLO ESCOLAR:
-                                {{ $cicloEscolar->inicio_anio ?? '' }} - {{ $cicloEscolar->fin_anio ?? '' }}
-                            @else
-                                CICLO ESCOLAR: —
-                            @endif
+                            LISTA DE GRUPO<br>
+                            C.C.T. {{ $nivel->cct ?? '—' }}
                         </div>
 
                         <div class="direccion">
@@ -398,16 +353,14 @@
                     </span>
                 </span>
 
-                @if ($esBachillerato && !empty($semestre))
+                @if ($esBachillerato)
                     <span>
                         <span class="label">Semestre:</span>
                         <span class="valor">
-                            @if (!empty($semestre->numero))
-                                {{ $semestre->numero }}°
-                            @elseif (!empty($semestre->semestre))
-                                {{ strtoupper($semestre->semestre) }}
+                            @if (!empty($semestre))
+                                {{ $semestre->numero }}° SEMESTRE
                             @else
-                                {{ $semestre->id }}°
+                                —
                             @endif
                         </span>
                     </span>
@@ -430,47 +383,17 @@
                         <span class="valor">{{ $turnoTexto }}</span>
                     </span>
                 @endif
-
-            </div>
-
-            <div class="datos-periodo">
-                <span>
-                    <span class="label">{{ $labelPeriodoParcial }}:</span>
-                    <span class="valor">
-                        {{ $textoPeriodoParcial }}
-                    </span>
-                </span>
-
-                @if (!empty($fechaInicioPeriodo) || !empty($fechaFinPeriodo))
-                    <span>
-                        <span class="label">Fechas:</span>
-                        <span class="valor">
-                            @if (!empty($fechaInicioPeriodo))
-                                {{ \Carbon\Carbon::parse($fechaInicioPeriodo)->locale('es')->translatedFormat('j \\de F \\d\\e Y') }}
-                            @else
-                                —
-                            @endif
-
-                            al
-
-                            @if (!empty($fechaFinPeriodo))
-                                {{ \Carbon\Carbon::parse($fechaFinPeriodo)->locale('es')->translatedFormat('j \\de F \\d\\e Y') }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </span>
-                @endif
             </div>
 
             <table class="tabla-grupo">
                 <thead>
                     <tr>
-                        <th class="col-numero">NO.</th>
-                        <th class="col-nombre">NOMBRE</th>
-                        <th class="col-apellido">APELLIDO PATERNO</th>
-                        <th class="col-apellido">APELLIDO MATERNO</th>
-                        <th class="col-firma">FIRMA DEL PADRE/MADRE O TUTOR</th>
+                        <th class="col-numero">No.</th>
+                        <th class="col-nombre">Nombre completo</th>
+                        <th class="col-nombre">CURP</th>
+                        <th class="col-nombre">Fecha de nacimiento</th>
+
+
                     </tr>
                 </thead>
 
@@ -480,20 +403,19 @@
                             <td class="numero">
                                 {{ $loop->iteration }}
                             </td>
-
-                            <td class="alumno">
+                            <td class="alumno" style="width: 300px">
+                                {{ $alumno->apellido_paterno }}
+                                {{ $alumno->apellido_materno }}
                                 {{ $alumno->nombre }}
                             </td>
-
-                            <td class="alumno">
-                                {{ $alumno->apellido_paterno }}
+                            <td class="alumno" style="text-align: center">
+                                {{ $alumno->curp }}
+                            </td>
+                            <td class="alumno" style="text-align: center">
+                                {{ \Carbon\Carbon::parse($alumno->fecha_nacimiento)->format('d/m/Y') }}
                             </td>
 
-                            <td class="alumno">
-                                {{ $alumno->apellido_materno ?: '----------------' }}
-                            </td>
 
-                            <td class="alumno"></td>
                         </tr>
                     @empty
                         <tr>
@@ -503,11 +425,72 @@
                         </tr>
                     @endforelse
 
+                    @for ($i = $alumnos->count() + 1; $i <= $totalFilasMinimas; $i++)
+                        <tr>
+                            <td class="numero">
+                                {{ $i }}
+                            </td>
 
+                            <td class="alumno"></td>
+                            <td class="alumno"></td>
+                            <td class="alumno"></td>
 
+                            @if ($mostrarMotivo)
+                                <td class="motivo"></td>
+                            @endif
+                        </tr>
+                    @endfor
                 </tbody>
             </table>
         </div>
+
+
+
+        @if (!$esBachillerato && !$esSecundaria)
+            <table class="firmas">
+                <tr>
+                    <td style="width: 50%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($docente)->titulo ?? '') . ' ' . (optional($docente)->nombre ?? '') . ' ' . (optional($docente)->apellido_paterno ?? '') . ' ' . (optional($docente)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if (optional($docente)->genero === 'M')
+                            Firma de la profesora de grupo
+                        @else
+                            Firma de profesor de grupo
+                        @endif
+
+
+                    </td>
+
+                    <td style="width: 50%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if ($director->director->genero === 'F')
+                            Firma de la directora de la escuela
+                        @else
+                            Firma del director de la escuela
+                        @endif
+                    </td>
+                </tr>
+            </table>
+        @else
+            <table class="firmas">
+                <tr>
+
+                    <td style="width: 100%; padding-top: 60px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
+                        @if ($director->director->genero === 'F')
+                            Firma de la directora de la escuela
+                        @else
+                            Firma del director de la escuela
+                        @endif
+                    </td>
+                </tr>
+            </table>
+
+        @endif
+
+
+
+
+
     </div>
 
     <div class="footer">
@@ -532,7 +515,7 @@
 
         <p>
             Fecha de expedición:
-            {{ now()->locale('es')->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
+            {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
         </p>
     </div>
 </body>

@@ -10,8 +10,22 @@
             margin: 18px 16px 0px 16px;
         }
 
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: 'calibri';
             font-size: 9px;
             color: #334155;
             background: #ffffff;
@@ -66,7 +80,7 @@
             margin-top: 5px;
             padding: 4px 10px;
             border-radius: 999px;
-            background: #e0f2fe;
+            /* background: #e0f2fe; */
             color: #0369a1;
             font-size: 8px;
             font-weight: bold;
@@ -87,7 +101,7 @@
         .info-label {
             width: 110px;
             font-weight: bold;
-            background: #eff6ff;
+            /* background: #eff6ff; */
             color: #1e3a8a;
         }
 
@@ -104,6 +118,7 @@
             border: 1px solid #e2e8f0;
         }
 
+        /*
         .card-blue {
             background: #eff6ff;
             border-color: #bfdbfe;
@@ -112,9 +127,9 @@
         .card-green {
             background: #ecfdf5;
             border-color: #bbf7d0;
-        }
+        } */
 
-        .card-yellow {
+        /* .card-yellow {
             background: #fffbeb;
             border-color: #fde68a;
         }
@@ -141,7 +156,7 @@
             font-size: 16px;
             font-weight: bold;
             color: #0f172a;
-        }
+        } */
 
         .section-title {
             font-size: 11px;
@@ -150,7 +165,7 @@
             margin: 10px 0 6px 0;
             padding: 6px 8px;
             border-radius: 10px;
-            background: #f8fafc;
+            /* background: #f8fafc; */
             border-left: 4px solid #93c5fd;
         }
 
@@ -184,7 +199,7 @@
         }
 
         .tabla tbody tr:nth-child(even) {
-            background: #f8fafc;
+            /* background: #f8fafc; */
         }
 
         .text-center {
@@ -333,16 +348,45 @@
         }
 
         .footer {
-            margin-top: 12px;
+            position: fixed;
+            left: 18px;
+            right: 18px;
+            bottom: 5px;
+            text-align: center;
             font-size: 8px;
-            color: #64748b;
-            text-align: right;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 6px;
+            color: #475569;
+            border-top: 1px solid #94a3b8;
+            padding-top: 3px;
+        }
+
+        .footer p {
+            margin: 0;
+            line-height: 1.2;
         }
 
         .page-break {
             page-break-before: always;
+        }
+
+        .lugar {
+            font-weight: bold;
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        .lugar-uno {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .lugar-dos {
+            background: #e0f2fe;
+            color: #075985;
+        }
+
+        .lugar-tres {
+            background: #dcfce7;
+            color: #166534;
         }
     </style>
 </head>
@@ -466,17 +510,60 @@
         </tr>
     </table>
 
+    @php
+        /*
+        Ordeno los alumnos por promedio de mayor a menor.
+        Los alumnos sin promedio numérico se mandan al final.
+    */
+        $inscripcionesOrdenadas = collect($inscripciones)
+            ->sortByDesc(function ($fila) use ($promedios) {
+                $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
+
+                return is_numeric($promedioAlumno) ? (float) $promedioAlumno : -1;
+            })
+            ->values();
+
+        /*
+        Obtengo los primeros 3 lugares por promedio único.
+        Si varios alumnos tienen el mismo promedio, comparten el mismo lugar.
+    */
+        $promediosUnicos = $inscripcionesOrdenadas
+            ->map(function ($fila) use ($promedios) {
+                $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
+
+                return is_numeric($promedioAlumno) ? number_format((float) $promedioAlumno, 2, '.', '') : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->take(3);
+
+        /*
+        Relaciono cada promedio con su lugar.
+        Ejemplo:
+        10.00 => 1
+        9.80  => 2
+        9.50  => 3
+    */
+        $lugaresPorPromedio = [];
+
+        foreach ($promediosUnicos as $index => $promedioUnico) {
+            $lugaresPorPromedio[$promedioUnico] = $index + 1;
+        }
+    @endphp
+
     <div class="section-title">Listado de calificaciones</div>
 
     <table class="tabla">
         <thead>
             <tr>
+                <th style="width: 42px;">LUGAR</th>
+
                 <th style="width: 450px;">ALUMNO</th>
 
                 @if ($esBachillerato)
                     <th style="width: 42px;">SEM.</th>
                 @endif
-
 
                 @foreach ($materias as $materia)
                     <th>{{ mb_strtoupper($materia['materia']) }}</th>
@@ -487,14 +574,44 @@
         </thead>
 
         <tbody>
-            @forelse ($inscripciones as $fila)
+            @forelse ($inscripcionesOrdenadas as $fila)
+                @php
+                    $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? '—';
+
+                    $promedioClave = is_numeric($promedioAlumno)
+                        ? number_format((float) $promedioAlumno, 2, '.', '')
+                        : null;
+
+                    $lugarAlumno =
+                        $promedioClave && isset($lugaresPorPromedio[$promedioClave])
+                            ? $lugaresPorPromedio[$promedioClave]
+                            : null;
+
+                    $claseLugar = '';
+
+                    if ($lugarAlumno === 1) {
+                        $claseLugar = 'lugar-uno';
+                    } elseif ($lugarAlumno === 2) {
+                        $claseLugar = 'lugar-dos';
+                    } elseif ($lugarAlumno === 3) {
+                        $claseLugar = 'lugar-tres';
+                    }
+                @endphp
+
                 <tr>
+                    <td class="text-center lugar {{ $claseLugar }}">
+                        @if ($lugarAlumno)
+                            {{ $lugarAlumno }}°
+                        @else
+                            —
+                        @endif
+                    </td>
+
                     <td class="text-left alumno">{{ $fila['alumno'] }}</td>
 
                     @if ($esBachillerato)
                         <td class="text-center">{{ $fila['semestre'] }}</td>
                     @endif
-
 
                     @foreach ($materias as $materia)
                         @php
@@ -525,7 +642,6 @@
                     @endforeach
 
                     @php
-                        $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? '—';
                         $clasePromedio = 'promedio';
 
                         if (is_numeric($promedioAlumno)) {
@@ -547,7 +663,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ $esBachillerato ? 6 + count($materias) : 5 + count($materias) }}"
+                    <td colspan="{{ $esBachillerato ? count($materias) + 4 : count($materias) + 3 }}"
                         class="text-center">
                         No hay registros para mostrar con los filtros actuales.
                     </td>
@@ -695,7 +811,29 @@
     </table>
 
     <div class="footer">
-        Generado el {{ \Carbon\Carbon::parse($fecha_impresion)->format('d/m/Y h:i A') }}
+        <p>
+            {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
+            · C.C.T. {{ $nivel->cct ?? '—' }}
+        </p>
+
+        <p>
+            C.
+            {{ $escuela->calle ?? '' }}
+            No.
+            {{ $escuela->no_exterior ?? '' }},
+            Col.
+            {{ $escuela->colonia ?? '' }},
+            C.P.
+            {{ $escuela->codigo_postal ?? '' }},
+            Cd.
+            {{ $escuela->ciudad ?? '' }},
+            {{ $escuela->estado ?? '' }}.
+        </p>
+
+        <p>
+            Fecha de expedición:
+            {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
+        </p>
     </div>
 </body>
 

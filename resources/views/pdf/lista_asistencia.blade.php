@@ -148,7 +148,7 @@
         }
 
         .th-numero {
-            background: {{ $colorFondoPrincipal }};
+
             font-size: 15px;
             /* font-weight: 700; */
             text-align: center;
@@ -156,9 +156,7 @@
         }
 
         .th-alumno {
-            /* width: 210px;
-            height: 136px; */
-            background: {{ $colorFondoAlumno }};
+
             text-align: center;
             width: 0px;
             font-family: Claphappy, DejaVu Sans, sans-serif;
@@ -280,7 +278,7 @@
         }
 
         .celda {
-            background: #ffffff;
+            /* background: #ffffff; */
         }
 
         .sin-alumnos {
@@ -354,11 +352,23 @@
             padding: 0 10px 1px 10px;
             margin-bottom: 3px;
         }
+
+        .marca-agua {
+            position: absolute;
+            top: 50px;
+            left: 220px;
+            width: 560px;
+            opacity: 0.07;
+            z-index: 0;
+        }
     </style>
 </head>
 
 <body>
     <div class="pagina">
+        @if ($marcaAgua)
+            <img src="{{ $marcaAgua }}" class="marca-agua" alt="">
+        @endif
         <div class="contenido">
 
             <table class="encabezado">

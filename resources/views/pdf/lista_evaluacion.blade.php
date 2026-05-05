@@ -6,10 +6,39 @@
 
     <title>Lista de evaluación</title>
 
-
-
     @php
         $totalAlumnos = $alumnos->count() > 15 ? '1px' : '2px';
+
+        /*
+         * Se obtiene el texto del periodo para mostrarlo en el encabezado.
+         */
+        $textoPeriodoEvaluacion =
+            $nombrePeriodo ??
+            ($periodoTexto ?? ($periodo?->periodoBasica?->periodo ?? ($periodo?->periodoBasica?->descripcion ?? '—')));
+
+        $fechaInicioEvaluacion = $periodo?->fecha_inicio
+            ? \Carbon\Carbon::parse($periodo->fecha_inicio)->locale('es')->translatedFormat('j \\de F Y')
+            : '';
+
+        $fechaFinEvaluacion = $periodo?->fecha_fin
+            ? \Carbon\Carbon::parse($periodo->fecha_fin)->locale('es')->translatedFormat('j \\de F Y')
+            : '';
+
+        $esListaPrimariaEvaluacion = ($esPrimaria ?? false) && ($tipo_descarga ?? '') === 'evaluacion';
+
+        $materiasPromediables = $materiasPromediables ?? collect();
+        $materiasCualitativas = $materiasCualitativas ?? collect();
+
+        /*
+         * En primaria se muestran primero las materias que se promedian
+         * y después las materias cualitativas.
+         */
+        $materiasMostrar = $esListaPrimariaEvaluacion ? $materiasPromediables->merge($materiasCualitativas) : $materias;
+
+        /*
+         * Solo estas materias pueden usar AC / ED / RA.
+         */
+        $slugsMateriasCualitativas = ['calculo-mental', 'caligrafia', 'lectura'];
     @endphp
 
     <style>
@@ -35,8 +64,8 @@
         }
 
         body {
-            font-family: ARIAL,
-                color: #001333;
+            font-family: ARIAL, DejaVu Sans, sans-serif;
+            color: #001333;
             font-size: 10px;
             margin: 0;
             padding: 0;
@@ -50,10 +79,10 @@
 
         .marca-agua {
             position: absolute;
-            top: 50px;
-            left: 220px;
+            top: 150px;
+            left: 100px;
             width: 560px;
-            opacity: 0.10;
+            opacity: 0.07;
             z-index: 0;
         }
 
@@ -74,13 +103,11 @@
         }
 
         .logo-izquierdo {
-            /* width: 205px; */
             text-align: left;
         }
 
         .logo-izquierdo img {
             width: 100px;
-            /* max-height: 100px; */
             object-fit: contain;
         }
 
@@ -170,74 +197,42 @@
             margin-bottom: 10px;
         }
 
-        .linea-fecha {
-            display: inline-block;
-            width: 185px;
-            border-bottom: 1px solid #001333;
-            height: 13px;
-            vertical-align: bottom;
-        }
-
         .tabla-evaluacion {
             width: 100%;
             border-collapse: collapse;
-            /* table-layout: fixed; */
             font-size: 8px;
         }
 
         .tabla-evaluacion th,
         .tabla-evaluacion td {
             border: 1px solid #333;
-            /* padding: 2px 3px; */
         }
 
         .tabla-evaluacion thead th {
             background: #c7c7c7;
-            /* color: #001333; */
             text-align: center;
             vertical-align: middle;
             font-weight: bold;
         }
 
         .col-numero {
-            /* width: 5px; */
             text-align: center;
-
+            width: 18px;
         }
 
         .col-alumno {
             text-align: center;
-            width: 300px;
+            width: 120px;
             font-size: 10px;
         }
 
         .col-materia {
-            /* width: 52px;
-            height: 165px; */
-            /* padding: 0; */
-            /* vertical-align: bottom; */
-        }
-
-        .materia-vertical {
-            /* writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            white-space: nowrap;
-            display: inline-block;
-            font-size: 8px;
-            line-height: 1;
-            max-height: 155px; */
-            /* writing-mode: vertical-rl;
-            transform: rotate(-90deg);
-            display: inline-block;
-            font-size: 10px;
-            width: 40px;
-            height: 100px;
-            line-height: 10px; */
+            text-align: center;
         }
 
         .col-promedio {
-            /* width: 58px;
-            height: 165px; */
+            text-align: center;
+            width: 50px;
         }
 
         .tbody-numero {
@@ -247,10 +242,10 @@
         }
 
         .tbody-alumno {
-            /* text-align: left; */
-            font-size: 12px;
+            font-size: 9.8px;
+            width: 100px;
+            line-height: 9px;
             padding: {{ $totalAlumnos }} 2px;
-            /* white-space: nowrap; */
             overflow: hidden;
         }
 
@@ -262,41 +257,58 @@
             height: 19px;
         }
 
-        .texto-promedio {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            white-space: nowrap;
-            display: inline-block;
-            font-size: 8px;
-        }
-
         .sin-materias {
             text-align: center;
             font-size: 12px;
             padding: 14px;
         }
 
-        .rotate {
-            /* writing-mode: vertical-rl; */
-            /* transform: rotate(-90deg); */
-            /* white-space: nowrap; */
-            /* width: 50px;
-            rotate: 270deg;
-            height: 70px; */
-
+        .encabezado-promediable {
+            background: #dbeafe !important;
+            color: #1e3a8a;
         }
 
-        .leyenda-calificaciones {
-            margin-top: 8px;
+        .encabezado-cualitativa {
+            background: #fef3c7 !important;
+            color: #92400e;
+        }
+
+        .badge-materia {
+            display: block;
+            margin-top: 2px;
+            font-size: 6px;
+            font-weight: bold;
+            letter-spacing: 0.2px;
+        }
+
+        .leyenda-promedio {
+            margin-top: 6px;
             width: 100%;
-            border: 1px solid #94a3b8;
             border-collapse: collapse;
             font-size: 10px;
+            border: 1px solid #93c5fd;
         }
 
-        .leyenda-calificaciones td {
-            border: 1px solid #94a3b8;
-            padding: 5px 6px;
+        .leyenda-promedio td {
+            border: 1px solid #93c5fd;
+            padding: 6px 8px;
+            text-align: center;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-weight: bold;
+        }
+
+        .leyenda-cualitativa {
+            margin-top: 6px;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            border: 1px solid #facc15;
+        }
+
+        .leyenda-cualitativa td {
+            border: 1px solid #facc15;
+            padding: 6px 8px;
             text-align: center;
         }
 
@@ -330,6 +342,13 @@
         .leyenda-ra {
             background: #fecaca;
             color: #991b1b;
+        }
+
+        .nota-leyenda {
+            font-size: 9px;
+            font-weight: normal;
+            color: #334155;
+            line-height: 1.25;
         }
 
         footer {
@@ -378,23 +397,29 @@
                         </div>
 
                         <div class="ciclo">
-                            CICLO ESCOLAR: {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
+                            CICLO ESCOLAR:
+                            {{ $cicloEscolar->inicio_anio ?? '—' }} - {{ $cicloEscolar->fin_anio ?? '—' }}
                         </div>
 
                         <div class="direccion">
                             {{ $escuela->calle ?? 'Francisco I. Madero Ote.' }}
+
                             @if (!empty($escuela->no_exterior))
                                 #{{ $escuela->no_exterior }},
                             @endif
+
                             @if (!empty($escuela->colonia))
                                 Col. {{ $escuela->colonia }},
                             @endif
+
                             @if (!empty($escuela->ciudad))
                                 {{ $escuela->ciudad }},
                             @endif
+
                             @if (!empty($escuela->municipio))
                                 {{ $escuela->municipio }},
                             @endif
+
                             @if (!empty($escuela->estado))
                                 {{ $escuela->estado }}.
                             @endif
@@ -416,46 +441,45 @@
             <div class="datos">
                 <p>
                     Nivel:
-                    <span class="subrayado">{{ strtoupper($nivel->nombre) }}</span>
+                    <span class="subrayado">{{ strtoupper($nivel->nombre ?? '—') }}</span>
                 </p>
 
                 <p>
                     Nombre del Docente:
-                    <span class="docente">{{ strtoupper($nombreDocente) }}</span>
+                    <span class="docente">{{ strtoupper($nombreDocente ?? 'DOCENTE') }}</span>
                 </p>
             </div>
 
             <div class="linea-centro">
                 <span>
                     Periodo No:
-                    <span class="subrayado">{{ $periodoNumero->periodoBasica->periodo }}</span>
+                    <span class="subrayado">{{ $textoPeriodoEvaluacion }}</span>
                 </span>
 
                 <span>
                     Grado:
-                    <span class="subrayado">{{ $grado->nombre }}</span>
+                    <span class="subrayado">{{ $grado->nombre ?? '—' }}</span>
                 </span>
 
                 <span>
                     Grupo:
-                    <span class="subrayado">"{{ $grupo->nombre }}"</span>
+                    <span class="subrayado">"{{ $grupo->nombre ?? '—' }}"</span>
                 </span>
 
                 <span>
                     Turno:
-                    <span class="subrayado">{{ $turno }}</span>
+                    <span class="subrayado">{{ $turno ?? 'Matutino' }}</span>
                 </span>
             </div>
 
             <div class="fechas">
                 que comprende las fechas
-                <u>{{ $periodoNumero->fecha_inicio ? \Carbon\Carbon::parse($periodoNumero->fecha_inicio)->locale('es')->translatedFormat('j \\de F  Y') : '' }}</u>
+                <u>{{ $fechaInicioEvaluacion }}</u>
                 al
-                <u>{{ $periodoNumero->fecha_fin ? \Carbon\Carbon::parse($periodoNumero->fecha_fin)->locale('es')->translatedFormat('j \\de F  Y') : '' }}</u>
-
+                <u>{{ $fechaFinEvaluacion }}</u>
             </div>
 
-            @if ($materias->isEmpty())
+            @if ($materiasMostrar->isEmpty())
                 <div class="sin-materias">
                     No hay materias calificables asignadas para este grupo.
                 </div>
@@ -471,19 +495,38 @@
                                 NOMBRE DEL ALUMNO
                             </th>
 
-                            @foreach ($materias as $materia)
-                                <th class="col-materia">
-                                    <div style="text-align:center;  text-transform:uppercase" class="materia-vertical">
-                                        {{ $materia->materia }}
-                                    </div>
+                            @foreach ($materiasMostrar as $materia)
+                                @php
+                                    $esMateriaCualitativa =
+                                        $esListaPrimariaEvaluacion &&
+                                        in_array($materia->slug, $slugsMateriasCualitativas, true) &&
+                                        (int) ($materia->calificable ?? 0) === 1 &&
+                                        (int) ($materia->extra ?? 0) === 1;
 
+                                    $esMateriaPromediable =
+                                        $esListaPrimariaEvaluacion &&
+                                        !$esMateriaCualitativa &&
+                                        (int) ($materia->calificable ?? 0) === 1;
+                                @endphp
+
+                                <th
+                                    class="col-materia {{ $esMateriaCualitativa ? 'encabezado-cualitativa' : '' }} {{ $esMateriaPromediable ? 'encabezado-promediable' : '' }}">
+                                    <div style="text-align:center; text-transform:uppercase">
+                                        {{ $materia->materia }}
+
+                                        @if ($esMateriaCualitativa)
+                                            <span class="badge-materia">
+                                                AC / ED / RA
+                                            </span>
+                                        @endif
+
+
+                                    </div>
                                 </th>
                             @endforeach
 
                             <th class="col-promedio">
-                                <span>
-                                    PROMEDIO
-                                </span>
+                                PROMEDIO
                             </th>
                         </tr>
                     </thead>
@@ -501,7 +544,7 @@
                                     {{ $alumno->nombre }}
                                 </td>
 
-                                @foreach ($materias as $materia)
+                                @foreach ($materiasMostrar as $materia)
                                     <td class="celda-calificacion"></td>
                                 @endforeach
 
@@ -509,50 +552,97 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $materias->count() + 3 }}" class="sin-materias">
+                                <td colspan="{{ $materiasMostrar->count() + 3 }}" class="sin-materias">
                                     No hay alumnos activos con los filtros seleccionados.
                                 </td>
                             </tr>
                         @endforelse
-
-
                     </tbody>
                 </table>
 
-                <table class="leyenda-calificaciones">
-                    <tr>
-                        <td colspan="3" class="leyenda-titulo">
-                            Leyenda de evaluación
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="background: #f0fdf4;">
-                            <span class="leyenda-clave leyenda-ac">AC</span>
-                            Acreditado
-                        </td>
 
-                        <td style="background: #fffbeb;">
-                            <span class="leyenda-clave leyenda-ed">ED</span>
-                            En desarrollo
-                        </td>
 
-                        <td style="background: #fef2f2;">
-                            <span class="leyenda-clave leyenda-ra">RA</span>
-                            Requiere apoyo
-                        </td>
-                    </tr>
-                </table>
+                @if ($esListaPrimariaEvaluacion && $materiasCualitativas->isNotEmpty())
+                    <table class="leyenda-cualitativa">
+                        <tr>
+                            <td colspan="3" class="leyenda-titulo">
+                                Leyenda de evaluación cualitativa
+                                <br>
+                                <span class="nota-leyenda">
+                                    Solo Cálculo mental, Caligrafía y Lectura deberán evaluarse con AC, ED o RA.
+                                </span>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background: #f0fdf4;">
+                                <span class="leyenda-clave leyenda-ac">AC</span>
+                                Acreditado
+                            </td>
+
+                            <td style="background: #fffbeb;">
+                                <span class="leyenda-clave leyenda-ed">ED</span>
+                                En desarrollo
+                            </td>
+
+                            <td style="background: #fef2f2;">
+                                <span class="leyenda-clave leyenda-ra">RA</span>
+                                Requiere apoyo
+                            </td>
+                        </tr>
+                    </table>
+                @endif
+
+                @if (!$esListaPrimariaEvaluacion)
+                    <table class="leyenda-cualitativa">
+                        <tr>
+                            <td colspan="3" class="leyenda-titulo">
+                                Leyenda de evaluación
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background: #f0fdf4;">
+                                <span class="leyenda-clave leyenda-ac">AC</span>
+                                Acreditado
+                            </td>
+
+                            <td style="background: #fffbeb;">
+                                <span class="leyenda-clave leyenda-ed">ED</span>
+                                En desarrollo
+                            </td>
+
+                            <td style="background: #fef2f2;">
+                                <span class="leyenda-clave leyenda-ra">RA</span>
+                                Requiere apoyo
+                            </td>
+                        </tr>
+                    </table>
+                @endif
             @endif
 
         </div>
     </div>
+
     <footer>
-        <p class="uppercase fw-700">{{ $escuela->nombre }} · C.C.T. {{ $nivel->cct }} </p>
-        <p>
-            C. {{ $escuela->calle }} No. {{ $escuela->no_exterior }}, Col. {{ $escuela->colonia }},
-            C.P. {{ $escuela->codigo_postal }}, Cd. {{ $escuela->ciudad }}, {{ $escuela->estado }}.
+        <p class="uppercase fw-700">
+            {{ $escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA' }}
+            · C.C.T. {{ $nivel->cct ?? '—' }}
         </p>
-        <p>Fecha de expedición: {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}</p>
+
+        <p>
+            C. {{ $escuela->calle ?? '' }}
+            No. {{ $escuela->no_exterior ?? '' }},
+            Col. {{ $escuela->colonia ?? '' }},
+            C.P. {{ $escuela->codigo_postal ?? '' }},
+            Cd. {{ $escuela->ciudad ?? '' }},
+            {{ $escuela->estado ?? '' }}.
+        </p>
+
+        <p>
+            Fecha de expedición:
+            {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
+        </p>
     </footer>
 </body>
 
