@@ -1948,12 +1948,12 @@ class PDFController extends Controller
         */
 
         /*
-|--------------------------------------------------------------------------
-| Logos y datos institucionales del diploma
-|--------------------------------------------------------------------------
-| Se usan imágenes en base64 porque Dompdf suele fallar con rutas relativas.
-| Las imágenes deben estar dentro de public/.
-*/
+        |--------------------------------------------------------------------------
+        | Logos y datos institucionales del diploma
+        |--------------------------------------------------------------------------
+        | Se usan imágenes en base64 porque Dompdf suele fallar con rutas relativas.
+        | Las imágenes deben estar dentro de public/.
+        */
 
         $logoIzquierdo = $this->imagenBase64Publica('imagenes/logo-letra.png');
 
@@ -1962,11 +1962,11 @@ class PDFController extends Controller
         $marcaAgua = $this->imagenBase64Publica('imagenes/logo-letra.png');
 
         /*
-|
-| Datos según el nivel
-|--------------------------------------------------------------------------
-| Se arma el encabezado de acuerdo al nivel seleccionado.
-*/
+            |
+            | Datos según el nivel
+            |--------------------------------------------------------------------------
+            | Se arma el encabezado de acuerdo al nivel seleccionado.
+            */
 
         $nombreNivel = mb_strtolower($nivel->nombre ?? '');
 
@@ -2113,6 +2113,7 @@ class PDFController extends Controller
 
         $esBachillerato = $this->esBachillerato($nivel);
         $esSecundaria = $this->esSecundaria($nivel);
+        $esPreescolar = (int) $nivel->id === 1 || $nivel->slug === 'preescolar';
         $esPrimaria = (int) $nivel->id === 2 || $nivel->slug === 'primaria';
 
         /*
@@ -2254,8 +2255,6 @@ class PDFController extends Controller
 
         if ($esBachillerato) {
             $grupoQuery->where('semestre_id', $semestreId);
-        } else {
-            $grupoQuery->whereNull('semestre_id');
         }
 
         $grupo = $grupoQuery->first();
@@ -2292,8 +2291,6 @@ class PDFController extends Controller
 
         if ($esBachillerato) {
             $alumnosQuery->where('semestre_id', $semestre->id);
-        } else {
-            $alumnosQuery->whereNull('semestre_id');
         }
 
         $alumnos = $alumnosQuery
@@ -2303,21 +2300,15 @@ class PDFController extends Controller
             ->get();
 
         /*
+        /*
         |--------------------------------------------------------------------------
         | Materias calificables
         |--------------------------------------------------------------------------
+        | Para primaria en lista de evaluación:
+        | - Se muestran todas las materias con calificable = 1.
+        | - Solo Cálculo mental, Caligrafía y Lectura usarán AC / ED / RA.
+        | - Las demás materias se marcarán como PROMEDIA.
         */
-
-        /*
-/*
-|--------------------------------------------------------------------------
-| Materias calificables
-|--------------------------------------------------------------------------
-| Para primaria en lista de evaluación:
-| - Se muestran todas las materias con calificable = 1.
-| - Solo Cálculo mental, Caligrafía y Lectura usarán AC / ED / RA.
-| - Las demás materias se marcarán como PROMEDIA.
-*/
 
         $materiasQuery = AsignacionMateria::query()
             ->where('nivel_id', $nivel->id)
@@ -2365,25 +2356,51 @@ class PDFController extends Controller
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Docente principal
-        |--------------------------------------------------------------------------
-        */
-
-        $profesorId = $materias
-            ->pluck('profesor_id')
-            ->filter()
-            ->countBy()
-            ->sortDesc()
-            ->keys()
-            ->first();
+                |--------------------------------------------------------------------------
+                | Docente principal
+                |--------------------------------------------------------------------------
+                | Para preescolar y primaria se toma el personal desde PersonaNivel,
+                | siguiendo la misma lógica que se usa en Matrícula.
+                |
+                | Para secundaria y bachillerato se conserva la lógica de materias.
+                */
 
         $docente = null;
 
-        if ($profesorId) {
-            $docente = Persona::query()
-                ->where('id', $profesorId)
+        if ($esPreescolar || $esPrimaria) {
+            $personalAsignado = PersonaNivel::query()
+                ->with([
+                    'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero',
+                    'nivel:id,nombre',
+                    'detalles' => function ($query) {
+                        $query->with([
+                            'grado:id,nombre',
+                            'grupo:id,nombre',
+                        ]);
+                    },
+                ])
+                ->where('nivel_id', $nivel->id)
+                ->whereHas('detalles', function ($query) use ($grado, $grupo) {
+                    $query->where('grado_id', $grado->id)
+                        ->where('grupo_id', $grupo->id);
+                })
                 ->first();
+
+            $docente = $personalAsignado?->persona;
+        } else {
+            $profesorId = $materias
+                ->pluck('profesor_id')
+                ->filter()
+                ->countBy()
+                ->sortDesc()
+                ->keys()
+                ->first();
+
+            if ($profesorId) {
+                $docente = Persona::query()
+                    ->where('id', $profesorId)
+                    ->first();
+            }
         }
 
         $nombreDocente = $this->nombrePersona($docente);
@@ -2391,7 +2408,6 @@ class PDFController extends Controller
         if ($nombreDocente === '') {
             $nombreDocente = 'DOCENTE';
         }
-
         /*
         |--------------------------------------------------------------------------
         | Escuela, ciclo y director

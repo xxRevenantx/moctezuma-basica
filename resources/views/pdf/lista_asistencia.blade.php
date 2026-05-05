@@ -36,7 +36,7 @@
 
     <style>
         @page {
-            margin: 8px 25px;
+            margin: 30px 50px;
         }
 
         @font-face {
@@ -532,23 +532,7 @@
                         </tr>
                     @endforelse
 
-                    @for ($i = $alumnos->count() + 1; $i <= 13; $i++)
-                        <tr class="fila-alumno">
-                            <td class="numero">
-                                {{ $i }}
-                            </td>
 
-                            <td class="alumno"></td>
-
-                            @for ($d = 1; $d <= 20; $d++)
-                                <td class="celda"></td>
-                            @endfor
-
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                    @endfor
                 </tbody>
             </table>
         </div>
