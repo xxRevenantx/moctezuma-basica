@@ -80,14 +80,14 @@
         .logo-derecho {
             position: absolute;
             top: 112px;
-            right: 135px;
-            width: 180px;
+            right: 90px;
+            width: 190px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-derecho img {
-            max-width: 180px;
+            max-width: 190px;
         }
 
         .encabezado {
@@ -150,7 +150,7 @@
             z-index: 6;
             text-align: center;
             font-family: 'ARIAL', sans-serif;
-            font-size: 110px;
+            font-size: 120px;
             line-height: 1;
             font-weight: 700;
             letter-spacing: 3px;
@@ -162,7 +162,7 @@
         .adorno-izquierdo {
             position: absolute;
             top: 306px;
-            left: 164px;
+            left: 120px;
             width: 95px;
             height: 1.5px;
             background: #b5792f;
@@ -172,7 +172,7 @@
         .adorno-derecho {
             position: absolute;
             top: 306px;
-            right: 164px;
+            right: 120px;
             width: 95px;
             height: 1.5px;
             background: #b5792f;
@@ -195,7 +195,7 @@
 
         .alumno {
             position: absolute;
-            top: 420px;
+            top: 410px;
             left: 145px;
             right: 145px;
             z-index: 6;
@@ -210,7 +210,7 @@
 
         .linea-alumno {
             position: absolute;
-            top: 480px;
+            top: 470px;
             left: 145px;
             right: 145px;
             z-index: 6;
@@ -220,7 +220,7 @@
 
         .descripcion {
             position: absolute;
-            top: 490px;
+            top: 480px;
             left: 150px;
             right: 150px;
             z-index: 6;
@@ -322,30 +322,14 @@
         }
 
         .firmas {
-            position: absolute;
-            left: 150px;
-            right: 150px;
-            bottom: 62px;
-            z-index: 6;
-            width: calc(100% - 300px);
-            border-collapse: collapse;
-        }
-
-        .firmas td {
-            width: 10%;
-            text-align: center;
-            font-family: 'calibri', 'ARIAL', sans-serif;
-            font-size: 11px;
+            font-family: 'ARIAL', sans-serif;
+            width: 100%;
+            margin-top: 650px;
+            font-size: 15px;
             color: #071846;
-            padding: 0 55px;
         }
 
-        .linea-firma {
-            border-top: 1.5px solid #071846;
-            padding-top: 7px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+
 
         .cargo {
             margin-top: 2px;
@@ -413,20 +397,17 @@
         <div class="descripcion">
             Por haber obtenido el @if (!empty($lugarAlumno))
                 <b><u> {{ $textoLugarAlumno ?? '—' }} </u></b>
-            @endif en aprovechamiento acádemico durante el
-            <strong> {{ $nombrePeriodo ?? '—' }}° {{ !empty($esBachillerato) ? 'Parcial' : 'Periodo' }}</strong>,
-            correspondiente al nivel
-            <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
-            <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>° grado
-            ,
-            grupo
-            <strong>{{ mb_strtoupper($grupo->nombre ?? 'GRUPO') }}</strong>.
-
+            @endif en aprovechamiento académico durante el
+            <strong> {{ $nombrePeriodo ?? '—' }}° {{ !empty($esBachillerato) ? 'parcial' : 'periodo' }}</strong>,
+            correspondiente al
             @if (!empty($esBachillerato) && !empty($semestre))
-                <br>
-                Semestre:
-                <strong>{{ $semestre->numero ?? '—' }}</strong>
+                <strong>{{ $semestre->numero ?? '—' }}° Semestre</strong>
             @endif
+            del <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>° grado
+            de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
+            grupo "<strong>{{ mb_strtoupper($grupo->nombre ?? 'GRUPO') }}</strong>".
+
+
         </div>
 
         <table class="datos-extra">
@@ -454,21 +435,20 @@
         </div>
 
 
-
         <table class="firmas">
             <tr>
+                <td style="width: 100%; padding-top: 60px; text-align: center;">
+                    <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________') }}</u><br>
 
-                <td>
-                    <div class="linea-firma">
-                        {{ mb_strtoupper($director->director->nombre_completo ?? ($director->director->nombre ?? 'DIRECCIÓN ACADÉMICA')) }}
-                    </div>
-
-                    <div class="cargo">
-                        Dirección Académica
-                    </div>
+                    @if ($director->director->genero === 'F')
+                        Firma de la directora de la escuela
+                    @else
+                        Firma del director de la escuela
+                    @endif
                 </td>
             </tr>
         </table>
+
 
     </div>
 </body>

@@ -12,26 +12,23 @@ return new class extends Migration {
     {
         Schema::create('asignacion_materias', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('nivel_id');
-            $table->unsignedBigInteger('grado_id');
-            $table->unsignedBigInteger('grupo_id');
-            $table->unsignedBigInteger('semestre')->nullable();
-            $table->unsignedBigInteger('profesor_id')->nullable();
-            $table->string('materia');
-            $table->string('clave')->nullable();
-            $table->string('slug');
-            $table->boolean('calificable')->default(true);
-            $table->boolean('extra')->default(true);
-            $table->integer('orden')->default(0);
+            $table->foreignId('materia_id')
+                ->constrained('materias')
+                ->cascadeOnDelete();
 
-            $table->foreign('nivel_id')->references('id')->on('niveles')->onDelete('cascade');
-            $table->foreign('grado_id')->references('id')->on('grados')->onDelete('cascade');
-            $table->foreign('grupo_id')->references('id')->on('grupos')->onDelete('cascade');
-            $table->foreign('semestre')->references('id')->on('semestres')->onDelete('set null');
-            $table->foreign('profesor_id')->references('id')->on('personas')->onDelete('set null');
+            $table->foreignId('grupo_id')
+                ->constrained('grupos')
+                ->cascadeOnDelete();
 
+            $table->foreignId('profesor_id')
+                ->nullable()
+                ->constrained('personas')
+                ->nullOnDelete();
+
+            $table->unsignedInteger('orden')->default(0);
 
             $table->timestamps();
+
         });
     }
 

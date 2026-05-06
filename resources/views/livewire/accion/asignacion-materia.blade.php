@@ -150,94 +150,147 @@
 
                 <div
                     class="grid grid-cols-1 gap-5 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-3' : 'xl:grid-cols-2' }}">
+
+                    {{-- GENERACIÓN --}}
+                    <div class="space-y-2">
+                        <flux:field>
+                            <flux:label>Generación</flux:label>
+
+                            <flux:select wire:model.live="generacion_id">
+                                <option value="">Selecciona una generación</option>
+
+                                @foreach ($generaciones as $item)
+                                    <option value="{{ $item['id'] }}">
+                                        {{ $item['nombre'] }}
+                                    </option>
+                                @endforeach
+                            </flux:select>
+
+                            <flux:error name="generacion_id" />
+                        </flux:field>
+                    </div>
+
+                    {{-- GRADO --}}
                     <div class="space-y-2">
                         <flux:field>
                             <flux:label>Grado</flux:label>
-                            <flux:select wire:model.live="grado_id">
+
+                            <flux:select wire:model.live="grado_id" :disabled="blank($generacion_id)">
                                 <option value="">Selecciona un grado</option>
+
                                 @foreach ($grados as $item)
-                                    <option value="{{ $item['id'] }}">{{ $item['nombre'] }}</option>
+                                    <option value="{{ $item['id'] }}">
+                                        {{ $item['nombre'] }}
+                                    </option>
                                 @endforeach
                             </flux:select>
+
                             <flux:error name="grado_id" />
                         </flux:field>
                     </div>
 
+                    {{-- SEMESTRE SOLO BACHILLERATO --}}
                     @if ($this->esBachillerato)
                         <div class="space-y-2">
                             <flux:field>
                                 <flux:label>Semestre</flux:label>
-                                <flux:select wire:model.live="semestre" :disabled="blank($grado_id)">
+
+                                <flux:select wire:model.live="semestre"
+                                    :disabled="blank($generacion_id) || blank($grado_id)">
                                     <option value="">Selecciona un semestre</option>
+
                                     @foreach ($semestres as $item)
                                         <option value="{{ $item['id'] }}">
                                             {{ $item['numero'] }}° semestre
                                         </option>
                                     @endforeach
                                 </flux:select>
+
                                 <flux:error name="semestre" />
                             </flux:field>
                         </div>
                     @endif
 
+                    {{-- GRUPO --}}
                     <div class="space-y-2">
                         <flux:field>
                             <flux:label>Grupo</flux:label>
+
                             <flux:select wire:model.live="grupo_id"
-                                :disabled="$this->esBachillerato ? (blank($grado_id) || blank($semestre)) : blank($grado_id)">
+                                :disabled="$this->esBachillerato
+                                                    ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                    : (blank($generacion_id) || blank($grado_id))">
                                 <option value="">Selecciona un grupo</option>
+
                                 @foreach ($grupos as $item)
-                                    <option value="{{ $item['id'] }}">{{ $item['nombre'] }}</option>
+                                    <option value="{{ $item['id'] }}">
+                                        {{ $item['nombre'] }}
+                                    </option>
                                 @endforeach
                             </flux:select>
+
                             <flux:error name="grupo_id" />
                         </flux:field>
                     </div>
 
-
-
+                    {{-- PROFESOR --}}
                     <div
                         class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
                         <flux:field>
                             <flux:label>Profesor</flux:label>
+
                             <flux:select wire:model.live="profesor_id">
                                 <option value="">Selecciona un profesor</option>
+
                                 @foreach ($profesores as $item)
-                                    <option value="{{ $item['id'] }}">{{ $item['nombre'] }}</option>
+                                    <option value="{{ $item['id'] }}">
+                                        {{ $item['nombre'] }}
+                                    </option>
                                 @endforeach
                             </flux:select>
+
                             <flux:error name="profesor_id" />
                         </flux:field>
                     </div>
 
+                    {{-- MATERIA --}}
                     <div
                         class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
                         <flux:field>
                             <flux:label>Materia</flux:label>
+
                             <flux:input wire:model.live="materia" placeholder="Nombre de la materia" />
+
                             <flux:error name="materia" />
                         </flux:field>
                     </div>
 
+                    {{-- CLAVE SOLO BACHILLERATO --}}
                     @if ($this->esBachillerato)
                         <div class="space-y-2">
                             <flux:field>
                                 <flux:label>Clave</flux:label>
+
                                 <flux:input wire:model.live="clave" placeholder="Clave de la materia" />
+
                                 <flux:error name="clave" />
                             </flux:field>
                         </div>
                     @endif
 
+                    {{-- SLUG --}}
                     <div
                         class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
                         <flux:field>
                             <flux:label>Slug</flux:label>
+
                             <flux:input variant="filled" wire:model.live="slug" placeholder="slug-de-la-materia" />
+
                             <flux:error name="slug" />
                         </flux:field>
                     </div>
 
+                    {{-- CALIFICABLE --}}
                     <div class="space-y-2">
                         <flux:field>
                             <flux:label>¿Calificable?</flux:label>
@@ -246,20 +299,27 @@
                                 <flux:select.option value="1">Sí</flux:select.option>
                                 <flux:select.option value="0">No</flux:select.option>
                             </flux:select>
+
                             <flux:error name="calificable" />
                         </flux:field>
                     </div>
 
+                    {{-- EXTRA --}}
                     <div class="space-y-2">
                         <flux:field>
-                            <flux:label>¿Extra? <span class="text-xs text-slate-500 dark:text-slate-400"> Las materias
-                                    extra no se toman en
-                                    cuenta para el promedio final, pero sí cuentan como asignadas.</span></flux:label>
+                            <flux:label>
+                                ¿Extra?
+                                <span class="text-xs text-slate-500 dark:text-slate-400">
+                                    Las materias extra no se toman en cuenta para el promedio final, pero sí cuentan
+                                    como asignadas.
+                                </span>
+                            </flux:label>
 
                             <flux:select wire:model="extra">
                                 <flux:select.option value="1">Sí</flux:select.option>
                                 <flux:select.option value="0">No</flux:select.option>
                             </flux:select>
+
                             <flux:error name="extra" />
                         </flux:field>
                     </div>

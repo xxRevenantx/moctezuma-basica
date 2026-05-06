@@ -12,18 +12,17 @@ return new class extends Migration {
     {
         Schema::create('materia_promediar', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('nivel_id');
-            $table->unsignedBigInteger('grado_id');
-            $table->unsignedBigInteger('grupo_id');
-            $table->unsignedBigInteger('semestre_id')->nullable();
-            $table->integer('numero_materias');
+            $table->foreignId('nivel_id')->constrained('niveles')->cascadeOnDelete();
+            $table->foreignId('grado_id')->constrained('grados')->cascadeOnDelete();
 
+            $table->foreignId('semestre_id')
+                ->nullable()
+                ->constrained('semestres')
+                ->nullOnDelete();
 
-            $table->foreign('nivel_id')->references('id')->on('niveles')->onDelete('cascade');
-            $table->foreign('grado_id')->references('id')->on('grados')->onDelete('cascade');
-            $table->foreign('grupo_id')->references('id')->on('grupos')->onDelete('cascade');
-            $table->foreign('semestre_id')->references('id')->on('semestres')->onDelete('set null');
+            $table->unsignedInteger('numero_materias');
 
+            $table->timestamps();
 
             $table->timestamps();
         });
