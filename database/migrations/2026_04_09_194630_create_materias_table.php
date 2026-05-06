@@ -16,15 +16,10 @@ return new class extends Migration {
         Schema::create('materias', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Nivel::class)
-                ->constrained('niveles')
-                ->cascadeOnDelete();
+            $table->foreignId('nivel_id')->constrained('niveles')->cascadeOnDelete();
+            $table->foreignId('grado_id')->constrained('grados')->cascadeOnDelete();
 
-            $table->foreignIdFor(Grado::class)
-                ->constrained('grados')
-                ->cascadeOnDelete();
-
-            $table->foreignIdFor(Semestre::class)
+            $table->foreignId('semestre_id')
                 ->nullable()
                 ->constrained('semestres')
                 ->nullOnDelete();
@@ -35,12 +30,11 @@ return new class extends Migration {
 
             $table->boolean('calificable')->default(true);
             $table->boolean('extra')->default(false);
+            $table->boolean('receso')->default(false);
 
             $table->unsignedInteger('orden')->default(0);
 
             $table->timestamps();
-
-
         });
     }
 

@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Accion;
 
+use App\Exports\CalificacionExport;
 use App\Models\AsignacionMateria;
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion as ModelsCalificacion;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -19,15 +21,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-
-use App\Exports\CalificacionExport;
 use Maatwebsite\Excel\Facades\Excel;
 
 class Calificacion extends Component
 {
     public string $slug_nivel = '';
-
-    public $boleta_inscripcion_id = '';
 
     public $nivel_id = null;
     public $generacion_id = null;
@@ -55,9 +53,11 @@ class Calificacion extends Component
 
     public bool $mostrarModalBitacora = false;
     public bool $mostrarModalRevision = false;
+
     public array $resumenRevision = [];
     public string $motivo_guardado = '';
 
+    public $boleta_inscripcion_id = '';
     public $diploma_inscripcion_id = '';
 
     public Collection $niveles;
@@ -94,16 +94,6 @@ class Calificacion extends Component
         $this->cargarCatalogos();
     }
 
-    public function getPuedeExportarDiplomaProperty()
-    {
-        return !empty($this->diploma_inscripcion_id)
-            && !empty($this->periodo_id)
-            && !empty($this->generacion_id)
-            && !empty($this->grado_id)
-            && !empty($this->grupo_id)
-            && (!$this->esBachillerato || !empty($this->semestre_id));
-    }
-
     public function getEsBachilleratoProperty(): bool
     {
         return (int) $this->nivel_id === 4;
@@ -113,15 +103,13 @@ class Calificacion extends Component
     {
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel_id)
+            ->where('status', 1)
             ->orderByDesc('anio_ingreso')
             ->get();
 
         $this->grados = collect();
         $this->grupos = collect();
-
-        $this->semestres = Semestre::query()
-            ->orderBy('numero')
-            ->get();
+        $this->semestres = collect();
 
         $this->parciales = Parcial::query()
             ->orderBy('parcial')
@@ -134,25 +122,57 @@ class Calificacion extends Component
 
     public function updatedGeneracionId(): void
     {
-        $this->resetEstadoAcademico(['grado_id', 'grupo_id', 'semestre_id', 'parcial_bachillerato_id', 'periodo_basica_id']);
+        $this->resetEstadoAcademico([
+            'grado_id',
+            'grupo_id',
+            'semestre_id',
+            'parcial_bachillerato_id',
+            'periodo_basica_id',
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
+
         $this->cargarGrados();
     }
 
     public function updatedGradoId(): void
     {
-        $this->resetEstadoAcademico(['grupo_id', 'semestre_id', 'parcial_bachillerato_id', 'periodo_basica_id']);
-        $this->cargarGrupos();
+        $this->resetEstadoAcademico([
+            'grupo_id',
+            'semestre_id',
+            'parcial_bachillerato_id',
+            'periodo_basica_id',
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
+
+        if ($this->esBachillerato) {
+            $this->cargarSemestres();
+        } else {
+            $this->cargarGrupos();
+        }
     }
 
     public function updatedSemestreId(): void
     {
-        $this->resetEstadoAcademico(['grupo_id', 'parcial_bachillerato_id']);
+        $this->resetEstadoAcademico([
+            'grupo_id',
+            'parcial_bachillerato_id',
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
+
         $this->cargarGrupos();
     }
 
     public function updatedGrupoId(): void
     {
-        $this->resetEstadoAcademico(['parcial_bachillerato_id', 'periodo_basica_id']);
+        $this->resetEstadoAcademico([
+            'parcial_bachillerato_id',
+            'periodo_basica_id',
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
 
         if (!$this->esBachillerato) {
             $this->cargarDatos();
@@ -161,13 +181,21 @@ class Calificacion extends Component
 
     public function updatedParcialBachilleratoId(): void
     {
-        $this->resetEstadoAcademico();
+        $this->resetEstadoAcademico([
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
+
         $this->cargarDatos();
     }
 
     public function updatedPeriodoBasicaId(): void
     {
-        $this->resetEstadoAcademico();
+        $this->resetEstadoAcademico([
+            'boleta_inscripcion_id',
+            'diploma_inscripcion_id',
+        ]);
+
         $this->cargarDatos();
     }
 
@@ -187,7 +215,6 @@ class Calificacion extends Component
             'periodo_id',
             'ciclo_escolar_id',
             'periodoSeleccionado',
-            'busqueda',
             'filtro_estado',
             'inscripciones',
             'inscripcionesTabla',
@@ -219,9 +246,27 @@ class Calificacion extends Component
             ->get();
     }
 
+    private function cargarSemestres(): void
+    {
+        if (!$this->esBachillerato || blank($this->grado_id)) {
+            $this->semestres = collect();
+            return;
+        }
+
+        $this->semestres = Semestre::query()
+            ->where('grado_id', $this->grado_id)
+            ->orderBy('numero')
+            ->get();
+    }
+
     private function cargarGrupos(): void
     {
         if (blank($this->generacion_id) || blank($this->grado_id)) {
+            $this->grupos = collect();
+            return;
+        }
+
+        if ($this->esBachillerato && blank($this->semestre_id)) {
             $this->grupos = collect();
             return;
         }
@@ -230,7 +275,11 @@ class Calificacion extends Component
             ->where('nivel_id', $this->nivel_id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grado_id', $this->grado_id)
-            ->when($this->esBachillerato, fn($query) => $query->where('semestre_id', $this->semestre_id))
+            ->when(
+                $this->esBachillerato,
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
+            )
             ->orderBy('nombre')
             ->get();
     }
@@ -260,25 +309,13 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'boleta_inscripcion_id',
             'diploma_inscripcion_id',
         ]);
 
-        $this->boleta_inscripcion_id = '';
-        $this->diploma_inscripcion_id = '';
-
         $this->grados = collect();
         $this->grupos = collect();
-    }
-
-    public function getPuedeExportarBoletaProperty(): bool
-    {
-        return !empty($this->slug_nivel)
-            && !empty($this->generacion_id)
-            && !empty($this->grado_id)
-            && !empty($this->grupo_id)
-            && !empty($this->periodo_id)
-            && !empty($this->boleta_inscripcion_id)
-            && (!$this->esBachillerato || !empty($this->semestre_id));
+        $this->semestres = collect();
     }
 
     public function cargarDatos(): void
@@ -301,11 +338,22 @@ class Calificacion extends Component
         ]);
 
         if ($this->esBachillerato) {
-            if (blank($this->generacion_id) || blank($this->grado_id) || blank($this->semestre_id) || blank($this->grupo_id) || blank($this->parcial_bachillerato_id)) {
+            if (
+                blank($this->generacion_id) ||
+                blank($this->grado_id) ||
+                blank($this->semestre_id) ||
+                blank($this->grupo_id) ||
+                blank($this->parcial_bachillerato_id)
+            ) {
                 return;
             }
         } else {
-            if (blank($this->generacion_id) || blank($this->grado_id) || blank($this->grupo_id) || blank($this->periodo_basica_id)) {
+            if (
+                blank($this->generacion_id) ||
+                blank($this->grado_id) ||
+                blank($this->grupo_id) ||
+                blank($this->periodo_basica_id)
+            ) {
                 return;
             }
         }
@@ -334,7 +382,6 @@ class Calificacion extends Component
                 ->where('semestre_id', $this->semestre_id)
                 ->where('parcial_bachillerato_id', $this->parcial_bachillerato_id);
         } else {
-            // En básica el periodo es global.
             $query->where('periodo_basica_id', $this->periodo_basica_id);
         }
 
@@ -373,7 +420,7 @@ class Calificacion extends Component
             return (int) $periodo->ciclo_escolar_id;
         }
 
-        return \App\Models\cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->value('id');
     }
@@ -416,7 +463,11 @@ class Calificacion extends Component
                 return [
                     'inscripcion_id' => $inscripcion->id,
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
-                    'alumno' => trim(($inscripcion->apellido_paterno ?? '') . ' ' . ($inscripcion->apellido_materno ?? '') . ' ' . ($inscripcion->nombre ?? '')),
+                    'alumno' => trim(
+                        ($inscripcion->apellido_paterno ?? '') . ' ' .
+                            ($inscripcion->apellido_materno ?? '') . ' ' .
+                            ($inscripcion->nombre ?? '')
+                    ),
                 ];
             })
             ->values()
@@ -427,28 +478,53 @@ class Calificacion extends Component
 
     private function cargarMaterias(): void
     {
-        $query = AsignacionMateria::query()
-            ->with(['profesor'])
-            ->where('nivel_id', $this->nivel_id)
-            ->where('grado_id', $this->grado_id)
-            ->where('grupo_id', $this->grupo_id)
-            ->where('calificable', 1);
-
-        if ($this->esBachillerato) {
-            // La tabla asignacion_materias usa la columna semestre, no semestre_id.
-            $query->where('semestre', $this->semestre_id);
+        if (blank($this->grupo_id) || blank($this->grado_id) || blank($this->nivel_id)) {
+            $this->materias = [];
+            return;
         }
 
-        $this->materias = $query
-            ->orderBy('orden')
-            ->orderBy('materia')
+        $asignaciones = AsignacionMateria::query()
+            ->with([
+                'profesor:id,nombre,apellido_paterno,apellido_materno',
+                'materia:id,nivel_id,grado_id,semestre_id,materia,clave,slug,calificable,extra,orden',
+            ])
+            ->where('grupo_id', $this->grupo_id)
+            ->whereHas('materia', function ($query) {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('grado_id', $this->grado_id)
+                    ->where('calificable', 1);
+
+                if ($this->esBachillerato) {
+                    $query->where('semestre_id', $this->semestre_id);
+                } else {
+                    $query->whereNull('semestre_id');
+                }
+            })
             ->get()
-            ->map(function ($materia) {
+            ->sortBy([
+                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
+                fn($a, $b) => strcasecmp($a->materia?->materia ?? '', $b->materia?->materia ?? ''),
+            ])
+            ->values();
+
+        $this->materias = $asignaciones
+            ->map(function ($asignacion) {
+                $profesor = $asignacion->profesor;
+
                 return [
-                    'id' => $materia->id,
-                    'materia' => $materia->materia ?? 'Materia',
-                    'profesor' => $materia->profesor
-                        ? trim(($materia->profesor->nombre ?? '') . ' ' . ($materia->profesor->apellido_paterno ?? '') . ' ' . ($materia->profesor->apellido_materno ?? ''))
+                    'id' => (int) $asignacion->id,
+                    'materia_id' => (int) $asignacion->materia_id,
+                    'materia' => $asignacion->materia?->materia ?? 'Materia',
+                    'clave' => $asignacion->materia?->clave,
+                    'slug' => $asignacion->materia?->slug,
+                    'extra' => (bool) ($asignacion->materia?->extra ?? false),
+                    'calificable' => (bool) ($asignacion->materia?->calificable ?? false),
+                    'profesor' => $profesor
+                        ? trim(
+                            ($profesor->nombre ?? '') . ' ' .
+                                ($profesor->apellido_paterno ?? '') . ' ' .
+                                ($profesor->apellido_materno ?? '')
+                        )
                         : 'SIN PROFESOR ASIGNADO',
                 ];
             })
@@ -458,12 +534,24 @@ class Calificacion extends Component
 
     private function cargarCalificaciones(): void
     {
-        if (empty($this->inscripciones) || empty($this->materias) || blank($this->periodo_id) || blank($this->ciclo_escolar_id)) {
+        if (
+            empty($this->inscripciones) ||
+            empty($this->materias) ||
+            blank($this->periodo_id) ||
+            blank($this->ciclo_escolar_id)
+        ) {
             return;
         }
 
-        $inscripcionIds = collect($this->inscripciones)->pluck('inscripcion_id')->values()->all();
-        $materiaIds = collect($this->materias)->pluck('id')->values()->all();
+        $inscripcionIds = collect($this->inscripciones)
+            ->pluck('inscripcion_id')
+            ->values()
+            ->all();
+
+        $asignacionMateriaIds = collect($this->materias)
+            ->pluck('id')
+            ->values()
+            ->all();
 
         $calificacionesGuardadas = ModelsCalificacion::query()
             ->where('periodo_id', $this->periodo_id)
@@ -475,27 +563,27 @@ class Calificacion extends Component
             ->when($this->esBachillerato, fn($query) => $query->where('semestre_id', $this->semestre_id))
             ->when(!$this->esBachillerato, fn($query) => $query->whereNull('semestre_id'))
             ->whereIn('inscripcion_id', $inscripcionIds)
-            ->whereIn('asignacion_materia_id', $materiaIds)
+            ->whereIn('asignacion_materia_id', $asignacionMateriaIds)
             ->get();
 
         foreach ($this->inscripciones as $fila) {
             $inscripcionId = (int) $fila['inscripcion_id'];
 
             foreach ($this->materias as $materia) {
-                $materiaId = (int) $materia['id'];
+                $asignacionMateriaId = (int) $materia['id'];
 
                 $calificacion = $calificacionesGuardadas
                     ->where('inscripcion_id', $inscripcionId)
-                    ->where('asignacion_materia_id', $materiaId)
+                    ->where('asignacion_materia_id', $asignacionMateriaId)
                     ->first();
 
                 $valor = $calificacion?->calificacion;
                 $observacion = $calificacion?->observacion;
 
-                $this->calificaciones[$inscripcionId][$materiaId] = $valor !== null ? (string) $valor : '';
-                $this->calificacionesOriginales[$inscripcionId][$materiaId] = $valor !== null ? (string) $valor : '';
-                $this->observaciones[$inscripcionId][$materiaId] = $observacion !== null ? (string) $observacion : '';
-                $this->observacionesOriginales[$inscripcionId][$materiaId] = $observacion !== null ? (string) $observacion : '';
+                $this->calificaciones[$inscripcionId][$asignacionMateriaId] = $valor !== null ? (string) $valor : '';
+                $this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] = $valor !== null ? (string) $valor : '';
+                $this->observaciones[$inscripcionId][$asignacionMateriaId] = $observacion !== null ? (string) $observacion : '';
+                $this->observacionesOriginales[$inscripcionId][$asignacionMateriaId] = $observacion !== null ? (string) $observacion : '';
             }
         }
     }
@@ -508,12 +596,14 @@ class Calificacion extends Component
     private function normalizarCalificacion($valor): ?string
     {
         $valor = strtoupper(trim((string) $valor));
+
         return $valor === '' ? null : $valor;
     }
 
     private function esCalificacionEspecial($valor): bool
     {
         $valor = $this->normalizarCalificacion($valor);
+
         return $valor !== null && in_array($valor, $this->clavesEspecialesPermitidas(), true);
     }
 
@@ -526,12 +616,15 @@ class Calificacion extends Component
         }
 
         $numero = (float) $valor;
+
         return $numero >= 0 && $numero <= 10;
     }
 
     private function obtenerValorNumerico($valor): ?float
     {
-        return $this->esCalificacionNumerica($valor) ? (float) $this->normalizarCalificacion($valor) : null;
+        return $this->esCalificacionNumerica($valor)
+            ? (float) $this->normalizarCalificacion($valor)
+            : null;
     }
 
     private function validarCalificacionPermitida($valor): bool
@@ -542,63 +635,144 @@ class Calificacion extends Component
             return true;
         }
 
-        return $this->esCalificacionEspecial($valor) || $this->esCalificacionNumerica($valor);
+        return $this->esCalificacionNumerica($valor) || $this->esCalificacionEspecial($valor);
     }
 
     private function tipoValorCalificacion($valor): string
     {
-        $valor = $this->normalizarCalificacion($valor);
-
-        if ($valor === null) {
-            return 'vacio';
+        if ($this->esCalificacionNumerica($valor)) {
+            return 'numerico';
         }
 
         if ($this->esCalificacionEspecial($valor)) {
             return 'especial';
         }
 
-        if ($this->esCalificacionNumerica($valor)) {
-            return 'numerico';
+        return 'vacio';
+    }
+
+    private function reglasCalificaciones(): array
+    {
+        $reglas = [];
+
+        foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
+            foreach ($materiasAlumno as $asignacionMateriaId => $valor) {
+                $reglas["calificaciones.{$inscripcionId}.{$asignacionMateriaId}"] = [
+                    'nullable',
+                    'string',
+                    'max:5',
+                    function ($attribute, $value, $fail) {
+                        if (!$this->validarCalificacionPermitida($value)) {
+                            $fail('Usa una calificación de 0 a 10 o una clave válida: AC, ED, RA, NP, SD.');
+                        }
+                    },
+                ];
+            }
         }
 
-        return 'invalido';
+        return $reglas;
+    }
+
+    private function mensajesCalificaciones(): array
+    {
+        return [
+            'calificaciones.*.*.max' => 'La calificación no debe exceder 5 caracteres.',
+        ];
+    }
+
+    public function calcularPromedios(): void
+    {
+        $this->promedios = [];
+
+        $materiasPromediables = collect($this->materias)
+            ->filter(fn($materia) => empty($materia['extra']))
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->toArray();
+
+        foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
+            $valores = collect($materiasAlumno)
+                ->filter(fn($valor, $asignacionMateriaId) => in_array((int) $asignacionMateriaId, $materiasPromediables, true))
+                ->map(fn($valor) => $this->normalizarCalificacion($valor))
+                ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
+                ->map(fn($valor) => (float) $valor)
+                ->values();
+
+            $this->promedios[(int) $inscripcionId] = $valores->isEmpty()
+                ? '—'
+                : number_format($valores->avg(), 1);
+        }
+    }
+
+    private function aplicarFiltroEstado(): void
+    {
+        $this->inscripcionesTabla = $this->inscripciones;
+
+        if ($this->filtro_estado === '') {
+            return;
+        }
+
+        $this->inscripcionesTabla = collect($this->inscripciones)
+            ->filter(function ($fila) {
+                $inscripcionId = (int) $fila['inscripcion_id'];
+                $materiasAlumno = $this->calificaciones[$inscripcionId] ?? [];
+
+                $valores = collect($materiasAlumno)
+                    ->map(fn($valor) => $this->normalizarCalificacion($valor));
+
+                return match ($this->filtro_estado) {
+                    'pendientes' => $valores->contains(fn($valor) => $valor === null),
+                    'aprobados' => $valores->filter(fn($valor) => $this->esCalificacionNumerica($valor))->every(fn($valor) => (float) $valor >= 6),
+                    'reprobados' => $valores->contains(fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6),
+                    'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
+                    'cambios' => $this->tieneCambiosInscripcion($inscripcionId),
+                    default => true,
+                };
+            })
+            ->values()
+            ->toArray();
+    }
+
+    private function tieneCambiosInscripcion(int $inscripcionId): bool
+    {
+        foreach (($this->calificaciones[$inscripcionId] ?? []) as $asignacionMateriaId => $valor) {
+            $nuevo = $this->normalizarCalificacion($valor);
+            $anterior = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? null);
+
+            $observacionNueva = trim((string) ($this->observaciones[$inscripcionId][$asignacionMateriaId] ?? ''));
+            $observacionAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? ''));
+
+            if ($nuevo !== $anterior || $observacionNueva !== $observacionAnterior) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getHayCambiosProperty(): bool
+    {
+        foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
+            if ($this->tieneCambiosInscripcion((int) $inscripcionId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function abrirRevisionGuardado(): void
     {
-        $this->resetErrorBag();
+        $this->resetErrorBag('calificaciones');
 
         if (!$this->puedeGuardar) {
             $this->addError('calificaciones', 'Selecciona todos los filtros requeridos antes de guardar.');
             return;
         }
 
-        if (blank($this->ciclo_escolar_id)) {
-            $this->addError('calificaciones', 'No se pudo determinar el ciclo escolar para guardar las calificaciones.');
-            return;
-        }
+        $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
-        foreach ($this->calificaciones as $materiasAlumno) {
-            foreach ($materiasAlumno as $valor) {
-                if (!$this->validarCalificacionPermitida($valor)) {
-                    $this->addError('calificaciones', 'Hay calificaciones inválidas. Solo se permite 0 a 10 o claves: AC, ED, RA, NP, SD.');
-                    return;
-                }
-            }
-        }
-
-        $this->resumenRevision = $this->generarResumenRevision();
-        $this->mostrarModalRevision = true;
-    }
-
-    public function cerrarRevisionGuardado(): void
-    {
-        $this->mostrarModalRevision = false;
-        $this->motivo_guardado = '';
-    }
-
-    private function generarResumenRevision(): array
-    {
         $cambios = [];
 
         foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
@@ -613,15 +787,15 @@ class Calificacion extends Component
                     continue;
                 }
 
-                $filaAlumno = collect($this->inscripciones)->firstWhere('inscripcion_id', (int) $inscripcionId);
-                $filaMateria = collect($this->materias)->firstWhere('id', (int) $asignacionMateriaId);
+                $alumno = collect($this->inscripciones)->firstWhere('inscripcion_id', (int) $inscripcionId);
+                $materia = collect($this->materias)->firstWhere('id', (int) $asignacionMateriaId);
 
                 $cambios[] = [
                     'inscripcion_id' => (int) $inscripcionId,
                     'asignacion_materia_id' => (int) $asignacionMateriaId,
-                    'alumno' => $filaAlumno['alumno'] ?? 'Sin alumno',
-                    'matricula' => $filaAlumno['matricula'] ?? '—',
-                    'materia' => $filaMateria['materia'] ?? 'Sin materia',
+                    'matricula' => $alumno['matricula'] ?? '—',
+                    'alumno' => $alumno['alumno'] ?? 'Alumno',
+                    'materia' => $materia['materia'] ?? 'Materia',
                     'anterior' => $valorAnterior,
                     'nuevo' => $valorNuevo,
                     'tipo' => $this->tipoValorCalificacion($valorNuevo),
@@ -630,18 +804,24 @@ class Calificacion extends Component
             }
         }
 
-        $coleccion = collect($cambios);
-
-        return [
-            'total' => $coleccion->count(),
-            'numericas' => $coleccion->where('tipo', 'numerico')->count(),
-            'especiales' => $coleccion->where('tipo', 'especial')->count(),
-            'vacias' => $coleccion->where('tipo', 'vacio')->count(),
-            'reprobatorias' => $coleccion->filter(fn($item) => is_numeric($item['nuevo']) && (float) $item['nuevo'] < 6)->count(),
-            'alumnos_afectados' => $coleccion->pluck('inscripcion_id')->unique()->count(),
-            'materias_afectadas' => $coleccion->pluck('asignacion_materia_id')->unique()->count(),
+        $this->resumenRevision = [
+            'total' => count($cambios),
+            'numericas' => collect($cambios)->where('tipo', 'numerico')->count(),
+            'especiales' => collect($cambios)->where('tipo', 'especial')->count(),
+            'reprobatorias' => collect($cambios)
+                ->filter(fn($item) => is_numeric($item['nuevo'] ?? null) && (float) $item['nuevo'] < 6)
+                ->count(),
+            'alumnos_afectados' => collect($cambios)->pluck('inscripcion_id')->unique()->count(),
+            'materias_afectadas' => collect($cambios)->pluck('asignacion_materia_id')->unique()->count(),
             'cambios' => $cambios,
         ];
+
+        $this->mostrarModalRevision = true;
+    }
+
+    public function cerrarRevisionGuardado(): void
+    {
+        $this->mostrarModalRevision = false;
     }
 
     public function guardarCalificaciones(): void
@@ -661,13 +841,15 @@ class Calificacion extends Component
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
         DB::transaction(function () {
-            foreach ($this->calificaciones as $inscripcionId => $materias) {
-                foreach ($materias as $materiaId => $valorNuevo) {
+            foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
+                foreach ($materiasAlumno as $asignacionMateriaId => $valorNuevo) {
                     $valorNuevo = $this->normalizarCalificacion($valorNuevo);
-                    $valorAnterior = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$materiaId] ?? null);
+                    $valorAnterior = $this->normalizarCalificacion(
+                        $this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? null
+                    );
 
-                    $observacionNueva = trim((string) ($this->observaciones[$inscripcionId][$materiaId] ?? ''));
-                    $observacionAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$materiaId] ?? ''));
+                    $observacionNueva = trim((string) ($this->observaciones[$inscripcionId][$asignacionMateriaId] ?? ''));
+                    $observacionAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? ''));
 
                     if ($valorNuevo === $valorAnterior && $observacionNueva === $observacionAnterior) {
                         continue;
@@ -676,14 +858,13 @@ class Calificacion extends Component
                     $condiciones = [
                         'periodo_id' => $this->periodo_id,
                         'inscripcion_id' => (int) $inscripcionId,
-                        'asignacion_materia_id' => (int) $materiaId,
-                        'ciclo_escolar_id' => $this->ciclo_escolar_id,
-                        'grado_id' => $this->grado_id,
-                        'grupo_id' => $this->grupo_id,
+                        'asignacion_materia_id' => (int) $asignacionMateriaId,
                     ];
 
                     if ($valorNuevo === null) {
-                        $calificacion = ModelsCalificacion::query()->where($condiciones)->first();
+                        $calificacion = ModelsCalificacion::query()
+                            ->where($condiciones)
+                            ->first();
 
                         if ($calificacion) {
                             $calificacion->delete();
@@ -691,7 +872,7 @@ class Calificacion extends Component
                             $this->crearBitacoraCalificacion(
                                 accion: 'eliminar',
                                 inscripcionId: (int) $inscripcionId,
-                                asignacionMateriaId: (int) $materiaId,
+                                asignacionMateriaId: (int) $asignacionMateriaId,
                                 anterior: $valorAnterior,
                                 nuevo: null,
                                 observacion: $observacionNueva
@@ -701,12 +882,19 @@ class Calificacion extends Component
                         continue;
                     }
 
-                    $accion = ModelsCalificacion::query()->where($condiciones)->exists() ? 'editar' : 'crear';
+                    $existe = ModelsCalificacion::query()
+                        ->where($condiciones)
+                        ->exists();
+
+                    $accion = $existe ? 'editar' : 'crear';
 
                     ModelsCalificacion::query()->updateOrCreate(
                         $condiciones,
                         [
                             'nivel_id' => $this->nivel_id,
+                            'grado_id' => $this->grado_id,
+                            'grupo_id' => $this->grupo_id,
+                            'ciclo_escolar_id' => $this->ciclo_escolar_id,
                             'generacion_id' => $this->generacion_id,
                             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
                             'calificacion' => $valorNuevo,
@@ -723,7 +911,7 @@ class Calificacion extends Component
                     $this->crearBitacoraCalificacion(
                         accion: $accion,
                         inscripcionId: (int) $inscripcionId,
-                        asignacionMateriaId: (int) $materiaId,
+                        asignacionMateriaId: (int) $asignacionMateriaId,
                         anterior: $valorAnterior,
                         nuevo: $valorNuevo,
                         observacion: $observacionNueva
@@ -747,8 +935,14 @@ class Calificacion extends Component
         ]);
     }
 
-    private function crearBitacoraCalificacion(string $accion, int $inscripcionId, int $asignacionMateriaId, mixed $anterior, mixed $nuevo, ?string $observacion = null): void
-    {
+    private function crearBitacoraCalificacion(
+        string $accion,
+        int $inscripcionId,
+        int $asignacionMateriaId,
+        mixed $anterior,
+        mixed $nuevo,
+        ?string $observacion = null
+    ): void {
         BitacoraCalificacion::query()->create([
             'nivel_id' => $this->nivel_id,
             'grado_id' => $this->grado_id,
@@ -771,156 +965,43 @@ class Calificacion extends Component
         ]);
     }
 
-    private function reglasCalificaciones(): array
+    public function claseInputCalificacion(int $inscripcionId, int $asignacionMateriaId): string
     {
-        $reglas = [];
+        $valor = $this->normalizarCalificacion($this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null);
+        $valorOriginal = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? null);
 
-        foreach ($this->calificaciones as $inscripcionId => $materias) {
-            foreach ($materias as $materiaId => $valor) {
-                $reglas["calificaciones.$inscripcionId.$materiaId"] = [
-                    'nullable',
-                    'string',
-                    'max:5',
-                    'regex:/^(10(\.0)?|[0-9](\.[0-9])?|AC|ED|RA|NP|SD)$/i',
-                ];
-            }
+        $base = 'w-full rounded-xl border px-3 py-2 text-center text-sm font-bold outline-none transition focus:ring-2 dark:bg-neutral-950 dark:text-white';
+
+        if ($valor !== $valorOriginal) {
+            return $base . ' border-sky-300 bg-sky-50 text-sky-900 focus:ring-sky-300 dark:border-sky-700 dark:bg-sky-950/30';
         }
-
-        return $reglas;
-    }
-
-    private function mensajesCalificaciones(): array
-    {
-        return [
-            'calificaciones.*.*.string' => 'Debe ser texto válido.',
-            'calificaciones.*.*.max' => 'Máximo 5 caracteres.',
-            'calificaciones.*.*.regex' => 'Usa 0 a 10, AC, ED, RA, NP o SD.',
-        ];
-    }
-
-    public function calcularPromedios(): void
-    {
-        $this->promedios = [];
-
-        foreach ($this->calificaciones as $inscripcionId => $materias) {
-            $valores = collect($materias)
-                ->map(fn($valor) => $this->normalizarCalificacion($valor))
-                ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
-                ->map(fn($valor) => (float) $valor)
-                ->values();
-
-            if ($valores->isEmpty()) {
-                $this->promedios[$inscripcionId] = '—';
-                continue;
-            }
-
-            $this->promedios[$inscripcionId] = $this->truncarDecimal($valores->avg(), 1);
-        }
-    }
-
-    private function truncarDecimal(float $numero, int $decimales = 1): string
-    {
-        $factor = pow(10, $decimales);
-        return number_format(floor($numero * $factor) / $factor, $decimales);
-    }
-
-    public function claseInputCalificacion($inscripcionId, $materiaId): string
-    {
-        $base = 'w-full rounded-xl border px-2 py-1.5 text-center text-sm font-semibold uppercase outline-none transition focus:ring-2';
-        $valor = $this->calificaciones[$inscripcionId][$materiaId] ?? '';
-        $valor = $this->normalizarCalificacion($valor);
 
         if ($valor === null) {
-            return $base . ' border-neutral-200 bg-white text-neutral-800 focus:ring-sky-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100';
+            return $base . ' border-neutral-200 bg-white text-neutral-900 focus:ring-sky-300 dark:border-neutral-800';
         }
 
         if ($this->esCalificacionEspecial($valor)) {
-            return $base . ' border-violet-300 bg-violet-50 text-violet-700 focus:ring-violet-300 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300';
+            return $base . ' border-violet-300 bg-violet-50 text-violet-900 focus:ring-violet-300 dark:border-violet-800 dark:bg-violet-950/30';
         }
 
-        if (!$this->validarCalificacionPermitida($valor)) {
-            return $base . ' border-red-300 bg-red-50 text-red-700 focus:ring-red-300 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300';
+        if ($this->esCalificacionNumerica($valor) && (float) $valor < 6) {
+            return $base . ' border-rose-300 bg-rose-50 text-rose-900 focus:ring-rose-300 dark:border-rose-800 dark:bg-rose-950/30';
         }
 
-        $numero = (float) $valor;
-
-        if ($numero < 6) {
-            return $base . ' border-rose-300 bg-rose-50 text-rose-700 focus:ring-rose-300 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300';
-        }
-
-        if ($numero < 8) {
-            return $base . ' border-amber-300 bg-amber-50 text-amber-700 focus:ring-amber-300 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
-        }
-
-        return $base . ' border-emerald-300 bg-emerald-50 text-emerald-700 focus:ring-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
-    }
-
-    public function getPuedeGuardarProperty(): bool
-    {
-        if ($this->esBachillerato) {
-            return filled($this->generacion_id)
-                && filled($this->grado_id)
-                && filled($this->semestre_id)
-                && filled($this->grupo_id)
-                && filled($this->parcial_bachillerato_id)
-                && filled($this->periodo_id)
-                && filled($this->ciclo_escolar_id)
-                && count($this->inscripciones) > 0
-                && count($this->materias) > 0;
-        }
-
-        return filled($this->generacion_id)
-            && filled($this->grado_id)
-            && filled($this->grupo_id)
-            && filled($this->periodo_basica_id)
-            && filled($this->periodo_id)
-            && filled($this->ciclo_escolar_id)
-            && count($this->inscripciones) > 0
-            && count($this->materias) > 0;
-    }
-
-    public function getPuedeExportarPdfProperty(): bool
-    {
-        return $this->puedeGuardar;
-    }
-
-    public function getHayCambiosProperty(): bool
-    {
-        return $this->calificaciones !== $this->calificacionesOriginales || $this->observaciones !== $this->observacionesOriginales;
-    }
-
-    public function getMensajeCambiosProperty(): string
-    {
-        return $this->hayCambios ? 'Cambios pendientes' : 'Sin cambios pendientes';
-    }
-
-    public function getClaseEstadoCambiosProperty(): string
-    {
-        return $this->hayCambios
-            ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900'
-            : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900';
-    }
-
-    public function getClaseGuardarProperty(): string
-    {
-        if (!$this->puedeGuardar) {
-            return 'inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-neutral-300 px-5 py-3 text-sm font-semibold text-neutral-500 opacity-70 dark:bg-neutral-800 dark:text-neutral-500';
-        }
-
-        return 'inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow transition hover:opacity-95';
-    }
-
-    public function getCeldasCapturadasProperty(): int
-    {
-        return collect($this->calificaciones)
-            ->flatMap(fn($materias) => $materias)
-            ->filter(fn($valor) => $this->normalizarCalificacion($valor) !== null)
-            ->count();
+        return $base . ' border-emerald-300 bg-emerald-50 text-emerald-900 focus:ring-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/30';
     }
 
     public function getTotalCeldasProperty(): int
     {
         return count($this->inscripciones) * count($this->materias);
+    }
+
+    public function getCeldasCapturadasProperty(): int
+    {
+        return collect($this->calificaciones)
+            ->flatten()
+            ->filter(fn($valor) => $this->normalizarCalificacion($valor) !== null)
+            ->count();
     }
 
     public function getPorcentajeCapturaProperty(): int
@@ -932,80 +1013,79 @@ class Calificacion extends Component
         return (int) round(($this->celdasCapturadas / $this->totalCeldas) * 100);
     }
 
-    public function getEstadisticasCalificacionesProperty(): array
+    public function getPuedeGuardarProperty(): bool
     {
-        $valores = collect($this->calificaciones)
-            ->flatMap(fn($materiasAlumno) => $materiasAlumno)
-            ->map(fn($valor) => $this->normalizarCalificacion($valor))
-            ->filter(fn($valor) => $valor !== null)
-            ->values();
-
-        $numericas = $valores
-            ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
-            ->map(fn($valor) => (float) $valor)
-            ->values();
-
-        $especiales = $valores
-            ->filter(fn($valor) => $this->esCalificacionEspecial($valor))
-            ->values();
-
-        $aprobadas = $numericas->filter(fn($valor) => $valor >= 6)->count();
-        $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
-
-        $promedioGlobal = $numericas->isNotEmpty()
-            ? $this->truncarDecimal($numericas->avg(), 1)
-            : null;
-
-        $totalCeldas = $this->totalCeldas;
-        $capturadas = $valores->count();
-        $pendientes = max(0, $totalCeldas - $capturadas);
-
-        return [
-            'promedio_global' => $promedioGlobal,
-            'total_celdas' => $totalCeldas,
-            'capturadas' => $capturadas,
-            'pendientes' => $pendientes,
-            'numericas' => $numericas->count(),
-            'especiales' => $especiales->count(),
-            'aprobadas' => $aprobadas,
-            'reprobadas' => $reprobadas,
-            'porcentaje_captura' => $totalCeldas > 0 ? round(($capturadas / $totalCeldas) * 100) : 0,
-            'porcentaje_aprobacion' => $numericas->count() > 0 ? round(($aprobadas / $numericas->count()) * 100) : 0,
-        ];
+        return filled($this->periodo_id)
+            && filled($this->ciclo_escolar_id)
+            && filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id)
+            && (!$this->esBachillerato || filled($this->semestre_id))
+            && count($this->inscripciones) > 0
+            && count($this->materias) > 0;
     }
 
-    public function aplicarFiltroEstado(): void
+    public function getPuedeExportarPdfProperty(): bool
     {
-        if ($this->filtro_estado === '') {
-            $this->inscripcionesTabla = $this->inscripciones;
-            return;
+        return filled($this->slug_nivel)
+            && filled($this->periodo_id)
+            && filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id)
+            && (!$this->esBachillerato || filled($this->semestre_id));
+    }
+
+    public function getPuedeExportarBoletaProperty(): bool
+    {
+        return $this->puedeExportarPdf && filled($this->boleta_inscripcion_id);
+    }
+
+    public function getPuedeExportarDiplomaProperty(): bool
+    {
+        return $this->puedeExportarPdf && filled($this->diploma_inscripcion_id);
+    }
+
+    public function getClaseGuardarProperty(): string
+    {
+        $base = 'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50';
+
+        if ($this->hayCambios) {
+            return $base . ' bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600 text-white shadow-sky-500/20 hover:opacity-95';
         }
 
-        $this->inscripcionesTabla = collect($this->inscripciones)
-            ->filter(function ($fila) {
-                $inscripcionId = (int) $fila['inscripcion_id'];
-                $valores = collect($this->calificaciones[$inscripcionId] ?? [])
-                    ->map(fn($valor) => $this->normalizarCalificacion($valor));
+        return $base . ' bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400';
+    }
 
-                return match ($this->filtro_estado) {
-                    'pendientes' => $valores->contains(fn($valor) => $valor === null),
-                    'aprobados' => $valores->contains(fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor >= 6),
-                    'reprobados' => $valores->contains(fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6),
-                    'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
-                    'cambios' => collect($this->calificaciones[$inscripcionId] ?? [])
-                        ->contains(function ($valor, $materiaId) use ($inscripcionId) {
-                                $nuevo = $this->normalizarCalificacion($valor);
-                                $anterior = $this->normalizarCalificacion($this->calificacionesOriginales[$inscripcionId][$materiaId] ?? null);
-                                $obsNueva = trim((string) ($this->observaciones[$inscripcionId][$materiaId] ?? ''));
-                                $obsAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$materiaId] ?? ''));
+    public function getClaseEstadoCambiosProperty(): string
+    {
+        return $this->hayCambios
+            ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40'
+            : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40';
+    }
 
-                                return $nuevo !== $anterior || $obsNueva !== $obsAnterior;
-                            }),
-                    default => true,
-                };
-            })
-            ->values()
-            ->toArray();
+    public function getMensajeCambiosProperty(): string
+    {
+        return $this->hayCambios
+            ? 'Hay cambios sin guardar'
+            : 'Sin cambios pendientes';
+    }
+
+    public function getMostrarBotonBitacoraProperty(): bool
+    {
+        return filled($this->periodo_id)
+            && filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id);
+    }
+
+    public function abrirModalBitacora(): void
+    {
+        $this->mostrarModalBitacora = true;
+    }
+
+    public function cerrarModalBitacora(): void
+    {
+        $this->mostrarModalBitacora = false;
     }
 
     public function getNombrePeriodoProperty(): string
@@ -1015,34 +1095,52 @@ class Calificacion extends Component
 
     public function getEstadoPeriodoProperty(): string
     {
-        if (!$this->periodoSeleccionado || empty($this->periodoSeleccionado['fecha_inicio']) || empty($this->periodoSeleccionado['fecha_fin'])) {
+        if (!$this->periodoSeleccionado) {
+            return 'Sin periodo';
+        }
+
+        $inicio = !empty($this->periodoSeleccionado['fecha_inicio'])
+            ? Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->startOfDay()
+            : null;
+
+        $fin = !empty($this->periodoSeleccionado['fecha_fin'])
+            ? Carbon::parse($this->periodoSeleccionado['fecha_fin'])->endOfDay()
+            : null;
+
+        if (!$inicio || !$fin) {
             return 'Sin fechas';
         }
 
-        $inicio = Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->startOfDay();
-        $fin = Carbon::parse($this->periodoSeleccionado['fecha_fin'])->endOfDay();
         $hoy = Carbon::today();
 
-        if ($hoy->between($inicio, $fin)) {
-            return 'Activo';
+        if ($hoy->lt($inicio)) {
+            return 'Próximo';
         }
 
-        return $hoy->gt($fin) ? 'Finalizado' : 'Próximo';
+        if ($hoy->gt($fin)) {
+            return 'Finalizado';
+        }
+
+        return 'Activo';
     }
 
     public function getClaseEstadoPeriodoProperty(): string
     {
         return match ($this->estadoPeriodo) {
-            'Activo' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900',
-            'Finalizado' => 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900',
-            'Próximo' => 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900',
-            default => 'bg-neutral-50 text-neutral-700 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:text-neutral-300 dark:ring-neutral-700',
+            'Activo' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40',
+            'Próximo' => 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40',
+            'Finalizado' => 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/40',
+            default => 'bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700',
         };
     }
 
     public function getPorcentajePeriodoProperty(): int
     {
-        if (!$this->periodoSeleccionado || empty($this->periodoSeleccionado['fecha_inicio']) || empty($this->periodoSeleccionado['fecha_fin'])) {
+        if (
+            !$this->periodoSeleccionado ||
+            empty($this->periodoSeleccionado['fecha_inicio']) ||
+            empty($this->periodoSeleccionado['fecha_fin'])
+        ) {
             return 0;
         }
 
@@ -1064,64 +1162,31 @@ class Calificacion extends Component
         return min(100, max(0, (int) round(($diasTranscurridos / $totalDias) * 100)));
     }
 
-    public function getMostrarBotonBitacoraProperty(): bool
+    public function getEstadisticasCalificacionesProperty(): array
     {
-        return filled($this->periodo_id)
-            && filled($this->generacion_id)
-            && filled($this->grado_id)
-            && filled($this->grupo_id);
-    }
+        $valores = collect($this->calificaciones)
+            ->flatten()
+            ->map(fn($valor) => $this->normalizarCalificacion($valor))
+            ->values();
 
-    public function abrirModalBitacora(): void
-    {
-        $this->mostrarModalBitacora = true;
-    }
+        $numericas = $valores
+            ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
+            ->map(fn($valor) => (float) $valor)
+            ->values();
 
-    public function cerrarModalBitacora(): void
-    {
-        $this->mostrarModalBitacora = false;
-    }
+        $aprobadas = $numericas->filter(fn($valor) => $valor >= 6)->count();
+        $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
+        $especiales = $valores->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
+        $pendientes = max(0, $this->totalCeldas - $this->celdasCapturadas);
 
-    public function exportarCalificaciones()
-    {
-
-
-
-
-        if (!$this->puedeExportarPdf) {
-            $this->dispatch('swal', [
-                'title' => 'Selecciona todos los filtros antes de exportar.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-
-            return null;
-        }
-
-        $nombreNivel = mb_strtoupper($this->nivel?->nombre ?? $this->slug_nivel ?? 'NIVEL');
-        $nombreGrado = Grado::query()->where('id', $this->grado_id)->value('nombre') ?? 'GRADO';
-        $nombreGrupo = Grupo::query()->where('id', $this->grupo_id)->value('nombre') ?? 'GRUPO';
-
-        $nombreArchivo = 'CALIFICACIONES_' .
-            str_replace(' ', '_', $nombreNivel) .
-            '_GRADO_' . ($nombreGrado) .
-            '_GRUPO_' . ($nombreGrupo) .
-            '_PERIODO_' . ($this->periodo_id ?? 'SIN_PERIODO') .
-            '.xlsx';
-
-        return Excel::download(
-            new CalificacionExport(
-                nivel_id: $this->nivel_id ? (int) $this->nivel_id : null,
-                grado_id: $this->grado_id ? (int) $this->grado_id : null,
-                grupo_id: $this->grupo_id ? (int) $this->grupo_id : null,
-                periodo_id: $this->periodo_id ? (int) $this->periodo_id : null,
-                semestre_id: $this->semestre_id ? (int) $this->semestre_id : null,
-                generacion_id: $this->generacion_id ? (int) $this->generacion_id : null,
-                esBachillerato: $this->esBachillerato,
-                busqueda: $this->busqueda ?? ''
-            ),
-            $nombreArchivo
-        );
+        return [
+            'promedio_global' => $numericas->isEmpty() ? '—' : number_format($numericas->avg(), 1),
+            'porcentaje_aprobacion' => $numericas->isEmpty() ? 0 : (int) round(($aprobadas / $numericas->count()) * 100),
+            'pendientes' => $pendientes,
+            'reprobadas' => $reprobadas,
+            'especiales' => $especiales,
+            'porcentaje_captura' => $this->porcentajeCaptura,
+        ];
     }
 
     public function getGraficasCalificacionesProperty(): array
@@ -1145,10 +1210,10 @@ class Calificacion extends Component
 
         $materias = collect($this->materias)
             ->map(function ($materia) {
-                $materiaId = (int) $materia['id'];
+                $asignacionMateriaId = (int) $materia['id'];
 
                 $valores = collect($this->calificaciones)
-                    ->map(fn($materiasAlumno) => $materiasAlumno[$materiaId] ?? null)
+                    ->map(fn($materiasAlumno) => $materiasAlumno[$asignacionMateriaId] ?? null)
                     ->map(fn($valor) => $this->normalizarCalificacion($valor))
                     ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
                     ->map(fn($valor) => (float) $valor)
@@ -1159,63 +1224,93 @@ class Calificacion extends Component
                 }
 
                 return [
-                    'materia' => $this->recortarTexto($materia['materia'] ?? 'Materia', 22),
-                    'promedio' => (float) $this->truncarDecimal($valores->avg(), 1),
+                    'materia' => $this->recortarTexto($materia['materia'] ?? 'Materia', 18),
+                    'promedio' => round($valores->avg(), 1),
                 ];
             })
             ->filter()
             ->values();
 
-        $valoresGlobales = collect($this->calificaciones)
-            ->flatMap(fn($materiasAlumno) => $materiasAlumno)
+        $globalValores = collect($this->calificaciones)
+            ->flatten()
             ->map(fn($valor) => $this->normalizarCalificacion($valor))
             ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
             ->map(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioGlobal = $valoresGlobales->isNotEmpty()
-            ? (float) $this->truncarDecimal($valoresGlobales->avg(), 1)
-            : 0;
-
-        $aprobadas = $valoresGlobales->filter(fn($valor) => $valor >= 6)->count();
-        $reprobadas = $valoresGlobales->filter(fn($valor) => $valor < 6)->count();
+        $promedioGlobal = $globalValores->isEmpty() ? 0 : round($globalValores->avg(), 1);
+        $aprobadas = $globalValores->filter(fn($valor) => $valor >= 6)->count();
+        $reprobadas = $globalValores->filter(fn($valor) => $valor < 6)->count();
 
         return [
             'alumnos' => [
-                'labels' => $alumnos->pluck('nombre')->values()->all(),
-                'series' => $alumnos->pluck('promedio')->values()->all(),
+                'labels' => $alumnos->pluck('nombre')->toArray(),
+                'series' => $alumnos->pluck('promedio')->toArray(),
             ],
             'materias' => [
-                'labels' => $materias->pluck('materia')->values()->all(),
-                'series' => $materias->pluck('promedio')->values()->all(),
+                'labels' => $materias->pluck('materia')->toArray(),
+                'series' => $materias->pluck('promedio')->toArray(),
             ],
             'global' => [
                 'promedio' => $promedioGlobal,
-                'porcentaje' => min(100, $promedioGlobal * 10),
-                'total_numericas' => $valoresGlobales->count(),
+                'porcentaje' => min(100, round(($promedioGlobal / 10) * 100)),
+                'total_numericas' => $globalValores->count(),
                 'aprobadas' => $aprobadas,
                 'reprobadas' => $reprobadas,
-                'porcentaje_aprobacion' => $valoresGlobales->count() > 0 ? round(($aprobadas / $valoresGlobales->count()) * 100) : 0,
+                'porcentaje_aprobacion' => $globalValores->isEmpty() ? 0 : (int) round(($aprobadas / $globalValores->count()) * 100),
             ],
         ];
     }
 
-    private function recortarTexto(string $texto, int $limite = 24): string
+    private function recortarTexto(string $texto, int $limite): string
     {
-        $texto = trim($texto);
+        return mb_strlen($texto) > $limite
+            ? mb_substr($texto, 0, $limite) . '...'
+            : $texto;
+    }
 
-        if (mb_strlen($texto) <= $limite) {
-            return $texto;
+    public function exportarCalificaciones()
+    {
+        if (!$this->puedeExportarPdf) {
+            $this->dispatch('swal', [
+                'title' => 'Selecciona todos los filtros antes de exportar.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return null;
         }
 
-        return mb_substr($texto, 0, $limite) . '...';
+        $nombreNivel = mb_strtoupper(Nivel::query()->where('id', $this->nivel_id)->value('nombre') ?? $this->slug_nivel ?? 'NIVEL');
+        $nombreGrado = Grado::query()->where('id', $this->grado_id)->value('nombre') ?? 'GRADO';
+        $nombreGrupo = Grupo::query()->where('id', $this->grupo_id)->value('nombre') ?? 'GRUPO';
+
+        $nombreArchivo = 'CALIFICACIONES_' .
+            str_replace(' ', '_', $nombreNivel) .
+            '_GRADO_' . str_replace(' ', '_', $nombreGrado) .
+            '_GRUPO_' . str_replace(' ', '_', $nombreGrupo) .
+            '_PERIODO_' . ($this->periodo_id ?? 'SIN_PERIODO') .
+            '.xlsx';
+
+        return Excel::download(
+            new CalificacionExport(
+                nivel_id: $this->nivel_id ? (int) $this->nivel_id : null,
+                grado_id: $this->grado_id ? (int) $this->grado_id : null,
+                grupo_id: $this->grupo_id ? (int) $this->grupo_id : null,
+                periodo_id: $this->periodo_id ? (int) $this->periodo_id : null,
+                semestre_id: $this->semestre_id ? (int) $this->semestre_id : null,
+                generacion_id: $this->generacion_id ? (int) $this->generacion_id : null,
+                esBachillerato: $this->esBachillerato,
+                busqueda: $this->busqueda ?? ''
+            ),
+            $nombreArchivo
+        );
     }
 
     public function render()
     {
         return view('livewire.accion.calificacion', [
             'hayCambios' => $this->hayCambios,
-            'graficasCalificaciones' => $this->graficasCalificaciones,
         ]);
     }
 }

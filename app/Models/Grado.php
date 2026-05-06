@@ -58,10 +58,10 @@ class Grado extends Model
         return $this->hasMany(MateriaPromediar::class, 'grado_id');
     }
 
-    // RELACION CON ASIGNACIONES DE MATERIAS
-    public function asignacionesMaterias()
+    // RELACION CON MATERIAS
+    public function materias()
     {
-        return $this->hasMany(AsignacionMateria::class, 'grado_id');
+        return $this->hasMany(Materia::class, 'grado_id');
     }
 
     // RELACION CON HORARIOS

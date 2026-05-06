@@ -2,67 +2,37 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class BitacoraCalificacion extends Model
 {
-    use HasFactory;
-
     protected $table = 'bitacora_calificaciones';
 
     protected $fillable = [
-        'user_id',
-        'inscripcion_id',
-        'asignacion_materia_id',
         'nivel_id',
         'grado_id',
         'grupo_id',
-        'generacion_id',
         'semestre_id',
+        'generacion_id',
         'periodo_id',
-        'ciclo_escolar_id',
+        'inscripcion_id',
+        'asignacion_materia_id',
+        'user_id',
+        'accion',
         'calificacion_anterior',
         'calificacion_nueva',
-        'accion',
-        'comentario',
+        'valor_anterior_numerico',
+        'valor_nuevo_numerico',
+        'tipo_valor',
+        'observacion',
+        'motivo',
+        'ip',
     ];
 
-    // Relaciones
-    public function nivel()
-    {
-        return $this->belongsTo(Nivel::class);
-    }
-
-    public function grado()
-    {
-        return $this->belongsTo(Grado::class);
-    }
-
-    public function grupo()
-    {
-        return $this->belongsTo(Grupo::class);
-    }
-
-    public function cicloEscolar()
-    {
-        return $this->belongsTo(CicloEscolar::class);
-    }
-
-    public function generacion()
-    {
-        return $this->belongsTo(Generacion::class);
-    }
-
-    public function semestre()
-    {
-        return $this->belongsTo(Semestre::class);
-    }
-
-    public function periodo()
-    {
-        return $this->belongsTo(Periodos::class);
-    }
+    protected $casts = [
+        'valor_anterior_numerico' => 'decimal:2',
+        'valor_nuevo_numerico' => 'decimal:2',
+    ];
 
     public function usuario()
     {
@@ -71,11 +41,41 @@ class BitacoraCalificacion extends Model
 
     public function inscripcion()
     {
-        return $this->belongsTo(Inscripcion::class);
+        return $this->belongsTo(Inscripcion::class, 'inscripcion_id');
     }
 
     public function asignacionMateria()
     {
         return $this->belongsTo(AsignacionMateria::class, 'asignacion_materia_id');
+    }
+
+    public function nivel()
+    {
+        return $this->belongsTo(Nivel::class, 'nivel_id');
+    }
+
+    public function grado()
+    {
+        return $this->belongsTo(Grado::class, 'grado_id');
+    }
+
+    public function grupo()
+    {
+        return $this->belongsTo(Grupo::class, 'grupo_id');
+    }
+
+    public function semestre()
+    {
+        return $this->belongsTo(Semestre::class, 'semestre_id');
+    }
+
+    public function generacion()
+    {
+        return $this->belongsTo(Generacion::class, 'generacion_id');
+    }
+
+    public function periodo()
+    {
+        return $this->belongsTo(Periodos::class, 'periodo_id');
     }
 }

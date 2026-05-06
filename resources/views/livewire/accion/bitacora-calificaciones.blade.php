@@ -197,7 +197,7 @@
                                 </td>
 
                                 <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                    {{ $row->asignacionMateria?->materia ?? 'Sin materia' }}
+                                    {{ $row->asignacionMateria?->materia?->materia ?? 'Sin materia' }}
                                 </td>
 
                                 <td class="px-4 py-4 align-top">
@@ -252,7 +252,7 @@
                                 {{ $alumno !== '' ? $alumno : 'Sin alumno' }}
                             </p>
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {{ $row->asignacionMateria?->materia ?? 'Sin materia' }}
+                                {{ $row->asignacionMateria?->materia?->materia ?? 'Sin materia' }}
                             </p>
                         </div>
 

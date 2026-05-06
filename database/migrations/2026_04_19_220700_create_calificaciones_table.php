@@ -1,52 +1,98 @@
 <?php
 
+use App\Models\AsignacionMateria;
+use App\Models\CicloEscolar;
+use App\Models\Generacion;
+use App\Models\Grado;
+use App\Models\Grupo;
+use App\Models\Inscripcion;
+use App\Models\Nivel;
+use App\Models\Periodos;
+use App\Models\Semestre;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
-     * Run the migrations.
+     * Crea la tabla de calificaciones.
      */
     public function up(): void
     {
         Schema::create('calificaciones', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('inscripcion_id');
-            $table->unsignedBigInteger('asignacion_materia_id');
 
-            $table->unsignedBigInteger('nivel_id');
-            $table->unsignedBigInteger('grado_id');
-            $table->unsignedBigInteger('grupo_id');
+            $table->foreignId('inscripcion_id')
+                ->constrained('inscripciones')
+                ->cascadeOnDelete();
 
-            $table->unsignedBigInteger('ciclo_escolar_id');
-            $table->unsignedBigInteger('generacion_id');
-            $table->unsignedBigInteger('semestre_id')->nullable();
+            $table->foreignId('asignacion_materia_id')
+                ->constrained('asignacion_materias')
+                ->cascadeOnDelete();
 
-            $table->unsignedBigInteger('periodo_id')->nullable();
+            $table->foreignId('nivel_id')
+                ->constrained('niveles')
+                ->cascadeOnDelete();
 
+            $table->foreignId('grado_id')
+                ->constrained('grados')
+                ->cascadeOnDelete();
 
-            $table->string('calificacion', 2)->nullable();
+            $table->foreignId('grupo_id')
+                ->constrained('grupos')
+                ->cascadeOnDelete();
 
-            $table->foreign('inscripcion_id')->references('id')->on('inscripciones')->onDelete('cascade');
-            $table->foreign('asignacion_materia_id')->references('id')->on('asignacion_materias')->onDelete('cascade');
-            $table->foreign('nivel_id')->references('id')->on('niveles')->onDelete('cascade');
-            $table->foreign('grado_id')->references('id')->on('grados')->onDelete('cascade');
-            $table->foreign('grupo_id')->references('id')->on('grupos')->onDelete('cascade');
-            $table->foreign('ciclo_escolar_id')->references('id')->on('ciclo_escolares')->onDelete('cascade');
-            $table->foreign('generacion_id')->references('id')->on('generaciones')->onDelete('cascade');
-            $table->foreign('semestre_id')->references('id')->on('semestres')->onDelete('cascade');
-            $table->foreign('periodo_id')->references('id')->on('periodos')->onDelete('cascade');
+            $table->foreignId('ciclo_escolar_id')
+                ->constrained('ciclo_escolares')
+                ->cascadeOnDelete();
 
+            $table->foreignId('generacion_id')
+                ->constrained('generaciones')
+                ->cascadeOnDelete();
 
+            $table->foreignId('semestre_id')
+                ->nullable()
+                ->constrained('semestres')
+                ->nullOnDelete();
 
+            $table->foreignId('periodo_id')
+                ->nullable()
+                ->constrained('periodos')
+                ->cascadeOnDelete();
+
+            // Se usa string porque permite números y claves como AC, ED, RA.
+            $table->string('calificacion', 5)->nullable();
+
+            // Datos normalizados para reportes, promedios y validaciones.
+            $table->decimal('valor_numerico', 5, 2)->nullable();
+            $table->boolean('es_numerica')->default(false);
+            $table->string('clave_especial', 10)->nullable();
+            $table->text('observacion')->nullable();
+
+            // Usuario autenticado que capturó la calificación.
+            $table->foreignId('capturado_por')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->timestamp('fecha_captura')->nullable();
+            $table->string('ip_captura', 45)->nullable();
 
             $table->timestamps();
+
+            $table->unique(
+                ['periodo_id', 'inscripcion_id', 'asignacion_materia_id'],
+                'calificacion_unica_por_periodo'
+            );
+
+            $table->index(['nivel_id', 'grado_id', 'grupo_id'], 'calificaciones_contexto_index');
+            $table->index(['ciclo_escolar_id', 'generacion_id', 'semestre_id'], 'calificaciones_ciclo_index');
         });
     }
 
     /**
-     * Reverse the migrations.
+     * Elimina la tabla de calificaciones.
      */
     public function down(): void
     {

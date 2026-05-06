@@ -69,4 +69,10 @@ class Semestre extends Model
     {
         return $this->hasMany(BitacoraCalificacion::class, 'semestre_id');
     }
+
+    // RELACION CON MATERIAS
+    public function materias()
+    {
+        return $this->hasMany(Materia::class);
+    }
 }

@@ -23,8 +23,6 @@ return new class extends Migration {
             $table->unsignedInteger('numero_materias');
 
             $table->timestamps();
-
-            $table->timestamps();
         });
     }
 

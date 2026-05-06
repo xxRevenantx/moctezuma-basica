@@ -14,27 +14,15 @@ class AsignacionMateria extends Model
     use HasFactory;
 
     protected $fillable = [
-        'nivel_id',
-        'grado_id',
+        'materia_id',
         'grupo_id',
-        'semestre',
         'profesor_id',
-        'materia',
-        'clave',
-        'slug',
-        'calificable',
-        'extra',
-        'orden',
     ];
 
-    public function nivel()
+    // RELACIONES
+    public function materia()
     {
-        return $this->belongsTo(Nivel::class);
-    }
-
-    public function grado()
-    {
-        return $this->belongsTo(Grado::class);
+        return $this->belongsTo(Materia::class);
     }
 
     public function grupo()
@@ -44,26 +32,6 @@ class AsignacionMateria extends Model
 
     public function profesor()
     {
-        return $this->belongsTo(Persona::class);
-    }
-
-    public function semestre()
-    {
-        return $this->belongsTo(Semestre::class, 'semestre', 'id');
-    }
-
-    public function horarios()
-    {
-        return $this->hasMany(Horario::class, 'asignacion_materia_id');
-    }
-
-    public function calificaciones()
-    {
-        return $this->hasMany(Calificacion::class, 'asignacion_materia_id');
-    }
-
-    public function bitacoraCalificaciones()
-    {
-        return $this->hasMany(BitacoraCalificacion::class, 'asignacion_materia_id');
+        return $this->belongsTo(Persona::class, 'profesor_id');
     }
 }

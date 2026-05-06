@@ -121,26 +121,23 @@ class BitacoraCalificaciones extends Component
         $this->grupos = Grupo::query()
             ->when($this->nivel_id, fn($q) => $q->where('nivel_id', $this->nivel_id))
             ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->esBachillerato && $this->semestre_id, fn($q) => $q->where('semestre_id', $this->semestre_id))
+            ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
+            ->when(
+                $this->esBachillerato && $this->semestre_id,
+                fn($q) => $q->where('semestre_id', $this->semestre_id)
+            )
+            ->when(
+                !$this->esBachillerato,
+                fn($q) => $q->whereNull('semestre_id')
+            )
             ->orderBy('nombre')
             ->get();
 
         if ($this->esBachillerato && $this->grado_id) {
-            $idsSemestres = Grupo::query()
-                ->where('nivel_id', $this->nivel_id)
+            $this->semestres = Semestre::query()
                 ->where('grado_id', $this->grado_id)
-                ->whereNotNull('semestre_id')
-                ->distinct()
-                ->pluck('semestre_id')
-                ->filter()
-                ->values();
-
-            if ($idsSemestres->isNotEmpty()) {
-                $this->semestres = Semestre::query()
-                    ->whereIn('id', $idsSemestres)
-                    ->orderBy('numero')
-                    ->get();
-            }
+                ->orderBy('numero')
+                ->get();
         }
 
         $query = Periodos::query()
@@ -182,7 +179,8 @@ class BitacoraCalificaciones extends Component
             ->with([
                 'usuario:id,name,email',
                 'inscripcion:id,matricula,nombre,apellido_paterno,apellido_materno',
-                'asignacionMateria:id,materia',
+                'asignacionMateria:id,materia_id,grupo_id,profesor_id',
+                'asignacionMateria.materia:id,materia,clave,slug',
                 'grado:id,nombre',
                 'grupo:id,nombre',
                 'semestre:id,numero',
@@ -193,6 +191,7 @@ class BitacoraCalificaciones extends Component
             ->when($this->periodo_id, fn($q) => $q->where('periodo_id', $this->periodo_id))
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
             ->when($this->esBachillerato && $this->semestre_id, fn($q) => $q->where('semestre_id', $this->semestre_id))
+            ->when(!$this->esBachillerato, fn($q) => $q->whereNull('semestre_id'))
             ->when($this->accion !== '', fn($q) => $q->where('accion', $this->accion))
             ->when($this->tipo_valor !== '', fn($q) => $q->where('tipo_valor', $this->tipo_valor))
             ->when(trim($this->buscar_alumno) !== '', function ($q) {
@@ -208,8 +207,10 @@ class BitacoraCalificaciones extends Component
             ->when(trim($this->buscar_materia) !== '', function ($q) {
                 $buscar = trim($this->buscar_materia);
 
-                $q->whereHas('asignacionMateria', function ($sub) use ($buscar) {
-                    $sub->where('materia', 'like', "%{$buscar}%");
+                $q->whereHas('asignacionMateria.materia', function ($sub) use ($buscar) {
+                    $sub->where('materia', 'like', "%{$buscar}%")
+                        ->orWhere('clave', 'like', "%{$buscar}%")
+                        ->orWhere('slug', 'like', "%{$buscar}%");
                 });
             })
             ->when(trim($this->buscar_usuario) !== '', function ($q) {
@@ -229,7 +230,12 @@ class BitacoraCalificaciones extends Component
                         ->orWhere('tipo_valor', 'like', "%{$buscar}%")
                         ->orWhere('observacion', 'like', "%{$buscar}%")
                         ->orWhere('motivo', 'like', "%{$buscar}%")
-                        ->orWhere('ip', 'like', "%{$buscar}%");
+                        ->orWhere('ip', 'like', "%{$buscar}%")
+                        ->orWhereHas('asignacionMateria.materia', function ($materiaQuery) use ($buscar) {
+                            $materiaQuery->where('materia', 'like', "%{$buscar}%")
+                                ->orWhere('clave', 'like', "%{$buscar}%")
+                                ->orWhere('slug', 'like', "%{$buscar}%");
+                        });
                 });
             });
     }
@@ -275,21 +281,10 @@ class BitacoraCalificaciones extends Component
     public function claseAccion(?string $accion): string
     {
         return match ($accion) {
-            'crear' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40',
-            'editar' => 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40',
-            'eliminar' => 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/40',
-            default => 'bg-slate-50 text-slate-700 ring-1 ring-slate-100 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700',
-        };
-    }
-
-    public function claseTipoValor(?string $tipo): string
-    {
-        return match ($tipo) {
-            'numerico' => 'bg-sky-50 text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40',
-            'especial' => 'bg-violet-50 text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40',
-            'vacio' => 'bg-slate-50 text-slate-700 ring-1 ring-slate-100 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700',
-            'invalido' => 'bg-red-50 text-red-700 ring-1 ring-red-100 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900/40',
-            default => 'bg-neutral-50 text-neutral-700 ring-1 ring-neutral-100 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700',
+            'crear' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'editar' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
+            'eliminar' => 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300',
+            default => 'bg-slate-50 text-slate-700 dark:bg-neutral-800 dark:text-slate-300',
         };
     }
 

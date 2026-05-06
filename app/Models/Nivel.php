@@ -69,9 +69,10 @@ class Nivel extends Model
         return $this->hasMany(MateriaPromediar::class, 'nivel_id');
     }
 
-    public function asignacionesMaterias()
+    // RELACION CON MATERIAS
+    public function materias()
     {
-        return $this->hasMany(AsignacionMateria::class, 'nivel_id');
+        return $this->hasMany(Materia::class);
     }
 
     // RELACION CON HORAS

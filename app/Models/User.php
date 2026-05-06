@@ -69,4 +69,6 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(BitacoraCalificacion::class);
     }
+
+    // Otros métodos relacionados con el usuario pueden ir aquí
 }
