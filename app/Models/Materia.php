@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Observers\MateriaObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 
+
+#[ObservedBy(MateriaObserver::class)]
 class Materia extends Model
 {
 
@@ -22,24 +26,29 @@ class Materia extends Model
         'orden',
     ];
 
-    // RELACIONES
+    protected $casts = [
+        'calificable' => 'boolean',
+        'extra' => 'boolean',
+        'receso' => 'boolean',
+    ];
+
     public function nivel()
     {
-        return $this->belongsTo(Nivel::class);
+        return $this->belongsTo(Nivel::class, 'nivel_id');
     }
 
     public function grado()
     {
-        return $this->belongsTo(Grado::class);
+        return $this->belongsTo(Grado::class, 'grado_id');
     }
 
     public function semestre()
     {
-        return $this->belongsTo(Semestre::class);
+        return $this->belongsTo(Semestre::class, 'semestre_id');
     }
 
     public function asignaciones()
     {
-        return $this->hasMany(AsignacionMateria::class);
+        return $this->hasMany(AsignacionMateria::class, 'materia_id');
     }
 }

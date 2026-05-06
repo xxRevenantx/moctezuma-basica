@@ -160,9 +160,15 @@
                             Grupos
                         </flux:navlist.item>
 
+
                         <flux:navlist.item icon="home" :href="route('misrutas.periodos')"
                             :current="request()->routeIs('misrutas.periodos')" wire:navigate>
                             Periodos
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.materias')"
+                            :current="request()->routeIs('misrutas.materias')" wire:navigate>
+                            Materias
                         </flux:navlist.item>
 
 

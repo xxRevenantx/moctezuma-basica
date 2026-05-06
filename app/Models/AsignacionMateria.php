@@ -17,6 +17,7 @@ class AsignacionMateria extends Model
         'materia_id',
         'grupo_id',
         'profesor_id',
+        'orden',
     ];
 
     // RELACIONES

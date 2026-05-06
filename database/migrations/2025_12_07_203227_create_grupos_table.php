@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('grupos', function (Blueprint $table) {
-                 $table->id();
+            $table->id();
 
             // NIVEL: Preescolar, Primaria, Secundaria, Bachillerato
             $table->foreignId('nivel_id')
@@ -46,10 +46,6 @@ return new class extends Migration
 
 
             $table->timestamps();
-            $table->softDeletes();
-
-
-
         });
     }
 

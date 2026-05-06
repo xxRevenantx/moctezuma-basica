@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
+use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\PeriodosController;
@@ -69,6 +70,9 @@ Route::get('/grupos', [GrupoController::class, 'index'])->name('misrutas.grupos'
 
 // RUTAS DE PERIODOS
 Route::get('/periodos', [PeriodosController::class, 'index'])->name('misrutas.periodos');
+
+//RUTA MATERIAS
+Route::get('/materias', [MateriaController::class, 'index'])->name('misrutas.materias');
 
 
 Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaController::class, 'editar'])
