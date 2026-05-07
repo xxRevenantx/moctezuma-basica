@@ -42,14 +42,103 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <flux:select wire:model.live="persona_id" label="Seleccionar Personal">
-                            <flux:select.option value="">-- Seleccionar Personal --</flux:select.option>
-                            @foreach ($personas as $p)
-                                <flux:select.option value="{{ $p->id }}">
-                                    {{ trim($p->nombre . ' ' . $p->apellido_paterno . ' ' . $p->apellido_materno) }}
-                                </flux:select.option>
-                            @endforeach
-                        </flux:select>
+                        <div x-data="{
+                            abierto: false,
+                            cerrar() {
+                                setTimeout(() => {
+                                    this.abierto = false;
+                                }, 150);
+                            }
+                        }" class="relative">
+
+                            <flux:field>
+                                <flux:label>Seleccionar Personal</flux:label>
+
+                                <div class="relative">
+                                    <flux:input wire:model.live.debounce.300ms="buscar_persona" @focus="abierto = true"
+                                        @click="abierto = true" placeholder="Buscar persona por nombre o apellidos..."
+                                        autocomplete="off" />
+
+                                    @if ($persona_id)
+                                        <button type="button" wire:click="limpiarPersona" @click="abierto = true"
+                                            class="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                                            title="Quitar selección">
+                                            <span class="text-sm font-black">×</span>
+                                        </button>
+                                    @endif
+                                </div>
+
+                                <flux:error name="persona_id" />
+                            </flux:field>
+
+                            <div x-show="abierto" x-cloak @click.outside="abierto = false"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 translate-y-1 scale-[0.98]"
+                                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                                x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]"
+                                class="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/10 dark:border-white/10 dark:bg-neutral-950">
+
+                                @forelse ($this->personalFiltrado as $p)
+                                    @php
+                                        $nombreCompleto = trim(
+                                            ($p->titulo ?? '') .
+                                                ' ' .
+                                                ($p->nombre ?? '') .
+                                                ' ' .
+                                                ($p->apellido_paterno ?? '') .
+                                                ' ' .
+                                                ($p->apellido_materno ?? ''),
+                                        );
+
+                                        $iniciales =
+                                            mb_substr($p->nombre ?? 'P', 0, 1) .
+                                            mb_substr($p->apellido_paterno ?? '', 0, 1);
+                                    @endphp
+
+                                    <button type="button" wire:click="seleccionarPersona({{ $p->id }})"
+                                        @click="abierto = false"
+                                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10
+                    {{ (int) $persona_id === (int) $p->id ? 'bg-indigo-50 dark:bg-indigo-500/10' : '' }}">
+
+                                        <span
+                                            class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-black uppercase text-white shadow-sm">
+                                            {{ $iniciales }}
+                                        </span>
+
+                                        <span class="min-w-0 flex-1">
+                                            <span
+                                                class="block truncate text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                {{ $nombreCompleto }}
+                                            </span>
+
+                                            <span class="mt-0.5 block text-xs font-medium text-slate-400">
+                                                ID: {{ $p->id }}
+                                            </span>
+                                        </span>
+
+                                        @if ((int) $persona_id === (int) $p->id)
+                                            <span
+                                                class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                Seleccionado
+                                            </span>
+                                        @endif
+                                    </button>
+                                @empty
+                                    <div
+                                        class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center dark:border-white/10">
+                                        <p class="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                            No se encontraron personas
+                                        </p>
+
+                                        <p class="mt-1 text-xs text-slate-400">
+                                            Intenta buscar por nombre o apellido.
+                                        </p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
 
                         <flux:select wire:model.live="nivel_id" label="Seleccionar Nivel" required>
                             <flux:select.option value="">-- Seleccionar Nivel --</flux:select.option>
@@ -185,7 +274,8 @@
 
                     <div class="mt-6 border-t border-gray-200 dark:border-neutral-800"></div>
 
-                    <div class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
+                    <div
+                        class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
                         <button type="button" @click="open = false"
                             class="inline-flex justify-center rounded-xl px-4 py-2.5 border border-neutral-200 dark:border-neutral-700
                                    bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-100

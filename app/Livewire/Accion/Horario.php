@@ -21,6 +21,7 @@ class Horario extends Component
     public string $slug_nivel;
 
     public ?Nivel $nivel = null;
+
     public Collection $niveles;
     public Collection $generaciones;
     public Collection $grados;
@@ -38,10 +39,8 @@ class Horario extends Component
 
     public bool $esBachillerato = false;
 
-    // Estado visual por celda
     public array $seleccionesHorario = [];
 
-    // Modal de confirmación
     public bool $mostrarModalTraslapeProfesor = false;
 
     public array $pendienteHorario = [
@@ -59,7 +58,6 @@ class Horario extends Component
             ->where('slug', $this->slug_nivel)
             ->firstOrFail();
 
-        // Bachillerato es nivel 4
         $this->esBachillerato = (int) $this->nivel->id === 4;
 
         $this->niveles = Nivel::query()
@@ -195,7 +193,6 @@ class Horario extends Component
 
         $horarioExistente = $consulta->first();
 
-        // Si se limpia la celda, se elimina el horario
         if (blank($asignacionMateriaId)) {
             if ($horarioExistente) {
                 $horarioExistente->delete();
@@ -204,12 +201,28 @@ class Horario extends Component
             $this->resetEstadoTraslapeProfesor();
             $this->cargarHorariosGuardados();
             $this->sincronizarSeleccionesHorario();
+
             return;
         }
 
         $asignacion = AsignacionMateria::query()
-            ->with('profesor')
-            ->find($asignacionMateriaId);
+            ->with([
+                'materia',
+                'profesor',
+            ])
+            ->where('id', $asignacionMateriaId)
+            ->where('grupo_id', $this->grupo_id)
+            ->whereHas('materia', function ($query) {
+                $query->where('nivel_id', $this->nivel->id)
+                    ->where('grado_id', $this->grado_id);
+
+                if ($this->esBachillerato) {
+                    $query->where('semestre_id', $this->semestre_id);
+                } else {
+                    $query->whereNull('semestre_id');
+                }
+            })
+            ->first();
 
         if (!$asignacion) {
             $this->sincronizarSeleccionesHorario();
@@ -223,6 +236,7 @@ class Horario extends Component
                 asignacionMateriaId: $asignacionMateriaId,
                 horarioExistente: $horarioExistente
             );
+
             return;
         }
 
@@ -313,6 +327,7 @@ class Horario extends Component
                 'grupo',
                 'dia',
                 'semestre',
+                'asignacionMateria.materia',
                 'asignacionMateria.profesor',
             ])
             ->where('dia_id', $diaId)
@@ -340,14 +355,14 @@ class Horario extends Component
             return [
                 'id' => $item->id,
                 'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
-                'nivel' => $item->nivel->nombre ?? 'N/D',
-                'grado' => $item->grado->nombre ?? 'N/D',
-                'grupo' => $item->grupo->nombre ?? 'N/D',
-                'dia' => $item->dia->dia ?? 'N/D',
+                'nivel' => $item->nivel?->nombre ?? 'N/D',
+                'grado' => $item->grado?->nombre ?? 'N/D',
+                'grupo' => $item->grupo?->nombre ?? 'N/D',
+                'dia' => $item->dia?->dia ?? 'N/D',
                 'hora_inicio' => $item->hora?->hora_inicio,
                 'hora_fin' => $item->hora?->hora_fin,
                 'semestre' => $item->semestre?->numero ? $item->semestre->numero . '° semestre' : null,
-                'materia' => $item->asignacionMateria->materia ?? 'N/D',
+                'materia' => $item->asignacionMateria?->materia?->materia ?? 'N/D',
             ];
         })->toArray();
     }
@@ -362,6 +377,7 @@ class Horario extends Component
         ) {
             $this->resetEstadoTraslapeProfesor();
             $this->sincronizarSeleccionesHorario();
+
             return;
         }
 
@@ -435,6 +451,7 @@ class Horario extends Component
     protected function restaurarCeldaDesdeHorarioGuardado(string $claveCelda): void
     {
         $horario = $this->horariosGuardados->get($claveCelda);
+
         $this->seleccionesHorario[$claveCelda] = $horario?->asignacion_materia_id;
     }
 
@@ -516,19 +533,20 @@ class Horario extends Component
     protected function filtrosCompletos(): bool
     {
         if ($this->esBachillerato) {
-            return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
+            return filled($this->generacion_id)
+                && filled($this->grado_id)
+                && filled($this->grupo_id)
+                && filled($this->semestre_id);
         }
 
-        return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id);
+        return filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id);
     }
 
     protected function filtrosMinimosParaMaterias(): bool
     {
-        if ($this->esBachillerato) {
-            return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id) && filled($this->semestre_id);
-        }
-
-        return filled($this->generacion_id) && filled($this->grado_id) && filled($this->grupo_id);
+        return $this->filtrosCompletos();
     }
 
     protected function obtenerGrupoSeleccionado(): ?Grupo
@@ -538,8 +556,17 @@ class Horario extends Component
         }
 
         return Grupo::query()
-            ->select('id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre')
-            ->find($this->grupo_id);
+            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre')
+            ->where('id', $this->grupo_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $this->generacion_id)
+            ->when(
+                $this->esBachillerato,
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
+            )
+            ->first();
     }
 
     protected function cargarGeneraciones(): void
@@ -547,7 +574,8 @@ class Horario extends Component
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('status', 1)
-            ->orderBy('anio_ingreso')
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
             ->get();
     }
 
@@ -556,6 +584,7 @@ class Horario extends Component
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
             ->orderBy('orden')
+            ->orderBy('id')
             ->get();
     }
 
@@ -563,16 +592,16 @@ class Horario extends Component
     {
         $this->grupos = Grupo::query()
             ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id, function ($query) {
-                $query->where('generacion_id', $this->generacion_id);
-            }, function ($query) {
-                $query->whereRaw('1 = 0');
-            })
-            ->when($this->grado_id, function ($query) {
-                $query->where('grado_id', $this->grado_id);
-            }, function ($query) {
-                $query->whereRaw('1 = 0');
-            })
+            ->when(
+                $this->generacion_id,
+                fn($query) => $query->where('generacion_id', $this->generacion_id),
+                fn($query) => $query->whereRaw('1 = 0')
+            )
+            ->when(
+                $this->grado_id,
+                fn($query) => $query->where('grado_id', $this->grado_id),
+                fn($query) => $query->whereRaw('1 = 0')
+            )
             ->when($this->esBachillerato, function ($query) {
                 if ($this->semestre_id) {
                     $query->where('semestre_id', $this->semestre_id);
@@ -629,18 +658,29 @@ class Horario extends Component
         }
 
         $this->materiasDisponibles = AsignacionMateria::query()
-            ->with('profesor')
-            ->where('nivel_id', $this->nivel->id)
-            ->where('grado_id', $this->grado_id)
+            ->with([
+                'materia',
+                'profesor',
+            ])
             ->where('grupo_id', $this->grupo_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('semestre', $this->semestre_id),
-                fn($query) => $query->whereNull('semestre')
-            )
+            ->whereHas('materia', function ($query) {
+                $query->where('nivel_id', $this->nivel->id)
+                    ->where('grado_id', $this->grado_id);
+
+                if ($this->esBachillerato) {
+                    $query->where('semestre_id', $this->semestre_id);
+                } else {
+                    $query->whereNull('semestre_id');
+                }
+            })
             ->orderBy('orden')
-            ->orderBy('materia')
-            ->get();
+            ->get()
+            ->sortBy([
+                fn($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),
+                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
+                fn($a, $b) => strcmp($a->materia?->materia ?? '', $b->materia?->materia ?? ''),
+            ])
+            ->values();
     }
 
     protected function cargarHorariosGuardados(): void
@@ -652,6 +692,7 @@ class Horario extends Component
 
         $horarios = HorarioModel::query()
             ->with([
+                'asignacionMateria.materia',
                 'asignacionMateria.profesor',
             ])
             ->where('nivel_id', $this->nivel->id)

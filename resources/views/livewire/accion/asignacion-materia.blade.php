@@ -211,8 +211,8 @@
 
                         <flux:select wire:model.live="grupo_id"
                             :disabled="$this->esBachillerato
-                                                                                        ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
-                                                                                        : (blank($generacion_id) || blank($grado_id))">
+                                                                                                                    ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                                                                                    : (blank($generacion_id) || blank($grado_id))">
                             <option value="">Selecciona un grupo</option>
 
                             @foreach ($grupos as $item)
@@ -231,8 +231,8 @@
 
                         <flux:select wire:model.live="materia_id"
                             :disabled="$this->esBachillerato
-                                                                                        ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
-                                                                                        : (blank($generacion_id) || blank($grado_id))">
+                                                                                                                    ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                                                                                    : (blank($generacion_id) || blank($grado_id))">
                             <option value="">Selecciona una materia</option>
 
                             @foreach ($this->materiasDisponibles as $item)
@@ -254,7 +254,6 @@
                         <flux:error name="materia_id" />
                     </flux:field>
 
-                    {{-- PROFESOR --}}
                     {{-- PROFESOR --}}
                     <div
                         class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">

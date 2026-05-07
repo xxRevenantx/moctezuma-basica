@@ -17,6 +17,10 @@ class CrearPersonaNivel extends Component
     // Paso 1
     public ?int $persona_id = null;
 
+    public string $buscar_persona = '';
+
+    public string $nombre_persona_seleccionada = '';
+
     // Paso 2 (chip seleccionado)
     public ?int $persona_role_id = null;
 
@@ -45,12 +49,7 @@ class CrearPersonaNivel extends Component
 
     public function mount(): void
     {
-        $this->personas = Persona::query()
-            ->select('id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno')
-            ->orderBy('nombre')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->get();
+        $this->personas = collect();
 
         $this->niveles = Nivel::query()
             ->select('id', 'nombre', 'slug')
@@ -60,6 +59,84 @@ class CrearPersonaNivel extends Component
         $this->rolesPersona = collect();
         $this->grados = collect();
         $this->grupos = collect();
+    }
+
+    public function updatedBuscarPersona(): void
+    {
+        if (blank($this->buscar_persona)) {
+            $this->persona_id = null;
+            $this->nombre_persona_seleccionada = '';
+            $this->rolesPersona = collect();
+            $this->persona_role_id = null;
+            $this->rolSlugSeleccionado = null;
+
+            $this->resetBloqueoFechas();
+        }
+    }
+
+    public function seleccionarPersona(int $id): void
+    {
+        $persona = Persona::query()
+            ->select('id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno')
+            ->find($id);
+
+        if (!$persona) {
+            $this->persona_id = null;
+            $this->buscar_persona = '';
+            $this->nombre_persona_seleccionada = '';
+
+            $this->addError('persona_id', 'La persona seleccionada no es válida.');
+            return;
+        }
+
+        $nombreCompleto = trim(
+            ($persona->titulo ?? '') . ' ' .
+                ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
+        );
+
+        $this->persona_id = $persona->id;
+        $this->buscar_persona = $nombreCompleto;
+        $this->nombre_persona_seleccionada = $nombreCompleto;
+
+        $this->resetErrorBag('persona_id');
+
+        $this->updatedPersonaId($persona->id);
+    }
+
+    public function limpiarPersona(): void
+    {
+        $this->persona_id = null;
+        $this->buscar_persona = '';
+        $this->nombre_persona_seleccionada = '';
+        $this->persona_role_id = null;
+        $this->rolSlugSeleccionado = null;
+        $this->rolesPersona = collect();
+
+        $this->resetErrorBag('persona_id');
+        $this->resetBloqueoFechas();
+    }
+
+    public function getPersonalFiltradoProperty()
+    {
+        $buscar = trim($this->buscar_persona);
+
+        return Persona::query()
+            ->select('id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno')
+            ->when($buscar !== '', function ($query) use ($buscar) {
+                $query->where(function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', '%' . $buscar . '%')
+                        ->orWhere('apellido_paterno', 'like', '%' . $buscar . '%')
+                        ->orWhere('apellido_materno', 'like', '%' . $buscar . '%')
+                        ->orWhereRaw("CONCAT(nombre, ' ', apellido_paterno, ' ', apellido_materno) LIKE ?", ['%' . $buscar . '%']);
+                });
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->limit(30)
+            ->get();
     }
 
     // Detecta si el nivel seleccionado es bachillerato

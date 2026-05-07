@@ -41,6 +41,11 @@ class AsignacionMateria extends Component
 
     public string $ultimoMovimiento = '';
 
+
+
+
+
+
     public function mount($slug_nivel)
     {
         $this->slug_nivel = $slug_nivel;
@@ -156,9 +161,9 @@ class AsignacionMateria extends Component
 
                 $nombreCompleto = trim(
                     ($persona->titulo ?? '') . ' ' .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
+                        ($persona->nombre ?? '') . ' ' .
+                        ($persona->apellido_paterno ?? '') . ' ' .
+                        ($persona->apellido_materno ?? '')
                 );
 
                 return [
@@ -477,9 +482,9 @@ class AsignacionMateria extends Component
 
         $this->buscarProfesor = trim(
             ($asignacion->profesor?->titulo ?? '') . ' ' .
-            ($asignacion->profesor?->nombre ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_materno ?? '')
+                ($asignacion->profesor?->nombre ?? '') . ' ' .
+                ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
+                ($asignacion->profesor?->apellido_materno ?? '')
         );
 
         $this->dispatch('abrir-formulario-materia');
