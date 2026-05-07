@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 #[ObservedBy(AsignacionMateriaObserver::class)]
 class AsignacionMateria extends Model
 {
-    /** @use HasFactory<\Database\Factories\AsignacionMateriaFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -20,17 +19,26 @@ class AsignacionMateria extends Model
         'orden',
     ];
 
-    // RELACIONES
+    protected $casts = [
+        'materia_id' => 'integer',
+        'grupo_id' => 'integer',
+        'profesor_id' => 'integer',
+        'orden' => 'integer',
+    ];
+
+    // RELACIÓN CON EL CATÁLOGO DE MATERIAS
     public function materia()
     {
-        return $this->belongsTo(Materia::class);
+        return $this->belongsTo(Materia::class, 'materia_id');
     }
 
+    // RELACIÓN CON GRUPOS
     public function grupo()
     {
-        return $this->belongsTo(Grupo::class);
+        return $this->belongsTo(Grupo::class, 'grupo_id');
     }
 
+    // RELACIÓN CON PROFESORES
     public function profesor()
     {
         return $this->belongsTo(Persona::class, 'profesor_id');

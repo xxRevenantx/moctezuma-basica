@@ -4,7 +4,7 @@
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `La materia ${nombre} se eliminará de forma permanente`,
+            text: `La asignación ${nombre} se eliminará de forma permanente`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#2563EB',
@@ -14,58 +14,57 @@
         }).then((r) => r.isConfirmed && @this.call('eliminar', id))
     }
 }" x-on:abrir-formulario-materia.window="openForm = true; openPromediar = false"
+    x-on:cerrar-formulario-materia.window="openForm = false"
+    x-on:scroll-editar-materia.window="$nextTick(() => document.getElementById('panel-editar-asignacion')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
     class="space-y-6">
 
-    {{-- ITERA NIVELES --}}
+    {{-- NIVELES --}}
     <div class="overflow-hidden">
-        <div>
-            <div class="-mx-1 overflow-x-auto pb-1">
-                <div class="flex min-w-max items-center justify-center gap-2 px-1">
-                    @foreach ($niveles as $item)
-                        @php
-                            $activo = $slug_nivel === $item->slug;
-                        @endphp
+        <div class="-mx-1 overflow-x-auto pb-1">
+            <div class="flex min-w-max items-center justify-center gap-2 px-1">
+                @foreach ($niveles as $item)
+                    @php
+                        $activo = $slug_nivel === $item->slug;
+                    @endphp
 
-                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'asignacion-de-materias']) }}"
-                            wire:navigate aria-current="{{ $activo ? 'page' : 'false' }}"
-                            class="group relative inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5
+                    <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'asignacion-de-materias']) }}"
+                        wire:navigate aria-current="{{ $activo ? 'page' : 'false' }}"
+                        class="group relative inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5
+                        {{ $activo
+                            ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
+                            : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
+
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-xl
                             {{ $activo
-                                ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
-                                : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
+                                ? 'bg-white/15 text-white'
+                                : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
+                            <flux:icon.rectangle-stack class="h-4 w-4" />
+                        </span>
 
-                            <span
-                                class="flex h-8 w-8 items-center justify-center rounded-xl
-                                {{ $activo
-                                    ? 'bg-white/15 text-white'
-                                    : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
-                                <flux:icon.rectangle-stack class="h-4 w-4" />
+                        <span>{{ $item->nombre }}</span>
+
+                        @if ($activo)
+                            <span class="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold text-white">
+                                Activo
                             </span>
-
-                            <span>{{ $item->nombre }}</span>
-
-                            @if ($activo)
-                                <span class="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold text-white">
-                                    Activo
-                                </span>
-                                <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-white/80"></span>
-                            @endif
-                        </a>
-                    @endforeach
-                </div>
+                            <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-white/80"></span>
+                        @endif
+                    </a>
+                @endforeach
             </div>
         </div>
     </div>
 
     {{-- ENCABEZADO --}}
     <section>
-
         <div class="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h1 class="text-2xl font-black tracking-tight text-slate-800 dark:text-white">
                     Asignación de materias
                 </h1>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Registra materias por nivel, grado, grupo y profesor.
+                    Asigna materias del catálogo a un grupo y profesor.
                 </p>
             </div>
 
@@ -84,7 +83,7 @@
                                 d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <span x-text="openForm ? 'Ocultar materia' : 'Nueva materia'"></span>
+                        <span x-text="openForm ? 'Ocultar asignación' : 'Nueva asignación'"></span>
                     </button>
 
                     <button type="button"
@@ -103,9 +102,10 @@
         </div>
     </section>
 
-    {{-- FORMULARIO NUEVA / EDICIÓN MATERIA --}}
-    <section x-show="openForm" x-collapse x-cloak
+    {{-- FORMULARIO --}}
+    <section id="panel-editar-asignacion" x-show="openForm" x-collapse x-cloak
         class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+
         <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
 
         <form wire:submit.prevent="guardarMateria" class="relative">
@@ -116,7 +116,7 @@
                             {{ $editandoId ? 'Editar asignación de materia' : 'Nueva asignación de materia' }}
                         </h3>
                         <p class="text-sm text-slate-500 dark:text-slate-400">
-                            Completa la información de la materia.
+                            Selecciona una materia ya registrada en el catálogo.
                         </p>
                     </div>
 
@@ -152,178 +152,172 @@
                     class="grid grid-cols-1 gap-5 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-3' : 'xl:grid-cols-2' }}">
 
                     {{-- GENERACIÓN --}}
-                    <div class="space-y-2">
-                        <flux:field>
-                            <flux:label>Generación</flux:label>
+                    <flux:field>
+                        <flux:label>Generación</flux:label>
 
-                            <flux:select wire:model.live="generacion_id">
-                                <option value="">Selecciona una generación</option>
+                        <flux:select wire:model.live="generacion_id">
+                            <option value="">Selecciona una generación</option>
 
-                                @foreach ($generaciones as $item)
-                                    <option value="{{ $item['id'] }}">
-                                        {{ $item['nombre'] }}
-                                    </option>
-                                @endforeach
-                            </flux:select>
+                            @foreach ($generaciones as $item)
+                                <option value="{{ $item['id'] }}">
+                                    {{ $item['nombre'] }}
+                                </option>
+                            @endforeach
+                        </flux:select>
 
-                            <flux:error name="generacion_id" />
-                        </flux:field>
-                    </div>
+                        <flux:error name="generacion_id" />
+                    </flux:field>
 
                     {{-- GRADO --}}
-                    <div class="space-y-2">
+                    <flux:field>
+                        <flux:label>Grado</flux:label>
+
+                        <flux:select wire:model.live="grado_id" :disabled="blank($generacion_id)">
+                            <option value="">Selecciona un grado</option>
+
+                            @foreach ($grados as $item)
+                                <option value="{{ $item['id'] }}">
+                                    {{ $item['nombre'] }}
+                                </option>
+                            @endforeach
+                        </flux:select>
+
+                        <flux:error name="grado_id" />
+                    </flux:field>
+
+                    {{-- SEMESTRE --}}
+                    @if ($this->esBachillerato)
                         <flux:field>
-                            <flux:label>Grado</flux:label>
+                            <flux:label>Semestre</flux:label>
 
-                            <flux:select wire:model.live="grado_id" :disabled="blank($generacion_id)">
-                                <option value="">Selecciona un grado</option>
+                            <flux:select wire:model.live="semestre"
+                                :disabled="blank($generacion_id) || blank($grado_id)">
+                                <option value="">Selecciona un semestre</option>
 
-                                @foreach ($grados as $item)
+                                @foreach ($semestres as $item)
                                     <option value="{{ $item['id'] }}">
-                                        {{ $item['nombre'] }}
+                                        {{ $item['numero'] }}° semestre
                                     </option>
                                 @endforeach
                             </flux:select>
 
-                            <flux:error name="grado_id" />
+                            <flux:error name="semestre" />
                         </flux:field>
-                    </div>
-
-                    {{-- SEMESTRE SOLO BACHILLERATO --}}
-                    @if ($this->esBachillerato)
-                        <div class="space-y-2">
-                            <flux:field>
-                                <flux:label>Semestre</flux:label>
-
-                                <flux:select wire:model.live="semestre"
-                                    :disabled="blank($generacion_id) || blank($grado_id)">
-                                    <option value="">Selecciona un semestre</option>
-
-                                    @foreach ($semestres as $item)
-                                        <option value="{{ $item['id'] }}">
-                                            {{ $item['numero'] }}° semestre
-                                        </option>
-                                    @endforeach
-                                </flux:select>
-
-                                <flux:error name="semestre" />
-                            </flux:field>
-                        </div>
                     @endif
 
                     {{-- GRUPO --}}
-                    <div class="space-y-2">
-                        <flux:field>
-                            <flux:label>Grupo</flux:label>
+                    <flux:field>
+                        <flux:label>Grupo</flux:label>
 
-                            <flux:select wire:model.live="grupo_id"
-                                :disabled="$this->esBachillerato
-                                                    ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
-                                                    : (blank($generacion_id) || blank($grado_id))">
-                                <option value="">Selecciona un grupo</option>
+                        <flux:select wire:model.live="grupo_id"
+                            :disabled="$this->esBachillerato
+                                                            ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                            : (blank($generacion_id) || blank($grado_id))">
+                            <option value="">Selecciona un grupo</option>
 
-                                @foreach ($grupos as $item)
-                                    <option value="{{ $item['id'] }}">
-                                        {{ $item['nombre'] }}
-                                    </option>
-                                @endforeach
-                            </flux:select>
+                            @foreach ($grupos as $item)
+                                <option value="{{ $item['id'] }}">
+                                    {{ $item['nombre'] }}
+                                </option>
+                            @endforeach
+                        </flux:select>
 
-                            <flux:error name="grupo_id" />
-                        </flux:field>
-                    </div>
-
-                    {{-- PROFESOR --}}
-                    <div
-                        class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
-                        <flux:field>
-                            <flux:label>Profesor</flux:label>
-
-                            <flux:select wire:model.live="profesor_id">
-                                <option value="">Selecciona un profesor</option>
-
-                                @foreach ($profesores as $item)
-                                    <option value="{{ $item['id'] }}">
-                                        {{ $item['nombre'] }}
-                                    </option>
-                                @endforeach
-                            </flux:select>
-
-                            <flux:error name="profesor_id" />
-                        </flux:field>
-                    </div>
+                        <flux:error name="grupo_id" />
+                    </flux:field>
 
                     {{-- MATERIA --}}
-                    <div
-                        class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
-                        <flux:field>
-                            <flux:label>Materia</flux:label>
+                    <flux:field class="{{ $this->esBachillerato ? 'md:col-span-2' : '' }}">
+                        <flux:label>Materia</flux:label>
 
-                            <flux:input wire:model.live="materia" placeholder="Nombre de la materia" />
+                        <flux:select wire:model.live="materia_id"
+                            :disabled="$this->esBachillerato
+                                                            ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                            : (blank($generacion_id) || blank($grado_id))">
+                            <option value="">Selecciona una materia</option>
 
-                            <flux:error name="materia" />
-                        </flux:field>
-                    </div>
+                            @foreach ($this->materiasDisponibles as $item)
+                                <option value="{{ $item->id }}">
+                                    {{ $item->materia }}
+                                    @if ($item->clave)
+                                        - {{ $item->clave }}
+                                    @endif
+                                    @if ($item->extra)
+                                        - Extra
+                                    @endif
+                                    @if ($item->receso)
+                                        - Receso
+                                    @endif
+                                </option>
+                            @endforeach
+                        </flux:select>
 
-                    {{-- CLAVE SOLO BACHILLERATO --}}
-                    @if ($this->esBachillerato)
-                        <div class="space-y-2">
-                            <flux:field>
-                                <flux:label>Clave</flux:label>
+                        <flux:error name="materia_id" />
+                    </flux:field>
 
-                                <flux:input wire:model.live="clave" placeholder="Clave de la materia" />
+                    {{-- PROFESOR --}}
+                    <flux:field class="{{ $this->esBachillerato ? 'md:col-span-2 xl:col-span-1' : '' }}">
+                        <flux:label>Profesor</flux:label>
 
-                                <flux:error name="clave" />
-                            </flux:field>
+                        <flux:select wire:model.live="profesor_id">
+                            <option value="">Selecciona un profesor</option>
+
+                            @foreach ($profesores as $item)
+                                <option value="{{ $item['id'] }}">
+                                    {{ $item['nombre'] }}
+                                </option>
+                            @endforeach
+                        </flux:select>
+
+                        <flux:error name="profesor_id" />
+                    </flux:field>
+                </div>
+
+                @if ($materia_id)
+                    @php
+                        $materiaSeleccionada = $this->materiasDisponibles->firstWhere('id', (int) $materia_id);
+                    @endphp
+
+                    @if ($materiaSeleccionada)
+                        <div
+                            class="mt-6 rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-neutral-950/40">
+                            <h4 class="text-sm font-black text-slate-800 dark:text-white">
+                                Datos de la materia seleccionada
+                            </h4>
+
+                            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Slug</p>
+                                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        {{ $materiaSeleccionada->slug }}
+                                    </p>
+                                </div>
+
+                                @if ($this->esBachillerato)
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Clave</p>
+                                        <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                            {{ $materiaSeleccionada->clave ?: '—' }}
+                                        </p>
+                                    </div>
+                                @endif
+
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Calificable</p>
+                                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        {{ $materiaSeleccionada->calificable ? 'Sí' : 'No' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Extra</p>
+                                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        {{ $materiaSeleccionada->extra ? 'Sí' : 'No' }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     @endif
-
-                    {{-- SLUG --}}
-                    <div
-                        class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
-                        <flux:field>
-                            <flux:label>Slug</flux:label>
-
-                            <flux:input variant="filled" wire:model.live="slug" placeholder="slug-de-la-materia" />
-
-                            <flux:error name="slug" />
-                        </flux:field>
-                    </div>
-
-                    {{-- CALIFICABLE --}}
-                    <div class="space-y-2">
-                        <flux:field>
-                            <flux:label>¿Calificable?</flux:label>
-
-                            <flux:select wire:model="calificable">
-                                <flux:select.option value="1">Sí</flux:select.option>
-                                <flux:select.option value="0">No</flux:select.option>
-                            </flux:select>
-
-                            <flux:error name="calificable" />
-                        </flux:field>
-                    </div>
-
-                    {{-- EXTRA --}}
-                    <div class="space-y-2">
-                        <flux:field>
-                            <flux:label>
-                                ¿Extra?
-                                <span class="text-xs text-slate-500 dark:text-slate-400">
-                                    Las materias extra no se toman en cuenta para el promedio final, pero sí cuentan
-                                    como asignadas.
-                                </span>
-                            </flux:label>
-
-                            <flux:select wire:model="extra">
-                                <flux:select.option value="1">Sí</flux:select.option>
-                                <flux:select.option value="0">No</flux:select.option>
-                            </flux:select>
-
-                            <flux:error name="extra" />
-                        </flux:field>
-                    </div>
-                </div>
+                @endif
             </div>
 
             <div
@@ -334,7 +328,7 @@
                 </button>
 
                 <flux:button type="submit" variant="primary">
-                    {{ $editandoId ? 'Actualizar materia' : 'Guardar materia' }}
+                    {{ $editandoId ? 'Actualizar asignación' : 'Guardar asignación' }}
                 </flux:button>
             </div>
 
@@ -345,27 +339,20 @@
                         class="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 dark:border-white/10 dark:border-t-sky-400">
                     </div>
                     <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        {{ $editandoId ? 'Actualizando materia...' : 'Guardando materia...' }}
+                        Guardando asignación...
                     </p>
                 </div>
             </div>
         </form>
     </section>
 
-    {{-- FORMULARIO MATERIAS A PROMEDIAR --}}
+    {{-- MATERIAS A PROMEDIAR --}}
     <section x-show="openPromediar" x-collapse x-cloak
         class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
         <div class="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"></div>
 
         <livewire:materia-promediar :slug_nivel="$slug_nivel" />
     </section>
-
-    @if (session()->has('success'))
-        <div
-            class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-            {{ session('success') }}
-        </div>
-    @endif
 
     {{-- RESUMEN --}}
     <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -400,7 +387,7 @@
         </div>
     </section>
 
-    {{-- LISTADO AGRUPADO POR GRADO --}}
+    {{-- LISTADO --}}
     <section
         class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
         <div class="h-1.5 w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-sky-500"></div>
@@ -409,10 +396,10 @@
             <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h3 class="text-lg font-black text-slate-800 dark:text-white">
-                        Materias registradas
+                        Materias asignadas
                     </h3>
                     <p class="text-sm text-slate-500 dark:text-slate-400">
-                        Consulta rápida de asignaciones capturadas, agrupadas por grado.
+                        Consulta rápida de asignaciones, agrupadas por grado.
                     </p>
                 </div>
 
@@ -426,13 +413,13 @@
 
             @php
                 $asignacionesAgrupadas = $this->asignacionesFiltradas->groupBy(function ($item) {
-                    return $item->grado?->nombre ?? 'Sin grado';
+                    return $item->materia?->grado?->nombre ?? 'Sin grado';
                 });
             @endphp
 
             @forelse ($asignacionesAgrupadas as $nombreGrado => $materias)
                 @php
-                    $gradoId = $materias->first()?->grado_id;
+                    $gradoId = $materias->first()?->materia?->grado_id;
                     $abrirGrado = $materias->contains('id', $ultimoRegistroId);
                 @endphp
 
@@ -440,7 +427,7 @@
                     class="mb-6 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-sm dark:border-white/10 dark:bg-neutral-950/40">
 
                     <button type="button" @click="open = !open"
-                        class="flex w-full items-center justify-between gap-3 border-b border-slate-200/70 bg-gradient-to-r from-sky-50 via-indigo-50 to-fuchsia-50 px-5 py-4 text-left transition hover:from-sky-100 hover:via-indigo-100 hover:to-fuchsia-100 dark:border-white/10 dark:from-sky-500/10 dark:via-indigo-500/10 dark:to-fuchsia-500/10 dark:hover:from-sky-500/20 dark:hover:via-indigo-500/20 dark:hover:to-fuchsia-500/20">
+                        class="flex w-full items-center justify-between gap-3 border-b border-slate-200/70 bg-gradient-to-r from-sky-50 via-indigo-50 to-fuchsia-50 px-5 py-4 text-left transition hover:from-sky-100 hover:via-indigo-100 hover:to-fuchsia-100 dark:border-white/10 dark:from-sky-500/10 dark:via-indigo-500/10 dark:to-fuchsia-500/10">
                         <div class="flex items-center gap-4">
                             <span
                                 class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-200 bg-white text-sky-600 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
@@ -463,25 +450,15 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-3">
-                            @if ($abrirGrado && $ultimoRegistroId)
-                                <span
-                                    class="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 sm:inline-flex">
-                                    Recién {{ $ultimoMovimiento }}
-                                </span>
-                            @endif
-
-                            <span
-                                class="inline-flex items-center rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                {{ $materias->count() }} {{ $materias->count() === 1 ? 'materia' : 'materias' }}
-                            </span>
-                        </div>
+                        <span
+                            class="inline-flex items-center rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                            {{ $materias->count() }} {{ $materias->count() === 1 ? 'materia' : 'materias' }}
+                        </span>
                     </button>
 
                     <div x-show="open" x-collapse>
                         {{-- TABLA DESKTOP --}}
-                        <div
-                            class="hidden lg:block {{ $materias->count() > 5 ? 'max-h-[420px] overflow-y-auto overflow-x-auto' : 'overflow-x-auto' }}">
+                        <div class="hidden overflow-x-auto lg:block">
                             <table class="min-w-full">
                                 <thead class="sticky top-0 z-10 bg-slate-100/95 backdrop-blur dark:bg-neutral-900">
                                     <tr class="text-left">
@@ -501,11 +478,6 @@
                                                 Clave
                                             </th>
                                         @endif
-
-                                        <th
-                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                            Nivel
-                                        </th>
 
                                         <th
                                             class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -535,6 +507,11 @@
                                         </th>
 
                                         <th
+                                            class="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Receso
+                                        </th>
+
+                                        <th
                                             class="px-4 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                             Acciones
                                         </th>
@@ -546,6 +523,7 @@
                                     @foreach ($materias as $item)
                                         @php
                                             $esUltimo = $ultimoRegistroId === $item->id;
+                                            $nombreMateria = $item->materia?->materia ?? 'Sin materia';
                                         @endphp
 
                                         <tr data-id="{{ $item->id }}"
@@ -564,24 +542,19 @@
 
                                             <td class="px-4 py-4 align-top">
                                                 <div class="font-bold text-slate-800 dark:text-white">
-                                                    {{ $item->materia }}
+                                                    {{ $nombreMateria }}
                                                 </div>
                                                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                    {{ $item->slug }}
+                                                    {{ $item->materia?->slug ?? 'sin-slug' }}
                                                 </div>
                                             </td>
 
                                             @if ($this->esBachillerato)
                                                 <td
                                                     class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                    {{ $item->clave ?: '—' }}
+                                                    {{ $item->materia?->clave ?: '—' }}
                                                 </td>
                                             @endif
-
-                                            <td
-                                                class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                {{ $item->nivel?->nombre ?? '—' }}
-                                            </td>
 
                                             <td
                                                 class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -591,7 +564,8 @@
                                             @if ($this->esBachillerato)
                                                 <td
                                                     class="px-4 py-4 align-top text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                    {{ $item->semestre ? $item->semestre . '° semestre' : '—' }}
+                                                    {{ $item->materia?->semestre?->numero ?? $item->materia?->semestre_id }}°
+                                                    semestre
                                                 </td>
                                             @endif
 
@@ -601,28 +575,42 @@
                                             </td>
 
                                             <td class="px-4 py-4 align-top">
-                                                @if ($item->calificable == 1)
+                                                @if ($item->materia?->calificable == 1)
                                                     <span
-                                                        class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                        class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                                                         Sí
                                                     </span>
                                                 @else
                                                     <span
-                                                        class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                        class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
                                                         No
                                                     </span>
                                                 @endif
                                             </td>
 
                                             <td class="px-4 py-4 align-top">
-                                                @if ($item->extra == 1)
+                                                @if ($item->materia?->extra == 1)
                                                     <span
-                                                        class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                        class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300">
                                                         Sí
                                                     </span>
                                                 @else
                                                     <span
-                                                        class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                                                        class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                                        No
+                                                    </span>
+                                                @endif
+                                            </td>
+
+                                            <td class="px-4 py-4 align-top">
+                                                @if ($item->materia?->receso == 1)
+                                                    <span
+                                                        class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                                                        Sí
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                                                         No
                                                     </span>
                                                 @endif
@@ -634,29 +622,11 @@
                                                         wire:loading.attr="disabled"
                                                         wire:target="editar({{ $item->id }})"
                                                         class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                                        <span wire:loading.remove
-                                                            wire:target="editar({{ $item->id }})">
-                                                            Editar
-                                                        </span>
-
-                                                        <span wire:loading.inline-flex
-                                                            wire:target="editar({{ $item->id }})"
-                                                            class="items-center gap-2">
-                                                            <svg class="h-4 w-4 animate-spin"
-                                                                xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                                viewBox="0 0 24 24">
-                                                                <circle class="opacity-25" cx="12"
-                                                                    cy="12" r="10" stroke="currentColor"
-                                                                    stroke-width="4"></circle>
-                                                                <path class="opacity-75" fill="currentColor"
-                                                                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                                            </svg>
-                                                            Cargando...
-                                                        </span>
+                                                        Editar
                                                     </button>
 
                                                     <button type="button"
-                                                        @click="eliminar('{{ $item->id }}', '{{ $item->materia }}')"
+                                                        @click="eliminar('{{ $item->id }}', '{{ addslashes($nombreMateria) }}')"
                                                         class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
                                                         Eliminar
                                                     </button>
@@ -668,57 +638,44 @@
                             </table>
                         </div>
 
-                        {{-- TARJETAS MOBILE --}}
+                        {{-- MÓVIL --}}
                         <div class="space-y-4 p-4 lg:hidden">
                             @foreach ($materias as $item)
                                 @php
-                                    $esUltimo = $ultimoRegistroId === $item->id;
+                                    $nombreMateria = $item->materia?->materia ?? 'Sin materia';
                                 @endphp
 
                                 <article
-                                    class="rounded-3xl border p-5 shadow-sm {{ $esUltimo ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:via-neutral-950/60 dark:to-sky-500/10' : 'border-slate-200 bg-white dark:border-white/10 dark:bg-neutral-950/50' }}">
+                                    class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-neutral-950/50">
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
                                             <h4 class="text-base font-black text-slate-800 dark:text-white">
-                                                {{ $item->materia }}
+                                                {{ $nombreMateria }}
                                             </h4>
                                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                {{ $item->slug }}
+                                                {{ $item->materia?->slug ?? 'sin-slug' }}
                                             </p>
                                         </div>
 
-                                        @if ($item->calificable)
+                                        @if ($item->materia?->receso)
                                             <span
-                                                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                                Sí
+                                                class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                                                Receso
                                             </span>
-                                        @else
+                                        @elseif ($item->materia?->extra)
                                             <span
-                                                class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-                                                No
+                                                class="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
+                                                Extra
+                                            </span>
+                                        @elseif ($item->materia?->calificable)
+                                            <span
+                                                class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                                Calificable
                                             </span>
                                         @endif
                                     </div>
 
                                     <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        @if ($this->esBachillerato)
-                                            <div>
-                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
-                                                    Clave</p>
-                                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                    {{ $item->clave ?: '—' }}
-                                                </p>
-                                            </div>
-                                        @endif
-
-                                        <div>
-                                            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Nivel
-                                            </p>
-                                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                {{ $item->nivel?->nombre ?? '—' }}
-                                            </p>
-                                        </div>
-
                                         <div>
                                             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grupo
                                             </p>
@@ -726,16 +683,6 @@
                                                 {{ $item->grupo?->nombre ?? '—' }}
                                             </p>
                                         </div>
-
-                                        @if ($this->esBachillerato)
-                                            <div>
-                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
-                                                    Semestre</p>
-                                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                    {{ $item->semestre ? $item->semestre . '° semestre' : '—' }}
-                                                </p>
-                                            </div>
-                                        @endif
 
                                         <div>
                                             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -748,27 +695,12 @@
 
                                     <div class="mt-5 flex justify-end gap-2">
                                         <button type="button" wire:click="editar({{ $item->id }})"
-                                            wire:loading.attr="disabled" wire:target="editar({{ $item->id }})"
-                                            class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
-                                            <span wire:loading.remove wire:target="editar({{ $item->id }})">
-                                                Editar
-                                            </span>
-
-                                            <span wire:loading.inline-flex wire:target="editar({{ $item->id }})"
-                                                class="items-center gap-2">
-                                                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                        stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                                </svg>
-                                                Cargando...
-                                            </span>
+                                            class="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                            Editar
                                         </button>
 
                                         <button type="button"
-                                            @click="eliminar('{{ $item->id }}', '{{ $item->materia }}')"
+                                            @click="eliminar('{{ $item->id }}', '{{ addslashes($nombreMateria) }}')"
                                             class="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
                                             Eliminar
                                         </button>
@@ -782,7 +714,7 @@
                 <div
                     class="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center dark:border-white/10 dark:bg-white/[0.02]">
                     <h4 class="text-base font-black text-slate-700 dark:text-slate-200">
-                        No hay materias registradas
+                        No hay materias asignadas
                     </h4>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         Agrega una nueva asignación para comenzar.
@@ -791,7 +723,6 @@
             @endforelse
         </div>
 
-        {{-- LOADER GENERAL AL EDITAR --}}
         <div wire:loading.flex wire:target="editar"
             class="absolute inset-0 z-20 items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
             <div class="flex flex-col items-center gap-3">
@@ -813,7 +744,9 @@
                 function getLivewireComponentFrom(el) {
                     const root = el.closest('[wire\\:id]');
                     if (!root) return null;
+
                     const componentId = root.getAttribute('wire:id');
+
                     return componentId ? Livewire.find(componentId) : null;
                 }
 
@@ -824,6 +757,7 @@
                         if (el._sortable) return;
 
                         const gradoId = parseInt(el.dataset.gradoId || '0', 10);
+
                         if (!gradoId) return;
 
                         el._sortable = new Sortable(el, {
@@ -843,6 +777,7 @@
                                 if (!ids.length) return;
 
                                 const component = getLivewireComponentFrom(el);
+
                                 if (!component) return;
 
                                 component.call('ordenarMateriasPorGradoJs', gradoId, ids);
@@ -855,12 +790,15 @@
 
                 document.addEventListener('livewire:init', () => {
                     initSortableMateriasPorGrado();
-                    Livewire.hook('message.processed', () => initSortableMateriasPorGrado());
+
+                    Livewire.hook('message.processed', () => {
+                        initSortableMateriasPorGrado();
+                    });
                 });
 
-                const t = setInterval(() => {
+                const intervalo = setInterval(() => {
                     if (typeof Sortable !== 'undefined') {
-                        clearInterval(t);
+                        clearInterval(intervalo);
                         initSortableMateriasPorGrado();
                     }
                 }, 120);

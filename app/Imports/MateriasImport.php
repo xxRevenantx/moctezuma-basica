@@ -1,0 +1,171 @@
+<?php
+
+namespace App\Imports;
+
+use App\Models\Grado;
+use App\Models\Materia;
+use App\Models\Nivel;
+use App\Models\Semestre;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithHeadingRow;
+
+class MateriasImport implements ToCollection, WithHeadingRow
+{
+    public int $importadas = 0;
+
+    public int $actualizadas = 0;
+
+    public array $errores = [];
+
+    public function collection(Collection $rows)
+    {
+        foreach ($rows as $indice => $row) {
+            $filaExcel = $indice + 2;
+
+            $datos = [
+                'nivel_id' => $row['nivel_id'] ?? null,
+                'grado_id' => $row['grado_id'] ?? null,
+                'semestre_id' => $row['semestre_id'] ?? null,
+                'materia' => trim((string) ($row['materia'] ?? '')),
+                'clave' => trim((string) ($row['clave'] ?? '')),
+                'slug' => trim((string) ($row['slug'] ?? '')),
+                'calificable' => $this->convertirBooleano($row['calificable'] ?? 0),
+                'extra' => $this->convertirBooleano($row['extra'] ?? 0),
+                'receso' => $this->convertirBooleano($row['receso'] ?? 0),
+            ];
+
+            if ($datos['slug'] === '' && $datos['materia'] !== '') {
+                $datos['slug'] = Str::slug($datos['materia']);
+            }
+
+            $validacion = Validator::make($datos, [
+                'nivel_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('niveles', 'id'),
+                ],
+                'grado_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('grados', 'id'),
+                ],
+                'semestre_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('semestres', 'id'),
+                ],
+                'materia' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+                'clave' => [
+                    'nullable',
+                    'string',
+                    'max:50',
+                ],
+                'slug' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+                'calificable' => [
+                    'required',
+                    'boolean',
+                ],
+                'extra' => [
+                    'required',
+                    'boolean',
+                ],
+                'receso' => [
+                    'required',
+                    'boolean',
+                ],
+            ], [
+                'nivel_id.required' => 'El nivel es obligatorio.',
+                'nivel_id.exists' => 'El nivel no existe.',
+                'grado_id.required' => 'El grado es obligatorio.',
+                'grado_id.exists' => 'El grado no existe.',
+                'semestre_id.exists' => 'El semestre no existe.',
+                'materia.required' => 'La materia es obligatoria.',
+                'slug.required' => 'El slug es obligatorio.',
+            ]);
+
+            if ($validacion->fails()) {
+                $this->errores[] = [
+                    'fila' => $filaExcel,
+                    'errores' => $validacion->errors()->all(),
+                ];
+
+                continue;
+            }
+
+            $nivel = Nivel::find($datos['nivel_id']);
+            $grado = Grado::find($datos['grado_id']);
+
+            if (!$nivel || !$grado) {
+                $this->errores[] = [
+                    'fila' => $filaExcel,
+                    'errores' => ['No se encontró el nivel o grado indicado.'],
+                ];
+
+                continue;
+            }
+
+            if ((int) $datos['nivel_id'] === 4 && blank($datos['semestre_id'])) {
+                $this->errores[] = [
+                    'fila' => $filaExcel,
+                    'errores' => ['Para bachillerato es obligatorio indicar semestre_id.'],
+                ];
+
+                continue;
+            }
+
+            if ((int) $datos['nivel_id'] !== 4) {
+                $datos['semestre_id'] = null;
+            }
+
+            if ((bool) $datos['receso']) {
+                $datos['calificable'] = false;
+                $datos['extra'] = false;
+            }
+
+            $materia = Materia::updateOrCreate(
+                [
+                    'nivel_id' => $datos['nivel_id'],
+                    'grado_id' => $datos['grado_id'],
+                    'semestre_id' => $datos['semestre_id'],
+                    'slug' => $datos['slug'],
+                ],
+                [
+                    'materia' => $datos['materia'],
+                    'clave' => $datos['clave'] !== '' ? Str::upper($datos['clave']) : null,
+                    'calificable' => $datos['calificable'],
+                    'extra' => $datos['extra'],
+                    'receso' => $datos['receso'],
+                ]
+            );
+
+            if ($materia->wasRecentlyCreated) {
+                $this->importadas++;
+            } else {
+                $this->actualizadas++;
+            }
+        }
+    }
+
+    private function convertirBooleano($valor): bool
+    {
+        if (is_bool($valor)) {
+            return $valor;
+        }
+
+        $valor = Str::lower(trim((string) $valor));
+
+        return in_array($valor, ['1', 'si', 'sí', 'true', 'verdadero', 'x'], true);
+    }
+}

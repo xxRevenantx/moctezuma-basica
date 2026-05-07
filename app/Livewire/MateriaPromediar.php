@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\Grado;
-use App\Models\Grupo;
 use App\Models\MateriaPromediar as MateriaPromediarModel;
 use App\Models\Nivel;
 use App\Models\Semestre;
@@ -16,7 +15,6 @@ class MateriaPromediar extends Component
     // =========================
     public ?int $promediar_nivel_id = null;
     public ?int $promediar_grado_id = null;
-    public ?int $promediar_grupo_id = null;
     public ?int $promediar_semestre_id = null;
     public ?int $promediar_numero_materias = null;
 
@@ -24,13 +22,12 @@ class MateriaPromediar extends Component
     // Catálogos
     // =========================
     public array $promediar_grados = [];
-    public array $promediar_grupos = [];
     public array $promediar_semestres = [];
 
     // =========================
     // Listado
     // =========================
-    public $configuracionesPromedio = [];
+    public $configuracionesPromedio;
 
     public ?string $slug_nivel = null;
     public ?string $nombre_nivel = null;
@@ -41,6 +38,7 @@ class MateriaPromediar extends Component
     public function mount(?string $slug_nivel = null): void
     {
         $this->slug_nivel = $slug_nivel;
+        $this->configuracionesPromedio = collect();
 
         if ($this->slug_nivel) {
             $nivelActual = Nivel::query()
@@ -62,42 +60,31 @@ class MateriaPromediar extends Component
     // =========================
     public function getEsBachilleratoProperty(): bool
     {
-        return $this->slug_nivel === 'bachillerato';
+        return (int) $this->promediar_nivel_id === 4 || $this->slug_nivel === 'bachillerato';
     }
 
     // =========================
     // Eventos reactivos
     // =========================
-    public function updatedPromediarGradoId(): void
+    public function updatedPromediarGradoId($value): void
     {
-        $this->promediar_grupo_id = null;
+        $this->promediar_grado_id = filled($value) ? (int) $value : null;
         $this->promediar_semestre_id = null;
         $this->promediar_numero_materias = null;
-
-        $this->promediar_grupos = [];
         $this->promediar_semestres = [];
 
         if ($this->esBachillerato) {
             $this->cargarSemestresPromediar();
-        } else {
-            $this->cargarGruposPromediar();
         }
 
         $this->cargarRegistroExistente();
     }
 
-    public function updatedPromediarGrupoId(): void
+    public function updatedPromediarSemestreId($value): void
     {
-        $this->promediar_numero_materias = null;
-        $this->cargarRegistroExistente();
-    }
-
-    public function updatedPromediarSemestreId(): void
-    {
-        $this->promediar_grupo_id = null;
+        $this->promediar_semestre_id = filled($value) ? (int) $value : null;
         $this->promediar_numero_materias = null;
 
-        $this->cargarGruposPromediar();
         $this->cargarRegistroExistente();
     }
 
@@ -116,61 +103,40 @@ class MateriaPromediar extends Component
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get()
-            ->toArray();
-    }
-
-    public function cargarGruposPromediar(): void
-    {
-        if (!$this->promediar_nivel_id || !$this->promediar_grado_id) {
-            $this->promediar_grupos = [];
-            return;
-        }
-
-        $this->promediar_grupos = Grupo::query()
-            ->where('nivel_id', $this->promediar_nivel_id)
-            ->where('grado_id', $this->promediar_grado_id)
-            ->when($this->esBachillerato, function ($query) {
-                if ($this->promediar_semestre_id) {
-                    $query->where('semestre_id', $this->promediar_semestre_id);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nombre' => $item->nombre ?? $item->grado ?? 'Grado ' . $item->id,
+                ];
             })
-            ->orderBy('nombre')
-            ->get()
             ->toArray();
     }
 
     public function cargarSemestresPromediar(): void
     {
-        if (!$this->esBachillerato) {
+        if (!$this->esBachillerato || !$this->promediar_grado_id) {
             $this->promediar_semestres = [];
             return;
         }
 
-        if (!$this->promediar_grado_id) {
-            $this->promediar_semestres = [];
-            return;
+        $query = Semestre::query();
+
+        // Si tu tabla semestres tiene grado_id, se filtra por grado.
+        // Si no lo tiene, se cargan todos los semestres.
+        if ($this->columnaExiste('semestres', 'grado_id')) {
+            $query->where('grado_id', $this->promediar_grado_id);
         }
 
-        $semestreIds = Grupo::query()
-            ->where('nivel_id', $this->promediar_nivel_id)
-            ->where('grado_id', $this->promediar_grado_id)
-            ->whereNotNull('semestre_id')
-            ->pluck('semestre_id')
-            ->unique()
-            ->values();
-
-        $this->promediar_semestres = Semestre::query()
-            ->whereIn('id', $semestreIds)
+        $this->promediar_semestres = $query
+            ->orderBy('numero')
             ->orderBy('id')
             ->get()
             ->map(function ($item) {
                 return [
                     'id' => $item->id,
-                    'numero' => $item->numero,
-                    'nombre' => $item->nombre,
-                    'semestre' => $item->semestre,
+                    'numero' => $item->numero ?? null,
+                    'nombre' => $item->nombre ?? null,
+                    'semestre' => $item->semestre ?? null,
                 ];
             })
             ->toArray();
@@ -184,10 +150,12 @@ class MateriaPromediar extends Component
         }
 
         $this->configuracionesPromedio = MateriaPromediarModel::query()
-            ->with(['grado', 'grupo', 'semestre'])
+            ->with([
+                'grado',
+                'semestre',
+            ])
             ->where('nivel_id', $this->promediar_nivel_id)
             ->orderBy('grado_id')
-            ->orderBy('grupo_id')
             ->orderBy('semestre_id')
             ->get();
     }
@@ -197,12 +165,11 @@ class MateriaPromediar extends Component
     // =========================
     public function cargarRegistroExistente(): void
     {
-        if (!$this->promediar_nivel_id || !$this->promediar_grado_id || !$this->promediar_grupo_id) {
+        if (!$this->promediar_nivel_id || !$this->promediar_grado_id) {
             $this->promediar_numero_materias = null;
             return;
         }
 
-        // Si es bachillerato, obligo a que exista semestre para buscar
         if ($this->esBachillerato && !$this->promediar_semestre_id) {
             $this->promediar_numero_materias = null;
             return;
@@ -211,7 +178,6 @@ class MateriaPromediar extends Component
         $registro = MateriaPromediarModel::query()
             ->where('nivel_id', $this->promediar_nivel_id)
             ->where('grado_id', $this->promediar_grado_id)
-            ->where('grupo_id', $this->promediar_grupo_id)
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->promediar_semestre_id),
@@ -228,16 +194,33 @@ class MateriaPromediar extends Component
     protected function rules(): array
     {
         $rules = [
-            'promediar_nivel_id' => 'required|integer|exists:niveles,id',
-            'promediar_grado_id' => 'required|integer|exists:grados,id',
-            'promediar_grupo_id' => 'required|integer|exists:grupos,id',
-            'promediar_numero_materias' => 'required|integer|min:1',
+            'promediar_nivel_id' => [
+                'required',
+                'integer',
+                'exists:niveles,id',
+            ],
+            'promediar_grado_id' => [
+                'required',
+                'integer',
+                'exists:grados,id',
+            ],
+            'promediar_numero_materias' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
         ];
 
         if ($this->esBachillerato) {
-            $rules['promediar_semestre_id'] = 'required|integer|exists:semestres,id';
+            $rules['promediar_semestre_id'] = [
+                'required',
+                'integer',
+                'exists:semestres,id',
+            ];
         } else {
-            $rules['promediar_semestre_id'] = 'nullable';
+            $rules['promediar_semestre_id'] = [
+                'nullable',
+            ];
         }
 
         return $rules;
@@ -251,9 +234,6 @@ class MateriaPromediar extends Component
 
             'promediar_grado_id.required' => 'Selecciona un grado.',
             'promediar_grado_id.exists' => 'El grado seleccionado no es válido.',
-
-            'promediar_grupo_id.required' => 'Selecciona un grupo.',
-            'promediar_grupo_id.exists' => 'El grupo seleccionado no es válido.',
 
             'promediar_semestre_id.required' => 'Selecciona un semestre.',
             'promediar_semestre_id.exists' => 'El semestre seleccionado no es válido.',
@@ -278,7 +258,6 @@ class MateriaPromediar extends Component
         $registroExistente = MateriaPromediarModel::query()
             ->where('nivel_id', $this->promediar_nivel_id)
             ->where('grado_id', $this->promediar_grado_id)
-            ->where('grupo_id', $this->promediar_grupo_id)
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->promediar_semestre_id),
@@ -292,7 +271,6 @@ class MateriaPromediar extends Component
             [
                 'nivel_id' => $this->promediar_nivel_id,
                 'grado_id' => $this->promediar_grado_id,
-                'grupo_id' => $this->promediar_grupo_id,
                 'semestre_id' => $this->promediar_semestre_id,
             ],
             [
@@ -326,20 +304,37 @@ class MateriaPromediar extends Component
         $this->cargarRegistroExistente();
 
         session()->flash('success', 'Configuración eliminada correctamente.');
+
+        $this->dispatch('swal', [
+            'title' => 'Configuración eliminada correctamente',
+            'position' => 'top-end',
+            'icon' => 'success',
+        ]);
     }
 
     public function limpiarFormularioPromediar(): void
     {
-        $this->promediar_grado_id = null;
-        $this->promediar_grupo_id = null;
-        $this->promediar_semestre_id = null;
-        $this->promediar_numero_materias = null;
+        $this->reset([
+            'promediar_grado_id',
+            'promediar_semestre_id',
+            'promediar_numero_materias',
+        ]);
 
-        $this->promediar_grupos = [];
         $this->promediar_semestres = [];
 
-        $this->cargarGradosPromediar();
-        $this->resetErrorBag();
+        $this->resetValidation();
+    }
+
+    // =========================
+    // Verificación simple de columnas
+    // =========================
+    private function columnaExiste(string $tabla, string $columna): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn($tabla, $columna);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function render()

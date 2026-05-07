@@ -1,5 +1,6 @@
 <div x-data="{
     open: @js($errors->any()),
+
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
@@ -15,9 +16,25 @@
                 @this.call('eliminar', id)
             }
         })
+    },
+
+    irAlFormulario() {
+        open = true
+
+        setTimeout(() => {
+            const panel = document.getElementById('panel-materia')
+
+            if (!panel) return
+
+            panel.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            })
+        }, 250)
     }
 }" x-on:abrir-formulario-materia.window="open = true"
-    x-on:cerrar-formulario-materia.window="open = false" class="space-y-6">
+    x-on:scroll-panel-materia.window="irAlFormulario()" x-on:cerrar-formulario-materia.window="open = false"
+    class="space-y-6">
 
     {{-- Encabezado --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -30,26 +47,62 @@
             </p>
         </div>
 
-        <button type="button" @click="open = !open" :aria-expanded="open" aria-controls="panel-materia"
-            class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-sky-500/30 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-offset-neutral-900">
 
-            <span class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-white/15">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition" :class="{ 'rotate-45': open }"
-                    viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-            </span>
 
-            <span x-text="open ? 'Ocultar formulario' : 'Nueva materia'"></span>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form wire:submit.prevent="importarMaterias" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label
+                    class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
 
-            <span class="transition-transform duration-200" :class="open ? 'rotate-180' : 'rotate-0'">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 15.5l-6-6h12l-6 6z" />
-                </svg>
-            </span>
-        </button>
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 9.707a1 1 0 011.414 0L9 11V3a1 1 0 112 0v8l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </span>
+
+                    <span>Seleccionar Excel</span>
+
+                    <input type="file" wire:model="archivo_materias" accept=".xlsx,.xls" class="hidden">
+                </label>
+
+                @if ($archivo_materias)
+                    <button type="submit" wire:loading.attr="disabled" wire:target="importarMaterias,archivo_materias"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60">
+
+                        <span wire:loading.remove wire:target="importarMaterias">
+                            Importar materias
+                        </span>
+
+                        <span wire:loading wire:target="importarMaterias">
+                            Importando…
+                        </span>
+                    </button>
+                @endif
+            </form>
+
+            <button type="button" @click="open = !open" :aria-expanded="open" aria-controls="panel-materia"
+                class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-sky-500/30 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-offset-neutral-900">
+
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-white/15">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition" :class="{ 'rotate-45': open }"
+                        viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </span>
+
+                <span x-text="open ? 'Ocultar formulario' : 'Nueva materia'"></span>
+
+                <span class="transition-transform duration-200" :class="open ? 'rotate-180' : 'rotate-0'">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 15.5l-6-6h12l-6 6z" />
+                    </svg>
+                </span>
+            </button>
+        </div>
     </div>
 
     {{-- Resumen --}}
@@ -350,96 +403,286 @@
     </section>
 
     {{-- Listado agrupado --}}
+    {{-- Listado agrupado por nivel con collapse --}}
     <section class="space-y-6">
-        @forelse ($materiasAgrupadas as $contexto => $materiasGrupo)
+        @php
+            $materiasPorNivel = $materiasAgrupadas->groupBy(function ($materiasGrupo) {
+                return $materiasGrupo->first()?->nivel_id ?? 'sin-nivel';
+            });
+        @endphp
+
+        @forelse ($materiasPorNivel as $nivelKey => $gruposDelNivel)
             @php
-                $primera = $materiasGrupo->first();
-                $contextoKey = str_replace('|', '-', $contexto);
+                $primeraMateriaNivel = $gruposDelNivel->flatten(1)->first();
+                $nombreNivel = $primeraMateriaNivel?->nivel?->nombre ?? 'Sin nivel';
+                $nivelCollapseKey = 'nivel-' . $nivelKey;
+                $totalMateriasNivel = $gruposDelNivel->sum(fn($grupo) => $grupo->count());
             @endphp
 
-            <div
+            <div x-data="{ abierto: false }"
                 class="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-xl shadow-slate-200/50 dark:border-white/10 dark:bg-neutral-900 dark:shadow-black/20">
-                <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500"></div>
 
-                <div
-                    class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/10 dark:bg-neutral-950/40 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
-                            Contexto académico
-                        </p>
-                        <h3 class="text-lg font-black text-slate-900 dark:text-white">
-                            {{ $primera->nivel?->nombre ?? 'Sin nivel' }} ·
-                            {{ $primera->grado?->nombre ?? 'Sin grado' }}
-                            @if ($primera->semestre)
-                                · {{ $primera->semestre?->numero }}° semestre
-                            @endif
-                        </h3>
+                <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
+
+                {{-- Encabezado del nivel --}}
+                <button type="button" @click="abierto = !abierto" :aria-expanded="abierto"
+                    aria-controls="{{ $nivelCollapseKey }}"
+                    class="flex w-full flex-col gap-4 border-b border-slate-200 bg-slate-50/80 px-5 py-5 text-left transition hover:bg-slate-100/80 dark:border-white/10 dark:bg-neutral-950/40 dark:hover:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+
+                    <div class="flex items-center gap-4">
+                        <div
+                            class="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path
+                                    d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.786 0l7-3a1 1 0 000-1.838l-7-3z" />
+                                <path
+                                    d="M3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762z" />
+                                <path
+                                    d="M9.21 10.929a3 3 0 002.58 0l3.96-1.697a11.083 11.083 0 01.19 3.927 1 1 0 01-.89.89 8.968 8.968 0 00-5.55 2.27 8.968 8.968 0 00-5.55-2.27 1 1 0 01-.89-.89 11.083 11.083 0 01.19-3.927l3.96 1.697z" />
+                            </svg>
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-wide text-sky-600 dark:text-sky-300">
+                                Nivel académico
+                            </p>
+
+                            <h2 class="text-xl font-black text-slate-900 dark:text-white">
+                                {{ $nombreNivel }}
+                            </h2>
+
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {{ $gruposDelNivel->count() }} contexto(s) académico(s) registrado(s)
+                            </p>
+                        </div>
                     </div>
 
-                    <span
-                        class="inline-flex w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                        {{ $materiasGrupo->count() }} materias
-                    </span>
-                </div>
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="inline-flex w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                            {{ $totalMateriasNivel }} materias
+                        </span>
 
-                {{-- Tabla desktop --}}
-                <div class="hidden overflow-x-auto lg:block">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-slate-100 text-slate-600 dark:bg-neutral-950 dark:text-slate-300">
-                            <tr>
-                                <th class="w-20 px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
-                                    Orden
-                                </th>
-                                <th class="px-4 py-4 text-left text-xs font-black uppercase tracking-wider">
-                                    Materia
-                                </th>
-                                <th class="px-4 py-4 text-left text-xs font-black uppercase tracking-wider">
-                                    Clave
-                                </th>
-                                <th class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
-                                    Estados
-                                </th>
-                                <th class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
-                                    Asignaciones
-                                </th>
-                                <th class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
-                                    Acciones
-                                </th>
-                            </tr>
-                        </thead>
+                        <span
+                            class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition dark:border-white/10 dark:bg-neutral-900 dark:text-slate-300"
+                            :class="{ 'rotate-180': abierto }">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24"
+                                fill="currentColor">
+                                <path d="M12 15.5l-6-6h12l-6 6z" />
+                            </svg>
+                        </span>
+                    </div>
+                </button>
 
-                        <tbody data-sortable="materias" data-contexto="{{ $contextoKey }}"
-                            class="divide-y divide-slate-100 dark:divide-white/10">
-                            @foreach ($materiasGrupo as $item)
-                                <tr data-id="{{ $item->id }}"
-                                    class="transition hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                                    <td class="px-4 py-4 text-center">
-                                        <button type="button" data-handle
-                                            class="inline-flex h-9 w-9 cursor-move items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-sky-200 hover:text-sky-600 dark:border-white/10 dark:bg-neutral-900 dark:text-slate-500 dark:hover:border-sky-500/20 dark:hover:text-sky-300"
-                                            title="Arrastrar para ordenar">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                                viewBox="0 0 20 20" fill="currentColor">
-                                                <path
-                                                    d="M7 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM7 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-                                            </svg>
-                                        </button>
-                                    </td>
+                {{-- Contenido del nivel --}}
+                <div id="{{ $nivelCollapseKey }}" x-show="abierto" x-cloak
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 -translate-y-2"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    x-transition:leave="transition ease-in duration-200"
+                    x-transition:leave-start="opacity-100 translate-y-0"
+                    x-transition:leave-end="opacity-0 -translate-y-2" class="space-y-5 p-4 sm:p-5">
 
-                                    <td class="px-4 py-4">
-                                        <div class="font-black text-slate-900 dark:text-white">
-                                            {{ $item->materia }}
+                    @foreach ($gruposDelNivel as $contexto => $materiasGrupo)
+                        @php
+                            $primera = $materiasGrupo->first();
+                            $contextoKey = str_replace('|', '-', $contexto);
+                        @endphp
+
+                        <div
+                            class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-neutral-950/40">
+
+                            <div
+                                class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/10 dark:bg-neutral-950/60 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                        Contexto académico
+                                    </p>
+
+                                    <h3 class="text-lg font-black text-slate-900 dark:text-white">
+                                        {{ $primera->grado?->nombre ?? 'Sin grado' }}
+
+                                        @if ($primera->semestre)
+                                            · {{ $primera->semestre?->numero }}° semestre
+                                        @endif
+                                    </h3>
+                                </div>
+
+                                <span
+                                    class="inline-flex w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                    {{ $materiasGrupo->count() }} materias
+                                </span>
+                            </div>
+
+                            {{-- Tabla desktop --}}
+                            <div class="hidden overflow-x-auto lg:block">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-slate-100 text-slate-600 dark:bg-neutral-950 dark:text-slate-300">
+                                        <tr>
+                                            <th
+                                                class="w-20 px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
+                                                Orden
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-left text-xs font-black uppercase tracking-wider">
+                                                Materia
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-left text-xs font-black uppercase tracking-wider">
+                                                Clave
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
+                                                Estados
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
+                                                Asignaciones
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
+                                                Acciones
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody data-sortable="materias" data-contexto="{{ $contextoKey }}"
+                                        class="divide-y divide-slate-100 dark:divide-white/10">
+                                        @foreach ($materiasGrupo as $item)
+                                            <tr data-id="{{ $item->id }}"
+                                                class="transition hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                                                <td class="px-4 py-4 text-center">
+                                                    <button type="button" data-handle
+                                                        class="inline-flex h-9 w-9 cursor-move items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-sky-200 hover:text-sky-600 dark:border-white/10 dark:bg-neutral-900 dark:text-slate-500 dark:hover:border-sky-500/20 dark:hover:text-sky-300"
+                                                        title="Arrastrar para ordenar">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
+                                                            viewBox="0 0 20 20" fill="currentColor">
+                                                            <path
+                                                                d="M7 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM7 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 4a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM13 13a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                                                        </svg>
+                                                    </button>
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="font-black text-slate-900 dark:text-white">
+                                                        {{ $item->materia }}
+                                                    </div>
+
+                                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {{ $item->slug }} · Orden {{ $item->orden }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-4 font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->clave ?: '—' }}
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="flex flex-wrap items-center justify-center gap-2">
+                                                        @if ($item->calificable)
+                                                            <span
+                                                                class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                                Calificable
+                                                            </span>
+                                                        @endif
+
+                                                        @if ($item->extra)
+                                                            <span
+                                                                class="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
+                                                                Extra
+                                                            </span>
+                                                        @endif
+
+                                                        @if ($item->receso)
+                                                            <span
+                                                                class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                                                Receso
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-4 text-center">
+                                                    <span
+                                                        class="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                                        {{ $item->asignaciones_count }}
+                                                    </span>
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="flex items-center justify-center gap-2">
+                                                        <button type="button"
+                                                            wire:click="editar({{ $item->id }})"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="editar({{ $item->id }})"
+                                                            class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                                            Editar
+                                                        </button>
+
+                                                        <button type="button"
+                                                            @click="eliminar('{{ $item->id }}', '{{ addslashes($item->materia) }}')"
+                                                            class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {{-- Móvil --}}
+                            <div class="space-y-4 p-4 lg:hidden">
+                                @foreach ($materiasGrupo as $item)
+                                    <article
+                                        class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-neutral-950/40">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h3 class="text-base font-black text-slate-900 dark:text-white">
+                                                    {{ $item->materia }}
+                                                </h3>
+
+                                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                    {{ $item->slug }}
+                                                </p>
+                                            </div>
+
+                                            <span
+                                                class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                                Orden {{ $item->orden }}
+                                            </span>
                                         </div>
-                                        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                            {{ $item->slug }} · Orden {{ $item->orden }}
+
+                                        <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                    Clave
+                                                </p>
+
+                                                <p class="font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->clave ?: '—' }}
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                    Asignaciones
+                                                </p>
+
+                                                <p class="font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->asignaciones_count }}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </td>
 
-                                    <td class="px-4 py-4 font-semibold text-slate-700 dark:text-slate-200">
-                                        {{ $item->clave ?: '—' }}
-                                    </td>
-
-                                    <td class="px-4 py-4">
-                                        <div class="flex flex-wrap items-center justify-center gap-2">
+                                        <div class="mt-4 flex flex-wrap gap-2">
                                             @if ($item->calificable)
                                                 <span
                                                     class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -461,21 +704,10 @@
                                                 </span>
                                             @endif
                                         </div>
-                                    </td>
 
-                                    <td class="px-4 py-4 text-center">
-                                        <span
-                                            class="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                            {{ $item->asignaciones_count }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-4 py-4">
-                                        <div class="flex items-center justify-center gap-2">
+                                        <div class="mt-5 flex justify-end gap-2">
                                             <button type="button" wire:click="editar({{ $item->id }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="editar({{ $item->id }})"
-                                                class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                                class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
                                                 Editar
                                             </button>
 
@@ -485,88 +717,10 @@
                                                 Eliminar
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- Móvil --}}
-                <div class="space-y-4 p-4 lg:hidden">
-                    @foreach ($materiasGrupo as $item)
-                        <article
-                            class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-neutral-950/40">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <h3 class="text-base font-black text-slate-900 dark:text-white">
-                                        {{ $item->materia }}
-                                    </h3>
-                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $item->slug }}
-                                    </p>
-                                </div>
-
-                                <span
-                                    class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                    Orden {{ $item->orden }}
-                                </span>
+                                    </article>
+                                @endforeach
                             </div>
-
-                            <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                                <div>
-                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Clave</p>
-                                    <p class="font-semibold text-slate-700 dark:text-slate-200">
-                                        {{ $item->clave ?: '—' }}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
-                                        Asignaciones
-                                    </p>
-                                    <p class="font-semibold text-slate-700 dark:text-slate-200">
-                                        {{ $item->asignaciones_count }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                @if ($item->calificable)
-                                    <span
-                                        class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                        Calificable
-                                    </span>
-                                @endif
-
-                                @if ($item->extra)
-                                    <span
-                                        class="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                                        Extra
-                                    </span>
-                                @endif
-
-                                @if ($item->receso)
-                                    <span
-                                        class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-                                        Receso
-                                    </span>
-                                @endif
-                            </div>
-
-                            <div class="mt-5 flex justify-end gap-2">
-                                <button type="button" wire:click="editar({{ $item->id }})"
-                                    class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                    Editar
-                                </button>
-
-                                <button type="button"
-                                    @click="eliminar('{{ $item->id }}', '{{ addslashes($item->materia) }}')"
-                                    class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                    Eliminar
-                                </button>
-                            </div>
-                        </article>
+                        </div>
                     @endforeach
                 </div>
             </div>
@@ -576,6 +730,7 @@
                 <h3 class="text-base font-black text-slate-800 dark:text-white">
                     No hay materias registradas
                 </h3>
+
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Agrega una nueva materia para comenzar.
                 </p>

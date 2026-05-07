@@ -9,9 +9,18 @@ use App\Models\Semestre;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use App\Imports\MateriasImport;
+use Livewire\WithFileUploads;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Validation\ValidationException;
 
 class CrearMateria extends Component
 {
+    use WithFileUploads;
+
+    public $archivo_materias;
+
+    public array $erroresImportacion = [];
     public string $buscar = '';
 
     public ?int $filtro_nivel_id = null;
@@ -259,6 +268,13 @@ class CrearMateria extends Component
                 'required',
                 'boolean',
             ],
+
+            'archivo_materias' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls',
+                'max:5120',
+            ],
         ];
     }
 
@@ -287,7 +303,45 @@ class CrearMateria extends Component
             'calificable.boolean' => 'El valor de calificable no es válido.',
             'extra.boolean' => 'El valor de extra no es válido.',
             'receso.boolean' => 'El valor de receso no es válido.',
+
+            'archivo_materias.required' => 'Selecciona un archivo de Excel.',
+            'archivo_materias.file' => 'El archivo no es válido.',
+            'archivo_materias.mimes' => 'El archivo debe ser .xlsx o .xls.',
+            'archivo_materias.max' => 'El archivo no debe pesar más de 5 MB.',
         ];
+    }
+
+    public function importarMaterias()
+    {
+        $this->validateOnly('archivo_materias');
+
+        $this->erroresImportacion = [];
+
+        try {
+            $import = new MateriasImport();
+
+            Excel::import($import, $this->archivo_materias);
+
+            $this->erroresImportacion = $import->errores;
+
+            $this->reset('archivo_materias');
+
+            $this->dispatch('swal', [
+                'title' => 'Importación finalizada',
+                'text' => "Materias nuevas: {$import->importadas}. Materias actualizadas: {$import->actualizadas}. Errores: " . count($import->errores) . '.',
+                'icon' => count($import->errores) ? 'warning' : 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            $this->dispatch('swal', [
+                'title' => 'Error al importar',
+                'text' => 'Revisa que el archivo tenga el formato correcto.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
     }
 
     public function guardarMateria(): void
@@ -414,6 +468,8 @@ class CrearMateria extends Component
         $this->receso = (bool) $materia->receso;
 
         $this->dispatch('abrir-formulario-materia');
+
+        $this->dispatch('scroll-panel-materia');
     }
 
     public function eliminar(int $id): void
