@@ -8,7 +8,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Materia;
 use App\Models\Nivel;
-use App\Models\Persona;
+use App\Models\PersonaNivel;
 use App\Models\Semestre;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -19,7 +19,7 @@ class AsignacionMateria extends Component
 
     public $nivel = null;
 
-    public $buscar = '';
+    public string $buscar = '';
 
     public $editandoId = null;
 
@@ -35,9 +35,11 @@ class AsignacionMateria extends Component
 
     public $profesor_id = '';
 
+    public string $buscarProfesor = '';
+
     public $ultimoRegistroId = null;
 
-    public $ultimoMovimiento = '';
+    public string $ultimoMovimiento = '';
 
     public function mount($slug_nivel)
     {
@@ -62,13 +64,20 @@ class AsignacionMateria extends Component
 
     public function getGeneracionesProperty()
     {
+        if (blank($this->nivel?->id)) {
+            return collect();
+        }
+
         return Generacion::query()
-            ->orderByDesc('id')
+            ->where('nivel_id', $this->nivel->id)
+            ->where('status', 1)
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
             ->get()
             ->map(function ($item) {
                 return [
                     'id' => $item->id,
-                    'nombre' => $item->generacion ?? $item->nombre ?? 'Generación ' . $item->id,
+                    'nombre' => 'Generación ' . $item->anio_ingreso . ' - ' . $item->anio_egreso,
                 ];
             });
     }
@@ -86,7 +95,7 @@ class AsignacionMateria extends Component
             ->map(function ($item) {
                 return [
                     'id' => $item->id,
-                    'nombre' => $item->nombre ?? $item->grado ?? $item->numero . '°',
+                    'nombre' => $item->nombre ?? $item->grado ?? $item->numero ?? 'Grado ' . $item->id,
                 ];
             });
     }
@@ -133,20 +142,50 @@ class AsignacionMateria extends Component
 
     public function getProfesoresProperty()
     {
-        return Persona::query()
-            ->orderBy('nombre')
-            ->orderBy('apellido_paterno')
+        if (blank($this->nivel?->id)) {
+            return collect();
+        }
+
+        return PersonaNivel::query()
+            ->with('persona')
+            ->where('nivel_id', $this->nivel->id)
+            ->whereHas('persona')
             ->get()
-            ->map(function ($item) {
+            ->map(function ($registro) {
+                $persona = $registro->persona;
+
+                $nombreCompleto = trim(
+                    ($persona->titulo ?? '') . ' ' .
+                    ($persona->nombre ?? '') . ' ' .
+                    ($persona->apellido_paterno ?? '') . ' ' .
+                    ($persona->apellido_materno ?? '')
+                );
+
                 return [
-                    'id' => $item->id,
-                    'nombre' => trim(
-                        ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
-                    ),
+                    'id' => $persona->id,
+                    'nombre' => $nombreCompleto,
+                    'buscar' => mb_strtolower($nombreCompleto),
                 ];
-            });
+            })
+            ->filter(fn($item) => filled($item['nombre']))
+            ->unique('id')
+            ->sortBy('nombre')
+            ->values();
+    }
+
+    public function getProfesoresFiltradosProperty()
+    {
+        $buscar = mb_strtolower(trim($this->buscarProfesor));
+
+        if ($buscar === '') {
+            return $this->profesores;
+        }
+
+        return $this->profesores
+            ->filter(function ($item) use ($buscar) {
+                return str_contains($item['buscar'], $buscar);
+            })
+            ->values();
     }
 
     public function getMateriasDisponiblesProperty()
@@ -255,6 +294,7 @@ class AsignacionMateria extends Component
             'grupo_id.required' => 'Selecciona un grupo.',
             'materia_id.required' => 'Selecciona una materia.',
             'materia_id.exists' => 'La materia seleccionada no existe.',
+            'profesor_id.required' => 'Selecciona un profesor.',
             'profesor_id.exists' => 'El profesor seleccionado no existe.',
         ];
     }
@@ -262,8 +302,6 @@ class AsignacionMateria extends Component
     public function updatedGeneracionId()
     {
         $this->reset([
-            'grado_id',
-            'semestre',
             'grupo_id',
             'materia_id',
         ]);
@@ -291,6 +329,13 @@ class AsignacionMateria extends Component
         $this->reset([
             'materia_id',
         ]);
+    }
+
+    public function updatedBuscarProfesor()
+    {
+        if (blank($this->buscarProfesor)) {
+            $this->profesor_id = null;
+        }
     }
 
     public function guardarMateria()
@@ -361,6 +406,18 @@ class AsignacionMateria extends Component
             return;
         }
 
+        if (!$materia->receso) {
+            $profesorRelacionado = PersonaNivel::query()
+                ->where('persona_id', $profesorId)
+                ->where('nivel_id', $this->nivel->id)
+                ->exists();
+
+            if (!$profesorRelacionado) {
+                $this->addError('profesor_id', 'El profesor seleccionado no pertenece al nivel actual.');
+                return;
+            }
+        }
+
         if ($this->editandoId) {
             $asignacion = AsignacionMateriaModel::findOrFail($this->editandoId);
 
@@ -405,6 +462,7 @@ class AsignacionMateria extends Component
             ->with([
                 'materia',
                 'grupo',
+                'profesor',
             ])
             ->findOrFail($id);
 
@@ -416,6 +474,13 @@ class AsignacionMateria extends Component
         $this->grupo_id = $asignacion->grupo_id;
         $this->materia_id = $asignacion->materia_id;
         $this->profesor_id = $asignacion->profesor_id;
+
+        $this->buscarProfesor = trim(
+            ($asignacion->profesor?->titulo ?? '') . ' ' .
+            ($asignacion->profesor?->nombre ?? '') . ' ' .
+            ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
+            ($asignacion->profesor?->apellido_materno ?? '')
+        );
 
         $this->dispatch('abrir-formulario-materia');
         $this->dispatch('scroll-editar-materia');
@@ -448,6 +513,7 @@ class AsignacionMateria extends Component
             'grupo_id',
             'materia_id',
             'profesor_id',
+            'buscarProfesor',
         ]);
 
         $this->resetValidation();

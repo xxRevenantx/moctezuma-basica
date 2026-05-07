@@ -211,8 +211,8 @@
 
                         <flux:select wire:model.live="grupo_id"
                             :disabled="$this->esBachillerato
-                                                            ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
-                                                            : (blank($generacion_id) || blank($grado_id))">
+                                                                                        ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                                                        : (blank($generacion_id) || blank($grado_id))">
                             <option value="">Selecciona un grupo</option>
 
                             @foreach ($grupos as $item)
@@ -231,8 +231,8 @@
 
                         <flux:select wire:model.live="materia_id"
                             :disabled="$this->esBachillerato
-                                                            ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
-                                                            : (blank($generacion_id) || blank($grado_id))">
+                                                                                        ? (blank($generacion_id) || blank($grado_id) || blank($semestre))
+                                                                                        : (blank($generacion_id) || blank($grado_id))">
                             <option value="">Selecciona una materia</option>
 
                             @foreach ($this->materiasDisponibles as $item)
@@ -255,21 +255,82 @@
                     </flux:field>
 
                     {{-- PROFESOR --}}
-                    <flux:field class="{{ $this->esBachillerato ? 'md:col-span-2 xl:col-span-1' : '' }}">
-                        <flux:label>Profesor</flux:label>
+                    {{-- PROFESOR --}}
+                    <div
+                        class="space-y-2 md:col-span-2 {{ $this->esBachillerato ? 'xl:col-span-2' : 'xl:col-span-1' }}">
+                        <div x-data="{
+                            abierto: false,
+                            seleccionar(id, nombre) {
+                                @this.set('profesor_id', id);
+                                @this.set('buscarProfesor', nombre);
+                                this.abierto = false;
+                            }
+                        }" class="relative">
 
-                        <flux:select wire:model.live="profesor_id">
-                            <option value="">Selecciona un profesor</option>
+                            <flux:field>
+                                <flux:label>Profesor</flux:label>
 
-                            @foreach ($profesores as $item)
-                                <option value="{{ $item['id'] }}">
-                                    {{ $item['nombre'] }}
-                                </option>
-                            @endforeach
-                        </flux:select>
+                                <div class="relative">
+                                    <flux:input wire:model.live.debounce.250ms="buscarProfesor" @focus="abierto = true"
+                                        @click="abierto = true" placeholder="Buscar profesor por nombre o apellido..."
+                                        autocomplete="off" />
 
-                        <flux:error name="profesor_id" />
-                    </flux:field>
+                                    @if ($profesor_id)
+                                        <button type="button" wire:click="$set('profesor_id', null)"
+                                            @click="@this.set('buscarProfesor', ''); abierto = true"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-white/10">
+                                            ✕
+                                        </button>
+                                    @endif
+                                </div>
+
+                                <flux:error name="profesor_id" />
+                            </flux:field>
+
+                            <div x-show="abierto" x-cloak @click.outside="abierto = false"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 translate-y-1 scale-[0.98]"
+                                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                                x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]"
+                                class="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/10 dark:border-white/10 dark:bg-neutral-950">
+
+                                @forelse ($this->profesoresFiltrados as $item)
+                                    <button type="button"
+                                        @click="seleccionar({{ $item['id'] }}, @js($item['nombre']))"
+                                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-sky-50 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-sky-500/10 dark:hover:text-sky-300">
+
+                                        <span
+                                            class="grid h-9 w-9 place-items-center rounded-xl bg-sky-50 text-xs font-black text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                            {{ mb_substr($item['nombre'], 0, 1) }}
+                                        </span>
+
+                                        <span class="min-w-0">
+                                            <span class="block truncate">
+                                                {{ $item['nombre'] }}
+                                            </span>
+
+                                            <span class="block text-xs font-medium text-slate-400">
+                                                Profesor asignado a {{ $nivel->nombre ?? 'este nivel' }}
+                                            </span>
+                                        </span>
+                                    </button>
+                                @empty
+                                    <div
+                                        class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center dark:border-white/10">
+                                        <p class="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                            No se encontraron profesores
+                                        </p>
+
+                                        <p class="mt-1 text-xs text-slate-400">
+                                            Revisa que el profesor esté relacionado con este nivel.
+                                        </p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 @if ($materia_id)
