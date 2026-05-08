@@ -393,6 +393,12 @@
                             {{ $periodo['nivel'] }}
                         </p>
 
+                        @if (!empty($periodo['periodo']))
+                            <p class="mt-1 text-xs font-semibold text-sky-600 dark:text-sky-400">
+                                {{ $periodo['periodo'] }}
+                            </p>
+                        @endif
+
                         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                             Del {{ \Carbon\Carbon::parse($periodo['fecha_inicio'])->format('d/m/Y') }}
                             al {{ \Carbon\Carbon::parse($periodo['fecha_fin'])->format('d/m/Y') }}

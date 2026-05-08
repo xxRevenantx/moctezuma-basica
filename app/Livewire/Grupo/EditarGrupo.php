@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Grupo;
 
+use App\Models\AsignacionGrupo;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -9,243 +10,227 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Illuminate\Validation\Rule;
 
 class EditarGrupo extends Component
 {
-    public $grupoId;
-    public $nombre;
-    public $nivel_id;
-    public $grado_id;
-    public $generacion_id;
-    public $semestre_id;
+    public $grupo_id = null;
 
-    public $open = false;
+    public $asignacion_grupo_id = '';
+    public $nivel_id = '';
+    public $grado_id = '';
+    public $generacion_id = '';
+    public $semestre_id = '';
 
-    // Para el badge
-    public $nivel_nombre;
-    public $grado_nombre;
+    public string $grupo_nombre = '';
+    public string $nivel_nombre = '';
+    public string $grado_nombre = '';
 
-    public $grados = [];
+    public $grados;
+    public $generaciones;
+    public $semestres;
 
-    // Flag para NO resetear al cargar desde editarModal
-    public $skipResetNivel = false;
+    public bool $esBachillerato = false;
+
+    public function mount()
+    {
+        $this->grados = collect();
+        $this->generaciones = collect();
+        $this->semestres = collect();
+    }
 
     #[On('editarModal')]
-    public function editarModal($id)
+    public function editarModal($id = null)
     {
+        if (is_array($id)) {
+            $id = $id['id'] ?? null;
+        }
 
-        $grupo = Grupo::findOrFail($id);
+        $grupo = Grupo::query()
+            ->with([
+                'asignacionGrupo',
+                'nivel',
+                'grado',
+                'generacion',
+                'semestre',
+            ])
+            ->find($id);
 
-        // dd($id);
+        if (!$grupo) {
+            $this->dispatch('swal', [
+                'title' => 'El grupo no existe.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
 
-        $this->grupoId       = $grupo->id;
-        $this->nombre        = $grupo->nombre;
+            $this->cerrarModal();
+            return;
+        }
 
-        // Evitar limpiar dependientes en esta carga inicial
-        $this->skipResetNivel = true;
-
-        $this->nivel_id      = $grupo->nivel_id;
-        $this->grado_id      = $grupo->grado_id;
+        $this->grupo_id = $grupo->id;
+        $this->asignacion_grupo_id = $grupo->asignacion_grupo_id;
+        $this->nivel_id = $grupo->nivel_id;
+        $this->grado_id = $grupo->grado_id;
         $this->generacion_id = $grupo->generacion_id;
-        $this->semestre_id   = $grupo->semestre_id;
+        $this->semestre_id = $grupo->semestre_id;
 
+        $this->esBachillerato = (int) $grupo->nivel_id === 4;
 
-        $this->skipResetNivel = false;
+        $this->grupo_nombre = $grupo->asignacionGrupo?->nombre ?? 'No definido';
+        $this->nivel_nombre = $grupo->nivel?->nombre ?? 'Nivel no seleccionado';
+        $this->grado_nombre = $grupo->grado?->nombre ?? 'Grado no seleccionado';
 
-        // Datos para el badge
-        $nivel = Nivel::find($this->nivel_id);
-        $this->nivel_nombre = $nivel?->nombre;
+        $this->cargarDatosPorNivel();
 
-        $grado = Grado::find($this->grado_id);
-        $this->grado_nombre = $grado?->nombre;
-
-        // Cargar grados del nivel del grupo
-        $this->grados = Grado::where('nivel_id', $this->nivel_id)
-            ->orderBy('nombre')
-            ->get();
-
-        $this->open = true;
-
-        // Notificar a Alpine que ya se cargaron los datos
         $this->dispatch('editar-cargado');
     }
 
-    /**
-     * Se ejecuta cuando cambia nivel_id (desde el select).
-     */
-    public function updatedNivelId($value)
+    public function updatedNivelId()
     {
-        // Si venimos de editarModal, no limpiamos
-        if ($this->skipResetNivel) {
+        $this->grado_id = '';
+        $this->generacion_id = '';
+        $this->semestre_id = '';
+
+        $this->esBachillerato = (int) $this->nivel_id === 4;
+
+        $this->cargarDatosPorNivel();
+    }
+
+    public function cargarDatosPorNivel()
+    {
+        if (!$this->nivel_id) {
+            $this->grados = collect();
+            $this->generaciones = collect();
+            $this->semestres = collect();
+            $this->esBachillerato = false;
+
             return;
         }
 
-        $nivel = Nivel::find($value);
-        $this->nivel_nombre = $nivel?->nombre;
-
-        // Cargar grados del nivel seleccionado
-        $this->grados = Grado::where('nivel_id', $this->nivel_id)
-            ->orderBy('nombre')
+        $this->grados = Grado::query()
+            ->with('nivel')
+            ->where('nivel_id', $this->nivel_id)
+            ->orderBy('id')
             ->get();
 
-        // Limpiar dependientes al cambiar manualmente el nivel
-        $this->reset(['grado_id', 'generacion_id', 'semestre_id']);
-        $this->grado_nombre = null;
+        $this->generaciones = Generacion::query()
+            ->with('nivel')
+            ->where('nivel_id', $this->nivel_id)
+            ->orderByDesc('anio_ingreso')
+            ->get();
+
+        $this->semestres = $this->esBachillerato
+            ? Semestre::query()
+                ->orderBy('numero')
+                ->get()
+            : collect();
     }
 
-    public function updatedGradoId($value)
+    public function actualizarGrupo()
     {
-        $grado = Grado::find($value);
-        $this->grado_nombre = $grado?->nombre;
-    }
+        $this->validate([
+            'grupo_id' => 'required|integer|exists:grupos,id',
+            'asignacion_grupo_id' => 'required|integer|exists:asignacion_grupos,id',
+            'nivel_id' => 'required|integer|exists:niveles,id',
+            'grado_id' => 'required|integer|exists:grados,id',
+            'generacion_id' => 'required|integer|exists:generaciones,id',
+            'semestre_id' => $this->esBachillerato
+                ? 'required|integer|exists:semestres,id'
+                : 'nullable',
+        ], [
+            'asignacion_grupo_id.required' => 'Selecciona un grupo.',
+            'asignacion_grupo_id.exists' => 'El grupo seleccionado no es válido.',
+            'nivel_id.required' => 'Selecciona un nivel educativo.',
+            'grado_id.required' => 'Selecciona un grado.',
+            'generacion_id.required' => 'Selecciona una generación.',
+            'semestre_id.required' => 'Selecciona un semestre para bachillerato.',
+        ]);
 
-   public function actualizarGrupo()
-{
-    // Normaliza antes de validar (para evitar diferencias por minúsculas/espacios)
-    $this->nombre = strtoupper(trim($this->nombre));
+        $existe = Grupo::query()
+            ->where('id', '!=', $this->grupo_id)
+            ->where('asignacion_grupo_id', $this->asignacion_grupo_id)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $this->generacion_id)
+            ->when($this->esBachillerato, function ($query) {
+                $query->where('semestre_id', $this->semestre_id);
+            })
+            ->when(!$this->esBachillerato, function ($query) {
+                $query->whereNull('semestre_id');
+            })
+            ->exists();
 
-    $nivelSeleccionado = Nivel::find($this->nivel_id);
-    $esBachillerato = $nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato';
-
-    $rules = [
-        'nombre'        => [
-            'required',
-            'string',
-            'max:255',
-            Rule::unique('grupos', 'nombre')
-                ->ignore($this->grupoId) // <- IMPORTANTÍSIMO: ignora el registro actual
-                ->where(fn ($q) => $q
-                    ->where('nivel_id', $this->nivel_id)
-                    ->where('grado_id', $this->grado_id)
-                    ->where('generacion_id', $this->generacion_id)
-                    ->when($esBachillerato, fn ($qq) => $qq->where('semestre_id', $this->semestre_id))
-                    // Si NO es bachillerato, forzamos a comparar con semestre NULL
-                    ->when(!$esBachillerato, fn ($qq) => $qq->whereNull('semestre_id'))
-                ),
-        ],
-        'nivel_id'      => ['required', 'exists:niveles,id'],
-        'grado_id'      => ['required', 'exists:grados,id'],
-        'generacion_id' => ['required', 'exists:generaciones,id'],
-        'semestre_id'   => [$esBachillerato ? 'required' : 'nullable', 'exists:semestres,id'],
-    ];
-
-    $this->validate($rules, [
-        'nombre.required'        => 'El nombre es obligatorio.',
-        'nombre.unique'          => 'Ya existe un grupo con este nombre para el nivel/grado/generación' . ($esBachillerato ? ' y semestre' : '') . ' seleccionados.',
-        'nivel_id.required'      => 'El nivel es obligatorio.',
-        'nivel_id.exists'        => 'El nivel seleccionado no es válido.',
-        'grado_id.required'      => 'El grado es obligatorio.',
-        'grado_id.exists'        => 'El grado seleccionado no es válido.',
-        'generacion_id.required' => 'La generación es obligatoria.',
-        'generacion_id.exists'   => 'La generación seleccionada no es válida.',
-        'semestre_id.required'   => 'El semestre es obligatorio para Bachillerato.',
-        'semestre_id.exists'     => 'El semestre seleccionado no es válido.',
-    ]);
-
-    // -------------------------------
-    // VALIDACIONES DE CONSISTENCIA
-    // -------------------------------
-
-    // 1) Grado pertenece al nivel
-    $grado = Grado::find($this->grado_id);
-    if (! $grado || (int)$grado->nivel_id !== (int)$this->nivel_id) {
-        $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
-        return;
-    }
-
-    // 2) Generación pertenece al nivel
-    $generacion = Generacion::find($this->generacion_id);
-    if (! $generacion || (int)$generacion->nivel_id !== (int)$this->nivel_id) {
-        $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
-        return;
-    }
-
-    // 3) Semestre (si aplica) pertenece al grado
-    if ($esBachillerato) {
-        $semestre = Semestre::find($this->semestre_id);
-
-        if (! $semestre) {
-            $this->addError('semestre_id', 'El semestre seleccionado no es válido.');
+        if ($existe) {
+            $this->addError('asignacion_grupo_id', 'Ya existe un grupo con los mismos datos.');
             return;
         }
 
-        if ((int)$semestre->grado_id !== (int)$this->grado_id) {
-            $this->addError('semestre_id', 'El semestre no pertenece al grado seleccionado.');
+        $grupo = Grupo::query()->find($this->grupo_id);
+
+        if (!$grupo) {
+            $this->dispatch('swal', [
+                'title' => 'El grupo no existe.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+
+            $this->cerrarModal();
             return;
         }
+
+        $grupo->update([
+            'asignacion_grupo_id' => $this->asignacion_grupo_id,
+            'nivel_id' => $this->nivel_id,
+            'grado_id' => $this->grado_id,
+            'generacion_id' => $this->generacion_id,
+            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+        ]);
+
+        $this->dispatch('swal', [
+            'title' => '¡Grupo actualizado correctamente!',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+
+        $this->dispatch('refreshGrupos');
+        $this->dispatch('grupoActualizado');
+        $this->dispatch('cerrar-modal-editar');
+
+        $this->cerrarModal();
     }
-
-    // -------------------------------
-    // ACTUALIZAR
-    // -------------------------------
-    $grupo = Grupo::findOrFail($this->grupoId);
-
-    $grupo->update([
-        'nombre'        => $this->nombre,
-        'nivel_id'      => $this->nivel_id,
-        'grado_id'      => $this->grado_id,
-        'generacion_id' => $this->generacion_id,
-        'semestre_id'   => $esBachillerato ? $this->semestre_id : null,
-    ]);
-
-    $this->dispatch('swal', [
-        'title'    => '¡Grupo actualizado correctamente!',
-        'icon'     => 'success',
-        'position' => 'top-end',
-    ]);
-
-    $this->dispatch('refreshGrupos');
-    $this->dispatch('cerrar-modal-editar');
-}
 
     public function cerrarModal()
     {
         $this->reset([
-            'open',
-            'grupoId',
-            'nombre',
+            'grupo_id',
+            'asignacion_grupo_id',
             'nivel_id',
             'grado_id',
             'generacion_id',
             'semestre_id',
+            'grupo_nombre',
             'nivel_nombre',
             'grado_nombre',
-            'skipResetNivel',
-            'grados',
+            'esBachillerato',
         ]);
-        $this->resetValidation();
+
+        $this->grados = collect();
+        $this->generaciones = collect();
+        $this->semestres = collect();
+
+        $this->resetErrorBag();
     }
 
+    #[On('refreshAsignacionGrupos')]
     public function render()
     {
-        $niveles        = Nivel::orderBy('id')->get();
-        $generaciones   = collect();
-        $semestres      = collect();
-        $esBachillerato = false;
-
-
-        $generaciones = Generacion::all();
-
-        $nivelSeleccionado = $niveles->firstWhere('id', $this->nivel_id);
-
-        if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
-            $esBachillerato = true;
-            $semestres = Semestre::all();
-        }
-
-
-        // Aseguramos que $grados siempre esté sincronizado si hay nivel
-
-        $this->grados = Grado::all();
-
-
         return view('livewire.grupo.editar-grupo', [
-            'niveles'        => $niveles,
-            'generaciones'   => $generaciones,
-            'semestres'      => $semestres,
-            'esBachillerato' => $esBachillerato,
-            'grados'         => $this->grados,
+            'niveles' => Nivel::query()
+                ->orderBy('id')
+                ->get(),
+
+            'asignacionGrupos' => AsignacionGrupo::query()
+                ->orderBy('nombre')
+                ->get(),
         ]);
     }
 }

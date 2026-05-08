@@ -7,6 +7,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use Illuminate\Database\QueryException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -17,43 +18,88 @@ class MostrarGrupos extends Component
 
     public string $search = '';
 
-    public ?int $nivel_id = null;
-    public ?int $generacion_id = null;
-    public ?int $grado_id = null;
-    public ?int $semestre_id = null;
+    public $nivel_id = '';
+    public $generacion_id = '';
+    public $grado_id = '';
+    public $semestre_id = '';
+
+    public $grados;
+    public $generaciones;
+    public $semestres;
+
+    public bool $esBachillerato = false;
 
     protected $paginationTheme = 'tailwind';
 
-    public function updatingSearch(): void
+    public function mount()
+    {
+        $this->grados = collect();
+        $this->generaciones = collect();
+        $this->semestres = collect();
+    }
+
+    public function updatingSearch()
     {
         $this->resetPage();
     }
 
-    public function updatingNivelId(): void
+    public function updatedNivelId()
     {
         $this->resetPage();
 
-        $this->generacion_id = null;
-        $this->grado_id = null;
-        $this->semestre_id = null;
+        $this->grado_id = '';
+        $this->generacion_id = '';
+        $this->semestre_id = '';
+
+        $this->esBachillerato = (int) $this->nivel_id === 4;
+
+        $this->cargarFiltrosPorNivel();
     }
 
-    public function updatingGeneracionId(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingGradoId(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSemestreId(): void
+    public function updatedGeneracionId()
     {
         $this->resetPage();
     }
 
-    public function limpiarFiltros(): void
+    public function updatedGradoId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSemestreId()
+    {
+        $this->resetPage();
+    }
+
+    public function cargarFiltrosPorNivel()
+    {
+        if (!$this->nivel_id) {
+            $this->grados = collect();
+            $this->generaciones = collect();
+            $this->semestres = collect();
+            $this->esBachillerato = false;
+
+            return;
+        }
+
+        $this->grados = Grado::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->orderBy('id')
+            ->get();
+
+        $this->generaciones = Generacion::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->orderByDesc('anio_ingreso')
+            ->get();
+
+        $this->semestres = $this->esBachillerato
+            ? Semestre::query()
+                ->orderBy('numero')
+                ->get()
+            : collect();
+    }
+
+    public function limpiarFiltros()
     {
         $this->reset([
             'search',
@@ -61,164 +107,121 @@ class MostrarGrupos extends Component
             'generacion_id',
             'grado_id',
             'semestre_id',
+            'esBachillerato',
         ]);
+
+        $this->grados = collect();
+        $this->generaciones = collect();
+        $this->semestres = collect();
 
         $this->resetPage();
     }
 
-    public function getEsBachilleratoProperty(): bool
-    {
-        if (!$this->nivel_id) {
-            return false;
-        }
-
-        $nivel = Nivel::query()->find($this->nivel_id);
-
-        if (!$nivel) {
-            return false;
-        }
-
-        return str($nivel->slug ?? '')->contains('bachillerato')
-            || str($nivel->nombre ?? '')->lower()->contains('bachillerato');
-    }
-
-    private function aplicarBusqueda($query): void
-    {
-        $busqueda = trim($this->search);
-
-        if ($busqueda === '') {
-            return;
-        }
-
-        $query->where(function ($q) use ($busqueda) {
-            // Busco por nombre del grupo
-            $q->where('nombre', 'like', '%' . $busqueda . '%')
-
-                // Busco por nombre o slug del nivel
-                ->orWhereHas('nivel', function ($nivelQuery) use ($busqueda) {
-                    $nivelQuery->where('nombre', 'like', '%' . $busqueda . '%')
-                        ->orWhere('slug', 'like', '%' . $busqueda . '%');
-                })
-
-                // Busco por generación: año ingreso, año egreso o texto completo
-                ->orWhereHas('generacion', function ($generacionQuery) use ($busqueda) {
-                    $generacionQuery->where('anio_ingreso', 'like', '%' . $busqueda . '%')
-                        ->orWhere('anio_egreso', 'like', '%' . $busqueda . '%')
-                        ->orWhereRaw("CONCAT(anio_ingreso, ' - ', anio_egreso) LIKE ?", [
-                            '%' . $busqueda . '%',
-                        ])
-                        ->orWhereRaw("CONCAT(anio_ingreso, '-', anio_egreso) LIKE ?", [
-                            '%' . $busqueda . '%',
-                        ]);
-                });
-        });
-    }
-
-    private function aplicarFiltros($query): void
-    {
-        $this->aplicarBusqueda($query);
-
-        $query
-            ->when($this->nivel_id, function ($query) {
-                $query->where('nivel_id', $this->nivel_id);
-            })
-            ->when($this->generacion_id, function ($query) {
-                $query->where('generacion_id', $this->generacion_id);
-            })
-            ->when($this->grado_id && !$this->esBachillerato, function ($query) {
-                $query->where('grado_id', $this->grado_id);
-            })
-            ->when($this->semestre_id && $this->esBachillerato, function ($query) {
-                $query->where('semestre_id', $this->semestre_id);
-            });
-    }
-
-    public function eliminar($id): void
+    public function eliminar($id)
     {
         $grupo = Grupo::query()->find($id);
 
-        if ($grupo) {
+        if (!$grupo) {
+            $this->dispatch('swal', [
+                'title' => 'El grupo no existe.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        try {
             $grupo->delete();
 
+            $this->dispatch('swal', [
+                'title' => '¡Grupo eliminado correctamente!',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+
             $this->dispatch('refreshGrupos');
+        } catch (QueryException $e) {
+            $this->dispatch('swal', [
+                'title' => 'No se puede eliminar.',
+                'text' => 'Este grupo ya tiene información relacionada en el sistema.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
         }
     }
 
     #[On('refreshGrupos')]
+    #[On('grupoActualizado')]
     public function render()
     {
         $niveles = Nivel::query()
             ->orderBy('id')
             ->get();
 
-        $generaciones = Generacion::query()
-            ->when($this->nivel_id, function ($query) {
-                $query->where('nivel_id', $this->nivel_id);
+        if ($this->nivel_id && $this->grados->isEmpty() && $this->generaciones->isEmpty()) {
+            $this->esBachillerato = (int) $this->nivel_id === 4;
+            $this->cargarFiltrosPorNivel();
+        }
+
+        $query = Grupo::query()
+            ->with([
+                'asignacionGrupo',
+                'nivel',
+                'grado',
+                'generacion',
+                'semestre',
+            ])
+            ->leftJoin('asignacion_grupos', 'grupos.asignacion_grupo_id', '=', 'asignacion_grupos.id')
+            ->select('grupos.*')
+            ->when(trim($this->search) !== '', function ($query) {
+                $buscar = trim($this->search);
+
+                $query->whereHas('asignacionGrupo', function ($q) use ($buscar) {
+                    $q->where('nombre', 'like', '%' . $buscar . '%');
+                });
             })
-            ->orderBy('anio_ingreso', 'desc')
-            ->orderBy('anio_egreso', 'desc')
-            ->get();
-
-        $grados = Grado::query()
             ->when($this->nivel_id, function ($query) {
-                $query->where('nivel_id', $this->nivel_id);
+                $query->where('grupos.nivel_id', $this->nivel_id);
             })
-            ->orderBy('nombre')
-            ->get();
+            ->when($this->generacion_id, function ($query) {
+                $query->where('grupos.generacion_id', $this->generacion_id);
+            })
+            ->when($this->grado_id && !$this->esBachillerato, function ($query) {
+                $query->where('grupos.grado_id', $this->grado_id);
+            })
+            ->when($this->semestre_id && $this->esBachillerato, function ($query) {
+                $query->where('grupos.semestre_id', $this->semestre_id);
+            })
+            ->orderBy('grupos.nivel_id', 'asc')
+            ->orderBy('grupos.grado_id', 'asc')
+            ->orderBy('grupos.semestre_id', 'asc')
+            ->orderBy('grupos.generacion_id', 'asc')
+            ->orderBy('asignacion_grupos.nombre', 'asc');
 
-        $semestres = Semestre::query()
-            ->orderBy('numero')
-            ->get();
+        $totalNiveles = (clone $query)
+            ->whereNotNull('grupos.nivel_id')
+            ->distinct()
+            ->count('grupos.nivel_id');
 
-        $gruposQuery = Grupo::query()
-            ->with(['nivel', 'grado', 'generacion', 'semestre']);
-
-        $this->aplicarFiltros($gruposQuery);
-
-        $grupos = $gruposQuery
-            ->orderBy('nivel_id', 'asc')
-            ->orderBy('grado_id', 'asc')
-            ->orderBy('semestre_id', 'asc')
-            ->orderBy('generacion_id', 'asc')
-            ->orderBy('nombre', 'asc')
-            ->paginate(12);
-
-        $collection = $grupos->getCollection();
-
-        $groupedByNivel = $collection->groupBy(function ($g) {
-            return optional($g->nivel)->nombre ?? 'Sin nivel asignado';
-        });
-
-        $totalGrupos = $grupos->total();
-
-        $totalNivelesQuery = Grupo::query();
-
-        $this->aplicarFiltros($totalNivelesQuery);
-
-        $totalNiveles = $totalNivelesQuery
-            ->whereNotNull('nivel_id')
-            ->distinct('nivel_id')
-            ->count('nivel_id');
-
-        $gruposSinNivelQuery = Grupo::query();
-
-        $this->aplicarFiltros($gruposSinNivelQuery);
-
-        $gruposSinNivel = $gruposSinNivelQuery
-            ->whereNull('nivel_id')
+        $gruposSinNivel = (clone $query)
+            ->whereNull('grupos.nivel_id')
             ->count();
 
+        $grupos = $query->paginate(12);
+
+        $groupedByNivel = $grupos->getCollection()
+            ->groupBy(function ($grupo) {
+                return $grupo->nivel?->nombre ?? 'Sin nivel asignado';
+            });
+
         return view('livewire.grupo.mostrar-grupos', [
+            'niveles' => $niveles,
             'grupos' => $grupos,
             'groupedByNivel' => $groupedByNivel,
-            'totalGrupos' => $totalGrupos,
+            'totalGrupos' => $grupos->total(),
             'totalNiveles' => $totalNiveles,
             'gruposSinNivel' => $gruposSinNivel,
-            'niveles' => $niveles,
-            'generaciones' => $generaciones,
-            'grados' => $grados,
-            'semestres' => $semestres,
-            'esBachillerato' => $this->esBachillerato,
         ]);
     }
 }

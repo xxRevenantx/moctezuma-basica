@@ -2,7 +2,9 @@
 
 namespace App\Livewire;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
@@ -53,7 +55,7 @@ class Dashboard extends Component
         return $this->tablaExiste($tabla) && Schema::hasColumn($tabla, $columna);
     }
 
-    private function aplicarFiltroNivel($query, string $tabla)
+    private function aplicarFiltroNivel(Builder $query, string $tabla): Builder
     {
         if ($this->nivel_id && $this->columnaExiste($tabla, 'nivel_id')) {
             $query->where($tabla . '.nivel_id', $this->nivel_id);
@@ -62,24 +64,21 @@ class Dashboard extends Component
         return $query;
     }
 
-    private function aplicarStatusActivo($query, string $tabla)
+    private function aplicarActivo(Builder $query, string $tabla): Builder
     {
+        if ($this->columnaExiste($tabla, 'activo')) {
+            $query->where($tabla . '.activo', 1);
+            return $query;
+        }
+
         if ($this->columnaExiste($tabla, 'status')) {
-            $query->whereIn($tabla . '.status', [
-                1,
-                '1',
-                true,
-                'true',
-                'activo',
-                'Activo',
-                'ACTIVO',
-            ]);
+            $query->whereIn($tabla . '.status', [1, '1', true, 'true', 'activo', 'Activo', 'ACTIVO']);
         }
 
         return $query;
     }
 
-    private function contarTabla(string $tabla, bool $filtrarNivel = true, bool $filtrarStatus = false): int
+    private function contarTabla(string $tabla, bool $filtrarNivel = true, bool $filtrarActivo = false): int
     {
         if (!$this->tablaExiste($tabla)) {
             return 0;
@@ -88,11 +87,26 @@ class Dashboard extends Component
         $query = DB::table($tabla);
 
         if ($filtrarNivel) {
-            $query = $this->aplicarFiltroNivel($query, $tabla);
+            $this->aplicarFiltroNivel($query, $tabla);
         }
 
-        if ($filtrarStatus) {
-            $query = $this->aplicarStatusActivo($query, $tabla);
+        if ($filtrarActivo) {
+            $this->aplicarActivo($query, $tabla);
+        }
+
+        return $query->count();
+    }
+
+    private function contarPorNivel(string $tabla, int $nivelId, bool $filtrarActivo = false): int
+    {
+        if (!$this->columnaExiste($tabla, 'nivel_id')) {
+            return 0;
+        }
+
+        $query = DB::table($tabla)->where($tabla . '.nivel_id', $nivelId);
+
+        if ($filtrarActivo) {
+            $this->aplicarActivo($query, $tabla);
         }
 
         return $query->count();
@@ -108,7 +122,7 @@ class Dashboard extends Component
             ->select('id', 'nombre')
             ->orderBy('id')
             ->get()
-            ->map(fn ($nivel) => [
+            ->map(fn($nivel) => [
                 'id' => $nivel->id,
                 'nombre' => $nivel->nombre,
             ])
@@ -118,8 +132,8 @@ class Dashboard extends Component
     private function obtenerResumenGeneral(): array
     {
         $alumnos = $this->contarTabla('inscripciones', true, true);
-        $materias = $this->contarTabla('asignacion_materias');
-        $calificaciones = $this->contarTabla('calificaciones', false);
+        $materias = $this->contarMateriasAsignadas();
+        $calificaciones = $this->contarTabla('calificaciones', true);
 
         $totalEsperadoCalificaciones = $alumnos * max($materias, 1);
 
@@ -129,7 +143,7 @@ class Dashboard extends Component
 
         return [
             'alumnos' => $alumnos,
-            'docentes' => $this->contarTabla('personas', false, true),
+            'docentes' => $this->contarDocentesActivos(),
             'grupos' => $this->contarTabla('grupos'),
             'materias' => $materias,
             'horarios' => $this->contarTabla('horarios'),
@@ -155,7 +169,7 @@ class Dashboard extends Component
                     'nombre' => $nivel->nombre,
                     'alumnos' => $this->contarPorNivel('inscripciones', $nivel->id, true),
                     'grupos' => $this->contarPorNivel('grupos', $nivel->id),
-                    'materias' => $this->contarPorNivel('asignacion_materias', $nivel->id),
+                    'materias' => $this->contarMateriasAsignadasPorNivel((int) $nivel->id),
                     'horarios' => $this->contarPorNivel('horarios', $nivel->id),
                     'periodos' => $this->contarPorNivel('periodos', $nivel->id),
                 ];
@@ -163,28 +177,69 @@ class Dashboard extends Component
             ->toArray();
     }
 
-    private function contarPorNivel(string $tabla, int $nivelId, bool $filtrarStatus = false): int
+    private function contarDocentesActivos(): int
     {
-        if (!$this->columnaExiste($tabla, 'nivel_id')) {
+        if (!$this->tablaExiste('personas')) {
             return 0;
         }
 
-        $query = DB::table($tabla)->where('nivel_id', $nivelId);
+        if ($this->tablaExiste('persona_role') && $this->tablaExiste('role_personas')) {
+            $query = DB::table('personas')
+                ->join('persona_role', 'persona_role.persona_id', '=', 'personas.id')
+                ->join('role_personas', 'role_personas.id', '=', 'persona_role.role_persona_id')
+                ->where(function ($q) {
+                    $q->where('role_personas.slug', 'like', '%docente%')
+                        ->orWhere('role_personas.slug', 'like', '%profesor%')
+                        ->orWhere('role_personas.nombre', 'like', '%Docente%')
+                        ->orWhere('role_personas.nombre', 'like', '%Profesor%');
+                });
 
-        if ($filtrarStatus) {
-            $query = $this->aplicarStatusActivo($query, $tabla);
+            $this->aplicarActivo($query, 'personas');
+
+            return $query->distinct('personas.id')->count('personas.id');
+        }
+
+        $query = DB::table('personas');
+        $this->aplicarActivo($query, 'personas');
+
+        return $query->count();
+    }
+
+    private function contarMateriasAsignadas(): int
+    {
+        if (!$this->tablaExiste('asignacion_materias')) {
+            return 0;
+        }
+
+        $query = DB::table('asignacion_materias');
+
+        if ($this->nivel_id && $this->tablaExiste('grupos') && $this->columnaExiste('grupos', 'nivel_id')) {
+            $query->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
+                ->where('grupos.nivel_id', $this->nivel_id);
         }
 
         return $query->count();
     }
 
+    private function contarMateriasAsignadasPorNivel(int $nivelId): int
+    {
+        if (!$this->tablaExiste('asignacion_materias') || !$this->tablaExiste('grupos')) {
+            return 0;
+        }
+
+        return DB::table('asignacion_materias')
+            ->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
+            ->where('grupos.nivel_id', $nivelId)
+            ->count();
+    }
+
     private function obtenerAlertas(): array
     {
-        $gruposSinHorario = count($this->obtenerGruposSinHorario());
+        $gruposSinHorario = count($this->gruposSinHorario ?: $this->obtenerGruposSinHorario());
         $materiasSinDocente = $this->contarMateriasSinDocente();
-        $periodosPorCerrar = count($this->obtenerPeriodosProximos());
+        $periodosPorCerrar = count($this->periodosProximos ?: $this->obtenerPeriodosProximos());
         $alumnosSinGrupo = $this->contarAlumnosSinGrupo();
-        $documentosPendientes = count($this->obtenerAlumnosConDocumentosPendientes());
+        $documentosPendientes = count($this->alumnosDocumentosPendientes ?: $this->obtenerAlumnosConDocumentosPendientes());
 
         return [
             [
@@ -227,9 +282,12 @@ class Dashboard extends Component
         }
 
         $query = DB::table('asignacion_materias')
-            ->whereNull('profesor_id');
+            ->whereNull('asignacion_materias.profesor_id');
 
-        $query = $this->aplicarFiltroNivel($query, 'asignacion_materias');
+        if ($this->nivel_id && $this->tablaExiste('grupos')) {
+            $query->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
+                ->where('grupos.nivel_id', $this->nivel_id);
+        }
 
         return $query->count();
     }
@@ -241,10 +299,13 @@ class Dashboard extends Component
         }
 
         $query = DB::table('inscripciones')
-            ->whereNull('grupo_id');
+            ->where(function ($q) {
+                $q->whereNull('inscripciones.grupo_id')
+                    ->orWhere('inscripciones.grupo_id', 0);
+            });
 
-        $query = $this->aplicarFiltroNivel($query, 'inscripciones');
-        $query = $this->aplicarStatusActivo($query, 'inscripciones');
+        $this->aplicarFiltroNivel($query, 'inscripciones');
+        $this->aplicarActivo($query, 'inscripciones');
 
         return $query->count();
     }
@@ -257,11 +318,15 @@ class Dashboard extends Component
 
         $query = DB::table('periodos')
             ->leftJoin('niveles', 'niveles.id', '=', 'periodos.nivel_id')
+            ->leftJoin('periodos_basica', 'periodos_basica.id', '=', 'periodos.periodo_basica_id')
+            ->leftJoin('parciales', 'parciales.id', '=', 'periodos.parcial_bachillerato_id')
             ->select(
                 'periodos.id',
                 'periodos.fecha_inicio',
                 'periodos.fecha_fin',
-                'niveles.nombre as nivel'
+                'niveles.nombre as nivel',
+                'periodos_basica.periodo as periodo_basica',
+                'parciales.parcial as parcial_bachillerato'
             )
             ->whereNotNull('periodos.fecha_fin')
             ->whereDate('periodos.fecha_fin', '>=', now()->toDateString())
@@ -273,9 +338,10 @@ class Dashboard extends Component
             $query->where('periodos.nivel_id', $this->nivel_id);
         }
 
-        return $query->get()->map(fn ($periodo) => [
+        return $query->get()->map(fn($periodo) => [
             'id' => $periodo->id,
             'nivel' => $periodo->nivel ?? 'Sin nivel',
+            'periodo' => $periodo->periodo_basica ?? $periodo->parcial_bachillerato ?? 'Sin periodo',
             'fecha_inicio' => $periodo->fecha_inicio,
             'fecha_fin' => $periodo->fecha_fin,
         ])->toArray();
@@ -295,10 +361,11 @@ class Dashboard extends Component
             'certificado_medico',
             'fotos_infantiles',
             'foto',
+            'foto_path',
         ];
 
         $columnasExistentes = collect($columnasDocumentos)
-            ->filter(fn ($columna) => $this->columnaExiste('inscripciones', $columna))
+            ->filter(fn($columna) => $this->columnaExiste('inscripciones', $columna))
             ->values();
 
         if ($columnasExistentes->isEmpty()) {
@@ -308,39 +375,35 @@ class Dashboard extends Component
         $query = DB::table('inscripciones')
             ->leftJoin('niveles', 'niveles.id', '=', 'inscripciones.nivel_id')
             ->leftJoin('grupos', 'grupos.id', '=', 'inscripciones.grupo_id')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select(
                 'inscripciones.id',
                 'inscripciones.nombre',
                 'inscripciones.apellido_paterno',
                 'inscripciones.apellido_materno',
                 'niveles.nombre as nivel',
-                'grupos.nombre as grupo'
-            );
+                'asignacion_grupos.nombre as grupo'
+            )
+            ->where(function ($query) use ($columnasExistentes) {
+                foreach ($columnasExistentes as $columna) {
+                    $query->orWhere(function ($q) use ($columna) {
+                        $q->whereNull('inscripciones.' . $columna)
+                            ->orWhere('inscripciones.' . $columna, '')
+                            ->orWhere('inscripciones.' . $columna, 0);
+                    });
+                }
+            });
 
-        foreach ($columnasExistentes as $index => $columna) {
-            if ($index === 0) {
-                $query->where(function ($q) use ($columna) {
-                    $q->whereNull('inscripciones.' . $columna)
-                        ->orWhere('inscripciones.' . $columna, '')
-                        ->orWhere('inscripciones.' . $columna, 0);
-                });
-            } else {
-                $query->orWhere(function ($q) use ($columna) {
-                    $q->whereNull('inscripciones.' . $columna)
-                        ->orWhere('inscripciones.' . $columna, '')
-                        ->orWhere('inscripciones.' . $columna, 0);
-                });
-            }
-        }
-
-        if ($this->nivel_id && $this->columnaExiste('inscripciones', 'nivel_id')) {
-            $query->where('inscripciones.nivel_id', $this->nivel_id);
-        }
+        $this->aplicarFiltroNivel($query, 'inscripciones');
+        $this->aplicarActivo($query, 'inscripciones');
 
         return $query
+            ->orderBy('inscripciones.apellido_paterno')
+            ->orderBy('inscripciones.apellido_materno')
+            ->orderBy('inscripciones.nombre')
             ->limit(5)
             ->get()
-            ->map(fn ($alumno) => [
+            ->map(fn($alumno) => [
                 'id' => $alumno->id,
                 'nombre' => trim($alumno->nombre . ' ' . $alumno->apellido_paterno . ' ' . $alumno->apellido_materno),
                 'nivel' => $alumno->nivel ?? 'Sin nivel',
@@ -357,10 +420,18 @@ class Dashboard extends Component
 
         $query = DB::table('grupos')
             ->leftJoin('niveles', 'niveles.id', '=', 'grupos.nivel_id')
+            ->leftJoin('grados', 'grados.id', '=', 'grupos.grado_id')
+            ->leftJoin('generaciones', 'generaciones.id', '=', 'grupos.generacion_id')
+            ->leftJoin('semestres', 'semestres.id', '=', 'grupos.semestre_id')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select(
                 'grupos.id',
-                'grupos.nombre',
-                'niveles.nombre as nivel'
+                'niveles.nombre as nivel',
+                'grados.nombre as grado',
+                'generaciones.anio_ingreso as generacion_inicio',
+                'generaciones.anio_egreso as generacion_fin',
+                'semestres.numero as semestre',
+                'asignacion_grupos.nombre as grupo'
             );
 
         if ($this->tablaExiste('horarios') && $this->columnaExiste('horarios', 'grupo_id')) {
@@ -377,14 +448,24 @@ class Dashboard extends Component
 
         return $query
             ->orderBy('niveles.id')
-            ->orderBy('grupos.nombre')
+            ->orderBy('grados.id')
+            ->orderBy('asignacion_grupos.nombre')
             ->limit(5)
             ->get()
-            ->map(fn ($grupo) => [
-                'id' => $grupo->id,
-                'grupo' => $grupo->nombre,
-                'nivel' => $grupo->nivel ?? 'Sin nivel',
-            ])
+            ->map(function ($grupo) {
+                $detalle = collect([
+                    $grupo->grado,
+                    $grupo->grupo,
+                    $grupo->semestre ? 'Semestre ' . $grupo->semestre : null,
+                    $grupo->generacion_inicio . ' - ' . $grupo->generacion_fin,
+                ])->filter()->implode(' - ');
+
+                return [
+                    'id' => $grupo->id,
+                    'grupo' => $detalle ?: 'Sin grupo',
+                    'nivel' => $grupo->nivel ?? 'Sin nivel',
+                ];
+            })
             ->toArray();
     }
 
@@ -411,13 +492,18 @@ class Dashboard extends Component
             }
 
             $labels[] = $nivel->nombre;
-            $series[] = $this->contarPorNivel('inscripciones', $nivel->id, true);
+            $series[] = $this->contarPorNivel('inscripciones', (int) $nivel->id, true);
         }
 
         return [
             'labels' => $labels,
             'series' => $series,
         ];
+    }
+
+    public function rutaSegura(string $nombreRuta, string $respaldo = '#'): string
+    {
+        return Route::has($nombreRuta) ? route($nombreRuta) : $respaldo;
     }
 
     public function render()

@@ -2,139 +2,143 @@
 
 namespace App\Livewire\Grupo;
 
-use Livewire\Component;
-use App\Models\Nivel;
-use App\Models\Grado;
+use App\Models\AsignacionGrupo;
 use App\Models\Generacion;
+use App\Models\Grado;
 use App\Models\Grupo;
+use App\Models\Nivel;
 use App\Models\Semestre;
+use Livewire\Attributes\On;
+use Livewire\Component;
 
 class CrearGrupo extends Component
 {
-    public $nombre;
+    public $asignacion_grupo_id = '';
     public $nivel_id = '';
     public $grado_id = '';
     public $generacion_id = '';
     public $semestre_id = '';
 
+    public $grados = [];
+    public $generaciones = [];
+    public $semestres = [];
 
+    public bool $esBachillerato = false;
 
     public function updatedNivelId()
     {
-        // Cuando cambie el nivel, limpiamos dependientes
-        $this->reset(['grado_id', 'generacion_id', 'semestre_id']);
+        $this->reset([
+            'grado_id',
+            'generacion_id',
+            'semestre_id',
+        ]);
+
+        $this->esBachillerato = (int) $this->nivel_id === 4;
+
+        $this->cargarDatosPorNivel();
+    }
+
+    public function cargarDatosPorNivel()
+    {
+        if (!$this->nivel_id) {
+            $this->grados = [];
+            $this->generaciones = [];
+            $this->semestres = [];
+            return;
+        }
+
+        $this->grados = Grado::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->orderBy('id')
+            ->get();
+
+        $this->generaciones = Generacion::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->orderByDesc('anio_ingreso')
+            ->get();
+
+        $this->semestres = $this->esBachillerato
+            ? Semestre::query()->orderBy('numero')->get()
+            : collect();
     }
 
     public function guardarGrupo()
     {
-        $rules = [
-            'nombre' => 'required|string|max:255',
-            'nivel_id' => 'required|exists:niveles,id',
-            'grado_id' => 'required|exists:grados,id',
-            'generacion_id' => 'required|exists:generaciones,id',
-            'semestre_id' => 'nullable|exists:semestres,id',
-        ];
-
-        // Si el nivel es Bachillerato, semestre_id es obligatorio
-        $nivelSeleccionado = Nivel::find($this->nivel_id);
-        if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
-            $rules['semestre_id'] = 'required|exists:semestres,id';
-        }
-
-        $this->validate($rules, [
-            'nombre.required' => 'El nombre es obligatorio.',
-            'nivel_id.required' => 'El nivel es obligatorio.',
-            'nivel_id.exists' => 'El nivel seleccionado no es válido.',
-            'grado_id.required' => 'El grado es obligatorio.',
-            'grado_id.exists' => 'El grado seleccionado no es válido.',
-            'generacion_id.required' => 'La generación es obligatoria.',
-            'generacion_id.exists' => 'La generación seleccionada no es válida.',
-            'semestre_id.required' => 'El semestre es obligatorio para Bachillerato.',
-            'semestre_id.exists' => 'El semestre seleccionado no es válido.',
+        $this->validate([
+            'asignacion_grupo_id' => 'required|integer|exists:asignacion_grupos,id',
+            'nivel_id' => 'required|integer|exists:niveles,id',
+            'grado_id' => 'required|integer|exists:grados,id',
+            'generacion_id' => 'required|integer|exists:generaciones,id',
+            'semestre_id' => $this->esBachillerato
+                ? 'required|integer|exists:semestres,id'
+                : 'nullable',
+        ], [
+            'asignacion_grupo_id.required' => 'Selecciona un grupo.',
+            'asignacion_grupo_id.exists' => 'El grupo seleccionado no es válido.',
+            'nivel_id.required' => 'Selecciona un nivel educativo.',
+            'grado_id.required' => 'Selecciona un grado.',
+            'generacion_id.required' => 'Selecciona una generación.',
+            'semestre_id.required' => 'Selecciona un semestre para bachillerato.',
         ]);
 
-        // VERIFICA QUE EL GRUPO NO EXISTA YA EN EN EL NIVEL, GRADO Y GENERACIÓN
-        $queryGrupo = Grupo::where('nombre', strtoupper($this->nombre))
+        $existe = Grupo::query()
+            ->where('asignacion_grupo_id', $this->asignacion_grupo_id)
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $this->generacion_id);
+            ->where('generacion_id', $this->generacion_id)
+            ->when($this->esBachillerato, function ($query) {
+                $query->where('semestre_id', $this->semestre_id);
+            })
+            ->when(!$this->esBachillerato, function ($query) {
+                $query->whereNull('semestre_id');
+            })
+            ->exists();
 
-        // Si es bachillerato, también validar por semestre
-        $nivelSeleccionado = Nivel::find($this->nivel_id);
-        if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
-            $queryGrupo->where('semestre_id', $this->semestre_id);
-        }
-
-        $existeGrupo = $queryGrupo->first();
-
-        if ($existeGrupo) {
-            $this->addError('nombre', 'Ya existe un grupo con este nombre en el nivel, grado, generación' . ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato' ? ' y semestre' : '') . ' seleccionados.');
+        if ($existe) {
+            $this->addError('asignacion_grupo_id', 'Este grupo ya está registrado con los mismos datos.');
             return;
         }
 
         Grupo::create([
-            'nombre' => strtoupper($this->nombre),
+            'asignacion_grupo_id' => $this->asignacion_grupo_id,
             'nivel_id' => $this->nivel_id,
             'grado_id' => $this->grado_id,
             'generacion_id' => $this->generacion_id,
-            'semestre_id' => $this->semestre_id ?: NULL,
+            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
         ]);
 
         $this->dispatch('swal', [
-            'title' => '¡Grupo creado correctamente!',
+            'title' => '¡Grupo guardado correctamente!',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
+
         $this->dispatch('refreshGrupos');
 
-        $this->reset(['nombre', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
-
-
-    }
-
-    public function render()
-    {
-        $niveles = Nivel::orderBy('id')->get();
-
-        // Por defecto, colecciones vacías
-        $grados = collect();
-        $generaciones = collect();
-        $semestres = collect();
-        $esBachillerato = false;
-
-        if ($this->nivel_id) {
-            // Filtrar grados y generaciones por nivel
-            $grados = Grado::where('nivel_id', $this->nivel_id)
-                ->orderBy('nombre')
-                ->get();
-
-            $generaciones = Generacion::where('nivel_id', $this->nivel_id)
-                ->where('status',1)
-                ->orderBy('anio_ingreso', 'desc')
-                ->orderBy('anio_egreso', 'asc')
-                ->get();
-
-            // Detectar si el nivel seleccionado es Bachillerato (por slug)
-            $nivelSeleccionado = $niveles->firstWhere('id', $this->nivel_id);
-
-            if ($nivelSeleccionado && $nivelSeleccionado->slug === 'bachillerato') {
-                $esBachillerato = true;
-
-                // Solo para bachillerato cargamos semestres
-                $semestres = Semestre::orderBy('id')->get();
-                // Si tus semestres también tienen nivel_id, podrías usar:
-                // $semestres = Semestre::where('nivel_id', $this->nivel_id)->orderBy('id')->get();
-            }
-        }
-
-        return view('livewire.grupo.crear-grupo', compact(
-            'niveles',
+        $this->reset([
+            'asignacion_grupo_id',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'semestre_id',
             'grados',
             'generaciones',
             'semestres',
             'esBachillerato',
-        ));
+        ]);
+
+        $this->resetErrorBag();
     }
 
+    #[On('refreshAsignacionGrupos')]
+    public function render()
+    {
+        return view('livewire.grupo.crear-grupo', [
+            'niveles' => Nivel::query()->orderBy('id')->get(),
 
+            'asignacionGrupos' => AsignacionGrupo::query()
+                ->orderBy('nombre')
+                ->get(),
+        ]);
+    }
 }

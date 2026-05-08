@@ -121,8 +121,7 @@
                     </flux:sidebar.group>
 
 
-                    <flux:sidebar.group expandable="false" :expanded="false" heading="PERSONAL"
-                        class="grid text-xs gap-1 text-zinc-300">
+                    <flux:sidebar.group expandable="false" heading="PERSONAL" class="grid text-xs gap-1 text-zinc-300">
                         <flux:navlist.item icon="home" :href="route('misrutas.personal')"
                             :current="request()->routeIs('misrutas.personal')" wire:navigate>
                             Crear Persona
@@ -141,8 +140,7 @@
                     </flux:sidebar.group>
 
 
-                    <flux:sidebar.group expandable :expanded="false" heading="ESTRUCTURA"
-                        class="grid text-xs gap-1 text-zinc-300">
+                    <flux:sidebar.group expandable heading="ESTRUCTURA" class="grid text-xs gap-1 text-zinc-300">
 
                         <flux:navlist.item icon="home" :href="route('misrutas.grados')"
                             :current="request()->routeIs('misrutas.grados')" wire:navigate>
