@@ -48,6 +48,7 @@
         <!-- Toolbar -->
         <div class="p-4 sm:p-5 lg:p-6">
             <div class="flex flex-col gap-3 lg:gap-4 sm:flex-row sm:items-center sm:justify-between">
+
                 <!-- Buscador -->
                 <div class="w-full sm:max-w-xl">
                     <label for="buscar-personal" class="sr-only">Buscar Personal</label>
@@ -55,8 +56,10 @@
                         placeholder="Buscar por nombre, apellido o correo…" icon="magnifying-glass" class="w-full" />
                 </div>
 
-                <!-- Resumen -->
-                <div class="flex items-center gap-3">
+                <!-- Acciones -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+
+                    <!-- Resumen -->
                     <div
                         class="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 dark:border-neutral-800 px-3 py-1.5 bg-gray-50 dark:bg-neutral-700">
                         <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -65,8 +68,57 @@
                             <strong>{{ method_exists($personal, 'total') ? $personal->total() : $personal->count() }}</strong>
                         </span>
                     </div>
+
+                    <!-- Importar Excel -->
+                    <div>
+                        <input id="archivo-personal" type="file" wire:model="archivo" wire:change="importarPersonal"
+                            accept=".xlsx,.xls,.csv" class="hidden">
+
+                        <label for="archivo-personal"
+                            class="inline-flex w-full sm:w-auto cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
+                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 16V4m0 0L8 8m4-4 4 4M4 20h16" />
+                            </svg>
+                            Importar
+                        </label>
+                    </div>
+
+                    <!-- Exportar Excel -->
+                    <flux:button type="button" variant="primary" wire:click="exportarPersonal"
+                        class="inline-flex w-full sm:w-auto cursor-pointer items-center justify-center  rounded-xl bg-emerald-600 px-4 py-1 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
+
+                        <div class="flex justify-between gap-1 items-center">
+                            <flux:icon.download class="w-4 h-4" />
+                            Exportar
+
+                        </div>
+
+                    </flux:button>
                 </div>
             </div>
+
+            <!-- Errores de importación -->
+            @if (!empty($erroresImportacion))
+                <div
+                    class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800/60 dark:bg-rose-900/20 dark:text-rose-300">
+                    <p class="font-semibold">No se pudo completar la importación:</p>
+
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach ($erroresImportacion as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @error('archivo')
+                <div
+                    class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800/60 dark:bg-rose-900/20 dark:text-rose-300">
+                    {{ $message }}
+                </div>
+            @enderror
         </div>
 
         <!-- Área de resultados -->

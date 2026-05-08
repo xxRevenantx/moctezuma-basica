@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -13,6 +12,12 @@ return new class extends Migration
     {
         Schema::create('grupos', function (Blueprint $table) {
             $table->id();
+
+            // ASIGNACIÓN DE GRUPO: Relación con la tabla asignacion_grupos
+            $table->foreignId('asignacion_grupo_id')
+                ->constrained('asignacion_grupos')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
 
             // NIVEL: Preescolar, Primaria, Secundaria, Bachillerato
             $table->foreignId('nivel_id')
@@ -40,9 +45,6 @@ return new class extends Migration
                 ->constrained('semestres')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
-
-            // Nombre del grupo: A, B, C, "Único", etc.
-            $table->string('nombre', 20);
 
 
             $table->timestamps();

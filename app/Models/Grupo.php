@@ -11,7 +11,7 @@ class Grupo extends Model
     use HasFactory;
 
     protected $fillable = [
-        'nombre',
+        'asignacion_grupo_id',
         'nivel_id',
         'grado_id',
         'generacion_id',
@@ -45,9 +45,9 @@ class Grupo extends Model
         return $this->hasMany(PersonaNivel::class);
     }
 
-    public function docentesGrupo()
+    public function asignacionGrupo()
     {
-        return $this->hasMany(\App\Models\DocenteGrupo::class, 'grupo_id');
+        return $this->belongsTo(\App\Models\AsignacionGrupo::class, 'asignacion_grupo_id');
     }
 
     public function docentes()
