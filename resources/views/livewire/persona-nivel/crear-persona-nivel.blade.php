@@ -1,4 +1,8 @@
 <div x-data="{ open: true }" class="my-4">
+    @php
+        $esBachillerato = $this->esBachilleratoSeleccionado();
+    @endphp
+
     <button type="button" @click="open = !open" :aria-expanded="open"
         class="group inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
                bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow
@@ -35,8 +39,13 @@
                         <div>
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Asignación</h2>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                Grado y Grupo están disponibles para todos los roles, pero son opcionales.
-                                <span class="font-semibold">Si eliges uno, el otro también.</span>
+                                @if ($esBachillerato)
+                                    En bachillerato no se asigna grado ni grupo desde este formulario. Tampoco se
+                                    captura ingreso SEG ni SEP.
+                                @else
+                                    Grado y Grupo están disponibles para todos los roles, pero son opcionales.
+                                    <span class="font-semibold">Si eliges uno, el otro también.</span>
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -148,26 +157,38 @@
                             @endforeach
                         </flux:select>
 
-                        <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
-                            :disabled="!$nivel_id || $grados->isEmpty()">
-                            <flux:select.option value="">-- Seleccionar Grado (opcional) --</flux:select.option>
-                            @foreach ($grados as $grado)
-                                <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
+                        @if (!$esBachillerato)
+                            <flux:select wire:model.live="grado_id" label="Seleccionar Grado"
+                                :disabled="!$nivel_id || $grados->isEmpty()">
+                                <flux:select.option value="">-- Seleccionar Grado (opcional) --
                                 </flux:select.option>
-                            @endforeach
-                        </flux:select>
+                                @foreach ($grados as $grado)
+                                    <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
 
-                        <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
-                            :disabled="!$grado_id || $grupos->isEmpty() || (int) $nivel_id === 4">
-                            <flux:select.option value="">
-                                {{ (int) $nivel_id === 4 ? '-- No aplica para Bachillerato --' : '-- Seleccionar Grupo (opcional) --' }}
-                            </flux:select.option>
-
-                            @foreach ($grupos as $grupo)
-                                <flux:select.option value="{{ $grupo->id }}">{{ $grupo->nombre }}
+                            <flux:select wire:model.live="grupo_id" label="Seleccionar Grupo"
+                                :disabled="!$grado_id || $grupos->isEmpty()">
+                                <flux:select.option value="">-- Seleccionar Grupo (opcional) --
                                 </flux:select.option>
-                            @endforeach
-                        </flux:select>
+
+                                @foreach ($grupos as $grupo)
+                                    <flux:select.option value="{{ $grupo->id }}">
+                                        {{ $this->textoGrupo($grupo) }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        @else
+                            <div
+                                class="md:col-span-2 rounded-2xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-sm text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+                                <p class="font-bold">Bachillerato activo</p>
+                                <p class="mt-1 text-xs">
+                                    No se permite seleccionar grado ni grupo. La asignación se guardará solo por
+                                    persona, nivel y función.
+                                </p>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="mt-5">
@@ -238,34 +259,51 @@
                             <div>
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">Fechas de ingreso</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                                    En secundaria, si el personal ya tiene registro, estas fechas quedan bloqueadas.
+                                    @if ($esBachillerato)
+                                        En bachillerato no se captura ingreso SEG ni ingreso SEP. Solo puedes registrar
+                                        Ingreso C.T.
+                                    @else
+                                        En secundaria, si el personal ya tiene registro, estas fechas quedan bloqueadas.
+                                    @endif
                                 </p>
                             </div>
 
-                            @if ($bloquearFechasSecundaria)
+                            @if ($esBachillerato)
                                 <span
                                     class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold
-                       bg-amber-50 text-amber-700 ring-1 ring-amber-200
-                       dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-800">
+                                    bg-violet-50 text-violet-700 ring-1 ring-violet-200
+                                    dark:bg-violet-900/20 dark:text-violet-200 dark:ring-violet-800">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span>
+                                    SEG y SEP no aplican
+                                </span>
+                            @elseif ($bloquearFechasSecundaria)
+                                <span
+                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold
+                                    bg-amber-50 text-amber-700 ring-1 ring-amber-200
+                                    dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-800">
                                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                                     Fechas bloqueadas (Secundaria)
                                 </span>
                             @endif
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG"
-                                :disabled="$bloquearFechasSecundaria" />
-                            <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP"
-                                :disabled="$bloquearFechasSecundaria" />
+                        <div
+                            class="grid grid-cols-1 {{ $esBachillerato ? 'md:grid-cols-1' : 'md:grid-cols-3' }} gap-4">
+                            @if (!$esBachillerato)
+                                <flux:input type="date" wire:model="ingreso_seg" label="Fecha de Ingreso SEG"
+                                    :disabled="$bloquearFechasSecundaria" />
+                                <flux:input type="date" wire:model="ingreso_sep" label="Fecha de Ingreso SEP"
+                                    :disabled="$bloquearFechasSecundaria" />
+                            @endif
+
                             <flux:input type="date" wire:model="ingreso_ct" label="Fecha de Ingreso C.T."
                                 :disabled="$bloquearFechasSecundaria" />
                         </div>
 
-                        @if ($bloquearFechasSecundaria)
+                        @if ($bloquearFechasSecundaria && !$esBachillerato)
                             <div
                                 class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800
-                    dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                                 Este personal ya tiene registro en <b>Secundaria</b>. Para evitar inconsistencias, las
                                 fechas solo se editan desde la cabecera existente.
                             </div>

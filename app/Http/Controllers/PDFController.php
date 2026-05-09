@@ -69,7 +69,7 @@ class PDFController extends Controller
                 },
                 'detalles.PersonaRole.rolePersona',
                 'detalles.grado',
-                'detalles.grupo',
+                'detalles.grupo.asignacionGrupo',
             ])
             ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('orden', 'asc')
@@ -184,7 +184,7 @@ class PDFController extends Controller
         }
 
         $grupo = \App\Models\Grupo::query()
-            ->with(['generacion', 'grado', 'semestre'])
+            ->with(['asignacionGrupo', 'generacion', 'grado', 'semestre'])
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $grado->id)
@@ -267,12 +267,14 @@ class PDFController extends Controller
         if (!$esBachillerato) {
             $primeraMateriaConProfesor = \App\Models\AsignacionMateria::query()
                 ->with('profesor')
-                ->where('nivel_id', $nivel->id)
-                ->where('grado_id', $grado->id)
-                ->where('grupo_id', $grupo->id)
-                ->whereNull('semestre')
-                ->whereNotNull('profesor_id')
-                ->orderBy('orden')
+                ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+                ->select('asignacion_materias.*')
+                ->where('materias.nivel_id', $nivel->id)
+                ->where('materias.grado_id', $grado->id)
+                ->where('asignacion_materias.grupo_id', $grupo->id)
+                ->whereNull('materias.semestre_id')
+                ->whereNotNull('asignacion_materias.profesor_id')
+                ->orderBy('asignacion_materias.orden')
                 ->first();
 
             if ($primeraMateriaConProfesor?->profesor) {
@@ -280,8 +282,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -324,7 +326,7 @@ class PDFController extends Controller
             mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') . '_' .
             'GEN_' . ($generacion->anio_ingreso ?? 'GEN') . '-' . ($generacion->anio_egreso ?? 'GEN') . '_' .
             'GRADO_' . ($grado->nombre ?? 'GRADO') . '_' .
-            'GRUPO_' . ($grupo->nombre ?? 'GRUPO') .
+            'GRUPO_' . $this->nombreGrupo($grupo) .
             ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? '') : '') .
             '.pdf';
 
@@ -387,7 +389,7 @@ class PDFController extends Controller
         }
 
         $grupoQuery = Grupo::query()
-            ->with('generacion')
+            ->with(['asignacionGrupo', 'generacion'])
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -487,21 +489,27 @@ class PDFController extends Controller
         */
 
         $queryMaterias = AsignacionMateria::query()
-            ->where('nivel_id', $nivel->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('calificable', 1);
-
-        if (Schema::hasColumn('asignacion_materias', 'grado_id')) {
-            $queryMaterias->where('grado_id', $grado->id);
-        }
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->select([
+                'asignacion_materias.*',
+                'materias.materia as materia',
+                'materias.clave as clave',
+                'materias.slug as slug',
+                'materias.calificable as calificable',
+                'materias.extra as extra',
+                'materias.receso as receso',
+            ])
+            ->where('materias.nivel_id', $nivel->id)
+            ->where('materias.grado_id', $grado->id)
+            ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
-        if (Schema::hasColumn('asignacion_materias', 'orden')) {
-            $queryMaterias->orderBy('orden');
-        }
-
-        $queryMaterias->orderBy('materia');
+        $queryMaterias
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('materias.orden')
+            ->orderBy('materias.materia');
 
         $materias = $queryMaterias->get()
             ->map(function ($item) {
@@ -521,7 +529,14 @@ class PDFController extends Controller
         */
 
         $queryInscripciones = Inscripcion::query()
-            ->with(['grado:id,nombre', 'grupo:id,nombre', 'semestre:id,numero'])
+            ->with([
+                'grado:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
+                'semestre:id,numero'
+            ])
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id)
@@ -562,11 +577,11 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
-                    'grupo' => $item->grupo?->nombre ?? '—',
+                    'grupo' => $this->nombreGrupo($item->grupo),
                     'semestre' => $item->semestre?->numero ?? '—',
                 ];
             })
@@ -890,7 +905,7 @@ class PDFController extends Controller
         $nombreArchivo = 'CALIFICACIONES_' .
             mb_strtoupper($nivel->nombre ?? 'NIVEL') . '_' .
             'GRADO_' . ($grado->nombre ?? 'GRADO') . '_' .
-            'GRUPO_' . ($grupo->nombre ?? 'GRUPO') .
+            'GRUPO_' . $this->nombreGrupo($grupo) .
             ($esBachillerato && $semestre ? '_SEMESTRE_' . $semestre->numero : '') .
             '_' . ($esBachillerato ? 'PARCIAL_' : 'PERIODO_') . $periodoNumero .
             '.pdf';
@@ -955,6 +970,7 @@ class PDFController extends Controller
         }
 
         $grupoQuery = Grupo::query()
+            ->with('asignacionGrupo')
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -1030,7 +1046,10 @@ class PDFController extends Controller
         $inscripcionQuery = Inscripcion::query()
             ->with([
                 'grado:id,nombre',
-                'grupo:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
                 'semestre:id,numero',
             ])
             ->where('id', $inscripcionId)
@@ -1054,8 +1073,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1065,19 +1084,27 @@ class PDFController extends Controller
         */
 
         $queryMaterias = AsignacionMateria::query()
-            ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('calificable', 1);
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->select([
+                'asignacion_materias.*',
+                'materias.materia as materia',
+                'materias.clave as clave',
+                'materias.slug as slug',
+                'materias.calificable as calificable',
+                'materias.extra as extra',
+                'materias.receso as receso',
+            ])
+            ->where('materias.nivel_id', $nivel->id)
+            ->where('materias.grado_id', $grado->id)
+            ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
-        if (Schema::hasColumn('asignacion_materias', 'orden')) {
-            $queryMaterias->orderBy('orden');
-        }
-
         $materias = $queryMaterias
-            ->orderBy('id')
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('materias.orden')
+            ->orderBy('asignacion_materias.id')
             ->get();
 
         $idsMaterias = $materias->pluck('id')->values()->all();
@@ -1410,6 +1437,7 @@ class PDFController extends Controller
         */
 
         $grupoQuery = Grupo::query()
+            ->with('asignacionGrupo')
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -1491,7 +1519,10 @@ class PDFController extends Controller
         $inscripcionQuery = Inscripcion::query()
             ->with([
                 'grado:id,nombre',
-                'grupo:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
                 'semestre:id,numero',
             ])
             ->where('id', $inscripcionId)
@@ -1518,8 +1549,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1533,22 +1564,27 @@ class PDFController extends Controller
         */
 
         $queryMaterias = AsignacionMateria::query()
-            ->where('nivel_id', $nivel->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('calificable', 1);
-
-        if (Schema::hasColumn('asignacion_materias', 'grado_id')) {
-            $queryMaterias->where('grado_id', $grado->id);
-        }
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->select([
+                'asignacion_materias.*',
+                'materias.materia as materia',
+                'materias.clave as clave',
+                'materias.slug as slug',
+                'materias.calificable as calificable',
+                'materias.extra as extra',
+                'materias.receso as receso',
+            ])
+            ->where('materias.nivel_id', $nivel->id)
+            ->where('materias.grado_id', $grado->id)
+            ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
-        if (Schema::hasColumn('asignacion_materias', 'orden')) {
-            $queryMaterias->orderBy('orden');
-        }
-
         $materias = $queryMaterias
-            ->orderBy('id')
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('materias.orden')
+            ->orderBy('asignacion_materias.id')
             ->get();
 
         $idsMaterias = $materias->pluck('id')->values()->all();
@@ -1738,7 +1774,14 @@ class PDFController extends Controller
         */
 
         $queryInscripcionesLugar = Inscripcion::query()
-            ->with(['grado:id,nombre', 'grupo:id,nombre', 'semestre:id,numero'])
+            ->with([
+                'grado:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
+                'semestre:id,numero'
+            ])
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id)
@@ -1765,11 +1808,11 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
-                    'grupo' => $item->grupo?->nombre ?? '—',
+                    'grupo' => $this->nombreGrupo($item->grupo),
                     'semestre' => $item->semestre?->numero ?? '—',
                 ];
             })
@@ -2248,6 +2291,7 @@ class PDFController extends Controller
         }
 
         $grupoQuery = Grupo::query()
+            ->with('asignacionGrupo')
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -2255,6 +2299,8 @@ class PDFController extends Controller
 
         if ($esBachillerato) {
             $grupoQuery->where('semestre_id', $semestreId);
+        } else {
+            $grupoQuery->whereNull('semestre_id');
         }
 
         $grupo = $grupoQuery->first();
@@ -2311,19 +2357,27 @@ class PDFController extends Controller
         */
 
         $materiasQuery = AsignacionMateria::query()
-            ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('calificable', 1);
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->select([
+                'asignacion_materias.*',
+                'materias.materia as materia',
+                'materias.clave as clave',
+                'materias.slug as slug',
+                'materias.calificable as calificable',
+                'materias.extra as extra',
+                'materias.receso as receso',
+            ])
+            ->where('materias.nivel_id', $nivel->id)
+            ->where('materias.grado_id', $grado->id)
+            ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($materiasQuery, $esBachillerato, $semestre?->id);
 
-        if (Schema::hasColumn('asignacion_materias', 'orden')) {
-            $materiasQuery->orderBy('orden');
-        }
-
         $materias = $materiasQuery
-            ->orderBy('id')
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('materias.orden')
+            ->orderBy('asignacion_materias.id')
             ->get();
 
         $materiasPromediables = collect();
@@ -2375,7 +2429,10 @@ class PDFController extends Controller
                     'detalles' => function ($query) {
                         $query->with([
                             'grado:id,nombre',
-                            'grupo:id,nombre',
+                            'grupo' => function ($query) {
+                                $query->select('id', 'asignacion_grupo_id')
+                                    ->with('asignacionGrupo:id,nombre');
+                            },
                         ]);
                     },
                 ])
@@ -2567,12 +2624,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'pdf.lista.sece',
-                'sece_interna' => 'pdf.sece_interna',
-                'personalizadores' => 'pdf.personalizadores',
-                'etiquetas' => 'pdf.etiquetas_pdf',
-                default => abort(404, 'El formato seleccionado no existe.'),
-            },
+                    'sece' => 'pdf.lista.sece',
+                    'sece_interna' => 'pdf.sece_interna',
+                    'personalizadores' => 'pdf.personalizadores',
+                    'etiquetas' => 'pdf.etiquetas_pdf',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2590,12 +2647,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'formato-sece',
-                'sece_interna' => 'formato-sece-interna',
-                'personalizadores' => 'personalizadores',
-                'etiquetas' => 'etiquetas',
-                default => 'formato',
-            },
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
 
             default => 'lista',
         };
@@ -2604,7 +2661,7 @@ class PDFController extends Controller
             . '-' . $nivel->slug
             . '-grado-' . $grado->nombre
             . ($esBachillerato && $semestre ? '-semestre-' . $semestre->numero : '')
-            . '-grupo-' . $grupo->nombre
+            . '-grupo-' . $this->nombreGrupo($grupo)
             . ($periodoNumero ? '-' . ($esBachillerato ? 'parcial-' : 'periodo-') . $periodoNumero : '')
             . '.pdf';
 
@@ -2716,11 +2773,21 @@ class PDFController extends Controller
 
     private function aplicarFiltroSemestreAsignacion($query, bool $esBachillerato, ?int $semestreId): void
     {
+        if (Schema::hasColumn('materias', 'semestre_id')) {
+            if ($esBachillerato) {
+                $query->where('materias.semestre_id', $semestreId);
+            } else {
+                $query->whereNull('materias.semestre_id');
+            }
+
+            return;
+        }
+
         if (Schema::hasColumn('asignacion_materias', 'semestre_id')) {
             if ($esBachillerato) {
-                $query->where('semestre_id', $semestreId);
+                $query->where('asignacion_materias.semestre_id', $semestreId);
             } else {
-                $query->whereNull('semestre_id');
+                $query->whereNull('asignacion_materias.semestre_id');
             }
 
             return;
@@ -2728,9 +2795,9 @@ class PDFController extends Controller
 
         if (Schema::hasColumn('asignacion_materias', 'semestre')) {
             if ($esBachillerato) {
-                $query->where('semestre', $semestreId);
+                $query->where('asignacion_materias.semestre', $semestreId);
             } else {
-                $query->whereNull('semestre');
+                $query->whereNull('asignacion_materias.semestre');
             }
         }
     }
@@ -2745,9 +2812,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-                ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->nombre ?? '') . ' ' .
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 
@@ -2963,17 +3030,31 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                    ?? $periodo?->parcialBachillerato?->descripcion
-                    ?? 'PARCIAL'
+                ?? $periodo?->parcialBachillerato?->descripcion
+                ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-                ?? $periodo?->periodoBasica?->descripcion
-                ?? 'PERIODO'
+            ?? $periodo?->periodoBasica?->descripcion
+            ?? 'PERIODO'
         );
     }
+    private function nombreGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return 'GRUPO';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'GRUPO';
+    }
+
+    private function nombreGrupoArchivo($grupo): string
+    {
+        return Str::slug($this->nombreGrupo($grupo), '_');
+    }
+
     private function imagenBase64Publica(?string $ruta): ?string
     {
         if (!$ruta) {
