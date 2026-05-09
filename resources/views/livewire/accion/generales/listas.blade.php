@@ -265,7 +265,7 @@
 
                                     @foreach ($grupos as $grupo)
                                         <flux:select.option value="{{ $grupo->id }}">
-                                            {{ $grupo->nombre }}
+                                            {{ $this->textoGrupo($grupo) }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
@@ -373,7 +373,7 @@
                             @if ($this->grupoSeleccionado)
                                 <span
                                     class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                    Grupo: {{ $this->grupoSeleccionado->nombre }}
+                                    Grupo: {{ $this->textoGrupo($this->grupoSeleccionado) }}
                                 </span>
                             @endif
 

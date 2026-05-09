@@ -450,7 +450,7 @@
 
                     <td style="width: 120px;">
                         <span class="campo campo-corto">
-                            {{ $grado->nombre }} ° "{{ $grupo->nombre }}"
+                            {{ $grado->nombre }} ° "{{ $grupo->asignacionGrupo->nombre ?? '' }}"
                         </span>
                     </td>
                 </tr>

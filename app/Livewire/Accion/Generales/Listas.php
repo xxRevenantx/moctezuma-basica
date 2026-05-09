@@ -57,18 +57,9 @@ class Listas extends Component
             ->get(['id', 'nivel_id', 'nombre', 'orden']);
 
         $this->semestres = $this->cargarSemestresIniciales();
-
         $this->parciales = $this->cargarParciales();
-
         $this->grupos = collect();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Valores iniciales según el nivel
-        |--------------------------------------------------------------------------
-        | En básica inicio con Lista de evaluación.
-        | En bachillerato oculto evaluación/asistencia y arranco con Lista de grupo.
-        */
         $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
 
         $opciones = $this->opcionesDescarga();
@@ -168,12 +159,6 @@ class Listas extends Component
 
         $query = Semestre::query();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Filtro de semestres
-        |--------------------------------------------------------------------------
-        | Si la tabla tiene grado_id, filtro los semestres por el grado seleccionado.
-        */
         if ($this->grado_id && Schema::hasColumn('semestres', 'grado_id')) {
             $query->where('grado_id', $this->grado_id);
         }
@@ -195,38 +180,51 @@ class Listas extends Component
             return;
         }
 
-        $columnas = ['id', 'nivel_id', 'nombre'];
+        $columnas = [
+            'grupos.id',
+            'grupos.nivel_id',
+            'grupos.asignacion_grupo_id',
+        ];
 
         if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $columnas[] = 'generacion_id';
+            $columnas[] = 'grupos.generacion_id';
         }
 
         if (Schema::hasColumn('grupos', 'grado_id')) {
-            $columnas[] = 'grado_id';
+            $columnas[] = 'grupos.grado_id';
         }
 
         if (Schema::hasColumn('grupos', 'semestre_id')) {
-            $columnas[] = 'semestre_id';
+            $columnas[] = 'grupos.semestre_id';
         }
 
         $query = Grupo::query()
-            ->where('nivel_id', $this->nivel->id);
+            ->with([
+                'asignacionGrupo:id,nombre',
+            ])
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select($columnas)
+            ->where('grupos.nivel_id', $this->nivel->id);
 
         if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $query->where('generacion_id', $this->generacion_id);
+            $query->where('grupos.generacion_id', $this->generacion_id);
         }
 
         if (Schema::hasColumn('grupos', 'grado_id')) {
-            $query->where('grado_id', $this->grado_id);
+            $query->where('grupos.grado_id', $this->grado_id);
         }
 
         if ($this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $query->where('semestre_id', $this->semestre_id);
+            $query->where('grupos.semestre_id', $this->semestre_id);
+        }
+
+        if (!$this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
+            $query->whereNull('grupos.semestre_id');
         }
 
         $this->grupos = $query
-            ->orderBy('nombre')
-            ->get($columnas);
+            ->orderBy('asignacion_grupos.nombre')
+            ->get();
     }
 
     public function limpiarFiltros(): void
@@ -243,7 +241,6 @@ class Listas extends Component
         $this->opcion_descarga = array_key_first($opciones) ?? '';
 
         $this->grupos = collect();
-
         $this->mostrar_motivo = false;
         $this->semestres = $this->cargarSemestresIniciales();
         $this->parciales = $this->cargarParciales();
@@ -267,13 +264,6 @@ class Listas extends Component
 
     public function opcionesDescarga(): array
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Opciones para bachillerato
-        |--------------------------------------------------------------------------
-        | En bachillerato ya no uso periodos. Uso parciales.
-        | Se genera la llave como parcial_ID para validar fácil en el controlador.
-        */
         if ($this->esBachillerato() && $this->tipo_descarga !== 'formatos') {
             return $this->parciales
                 ->mapWithKeys(function ($parcial) {
@@ -357,13 +347,6 @@ class Listas extends Component
             'grupo_id' => $this->grupo_id,
             'tipo_descarga' => $this->tipo_descarga,
             'opcion_descarga' => $this->opcion_descarga,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Columna motivo
-            |--------------------------------------------------------------------------
-            | Solo se manda cuando el documento seleccionado sea Lista de grupo.
-            */
             'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
         ];
     }
@@ -436,7 +419,7 @@ class Listas extends Component
             return null;
         }
 
-        return $this->generaciones->firstWhere('id', $this->generacion_id);
+        return $this->generaciones->firstWhere('id', (int) $this->generacion_id);
     }
 
     #[Computed]
@@ -446,7 +429,7 @@ class Listas extends Component
             return null;
         }
 
-        return $this->grados->firstWhere('id', $this->grado_id);
+        return $this->grados->firstWhere('id', (int) $this->grado_id);
     }
 
     #[Computed]
@@ -456,7 +439,7 @@ class Listas extends Component
             return null;
         }
 
-        return $this->semestres->firstWhere('id', $this->semestre_id);
+        return $this->semestres->firstWhere('id', (int) $this->semestre_id);
     }
 
     #[Computed]
@@ -466,7 +449,7 @@ class Listas extends Component
             return null;
         }
 
-        return $this->grupos->firstWhere('id', $this->grupo_id);
+        return $this->grupos->firstWhere('id', (int) $this->grupo_id);
     }
 
     #[Computed]
@@ -488,6 +471,15 @@ class Listas extends Component
         }
 
         return $this->esBachillerato() ? 'Parcial' : 'Periodo';
+    }
+
+    public function textoGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return '—';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
     }
 
     public function textoSemestre($semestre): string
