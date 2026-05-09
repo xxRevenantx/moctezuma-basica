@@ -209,6 +209,8 @@
                 $nivelId = (int) ($first?->cabecera?->nivel_id ?? 0);
 
                 $isSecundaria = str_contains(mb_strtolower((string) $nivelNombre), 'secund');
+                $isBachillerato =
+                    (int) $nivelId === 4 || str_contains(mb_strtolower((string) $nivelNombre), 'bachiller');
 
                 // ✅ si existe el modelo "secundaria" lo usamos
                 $secundariaId = (int) ($secundaria?->id ?? 0);
@@ -609,6 +611,10 @@
                             </div>
                         </div>
                     @else
+                        @php
+                            $colspanVacio = $isBachillerato ? 6 : 10;
+                        @endphp
+
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead class="bg-gray-50 dark:bg-neutral-800/70">
@@ -617,10 +623,12 @@
                                         <th class="px-4 py-3 font-semibold">Orden</th>
                                         <th class="px-4 py-3 font-semibold">Personal</th>
                                         <th class="px-4 py-3 font-semibold">Función</th>
-                                        <th class="px-4 py-3 font-semibold">Grado</th>
-                                        <th class="px-4 py-3 font-semibold">Grupo</th>
-                                        <th class="px-4 py-3 font-semibold text-center">SEP</th>
-                                        <th class="px-4 py-3 font-semibold text-center">SEG</th>
+                                        @if (!$isBachillerato)
+                                            <th class="px-4 py-3 font-semibold">Grado</th>
+                                            <th class="px-4 py-3 font-semibold">Grupo</th>
+                                            <th class="px-4 py-3 font-semibold text-center">SEP</th>
+                                            <th class="px-4 py-3 font-semibold text-center">SEG</th>
+                                        @endif
                                         <th class="px-4 py-3 font-semibold text-center">CT</th>
                                         <th class="px-4 py-3 font-semibold text-right">Acciones</th>
                                     </tr>
@@ -688,33 +696,35 @@
                                                 @endif
                                             </td>
 
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                {{ $row->grado?->nombre ?? '—' }}
-                                            </td>
+                                            @if (!$isBachillerato)
+                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                                    {{ $row->grado?->nombre ?? '—' }}
+                                                </td>
 
-                                            <td class="px-4 py-3">
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                    bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                    {{ $row->grupo?->nombre ?? '—' }}
-                                                </span>
-                                            </td>
+                                                <td class="px-4 py-3">
+                                                    <span
+                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
+                                                        bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
+                                                        {{ $row->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                                    </span>
+                                                </td>
 
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
-                                                @if ($row->cabecera->ingreso_sep)
-                                                    {{ \Carbon\Carbon::parse($row->cabecera->ingreso_sep)->format('d/m/Y') }}
-                                                @else
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                @endif
-                                            </td>
+                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
+                                                    @if ($row->cabecera->ingreso_sep)
+                                                        {{ \Carbon\Carbon::parse($row->cabecera->ingreso_sep)->format('d/m/Y') }}
+                                                    @else
+                                                        <span class="text-xs text-gray-400">—</span>
+                                                    @endif
+                                                </td>
 
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
-                                                @if ($row->cabecera->ingreso_seg)
-                                                    {{ \Carbon\Carbon::parse($row->cabecera->ingreso_seg)->format('d/m/Y') }}
-                                                @else
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                @endif
-                                            </td>
+                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
+                                                    @if ($row->cabecera->ingreso_seg)
+                                                        {{ \Carbon\Carbon::parse($row->cabecera->ingreso_seg)->format('d/m/Y') }}
+                                                    @else
+                                                        <span class="text-xs text-gray-400">—</span>
+                                                    @endif
+                                                </td>
+                                            @endif
 
                                             <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
                                                 @if ($row->cabecera->ingreso_ct)
@@ -740,7 +750,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="10" class="px-6 py-10 text-center">
+                                            <td colspan="{{ $colspanVacio }}" class="px-6 py-10 text-center">
                                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin
                                                     asignaciones</p>
                                                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">

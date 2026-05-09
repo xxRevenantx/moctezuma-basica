@@ -262,6 +262,28 @@ class MostrarPersonaNivel extends Component
         $this->dispatch('$refresh');
     }
 
+
+    private function nombreGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return '—';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? '—';
+    }
+
+    private function esBachilleratoNivel($nivel): bool
+    {
+        if (!$nivel) {
+            return false;
+        }
+
+        return (int) ($nivel->id ?? 0) === 4
+            || str_contains(mb_strtolower((string) ($nivel->slug ?? '')), 'bachillerato')
+            || str_contains(mb_strtolower((string) ($nivel->nombre ?? '')), 'bachillerato');
+    }
+
+
     // exportar a Excel (solo detalles, sin agrupar por nivel)
     public function exportarPlantilla($nivelId)
     {
@@ -272,7 +294,7 @@ class MostrarPersonaNivel extends Component
                 'cabecera.persona',
                 'cabecera.nivel',
                 'grado',
-                'grupo',
+                'grupo.asignacionGrupo',
                 'personaRole.rolePersona'
             ])
             ->whereHas('cabecera', function ($query) use ($nivelId) {
@@ -306,7 +328,7 @@ class MostrarPersonaNivel extends Component
                 ),
                 'nivel' => $r->cabecera?->nivel?->nombre ?? 'Sin nivel',
                 'grado' => $r->grado?->nombre ?? 'Sin grado',
-                'grupo' => $r->grupo?->nombre ?? 'Sin grupo',
+                'grupo' => $this->nombreGrupo($r->grupo),
                 'materia' => $r->personaRole?->rolePersona?->nombre ?? 'Sin función',
                 'ingreso_seg' => $r->cabecera?->ingreso_seg
                     ? \Carbon\Carbon::parse($r->cabecera->ingreso_seg)->format('d/m/Y')
@@ -339,7 +361,7 @@ class MostrarPersonaNivel extends Component
                 'cabecera.nivel',
                 'cabecera:id,persona_id,nivel_id,orden,ingreso_seg,ingreso_sep,ingreso_ct',
                 'grado',
-                'grupo',
+                'grupo.asignacionGrupo',
                 'personaRole.rolePersona',
             ])
             ->when($this->search, function ($q) {
@@ -354,7 +376,7 @@ class MostrarPersonaNivel extends Component
                     })
                         ->orWhereHas('cabecera.nivel', fn($n) => $n->where('nombre', 'like', "%{$s}%"))
                         ->orWhereHas('grado', fn($g) => $g->where('nombre', 'like', "%{$s}%"))
-                        ->orWhereHas('grupo', fn($gr) => $gr->where('nombre', 'like', "%{$s}%"))
+                        ->orWhereHas('grupo.asignacionGrupo', fn($gr) => $gr->where('nombre', 'like', "%{$s}%"))
                         ->orWhereHas('personaRole.rolePersona', fn($r) => $r->where('nombre', 'like', "%{$s}%"));
                 });
             })
@@ -404,7 +426,7 @@ class MostrarPersonaNivel extends Component
                         'id' => $r->id,
                         'materia' => $r->personaRole?->rolePersona?->nombre,
                         'grado' => $r->grado?->nombre,
-                        'grupo' => $r->grupo?->nombre,
+                        'grupo' => $this->nombreGrupo($r->grupo),
                         'ingreso_seg' => $cab?->ingreso_seg,
                         'ingreso_sep' => $cab?->ingreso_sep,
                         'ingreso_ct' => $cab?->ingreso_ct,
