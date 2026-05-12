@@ -1,10 +1,10 @@
 <div x-data="{
     openRow: null,
 
-    eliminar(id, nombre) {
+    eliminar(id) {
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `El periodo ${nombre} se eliminará de forma permanente`,
+            text: `El periodo se eliminará de forma permanente`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#2563EB',
@@ -332,8 +332,7 @@
                                                         <flux:button variant="danger"
                                                             class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
                                                             @click="eliminar(
-                                                                {{ $periodo->id }},
-                                                                @js($nombreEliminar)
+                                                                {{ $periodo->id }}
                                                             )">
                                                             <flux:icon.trash class="h-3.5 w-3.5" />
                                                         </flux:button>
@@ -502,8 +501,7 @@
                                             <flux:button variant="danger"
                                                 class="cursor-pointer bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
                                                 @click="eliminar(
-                                                    {{ $periodo->id }},
-                                                    @js($nombreEliminar)
+                                                    {{ $periodo->id }}
                                                 )">
                                                 <flux:icon.trash class="h-3.5 w-3.5" />
                                             </flux:button>

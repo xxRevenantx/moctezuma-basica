@@ -27,11 +27,11 @@
         $nombreNivel = strtoupper($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL'));
 
         $nombreGrado = $grado->nombre ?? ($grado->grado ?? '');
-        $nombreGrupo = $grupo->nombre ?? '';
+        $nombreGrupo = $grupo->asignacionGrupo->nombre ?? '';
 
         $turnoTexto = $turno ?? 'Matutino';
 
-        $totalAlumnos = $alumnos->count() > 15 ? '25px' : '35px';
+        $totalAlumnos = $alumnos->count() > 20 ? '20px' : '30px';
 
     @endphp
 
@@ -425,21 +425,7 @@
                         </tr>
                     @endforelse
 
-                    @for ($i = $alumnos->count() + 1; $i <= $totalFilasMinimas; $i++)
-                        <tr>
-                            <td class="numero">
-                                {{ $i }}
-                            </td>
 
-                            <td class="alumno"></td>
-                            <td class="alumno"></td>
-                            <td class="alumno"></td>
-
-                            @if ($mostrarMotivo)
-                                <td class="motivo"></td>
-                            @endif
-                        </tr>
-                    @endfor
                 </tbody>
             </table>
         </div>

@@ -312,12 +312,12 @@
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
                         wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                         :disabled="$esBachillerato
-                                                                                                                                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                                                                                                                                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                                                                                                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ (string) $grupo->id }}">
-                                {{ $grupo->nombre }}
+                                {{ $this->textoGrupo($grupo) }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
@@ -450,7 +450,7 @@
                                                         </p>
                                                     @endif
                                                     <p><span class="font-semibold">Grupo:</span>
-                                                        {{ $detalle?->grupo?->nombre ?? '—' }}</p>
+                                                        {{ $this->textoGrupo($detalle?->grupo) }}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -576,7 +576,7 @@
 
                                         @foreach ($nuevosGrupos as $grupoDestino)
                                             <option value="{{ $grupoDestino->id }}">
-                                                Grupo {{ $grupoDestino->nombre }}
+                                                Grupo {{ $this->textoGrupo($grupoDestino) }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -944,7 +944,7 @@
 
                                                 <td
                                                     class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->grupo?->nombre ?? '—' }}
+                                                    {{ $this->textoGrupo($row->grupo) }}
                                                 </td>
 
                                                 <td class="px-4 py-4 align-top">
@@ -1017,7 +1017,7 @@
                                                 {{ $row->semestre?->numero ?? '—' }}</div>
                                         @endif
                                         <div><span class="font-semibold">Grupo:</span>
-                                            {{ $row->grupo?->nombre ?? '—' }}</div>
+                                            {{ $this->textoGrupo($row->grupo) }}</div>
                                         <div><span class="font-semibold">Folio:</span> {{ $row->folio ?: '—' }}</div>
                                     </div>
 

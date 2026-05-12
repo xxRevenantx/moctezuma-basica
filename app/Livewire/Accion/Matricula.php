@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Accion;
 
+use App\Exports\MatriculaExport;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -102,7 +103,10 @@ class Matricula extends Component
     protected function baseGrupoQuery(): Builder
     {
         return Grupo::query()
-            ->where('nivel_id', $this->nivel->id);
+            ->with('asignacionGrupo:id,nombre')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select('grupos.*')
+            ->where('grupos.nivel_id', $this->nivel->id);
     }
 
     protected function loadSemestres(): Collection
@@ -136,8 +140,8 @@ class Matricula extends Component
         }
 
         $query = $this->baseGrupoQuery()
-            ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $this->generacion_id);
+            ->where('grupos.grado_id', $this->grado_id)
+            ->where('grupos.generacion_id', $this->generacion_id);
 
         if ($this->esBachillerato()) {
             if (!$this->semestre_id) {
@@ -146,12 +150,13 @@ class Matricula extends Component
 
             $query->where('semestre_id', $this->semestre_id);
         } else {
-            $query->whereNull('semestre_id');
+            $query->whereNull('grupos.semestre_id');
         }
 
         return $query
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'generacion_id', 'grado_id', 'semestre_id']);
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
+            ->get();
     }
 
     protected function loadGruposDestino(): Collection
@@ -161,22 +166,23 @@ class Matricula extends Component
         }
 
         $query = $this->baseGrupoQuery()
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->nuevo_grado_id);
+            ->where('grupos.generacion_id', $this->generacion_id)
+            ->where('grupos.grado_id', $this->nuevo_grado_id);
 
         if ($this->esBachillerato()) {
             if (!$this->nuevo_semestre_id) {
                 return collect();
             }
 
-            $query->where('semestre_id', $this->nuevo_semestre_id);
+            $query->where('grupos.semestre_id', $this->nuevo_semestre_id);
         } else {
-            $query->whereNull('semestre_id');
+            $query->whereNull('grupos.semestre_id');
         }
 
         return $query
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'nivel_id', 'generacion_id', 'grado_id', 'semestre_id']);
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
+            ->get();
     }
 
     protected function consultaInscripcionesBase(): Builder
@@ -184,7 +190,10 @@ class Matricula extends Component
         $query = Inscripcion::query()
             ->with([
                 'grado:id,nombre',
-                'grupo:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
                 'semestre:id,numero',
                 'generacion:id,anio_ingreso,anio_egreso',
             ])
@@ -249,7 +258,10 @@ class Matricula extends Component
                 'detalles' => function ($query) {
                     $query->with([
                         'grado:id,nombre',
-                        'grupo:id,nombre',
+                        'grupo' => function ($q) {
+                            $q->select('id', 'asignacion_grupo_id')
+                                ->with('asignacionGrupo:id,nombre');
+                        },
                     ]);
                 },
             ])
@@ -520,12 +532,13 @@ class Matricula extends Component
         }
 
         $grupoDestino = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
             ->where('id', $this->nuevo_grupo_id)
             ->where('nivel_id', $this->nivel->id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grado_id', $this->nuevo_grado_id)
             ->whereNull('semestre_id')
-            ->first(['id', 'nombre', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
+            ->first(['id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
 
         if (!$grupoDestino) {
             $this->addError('nuevo_grupo_id', 'El grupo destino no pertenece al nivel, generación y grado seleccionados.');
@@ -614,12 +627,13 @@ class Matricula extends Component
         }
 
         $grupoDestino = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
             ->where('id', $this->nuevo_grupo_id)
             ->where('nivel_id', $this->nivel->id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grado_id', $this->nuevo_grado_id)
             ->where('semestre_id', $this->nuevo_semestre_id)
-            ->first(['id', 'nombre', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
+            ->first(['id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
 
         if (!$grupoDestino) {
             $this->addError('nuevo_grupo_id', 'El grupo destino no pertenece al nivel, generación, grado y semestre seleccionados.');
@@ -673,71 +687,79 @@ class Matricula extends Component
         ]);
     }
 
+
+    public function textoGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return '—';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
+    }
+
     public function exportarMatricula()
     {
         $rows = $this->consultaInscripcionesBase()->get();
 
-        $esBachillerato = $this->esBachillerato();
+        $nivelNombre = $this->nivel?->nombre ?? 'Sin nivel';
+
+        $generacionNombre = 'Todas';
+
+        if ($this->generacion_id) {
+            $generacion = $this->generaciones->firstWhere('id', $this->generacion_id);
+
+            if ($generacion) {
+                $generacionNombre = $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso;
+            }
+        }
+
+        $gradoNombre = 'Todos';
+
+        if ($this->grado_id) {
+            $grado = $this->grados->firstWhere('id', $this->grado_id);
+
+            if ($grado) {
+                $gradoNombre = $grado->nombre;
+            }
+        }
+
+        $semestreNombre = 'No aplica';
+
+        if ($this->esBachillerato() && $this->semestre_id) {
+            $semestre = $this->semestres->firstWhere('id', $this->semestre_id);
+
+            if ($semestre) {
+                $semestreNombre = 'Semestre ' . $semestre->numero;
+            }
+        }
+
+        $grupoNombre = 'Todos';
+
+        if ($this->grupo_id) {
+            $grupo = $this->grupos->firstWhere('id', $this->grupo_id);
+
+            if ($grupo) {
+                $grupoNombre = $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
+            }
+        }
+
+        $nombreArchivo = 'matricula_' .
+            str($nivelNombre)->slug('_') . '_' .
+            now()->format('Y_m_d_H_i_s') .
+            '.xlsx';
 
         return Excel::download(
-            new class ($rows, $esBachillerato) implements FromCollection, WithHeadings, WithMapping {
-            public function __construct(
-            protected Collection $rows,
-            protected bool $esBachillerato
-            ) {}
-
-            public function collection()
-            {
-                return $this->rows;
-            }
-
-            public function headings(): array
-            {
-                $headings = [
-                'Matrícula',
-                'Folio',
-                'Apellido paterno',
-                'Apellido materno',
-                'Nombre(s)',
-                'CURP',
-                'Género',
-                'Generación',
-                'Grado',
-                ];
-
-                if ($this->esBachillerato) {
-                    $headings[] = 'Semestre';
-                }
-
-                $headings[] = 'Grupo';
-
-                return $headings;
-            }
-
-            public function map($row): array
-            {
-                $data = [
-                    $row->matricula,
-                    $row->folio,
-                    $row->apellido_paterno,
-                    $row->apellido_materno,
-                    $row->nombre,
-                    $row->curp,
-                    $row->genero,
-                    $row->generacion ? ($row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso) : null,
-                    $row->grado?->nombre,
-                ];
-
-                if ($this->esBachillerato) {
-                    $data[] = $row->semestre?->numero;
-                }
-
-                $data[] = $row->grupo?->nombre;
-
-                return $data;
-            }
-            },
-            'matricula.xlsx'
+            new MatriculaExport(
+                rows: $rows,
+                nivelNombre: $nivelNombre,
+                generacionNombre: $generacionNombre,
+                gradoNombre: $gradoNombre,
+                semestreNombre: $semestreNombre,
+                grupoNombre: $grupoNombre,
+                search: $this->search,
+                esBachillerato: $this->esBachillerato()
+            ),
+            $nombreArchivo
         );
     }
 

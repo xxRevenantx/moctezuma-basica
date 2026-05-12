@@ -27,11 +27,11 @@
         $nombreNivel = strtoupper($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL'));
 
         $nombreGrado = $grado->nombre ?? ($grado->grado ?? '');
-        $nombreGrupo = $grupo->nombre ?? '';
+        $nombreGrupo = $grupo->asignacionGrupo->nombre ?? '';
 
         $turnoTexto = $turno ?? 'Matutino';
 
-        $totalAlumnos = $alumnos->count() > 15 ? '25px' : '45px';
+        $totalAlumnos = $alumnos->count() > 20 ? '20px' : '30px';
 
     @endphp
 
