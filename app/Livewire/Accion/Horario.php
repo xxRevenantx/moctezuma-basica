@@ -11,6 +11,7 @@ use App\Models\Hora;
 use App\Models\Horario as HorarioModel;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -324,7 +325,7 @@ class Horario extends Component
                 'hora',
                 'nivel',
                 'grado',
-                'grupo',
+                'grupo.asignacionGrupo',
                 'dia',
                 'semestre',
                 'asignacionMateria.materia',
@@ -357,7 +358,7 @@ class Horario extends Component
                 'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
                 'nivel' => $item->nivel?->nombre ?? 'N/D',
                 'grado' => $item->grado?->nombre ?? 'N/D',
-                'grupo' => $item->grupo?->nombre ?? 'N/D',
+                'grupo' => $this->textoGrupo($item->grupo, 'N/D'),
                 'dia' => $item->dia?->dia ?? 'N/D',
                 'hora_inicio' => $item->hora?->hora_inicio,
                 'hora_fin' => $item->hora?->hora_fin,
@@ -530,6 +531,57 @@ class Horario extends Component
         ];
     }
 
+    public function textoGrupo($grupo, string $valorPorDefecto = 'Sin grupo'): string
+    {
+        if (!$grupo) {
+            return $valorPorDefecto;
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? $valorPorDefecto;
+    }
+
+    public function limpiarFiltros(): void
+    {
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->grupo_id = null;
+        $this->semestre_id = null;
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->materiasDisponibles = collect();
+        $this->horariosGuardados = collect();
+        $this->seleccionesHorario = [];
+        $this->resetEstadoTraslapeProfesor();
+    }
+
+    public function getTotalCeldasProperty(): int
+    {
+        return $this->horas->count() * $this->dias->count();
+    }
+
+    public function getCeldasAsignadasProperty(): int
+    {
+        return $this->horariosGuardados->count();
+    }
+
+    public function getAvanceHorarioProperty(): int
+    {
+        if ($this->totalCeldas <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(($this->celdasAsignadas / $this->totalCeldas) * 100));
+    }
+
+    protected function consultaGruposBase(): Builder
+    {
+        return Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select('grupos.*')
+            ->where('grupos.nivel_id', $this->nivel->id);
+    }
+
     protected function filtrosCompletos(): bool
     {
         if ($this->esBachillerato) {
@@ -555,16 +607,14 @@ class Horario extends Component
             return null;
         }
 
-        return Grupo::query()
-            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre')
-            ->where('id', $this->grupo_id)
-            ->where('nivel_id', $this->nivel->id)
-            ->where('grado_id', $this->grado_id)
-            ->where('generacion_id', $this->generacion_id)
+        return $this->consultaGruposBase()
+            ->where('grupos.id', $this->grupo_id)
+            ->where('grupos.grado_id', $this->grado_id)
+            ->where('grupos.generacion_id', $this->generacion_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('semestre_id')
+                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('grupos.semestre_id')
             )
             ->first();
     }
@@ -590,26 +640,26 @@ class Horario extends Component
 
     protected function cargarGrupos(): void
     {
-        $this->grupos = Grupo::query()
-            ->where('nivel_id', $this->nivel->id)
+        if (!$this->generacion_id || !$this->grado_id) {
+            $this->grupos = collect();
+            return;
+        }
+
+        if ($this->esBachillerato && !$this->semestre_id) {
+            $this->grupos = collect();
+            return;
+        }
+
+        $this->grupos = $this->consultaGruposBase()
+            ->where('grupos.generacion_id', $this->generacion_id)
+            ->where('grupos.grado_id', $this->grado_id)
             ->when(
-                $this->generacion_id,
-                fn($query) => $query->where('generacion_id', $this->generacion_id),
-                fn($query) => $query->whereRaw('1 = 0')
+                $this->esBachillerato,
+                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('grupos.semestre_id')
             )
-            ->when(
-                $this->grado_id,
-                fn($query) => $query->where('grado_id', $this->grado_id),
-                fn($query) => $query->whereRaw('1 = 0')
-            )
-            ->when($this->esBachillerato, function ($query) {
-                if ($this->semestre_id) {
-                    $query->where('semestre_id', $this->semestre_id);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
-            })
-            ->orderBy('nombre')
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
             ->get();
     }
 
@@ -673,7 +723,7 @@ class Horario extends Component
                     $query->whereNull('semestre_id');
                 }
             })
-            ->orderBy('orden')
+            ->orderBy('asignacion_materias.orden')
             ->get()
             ->sortBy([
                 fn($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),

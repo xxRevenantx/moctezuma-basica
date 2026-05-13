@@ -52,7 +52,8 @@
         <div class="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"></div>
 
         {{-- Loader --}}
-        <div wire:loading.flex wire:target="refrescarHorasDias,generacion_id,grado_id,grupo_id,semestre_id"
+        <div wire:loading.flex
+            wire:target="refrescarHorasDias,generacion_id,grado_id,grupo_id,semestre_id,limpiarFiltros"
             class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-black/50">
             <div
                 class="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 px-6 py-5 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900/90">
@@ -95,14 +96,30 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                     <span
-                        class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
+                        class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
                         Horas: {{ $horas->count() }}
                     </span>
 
                     <span
-                        class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
+                        class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-300">
                         Días: {{ $dias->count() }}
                     </span>
+
+                    <span
+                        class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+                        Asignadas: {{ $this->celdasAsignadas }}/{{ $this->totalCeldas }}
+                    </span>
+
+                    <span
+                        class="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-700 dark:border-fuchsia-900/50 dark:bg-fuchsia-950/30 dark:text-fuchsia-300">
+                        Avance: {{ $this->avanceHorario }}%
+                    </span>
+
+                    <button type="button" wire:click="limpiarFiltros"
+                        class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700">
+                        <flux:icon.arrow-path class="h-4 w-4" />
+                        Limpiar
+                    </button>
 
                     <a target="_blank" href="{{ $this->urlDescargaHorario }}" @class([
                         'inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all duration-300' => true,
@@ -185,7 +202,7 @@
 
                             @foreach ($grupos as $grupo)
                                 <option value="{{ $grupo->id }}">
-                                    {{ $grupo->nombre }}
+                                    {{ $this->textoGrupo($grupo) }}
                                 </option>
                             @endforeach
                         </flux:select>
@@ -402,7 +419,7 @@
                             </p>
 
                             <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                {{ optional($grupos->firstWhere('id', $grupo_id))->nombre ?? 'No seleccionado' }}
+                                {{ $this->textoGrupo($grupos->firstWhere('id', (int) $grupo_id), 'No seleccionado') }}
                             </p>
                         </div>
 

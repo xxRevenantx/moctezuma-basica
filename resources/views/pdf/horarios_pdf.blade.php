@@ -3,25 +3,23 @@
 
 <head>
     <meta charset="UTF-8">
+
     @php
-        $nombreNivel = $nivel->nombre ?? 'NIVEL';
+        $nombreNivel = mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8');
+
         $nombreGeneracion = isset($generacion)
             ? ($generacion->anio_ingreso ?? '') . '-' . ($generacion->anio_egreso ?? '')
             : 'GENERACIÓN';
-        $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
-        $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
 
-        $tituloGrupo =
-            'GENERACIÓN: ' .
-            $nombreGeneracion .
-            ' · ' .
-            $nombreGrado .
-            '° grado de ' .
-            $nombreNivel .
-            ', grupo: ' .
-            $nombreGrupo;
+        $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
+
+        $nombreGrupo = mb_strtoupper($grupo->asignacionGrupo->nombre ?? ($grupo->nombre ?? 'GRUPO'), 'UTF-8');
+
+        $tituloGrupo = 'GENERACIÓN: ' . $nombreGeneracion . ' · ' . $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
     @endphp
+
     <title>Horario escolar de {{ $tituloGrupo }}</title>
+
     <style>
         @page {
             margin: 18px 22px;
@@ -86,6 +84,7 @@
         .logo-izq img,
         .logo-der img {
             max-width: 95px;
+            max-height: 85px;
         }
 
         .centro {
@@ -228,11 +227,19 @@
             background: #cfe0ef;
             color: #0f172a;
             font-size: 12px;
+            font-weight: 700;
         }
 
         .celda-no-calificable {
             background: #dbeafe;
             color: #1d4ed8;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .celda-extra {
+            background: #ede9fe;
+            color: #5b21b6;
             font-size: 12px;
             font-weight: 700;
         }
@@ -243,17 +250,18 @@
             font-size: 14px;
             font-weight: 700;
             height: 42px;
+            text-transform: uppercase;
         }
 
         .texto-grado {
             margin-bottom: 12px;
         }
 
-        .imagen-nina {
+        .imagen-nivel {
             margin-top: 10px;
         }
 
-        .imagen-nina img {
+        .imagen-nivel img {
             width: 74px;
             height: auto;
         }
@@ -284,6 +292,7 @@
         .sin-registro {
             color: #64748b;
             font-style: italic;
+            font-weight: 400;
         }
 
         footer {
@@ -310,11 +319,14 @@
         use Carbon\Carbon;
 
         $nombreNivel = mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8');
+
         $nombreGeneracion = isset($generacion)
             ? ($generacion->anio_ingreso ?? '') . '-' . ($generacion->anio_egreso ?? '')
             : 'GENERACIÓN';
+
         $nombreGrado = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
-        $nombreGrupo = mb_strtoupper($grupo->nombre ?? 'GRUPO', 'UTF-8');
+
+        $nombreGrupo = mb_strtoupper($grupo->asignacionGrupo->nombre ?? ($grupo->nombre ?? 'GRUPO'), 'UTF-8');
 
         $tituloGrupo = 'GENERACIÓN: ' . $nombreGeneracion . ' · ' . $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
@@ -324,7 +336,7 @@
         $esBachillerato = (int) ($nivel->id ?? 0) === 4;
 
         if ($esBachillerato && isset($semestre) && $semestre) {
-            $tituloGrupo .= ' · SEMESTRE: ' . ($semestre->numero ?? '');
+            $tituloGrupo .= ' · SEMESTRE: ' . ($semestre->numero ?? ($semestre->nombre ?? ($semestre->semestre ?? '')));
         }
 
         $profesorTitular = $profesor_titular ?? null;
@@ -339,16 +351,6 @@
             4 => ['texto' => 'VIERNES', 'class' => 'th-viernes'],
         ];
 
-        $slugsReceso = ['r', 'e', 'c', 's', 'o', 're', 'receso', 'receso-escolar', 'receso-general'];
-        $letrasReceso = ['RE', 'C', 'E', 'S', 'O'];
-
-        $partesColacion = ['co', 'l', 'a', 'ci', 'ón'];
-        $partesColacionSinAcento = ['co', 'l', 'a', 'ci', 'on'];
-        $letrasColacion = ['CO', 'L', 'A', 'CI', 'ÓN'];
-
-        $partesComida = ['co', 'm', 'i', 'd', 'a'];
-        $letrasComida = ['CO', 'M', 'I', 'D', 'A'];
-
         $docentes = collect();
 
         $slugsExcluidosDocentes = ['calculo-mental', 'caligrafia', 'lectura'];
@@ -357,44 +359,37 @@
             foreach ($diasOrdenados as $diaTmp) {
                 $registroTmp = $horarioPorCelda->get($horaTmp->id . '-' . $diaTmp->id);
                 $asignacionTmp = $registroTmp?->asignacionMateria;
+                $materiaTmp = $asignacionTmp?->materia;
 
-                if (!$asignacionTmp) {
+                if (!$asignacionTmp || !$materiaTmp) {
                     continue;
                 }
 
-                $slugMateria = mb_strtolower(trim($asignacionTmp->slug ?? ''), 'UTF-8');
+                $nombreMateriaTmp = $materiaTmp->materia ?? 'Sin materia';
+                $slugMateriaTmp = mb_strtolower(trim($materiaTmp->slug ?? ''), 'UTF-8');
+                $calificableTmp = (int) ($materiaTmp->calificable ?? 0);
+                $extraTmp = (int) ($materiaTmp->extra ?? 0);
+                $recesoTmp = (int) ($materiaTmp->receso ?? 0);
+                $ordenTmp = (int) ($materiaTmp->orden ?? 999999);
 
-                if (in_array($slugMateria, $slugsReceso, true)) {
+                // Se omiten recesos porque no son materias con docente.
+                if ($recesoTmp === 1) {
                     continue;
-                }
-
-                if ($esPreescolar) {
-                    if (
-                        in_array($slugMateria, $partesColacion, true) ||
-                        in_array($slugMateria, $partesColacionSinAcento, true)
-                    ) {
-                        continue;
-                    }
-
-                    if (in_array($slugMateria, $partesComida, true)) {
-                        continue;
-                    }
                 }
 
                 if ($esSecundaria || $esBachillerato) {
-                    if ((int) ($asignacionTmp->calificable ?? 0) !== 1) {
+                    // En secundaria y bachillerato se muestran docentes de materias calificables.
+                    if ($calificableTmp !== 1) {
                         continue;
                     }
                 } else {
-                    if (in_array($slugMateria, $slugsExcluidosDocentes, true)) {
+                    // En preescolar y primaria solo se muestran materias extra calificables.
+                    if ($extraTmp !== 1 || $calificableTmp !== 1) {
                         continue;
                     }
 
-                    if ((int) ($asignacionTmp->extra ?? 0) !== 1) {
-                        continue;
-                    }
-
-                    if ((int) ($asignacionTmp->calificable ?? 0) === 0) {
+                    // Se excluyen materias especiales que no deben aparecer como docente extra.
+                    if (in_array($slugMateriaTmp, $slugsExcluidosDocentes, true)) {
                         continue;
                     }
                 }
@@ -412,12 +407,13 @@
                     : 'Sin profesor asignado';
 
                 $docentes->push([
-                    'materia' => $asignacionTmp->materia ?? 'Sin materia',
+                    'materia' => $nombreMateriaTmp,
                     'docente' => $nombreProfesorTmp,
-                    'slug' => $slugMateria,
-                    'orden' => (int) ($asignacionTmp->orden ?? 999999),
-                    'calificable' => (int) ($asignacionTmp->calificable ?? 0),
-                    'extra' => (int) ($asignacionTmp->extra ?? 0),
+                    'slug' => $slugMateriaTmp,
+                    'orden' => $ordenTmp,
+                    'calificable' => $calificableTmp,
+                    'extra' => $extraTmp,
+                    'receso' => $recesoTmp,
                 ]);
             }
         }
@@ -443,9 +439,11 @@
                     <td class="centro">
                         <p class="titulo-institucion">Centro Universitario Moctezuma</p>
                         <div class="linea-titulo"></div>
+
                         <p class="titulo-principal">HORARIO DE CLASES</p>
+
                         <p class="subtitulo-principal">
-                            CICLO ESCOLAR {{ $ciclo_escolar->inicio_anio }}-{{ $ciclo_escolar->fin_anio }}
+                            CICLO ESCOLAR {{ $ciclo_escolar->inicio_anio ?? '' }}-{{ $ciclo_escolar->fin_anio ?? '' }}
                         </p>
                     </td>
 
@@ -459,6 +457,7 @@
 
             <div class="franja-grupo">
                 {{ $tituloGrupo }}
+
                 @if ($profesorTitular)
                     · PROFESOR(A): {{ mb_strtoupper($profesorTitular, 'UTF-8') }}
                 @endif
@@ -473,12 +472,17 @@
 
                     @foreach ($diasOrdenados as $index => $dia)
                         @php
+                            $nombreDia = $dia->dia ?? ($dia->nombre ?? 'DÍA');
+
                             $encabezado = $encabezadosPorDia[$index] ?? [
-                                'texto' => mb_strtoupper($dia->dia, 'UTF-8'),
+                                'texto' => mb_strtoupper($nombreDia, 'UTF-8'),
                                 'class' => 'th-lunes',
                             ];
                         @endphp
-                        <th class="{{ $encabezado['class'] }}">{{ $encabezado['texto'] }}</th>
+
+                        <th class="{{ $encabezado['class'] }}">
+                            {{ $encabezado['texto'] }}
+                        </th>
                     @endforeach
                 </tr>
             </thead>
@@ -488,14 +492,10 @@
                     <tr>
                         @if ($loop->first)
                             <td class="columna-grado" rowspan="{{ $horas->count() }}">
-                                <div class="texto-grado">
-                                    {{ $nombreGrado }}° GRADO DE <br>{{ $nombreNivel }}
-                                    <br><br>
-                                    GENERACIÓN {{ $nombreGeneracion }}
-                                </div>
+
 
                                 @if (!empty($imagen_nivel))
-                                    <div class="imagen-nina">
+                                    <div class="imagen-nivel">
                                         <img src="{{ $imagen_nivel }}" alt="Imagen del nivel">
                                     </div>
                                 @endif
@@ -503,70 +503,54 @@
                         @endif
 
                         <td class="columna-hora">
-                            {{ Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('g:ia') }}
-                            -
-                            {{ Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('g:ia') }}
+                            @php
+                                $horaInicio = $hora->hora_inicio
+                                    ? Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('g:ia')
+                                    : '';
+
+                                $horaFin = $hora->hora_fin
+                                    ? Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('g:ia')
+                                    : '';
+                            @endphp
+
+                            {{ $horaInicio }} - {{ $horaFin }}
                         </td>
 
                         @foreach ($diasOrdenados as $dia)
                             @php
                                 $registro = $horarioPorCelda->get($hora->id . '-' . $dia->id);
                                 $asignacion = $registro?->asignacionMateria;
+                                $materia = $asignacion?->materia;
 
-                                $textoMateria = $asignacion?->materia ?? null;
-                                $slugMateriaCelda = mb_strtolower(trim($asignacion?->slug ?? ''), 'UTF-8');
-                                $calificable = (int) ($asignacion?->calificable ?? 0);
+                                $textoMateria = $materia?->materia ?? null;
+                                $slugMateria = mb_strtolower(trim($materia?->slug ?? ''), 'UTF-8');
 
-                                $esReceso = false;
-                                $esColacion = false;
-                                $esComida = false;
+                                $calificable = (int) ($materia?->calificable ?? 0);
+                                $extra = (int) ($materia?->extra ?? 0);
+                                $receso = (int) ($materia?->receso ?? 0);
 
-                                if (in_array($slugMateriaCelda, $slugsReceso, true)) {
-                                    $esReceso = true;
-                                }
-
-                                if (!$esReceso) {
-                                    $horaInicio = Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('H:i');
-                                    $horaFin = Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('H:i');
-
-                                    if ($horaInicio === '10:00' && $horaFin === '10:30') {
-                                        $esReceso = true;
-                                    }
-                                }
-
-                                if ($esPreescolar && !$esReceso) {
-                                    if (
-                                        in_array($slugMateriaCelda, $partesColacion, true) ||
-                                        in_array($slugMateriaCelda, $partesColacionSinAcento, true)
-                                    ) {
-                                        $esColacion = true;
-                                    }
-
-                                    if (in_array($slugMateriaCelda, $partesComida, true)) {
-                                        $esComida = true;
-                                    }
-                                }
+                                $esReceso = $receso === 1;
 
                                 $claseCelda = 'celda-materia';
 
-                                if ($esPrimaria && !$esReceso && !$esColacion && !$esComida && $calificable === 0) {
+                                // En primaria se pinta diferente si la materia no es calificable.
+                                if ($esPrimaria && !$esReceso && $calificable === 0) {
                                     $claseCelda = 'celda-no-calificable';
                                 }
 
-                                $indiceDia = $loop->index;
+                                // Las materias extra se pueden distinguir visualmente.
+                                if (!$esReceso && $extra === 1 && $calificable === 1) {
+                                    $claseCelda = 'celda-extra';
+                                }
                             @endphp
 
                             @if ($esReceso)
                                 <td class="celda-receso">
-                                    {{ $letrasReceso[$indiceDia] ?? '' }}
-                                </td>
-                            @elseif ($esColacion)
-                                <td class="celda-receso">
-                                    {{ $letrasColacion[$indiceDia] ?? '' }}
-                                </td>
-                            @elseif ($esComida)
-                                <td class="celda-receso">
-                                    {{ $letrasComida[$indiceDia] ?? '' }}
+                                    @if ($textoMateria)
+                                        {{ mb_strtoupper($textoMateria, 'UTF-8') }}
+                                    @else
+                                        <span class="sin-registro">---</span>
+                                    @endif
                                 </td>
                             @else
                                 <td class="{{ $claseCelda }}">
@@ -597,11 +581,12 @@
                             <th style="width: 34%;">MATERIA</th>
                             <th>DOCENTE</th>
                         @else
-                            <th style="width: 34%;">MATERIA EXTRAS</th>
+                            <th style="width: 34%;">MATERIA EXTRA</th>
                             <th>DOCENTE EXTRA</th>
                         @endif
                     </tr>
                 </thead>
+
                 <tbody>
                     @foreach ($docentes as $item)
                         <tr>
@@ -614,12 +599,29 @@
         @endif
 
         <footer>
-            <strong>{{ $escuela->nombre }}</strong> — C.C.T. {{ $nivel->cct }}<br>
-            C. {{ $escuela->calle }} No.{{ $escuela->no_exterior }}, Col. {{ $escuela->colonia }}, C.P.
-            {{ $escuela->codigo_postal }},
-            {{ $escuela->ciudad }}, {{ $escuela->estado }}
-            · Tel. {{ $escuela->telefono }}<br>
-            <strong>Fecha de expedición:</strong> {{ Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
+            <strong>{{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }}</strong>
+
+            @if (!empty($nivel->cct))
+                — C.C.T. {{ $nivel->cct }}
+            @endif
+
+            <br>
+
+            C. {{ $escuela->calle ?? '' }}
+            No.{{ $escuela->no_exterior ?? '' }},
+            Col. {{ $escuela->colonia ?? '' }},
+            C.P. {{ $escuela->codigo_postal ?? '' }},
+            {{ $escuela->ciudad ?? '' }},
+            {{ $escuela->estado ?? '' }}
+
+            @if (!empty($escuela->telefono))
+                · Tel. {{ $escuela->telefono }}
+            @endif
+
+            <br>
+
+            <strong>Fecha de expedición:</strong>
+            {{ Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
         </footer>
     </div>
 </body>

@@ -141,13 +141,10 @@ class PDFController extends Controller
     public function horario_pdf(Request $request)
     {
         $slugNivel = (string) $request->input('slug_nivel');
-        $generacionId = $request->input('generacion_id');
-        $gradoId = $request->input('grado_id');
         $grupoId = $request->input('grupo_id');
-        $semestreId = $request->input('semestre_id');
 
-        if (blank($slugNivel) || blank($generacionId) || blank($gradoId) || blank($grupoId)) {
-            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
+        if (blank($slugNivel) || blank($grupoId)) {
+            abort(422, 'Los parámetros slug_nivel y grupo_id son obligatorios.');
         }
 
         $escuela = \App\Models\Escuela::query()->first();
@@ -164,58 +161,38 @@ class PDFController extends Controller
             abort(404, 'Nivel no encontrado.');
         }
 
-        $generacion = \App\Models\Generacion::query()
-            ->where('id', $generacionId)
-            ->where('nivel_id', $nivel->id)
-            ->first();
-
-        if (!$generacion) {
-            abort(404, 'Generación no encontrada o no pertenece al nivel seleccionado.');
-        }
-
-
-        $grado = \App\Models\Grado::query()
-            ->where('id', $gradoId)
-            ->where('nivel_id', $nivel->id)
-            ->first();
-
-        if (!$grado) {
-            abort(404, 'Grado no encontrado o no pertenece al nivel seleccionado.');
-        }
-
         $grupo = \App\Models\Grupo::query()
-            ->with(['asignacionGrupo', 'generacion', 'grado', 'semestre'])
+            ->with([
+                'nivel',
+                'grado',
+                'generacion',
+                'semestre',
+                'asignacionGrupo',
+            ])
             ->where('id', $grupoId)
             ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('generacion_id', $generacion->id)
             ->first();
 
         if (!$grupo) {
-            abort(404, 'Grupo no encontrado o no pertenece a la generación y grado seleccionados.');
+            abort(404, 'Grupo no encontrado o no pertenece al nivel seleccionado.');
+        }
+
+        $grado = $grupo->grado;
+        $generacion = $grupo->generacion;
+        $semestre = $grupo->semestre;
+
+        if (!$grado) {
+            abort(404, 'El grupo seleccionado no tiene grado asignado.');
+        }
+
+        if (!$generacion) {
+            abort(404, 'El grupo seleccionado no tiene generación asignada.');
         }
 
         $esBachillerato = (int) $nivel->id === 4;
 
-        $semestre = null;
-
-        if ($esBachillerato) {
-            if (blank($semestreId)) {
-                abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
-            }
-
-            $semestre = \App\Models\Semestre::query()
-                ->where('id', $semestreId)
-                ->where('grado_id', $grado->id)
-                ->first();
-
-            if (!$semestre) {
-                abort(404, 'Semestre no encontrado o no pertenece al grado seleccionado.');
-            }
-
-            if ((int) $grupo->semestre_id !== (int) $semestre->id) {
-                abort(422, 'El grupo seleccionado no pertenece al semestre indicado.');
-            }
+        if ($esBachillerato && !$semestre) {
+            abort(404, 'El grupo seleccionado de bachillerato no tiene semestre asignado.');
         }
 
         $cicloEscolar = \App\Models\CicloEscolar::query()
@@ -244,16 +221,20 @@ class PDFController extends Controller
                 'dia',
                 'hora',
                 'asignacionMateria.profesor',
+                'asignacionMateria.materia',
             ])
             ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id)
+            ->where('generacion_id', $generacion->id)
             ->where('grupo_id', $grupo->id);
 
         if ($esBachillerato) {
             $queryHorarios->where('semestre_id', $semestre->id);
         } else {
-            $queryHorarios->whereNull('semestre_id');
+            $queryHorarios->where(function ($query) {
+                $query->whereNull('semestre_id')
+                    ->orWhere('semestre_id', 0);
+            });
         }
 
         $horarios = $queryHorarios->get();
@@ -266,15 +247,25 @@ class PDFController extends Controller
 
         if (!$esBachillerato) {
             $primeraMateriaConProfesor = \App\Models\AsignacionMateria::query()
-                ->with('profesor')
+                ->with([
+                    'profesor',
+                    'materia',
+                ])
+                ->where('grupo_id', $grupo->id)
+                ->whereNotNull('profesor_id')
+                ->whereHas('materia', function ($query) use ($nivel, $grado) {
+                    $query->where('nivel_id', $nivel->id)
+                        ->where('grado_id', $grado->id)
+                        ->where('calificable', 1)
+                        ->where('receso', 0)
+                        ->where(function ($subquery) {
+                            $subquery->whereNull('semestre_id')
+                                ->orWhere('semestre_id', 0);
+                        });
+                })
                 ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
                 ->select('asignacion_materias.*')
-                ->where('materias.nivel_id', $nivel->id)
-                ->where('materias.grado_id', $grado->id)
-                ->where('asignacion_materias.grupo_id', $grupo->id)
-                ->whereNull('materias.semestre_id')
-                ->whereNotNull('asignacion_materias.profesor_id')
-                ->orderBy('asignacion_materias.orden')
+                ->orderBy('materias.orden')
                 ->first();
 
             if ($primeraMateriaConProfesor?->profesor) {
@@ -282,14 +273,14 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
 
         $logoIzquierdo = public_path('imagenes/logo-letra.png');
-        $logoDerecho = public_path('storage/logos/' . $nivel->logo);
+        $logoDerecho = public_path('storage/logos/' . ($nivel->logo ?? ''));
 
         $imagenesPorNivel = [
             'preescolar' => public_path('imagenes/personajes_preescolar.png'),
@@ -299,6 +290,7 @@ class PDFController extends Controller
         ];
 
         $slugNivelNormalizado = mb_strtolower((string) $nivel->slug, 'UTF-8');
+
         $imagenNivel = $imagenesPorNivel[$slugNivelNormalizado] ?? null;
 
         $logoIzquierdo = file_exists($logoIzquierdo) ? $logoIzquierdo : null;
@@ -327,7 +319,7 @@ class PDFController extends Controller
             'GEN_' . ($generacion->anio_ingreso ?? 'GEN') . '-' . ($generacion->anio_egreso ?? 'GEN') . '_' .
             'GRADO_' . ($grado->nombre ?? 'GRADO') . '_' .
             'GRUPO_' . $this->nombreGrupo($grupo) .
-            ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? '') : '') .
+            ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? $semestre->nombre ?? '') : '') .
             '.pdf';
 
         return $pdf->stream($nombreArchivo);
@@ -577,8 +569,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -1073,8 +1065,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1549,8 +1541,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1808,8 +1800,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -2624,12 +2616,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'pdf.lista.sece',
-                    'sece_interna' => 'pdf.sece_interna',
-                    'personalizadores' => 'pdf.personalizadores',
-                    'etiquetas' => 'pdf.etiquetas_pdf',
-                    default => abort(404, 'El formato seleccionado no existe.'),
-                },
+                'sece' => 'pdf.lista.sece',
+                'sece_interna' => 'pdf.sece_interna',
+                'personalizadores' => 'pdf.personalizadores',
+                'etiquetas' => 'pdf.etiquetas_pdf',
+                default => abort(404, 'El formato seleccionado no existe.'),
+            },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2647,12 +2639,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'formato-sece',
-                    'sece_interna' => 'formato-sece-interna',
-                    'personalizadores' => 'personalizadores',
-                    'etiquetas' => 'etiquetas',
-                    default => 'formato',
-                },
+                'sece' => 'formato-sece',
+                'sece_interna' => 'formato-sece-interna',
+                'personalizadores' => 'personalizadores',
+                'etiquetas' => 'etiquetas',
+                default => 'formato',
+            },
 
             default => 'lista',
         };
@@ -2812,9 +2804,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-            ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 
@@ -3030,15 +3022,15 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                ?? $periodo?->parcialBachillerato?->descripcion
-                ?? 'PARCIAL'
+                    ?? $periodo?->parcialBachillerato?->descripcion
+                    ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-            ?? $periodo?->periodoBasica?->descripcion
-            ?? 'PERIODO'
+                ?? $periodo?->periodoBasica?->descripcion
+                ?? 'PERIODO'
         );
     }
     private function nombreGrupo($grupo): string
