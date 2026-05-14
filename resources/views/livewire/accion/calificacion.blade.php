@@ -225,10 +225,12 @@
 
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
-                    :disabled="!$generacion_id || !$grado_id || !$semestre_id">
+                    wire:key="grupo-bachillerato-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
+                    :disabled="!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
+                        <flux:select.option value="{{ $gpo->id }}">{{ $this->textoGrupo($gpo) }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
@@ -245,10 +247,13 @@
             </div>
         @else
             <div>
-                <flux:select label="Grupo" wire:model.live="grupo_id" :disabled="!$generacion_id || !$grado_id">
+                <flux:select label="Grupo" wire:model.live="grupo_id"
+                    wire:key="grupo-basica-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $grupos->count() }}"
+                    :disabled="!$generacion_id || !$grado_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $gpo->nombre }}</flux:select.option>
+                        <flux:select.option value="{{ $gpo->id }}">{{ $this->textoGrupo($gpo) }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
@@ -258,7 +263,8 @@
                     :disabled="!$generacion_id || !$grado_id || !$grupo_id">
                     <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
                     @foreach ($periodosBasica as $periodoBasica)
-                        <flux:select.option value="{{ $periodoBasica->id }}">{{ $periodoBasica->descripcion }}
+                        <flux:select.option value="{{ $periodoBasica->id }}">
+                            {{ $periodoBasica->descripcion ?? ($periodoBasica->periodo ?? 'Periodo ' . $periodoBasica->id) }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>

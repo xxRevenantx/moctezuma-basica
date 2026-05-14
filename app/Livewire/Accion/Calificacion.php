@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -261,26 +262,30 @@ class Calificacion extends Component
 
     private function cargarGrupos(): void
     {
+        $this->grupos = collect();
+
         if (blank($this->generacion_id) || blank($this->grado_id)) {
-            $this->grupos = collect();
             return;
         }
 
         if ($this->esBachillerato && blank($this->semestre_id)) {
-            $this->grupos = collect();
             return;
         }
 
         $this->grupos = Grupo::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->grado_id)
+            ->with('asignacionGrupo:id,nombre')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select('grupos.*')
+            ->where('grupos.nivel_id', $this->nivel_id)
+            ->where('grupos.generacion_id', $this->generacion_id)
+            ->where('grupos.grado_id', $this->grado_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('semestre_id')
+                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('grupos.semestre_id')
             )
-            ->orderBy('nombre')
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
             ->get();
     }
 
@@ -465,8 +470,8 @@ class Calificacion extends Component
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
-                            ($inscripcion->apellido_materno ?? '') . ' ' .
-                            ($inscripcion->nombre ?? '')
+                        ($inscripcion->apellido_materno ?? '') . ' ' .
+                        ($inscripcion->nombre ?? '')
                     ),
                 ];
             })
@@ -522,8 +527,8 @@ class Calificacion extends Component
                     'profesor' => $profesor
                         ? trim(
                             ($profesor->nombre ?? '') . ' ' .
-                                ($profesor->apellido_paterno ?? '') . ' ' .
-                                ($profesor->apellido_materno ?? '')
+                            ($profesor->apellido_paterno ?? '') . ' ' .
+                            ($profesor->apellido_materno ?? '')
                         )
                         : 'SIN PROFESOR ASIGNADO',
                 ];
@@ -1125,6 +1130,27 @@ class Calificacion extends Component
         return 'Activo';
     }
 
+    public function textoGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return 'Sin grupo';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
+    }
+
+    public function grupoSeleccionado(): ?Grupo
+    {
+        if (blank($this->grupo_id)) {
+            return null;
+        }
+
+        return $this->grupos->firstWhere('id', (int) $this->grupo_id)
+            ?? Grupo::query()
+                ->with('asignacionGrupo:id,nombre')
+                ->find($this->grupo_id);
+    }
+
     public function getClaseEstadoPeriodoProperty(): string
     {
         return match ($this->estadoPeriodo) {
@@ -1282,14 +1308,18 @@ class Calificacion extends Component
             return null;
         }
 
+        $grupo = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
+            ->find($this->grupo_id);
+
         $nombreNivel = mb_strtoupper(Nivel::query()->where('id', $this->nivel_id)->value('nombre') ?? $this->slug_nivel ?? 'NIVEL');
         $nombreGrado = Grado::query()->where('id', $this->grado_id)->value('nombre') ?? 'GRADO';
-        $nombreGrupo = Grupo::query()->where('id', $this->grupo_id)->value('nombre') ?? 'GRUPO';
+        $nombreGrupo = $this->textoGrupo($grupo);
 
         $nombreArchivo = 'CALIFICACIONES_' .
-            str_replace(' ', '_', $nombreNivel) .
-            '_GRADO_' . str_replace(' ', '_', $nombreGrado) .
-            '_GRUPO_' . str_replace(' ', '_', $nombreGrupo) .
+            Str::slug($nombreNivel, '_') .
+            '_GRADO_' . Str::slug($nombreGrado, '_') .
+            '_GRUPO_' . Str::slug($nombreGrupo, '_') .
             '_PERIODO_' . ($this->periodo_id ?? 'SIN_PERIODO') .
             '.xlsx';
 
