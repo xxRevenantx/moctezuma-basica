@@ -748,7 +748,7 @@ class CrearInscripcion extends Component
 
     protected function baseGrupoQuery()
     {
-        return Grupo::query()->whereNull('deleted_at');
+        return Grupo::query();
     }
 
     protected function loadNivelesFromGrupos(): Collection

@@ -113,7 +113,6 @@ return new class extends Migration {
             $table->dateTime('fecha_inscripcion')->nullable();
 
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 
