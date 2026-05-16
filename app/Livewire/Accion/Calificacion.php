@@ -121,7 +121,7 @@ class Calificacion extends Component
             ->get();
     }
 
-    public function updatedGeneracionId(): void
+    public function updatedGeneracionId($value = null): void
     {
         $this->resetEstadoAcademico([
             'grado_id',
@@ -133,10 +133,18 @@ class Calificacion extends Component
             'diploma_inscripcion_id',
         ]);
 
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+
+        if (blank($value)) {
+            return;
+        }
+
         $this->cargarGrados();
     }
 
-    public function updatedGradoId(): void
+    public function updatedGradoId($value = null): void
     {
         $this->resetEstadoAcademico([
             'grupo_id',
@@ -147,14 +155,22 @@ class Calificacion extends Component
             'diploma_inscripcion_id',
         ]);
 
+        $this->grupos = collect();
+        $this->semestres = collect();
+
+        if (blank($value)) {
+            return;
+        }
+
         if ($this->esBachillerato) {
             $this->cargarSemestres();
-        } else {
-            $this->cargarGrupos();
+            return;
         }
+
+        $this->cargarGrupos();
     }
 
-    public function updatedSemestreId(): void
+    public function updatedSemestreId($value = null): void
     {
         $this->resetEstadoAcademico([
             'grupo_id',
@@ -163,10 +179,16 @@ class Calificacion extends Component
             'diploma_inscripcion_id',
         ]);
 
+        $this->grupos = collect();
+
+        if (blank($value)) {
+            return;
+        }
+
         $this->cargarGrupos();
     }
 
-    public function updatedGrupoId(): void
+    public function updatedGrupoId($value = null): void
     {
         $this->resetEstadoAcademico([
             'parcial_bachillerato_id',
@@ -175,34 +197,53 @@ class Calificacion extends Component
             'diploma_inscripcion_id',
         ]);
 
-        if (!$this->esBachillerato) {
-            $this->cargarDatos();
+        if (blank($value)) {
+            return;
         }
+
+        if (!$this->esBachillerato) {
+            return;
+        }
+
+        /*
+         * En bachillerato no se cargan datos al seleccionar grupo.
+         * Primero se debe seleccionar el parcial.
+         */
     }
 
-    public function updatedParcialBachilleratoId(): void
+    public function updatedParcialBachilleratoId($value = null): void
     {
         $this->resetEstadoAcademico([
             'boleta_inscripcion_id',
             'diploma_inscripcion_id',
         ]);
+
+        if (blank($value)) {
+            return;
+        }
 
         $this->cargarDatos();
     }
 
-    public function updatedPeriodoBasicaId(): void
+    public function updatedPeriodoBasicaId($value = null): void
     {
         $this->resetEstadoAcademico([
             'boleta_inscripcion_id',
             'diploma_inscripcion_id',
         ]);
+
+        if (blank($value)) {
+            return;
+        }
 
         $this->cargarDatos();
     }
 
     public function updatedBusqueda(): void
     {
-        $this->cargarDatos();
+        if ($this->puedeCargarDatos()) {
+            $this->cargarDatos();
+        }
     }
 
     public function updatedFiltroEstado(): void
@@ -225,12 +266,29 @@ class Calificacion extends Component
             'observaciones',
             'observacionesOriginales',
             'promedios',
+            'mostrarModalBitacora',
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
         ]);
 
         $this->reset($campos);
+    }
+
+    private function puedeCargarDatos(): bool
+    {
+        if ($this->esBachillerato) {
+            return filled($this->generacion_id)
+                && filled($this->grado_id)
+                && filled($this->semestre_id)
+                && filled($this->grupo_id)
+                && filled($this->parcial_bachillerato_id);
+        }
+
+        return filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id)
+            && filled($this->periodo_basica_id);
     }
 
     private function cargarGrados(): void
@@ -311,6 +369,7 @@ class Calificacion extends Component
             'observaciones',
             'observacionesOriginales',
             'promedios',
+            'mostrarModalBitacora',
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
@@ -337,30 +396,14 @@ class Calificacion extends Component
             'observaciones',
             'observacionesOriginales',
             'promedios',
+            'mostrarModalBitacora',
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
         ]);
 
-        if ($this->esBachillerato) {
-            if (
-                blank($this->generacion_id) ||
-                blank($this->grado_id) ||
-                blank($this->semestre_id) ||
-                blank($this->grupo_id) ||
-                blank($this->parcial_bachillerato_id)
-            ) {
-                return;
-            }
-        } else {
-            if (
-                blank($this->generacion_id) ||
-                blank($this->grado_id) ||
-                blank($this->grupo_id) ||
-                blank($this->periodo_basica_id)
-            ) {
-                return;
-            }
+        if (!$this->puedeCargarDatos()) {
+            return;
         }
 
         $this->cargarPeriodoSeleccionado();
@@ -430,20 +473,94 @@ class Calificacion extends Component
             ->value('id');
     }
 
+    private function obtenerGrupoIdsEquivalentes(): array
+    {
+        if (blank($this->grupo_id)) {
+            return [];
+        }
+
+        $grupoSeleccionado = Grupo::query()
+            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'asignacion_grupo_id')
+            ->find($this->grupo_id);
+
+        if (!$grupoSeleccionado) {
+            return [(int) $this->grupo_id];
+        }
+
+        /*
+         * En bachillerato se buscan todos los grupos equivalentes.
+         * Esto permite cargar alumnos del mismo grupo lógico, aunque estén
+         * registrados en otro semestre.
+         */
+        if ($this->esBachillerato) {
+            return Grupo::query()
+                ->where('nivel_id', $this->nivel_id)
+                ->where('generacion_id', $this->generacion_id)
+                ->where('grado_id', $this->grado_id)
+                ->where('asignacion_grupo_id', $grupoSeleccionado->asignacion_grupo_id)
+                ->pluck('id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->toArray();
+        }
+
+        return [(int) $this->grupo_id];
+    }
+    private function obtenerGrupoIdsParaAlumnos(): array
+    {
+        if (blank($this->grupo_id)) {
+            return [];
+        }
+
+        $grupoSeleccionado = Grupo::query()
+            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'asignacion_grupo_id')
+            ->find($this->grupo_id);
+
+        if (!$grupoSeleccionado) {
+            return [(int) $this->grupo_id];
+        }
+
+        /*
+         * En bachillerato se toman todos los grupos equivalentes.
+         * Esto permite mostrar los alumnos del mismo grupo lógico,
+         * aunque el alumno no tenga asignado el semestre seleccionado.
+         */
+        if ($this->esBachillerato) {
+            return Grupo::query()
+                ->where('nivel_id', $this->nivel_id)
+                ->where('generacion_id', $this->generacion_id)
+                ->where('grado_id', $this->grado_id)
+                ->where('asignacion_grupo_id', $grupoSeleccionado->asignacion_grupo_id)
+                ->pluck('id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->toArray();
+        }
+
+        return [(int) $this->grupo_id];
+    }
     private function cargarInscripciones(): void
     {
+        $grupoIds = $this->obtenerGrupoIdsParaAlumnos();
+
         $query = Inscripcion::query()
             ->where('nivel_id', $this->nivel_id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grado_id', $this->grado_id)
-            ->where('grupo_id', $this->grupo_id)
             ->where(function ($q) {
-                $q->where('activo', true)
-                    ->orWhere('activo', 1);
+                $q->where('activo', 1)
+                    ->orWhere('activo', true)
+                    ->orWhere('activo', '1')
+                    ->orWhere('activo', 'true');
             });
 
-        if ($this->esBachillerato) {
-            $query->where('semestre_id', $this->semestre_id);
+        /*
+         * No se filtra por semestre_id.
+         * En bachillerato tampoco se usa solo el grupo_id seleccionado,
+         * porque el mismo grupo A puede existir en varios semestres con ids diferentes.
+         */
+        if (!empty($grupoIds)) {
+            $query->whereIn('grupo_id', $grupoIds);
         }
 
         if (filled($this->busqueda)) {
@@ -466,7 +583,7 @@ class Calificacion extends Component
             ->get()
             ->map(function ($inscripcion) {
                 return [
-                    'inscripcion_id' => $inscripcion->id,
+                    'inscripcion_id' => (int) $inscripcion->id,
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
@@ -505,12 +622,12 @@ class Calificacion extends Component
                     $query->whereNull('semestre_id');
                 }
             })
-            ->get()
-            ->sortBy([
-                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
-                fn($a, $b) => strcasecmp($a->materia?->materia ?? '', $b->materia?->materia ?? ''),
-            ])
-            ->values();
+
+            // Se ordenan las materias por la columna orden de asignacion_materias.
+            ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('orden')
+            ->orderBy('id')
+            ->get();
 
         $this->materias = $asignaciones
             ->map(function ($asignacion) {
@@ -519,11 +636,16 @@ class Calificacion extends Component
                 return [
                     'id' => (int) $asignacion->id,
                     'materia_id' => (int) $asignacion->materia_id,
+
+                    // Se manda el orden al Blade por si se desea mostrar.
+                    'orden' => $asignacion->orden,
+
                     'materia' => $asignacion->materia?->materia ?? 'Materia',
                     'clave' => $asignacion->materia?->clave,
                     'slug' => $asignacion->materia?->slug,
                     'extra' => (bool) ($asignacion->materia?->extra ?? false),
                     'calificable' => (bool) ($asignacion->materia?->calificable ?? false),
+
                     'profesor' => $profesor
                         ? trim(
                             ($profesor->nombre ?? '') . ' ' .
@@ -1342,6 +1464,7 @@ class Calificacion extends Component
     {
         return view('livewire.accion.calificacion', [
             'hayCambios' => $this->hayCambios,
+            'graficasCalificaciones' => $this->graficasCalificaciones,
         ]);
     }
 }

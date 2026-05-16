@@ -404,260 +404,501 @@
             </span>
         </div>
 
-        <div class="p-6">
+        <div class="space-y-6 p-6">
             @php
-                $asignacionesAgrupadas = $this->asignacionesFiltradas->groupBy(function ($item) {
-                    $grado = $item->grupo?->grado?->nombre ?? 'Sin grado';
-                    $grupo = $item->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo';
+                $asignacionesPorGeneracion = $this->asignacionesFiltradas->groupBy(function ($item) {
+                    $generacionId = $item->grupo?->generacion?->id ?? 0;
 
-                    return $grado . ' - Grupo ' . $grupo;
+                    return 'generacion_' . $generacionId;
                 });
             @endphp
 
-            @forelse ($asignacionesAgrupadas as $nombreGrupo => $materias)
+            @forelse ($asignacionesPorGeneracion as $generacionKey => $materiasGeneracion)
                 @php
-                    $grupoId = $materias->first()?->grupo_id;
-                    $grupoBase = $materias->first()?->grupo;
+                    $generacionBase = $materiasGeneracion->first()?->grupo?->generacion;
+
+                    $nombreGeneracion = $generacionBase
+                        ? $generacionBase->anio_ingreso . ' - ' . $generacionBase->anio_egreso
+                        : 'Sin generación';
+
+                    $gruposDeGeneracion = $materiasGeneracion->groupBy(function ($item) {
+                        $gradoId = $item->grupo?->grado_id ?? 0;
+                        $grupoId = $item->grupo?->asignacion_grupo_id ?? 0;
+
+                        return 'grado_' . $gradoId . '_grupo_' . $grupoId;
+                    });
                 @endphp
 
-                <div class="mb-8 overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
-                    <div
-                        class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between">
+                {{-- Collapse principal de generación --}}
+                <div x-data="{ abiertoGeneracion: true }"
+                    class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                    <button type="button" x-on:click="abiertoGeneracion = !abiertoGeneracion"
+                        class="flex w-full flex-col gap-3 border-b border-slate-200 bg-white px-5 py-5 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h3 class="text-base font-black text-slate-900 dark:text-white">
-                                {{ $nombreGrupo }}
-                            </h3>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-sky-100 text-sm font-black text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                                    G
+                                </span>
 
-                            <p class="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                @if ($grupoBase?->generacion)
-                                    Generación {{ $grupoBase->generacion->anio_ingreso }} -
-                                    {{ $grupoBase->generacion->anio_egreso }}
-                                @else
-                                    Sin generación
-                                @endif
+                                <div>
+                                    <h3 class="text-lg font-black text-slate-900 dark:text-white">
+                                        Generación {{ $nombreGeneracion }}
+                                    </h3>
 
-                                @if ($grupoBase?->semestre)
-                                    · {{ $grupoBase->semestre->numero }}° semestre
-                                @endif
-                            </p>
+                                    <p class="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        Contiene {{ $gruposDeGeneracion->count() }} grupo(s) y
+                                        {{ $materiasGeneracion->count() }} materia(s).
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <span
-                            class="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600 shadow-sm dark:bg-slate-800 dark:text-slate-300">
-                            {{ $materias->count() }} materias
-                        </span>
-                    </div>
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                {{ $materiasGeneracion->count() }} materias
+                            </span>
 
-                    {{-- Tabla escritorio --}}
-                    <div class="hidden overflow-x-auto lg:block">
-                        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead class="bg-white dark:bg-slate-950">
-                                <tr>
-                                    <th
-                                        class="w-12 px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
-                                        Orden
-                                    </th>
+                            <span
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                <svg class="h-4 w-4 transition-transform duration-300"
+                                    :class="abiertoGeneracion ? 'rotate-180' : ''" fill="none"
+                                    stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                                </svg>
+                            </span>
+                        </div>
+                    </button>
 
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
-                                        Materia
-                                    </th>
+                    <div x-show="abiertoGeneracion" x-cloak x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 -translate-y-3"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-200"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 -translate-y-3" class="space-y-5 p-5">
 
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
-                                        Profesor
-                                    </th>
+                        @foreach ($gruposDeGeneracion as $grupoKey => $materiasGrupo)
+                            @php
+                                $grupoBase = $materiasGrupo->first()?->grupo;
 
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
-                                        Tipo
-                                    </th>
+                                $nombreGrado = $grupoBase?->grado?->nombre ?? 'Sin grado';
+                                $nombreGrupo = $grupoBase?->asignacionGrupo?->nombre ?? 'Sin grupo';
 
-                                    <th
-                                        class="px-4 py-3 text-right text-xs font-black uppercase tracking-wide text-slate-400">
-                                        Acciones
-                                    </th>
-                                </tr>
-                            </thead>
+                                if ((int) $nivel?->id === 4) {
+                                    $semestresDelGrupo = $materiasGrupo->groupBy(function ($item) {
+                                        return 'semestre_' . ($item->grupo?->semestre_id ?? 0);
+                                    });
+                                } else {
+                                    $semestresDelGrupo = collect([
+                                        'basica' => $materiasGrupo,
+                                    ]);
+                                }
+                            @endphp
 
-                            <tbody data-sortable="grupo" data-grupo-id="{{ $grupoId }}"
-                                class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
-                                @foreach ($materias as $item)
-                                    <tr data-id="{{ $item->id }}" @class([
-                                        'transition hover:bg-slate-50 dark:hover:bg-slate-900/70',
-                                        'bg-emerald-50/70 dark:bg-emerald-950/20' =>
-                                            $ultimoRegistroId === $item->id,
-                                    ])>
-                                        <td class="px-4 py-4">
-                                            <button type="button" data-handle
-                                                class="inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-sky-200 hover:text-sky-600 active:cursor-grabbing dark:border-slate-700 dark:bg-slate-900"
-                                                title="Mover">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor"
-                                                    stroke-width="1.8" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01" />
-                                                </svg>
-                                            </button>
-                                        </td>
-
-                                        <td class="px-4 py-4">
-                                            <div class="flex flex-col">
-                                                <span class="font-bold text-slate-800 dark:text-slate-100">
-                                                    {{ $item->materia?->materia ?? 'Sin materia' }}
-                                                </span>
-
-                                                <span class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                    {{ $item->materia?->clave ?? 'Sin clave' }}
-                                                </span>
-                                            </div>
-                                        </td>
-
-                                        <td class="px-4 py-4">
-                                            <div class="flex flex-col">
-                                                <span class="font-semibold text-slate-700 dark:text-slate-200">
-                                                    @if ($item->profesor)
-                                                        {{ trim(($item->profesor->titulo ?? '') . ' ' . ($item->profesor->nombre ?? '') . ' ' . ($item->profesor->apellido_paterno ?? '') . ' ' . ($item->profesor->apellido_materno ?? '')) }}
-                                                    @else
-                                                        Sin profesor
-                                                    @endif
-                                                </span>
-
-                                                <span class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                    Grupo {{ $item->grupo?->asignacionGrupo?->nombre ?? '—' }}
-                                                </span>
-                                            </div>
-                                        </td>
-
-                                        <td class="px-4 py-4">
-                                            <div class="flex flex-wrap gap-2">
-                                                @if ($item->materia?->calificable)
-                                                    <span
-                                                        class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                                        Calificable
-                                                    </span>
-                                                @else
-                                                    <span
-                                                        class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                        No calificable
-                                                    </span>
-                                                @endif
-
-                                                @if ($item->materia?->extra)
-                                                    <span
-                                                        class="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                                                        Extra
-                                                    </span>
-                                                @endif
-
-                                                @if ($item->materia?->receso)
-                                                    <span
-                                                        class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                                                        Receso
-                                                    </span>
-                                                @endif
-                                            </div>
-                                        </td>
-
-                                        <td class="px-4 py-4 text-right">
-                                            <div class="flex justify-end gap-2">
-                                                <button type="button" wire:click="editar({{ $item->id }})"
-                                                    class="inline-flex items-center justify-center rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900">
-                                                    Editar
-                                                </button>
-
-                                                <button type="button" wire:click="eliminar({{ $item->id }})"
-                                                    wire:confirm="¿Seguro que deseas eliminar esta asignación?"
-                                                    class="inline-flex items-center justify-center rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600 transition hover:bg-red-100 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900">
-                                                    Eliminar
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {{-- Vista móvil --}}
-                    <div class="grid gap-3 p-4 lg:hidden">
-                        @foreach ($materias as $item)
-                            <article data-id="{{ $item->id }}"
-                                class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                                <div class="flex items-start justify-between gap-3">
+                            {{-- Subcollapse de grado y grupo --}}
+                            <div x-data="{ abiertoGrupo: true }"
+                                class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                                <button type="button" x-on:click="abiertoGrupo = !abiertoGrupo"
+                                    class="flex w-full flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <h4 class="font-black text-slate-900 dark:text-white">
-                                            {{ $item->materia?->materia ?? 'Sin materia' }}
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                                {{ $nombreGrado }}
+                                            </span>
+
+                                            <span
+                                                class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                                Grupo {{ $nombreGrupo }}
+                                            </span>
+
+                                            @if ((int) $nivel?->id === 4)
+                                                <span
+                                                    class="inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                                    Bachillerato
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <h4 class="mt-2 text-base font-black text-slate-900 dark:text-white">
+                                            {{ $nombreGrado }} / Grupo {{ $nombreGrupo }}
                                         </h4>
 
-                                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                            {{ $item->materia?->clave ?? 'Sin clave' }}
+                                        <p class="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                            @if ((int) $nivel?->id === 4)
+                                                Agrupado por semestres dentro de la misma generación.
+                                            @else
+                                                Agrupado por grado y grupo dentro de la misma generación.
+                                            @endif
                                         </p>
                                     </div>
 
-                                    <span
-                                        class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                        #{{ $item->orden }}
-                                    </span>
-                                </div>
-
-                                <div class="mt-4 space-y-2 text-sm">
-                                    <p class="text-slate-600 dark:text-slate-300">
-                                        <span class="font-bold">Profesor:</span>
-
-                                        @if ($item->profesor)
-                                            {{ trim(($item->profesor->titulo ?? '') . ' ' . ($item->profesor->nombre ?? '') . ' ' . ($item->profesor->apellido_paterno ?? '') . ' ' . ($item->profesor->apellido_materno ?? '')) }}
-                                        @else
-                                            Sin profesor
-                                        @endif
-                                    </p>
-
-                                    <p class="text-slate-600 dark:text-slate-300">
-                                        <span class="font-bold">Grupo:</span>
-                                        {{ $item->grupo?->asignacionGrupo?->nombre ?? '—' }}
-                                    </p>
-                                </div>
-
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @if ($item->materia?->calificable)
+                                    <div class="flex items-center gap-3">
                                         <span
-                                            class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                            Calificable
+                                            class="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600 shadow-sm dark:bg-slate-800 dark:text-slate-300">
+                                            {{ $materiasGrupo->count() }} materias
                                         </span>
-                                    @else
-                                        <span
-                                            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                            No calificable
-                                        </span>
-                                    @endif
 
-                                    @if ($item->materia?->extra)
                                         <span
-                                            class="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                                            Extra
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                            <svg class="h-4 w-4 transition-transform duration-300"
+                                                :class="abiertoGrupo ? 'rotate-180' : ''" fill="none"
+                                                stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="m6 9 6 6 6-6" />
+                                            </svg>
                                         </span>
-                                    @endif
+                                    </div>
+                                </button>
 
-                                    @if ($item->materia?->receso)
-                                        <span
-                                            class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                                            Receso
-                                        </span>
-                                    @endif
+                                <div x-show="abiertoGrupo" x-cloak
+                                    x-transition:enter="transition ease-out duration-300"
+                                    x-transition:enter-start="opacity-0 -translate-y-3"
+                                    x-transition:enter-end="opacity-100 translate-y-0"
+                                    x-transition:leave="transition ease-in duration-200"
+                                    x-transition:leave-start="opacity-100 translate-y-0"
+                                    x-transition:leave-end="opacity-0 -translate-y-3" class="space-y-4 p-4">
+
+                                    @foreach ($semestresDelGrupo as $semestreKey => $materiasSemestre)
+                                        @php
+                                            $grupoSemestre = $materiasSemestre->first()?->grupo;
+                                            $grupoId = $grupoSemestre?->id;
+
+                                            $nombreSemestre = $grupoSemestre?->semestre
+                                                ? $grupoSemestre->semestre->numero . '° semestre'
+                                                : 'Materias del grupo';
+                                        @endphp
+
+                                        {{-- Subcollapse de semestre --}}
+                                        <div x-data="{ abiertoSemestre: true }"
+                                            class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                                            <button type="button" x-on:click="abiertoSemestre = !abiertoSemestre"
+                                                class="flex w-full flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                                                <div>
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        <span
+                                                            class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                                                            Generación {{ $nombreGeneracion }}
+                                                        </span>
+
+                                                        <span
+                                                            class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                                            {{ $nombreGrado }}
+                                                        </span>
+
+                                                        <span
+                                                            class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                                            Grupo {{ $nombreGrupo }}
+                                                        </span>
+
+                                                        @if ((int) $nivel?->id === 4)
+                                                            <span
+                                                                class="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                                                {{ $nombreSemestre }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+
+                                                    <h5 class="mt-2 text-sm font-black text-slate-900 dark:text-white">
+                                                        @if ((int) $nivel?->id === 4)
+                                                            {{ $nombreSemestre }}
+                                                        @else
+                                                            Materias asignadas
+                                                        @endif
+                                                    </h5>
+                                                </div>
+
+                                                <div class="flex items-center gap-3">
+                                                    <span
+                                                        class="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                        {{ $materiasSemestre->count() }} materias
+                                                    </span>
+
+                                                    <span
+                                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                                        <svg class="h-4 w-4 transition-transform duration-300"
+                                                            :class="abiertoSemestre ? 'rotate-180' : ''" fill="none"
+                                                            stroke="currentColor" stroke-width="1.8"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                d="m6 9 6 6 6-6" />
+                                                        </svg>
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            <div x-show="abiertoSemestre" x-cloak
+                                                x-transition:enter="transition ease-out duration-300"
+                                                x-transition:enter-start="opacity-0 -translate-y-3"
+                                                x-transition:enter-end="opacity-100 translate-y-0"
+                                                x-transition:leave="transition ease-in duration-200"
+                                                x-transition:leave-start="opacity-100 translate-y-0"
+                                                x-transition:leave-end="opacity-0 -translate-y-3">
+
+                                                {{-- Tabla escritorio --}}
+                                                <div class="hidden overflow-x-auto lg:block">
+                                                    <table
+                                                        class="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                                                        <thead class="bg-slate-50 dark:bg-slate-900/70">
+                                                            <tr>
+                                                                <th
+                                                                    class="w-12 px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                                    Orden
+                                                                </th>
+
+                                                                <th
+                                                                    class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                                    Materia
+                                                                </th>
+
+                                                                <th
+                                                                    class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                                    Profesor
+                                                                </th>
+
+                                                                <th
+                                                                    class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                                    Tipo
+                                                                </th>
+
+                                                                <th
+                                                                    class="px-4 py-3 text-right text-xs font-black uppercase tracking-wide text-slate-400">
+                                                                    Acciones
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
+
+                                                        <tbody data-sortable="grupo"
+                                                            data-grupo-id="{{ $grupoId }}"
+                                                            class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
+                                                            @foreach ($materiasSemestre as $item)
+                                                                <tr data-id="{{ $item->id }}"
+                                                                    @class([
+                                                                        'transition hover:bg-slate-50 dark:hover:bg-slate-900/70',
+                                                                        'bg-emerald-50/70 dark:bg-emerald-950/20' =>
+                                                                            $ultimoRegistroId === $item->id,
+                                                                    ])>
+                                                                    <td class="px-4 py-4">
+                                                                        <button type="button" data-handle
+                                                                            class="inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:border-sky-200 hover:text-sky-600 active:cursor-grabbing dark:border-slate-700 dark:bg-slate-900"
+                                                                            title="Mover">
+                                                                            <svg class="h-4 w-4" fill="none"
+                                                                                stroke="currentColor"
+                                                                                stroke-width="1.8"
+                                                                                viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round"
+                                                                                    stroke-linejoin="round"
+                                                                                    d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    </td>
+
+                                                                    <td class="px-4 py-4">
+                                                                        <div class="flex flex-col">
+                                                                            <span
+                                                                                class="font-bold text-slate-800 dark:text-slate-100">
+                                                                                {{ $item->materia?->materia ?? 'Sin materia' }}
+                                                                            </span>
+
+                                                                            <span
+                                                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                                                {{ $item->materia?->clave ?? 'Sin clave' }}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td class="px-4 py-4">
+                                                                        <div class="flex flex-col">
+                                                                            <span
+                                                                                class="font-semibold text-slate-700 dark:text-slate-200">
+                                                                                @if ($item->profesor)
+                                                                                    {{ trim(($item->profesor->titulo ?? '') . ' ' . ($item->profesor->nombre ?? '') . ' ' . ($item->profesor->apellido_paterno ?? '') . ' ' . ($item->profesor->apellido_materno ?? '')) }}
+                                                                                @else
+                                                                                    Sin profesor
+                                                                                @endif
+                                                                            </span>
+
+                                                                            <span
+                                                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                                                Grupo
+                                                                                {{ $item->grupo?->asignacionGrupo?->nombre ?? '—' }}
+
+                                                                                @if ((int) $nivel?->id === 4 && $item->grupo?->semestre)
+                                                                                    ·
+                                                                                    {{ $item->grupo->semestre->numero }}°
+                                                                                    semestre
+                                                                                @endif
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td class="px-4 py-4">
+                                                                        <div class="flex flex-wrap gap-2">
+                                                                            @if ($item->materia?->calificable)
+                                                                                <span
+                                                                                    class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                                                                    Calificable
+                                                                                </span>
+                                                                            @else
+                                                                                <span
+                                                                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                                                    No calificable
+                                                                                </span>
+                                                                            @endif
+
+                                                                            @if ($item->materia?->extra)
+                                                                                <span
+                                                                                    class="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                                                                    Extra
+                                                                                </span>
+                                                                            @endif
+
+                                                                            @if ($item->materia?->receso)
+                                                                                <span
+                                                                                    class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                                                                    Receso
+                                                                                </span>
+                                                                            @endif
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td class="px-4 py-4 text-right">
+                                                                        <div class="flex justify-end gap-2">
+                                                                            <button type="button"
+                                                                                wire:click="editar({{ $item->id }})"
+                                                                                class="inline-flex items-center justify-center rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900">
+                                                                                Editar
+                                                                            </button>
+
+                                                                            <button type="button"
+                                                                                wire:click="eliminar({{ $item->id }})"
+                                                                                wire:confirm="¿Seguro que deseas eliminar esta asignación?"
+                                                                                class="inline-flex items-center justify-center rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600 transition hover:bg-red-100 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900">
+                                                                                Eliminar
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {{-- Vista móvil --}}
+                                                <div class="grid gap-3 p-4 lg:hidden">
+                                                    @foreach ($materiasSemestre as $item)
+                                                        <article data-id="{{ $item->id }}"
+                                                            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                                                            <div class="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    <h4
+                                                                        class="font-black text-slate-900 dark:text-white">
+                                                                        {{ $item->materia?->materia ?? 'Sin materia' }}
+                                                                    </h4>
+
+                                                                    <p
+                                                                        class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                                        {{ $item->materia?->clave ?? 'Sin clave' }}
+                                                                    </p>
+                                                                </div>
+
+                                                                <span
+                                                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                                    #{{ $item->orden }}
+                                                                </span>
+                                                            </div>
+
+                                                            <div class="mt-4 space-y-2 text-sm">
+                                                                <p class="text-slate-600 dark:text-slate-300">
+                                                                    <span class="font-bold">Profesor:</span>
+
+                                                                    @if ($item->profesor)
+                                                                        {{ trim(($item->profesor->titulo ?? '') . ' ' . ($item->profesor->nombre ?? '') . ' ' . ($item->profesor->apellido_paterno ?? '') . ' ' . ($item->profesor->apellido_materno ?? '')) }}
+                                                                    @else
+                                                                        Sin profesor
+                                                                    @endif
+                                                                </p>
+
+                                                                <p class="text-slate-600 dark:text-slate-300">
+                                                                    <span class="font-bold">Generación:</span>
+                                                                    {{ $nombreGeneracion }}
+                                                                </p>
+
+                                                                <p class="text-slate-600 dark:text-slate-300">
+                                                                    <span class="font-bold">Grado:</span>
+                                                                    {{ $item->grupo?->grado?->nombre ?? 'Sin grado' }}
+                                                                </p>
+
+                                                                <p class="text-slate-600 dark:text-slate-300">
+                                                                    <span class="font-bold">Grupo:</span>
+                                                                    {{ $item->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                                                </p>
+
+                                                                @if ((int) $nivel?->id === 4)
+                                                                    <p class="text-slate-600 dark:text-slate-300">
+                                                                        <span class="font-bold">Semestre:</span>
+
+                                                                        @if ($item->grupo?->semestre)
+                                                                            {{ $item->grupo->semestre->numero }}°
+                                                                            semestre
+                                                                        @else
+                                                                            Sin semestre
+                                                                        @endif
+                                                                    </p>
+                                                                @endif
+                                                            </div>
+
+                                                            <div class="mt-4 flex flex-wrap gap-2">
+                                                                @if ($item->materia?->calificable)
+                                                                    <span
+                                                                        class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                                                        Calificable
+                                                                    </span>
+                                                                @else
+                                                                    <span
+                                                                        class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                                        No calificable
+                                                                    </span>
+                                                                @endif
+
+                                                                @if ($item->materia?->extra)
+                                                                    <span
+                                                                        class="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                                                        Extra
+                                                                    </span>
+                                                                @endif
+
+                                                                @if ($item->materia?->receso)
+                                                                    <span
+                                                                        class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                                                        Receso
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+
+                                                            <div class="mt-4 flex gap-2">
+                                                                <button type="button"
+                                                                    wire:click="editar({{ $item->id }})"
+                                                                    class="flex-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300">
+                                                                    Editar
+                                                                </button>
+
+                                                                <button type="button"
+                                                                    wire:click="eliminar({{ $item->id }})"
+                                                                    wire:confirm="¿Seguro que deseas eliminar esta asignación?"
+                                                                    class="flex-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600 transition hover:bg-red-100 dark:bg-red-950 dark:text-red-300">
+                                                                    Eliminar
+                                                                </button>
+                                                            </div>
+                                                        </article>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
                                 </div>
-
-                                <div class="mt-4 flex gap-2">
-                                    <button type="button" wire:click="editar({{ $item->id }})"
-                                        class="flex-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300">
-                                        Editar
-                                    </button>
-
-                                    <button type="button" wire:click="eliminar({{ $item->id }})"
-                                        wire:confirm="¿Seguro que deseas eliminar esta asignación?"
-                                        class="flex-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600 transition hover:bg-red-100 dark:bg-red-950 dark:text-red-300">
-                                        Eliminar
-                                    </button>
-                                </div>
-                            </article>
+                            </div>
                         @endforeach
                     </div>
                 </div>
@@ -701,19 +942,27 @@
                     return componentId ? Livewire.find(componentId) : null;
                 }
 
+                function destruirSortableSiExiste(el) {
+                    if (el._sortable) {
+                        el._sortable.destroy();
+                        el._sortable = null;
+                    }
+                }
+
                 function initSortableMateriasPorGrupo() {
                     if (typeof Sortable === 'undefined') {
                         return;
                     }
 
                     document.querySelectorAll('tbody[data-sortable="grupo"]').forEach((el) => {
-                        if (el._sortable) {
-                            return;
-                        }
-
                         const grupoId = parseInt(el.dataset.grupoId || '0', 10);
 
                         if (!grupoId) {
+                            destruirSortableSiExiste(el);
+                            return;
+                        }
+
+                        if (el._sortable) {
                             return;
                         }
 

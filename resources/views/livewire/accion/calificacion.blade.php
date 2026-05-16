@@ -193,9 +193,12 @@
     {{-- Filtros principales --}}
     <div
         class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
+
         <div>
-            <flux:select label="Generación" wire:model.live="generacion_id">
+            <flux:select label="Generación" wire:model.live="generacion_id"
+                wire:key="generacion-{{ $slug_nivel }}-{{ $generaciones->count() }}">
                 <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
+
                 @foreach ($generaciones as $generacion)
                     <flux:select.option value="{{ $generacion->id }}">
                         {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
@@ -205,31 +208,42 @@
         </div>
 
         <div>
-            <flux:select label="Grado" wire:model.live="grado_id" :disabled="!$generacion_id">
+            <flux:select label="Grado" wire:model.live="grado_id"
+                wire:key="grado-{{ $generacion_id ?: 'null' }}-{{ $grados->count() }}" :disabled="!$generacion_id">
                 <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
+
                 @foreach ($grados as $g)
-                    <flux:select.option value="{{ $g->id }}">{{ $g->nombre }}</flux:select.option>
+                    <flux:select.option value="{{ $g->id }}">
+                        {{ $g->nombre }}
+                    </flux:select.option>
                 @endforeach
             </flux:select>
         </div>
 
         @if ($this->esBachillerato)
             <div>
-                <flux:select label="Semestre" wire:model.live="semestre_id" :disabled="!$generacion_id || !$grado_id">
+                <flux:select label="Semestre" wire:model.live="semestre_id"
+                    wire:key="semestre-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestres->count() }}"
+                    :disabled="!$generacion_id || !$grado_id">
                     <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
+
                     @foreach ($semestres as $sem)
-                        <flux:select.option value="{{ $sem->id }}">{{ $sem->numero }}</flux:select.option>
+                        <flux:select.option value="{{ $sem->id }}">
+                            {{ $sem->numero }}
+                        </flux:select.option>
                     @endforeach
                 </flux:select>
             </div>
 
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
-                    wire:key="grupo-bachillerato-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
+                    wire:key="grupo-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupos->count() }}"
                     :disabled="!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
+
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $this->textoGrupo($gpo) }}
+                        <flux:select.option value="{{ $gpo->id }}">
+                            {{ $this->textoGrupo($gpo) }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -237,10 +251,13 @@
 
             <div>
                 <flux:select label="Parcial" wire:model.live="parcial_bachillerato_id"
+                    wire:key="parcial-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}"
                     :disabled="!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id">
                     <flux:select.option value="">-- Selecciona un parcial --</flux:select.option>
+
                     @foreach ($parciales as $parcial)
-                        <flux:select.option value="{{ $parcial->id }}">{{ $parcial->descripcion }}
+                        <flux:select.option value="{{ $parcial->id }}">
+                            {{ $parcial->descripcion }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -248,11 +265,13 @@
         @else
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
-                    wire:key="grupo-basica-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $grupos->count() }}"
+                    wire:key="grupo-basica-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupos->count() }}"
                     :disabled="!$generacion_id || !$grado_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
+
                     @foreach ($grupos as $gpo)
-                        <flux:select.option value="{{ $gpo->id }}">{{ $this->textoGrupo($gpo) }}
+                        <flux:select.option value="{{ $gpo->id }}">
+                            {{ $this->textoGrupo($gpo) }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -260,8 +279,10 @@
 
             <div>
                 <flux:select label="Periodo" wire:model.live="periodo_basica_id"
+                    wire:key="periodo-basica-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}"
                     :disabled="!$generacion_id || !$grado_id || !$grupo_id">
                     <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
+
                     @foreach ($periodosBasica as $periodoBasica)
                         <flux:select.option value="{{ $periodoBasica->id }}">
                             {{ $periodoBasica->descripcion ?? ($periodoBasica->periodo ?? 'Periodo ' . $periodoBasica->id) }}
