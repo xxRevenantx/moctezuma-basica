@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\cicloEscolar;
 use App\Models\Dia;
 use App\Models\Director;
@@ -141,10 +139,13 @@ class PDFController extends Controller
     public function horario_pdf(Request $request)
     {
         $slugNivel = (string) $request->input('slug_nivel');
+        $generacionId = $request->input('generacion_id');
+        $gradoId = $request->input('grado_id');
         $grupoId = $request->input('grupo_id');
+        $semestreId = $request->input('semestre_id');
 
-        if (blank($slugNivel) || blank($grupoId)) {
-            abort(422, 'Los parámetros slug_nivel y grupo_id son obligatorios.');
+        if (blank($slugNivel) || blank($generacionId) || blank($gradoId) || blank($grupoId)) {
+            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
         }
 
         $escuela = \App\Models\Escuela::query()->first();
@@ -161,38 +162,58 @@ class PDFController extends Controller
             abort(404, 'Nivel no encontrado.');
         }
 
-        $grupo = \App\Models\Grupo::query()
-            ->with([
-                'nivel',
-                'grado',
-                'generacion',
-                'semestre',
-                'asignacionGrupo',
-            ])
-            ->where('id', $grupoId)
+        $generacion = \App\Models\Generacion::query()
+            ->where('id', $generacionId)
             ->where('nivel_id', $nivel->id)
             ->first();
 
-        if (!$grupo) {
-            abort(404, 'Grupo no encontrado o no pertenece al nivel seleccionado.');
+        if (!$generacion) {
+            abort(404, 'Generación no encontrada o no pertenece al nivel seleccionado.');
         }
 
-        $grado = $grupo->grado;
-        $generacion = $grupo->generacion;
-        $semestre = $grupo->semestre;
+
+        $grado = \App\Models\Grado::query()
+            ->where('id', $gradoId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
 
         if (!$grado) {
-            abort(404, 'El grupo seleccionado no tiene grado asignado.');
+            abort(404, 'Grado no encontrado o no pertenece al nivel seleccionado.');
         }
 
-        if (!$generacion) {
-            abort(404, 'El grupo seleccionado no tiene generación asignada.');
+        $grupo = \App\Models\Grupo::query()
+            ->with(['asignacionGrupo', 'generacion', 'grado', 'semestre'])
+            ->where('id', $grupoId)
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('generacion_id', $generacion->id)
+            ->first();
+
+        if (!$grupo) {
+            abort(404, 'Grupo no encontrado o no pertenece a la generación y grado seleccionados.');
         }
 
         $esBachillerato = (int) $nivel->id === 4;
 
-        if ($esBachillerato && !$semestre) {
-            abort(404, 'El grupo seleccionado de bachillerato no tiene semestre asignado.');
+        $semestre = null;
+
+        if ($esBachillerato) {
+            if (blank($semestreId)) {
+                abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
+            }
+
+            $semestre = \App\Models\Semestre::query()
+                ->where('id', $semestreId)
+                ->where('grado_id', $grado->id)
+                ->first();
+
+            if (!$semestre) {
+                abort(404, 'Semestre no encontrado o no pertenece al grado seleccionado.');
+            }
+
+            if ((int) $grupo->semestre_id !== (int) $semestre->id) {
+                abort(422, 'El grupo seleccionado no pertenece al semestre indicado.');
+            }
         }
 
         $cicloEscolar = \App\Models\CicloEscolar::query()
@@ -221,20 +242,16 @@ class PDFController extends Controller
                 'dia',
                 'hora',
                 'asignacionMateria.profesor',
-                'asignacionMateria.materia',
             ])
             ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
             ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id)
             ->where('grupo_id', $grupo->id);
 
         if ($esBachillerato) {
             $queryHorarios->where('semestre_id', $semestre->id);
         } else {
-            $queryHorarios->where(function ($query) {
-                $query->whereNull('semestre_id')
-                    ->orWhere('semestre_id', 0);
-            });
+            $queryHorarios->whereNull('semestre_id');
         }
 
         $horarios = $queryHorarios->get();
@@ -247,25 +264,15 @@ class PDFController extends Controller
 
         if (!$esBachillerato) {
             $primeraMateriaConProfesor = \App\Models\AsignacionMateria::query()
-                ->with([
-                    'profesor',
-                    'materia',
-                ])
-                ->where('grupo_id', $grupo->id)
-                ->whereNotNull('profesor_id')
-                ->whereHas('materia', function ($query) use ($nivel, $grado) {
-                    $query->where('nivel_id', $nivel->id)
-                        ->where('grado_id', $grado->id)
-                        ->where('calificable', 1)
-                        ->where('receso', 0)
-                        ->where(function ($subquery) {
-                            $subquery->whereNull('semestre_id')
-                                ->orWhere('semestre_id', 0);
-                        });
-                })
+                ->with('profesor')
                 ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
                 ->select('asignacion_materias.*')
-                ->orderBy('materias.orden')
+                ->where('materias.nivel_id', $nivel->id)
+                ->where('materias.grado_id', $grado->id)
+                ->where('asignacion_materias.grupo_id', $grupo->id)
+                ->whereNull('materias.semestre_id')
+                ->whereNotNull('asignacion_materias.profesor_id')
+                ->orderBy('asignacion_materias.orden')
                 ->first();
 
             if ($primeraMateriaConProfesor?->profesor) {
@@ -273,14 +280,14 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
 
         $logoIzquierdo = public_path('imagenes/logo-letra.png');
-        $logoDerecho = public_path('storage/logos/' . ($nivel->logo ?? ''));
+        $logoDerecho = public_path('storage/logos/' . $nivel->logo);
 
         $imagenesPorNivel = [
             'preescolar' => public_path('imagenes/personajes_preescolar.png'),
@@ -290,7 +297,6 @@ class PDFController extends Controller
         ];
 
         $slugNivelNormalizado = mb_strtolower((string) $nivel->slug, 'UTF-8');
-
         $imagenNivel = $imagenesPorNivel[$slugNivelNormalizado] ?? null;
 
         $logoIzquierdo = file_exists($logoIzquierdo) ? $logoIzquierdo : null;
@@ -319,7 +325,7 @@ class PDFController extends Controller
             'GEN_' . ($generacion->anio_ingreso ?? 'GEN') . '-' . ($generacion->anio_egreso ?? 'GEN') . '_' .
             'GRADO_' . ($grado->nombre ?? 'GRADO') . '_' .
             'GRUPO_' . $this->nombreGrupo($grupo) .
-            ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? $semestre->nombre ?? '') : '') .
+            ($esBachillerato && $semestre ? '_SEMESTRE_' . ($semestre->numero ?? '') : '') .
             '.pdf';
 
         return $pdf->stream($nombreArchivo);
@@ -520,29 +526,13 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $queryInscripciones = Inscripcion::query()
-            ->with([
-                'grado:id,nombre',
-                'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id')
-                        ->with('asignacionGrupo:id,nombre');
-                },
-                'semestre:id,numero'
-            ])
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
-
-        if ($esBachillerato) {
-            $queryInscripciones->where('semestre_id', $semestre->id);
-        } else {
-            $queryInscripciones->whereNull('semestre_id');
-        }
-
-        if (Schema::hasColumn('inscripciones', 'activo')) {
-            $queryInscripciones->where('activo', 1);
-        }
+        $queryInscripciones = $this->queryInscripcionesPorContextoPdf(
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
 
         if ($busqueda !== '') {
             $queryInscripciones->where(function ($query) use ($busqueda) {
@@ -569,8 +559,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -644,8 +634,11 @@ class PDFController extends Controller
 
         $queryMateriaPromediar = MateriaPromediar::query()
             ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
+            ->where('grado_id', $grado->id);
+
+        if (Schema::hasColumn('materia_promediar', 'grupo_id')) {
+            $queryMateriaPromediar->where('grupo_id', $grupo->id);
+        }
 
         if ($esBachillerato) {
             $queryMateriaPromediar->where('semestre_id', $semestre->id);
@@ -1035,29 +1028,14 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $inscripcionQuery = Inscripcion::query()
-            ->with([
-                'grado:id,nombre',
-                'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id')
-                        ->with('asignacionGrupo:id,nombre');
-                },
-                'semestre:id,numero',
-            ])
-            ->where('id', $inscripcionId)
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('activo', 1);
-
-        if ($esBachillerato) {
-            $inscripcionQuery->where('semestre_id', $semestre->id);
-        } else {
-            $inscripcionQuery->whereNull('semestre_id');
-        }
-
-        $inscripcion = $inscripcionQuery->first();
+        $inscripcion = $this->buscarInscripcionAlumnoPdf(
+            inscripcionId: $inscripcionId,
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
 
         if (!$inscripcion) {
             abort(404, 'Inscripción no encontrada para el contexto seleccionado.');
@@ -1065,8 +1043,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1151,8 +1129,11 @@ class PDFController extends Controller
 
         $queryMateriaPromediar = MateriaPromediar::query()
             ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
+            ->where('grado_id', $grado->id);
+
+        if (Schema::hasColumn('materia_promediar', 'grupo_id')) {
+            $queryMateriaPromediar->where('grupo_id', $grupo->id);
+        }
 
         if ($esBachillerato) {
             $queryMateriaPromediar->where('semestre_id', $semestre->id);
@@ -1508,32 +1489,14 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $inscripcionQuery = Inscripcion::query()
-            ->with([
-                'grado:id,nombre',
-                'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id')
-                        ->with('asignacionGrupo:id,nombre');
-                },
-                'semestre:id,numero',
-            ])
-            ->where('id', $inscripcionId)
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
-
-        if (Schema::hasColumn('inscripciones', 'activo')) {
-            $inscripcionQuery->where('activo', 1);
-        }
-
-        if ($esBachillerato) {
-            $inscripcionQuery->where('semestre_id', $semestre->id);
-        } else {
-            $inscripcionQuery->whereNull('semestre_id');
-        }
-
-        $inscripcion = $inscripcionQuery->first();
+        $inscripcion = $this->buscarInscripcionAlumnoPdf(
+            inscripcionId: $inscripcionId,
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
 
         if (!$inscripcion) {
             abort(404, 'Inscripción no encontrada para el contexto seleccionado.');
@@ -1541,8 +1504,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1635,8 +1598,11 @@ class PDFController extends Controller
 
         $queryMateriaPromediar = MateriaPromediar::query()
             ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
+            ->where('grado_id', $grado->id);
+
+        if (Schema::hasColumn('materia_promediar', 'grupo_id')) {
+            $queryMateriaPromediar->where('grupo_id', $grupo->id);
+        }
 
         if ($esBachillerato) {
             $queryMateriaPromediar->where('semestre_id', $semestre->id);
@@ -1765,29 +1731,13 @@ class PDFController extends Controller
         | - Solo se consideran los primeros 3 lugares.
         */
 
-        $queryInscripcionesLugar = Inscripcion::query()
-            ->with([
-                'grado:id,nombre',
-                'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id')
-                        ->with('asignacionGrupo:id,nombre');
-                },
-                'semestre:id,numero'
-            ])
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id);
-
-        if (Schema::hasColumn('inscripciones', 'activo')) {
-            $queryInscripcionesLugar->where('activo', 1);
-        }
-
-        if ($esBachillerato) {
-            $queryInscripcionesLugar->where('semestre_id', $semestre->id);
-        } else {
-            $queryInscripcionesLugar->whereNull('semestre_id');
-        }
+        $queryInscripcionesLugar = $this->queryInscripcionesPorContextoPdf(
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
 
         $inscripcionesLugar = $queryInscripcionesLugar
             ->orderBy('apellido_paterno')
@@ -1800,8 +1750,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -2320,16 +2270,13 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $alumnosQuery = Inscripcion::query()
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $generacion->id)
-            ->where('grado_id', $grado->id)
-            ->where('grupo_id', $grupo->id)
-            ->where('activo', 1);
-
-        if ($esBachillerato) {
-            $alumnosQuery->where('semestre_id', $semestre->id);
-        }
+        $alumnosQuery = $this->queryInscripcionesPorContextoPdf(
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
 
         $alumnos = $alumnosQuery
             ->orderBy('apellido_paterno')
@@ -2616,12 +2563,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'pdf.lista.sece',
-                'sece_interna' => 'pdf.sece_interna',
-                'personalizadores' => 'pdf.personalizadores',
-                'etiquetas' => 'pdf.etiquetas_pdf',
-                default => abort(404, 'El formato seleccionado no existe.'),
-            },
+                    'sece' => 'pdf.lista.sece',
+                    'sece_interna' => 'pdf.sece_interna',
+                    'personalizadores' => 'pdf.personalizadores',
+                    'etiquetas' => 'pdf.etiquetas_pdf',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2639,12 +2586,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'formato-sece',
-                'sece_interna' => 'formato-sece-interna',
-                'personalizadores' => 'personalizadores',
-                'etiquetas' => 'etiquetas',
-                default => 'formato',
-            },
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
 
             default => 'lista',
         };
@@ -2683,6 +2630,106 @@ class PDFController extends Controller
     }
 
 
+
+
+    private function obtenerGrupoIdsEquivalentesPdf(Grupo $grupo, Nivel $nivel, Generacion $generacion, Grado $grado, bool $esBachillerato): array
+    {
+        if (!$esBachillerato) {
+            return [(int) $grupo->id];
+        }
+
+        /*
+         * En bachillerato, el mismo grupo puede existir en varios semestres
+         * con ids diferentes. Para alumnos se toma el grupo lógico.
+         */
+        if (blank($grupo->asignacion_grupo_id)) {
+            return [(int) $grupo->id];
+        }
+
+        return Grupo::query()
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id)
+            ->where('asignacion_grupo_id', $grupo->asignacion_grupo_id)
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->toArray();
+    }
+
+    private function aplicarFiltroActivoInscripcionPdf($query): void
+    {
+        if (!Schema::hasColumn('inscripciones', 'activo')) {
+            return;
+        }
+
+        $query->where(function ($q) {
+            $q->where('activo', 1)
+                ->orWhere('activo', true)
+                ->orWhere('activo', '1')
+                ->orWhere('activo', 'true');
+        });
+    }
+
+    private function queryInscripcionesPorContextoPdf(
+        Nivel $nivel,
+        Generacion $generacion,
+        Grado $grado,
+        Grupo $grupo,
+        bool $esBachillerato
+    ) {
+        $grupoIds = $this->obtenerGrupoIdsEquivalentesPdf(
+            grupo: $grupo,
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            esBachillerato: $esBachillerato
+        );
+
+        $query = Inscripcion::query()
+            ->with([
+                'grado:id,nombre',
+                'grupo' => function ($query) {
+                    $query->select('id', 'asignacion_grupo_id')
+                        ->with('asignacionGrupo:id,nombre');
+                },
+                'semestre:id,numero',
+            ])
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id);
+
+        /*
+         * No se filtra por semestre_id en alumnos.
+         * El semestre seleccionado solo se usa para materias, parciales y calificaciones.
+         */
+        if (!empty($grupoIds)) {
+            $query->whereIn('grupo_id', $grupoIds);
+        }
+
+        $this->aplicarFiltroActivoInscripcionPdf($query);
+
+        return $query;
+    }
+
+    private function buscarInscripcionAlumnoPdf(
+        int $inscripcionId,
+        Nivel $nivel,
+        Generacion $generacion,
+        Grado $grado,
+        Grupo $grupo,
+        bool $esBachillerato
+    ): ?Inscripcion {
+        return $this->queryInscripcionesPorContextoPdf(
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        )
+            ->where('id', $inscripcionId)
+            ->first();
+    }
 
     private function textoParcialBachillerato(?Parcial $parcial): string
     {
@@ -2804,9 +2851,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-                ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->nombre ?? '') . ' ' .
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 
@@ -3022,15 +3069,15 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                    ?? $periodo?->parcialBachillerato?->descripcion
-                    ?? 'PARCIAL'
+                ?? $periodo?->parcialBachillerato?->descripcion
+                ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-                ?? $periodo?->periodoBasica?->descripcion
-                ?? 'PERIODO'
+            ?? $periodo?->periodoBasica?->descripcion
+            ?? 'PERIODO'
         );
     }
     private function nombreGrupo($grupo): string

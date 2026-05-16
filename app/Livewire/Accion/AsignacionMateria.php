@@ -71,9 +71,9 @@ class AsignacionMateria extends Component
             })
             ->get()
             ->sortBy([
-                fn ($a, $b) => ($a->grado_id ?? 0) <=> ($b->grado_id ?? 0),
-                fn ($a, $b) => ($a->semestre_id ?? 0) <=> ($b->semestre_id ?? 0),
-                fn ($a, $b) => strcmp(
+                fn($a, $b) => ($a->grado_id ?? 0) <=> ($b->grado_id ?? 0),
+                fn($a, $b) => ($a->semestre_id ?? 0) <=> ($b->semestre_id ?? 0),
+                fn($a, $b) => strcmp(
                     $a->asignacionGrupo?->nombre ?? '',
                     $b->asignacionGrupo?->nombre ?? ''
                 ),
@@ -166,7 +166,7 @@ class AsignacionMateria extends Component
                     'buscar' => mb_strtolower($nombreCompleto),
                 ];
             })
-            ->filter(fn ($item) => filled($item['nombre']))
+            ->filter(fn($item) => filled($item['nombre']))
             ->unique('id')
             ->sortBy('nombre')
             ->values();
@@ -191,45 +191,69 @@ class AsignacionMateria extends Component
     {
         return AsignacionMateriaModel::query()
             ->with([
-                'materia.nivel',
-                'materia.grado',
-                'materia.semestre',
-                'grupo.asignacionGrupo',
+                'materia',
+                'profesor',
+                'grupo.nivel',
                 'grupo.grado',
                 'grupo.generacion',
                 'grupo.semestre',
-                'profesor',
+                'grupo.asignacionGrupo',
             ])
             ->whereHas('grupo', function ($query) {
-                $query->where('nivel_id', $this->nivel->id);
+                $query->where('nivel_id', $this->nivel?->id);
             })
-            ->when(filled($this->buscar), function ($query) {
-                $query->where(function ($q) {
-                    $q->whereHas('materia', function ($sub) {
-                        $sub->where('materia', 'like', '%' . $this->buscar . '%')
-                            ->orWhere('slug', 'like', '%' . $this->buscar . '%')
-                            ->orWhere('clave', 'like', '%' . $this->buscar . '%');
-                    })
-                    ->orWhereHas('grupo.asignacionGrupo', function ($sub) {
-                        $sub->where('nombre', 'like', '%' . $this->buscar . '%');
-                    })
-                    ->orWhereHas('profesor', function ($sub) {
-                        $sub->where('nombre', 'like', '%' . $this->buscar . '%')
-                            ->orWhere('apellido_paterno', 'like', '%' . $this->buscar . '%')
-                            ->orWhere('apellido_materno', 'like', '%' . $this->buscar . '%');
-                    });
+            ->when($this->buscar, function ($query) {
+                $buscar = '%' . trim($this->buscar) . '%';
+
+                $query->where(function ($subquery) use ($buscar) {
+                    $subquery
+                        ->whereHas('materia', function ($q) use ($buscar) {
+                            $q->where('materia', 'like', $buscar)
+                                ->orWhere('clave', 'like', $buscar);
+                        })
+                        ->orWhereHas('profesor', function ($q) use ($buscar) {
+                            $q->where('nombre', 'like', $buscar)
+                                ->orWhere('apellido_paterno', 'like', $buscar)
+                                ->orWhere('apellido_materno', 'like', $buscar)
+                                ->orWhere('titulo', 'like', $buscar);
+                        })
+                        ->orWhereHas('grupo.grado', function ($q) use ($buscar) {
+                            $q->where('nombre', 'like', $buscar);
+                        })
+                        ->orWhereHas('grupo.asignacionGrupo', function ($q) use ($buscar) {
+                            $q->where('nombre', 'like', $buscar);
+                        })
+                        ->orWhereHas('grupo.generacion', function ($q) use ($buscar) {
+                            $q->where('anio_ingreso', 'like', $buscar)
+                                ->orWhere('anio_egreso', 'like', $buscar);
+                        })
+                        ->orWhereHas('grupo.semestre', function ($q) use ($buscar) {
+                            $q->where('numero', 'like', $buscar);
+                        });
                 });
             })
             ->get()
             ->sortBy([
-                fn ($a, $b) => ($a->grupo?->grado_id ?? 0) <=> ($b->grupo?->grado_id ?? 0),
-                fn ($a, $b) => ($a->grupo?->semestre_id ?? 0) <=> ($b->grupo?->semestre_id ?? 0),
-                fn ($a, $b) => strcmp(
+                // Se muestra primero la generación más reciente.
+                fn($a, $b) => ($b->grupo?->generacion?->anio_ingreso ?? 0) <=> ($a->grupo?->generacion?->anio_ingreso ?? 0),
+
+                // Después se acomoda por grado.
+                fn($a, $b) => ($a->grupo?->grado_id ?? 0) <=> ($b->grupo?->grado_id ?? 0),
+
+                // Después se acomoda por grupo.
+                fn($a, $b) => strcmp(
                     $a->grupo?->asignacionGrupo?->nombre ?? '',
                     $b->grupo?->asignacionGrupo?->nombre ?? ''
                 ),
-                fn ($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),
-                fn ($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
+
+                // En bachillerato se separa por semestre.
+                fn($a, $b) => ($a->grupo?->semestre_id ?? 0) <=> ($b->grupo?->semestre_id ?? 0),
+
+                // Finalmente se respeta el orden manual.
+                fn($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),
+
+                // Respaldo por orden de la materia.
+                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
             ])
             ->values();
     }

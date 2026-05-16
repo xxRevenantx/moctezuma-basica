@@ -405,7 +405,7 @@
             @endif
             del <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>° grado
             de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
-            grupo "<strong>{{ mb_strtoupper($grupo->nombre ?? 'GRUPO') }}</strong>".
+            grupo "<strong>{{ mb_strtoupper($grupo->asignacionGrupo?->nombre ?? 'GRUPO') }}</strong>".
 
 
         </div>

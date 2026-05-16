@@ -1,6 +1,6 @@
 <div class="space-y-5">
     {{-- Resumen --}}
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <div class="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/30">
             <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
                 Total
@@ -39,6 +39,26 @@
                 {{ $this->totalEliminaciones }}
             </p>
         </div>
+
+        <div
+            class="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 dark:border-violet-900/40 dark:bg-violet-950/30">
+            <p class="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                Especiales
+            </p>
+            <p class="mt-1 text-2xl font-bold text-violet-900 dark:text-violet-100">
+                {{ $this->totalEspeciales }}
+            </p>
+        </div>
+
+        <div
+            class="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/30">
+            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                Numéricas
+            </p>
+            <p class="mt-1 text-2xl font-bold text-indigo-900 dark:text-indigo-100">
+                {{ $this->totalNumericas }}
+            </p>
+        </div>
     </div>
 
     {{-- Contexto --}}
@@ -46,7 +66,7 @@
         <div class="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-neutral-950/50">
             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grado</p>
             <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {{ optional(collect($grados)->firstWhere('id', $grado_id))->nombre ?? 'No seleccionado' }}
+                {{ optional(collect($grados)->firstWhere('id', (int) $grado_id))->nombre ?? 'No seleccionado' }}
             </p>
         </div>
 
@@ -54,7 +74,7 @@
             <div class="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-neutral-950/50">
                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Semestre</p>
                 <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    {{ optional(collect($semestres)->firstWhere('id', $semestre_id))->numero ?? 'No seleccionado' }}
+                    {{ optional(collect($semestres)->firstWhere('id', (int) $semestre_id))->numero ?? 'No seleccionado' }}
                 </p>
             </div>
         @endif
@@ -62,14 +82,21 @@
         <div class="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-neutral-950/50">
             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Grupo</p>
             <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {{ optional(collect($grupos)->firstWhere('id', $grupo_id))->nombre ?? 'No seleccionado' }}
+                {{ $this->textoGrupo(collect($grupos)->firstWhere('id', (int) $grupo_id)) }}
             </p>
         </div>
 
         <div class="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-neutral-950/50">
             <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Periodo</p>
             <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {{ optional(collect($periodos)->firstWhere('id', $periodo_id))['etiqueta'] ?? 'No seleccionado' }}
+                {{ optional(collect($periodos)->firstWhere('id', (int) $periodo_id))['etiqueta'] ?? 'No seleccionado' }}
+            </p>
+        </div>
+
+        <div class="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-neutral-950/50">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Reprobatorias</p>
+            <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {{ $this->totalReprobatorias }} movimiento(s)
             </p>
         </div>
     </div>
@@ -77,7 +104,7 @@
     {{-- Filtros --}}
     <div
         class="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/50">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div>
                 <flux:label>Alumno</flux:label>
                 <x-input wire:model.live.debounce.400ms="buscar_alumno" placeholder="Matrícula o nombre..." />
@@ -104,6 +131,16 @@
             </div>
 
             <div>
+                <flux:label>Tipo de valor</flux:label>
+                <flux:select wire:model.live="tipo_valor">
+                    <flux:select.option value="">Todos</flux:select.option>
+                    <flux:select.option value="numerico">Numérico</flux:select.option>
+                    <flux:select.option value="especial">Especial</flux:select.option>
+                    <flux:select.option value="vacio">Vacío</flux:select.option>
+                </flux:select>
+            </div>
+
+            <div>
                 <flux:label>Búsqueda general</flux:label>
                 <x-input wire:model.live.debounce.400ms="buscar_general" placeholder="Texto libre..." />
             </div>
@@ -120,7 +157,7 @@
     {{-- Tabla --}}
     <div class="relative">
         <div wire:loading.flex
-            wire:target="buscar_alumno,buscar_materia,buscar_usuario,buscar_general,accion,limpiarFiltros"
+            wire:target="buscar_alumno,buscar_materia,buscar_usuario,buscar_general,accion,tipo_valor,limpiarFiltros"
             class="absolute inset-0 z-20 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
             <div
                 class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-950">
@@ -150,6 +187,9 @@
                                 Materia</th>
                             <th
                                 class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Grupo</th>
+                            <th
+                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 Acción</th>
                             <th
                                 class="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -157,6 +197,9 @@
                             <th
                                 class="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 Ahora</th>
+                            <th
+                                class="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Tipo</th>
                         </tr>
                     </thead>
 
@@ -164,13 +207,8 @@
                         @forelse ($rows as $row)
                             @php
                                 $ins = $row->inscripcion;
-                                $alumno = trim(
-                                    ($ins?->nombre ?? '') .
-                                        ' ' .
-                                        ($ins?->apellido_paterno ?? '') .
-                                        ' ' .
-                                        ($ins?->apellido_materno ?? ''),
-                                );
+                                $alumno = $this->textoAlumno($row);
+                                $grupoBitacora = $row->grupo ?: $row->asignacionMateria?->grupo;
                             @endphp
 
                             <tr class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
@@ -189,7 +227,7 @@
 
                                 <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
                                     <div class="font-semibold text-slate-800 dark:text-slate-100">
-                                        {{ $alumno !== '' ? $alumno : 'Sin alumno' }}
+                                        {{ $alumno }}
                                     </div>
                                     <div class="text-xs text-slate-500 dark:text-slate-400">
                                         Matrícula: {{ $ins?->matricula ?? '—' }}
@@ -197,12 +235,19 @@
                                 </td>
 
                                 <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                    {{ $row->asignacionMateria?->materia?->materia ?? 'Sin materia' }}
+                                    {{ $this->textoMateria($row) }}
+                                </td>
+
+                                <td class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
+                                    <span
+                                        class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
+                                        {{ $this->textoGrupo($grupoBitacora) }}
+                                    </span>
                                 </td>
 
                                 <td class="px-4 py-4 align-top">
                                     <span
-                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $this->claseAccion($row->accion) }}">
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $this->claseAccion($row->accion) }}">
                                         {{ mb_strtoupper($row->accion) }}
                                     </span>
                                 </td>
@@ -216,10 +261,17 @@
                                     class="px-4 py-4 align-top text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
                                     {{ $row->calificacion_nueva !== null && $row->calificacion_nueva !== '' ? $row->calificacion_nueva : '—' }}
                                 </td>
+
+                                <td class="px-4 py-4 align-top text-center">
+                                    <span
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $this->claseTipoValor($row->tipo_valor) }}">
+                                        {{ $row->tipo_valor ? mb_strtoupper($row->tipo_valor) : '—' }}
+                                    </span>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7"
+                                <td colspan="9"
                                     class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
                                     No se encontraron movimientos con los filtros actuales.
                                 </td>
@@ -235,13 +287,7 @@
             @forelse ($rows as $row)
                 @php
                     $ins = $row->inscripcion;
-                    $alumno = trim(
-                        ($ins?->nombre ?? '') .
-                            ' ' .
-                            ($ins?->apellido_paterno ?? '') .
-                            ' ' .
-                            ($ins?->apellido_materno ?? ''),
-                    );
+                    $grupoBitacora = $row->grupo ?: $row->asignacionMateria?->grupo;
                 @endphp
 
                 <div
@@ -249,15 +295,15 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-base font-bold text-slate-800 dark:text-white">
-                                {{ $alumno !== '' ? $alumno : 'Sin alumno' }}
+                                {{ $this->textoAlumno($row) }}
                             </p>
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {{ $row->asignacionMateria?->materia?->materia ?? 'Sin materia' }}
+                                {{ $this->textoMateria($row) }}
                             </p>
                         </div>
 
                         <span
-                            class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $this->claseAccion($row->accion) }}">
+                            class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $this->claseAccion($row->accion) }}">
                             {{ mb_strtoupper($row->accion) }}
                         </span>
                     </div>
@@ -268,12 +314,15 @@
                         <div><span class="font-semibold">Usuario:</span> {{ $row->usuario?->name ?? 'Sin usuario' }}
                         </div>
                         <div><span class="font-semibold">Matrícula:</span> {{ $ins?->matricula ?? '—' }}</div>
+                        <div><span class="font-semibold">Grupo:</span> {{ $this->textoGrupo($grupoBitacora) }}</div>
                         <div><span class="font-semibold">Antes:</span>
                             {{ $row->calificacion_anterior !== null && $row->calificacion_anterior !== '' ? $row->calificacion_anterior : '—' }}
                         </div>
                         <div><span class="font-semibold">Ahora:</span>
                             {{ $row->calificacion_nueva !== null && $row->calificacion_nueva !== '' ? $row->calificacion_nueva : '—' }}
                         </div>
+                        <div><span class="font-semibold">Tipo:</span>
+                            {{ $row->tipo_valor ? mb_strtoupper($row->tipo_valor) : '—' }}</div>
                     </div>
                 </div>
             @empty

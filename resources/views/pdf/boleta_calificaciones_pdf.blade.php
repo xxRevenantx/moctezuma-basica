@@ -462,7 +462,7 @@
             <td>{{ $grado->nombre ?? '—' }}</td>
 
             <td class="label">Grupo</td>
-            <td>{{ $grupo->nombre ?? '—' }}</td>
+            <td>{{ $grupo->asignacionGrupo->nombre ?? '—' }}</td>
         </tr>
 
         @if ($esBachillerato)
