@@ -42,6 +42,7 @@ class Calificacion extends Component
 
     public string $busqueda = '';
     public string $filtro_estado = '';
+    public string $orden_promedio = '';
 
     public array $inscripciones = [];
     public array $inscripcionesTabla = [];
@@ -251,6 +252,11 @@ class Calificacion extends Component
         $this->aplicarFiltroEstado();
     }
 
+    public function updatedOrdenPromedio(): void
+    {
+        $this->aplicarFiltroEstado();
+    }
+
     private function resetEstadoAcademico(array $camposExtra = []): void
     {
         $campos = array_merge($camposExtra, [
@@ -258,6 +264,7 @@ class Calificacion extends Component
             'ciclo_escolar_id',
             'periodoSeleccionado',
             'filtro_estado',
+            'orden_promedio',
             'inscripciones',
             'inscripcionesTabla',
             'materias',
@@ -361,6 +368,7 @@ class Calificacion extends Component
             'periodoSeleccionado',
             'busqueda',
             'filtro_estado',
+            'orden_promedio',
             'inscripciones',
             'inscripcionesTabla',
             'materias',
@@ -587,8 +595,8 @@ class Calificacion extends Component
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
-                        ($inscripcion->apellido_materno ?? '') . ' ' .
-                        ($inscripcion->nombre ?? '')
+                            ($inscripcion->apellido_materno ?? '') . ' ' .
+                            ($inscripcion->nombre ?? '')
                     ),
                 ];
             })
@@ -649,8 +657,8 @@ class Calificacion extends Component
                     'profesor' => $profesor
                         ? trim(
                             ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                                ($profesor->apellido_paterno ?? '') . ' ' .
+                                ($profesor->apellido_materno ?? '')
                         )
                         : 'SIN PROFESOR ASIGNADO',
                 ];
@@ -826,22 +834,26 @@ class Calificacion extends Component
                 ->map(fn($valor) => (float) $valor)
                 ->values();
 
-            $this->promedios[(int) $inscripcionId] = $valores->isEmpty()
-                ? '—'
-                : number_format($valores->avg(), 1);
+            if ($valores->isEmpty()) {
+                $this->promedios[(int) $inscripcionId] = '—';
+                continue;
+            }
+
+            $promedio = $valores->avg();
+
+            // Se corta a 1 decimal sin redondear.
+            $promedioSinRedondear = floor($promedio * 10) / 10;
+
+            $this->promedios[(int) $inscripcionId] = number_format($promedioSinRedondear, 1, '.', '');
         }
     }
 
     private function aplicarFiltroEstado(): void
     {
-        $this->inscripcionesTabla = $this->inscripciones;
+        $filas = collect($this->inscripciones);
 
-        if ($this->filtro_estado === '') {
-            return;
-        }
-
-        $this->inscripcionesTabla = collect($this->inscripciones)
-            ->filter(function ($fila) {
+        if ($this->filtro_estado !== '') {
+            $filas = $filas->filter(function ($fila) {
                 $inscripcionId = (int) $fila['inscripcion_id'];
                 $materiasAlumno = $this->calificaciones[$inscripcionId] ?? [];
 
@@ -849,16 +861,53 @@ class Calificacion extends Component
                     ->map(fn($valor) => $this->normalizarCalificacion($valor));
 
                 return match ($this->filtro_estado) {
-                    'pendientes' => $valores->contains(fn($valor) => $valor === null),
-                    'aprobados' => $valores->filter(fn($valor) => $this->esCalificacionNumerica($valor))->every(fn($valor) => (float) $valor >= 6),
-                    'reprobados' => $valores->contains(fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6),
+                    'pendientes' => $valores->contains(fn($valor) => $valor === null || $valor === ''),
+                    'aprobados' => $valores
+                        ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
+                        ->every(fn($valor) => (float) $valor >= 6),
+                    'reprobados' => $valores->contains(
+                        fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6
+                    ),
                     'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
                     'cambios' => $this->tieneCambiosInscripcion($inscripcionId),
                     default => true,
                 };
-            })
+            });
+        }
+
+        $filas = $this->ordenarFilasPorPromedio($filas);
+
+        $this->inscripcionesTabla = $filas
             ->values()
             ->toArray();
+    }
+
+    private function ordenarFilasPorPromedio(Collection $filas): Collection
+    {
+        if ($this->orden_promedio === '') {
+            return $filas;
+        }
+
+        return match ($this->orden_promedio) {
+            'mayor_menor' => $filas->sortByDesc(
+                fn($fila) => $this->obtenerPromedioOrdenable((int) $fila['inscripcion_id'])
+            ),
+            'menor_mayor' => $filas->sortBy(
+                fn($fila) => $this->obtenerPromedioOrdenable((int) $fila['inscripcion_id'])
+            ),
+            default => $filas,
+        };
+    }
+
+    private function obtenerPromedioOrdenable(int $inscripcionId): float
+    {
+        $promedio = $this->promedios[$inscripcionId] ?? null;
+
+        if (!is_numeric($promedio)) {
+            return -1;
+        }
+
+        return (float) $promedio;
     }
 
     private function tieneCambiosInscripcion(int $inscripcionId): bool
@@ -1269,8 +1318,8 @@ class Calificacion extends Component
 
         return $this->grupos->firstWhere('id', (int) $this->grupo_id)
             ?? Grupo::query()
-                ->with('asignacionGrupo:id,nombre')
-                ->find($this->grupo_id);
+            ->with('asignacionGrupo:id,nombre')
+            ->find($this->grupo_id);
     }
 
     public function getClaseEstadoPeriodoProperty(): string

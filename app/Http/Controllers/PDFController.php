@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Http\Controllers;
+
 use App\Models\cicloEscolar;
 use App\Models\Dia;
 use App\Models\Director;
@@ -280,8 +282,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -559,8 +561,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -1043,8 +1045,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1504,8 +1506,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-            ($inscripcion->apellido_materno ?? '') . ' ' .
-            ($inscripcion->nombre ?? '')
+                ($inscripcion->apellido_materno ?? '') . ' ' .
+                ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1750,8 +1752,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -2068,6 +2070,85 @@ class PDFController extends Controller
         return Pdf::loadView('pdf.diploma_pdf', $data)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
+    }
+
+
+    // CREDENCIALES
+    public function credenciales(Request $request, string $slug_nivel)
+    {
+        $nivel = Nivel::query()
+            ->select('id', 'nombre', 'slug')
+            ->where('slug', $slug_nivel)
+            ->firstOrFail();
+
+        $modoDescarga = $request->string('modo_descarga')->toString();
+
+        $query = Inscripcion::query()
+            ->with([
+                'nivel:id,nombre,slug',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id',
+            ])
+            ->where('nivel_id', $nivel->id);
+
+        if ($modoDescarga === 'individual') {
+            $query->where('id', $request->integer('alumno_id'));
+        }
+
+        if ($modoDescarga === 'seleccionados') {
+            $ids = collect(explode(',', (string) $request->input('alumnos')))
+                ->filter()
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $query->whereIn('id', $ids);
+        }
+
+        if ($modoDescarga === 'generacion') {
+            $query->where('generacion_id', $request->integer('generacion_id'));
+        }
+
+        if ($modoDescarga === 'grado') {
+            $query->where('generacion_id', $request->integer('generacion_id'))
+                ->where('grado_id', $request->integer('grado_id'));
+        }
+
+        if ($modoDescarga === 'semestre') {
+            $query->where('generacion_id', $request->integer('generacion_id'))
+                ->where('grado_id', $request->integer('grado_id'));
+
+            if (Schema::hasColumn('inscripciones', 'semestre_id')) {
+                $query->where('semestre_id', $request->integer('semestre_id'));
+            }
+        }
+
+        if ($modoDescarga === 'grupo') {
+            $query->where('generacion_id', $request->integer('generacion_id'))
+                ->where('grado_id', $request->integer('grado_id'))
+                ->where('grupo_id', $request->integer('grupo_id'));
+
+            if ($nivel->slug === 'bachillerato' && Schema::hasColumn('inscripciones', 'semestre_id')) {
+                $query->where('semestre_id', $request->integer('semestre_id'));
+            }
+        }
+
+        $alumnos = $query
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+
+        $pdf = Pdf::loadView('pdf.credenciales_pdf', [
+            'nivel' => $nivel,
+            'alumnos' => $alumnos,
+            'modoDescarga' => $modoDescarga,
+        ])->setPaper('letter', 'portrait');
+
+        return $pdf->stream('credenciales_' . $nivel->slug . '.pdf');
     }
 
 
@@ -2563,12 +2644,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'pdf.lista.sece',
-                    'sece_interna' => 'pdf.sece_interna',
-                    'personalizadores' => 'pdf.personalizadores',
-                    'etiquetas' => 'pdf.etiquetas_pdf',
-                    default => abort(404, 'El formato seleccionado no existe.'),
-                },
+                'sece' => 'pdf.lista.sece',
+                'sece_interna' => 'pdf.sece_interna',
+                'personalizadores' => 'pdf.personalizadores',
+                'etiquetas' => 'pdf.etiquetas_pdf',
+                default => abort(404, 'El formato seleccionado no existe.'),
+            },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2586,12 +2667,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                    'sece' => 'formato-sece',
-                    'sece_interna' => 'formato-sece-interna',
-                    'personalizadores' => 'personalizadores',
-                    'etiquetas' => 'etiquetas',
-                    default => 'formato',
-                },
+                'sece' => 'formato-sece',
+                'sece_interna' => 'formato-sece-interna',
+                'personalizadores' => 'personalizadores',
+                'etiquetas' => 'etiquetas',
+                default => 'formato',
+            },
 
             default => 'lista',
         };
@@ -2851,9 +2932,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-            ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 
@@ -3069,15 +3150,15 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                ?? $periodo?->parcialBachillerato?->descripcion
-                ?? 'PARCIAL'
+                    ?? $periodo?->parcialBachillerato?->descripcion
+                    ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-            ?? $periodo?->periodoBasica?->descripcion
-            ?? 'PERIODO'
+                ?? $periodo?->periodoBasica?->descripcion
+                ?? 'PERIODO'
         );
     }
     private function nombreGrupo($grupo): string

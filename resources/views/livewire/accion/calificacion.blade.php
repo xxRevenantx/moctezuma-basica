@@ -18,6 +18,7 @@
         this.$watch('$wire.periodo_basica_id', () => this.guardarFiltros());
         this.$watch('$wire.busqueda', () => this.guardarFiltros());
         this.$watch('$wire.filtro_estado', () => this.guardarFiltros());
+        this.$watch('$wire.orden_promedio', () => this.guardarFiltros());
         this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
         this.$watch('$wire.diploma_inscripcion_id', () => this.guardarFiltros());
     },
@@ -78,6 +79,10 @@
             await this.$wire.set('filtro_estado', filtros.filtro_estado);
         }
 
+        if (filtros.orden_promedio !== undefined) {
+            await this.$wire.set('orden_promedio', filtros.orden_promedio);
+        }
+
         if (filtros.boleta_inscripcion_id) {
             await this.$wire.set('boleta_inscripcion_id', filtros.boleta_inscripcion_id);
         }
@@ -87,6 +92,13 @@
         }
 
         this.restaurandoFiltros = false;
+
+        // Se recargan las gráficas después de restaurar los filtros guardados.
+        this.$nextTick(() => {
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('recargar-graficas-calificaciones'));
+            }, 600);
+        });
     },
 
     guardarFiltros() {
@@ -105,6 +117,7 @@
             periodo_basica_id: this.$wire.periodo_basica_id || '',
             busqueda: this.$wire.busqueda || '',
             filtro_estado: this.$wire.filtro_estado || '',
+            orden_promedio: this.$wire.orden_promedio || '',
             boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
             diploma_inscripcion_id: this.$wire.diploma_inscripcion_id || '',
         };
@@ -831,21 +844,45 @@
 
     {{-- Gráficas --}}
     @if (count($inscripciones) > 0 && count($materias) > 0)
-        <div wire:key="graficas-calificaciones-{{ md5(json_encode($graficasCalificaciones)) }}"
+        <div wire:key="graficas-calificaciones-wrapper-{{ md5(
+            json_encode([
+                'nivel' => $nivel_id,
+                'generacion' => $generacion_id,
+                'grado' => $grado_id,
+                'grupo' => $grupo_id,
+                'semestre' => $semestre_id,
+                'periodo' => $periodo_id,
+                'parcial' => $parcial_bachillerato_id,
+                'periodo_basica' => $periodo_basica_id,
+                'busqueda' => $busqueda,
+                'filtro_estado' => $filtro_estado,
+                'orden_promedio' => $orden_promedio ?? '',
+                'datos' => $graficasCalificaciones,
+            ]),
+        ) }}"
             x-data="graficasCalificacionesPro(@js($graficasCalificaciones))" x-init="iniciar()"
+            x-on:recargar-graficas-calificaciones.window="actualizar(@js($graficasCalificaciones))"
             class="mt-6 overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+
             <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600"></div>
+
             <div class="p-5 sm:p-6">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <div
                             class="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
-                            <span class="h-2 w-2 rounded-full bg-sky-500"></span>Análisis visual
+                            <span class="h-2 w-2 rounded-full bg-sky-500"></span>
+                            Análisis visual
                         </div>
-                        <h3 class="mt-3 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">Gráficas
-                            de calificaciones</h3>
-                        <p class="mt-1 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">Visualización
-                            automática de promedios por alumno, por materia y rendimiento global del grupo.</p>
+
+                        <h3 class="mt-3 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
+                            Gráficas de calificaciones
+                        </h3>
+
+                        <p class="mt-1 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+                            Visualización automática de promedios por alumno, por materia y rendimiento global del
+                            grupo.
+                        </p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -853,75 +890,116 @@
                             class="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/50">
                             <div
                                 class="text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                Promedio global</div>
+                                Promedio global
+                            </div>
+
                             <div class="mt-1 text-2xl font-black text-neutral-900 dark:text-white">
-                                {{ number_format($graficasCalificaciones['global']['promedio'], 1) }}</div>
+                                {{ isset($graficasCalificaciones['global']['promedio'])
+                                    ? number_format((float) $graficasCalificaciones['global']['promedio'], 1)
+                                    : '—' }}
+                            </div>
                         </div>
+
                         <div
                             class="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/50">
                             <div
                                 class="text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                Aprobación</div>
+                                Aprobación
+                            </div>
+
                             <div class="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-300">
-                                {{ $graficasCalificaciones['global']['porcentaje_aprobacion'] }}%</div>
+                                {{ $graficasCalificaciones['global']['porcentaje_aprobacion'] ?? 0 }}%
+                            </div>
                         </div>
+
                         <div
                             class="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/50">
                             <div
                                 class="text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                Aprobadas</div>
+                                Aprobadas
+                            </div>
+
                             <div class="mt-1 text-2xl font-black text-sky-600 dark:text-sky-300">
-                                {{ $graficasCalificaciones['global']['aprobadas'] }}</div>
+                                {{ $graficasCalificaciones['global']['aprobadas'] ?? 0 }}
+                            </div>
                         </div>
+
                         <div
                             class="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/50">
                             <div
                                 class="text-[11px] font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                                Reprobadas</div>
+                                Reprobadas
+                            </div>
+
                             <div class="mt-1 text-2xl font-black text-rose-600 dark:text-rose-300">
-                                {{ $graficasCalificaciones['global']['reprobadas'] }}</div>
+                                {{ $graficasCalificaciones['global']['reprobadas'] ?? 0 }}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                @if ($graficasCalificaciones['global']['total_numericas'] > 0)
+                @if (($graficasCalificaciones['global']['total_numericas'] ?? 0) > 0)
                     <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">Promedio por alumno</h4>
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Promedio individual de cada
-                                estudiante.</p>
-                            <div id="graficaCalificacionesAlumnos" class="min-h-[330px]"></div>
+                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                Promedio por alumno
+                            </h4>
+
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                                Promedio individual de cada estudiante.
+                            </p>
+
+                            <div wire:ignore>
+                                <div id="graficaCalificacionesAlumnos" class="min-h-[330px]"></div>
+                            </div>
                         </div>
+
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">Promedio por materia</h4>
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Comparativo del rendimiento por
-                                asignatura.</p>
-                            <div id="graficaCalificacionesMaterias" class="min-h-[330px]"></div>
+                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                Promedio por materia
+                            </h4>
+
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                                Comparativo del rendimiento por asignatura.
+                            </p>
+
+                            <div wire:ignore>
+                                <div id="graficaCalificacionesMaterias" class="min-h-[330px]"></div>
+                            </div>
                         </div>
+
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">Rendimiento global</h4>
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">Promedio general del grupo
-                                seleccionado.</p>
-                            <div id="graficaCalificacionesGlobal" class="min-h-[330px]"></div>
+                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                Rendimiento global
+                            </h4>
+
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                                Promedio general del grupo seleccionado.
+                            </p>
+
+                            <div wire:ignore>
+                                <div id="graficaCalificacionesGlobal" class="min-h-[330px]"></div>
+                            </div>
                         </div>
                     </div>
                 @else
                     <div
                         class="mt-6 rounded-2xl border border-dashed border-neutral-300 p-6 text-center dark:border-neutral-700">
-                        <div class="text-sm font-bold text-neutral-800 dark:text-neutral-100">Todavía no hay
-                            calificaciones numéricas para graficar</div>
-                        <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Captura calificaciones de 0 a
-                            10 para generar las gráficas.</div>
+                        <div class="text-sm font-bold text-neutral-800 dark:text-neutral-100">
+                            Todavía no hay calificaciones numéricas para graficar
+                        </div>
+
+                        <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                            Captura calificaciones de 0 a 10 para generar las gráficas.
+                        </div>
                     </div>
                 @endif
             </div>
         </div>
     @endif
-
-
 
     {{-- Modal revisión --}}
     <div x-data="{ show: @entangle('mostrarModalRevision').live }" x-cloak>
@@ -1119,52 +1197,143 @@
     @endonce
 
     <script>
-        function graficasCalificacionesPro(datos) {
+        function graficasCalificacionesPro(datosIniciales) {
             return {
-                datos: datos,
+                datos: datosIniciales || {},
+
                 graficaAlumnos: null,
                 graficaMaterias: null,
                 graficaGlobal: null,
+                timer: null,
+
                 iniciar() {
-                    this.esperarApexCharts(() => {
-                        this.destruirGraficas();
-                        this.crearGraficaAlumnos();
-                        this.crearGraficaMaterias();
-                        this.crearGraficaGlobal();
-                    });
+                    this.programarCarga();
                 },
+
+                recargar() {
+                    this.programarCarga();
+                },
+
+                programarCarga() {
+                    clearTimeout(this.timer);
+
+                    this.timer = setTimeout(() => {
+                        this.$nextTick(() => {
+                            this.esperarApexCharts(() => {
+                                this.crearTodas();
+                            });
+                        });
+                    }, 500);
+                },
+
+                crearTodas() {
+                    this.destruirGraficas();
+
+                    const totalNumericas = Number(this.datos?.global?.total_numericas || 0);
+
+                    if (totalNumericas <= 0) {
+                        return;
+                    }
+
+                    this.crearGraficaAlumnos();
+                    this.crearGraficaMaterias();
+                    this.crearGraficaGlobal();
+                },
+
                 esperarApexCharts(callback) {
                     if (typeof ApexCharts !== 'undefined') {
                         callback();
                         return;
                     }
-                    setTimeout(() => this.esperarApexCharts(callback), 100);
+
+                    setTimeout(() => {
+                        this.esperarApexCharts(callback);
+                    }, 120);
                 },
+
                 destruirGraficas() {
-                    if (this.graficaAlumnos) this.graficaAlumnos.destroy();
-                    if (this.graficaMaterias) this.graficaMaterias.destroy();
-                    if (this.graficaGlobal) this.graficaGlobal.destroy();
-                    this.graficaAlumnos = null;
-                    this.graficaMaterias = null;
-                    this.graficaGlobal = null;
+                    if (this.graficaAlumnos) {
+                        this.graficaAlumnos.destroy();
+                        this.graficaAlumnos = null;
+                    }
+
+                    if (this.graficaMaterias) {
+                        this.graficaMaterias.destroy();
+                        this.graficaMaterias = null;
+                    }
+
+                    if (this.graficaGlobal) {
+                        this.graficaGlobal.destroy();
+                        this.graficaGlobal = null;
+                    }
+
+                    this.limpiarContenedor('#graficaCalificacionesAlumnos');
+                    this.limpiarContenedor('#graficaCalificacionesMaterias');
+                    this.limpiarContenedor('#graficaCalificacionesGlobal');
                 },
+
+                limpiarContenedor(selector) {
+                    const elemento = document.querySelector(selector);
+
+                    if (elemento) {
+                        elemento.innerHTML = '';
+                    }
+                },
+
                 crearGraficaAlumnos() {
                     const elemento = document.querySelector('#graficaCalificacionesAlumnos');
-                    if (!elemento || !this.datos.alumnos || this.datos.alumnos.series.length === 0) return;
-                    this.graficaAlumnos = new ApexCharts(elemento, this.opcionesBarra(this.datos.alumnos.labels, this.datos
-                        .alumnos.series));
+
+                    if (!elemento || !this.datos?.alumnos) {
+                        return;
+                    }
+
+                    const labels = this.datos.alumnos.labels || [];
+                    const series = this.datos.alumnos.series || [];
+
+                    if (labels.length === 0 || series.length === 0) {
+                        return;
+                    }
+
+                    this.graficaAlumnos = new ApexCharts(
+                        elemento,
+                        this.opcionesBarra(labels, series)
+                    );
+
                     this.graficaAlumnos.render();
                 },
+
                 crearGraficaMaterias() {
                     const elemento = document.querySelector('#graficaCalificacionesMaterias');
-                    if (!elemento || !this.datos.materias || this.datos.materias.series.length === 0) return;
-                    this.graficaMaterias = new ApexCharts(elemento, this.opcionesBarra(this.datos.materias.labels, this
-                        .datos.materias.series));
+
+                    if (!elemento || !this.datos?.materias) {
+                        return;
+                    }
+
+                    const labels = this.datos.materias.labels || [];
+                    const series = this.datos.materias.series || [];
+
+                    if (labels.length === 0 || series.length === 0) {
+                        return;
+                    }
+
+                    this.graficaMaterias = new ApexCharts(
+                        elemento,
+                        this.opcionesBarra(labels, series)
+                    );
+
                     this.graficaMaterias.render();
                 },
+
                 crearGraficaGlobal() {
                     const elemento = document.querySelector('#graficaCalificacionesGlobal');
-                    if (!elemento || !this.datos.global) return;
+
+                    if (!elemento || !this.datos?.global) {
+                        return;
+                    }
+
+                    const promedio = Number(this.datos.global.promedio || 0);
+                    const porcentaje = Number(this.datos.global.porcentaje || 0);
+
                     this.graficaGlobal = new ApexCharts(elemento, {
                         chart: {
                             type: 'radialBar',
@@ -1174,7 +1343,7 @@
                             },
                             fontFamily: 'Inter, ui-sans-serif, system-ui'
                         },
-                        series: [this.datos.global.porcentaje],
+                        series: [porcentaje],
                         labels: ['Promedio global'],
                         plotOptions: {
                             radialBar: {
@@ -1189,14 +1358,16 @@
                                     value: {
                                         fontSize: '34px',
                                         fontWeight: 900,
-                                        formatter: () => Number(this.datos.global.promedio).toFixed(1)
+                                        formatter: () => promedio.toFixed(1)
                                     }
                                 }
                             }
-                        },
+                        }
                     });
+
                     this.graficaGlobal.render();
                 },
+
                 opcionesBarra(labels, series) {
                     return {
                         chart: {

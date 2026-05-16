@@ -98,6 +98,8 @@ Route::get('/calificaciones/diploma/pdf', [PDFController::class, 'diploma_califi
 Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
     ->name('lista.evaluacion.word');
 
+Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales'])
+    ->name('generales.credenciales.pdf');
 
 Route::prefix('nivel')->group(function () {
 
