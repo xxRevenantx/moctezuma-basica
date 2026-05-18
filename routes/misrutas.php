@@ -19,12 +19,13 @@ use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
+use App\Http\Controllers\ProfesorPdfController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
 use App\Http\Controllers\TutorController;
 use App\Models\PersonaNivel;
-
+use App\Models\Profesor;
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');
@@ -99,6 +100,13 @@ Route::get('/calificaciones/diploma/pdf', [PDFController::class, 'diploma_califi
 
 Route::get('/credenciales/profesores/pdf', [PDFController::class, 'credencial_profesor_pdf'])
     ->name('credenciales.profesores.pdf');
+
+
+Route::get('/profesor/listas/asistencia/pdf', [ProfesorPdfController::class, 'asistencia'])
+    ->name('profesor.listas.asistencia.pdf');
+
+Route::get('/profesor/listas/evaluacion/pdf', [ProfesorPdfController::class, 'evaluacion'])
+    ->name('profesor.listas.evaluacion.pdf');
 
 // WORD
 Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])

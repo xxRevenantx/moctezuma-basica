@@ -120,12 +120,13 @@
         .director {
             position: absolute;
             text-align: center;
-            line-height: 9px;
+            line-height: 8px;
             top: 90px;
             bottom: 10px;
-            left: 470px;
-            font-size: 10px;
+            left: 460px;
+            font-size: 9px;
             color: rgb(0, 0, 0);
+            width: 160px;
         }
 
         .logo {
@@ -149,18 +150,21 @@
 
         @foreach ($personas as $index => $persona)
             @php
+                /*
+                 * Se toma el primer nivel asociado al profesor.
+                 * Esto permite generar credenciales sin filtrar por nivel.
+                 */
+                $personaNivelPrincipal = $persona->personaNiveles->first();
+                $nivelPrincipal = $personaNivelPrincipal?->nivel;
+                $director = $nivelPrincipal?->director;
+
                 $nombreCompleto = trim(
-                    ($persona->titulo ? $persona->titulo . ' ' : '') .
-                        ($persona->nombre ?? '') .
+                    ($persona->nombre ?? '') .
                         ' ' .
                         ($persona->apellido_paterno ?? '') .
                         ' ' .
                         ($persona->apellido_materno ?? ''),
                 );
-
-                $fotoExiste = !empty($persona->foto) && file_exists(public_path('storage/' . $persona->foto));
-
-                $logoPrincipal = public_path('imagenes/logo.png');
 
                 $rolPrincipal =
                     $persona->personaRoles
@@ -169,30 +173,54 @@
                         ->first() ??
                     ($cargo ?? 'PROFESOR');
 
-                $nombreDirector = 'DIRECTOR(A)';
+                $nombreDirector = $director
+                    ? mb_strtoupper(
+                        trim(
+                            ($director->titulo ? $director->titulo . ' ' : '') .
+                                ($director->nombre ?? '') .
+                                ' ' .
+                                ($director->apellido_paterno ?? '') .
+                                ' ' .
+                                ($director->apellido_materno ?? ''),
+                        ),
+                        'UTF-8',
+                    )
+                    : 'DIRECTOR(A)';
+
+                $cargoDirector = $director?->cargo ? mb_strtoupper($director->cargo, 'UTF-8') : 'FIRMA Y SELLO';
+
+                $cctCredencial = $nivelPrincipal?->cct ?? ($cct ?? 'No especificado');
+
+                $logoNivel = $nivelPrincipal?->logo;
+                $rutaLogo = $logoNivel ? public_path('storage/logos/' . $logoNivel) : null;
+
+                $existeLogo = $rutaLogo && file_exists($rutaLogo);
+
+                $rutaFoto = $persona->foto ? public_path('storage/personal/' . $persona->foto) : null;
+
+                $existeFoto = $rutaFoto && file_exists($rutaFoto);
             @endphp
 
             <div class="bloqueCredencial">
 
                 {{-- Fondo de la credencial --}}
-                <img class="credenciales" src="{{ public_path('imagenes/credencial.jpg') }}" alt="Credencial">
+                <img class="credenciales" src="{{ public_path('imagenes/credencial_profesor.jpg') }}" alt="Credencial">
 
-                {{-- Logos --}}
-                @if (file_exists($logoPrincipal))
-                    <img class="logo" src="{{ $logoPrincipal }}" alt="Logo">
+                {{-- Logos del nivel principal --}}
+                @if ($existeLogo)
+                    <img class="logo" src="{{ $rutaLogo }}" alt="Logo">
 
-                    <img class="logo2" src="{{ $logoPrincipal }}" alt="Logo">
+                    <img class="logo2" src="{{ $rutaLogo }}" alt="Logo">
                 @endif
 
-                {{-- CCT --}}
+                {{-- CCT del nivel principal --}}
                 <span class="cct">
-                    C.C.T. {{ $cct ?: 'CCT no especificado' }}
+                    C.C.T. {{ $cctCredencial }}
                 </span>
 
                 {{-- Foto del profesor --}}
-                @if ($fotoExiste)
-                    <img class="fotoProfesor" src="{{ public_path('storage/' . $persona->foto) }}"
-                        alt="Foto del profesor">
+                @if ($existeFoto)
+                    <img class="fotoProfesor" src="{{ $rutaFoto }}" alt="Foto del profesor">
                 @else
                     <div class="sinFoto">
                         FOTO + SELLO
@@ -213,33 +241,27 @@
                     <br>
 
                     <b>Cargo:</b>
-                    {{ $rolPrincipal ?: $cargo ?? 'PROFESOR' }}
+                    {{ $rolPrincipal ?: 'PROFESOR' }}
                     <br>
 
                     <b>CURP:</b>
                     {{ $persona->curp ?? 'No especificado' }}
                     <br>
 
-                    <b>RFC:</b>
-                    {{ $persona->rfc ?? 'No especificado' }}
-                    <br>
 
-                    <b>Correo:</b>
-                    {{ $persona->correo ?? 'No especificado' }}
-                    <br>
-
-                    <b>Teléfono:</b>
-                    {{ $persona->telefono_movil ?? ($persona->telefono_fijo ?? 'No especificado') }}
+                    <b>Nivel:</b>
+                    {{ $nivelPrincipal?->nombre ?? 'No especificado' }}
                     <br>
 
                     <b>Vigencia:</b>
                     {{ $vigencia ?? 'No especificada' }}
-
                     <br>
                 </div>
 
                 <span class="director">
                     {{ $nombreDirector }}
+                    <br>
+                    {{ $cargoDirector }}
                     <br>
                     FIRMA Y SELLO
                 </span>
