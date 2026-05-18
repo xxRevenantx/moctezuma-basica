@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>CREDENCIALES DE ESTUDIANTES</title>
+    <title>CREDENCIALES DE PROFESORES</title>
 
     <style>
         @page {
@@ -36,7 +36,6 @@
         .contenedorCredenciales {
             width: 100%;
             margin: auto;
-            /* background: #000; */
         }
 
         .bloqueCredencial {
@@ -54,13 +53,14 @@
             display: block;
         }
 
-        .fotoAlumno {
+        .fotoProfesor {
             position: absolute;
             top: 25px;
             left: 5px;
             width: 2.5cm;
             height: 3cm;
             border: 1px solid #efefef;
+            object-fit: cover;
         }
 
         .sinFoto {
@@ -77,7 +77,6 @@
             padding-top: 42px;
         }
 
-
         .info {
             position: absolute;
             top: 29px;
@@ -86,36 +85,25 @@
             font-size: 11px;
             line-height: 11px;
             color: #111;
-
         }
 
         .info b {
             font-weight: 700;
         }
 
-        .nombreAlumno {
+        .nombreProfesor {
             text-transform: uppercase;
             font-weight: 700;
             font-size: 9.5px;
         }
 
-
         .page-break {
             page-break-after: always;
-        }
-
-        .nivel {
-            font-size: 11px;
-            margin-left: 35px;
-            margin-bottom: 10px;
-            font-weight: 700;
-            color: rgb(255, 255, 255);
         }
 
         .titulo {
             font-size: 11px;
             margin-left: 35px;
-            /* margin-top: 50px; */
             font-weight: 700;
             color: rgb(255, 255, 255);
         }
@@ -127,7 +115,6 @@
             font-size: 10px;
             font-weight: 700;
             color: rgb(255, 255, 255);
-
         }
 
         .director {
@@ -160,94 +147,103 @@
 <body>
     <div class="contenedorCredenciales">
 
-        @foreach ($alumnos as $index => $alumno)
+        @foreach ($personas as $index => $persona)
+            @php
+                $nombreCompleto = trim(
+                    ($persona->titulo ? $persona->titulo . ' ' : '') .
+                        ($persona->nombre ?? '') .
+                        ' ' .
+                        ($persona->apellido_paterno ?? '') .
+                        ' ' .
+                        ($persona->apellido_materno ?? ''),
+                );
+
+                $fotoExiste = !empty($persona->foto) && file_exists(public_path('storage/' . $persona->foto));
+
+                $logoPrincipal = public_path('imagenes/logo.png');
+
+                $rolPrincipal =
+                    $persona->personaRoles
+                        ->map(fn($personaRole) => $personaRole->rolePersona?->nombre)
+                        ->filter()
+                        ->first() ??
+                    ($cargo ?? 'PROFESOR');
+
+                $nombreDirector = 'DIRECTOR(A)';
+            @endphp
+
             <div class="bloqueCredencial">
 
                 {{-- Fondo de la credencial --}}
                 <img class="credenciales" src="{{ public_path('imagenes/credencial.jpg') }}" alt="Credencial">
 
+                {{-- Logos --}}
+                @if (file_exists($logoPrincipal))
+                    <img class="logo" src="{{ $logoPrincipal }}" alt="Logo">
 
-                <img class="logo" src="{{ public_path('storage/logos/' . $nivel->logo ?? 'logo.png') }}"
-                    alt="Logo del nivel">
-
-
-                <img class="logo2" src="{{ public_path('storage/logos/' . $nivel->logo ?? 'logo.png') }}"
-                    alt="Logo del nivel">
-
-
-
-                @if ($alumno->nivel)
-                    <span class="cct">
-                        C.C.T.{{ $nivel->cct ?? 'CCT no especificado' }}
-                    </span>
+                    <img class="logo2" src="{{ $logoPrincipal }}" alt="Logo">
                 @endif
 
+                {{-- CCT --}}
+                <span class="cct">
+                    C.C.T. {{ $cct ?: 'CCT no especificado' }}
+                </span>
 
-
-                {{-- Foto del alumno --}}
-                @if (!empty($alumno->foto_path) && file_exists(public_path('storage/' . $alumno->foto_path)))
-                    <img class="fotoAlumno" src="{{ public_path('storage/' . $alumno->foto_path) }}"
-                        alt="Foto del alumno">
+                {{-- Foto del profesor --}}
+                @if ($fotoExiste)
+                    <img class="fotoProfesor" src="{{ public_path('storage/' . $persona->foto) }}"
+                        alt="Foto del profesor">
                 @else
                     <div class="sinFoto">
                         FOTO + SELLO
-
                     </div>
                 @endif
 
-                {{-- Información del alumno --}}
+                {{-- Información del profesor --}}
                 <div class="info">
-                    {{-- Título --}}
                     <span class="titulo">
-                        CREDENCIAL DEL ESTUDIANTE
+                        CREDENCIAL DEL PROFESOR
                     </span>
                     <br>
 
                     <b>Nombre:</b>
-                    <span class="nombreAlumno">
-                        {{ $alumno->nombre }}
-                        {{ $alumno->apellido_paterno }}
-                        {{ $alumno->apellido_materno }}
+                    <span class="nombreProfesor">
+                        {{ $nombreCompleto ?: 'No especificado' }}
                     </span>
                     <br>
 
-                    <b>Matrícula:</b>
-                    {{ $alumno->matricula ?? 'No especificado' }}
+                    <b>Cargo:</b>
+                    {{ $rolPrincipal ?: $cargo ?? 'PROFESOR' }}
                     <br>
+
                     <b>CURP:</b>
-                    {{ $alumno->curp ?? 'No especificado' }}
+                    {{ $persona->curp ?? 'No especificado' }}
                     <br>
 
-                    <b>Nivel:</b>
-                    {{ $alumno->nivel->nombre ?? 'No especificado' }} <b>Grado:</b>
-                    {{ $alumno->grado->nombre ?? 'No especificado' }}°
-                    <b>Grupo:</b> "{{ $alumno->grupo?->asignacionGrupo?->nombre ?? 'No especificado' }}"
+                    <b>RFC:</b>
+                    {{ $persona->rfc ?? 'No especificado' }}
                     <br>
 
-                    <b>Vigencia:</b> Agosto {{ $cicloEscolar->fin_anio }}
-
-
-                    @php
-                        $nombreDirector = $nivel->director
-                            ? mb_strtoupper(
-                                $nivel->director->titulo .
-                                    ' ' .
-                                    $nivel->director->nombre .
-                                    ' ' .
-                                    $nivel->director->apellido_paterno .
-                                    ' ' .
-                                    $nivel->director->apellido_materno,
-                                'UTF-8',
-                            )
-                            : 'No especificado';
-                    @endphp
+                    <b>Correo:</b>
+                    {{ $persona->correo ?? 'No especificado' }}
                     <br>
 
+                    <b>Teléfono:</b>
+                    {{ $persona->telefono_movil ?? ($persona->telefono_fijo ?? 'No especificado') }}
+                    <br>
 
+                    <b>Vigencia:</b>
+                    {{ $vigencia ?? 'No especificada' }}
+
+                    <br>
                 </div>
-                <span class="director">{{ $nombreDirector }}<br>FIRMA Y SELLO</span>
-            </div>
 
+                <span class="director">
+                    {{ $nombreDirector }}
+                    <br>
+                    FIRMA Y SELLO
+                </span>
+            </div>
 
             @if (($index + 1) % 4 === 0)
                 <div class="page-break"></div>

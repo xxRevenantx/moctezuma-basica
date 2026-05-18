@@ -31,6 +31,106 @@ use Illuminate\Support\Str;
 class PDFController extends Controller
 {
 
+    public function credencial_profesor_pdf(Request $request)
+    {
+        $modoDescarga = $request->query('modo_descarga', 'seleccionados');
+
+        $personas = $this->obtenerPersonas($request, $modoDescarga);
+
+        if ($personas->isEmpty()) {
+            abort(404, 'No se encontraron profesores para generar credenciales.');
+        }
+
+        $pdf = Pdf::loadView('pdf.credenciales_profesores_pdf', [
+            'personas' => $personas,
+            'vigencia' => $request->query('vigencia', 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year),
+            'cargo' => $request->query('cargo', 'PROFESOR'),
+            'cct' => $request->query('cct', ''),
+        ])->setPaper('letter', 'portrait');
+
+        return $pdf->stream('credenciales-profesores.pdf');
+    }
+
+    private function obtenerPersonas(Request $request, string $modoDescarga)
+    {
+        $query = Persona::query()
+            ->with([
+                'personaRoles.rolePersona:id,nombre,slug,status',
+            ])
+            ->where('status', 1)
+            ->whereHas('personaRoles.rolePersona', function ($consulta) {
+                $consulta
+                    ->where(function ($rol) {
+                        $rol->where('slug', 'like', '%docente%')
+                            ->orWhere('slug', 'like', '%maestro%')
+                            ->orWhere('slug', 'like', '%maestroa%')
+                            ->orWhere('slug', 'like', '%profesor%')
+                            ->orWhere('slug', 'like', '%tutor%')
+                            ->orWhere('slug', 'director_con_grupo')
+                            ->orWhere('nombre', 'like', '%Docente%')
+                            ->orWhere('nombre', 'like', '%Maestro%')
+                            ->orWhere('nombre', 'like', '%Maestra%')
+                            ->orWhere('nombre', 'like', '%Profesor%')
+                            ->orWhere('nombre', 'like', '%Tutora%')
+                            ->orWhere('nombre', 'like', '%Tutor%');
+                    });
+            });
+
+        if ($modoDescarga === 'individual') {
+            return $query
+                ->where('id', (int) $request->query('persona_id'))
+                ->get();
+        }
+
+        if ($modoDescarga === 'seleccionados') {
+            $ids = collect(explode(',', (string) $request->query('personas')))
+                ->map(fn($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($ids->isEmpty()) {
+                return collect();
+            }
+
+            $personas = $query
+                ->whereIn('id', $ids->all())
+                ->get();
+
+            return $personas
+                ->sortBy(fn($persona) => $ids->search((int) $persona->id))
+                ->values();
+        }
+
+        $busqueda = trim((string) $request->query('buscar'));
+
+        if ($busqueda !== '') {
+            $query->where(function ($consulta) use ($busqueda) {
+                $consulta
+                    ->where('nombre', 'like', '%' . $busqueda . '%')
+                    ->orWhere('apellido_paterno', 'like', '%' . $busqueda . '%')
+                    ->orWhere('apellido_materno', 'like', '%' . $busqueda . '%')
+                    ->orWhere('curp', 'like', '%' . $busqueda . '%')
+                    ->orWhere('rfc', 'like', '%' . $busqueda . '%')
+                    ->orWhere('correo', 'like', '%' . $busqueda . '%')
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
+                        ['%' . $busqueda . '%']
+                    )
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                        ['%' . $busqueda . '%']
+                    );
+            });
+        }
+
+        return $query
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
     // Generar oficios de reanudaciones de labores
     public function reanudaciones(Request $request)
     {
@@ -282,8 +382,8 @@ class PDFController extends Controller
 
                 $profesorTitular = trim(
                     ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
                 );
             }
         }
@@ -561,8 +661,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -1045,8 +1145,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         /*
@@ -1506,8 +1606,8 @@ class PDFController extends Controller
 
         $nombreAlumno = trim(
             ($inscripcion->apellido_paterno ?? '') . ' ' .
-                ($inscripcion->apellido_materno ?? '') . ' ' .
-                ($inscripcion->nombre ?? '')
+            ($inscripcion->apellido_materno ?? '') . ' ' .
+            ($inscripcion->nombre ?? '')
         );
 
         if ($nombreAlumno === '') {
@@ -1752,8 +1852,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                            ($item->apellido_paterno ?? '') . ' ' .
-                            ($item->apellido_materno ?? '')
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $item->grado?->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($item->grupo),
@@ -2077,9 +2177,13 @@ class PDFController extends Controller
     public function credenciales(Request $request, string $slug_nivel)
     {
         $nivel = Nivel::query()
-            ->select('id', 'nombre', 'slug')
+            ->with('director')
             ->where('slug', $slug_nivel)
             ->firstOrFail();
+
+        $cicloEscolar = CicloEscolar::query()
+            ->orderByDesc('id')
+            ->first();
 
         $modoDescarga = $request->string('modo_descarga')->toString();
 
@@ -2146,6 +2250,7 @@ class PDFController extends Controller
             'nivel' => $nivel,
             'alumnos' => $alumnos,
             'modoDescarga' => $modoDescarga,
+            'cicloEscolar' => $cicloEscolar,
         ])->setPaper('letter', 'portrait');
 
         return $pdf->stream('credenciales_' . $nivel->slug . '.pdf');
@@ -2644,12 +2749,12 @@ class PDFController extends Controller
             'boletas' => 'pdf.lista_boletas',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'pdf.lista.sece',
-                'sece_interna' => 'pdf.sece_interna',
-                'personalizadores' => 'pdf.personalizadores',
-                'etiquetas' => 'pdf.etiquetas_pdf',
-                default => abort(404, 'El formato seleccionado no existe.'),
-            },
+                    'sece' => 'pdf.lista.sece',
+                    'sece_interna' => 'pdf.sece_interna',
+                    'personalizadores' => 'pdf.personalizadores',
+                    'etiquetas' => 'pdf.etiquetas_pdf',
+                    default => abort(404, 'El formato seleccionado no existe.'),
+                },
 
             default => abort(404, 'El tipo de descarga seleccionado no existe.'),
         };
@@ -2667,12 +2772,12 @@ class PDFController extends Controller
             'boletas' => $esBachillerato ? 'lista-boletas-parcial' : 'lista-boletas-periodo',
 
             'formatos' => match ($opcionDescarga) {
-                'sece' => 'formato-sece',
-                'sece_interna' => 'formato-sece-interna',
-                'personalizadores' => 'personalizadores',
-                'etiquetas' => 'etiquetas',
-                default => 'formato',
-            },
+                    'sece' => 'formato-sece',
+                    'sece_interna' => 'formato-sece-interna',
+                    'personalizadores' => 'personalizadores',
+                    'etiquetas' => 'etiquetas',
+                    default => 'formato',
+                },
 
             default => 'lista',
         };
@@ -2932,9 +3037,9 @@ class PDFController extends Controller
 
         return trim(
             ($persona->titulo ?? '') . ' ' .
-                ($persona->nombre ?? '') . ' ' .
-                ($persona->apellido_paterno ?? '') . ' ' .
-                ($persona->apellido_materno ?? '')
+            ($persona->nombre ?? '') . ' ' .
+            ($persona->apellido_paterno ?? '') . ' ' .
+            ($persona->apellido_materno ?? '')
         );
     }
 
@@ -3150,15 +3255,15 @@ class PDFController extends Controller
         if ($esBachillerato) {
             return mb_strtoupper(
                 $periodo?->parcialBachillerato?->parcial
-                    ?? $periodo?->parcialBachillerato?->descripcion
-                    ?? 'PARCIAL'
+                ?? $periodo?->parcialBachillerato?->descripcion
+                ?? 'PARCIAL'
             );
         }
 
         return mb_strtoupper(
             $periodo?->periodoBasica?->periodo
-                ?? $periodo?->periodoBasica?->descripcion
-                ?? 'PERIODO'
+            ?? $periodo?->periodoBasica?->descripcion
+            ?? 'PERIODO'
         );
     }
     private function nombreGrupo($grupo): string

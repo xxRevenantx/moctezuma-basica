@@ -55,6 +55,9 @@ Route::get('/roles-del-personal', [PersonaController::class, 'rolePersona'])->na
 // Plantilla
 Route::get('/plantilla', [PersonaNivelController::class, 'plantilla'])->name('misrutas.plantilla');
 
+// Ruta profesores
+Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');
+
 // RUTAS DE GRADOS
 Route::get('/grados', [GradoController::class, 'index'])->name('misrutas.grados');
 // RUTAS DE GENERACIONES
@@ -93,6 +96,9 @@ Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificacion
 
 Route::get('/calificaciones/diploma/pdf', [PDFController::class, 'diploma_calificaciones_pdf'])
     ->name('misrutas.diploma.calificaciones.pdf');
+
+Route::get('/credenciales/profesores/pdf', [PDFController::class, 'credencial_profesor_pdf'])
+    ->name('credenciales.profesores.pdf');
 
 // WORD
 Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])

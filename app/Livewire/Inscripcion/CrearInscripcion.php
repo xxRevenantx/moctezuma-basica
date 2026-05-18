@@ -12,6 +12,7 @@ use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\CurpService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -29,6 +30,8 @@ class CrearInscripcion extends Component
 
     public string $curp = '';
     public string $matricula = '';
+
+    public bool $matriculaEditadaManual = false;
     public ?string $folio = null;
 
     public string $nombre = '';
@@ -124,6 +127,7 @@ class CrearInscripcion extends Component
                 'required',
                 'string',
                 'max:50',
+                'regex:/^[A-Z0-9\-]+$/i',
                 Rule::unique('inscripciones', 'matricula'),
             ],
             'folio' => [
@@ -450,6 +454,14 @@ class CrearInscripcion extends Component
 
     protected function refrescarMatriculaSiPosible(): void
     {
+        /*
+            Si la matrícula fue capturada manualmente,
+            no se vuelve a generar para no borrar el dato escrito.
+        */
+        if ($this->matriculaEditadaManual && trim($this->matricula) !== '') {
+            return;
+        }
+
         if (!$this->nivel_id) {
             $this->matricula = '';
             return;
@@ -472,6 +484,17 @@ class CrearInscripcion extends Component
         }
 
         $this->matricula = '';
+    }
+
+    public function updatedMatricula($value): void
+    {
+        $this->matriculaEditadaManual = true;
+
+        $this->matricula = mb_strtoupper(
+            preg_replace('/\s+/', '', trim((string) $value))
+        );
+
+        $this->validateOnly('matricula');
     }
 
     public function updatedCurp(string $value): void
@@ -748,7 +771,13 @@ class CrearInscripcion extends Component
 
     protected function baseGrupoQuery()
     {
-        return Grupo::query();
+        $query = Grupo::query();
+
+        if (Schema::hasColumn('grupos', 'deleted_at')) {
+            $query->whereNull('grupos.deleted_at');
+        }
+
+        return $query;
     }
 
     protected function loadNivelesFromGrupos(): Collection
@@ -886,23 +915,26 @@ class CrearInscripcion extends Component
 
         $grupos = $query
             ->with([
+                'asignacionGrupo:id,nombre',
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grado:id,nombre',
                 'semestre:id,numero',
             ])
-            ->orderBy('grado_id')
-            ->orderBy('semestre_id')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'nombre']);
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select('grupos.*')
+            ->orderBy('grupos.grado_id')
+            ->orderBy('grupos.semestre_id')
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
+            ->get();
 
         return $grupos->map(function ($grupo) {
             $generacion = $grupo->generacion
                 ? "{$grupo->generacion->anio_ingreso}-{$grupo->generacion->anio_egreso}"
                 : 'Sin generación';
 
-            $partes = [];
-
-            $partes[] = $grupo->nombre;
+            $nombreGrupo = $this->textoGrupo($grupo);
+            $partes = [$nombreGrupo];
 
             if ($grupo->grado) {
                 $partes[] = $grupo->grado->nombre;
@@ -915,10 +947,21 @@ class CrearInscripcion extends Component
             $partes[] = $generacion;
 
             return [
-                'id' => $grupo->id,
-                'label' => implode(' · ', $partes),
+                'id' => (int) $grupo->id,
+                'grado_id' => $grupo->grado_id ? (int) $grupo->grado_id : null,
+                'semestre_id' => $grupo->semestre_id ? (int) $grupo->semestre_id : null,
+                'label' => implode(' · ', array_filter($partes)),
             ];
         })->toArray();
+    }
+
+    protected function textoGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return 'Sin grupo';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
     }
 
     protected function loadCiclos(): Collection
@@ -1170,9 +1213,13 @@ class CrearInscripcion extends Component
             $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. La inscripción se guardará con datos capturados manualmente.';
         }
 
-        $this->refrescarMatriculaSiPosible();
+        if (!$this->matriculaEditadaManual || trim($this->matricula) === '') {
+            $this->refrescarMatriculaSiPosible();
+        }
 
         $data = $this->validate();
+
+
 
         if (!$this->validarRelacionAcademica($data)) {
             return;
@@ -1232,13 +1279,70 @@ class CrearInscripcion extends Component
             'position' => 'top-end',
         ]);
 
-        $this->cancelar();
+        $this->cancelar(true);
         $this->dispatch('refreshInscripciones');
     }
 
-    public function cancelar(): void
+    private function recargarOpcionesAsignacionEscolar(): void
     {
-        $this->reset([
+        $this->niveles = $this->loadNivelesFromGrupos();
+
+        $this->gradosOptions = collect();
+        $this->generacionesOptions = collect();
+        $this->semestresOptions = collect();
+        $this->gruposOptions = [];
+
+        if (!$this->nivel_id) {
+            $this->esBachillerato = false;
+            return;
+        }
+
+        $nivel = $this->niveles->firstWhere('id', $this->nivel_id)
+            ?: Nivel::query()->find($this->nivel_id);
+
+        $this->esBachillerato = $nivel?->slug === 'bachillerato';
+
+        if ($this->esBachillerato) {
+            $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
+
+            if ($this->generacion_id) {
+                $this->semestresOptions = $this->loadSemestresFromGrupos();
+            }
+
+            if ($this->generacion_id && $this->semestre_id) {
+                $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
+            }
+
+            return;
+        }
+
+        $this->gradosOptions = $this->loadGradosFromGrupos();
+
+        if ($this->grado_id) {
+            $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
+        }
+
+        if ($this->grado_id && $this->generacion_id) {
+            $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
+        }
+    }
+
+    public function cancelar(bool $conservarAsignacionEscolar = false): void
+    {
+        /*
+            Se guarda temporalmente la asignación escolar
+            para conservarla después de registrar un alumno.
+        */
+        $asignacionEscolar = [
+            'nivel_id' => $this->nivel_id,
+            'grado_id' => $this->grado_id,
+            'generacion_id' => $this->generacion_id,
+            'semestre_id' => $this->semestre_id,
+            'grupo_id' => $this->grupo_id,
+            'esBachillerato' => $this->esBachillerato,
+        ];
+
+        $camposParaLimpiar = [
             'curp',
             'matricula',
             'folio',
@@ -1249,6 +1353,7 @@ class CrearInscripcion extends Component
             'genero',
             'fecha_inscripcion',
             'ciclo_id',
+            'matriculaEditadaManual',
 
             'fecha_baja',
             'motivo_baja',
@@ -1265,11 +1370,7 @@ class CrearInscripcion extends Component
             'municipio',
             'estado_residencia',
             'ciudad_residencia',
-            'nivel_id',
-            'grado_id',
-            'generacion_id',
-            'semestre_id',
-            'grupo_id',
+
             'tutor_id',
             'copiar_direccion_tutor',
             'foto',
@@ -1278,19 +1379,41 @@ class CrearInscripcion extends Component
             'curpAdvertencia',
             'curpSuccess',
             'ultimaCurpConsultada',
-        ]);
+        ];
 
+        /*
+            Si se presiona Cancelar manualmente, sí se limpia todo.
+            Si viene después de Guardar, se conserva nivel, grado,
+            generación, semestre y grupo.
+        */
+        if (!$conservarAsignacionEscolar) {
+            $camposParaLimpiar = array_merge($camposParaLimpiar, [
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'semestre_id',
+                'grupo_id',
+                'esBachillerato',
+            ]);
+        }
+
+        $this->reset($camposParaLimpiar);
         $this->resetValidation();
 
-        $this->niveles = $this->loadNivelesFromGrupos();
-        $this->gradosOptions = collect();
-        $this->generacionesOptions = collect();
-        $this->semestresOptions = collect();
-        $this->gruposOptions = [];
+        if ($conservarAsignacionEscolar) {
+            $this->nivel_id = $asignacionEscolar['nivel_id'];
+            $this->grado_id = $asignacionEscolar['grado_id'];
+            $this->generacion_id = $asignacionEscolar['generacion_id'];
+            $this->semestre_id = $asignacionEscolar['semestre_id'];
+            $this->grupo_id = $asignacionEscolar['grupo_id'];
+            $this->esBachillerato = $asignacionEscolar['esBachillerato'];
+        }
+
+        $this->recargarOpcionesAsignacionEscolar();
+
         $this->ciclosOptions = $this->loadCiclos();
         $this->tutores = $this->loadTutores();
 
-        $this->esBachillerato = false;
         $this->fecha_inscripcion = now()->toDateString();
         $this->fecha_baja = null;
         $this->motivo_baja = null;

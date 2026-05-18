@@ -15,4 +15,10 @@ class PersonaNivelController extends Controller
     }
 
 
+    public function profesores()
+    {
+        return view('profesores.index');
+    }
+
+
 }

@@ -141,11 +141,18 @@ class Credenciales extends Component
     {
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->buscar_alumno = '';
     }
 
     public function updatedBuscarAlumno(): void
     {
         $this->alumno_individual_id = null;
+
+        /*
+         * No se limpian los alumnos seleccionados.
+         * Esto permite buscar otro alumno, seleccionarlo y conservar
+         * los que ya estaban agregados para descargar.
+         */
     }
 
     public function cargarSemestresPorGrado(): void
@@ -243,7 +250,17 @@ class Credenciales extends Component
     #[Computed]
     public function alumnos(): Collection
     {
-        if (!$this->generacion_id && in_array($this->modo_descarga, ['grado', 'grupo', 'semestre', 'individual', 'seleccionados'])) {
+        $busquedaLimpia = trim($this->buscar_alumno);
+
+        /*
+         * Si no hay filtros ni búsqueda, no se cargan alumnos.
+         * Si el usuario escribe una búsqueda, sí se consulta aunque no haya filtros completos.
+         */
+        if (
+            $busquedaLimpia === ''
+            && !$this->generacion_id
+            && in_array($this->modo_descarga, ['grado', 'grupo', 'semestre', 'individual', 'seleccionados'])
+        ) {
             return collect();
         }
 
@@ -265,22 +282,33 @@ class Credenciales extends Component
             $query->where('grado_id', $this->grado_id);
         }
 
-        if ($this->esBachillerato() && $this->semestre_id && Schema::hasColumn('inscripciones', 'semestre_id')) {
-            $query->where('semestre_id', $this->semestre_id);
-        }
-
         if ($this->grupo_id) {
             $query->where('grupo_id', $this->grupo_id);
         }
 
-        if ($this->buscar_alumno !== '') {
-            $busqueda = '%' . trim($this->buscar_alumno) . '%';
+        if (
+            $this->esBachillerato()
+            && $this->semestre_id
+            && Schema::hasColumn('inscripciones', 'semestre_id')
+        ) {
+            $query->where('semestre_id', $this->semestre_id);
+        }
 
-            $query->where(function ($consulta) use ($busqueda) {
-                $consulta->where('matricula', 'like', $busqueda)
-                    ->orWhere('nombre', 'like', $busqueda)
-                    ->orWhere('apellido_paterno', 'like', $busqueda)
-                    ->orWhere('apellido_materno', 'like', $busqueda);
+        if ($busquedaLimpia !== '') {
+            $query->where(function ($consulta) use ($busquedaLimpia) {
+                $consulta
+                    ->where('matricula', 'like', '%' . $busquedaLimpia . '%')
+                    ->orWhere('nombre', 'like', '%' . $busquedaLimpia . '%')
+                    ->orWhere('apellido_paterno', 'like', '%' . $busquedaLimpia . '%')
+                    ->orWhere('apellido_materno', 'like', '%' . $busquedaLimpia . '%')
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
+                        ['%' . $busquedaLimpia . '%']
+                    )
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                        ['%' . $busquedaLimpia . '%']
+                    );
             });
         }
 
@@ -290,6 +318,48 @@ class Credenciales extends Component
             ->orderBy('nombre')
             ->limit(500)
             ->get();
+    }
+
+    #[Computed]
+    public function alumnosSeleccionadosLista(): Collection
+    {
+        $ids = collect($this->alumnos_seleccionados)
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $alumnos = Inscripcion::query()
+            ->with([
+                'nivel:id,nombre,slug',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id',
+            ])
+            ->where('nivel_id', $this->nivel->id)
+            ->whereIn('id', $ids->all())
+            ->get();
+
+        /*
+         * Se conserva el orden en que fueron agregados.
+         */
+        return $alumnos
+            ->sortBy(fn($alumno) => $ids->search((int) $alumno->id))
+            ->values();
+    }
+
+    public function quitarAlumnoSeleccionado(int $alumnoId): void
+    {
+        $this->alumnos_seleccionados = collect($this->alumnos_seleccionados)
+            ->map(fn($id) => (int) $id)
+            ->reject(fn($id) => $id === $alumnoId)
+            ->values()
+            ->toArray();
     }
 
     public function seleccionarTodosVisibles(): void
@@ -340,16 +410,8 @@ class Credenciales extends Component
 
     public function modosDescarga(): array
     {
-        $modos = [
-            'generacion' => 'Por generación',
-            'grado' => 'Por grado',
-            'grupo' => 'Por grupo',
-            'individual' => 'Individual',
-            'seleccionados' => 'Seleccionados',
-        ];
-
         if ($this->esBachillerato()) {
-            $modos = [
+            return [
                 'generacion' => 'Por generación',
                 'grado' => 'Por grado',
                 'semestre' => 'Por semestre',
@@ -359,7 +421,13 @@ class Credenciales extends Component
             ];
         }
 
-        return $modos;
+        return [
+            'generacion' => 'Por generación',
+            'grado' => 'Por grado',
+            'grupo' => 'Por grupo',
+            'individual' => 'Individual',
+            'seleccionados' => 'Seleccionados',
+        ];
     }
 
     #[Computed]
@@ -499,8 +567,8 @@ class Credenciales extends Component
     {
         return trim(
             ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+            ($alumno->apellido_materno ?? '') . ' ' .
+            ($alumno->nombre ?? '')
         );
     }
 

@@ -106,12 +106,12 @@
                                 <div class="mb-1 flex items-center gap-2">
                                     <flux:label>Matrícula</flux:label>
                                     <span
-                                        class="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                        Automático
+                                        class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                        Editable
                                     </span>
                                 </div>
-                                <flux:input wire:model="matricula" variant="filled" readonly
-                                    placeholder="Se genera automáticamente" />
+                                <flux:input wire:model.live.debounce.500ms="matricula"
+                                    placeholder="Ingresa o edita la matrícula" />
                                 @error('matricula')
                                     <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                 @enderror

@@ -137,6 +137,11 @@
                             Plantilla
                         </flux:navlist.item>
 
+                        <flux:navlist.item icon="home" :href="route('misrutas.profesores')"
+                            :current="request()->routeIs('misrutas.profesores')" wire:navigate>
+                            Profesores
+                        </flux:navlist.item>
+
                     </flux:sidebar.group>
 
 

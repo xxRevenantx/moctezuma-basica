@@ -1,22 +1,22 @@
 <div x-data="{
-    abierto: localStorage.getItem('collapse_credenciales_{{ $slug_nivel }}') ?? 'credenciales',
+    abierto: localStorage.getItem('collapse_credenciales_profesor') ?? 'credenciales_profesor',
 
     cambiar(seccion) {
         this.abierto = this.abierto === seccion ? null : seccion;
 
         if (this.abierto) {
-            localStorage.setItem('collapse_credenciales_{{ $slug_nivel }}', this.abierto);
+            localStorage.setItem('collapse_credenciales_profesor', this.abierto);
         } else {
-            localStorage.removeItem('collapse_credenciales_{{ $slug_nivel }}');
+            localStorage.removeItem('collapse_credenciales_profesor');
         }
     },
 
     guardarScroll() {
-        localStorage.setItem('scroll_credenciales_{{ $slug_nivel }}', window.scrollY || 0);
+        localStorage.setItem('scroll_credenciales_profesor', window.scrollY || 0);
     },
 
     restaurarScroll() {
-        const posicion = localStorage.getItem('scroll_credenciales_{{ $slug_nivel }}');
+        const posicion = localStorage.getItem('scroll_credenciales_profesor');
 
         if (posicion !== null) {
             requestAnimationFrame(() => {
@@ -33,50 +33,50 @@
         });
     });
 });" class="space-y-6">
+
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click="cambiar('credenciales')"
+            <button type="button" x-on:click="cambiar('credenciales_profesor')"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
 
                 <div class="flex items-center gap-4">
                     <span
-                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-sky-600 text-white shadow-lg shadow-emerald-500/20 transition group-hover:scale-105">
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-500/20 transition group-hover:scale-105">
                         <flux:icon.identification class="h-5 w-5" />
                     </span>
 
                     <span>
                         <span class="block text-base font-black text-slate-900 dark:text-white">
-                            Descargar credenciales
+                            Descargar credenciales de profesores
                         </span>
 
                         <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                            Descarga credenciales por generación, grado,
-                            {{ $this->esBachillerato() ? 'semestre,' : '' }}
-                            grupo, alumno individual o selección manual.
+                            Busca personal docente, selecciónalo y descarga sus credenciales en PDF.
                         </span>
                     </span>
                 </div>
 
                 <div class="flex items-center gap-3">
                     <span
-                        class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/60 sm:inline-flex">
+                        class="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/60 sm:inline-flex">
                         PDF
                     </span>
 
                     <span
                         class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
-                        x-bind:class="abierto === 'credenciales'
+                        x-bind:class="abierto === 'credenciales_profesor'
                             ?
-                            'rotate-180 border-emerald-200 text-emerald-600 dark:border-emerald-900 dark:text-emerald-300' :
+                            'rotate-180 border-blue-200 text-blue-600 dark:border-blue-900 dark:text-blue-300' :
                             ''">
                         <flux:icon.chevron-down class="h-5 w-5" />
                     </span>
                 </div>
             </button>
 
-            <div x-cloak x-show="abierto === 'credenciales'" x-transition:enter="transition ease-out duration-300"
+            <div x-cloak x-show="abierto === 'credenciales_profesor'"
+                x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
@@ -86,7 +86,7 @@
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
                     <div wire:loading.delay.flex
-                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,modo_descarga,buscar_alumno,alumno_individual_id,alumnos_seleccionados,limpiarFiltros,seleccionarTodosVisibles,limpiarSeleccion,quitarAlumnoSeleccionado"
+                        wire:target="modo_descarga,buscar_persona,persona_individual_id,personas_seleccionadas,cct,vigencia,cargo,limpiarFiltros,limpiarSeleccion,seleccionarTodosVisibles,quitarPersonaSeleccionada"
                         class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
                         <div
                             class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -100,17 +100,17 @@
                         </div>
                     </div>
 
-                    <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600"></div>
+                    <div class="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900"></div>
 
                     <div class="p-5 sm:p-6">
                         <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h3 class="text-lg font-black text-slate-900 dark:text-white">
-                                    Filtros de credenciales
+                                    Filtros de credencial
                                 </h3>
 
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    Selecciona el alcance de descarga y después aplica los filtros necesarios.
+                                    Configura los datos generales y selecciona al personal que aparecerá en el PDF.
                                 </p>
                             </div>
 
@@ -129,40 +129,11 @@
                             </div>
                         </div>
 
-                        @if ($this->esBachillerato())
-                            <div
-                                class="mb-5 rounded-2xl border border-violet-200 bg-violet-50/80 p-4 text-sm text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
-                                <div class="flex items-start gap-3">
-                                    <div
-                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-200">
-                                        <flux:icon.information-circle class="h-5 w-5" />
-                                    </div>
-
-                                    <div>
-                                        <p class="font-black">
-                                            Modo bachillerato activo
-                                        </p>
-
-                                        <p class="mt-1 text-sm">
-                                            Para descargar por semestre o grupo, primero selecciona generación, grado y
-                                            semestre.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <flux:field>
-                                <flux:label>Nivel</flux:label>
-                                <flux:input readonly variant="filled" value="{{ $nivel?->nombre ?? '—' }}" disabled />
-                            </flux:field>
-
                             <flux:field>
                                 <flux:label>Modo de descarga</flux:label>
 
-                                <flux:select id="modo_descarga" wire:model.live="modo_descarga"
-                                    x-on:change="guardarScroll()">
+                                <flux:select wire:model.live="modo_descarga" x-on:change="guardarScroll()">
                                     @foreach ($this->modosDescarga() as $valor => $texto)
                                         <flux:select.option value="{{ $valor }}">
                                             {{ $texto }}
@@ -174,168 +145,64 @@
                             </flux:field>
 
                             <flux:field>
-                                <flux:label>Generación</flux:label>
+                                <flux:label>Buscar profesor</flux:label>
 
-                                <flux:select id="generacion_id" wire:model.live="generacion_id"
-                                    x-on:change="guardarScroll()">
-                                    <flux:select.option value="">
-                                        Selecciona una generación
-                                    </flux:select.option>
-
-                                    @foreach ($generaciones as $generacion)
-                                        <flux:select.option value="{{ $generacion->id }}">
-                                            {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
-                                        </flux:select.option>
-                                    @endforeach
-                                </flux:select>
-
-                                <flux:error name="generacion_id" />
+                                <flux:input type="search" wire:model.live.debounce.400ms="buscar_persona"
+                                    x-on:input="guardarScroll()" placeholder="Nombre, CURP, RFC o correo..." />
                             </flux:field>
 
                             <flux:field>
-                                <flux:label>Grado</flux:label>
+                                <flux:label>C.C.T.</flux:label>
 
-                                <flux:select id="grado_id" wire:model.live="grado_id" x-on:change="guardarScroll()"
-                                    :disabled="!$generacion_id">
-                                    <flux:select.option value="">
-                                        Selecciona un grado
-                                    </flux:select.option>
-
-                                    @foreach ($grados as $grado)
-                                        <flux:select.option value="{{ $grado->id }}">
-                                            {{ $grado->nombre }}
-                                        </flux:select.option>
-                                    @endforeach
-                                </flux:select>
-
-                                <flux:error name="grado_id" />
-                            </flux:field>
-
-                            @if ($this->esBachillerato())
-                                <flux:field>
-                                    <flux:label>Semestre</flux:label>
-
-                                    <flux:select id="semestre_id" wire:model.live="semestre_id"
-                                        x-on:change="guardarScroll()"
-                                        :disabled="!$generacion_id || !$grado_id || $semestres->isEmpty()">
-                                        <flux:select.option value="">
-                                            Selecciona un semestre
-                                        </flux:select.option>
-
-                                        @foreach ($semestres as $semestre)
-                                            <flux:select.option value="{{ $semestre->id }}">
-                                                {{ $this->textoSemestre($semestre) }}
-                                            </flux:select.option>
-                                        @endforeach
-                                    </flux:select>
-
-                                    <flux:error name="semestre_id" />
-                                </flux:field>
-                            @endif
-
-                            <flux:field>
-                                <flux:label>Grupo</flux:label>
-
-                                <flux:select id="grupo_id" wire:model.live="grupo_id" x-on:change="guardarScroll()"
-                                    wire:key="credenciales-grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
-                                    :disabled="$this->esBachillerato()
-                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
-
-                                    <flux:select.option value="">
-                                        Selecciona un grupo
-                                    </flux:select.option>
-
-                                    @foreach ($grupos as $grupo)
-                                        <flux:select.option value="{{ $grupo->id }}">
-                                            {{ $this->textoGrupo($grupo) }}
-                                        </flux:select.option>
-                                    @endforeach
-                                </flux:select>
-
-                                <flux:error name="grupo_id" />
-
-                                @if (!$this->esBachillerato() && $generacion_id && $grado_id && $grupos->isEmpty())
-                                    <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                        No hay grupos registrados para la generación y grado seleccionados.
-                                    </p>
-                                @endif
-
-                                @if ($this->esBachillerato() && $generacion_id && $grado_id && $semestre_id && $grupos->isEmpty())
-                                    <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                        No hay grupos registrados para la generación, grado y semestre seleccionados.
-                                    </p>
-                                @endif
+                                <flux:input type="text" wire:model.live.debounce.400ms="cct"
+                                    placeholder="Ej. 12PES0105U" />
                             </flux:field>
 
                             <flux:field>
-                                <flux:label>Buscar alumno</flux:label>
-                                <flux:input type="search" wire:model.live.debounce.400ms="buscar_alumno"
-                                    x-on:input="guardarScroll()" placeholder="Nombre, apellidos o matrícula..." />
+                                <flux:label>Vigencia</flux:label>
+
+                                <flux:input type="text" wire:model.live.debounce.400ms="vigencia"
+                                    placeholder="Ej. Ciclo escolar 2026 - 2027" />
+                            </flux:field>
+
+                            <flux:field>
+                                <flux:label>Cargo</flux:label>
+
+                                <flux:input type="text" wire:model.live.debounce.400ms="cargo"
+                                    placeholder="Ej. Profesor" />
                             </flux:field>
 
                             @if ($modo_descarga === 'individual')
-                                <flux:field>
-                                    <flux:label>Alumno individual</flux:label>
+                                <flux:field class="xl:col-span-2">
+                                    <flux:label>Profesor individual</flux:label>
 
-                                    <flux:select id="alumno_individual_id" wire:model.live="alumno_individual_id"
-                                        x-on:change="guardarScroll()">
+                                    <flux:select wire:model.live="persona_individual_id" x-on:change="guardarScroll()">
                                         <flux:select.option value="">
-                                            Selecciona un alumno
+                                            Selecciona un profesor
                                         </flux:select.option>
 
-                                        @foreach ($this->alumnos as $alumno)
-                                            <flux:select.option value="{{ $alumno->id }}">
-                                                {{ $alumno->matricula ?? 'S/M' }} — {{ $this->nombreAlumno($alumno) }}
+                                        @foreach ($this->personas as $persona)
+                                            <flux:select.option value="{{ $persona->id }}">
+                                                {{ $this->nombrePersona($persona) }}
                                             </flux:select.option>
                                         @endforeach
                                     </flux:select>
 
-                                    <flux:error name="alumno_individual_id" />
+                                    <flux:error name="persona_individual_id" />
                                 </flux:field>
                             @endif
                         </div>
 
                         <div class="mt-5 flex flex-wrap items-center gap-2">
                             <span
-                                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
                                 Modo: {{ $this->textoModoDescarga }}
                             </span>
-
-                            @if ($this->generacionSeleccionada)
-                                <span
-                                    class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
-                                    Generación:
-                                    {{ $this->generacionSeleccionada->anio_ingreso }} -
-                                    {{ $this->generacionSeleccionada->anio_egreso }}
-                                </span>
-                            @endif
-
-                            @if ($this->gradoSeleccionado)
-                                <span
-                                    class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                    Grado: {{ $this->gradoSeleccionado->nombre }}
-                                </span>
-                            @endif
-
-                            @if ($this->esBachillerato() && $this->semestreSeleccionado)
-                                <span
-                                    class="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                                    {{ $this->textoSemestre($this->semestreSeleccionado) }}
-                                </span>
-                            @endif
-
-                            @if ($this->grupoSeleccionado)
-                                <span
-                                    class="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300">
-                                    Grupo: {{ $this->textoGrupo($this->grupoSeleccionado) }}
-                                </span>
-                            @endif
 
                             @if ($modo_descarga === 'seleccionados')
                                 <span
                                     class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                    Seleccionados: {{ count($alumnos_seleccionados) }}
+                                    Seleccionados: {{ count($personas_seleccionadas) }}
                                 </span>
                             @endif
 
@@ -360,8 +227,8 @@
                                             </h4>
 
                                             <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                Marca alumnos desde la búsqueda. Los seleccionados se conservarán aunque
-                                                busques otro alumno.
+                                                Busca y marca profesores. La selección se conserva aunque cambies la
+                                                búsqueda.
                                             </p>
                                         </div>
 
@@ -381,71 +248,59 @@
                                                     <th class="w-12 px-4 py-3 text-left"></th>
                                                     <th
                                                         class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                                        Matrícula
+                                                        Profesor
                                                     </th>
                                                     <th
                                                         class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                                        Alumno
+                                                        RFC
                                                     </th>
                                                     <th
                                                         class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                                        Grupo
+                                                        Teléfono
                                                     </th>
                                                 </tr>
                                             </thead>
 
                                             <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                                                @forelse ($this->alumnos as $alumno)
-                                                    <tr wire:key="resultado-alumno-{{ $alumno->id }}"
+                                                @forelse ($this->personas as $persona)
+                                                    <tr wire:key="resultado-persona-{{ $persona->id }}"
                                                         class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
                                                         <td class="px-4 py-3">
-                                                            <input type="checkbox" value="{{ $alumno->id }}"
-                                                                wire:model.live="alumnos_seleccionados"
+                                                            <input type="checkbox" value="{{ $persona->id }}"
+                                                                wire:model.live="personas_seleccionadas"
                                                                 x-on:change="guardarScroll()"
-                                                                class="h-4 w-4 rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 dark:border-neutral-700">
-                                                        </td>
-
-                                                        <td
-                                                            class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
-                                                            {{ $alumno->matricula ?? 'S/M' }}
+                                                                class="h-4 w-4 rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-neutral-700">
                                                         </td>
 
                                                         <td class="px-4 py-3">
                                                             <p class="font-black text-slate-900 dark:text-white">
-                                                                {{ $this->nombreAlumno($alumno) }}
+                                                                {{ $this->nombrePersona($persona) }}
                                                             </p>
 
-                                                            <div class="mt-1 flex flex-wrap gap-1.5">
-                                                                @if ($alumno->generacion)
-                                                                    <span
-                                                                        class="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-black text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/40">
-                                                                        {{ $alumno->generacion->anio_ingreso }} -
-                                                                        {{ $alumno->generacion->anio_egreso }}
-                                                                    </span>
-                                                                @endif
+                                                            <p
+                                                                class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                                {{ $persona->correo ?? 'Sin correo' }}
+                                                            </p>
+                                                        </td>
 
-                                                                @if ($alumno->grado)
-                                                                    <span
-                                                                        class="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40">
-                                                                        {{ $alumno->grado->nombre }}
-                                                                    </span>
-                                                                @endif
-                                                            </div>
+                                                        <td
+                                                            class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
+                                                            {{ $persona->rfc ?? 'No especificado' }}
                                                         </td>
 
                                                         <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
-                                                            {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                                            {{ $persona->telefono_movil ?? ($persona->telefono_fijo ?? 'No especificado') }}
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
                                                         <td colspan="4" class="px-4 py-10 text-center">
                                                             <p class="font-black text-slate-700 dark:text-slate-200">
-                                                                No hay alumnos para mostrar.
+                                                                No hay profesores para mostrar.
                                                             </p>
 
                                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                                Ajusta los filtros o escribe en el buscador.
+                                                                Escribe en el buscador para consultar personal.
                                                             </p>
                                                         </td>
                                                     </tr>
@@ -456,17 +311,17 @@
                                 </div>
 
                                 <div
-                                    class="overflow-hidden rounded-[1.4rem] border border-emerald-200 bg-emerald-50/50 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/10 xl:col-span-5">
+                                    class="overflow-hidden rounded-[1.4rem] border border-blue-200 bg-blue-50/50 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/10 xl:col-span-5">
                                     <div
-                                        class="border-b border-emerald-200 bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600 p-4 text-white dark:border-emerald-900/50">
+                                        class="border-b border-blue-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 p-4 text-white dark:border-blue-900/50">
                                         <div class="flex items-center justify-between gap-3">
                                             <div>
                                                 <h4 class="text-sm font-black">
-                                                    Alumnos agregados para descargar
+                                                    Profesores agregados
                                                 </h4>
 
                                                 <p class="mt-1 text-xs font-semibold text-white/80">
-                                                    {{ count($alumnos_seleccionados) }} alumno(s) seleccionado(s).
+                                                    {{ count($personas_seleccionadas) }} profesor(es) seleccionado(s).
                                                 </p>
                                             </div>
 
@@ -481,47 +336,45 @@
 
                                     <div class="max-h-[430px] overflow-y-auto">
                                         <table
-                                            class="min-w-full divide-y divide-emerald-100 text-sm dark:divide-neutral-800">
-                                            <thead class="sticky top-0 z-10 bg-emerald-50 dark:bg-neutral-950">
+                                            class="min-w-full divide-y divide-blue-100 text-sm dark:divide-neutral-800">
+                                            <thead class="sticky top-0 z-10 bg-blue-50 dark:bg-neutral-950">
                                                 <tr>
                                                     <th
-                                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                                                        Alumno
+                                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                                                        Profesor
                                                     </th>
                                                     <th
-                                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                                                        Matrícula
+                                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                                                        RFC
                                                     </th>
                                                     <th class="w-12 px-4 py-3 text-right"></th>
                                                 </tr>
                                             </thead>
 
                                             <tbody
-                                                class="divide-y divide-emerald-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
-                                                @forelse ($this->alumnosSeleccionadosLista as $alumno)
-                                                    <tr wire:key="seleccionado-alumno-{{ $alumno->id }}"
-                                                        class="transition hover:bg-emerald-50/70 dark:hover:bg-neutral-800/60">
+                                                class="divide-y divide-blue-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
+                                                @forelse ($this->personasSeleccionadasLista as $persona)
+                                                    <tr wire:key="seleccionado-persona-{{ $persona->id }}"
+                                                        class="transition hover:bg-blue-50/70 dark:hover:bg-neutral-800/60">
                                                         <td class="px-4 py-3">
                                                             <p class="font-black text-slate-900 dark:text-white">
-                                                                {{ $this->nombreAlumno($alumno) }}
+                                                                {{ $this->nombrePersona($persona) }}
                                                             </p>
 
                                                             <p
                                                                 class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                                {{ $alumno->grado?->nombre ?? 'Sin grado' }}
-                                                                ·
-                                                                {{ $alumno->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo' }}
+                                                                {{ $persona->correo ?? 'Sin correo' }}
                                                             </p>
                                                         </td>
 
                                                         <td
                                                             class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
-                                                            {{ $alumno->matricula ?? 'S/M' }}
+                                                            {{ $persona->rfc ?? 'N/A' }}
                                                         </td>
 
                                                         <td class="px-4 py-3 text-right">
                                                             <button type="button"
-                                                                wire:click="quitarAlumnoSeleccionado({{ $alumno->id }})"
+                                                                wire:click="quitarPersonaSeleccionada({{ $persona->id }})"
                                                                 x-on:click="guardarScroll()"
                                                                 class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
                                                                 <flux:icon.trash class="h-4 w-4" />
@@ -532,17 +385,17 @@
                                                     <tr>
                                                         <td colspan="3" class="px-4 py-10 text-center">
                                                             <div
-                                                                class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                                class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                                                                 <flux:icon.user-plus class="h-5 w-5" />
                                                             </div>
 
                                                             <p
                                                                 class="mt-3 font-black text-slate-700 dark:text-slate-200">
-                                                                Todavía no hay alumnos seleccionados.
+                                                                Todavía no hay profesores seleccionados.
                                                             </p>
 
                                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                                Marca alumnos desde la tabla de resultados.
+                                                                Marca profesores desde la tabla de resultados.
                                                             </p>
                                                         </td>
                                                     </tr>
@@ -559,13 +412,13 @@
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                 <div class="flex items-start gap-3">
                                     <div
-                                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                                         <flux:icon.information-circle class="h-5 w-5" />
                                     </div>
 
                                     <div>
                                         <p class="text-sm font-black text-slate-900 dark:text-white">
-                                            Estado de la descarga
+                                            Estado de descarga
                                         </p>
 
                                         @if ($this->puedeDescargar)
@@ -578,7 +431,7 @@
                                             </p>
                                         @else
                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                Completa los campos necesarios según el modo de descarga.
+                                                Completa la selección del personal para habilitar la descarga.
                                             </p>
                                         @endif
                                     </div>
@@ -586,7 +439,7 @@
 
                                 @if ($this->puedeDescargar)
                                     <a href="{{ $this->urlDescarga }}" target="_blank"
-                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
+                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
                                         <flux:icon.document-arrow-down class="h-5 w-5" />
                                         Descargar credenciales
                                     </a>
