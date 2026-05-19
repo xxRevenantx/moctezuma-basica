@@ -29,9 +29,9 @@ class ListasProfesores extends Component
 
     public string $filtro_dia = '';
 
-    public string $periodo_id = '';
+    public array $periodos_por_materia = [];
 
-    public string $parcial_id = '';
+    public array $parciales_por_materia = [];
 
     public function updatedBuscarProfesor(): void
     {
@@ -67,8 +67,8 @@ class ListasProfesores extends Component
         $this->filtro_generacion = '';
         $this->filtro_semestre = '';
         $this->filtro_dia = '';
-        $this->periodo_id = '';
-        $this->parcial_id = '';
+        $this->periodos_por_materia = [];
+        $this->parciales_por_materia = [];
     }
 
     #[Computed]
@@ -167,12 +167,12 @@ class ListasProfesores extends Component
                         ->orWhere('clave', 'like', '%' . $busqueda . '%');
                 });
             })
-            ->when($this->filtro_nivel !== '', fn($q) => $q->where('nivel_id', $this->filtro_nivel))
-            ->when($this->filtro_grado !== '', fn($q) => $q->where('grado_id', $this->filtro_grado))
-            ->when($this->filtro_grupo !== '', fn($q) => $q->where('grupo_id', $this->filtro_grupo))
-            ->when($this->filtro_generacion !== '', fn($q) => $q->where('generacion_id', $this->filtro_generacion))
-            ->when($this->filtro_semestre !== '', fn($q) => $q->where('semestre_id', $this->filtro_semestre))
-            ->when($this->filtro_dia !== '', fn($q) => $q->where('dia_id', $this->filtro_dia))
+            ->when($this->filtro_nivel !== '', fn($q) => $q->where('horarios.nivel_id', $this->filtro_nivel))
+            ->when($this->filtro_grado !== '', fn($q) => $q->where('horarios.grado_id', $this->filtro_grado))
+            ->when($this->filtro_grupo !== '', fn($q) => $q->where('horarios.grupo_id', $this->filtro_grupo))
+            ->when($this->filtro_generacion !== '', fn($q) => $q->where('horarios.generacion_id', $this->filtro_generacion))
+            ->when($this->filtro_semestre !== '', fn($q) => $q->where('horarios.semestre_id', $this->filtro_semestre))
+            ->when($this->filtro_dia !== '', fn($q) => $q->where('horarios.dia_id', $this->filtro_dia))
             ->join('dias', 'dias.id', '=', 'horarios.dia_id')
             ->join('horas', 'horas.id', '=', 'horarios.hora_id')
             ->join('asignacion_materias', 'asignacion_materias.id', '=', 'horarios.asignacion_materia_id')
@@ -207,18 +207,35 @@ class ListasProfesores extends Component
             ->values();
     }
 
-    #[Computed]
-    public function periodos(): Collection
+    public function esBachilleratoMateria(array $item): bool
     {
+        $nivel = $item['nivel'] ?? null;
+
+        if (!$nivel) {
+            return false;
+        }
+
+        return (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
+    }
+
+    public function periodosParaMateria(array $item): Collection
+    {
+        $nivel = $item['nivel'] ?? null;
+
+        if (!$nivel || $this->esBachilleratoMateria($item)) {
+            return collect();
+        }
+
         return DB::table('periodos')
             ->leftJoin('periodos_basica', 'periodos_basica.id', '=', 'periodos.periodo_basica_id')
             ->leftJoin('meses_basica', 'meses_basica.id', '=', 'periodos.mes_basica_id')
             ->leftJoin('ciclo_escolares', 'ciclo_escolares.id', '=', 'periodos.ciclo_escolar_id')
+            ->where('periodos.nivel_id', $nivel->id)
+            ->whereNotNull('periodos.periodo_basica_id')
             ->select(
                 'periodos.id',
                 'periodos.nivel_id',
-                'periodos.generacion_id',
-                'periodos.semestre_id',
+                'periodos.ciclo_escolar_id',
                 'periodos.periodo_basica_id',
                 'periodos.mes_basica_id',
                 'periodos.fecha_inicio',
@@ -229,30 +246,139 @@ class ListasProfesores extends Component
                 'ciclo_escolares.inicio_anio',
                 'ciclo_escolares.fin_anio'
             )
-            ->whereNotNull('periodos.periodo_basica_id')
             ->orderBy('periodos_basica.periodo')
+            ->orderBy('meses_basica.id')
             ->get();
     }
 
-    #[Computed]
-    public function parciales(): Collection
+    public function parcialesParaMateria(array $item): Collection
     {
-        return DB::table('parciales')
-            ->select('id', 'parcial', 'descripcion')
-            ->orderBy('parcial')
+        if (!$this->esBachilleratoMateria($item)) {
+            return collect();
+        }
+
+        $generacion = $item['generacion'] ?? null;
+        $semestre = $item['semestre'] ?? null;
+
+        return DB::table('periodos')
+            ->leftJoin('parciales', 'parciales.id', '=', 'periodos.parcial_bachillerato_id')
+            ->leftJoin('meses_bachilleratos', 'meses_bachilleratos.id', '=', 'periodos.mes_bachillerato_id')
+            ->leftJoin('ciclo_escolares', 'ciclo_escolares.id', '=', 'periodos.ciclo_escolar_id')
+            ->where('periodos.nivel_id', 4)
+            ->whereNotNull('periodos.parcial_bachillerato_id')
+            ->when($generacion, function ($consulta) use ($generacion) {
+                $consulta->where('periodos.generacion_id', $generacion->id);
+            })
+            ->when($semestre, function ($consulta) use ($semestre) {
+                $consulta->where('periodos.semestre_id', $semestre->id);
+            })
+            ->select(
+                'periodos.id',
+                'periodos.nivel_id',
+                'periodos.generacion_id',
+                'periodos.semestre_id',
+                'periodos.ciclo_escolar_id',
+                'periodos.parcial_bachillerato_id',
+                'periodos.mes_bachillerato_id',
+                'periodos.fecha_inicio',
+                'periodos.fecha_fin',
+                'parciales.parcial',
+                'parciales.descripcion',
+                'meses_bachilleratos.meses',
+                'ciclo_escolares.inicio_anio',
+                'ciclo_escolares.fin_anio'
+            )
+            ->orderBy('parciales.parcial')
+            ->orderBy('meses_bachilleratos.id')
             ->get();
+    }
+
+    public function puedeDescargarMateria(array $item): bool
+    {
+        $asignacionId = (int) $item['asignacion_id'];
+
+        if ($this->esBachilleratoMateria($item)) {
+            return filled($this->parciales_por_materia[$asignacionId] ?? null);
+        }
+
+        return filled($this->periodos_por_materia[$asignacionId] ?? null);
+    }
+
+    public function puedeDescargarTodas(): bool
+    {
+        if (!$this->profesor_id || $this->materiasAgrupadas->isEmpty()) {
+            return false;
+        }
+
+        foreach ($this->materiasAgrupadas as $item) {
+            if (!$this->puedeDescargarMateria($item)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function urlAsistencia(?int $asignacionMateriaId = null): string
+    {
+        return $this->urlPdf('profesor.listas.asistencia.pdf', $asignacionMateriaId);
+    }
+
+    public function urlEvaluacion(?int $asignacionMateriaId = null): string
+    {
+        return $this->urlPdf('profesor.listas.evaluacion.pdf', $asignacionMateriaId);
+    }
+
+    private function urlPdf(string $ruta, ?int $asignacionMateriaId = null): string
+    {
+        $parametros = [
+            'profesor_id' => $this->profesor_id,
+            'asignacion_materia_id' => $asignacionMateriaId ?: 'todas',
+        ];
+
+        if ($asignacionMateriaId) {
+            $item = $this->materiasAgrupadas->firstWhere('asignacion_id', $asignacionMateriaId);
+
+            if ($item && $this->esBachilleratoMateria($item)) {
+                $parametros['parcial_id'] = $this->parciales_por_materia[$asignacionMateriaId] ?? null;
+            } else {
+                $parametros['periodo_id'] = $this->periodos_por_materia[$asignacionMateriaId] ?? null;
+            }
+
+            return route($ruta, $parametros);
+        }
+
+        return route($ruta, array_merge($parametros, [
+            'asignaciones' => $this->materiasAgrupadas
+                ->pluck('asignacion_id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->all(),
+            'periodos' => $this->periodos_por_materia,
+            'parciales' => $this->parciales_por_materia,
+        ]));
     }
 
     #[Computed]
     public function nivelesFiltro(): Collection
     {
-        return $this->horariosProfesor->pluck('nivel')->filter()->unique('id')->sortBy('nombre')->values();
+        return $this->horariosProfesor
+            ->pluck('nivel')
+            ->filter()
+            ->unique('id')
+            ->sortBy('nombre')
+            ->values();
     }
 
     #[Computed]
     public function gradosFiltro(): Collection
     {
-        return $this->horariosProfesor->pluck('grado')->filter()->unique('id')->sortBy('orden')->values();
+        return $this->horariosProfesor
+            ->pluck('grado')
+            ->filter()
+            ->unique('id')
+            ->sortBy('orden')
+            ->values();
     }
 
     #[Computed]
@@ -284,7 +410,7 @@ class ListasProfesores extends Component
             ->pluck('semestre')
             ->filter()
             ->unique('id')
-            ->sortBy('orden_global')
+            ->sortBy('numero')
             ->values();
     }
 
@@ -311,41 +437,13 @@ class ListasProfesores extends Component
         return $this->horariosProfesor->count();
     }
 
-    public function urlAsistencia(?int $asignacionMateriaId = null): string
-    {
-        return route('profesor.listas.asistencia.pdf', [
-            'profesor_id' => $this->profesor_id,
-            'asignacion_materia_id' => $asignacionMateriaId ?: 'todas',
-            'periodo_id' => $this->periodo_id,
-            'parcial_id' => $this->parcial_id,
-        ]);
-    }
-
-    public function urlEvaluacion(?int $asignacionMateriaId = null): string
-    {
-        return route('profesor.listas.evaluacion.pdf', [
-            'profesor_id' => $this->profesor_id,
-            'asignacion_materia_id' => $asignacionMateriaId ?: 'todas',
-            'periodo_id' => $this->periodo_id,
-            'parcial_id' => $this->parcial_id,
-        ]);
-    }
-
-    public function puedeDescargarPdf(): bool
-    {
-        return filled($this->profesor_id)
-            && filled($this->periodo_id)
-            && filled($this->parcial_id)
-            && $this->materiasAgrupadas->isNotEmpty();
-    }
-
     public function nombreProfesor($profesor): string
     {
         return trim(
             ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-                ($profesor->nombre ?? '') . ' ' .
-                ($profesor->apellido_paterno ?? '') . ' ' .
-                ($profesor->apellido_materno ?? '')
+            ($profesor->nombre ?? '') . ' ' .
+            ($profesor->apellido_paterno ?? '') . ' ' .
+            ($profesor->apellido_materno ?? '')
         );
     }
 

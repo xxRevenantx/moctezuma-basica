@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Horario;
 use App\Models\Inscripcion;
 use App\Models\Persona;
@@ -27,23 +26,41 @@ class ProfesorPdfController extends Controller
     {
         $profesorId = (int) $request->query('profesor_id');
         $asignacionMateriaId = $request->query('asignacion_materia_id', 'todas');
-        $periodoId = $request->query('periodo_id');
-        $parcialId = $request->query('parcial_id');
 
         $profesor = Persona::query()
             ->with(['personaRoles.rolePersona:id,nombre,slug,status'])
             ->findOrFail($profesorId);
 
-        $periodo = $this->obtenerPeriodo($periodoId);
-        $parcial = $this->obtenerParcial($parcialId);
+        $asignaciones = collect($request->query('asignaciones', []))
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
 
-        $horarios = $this->obtenerHorarios($profesorId, $asignacionMateriaId);
+        $horarios = $this->obtenerHorarios($profesorId, $asignacionMateriaId, $asignaciones);
 
         if ($horarios->isEmpty()) {
             abort(404, 'No se encontraron materias en horario para generar el PDF.');
         }
 
-        $bloques = $this->crearBloques($horarios);
+        if ($asignacionMateriaId === 'todas') {
+            $periodosPorMateria = $request->query('periodos', []);
+            $parcialesPorMateria = $request->query('parciales', []);
+        } else {
+            $horario = $horarios->first();
+            $asignacionId = (int) $horario->asignacion_materia_id;
+
+            $periodosPorMateria = [];
+            $parcialesPorMateria = [];
+
+            if ($this->esBachillerato($horario)) {
+                $parcialesPorMateria[$asignacionId] = $request->query('parcial_id');
+            } else {
+                $periodosPorMateria[$asignacionId] = $request->query('periodo_id');
+            }
+        }
+
+        $bloques = $this->crearBloques($horarios, $periodosPorMateria, $parcialesPorMateria);
 
         $vista = $tipo === 'asistencia'
             ? 'pdf.lista_asistencia_pdf'
@@ -56,15 +73,13 @@ class ProfesorPdfController extends Controller
         $pdf = Pdf::loadView($vista, [
             'profesor' => $profesor,
             'bloques' => $bloques,
-            'periodo' => $periodo,
-            'parcial' => $parcial,
             'fecha' => now()->locale('es')->translatedFormat('d \\d\\e F \\d\\e Y'),
         ])->setPaper('letter', 'portrait');
 
         return $pdf->stream($nombreArchivo);
     }
 
-    private function obtenerHorarios(int $profesorId, string $asignacionMateriaId): Collection
+    private function obtenerHorarios(int $profesorId, string $asignacionMateriaId, Collection $asignaciones): Collection
     {
         return Horario::query()
             ->with([
@@ -80,11 +95,15 @@ class ProfesorPdfController extends Controller
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,nivel_id,grado_id,semestre_id,materia,clave,calificable,extra,receso,orden',
             ])
-            ->whereHas('asignacionMateria', function ($consulta) use ($profesorId, $asignacionMateriaId) {
+            ->whereHas('asignacionMateria', function ($consulta) use ($profesorId, $asignacionMateriaId, $asignaciones) {
                 $consulta->where('profesor_id', $profesorId);
 
                 if ($asignacionMateriaId !== 'todas') {
                     $consulta->where('id', (int) $asignacionMateriaId);
+                }
+
+                if ($asignacionMateriaId === 'todas' && $asignaciones->isNotEmpty()) {
+                    $consulta->whereIn('id', $asignaciones->all());
                 }
             })
             ->join('dias', 'dias.id', '=', 'horarios.dia_id')
@@ -98,12 +117,33 @@ class ProfesorPdfController extends Controller
             ->get();
     }
 
-    private function crearBloques(Collection $horarios): Collection
+    private function crearBloques(Collection $horarios, array $periodosPorMateria = [], array $parcialesPorMateria = []): Collection
     {
         return $horarios
             ->groupBy('asignacion_materia_id')
-            ->map(function ($items) {
+            ->map(function ($items) use ($periodosPorMateria, $parcialesPorMateria) {
                 $horario = $items->first();
+                $asignacionId = (int) $horario->asignacion_materia_id;
+
+                $esBachillerato = $this->esBachillerato($horario);
+
+                $periodo = null;
+                $parcial = null;
+
+                if ($esBachillerato) {
+                    $periodoSeleccionado = $parcialesPorMateria[$asignacionId] ?? null;
+
+                    $parcial = $this->obtenerPeriodoBachillerato($periodoSeleccionado);
+                    $periodo = $parcial;
+                } else {
+                    $periodoSeleccionado = $periodosPorMateria[$asignacionId] ?? null;
+
+                    $periodo = $this->obtenerPeriodoBasica($periodoSeleccionado);
+                }
+
+                if (!$periodo && !$parcial) {
+                    abort(422, 'Hay materias sin periodo o parcial seleccionado.');
+                }
 
                 $alumnos = Inscripcion::query()
                     ->where('activo', 1)
@@ -126,12 +166,15 @@ class ProfesorPdfController extends Controller
                     'horario_base' => $horario,
                     'horarios' => $items->values(),
                     'alumnos' => $alumnos,
+                    'periodo' => $periodo,
+                    'parcial' => $parcial,
+                    'es_bachillerato' => $esBachillerato,
                 ];
             })
             ->values();
     }
 
-    private function obtenerPeriodo(?string $periodoId): ?object
+    private function obtenerPeriodoBasica(?string $periodoId): ?object
     {
         if (!$periodoId) {
             return null;
@@ -142,26 +185,45 @@ class ProfesorPdfController extends Controller
             ->leftJoin('meses_basica', 'meses_basica.id', '=', 'periodos.mes_basica_id')
             ->leftJoin('ciclo_escolares', 'ciclo_escolares.id', '=', 'periodos.ciclo_escolar_id')
             ->where('periodos.id', $periodoId)
+            ->whereNotNull('periodos.periodo_basica_id')
             ->select(
                 'periodos.*',
                 'periodos_basica.periodo',
                 'periodos_basica.descripcion',
                 'meses_basica.meses',
+                'meses_basica.meses_corto',
                 'ciclo_escolares.inicio_anio',
                 'ciclo_escolares.fin_anio'
             )
             ->first();
     }
 
-    private function obtenerParcial(?string $parcialId): ?object
+    private function obtenerPeriodoBachillerato(?string $periodoId): ?object
     {
-        if (!$parcialId) {
+        if (!$periodoId) {
             return null;
         }
 
-        return DB::table('parciales')
-            ->where('id', $parcialId)
-            ->select('id', 'parcial', 'descripcion')
+        return DB::table('periodos')
+            ->leftJoin('parciales', 'parciales.id', '=', 'periodos.parcial_bachillerato_id')
+            ->leftJoin('meses_bachilleratos', 'meses_bachilleratos.id', '=', 'periodos.mes_bachillerato_id')
+            ->leftJoin('ciclo_escolares', 'ciclo_escolares.id', '=', 'periodos.ciclo_escolar_id')
+            ->where('periodos.id', $periodoId)
+            ->whereNotNull('periodos.parcial_bachillerato_id')
+            ->select(
+                'periodos.*',
+                'parciales.parcial',
+                'parciales.descripcion',
+                'meses_bachilleratos.meses',
+                'meses_bachilleratos.meses_corto',
+                'ciclo_escolares.inicio_anio',
+                'ciclo_escolares.fin_anio'
+            )
             ->first();
+    }
+
+    private function esBachillerato($horario): bool
+    {
+        return (int) $horario->nivel_id === 4 || $horario->nivel?->slug === 'bachillerato';
     }
 }

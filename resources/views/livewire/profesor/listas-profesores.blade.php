@@ -87,7 +87,7 @@
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
                     <div wire:loading.delay.flex
-                        wire:target="buscar_profesor,profesor_id,buscar_materia,filtro_nivel,filtro_grado,filtro_grupo,filtro_generacion,filtro_semestre,filtro_dia,periodo_id,parcial_id,limpiarTodo,limpiarFiltrosMaterias,seleccionarProfesor"
+                        wire:target="buscar_profesor,profesor_id,buscar_materia,filtro_nivel,filtro_grado,filtro_grupo,filtro_generacion,filtro_semestre,filtro_dia,periodos_por_materia,parciales_por_materia,limpiarTodo,limpiarFiltrosMaterias,seleccionarProfesor"
                         class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
                         <div
                             class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -111,7 +111,7 @@
                                 </h3>
 
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    Selecciona profesor, periodo y parcial para habilitar las descargas PDF.
+                                    Cada materia usa periodo o parcial según el nivel al que pertenece.
                                 </p>
                             </div>
 
@@ -236,7 +236,7 @@
                                                 </p>
                                             </div>
 
-                                            @if ($this->puedeDescargarPdf())
+                                            @if ($this->puedeDescargarTodas())
                                                 <div class="flex flex-wrap gap-2">
                                                     <a href="{{ $this->urlAsistencia() }}" target="_blank"
                                                         class="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700">
@@ -250,6 +250,14 @@
                                                         Evaluación todas
                                                     </a>
                                                 </div>
+                                            @else
+                                                @if ($this->profesorSeleccionado && $this->materiasAgrupadas->isNotEmpty())
+                                                    <div
+                                                        class="rounded-2xl bg-amber-50 px-4 py-2 text-xs font-black text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50">
+                                                        Selecciona el periodo o parcial de cada materia para descargar
+                                                        todas.
+                                                    </div>
+                                                @endif
                                             @endif
                                         </div>
                                     </div>
@@ -269,38 +277,6 @@
                                             </div>
                                         @else
                                             <div class="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                                <flux:field>
-                                                    <flux:label>Periodo</flux:label>
-
-                                                    <flux:select wire:model.live="periodo_id">
-                                                        <flux:select.option value="">Selecciona periodo
-                                                        </flux:select.option>
-
-                                                        @foreach ($this->periodos as $periodo)
-                                                            <flux:select.option value="{{ $periodo->id }}">
-                                                                Periodo {{ $periodo->periodo }}
-                                                                {{ $periodo->descripcion ? ' - ' . $periodo->descripcion : '' }}
-                                                            </flux:select.option>
-                                                        @endforeach
-                                                    </flux:select>
-                                                </flux:field>
-
-                                                <flux:field>
-                                                    <flux:label>Parcial</flux:label>
-
-                                                    <flux:select wire:model.live="parcial_id">
-                                                        <flux:select.option value="">Selecciona parcial
-                                                        </flux:select.option>
-
-                                                        @foreach ($this->parciales as $parcial)
-                                                            <flux:select.option value="{{ $parcial->id }}">
-                                                                Parcial {{ $parcial->parcial }}
-                                                                {{ $parcial->descripcion ? ' - ' . $parcial->descripcion : '' }}
-                                                            </flux:select.option>
-                                                        @endforeach
-                                                    </flux:select>
-                                                </flux:field>
-
                                                 <flux:field>
                                                     <flux:label>Buscar materia</flux:label>
 
@@ -430,7 +406,7 @@
                                                     </p>
 
                                                     <p class="mt-1 text-sm font-black text-slate-900 dark:text-white">
-                                                        {{ $this->puedeDescargarPdf() ? 'PDF habilitado' : 'Selecciona periodo y parcial' }}
+                                                        {{ $this->puedeDescargarTodas() ? 'PDF habilitado' : 'Selecciona cada periodo/parcial' }}
                                                     </p>
                                                 </div>
                                             </div>
@@ -467,6 +443,10 @@
                                                                         Horario
                                                                     </th>
                                                                     <th
+                                                                        class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                                        Periodo / Parcial
+                                                                    </th>
+                                                                    <th
                                                                         class="px-4 py-3 text-right text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                                                         PDF
                                                                     </th>
@@ -478,6 +458,10 @@
                                                                 @foreach ($this->materiasAgrupadas as $item)
                                                                     @php
                                                                         $materia = $item['materia'];
+                                                                        $asignacionId = $item['asignacion_id'];
+                                                                        $esBachillerato = $this->esBachilleratoMateria(
+                                                                            $item,
+                                                                        );
                                                                     @endphp
 
                                                                     <tr
@@ -554,17 +538,69 @@
                                                                             </div>
                                                                         </td>
 
+                                                                        <td class="px-4 py-3">
+                                                                            @if ($esBachillerato)
+                                                                                <flux:select
+                                                                                    wire:model.live="parciales_por_materia.{{ $asignacionId }}">
+                                                                                    <flux:select.option value="">
+                                                                                        Selecciona parcial
+                                                                                    </flux:select.option>
+
+                                                                                    @foreach ($this->parcialesParaMateria($item) as $parcial)
+                                                                                        <flux:select.option
+                                                                                            value="{{ $parcial->id }}">
+                                                                                            Parcial
+                                                                                            {{ $parcial->parcial }}
+                                                                                            {{ $parcial->descripcion ? ' - ' . $parcial->descripcion : '' }}
+                                                                                            @if ($parcial->meses)
+                                                                                                / {{ $parcial->meses }}
+                                                                                            @endif
+                                                                                        </flux:select.option>
+                                                                                    @endforeach
+                                                                                </flux:select>
+
+                                                                                <p
+                                                                                    class="mt-1 text-[11px] font-bold text-violet-600 dark:text-violet-300">
+                                                                                    Bachillerato trabaja por parcial.
+                                                                                </p>
+                                                                            @else
+                                                                                <flux:select
+                                                                                    wire:model.live="periodos_por_materia.{{ $asignacionId }}">
+                                                                                    <flux:select.option value="">
+                                                                                        Selecciona periodo
+                                                                                    </flux:select.option>
+
+                                                                                    @foreach ($this->periodosParaMateria($item) as $periodo)
+                                                                                        <flux:select.option
+                                                                                            value="{{ $periodo->id }}">
+                                                                                            Periodo
+                                                                                            {{ $periodo->periodo }}
+                                                                                            {{ $periodo->descripcion ? ' - ' . $periodo->descripcion : '' }}
+                                                                                            @if ($periodo->meses)
+                                                                                                / {{ $periodo->meses }}
+                                                                                            @endif
+                                                                                        </flux:select.option>
+                                                                                    @endforeach
+                                                                                </flux:select>
+
+                                                                                <p
+                                                                                    class="mt-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-300">
+                                                                                    Básica trabaja por periodo.
+                                                                                </p>
+                                                                            @endif
+                                                                        </td>
+
                                                                         <td class="px-4 py-3 text-right">
                                                                             <div
                                                                                 class="flex flex-wrap justify-end gap-2">
-                                                                                @if ($this->puedeDescargarPdf())
-                                                                                    <a href="{{ $this->urlAsistencia($item['asignacion_id']) }}"
+                                                                                @if ($this->puedeDescargarMateria($item))
+                                                                                    <a href="{{ $this->urlAsistencia($asignacionId) }}"
                                                                                         target="_blank"
                                                                                         class="inline-flex items-center justify-center rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50">
                                                                                         Asistencia
                                                                                     </a>
 
-                                                                                    <a href="{{ $this->urlEvaluacion($item['asignacion_id']) }}"
+                                                                                    <a href="{{ $this->urlEvaluacion($asignacionId) }}"
                                                                                         target="_blank"
                                                                                         class="inline-flex items-center justify-center rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 ring-1 ring-indigo-100 transition hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50">
                                                                                         Evaluación
@@ -572,7 +608,7 @@
                                                                                 @else
                                                                                     <span
                                                                                         class="text-xs font-bold text-slate-400">
-                                                                                        Selecciona periodo y parcial
+                                                                                        {{ $esBachillerato ? 'Selecciona parcial' : 'Selecciona periodo' }}
                                                                                     </span>
                                                                                 @endif
                                                                             </div>

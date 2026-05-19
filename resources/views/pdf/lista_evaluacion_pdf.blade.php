@@ -6,6 +6,19 @@
     <title>LISTA DE EVALUACIÓN</title>
 
     <style>
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         @page {
             margin: 22px 24px 28px 24px;
         }
@@ -15,8 +28,8 @@
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
+            font-family: 'calibri';
+            font-size: 12px;
             color: #0f172a;
         }
 
@@ -151,12 +164,16 @@
 </head>
 
 <body>
-    @foreach ($bloques as $indice => $bloque)
+    @foreach ($bloques as $bloque)
         @php
             $horario = $bloque['horario_base'];
             $nivel = $horario->nivel;
             $materia = $horario->asignacionMateria?->materia;
             $grupo = $horario->grupo;
+
+            $periodo = $bloque['periodo'] ?? null;
+            $parcial = $bloque['parcial'] ?? null;
+            $esBachillerato = $bloque['es_bachillerato'] ?? false;
 
             $nombreProfesor = trim(
                 ($profesor->titulo ? $profesor->titulo . ' ' : '') .
@@ -170,12 +187,14 @@
             $ciclo =
                 $periodo?->inicio_anio && $periodo?->fin_anio
                     ? $periodo->inicio_anio . '-' . $periodo->fin_anio
-                    : '2025-2026';
+                    : 'No especificado';
 
             $logoNivel =
                 $nivel?->logo && file_exists(public_path('storage/logos/' . $nivel->logo))
                     ? public_path('storage/logos/' . $nivel->logo)
                     : null;
+
+            $logoPrincipal = file_exists(public_path('logo-letra.png')) ? public_path('logo-letra.png') : null;
         @endphp
 
         <div class="hoja">
@@ -186,7 +205,9 @@
             <table class="encabezado">
                 <tr>
                     <td style="width: 25%;">
-                        <img class="logo" src="{{ public_path('imagenes/logo_moctezuma.png') }}">
+                        @if ($logoPrincipal)
+                            <img class="logo" src="{{ $logoPrincipal }}">
+                        @endif
                     </td>
 
                     <td style="width: 50%; text-align: center;">
@@ -210,17 +231,32 @@
             </div>
 
             <div class="centrado">
-                Periodo:
-                <b>{{ $periodo?->periodo ?? '—' }}</b>
+                @if ($esBachillerato)
+                    Parcial:
+                    <b>{{ $parcial?->parcial ?? '—' }}</b>
+                @else
+                    Periodo:
+                    <b>{{ $periodo?->periodo ?? '—' }}</b>
+                @endif
+
                 &nbsp;&nbsp;&nbsp;
-                Parcial:
-                <b>{{ $parcial?->parcial ?? '—' }}</b>
+                Mes:
+                <b>{{ $periodo?->meses ?? ($parcial?->meses ?? '—') }}</b>
+
                 &nbsp;&nbsp;&nbsp;
                 Grado:
                 <b>{{ $horario->grado?->nombre ?? '—' }}°</b>
+
                 &nbsp;&nbsp;&nbsp;
                 Grupo:
                 <b>"{{ $grupo?->asignacionGrupo?->nombre ?? '—' }}"</b>
+
+                @if ($horario->semestre)
+                    &nbsp;&nbsp;&nbsp;
+                    Semestre:
+                    <b>{{ $horario->semestre->numero }}°</b>
+                @endif
+
                 &nbsp;&nbsp;&nbsp;
                 Turno:
                 <b>Matutino</b>
