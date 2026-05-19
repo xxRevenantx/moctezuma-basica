@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profesor;
 
+use App\Models\Nivel;
 use App\Models\Persona;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -10,6 +11,8 @@ use Livewire\Component;
 class CredencialProfesor extends Component
 {
     public string $modo_descarga = 'seleccionados';
+
+    public ?int $nivel_id = null;
 
     public ?int $persona_individual_id = null;
 
@@ -21,11 +24,16 @@ class CredencialProfesor extends Component
 
     public string $cargo = 'PROFESOR';
 
-    public string $cct = '';
-
     public function mount(): void
     {
         $this->vigencia = 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year;
+    }
+
+    public function updatedNivelId(): void
+    {
+        $this->persona_individual_id = null;
+        $this->personas_seleccionadas = [];
+        $this->buscar_persona = '';
     }
 
     public function updatedModoDescarga(): void
@@ -38,17 +46,38 @@ class CredencialProfesor extends Component
     public function updatedBuscarPersona(): void
     {
         $this->persona_individual_id = null;
+    }
 
-        /*
-         * No se limpia la selección para permitir agregar profesores
-         * aunque se realicen varias búsquedas.
-         */
+    #[Computed]
+    public function niveles(): Collection
+    {
+        return Nivel::query()
+            ->select('id', 'nombre', 'slug', 'cct', 'logo', 'color', 'director_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    #[Computed]
+    public function nivelSeleccionado(): ?Nivel
+    {
+        if (!$this->nivel_id) {
+            return null;
+        }
+
+        return Nivel::query()
+            ->with('director:id,titulo,nombre,apellido_paterno,apellido_materno,cargo,status')
+            ->select('id', 'nombre', 'slug', 'cct', 'logo', 'color', 'director_id')
+            ->find($this->nivel_id);
     }
 
     #[Computed]
     public function personas(): Collection
     {
         $busqueda = trim($this->buscar_persona);
+
+        if (!$this->nivel_id) {
+            return collect();
+        }
 
         if ($busqueda === '' && in_array($this->modo_descarga, ['individual', 'seleccionados'])) {
             return collect();
@@ -63,24 +92,31 @@ class CredencialProfesor extends Component
     public function personasSeleccionadasLista(): Collection
     {
         $ids = collect($this->personas_seleccionadas)
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->filter()
             ->unique()
             ->values();
 
-        if ($ids->isEmpty()) {
+        if ($ids->isEmpty() || !$this->nivel_id) {
             return collect();
         }
 
         $personas = Persona::query()
             ->with([
                 'personaRoles.rolePersona:id,nombre,slug,status',
+                'personaNiveles' => function ($consulta) {
+                    $consulta->where('nivel_id', $this->nivel_id);
+                },
+                'personaNiveles.nivel:id,nombre,slug,cct,logo,color,director_id',
             ])
             ->whereIn('id', $ids->all())
+            ->whereHas('personaNiveles', function ($consulta) {
+                $consulta->where('nivel_id', $this->nivel_id);
+            })
             ->get();
 
         return $personas
-            ->sortBy(fn($persona) => $ids->search((int) $persona->id))
+            ->sortBy(fn ($persona) => $ids->search((int) $persona->id))
             ->values();
     }
 
@@ -89,24 +125,30 @@ class CredencialProfesor extends Component
         return Persona::query()
             ->with([
                 'personaRoles.rolePersona:id,nombre,slug,status',
+                'personaNiveles' => function ($consulta) {
+                    $consulta->where('nivel_id', $this->nivel_id);
+                },
+                'personaNiveles.nivel:id,nombre,slug,cct,logo,color,director_id',
             ])
             ->where('status', 1)
+            ->whereHas('personaNiveles', function ($consulta) {
+                $consulta->where('nivel_id', $this->nivel_id);
+            })
             ->whereHas('personaRoles.rolePersona', function ($consulta) {
-                $consulta
-                    ->where(function ($rol) {
-                        $rol->where('slug', 'like', '%docente%')
-                            ->orWhere('slug', 'like', '%maestro%')
-                            ->orWhere('slug', 'like', '%maestroa%')
-                            ->orWhere('slug', 'like', '%profesor%')
-                            ->orWhere('slug', 'like', '%tutor%')
-                            ->orWhere('slug', 'director_con_grupo')
-                            ->orWhere('nombre', 'like', '%Docente%')
-                            ->orWhere('nombre', 'like', '%Maestro%')
-                            ->orWhere('nombre', 'like', '%Maestra%')
-                            ->orWhere('nombre', 'like', '%Profesor%')
-                            ->orWhere('nombre', 'like', '%Tutora%')
-                            ->orWhere('nombre', 'like', '%Tutor%');
-                    });
+                $consulta->where(function ($rol) {
+                    $rol->where('slug', 'like', '%docente%')
+                        ->orWhere('slug', 'like', '%maestro%')
+                        ->orWhere('slug', 'like', '%maestroa%')
+                        ->orWhere('slug', 'like', '%profesor%')
+                        ->orWhere('slug', 'like', '%tutor%')
+                        ->orWhere('slug', 'director_con_grupo')
+                        ->orWhere('nombre', 'like', '%Docente%')
+                        ->orWhere('nombre', 'like', '%Maestro%')
+                        ->orWhere('nombre', 'like', '%Maestra%')
+                        ->orWhere('nombre', 'like', '%Profesor%')
+                        ->orWhere('nombre', 'like', '%Tutora%')
+                        ->orWhere('nombre', 'like', '%Tutor%');
+                });
             })
             ->when($busqueda !== '', function ($consulta) use ($busqueda) {
                 $consulta->where(function ($q) use ($busqueda) {
@@ -135,12 +177,12 @@ class CredencialProfesor extends Component
     {
         $idsVisibles = $this->personas
             ->pluck('id')
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->values()
             ->toArray();
 
         $seleccionados = collect($this->personas_seleccionadas)
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->values()
             ->toArray();
 
@@ -158,8 +200,8 @@ class CredencialProfesor extends Component
     public function quitarPersonaSeleccionada(int $personaId): void
     {
         $this->personas_seleccionadas = collect($this->personas_seleccionadas)
-            ->map(fn($id) => (int) $id)
-            ->reject(fn($id) => $id === $personaId)
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $id === $personaId)
             ->values()
             ->toArray();
     }
@@ -173,18 +215,18 @@ class CredencialProfesor extends Component
     public function limpiarFiltros(): void
     {
         $this->modo_descarga = 'seleccionados';
+        $this->nivel_id = null;
         $this->persona_individual_id = null;
         $this->personas_seleccionadas = [];
         $this->buscar_persona = '';
         $this->cargo = 'PROFESOR';
-        $this->cct = '';
         $this->vigencia = 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year;
     }
 
     public function modosDescarga(): array
     {
         return [
-            'todos' => 'Todo el personal docente',
+            'todos' => 'Todo el personal docente del nivel',
             'individual' => 'Individual',
             'seleccionados' => 'Seleccionados',
         ];
@@ -193,6 +235,10 @@ class CredencialProfesor extends Component
     #[Computed]
     public function puedeDescargar(): bool
     {
+        if (!$this->nivel_id) {
+            return false;
+        }
+
         if ($this->modo_descarga === 'todos') {
             return true;
         }
@@ -212,13 +258,13 @@ class CredencialProfesor extends Component
     public function parametrosDescarga(): array
     {
         return [
+            'nivel_id' => $this->nivel_id,
             'modo_descarga' => $this->modo_descarga,
             'persona_id' => $this->persona_individual_id,
             'personas' => implode(',', $this->personas_seleccionadas),
             'buscar' => trim($this->buscar_persona),
             'vigencia' => trim($this->vigencia),
             'cargo' => trim($this->cargo),
-            'cct' => trim($this->cct),
         ];
     }
 
@@ -251,7 +297,7 @@ class CredencialProfesor extends Component
     public function rolPrincipal($persona): string
     {
         return $persona->personaRoles
-            ->map(fn($personaRole) => $personaRole->rolePersona?->nombre)
+            ->map(fn ($personaRole) => $personaRole->rolePersona?->nombre)
             ->filter()
             ->first() ?? 'Profesor';
     }

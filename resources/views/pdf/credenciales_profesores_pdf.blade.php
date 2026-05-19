@@ -120,13 +120,13 @@
         .director {
             position: absolute;
             text-align: center;
-            line-height: 8px;
+            line-height: 9px;
             top: 90px;
             bottom: 10px;
-            left: 460px;
-            font-size: 9px;
-            color: rgb(0, 0, 0);
+            left: 470px;
             width: 160px;
+            font-size: 10px;
+            color: rgb(0, 0, 0);
         }
 
         .logo {
@@ -151,11 +151,10 @@
         @foreach ($personas as $index => $persona)
             @php
                 /*
-                 * Se toma el primer nivel asociado al profesor.
-                 * Esto permite generar credenciales sin filtrar por nivel.
+                 * El nivel ya viene seleccionado desde el componente.
+                 * Por eso no se toma el primer nivel del profesor.
                  */
-                $personaNivelPrincipal = $persona->personaNiveles->first();
-                $nivelPrincipal = $personaNivelPrincipal?->nivel;
+                $nivelPrincipal = $nivel ?? null;
                 $director = $nivelPrincipal?->director;
 
                 $nombreCompleto = trim(
@@ -189,9 +188,10 @@
 
                 $cargoDirector = $director?->cargo ? mb_strtoupper($director->cargo, 'UTF-8') : 'FIRMA Y SELLO';
 
-                $cctCredencial = $nivelPrincipal?->cct ?? ($cct ?? 'No especificado');
+                $cctCredencial = $nivelPrincipal?->cct ?? 'No especificado';
 
                 $logoNivel = $nivelPrincipal?->logo;
+
                 $rutaLogo = $logoNivel ? public_path('storage/logos/' . $logoNivel) : null;
 
                 $existeLogo = $rutaLogo && file_exists($rutaLogo);
@@ -206,14 +206,14 @@
                 {{-- Fondo de la credencial --}}
                 <img class="credenciales" src="{{ public_path('imagenes/credencial_profesor.jpg') }}" alt="Credencial">
 
-                {{-- Logos del nivel principal --}}
+                {{-- Logos del nivel seleccionado --}}
                 @if ($existeLogo)
-                    <img class="logo" src="{{ $rutaLogo }}" alt="Logo">
+                    <img class="logo" src="{{ $rutaLogo }}" alt="Logo del nivel">
 
-                    <img class="logo2" src="{{ $rutaLogo }}" alt="Logo">
+                    <img class="logo2" src="{{ $rutaLogo }}" alt="Logo del nivel">
                 @endif
 
-                {{-- CCT del nivel principal --}}
+                {{-- CCT del nivel seleccionado --}}
                 <span class="cct">
                     C.C.T. {{ $cctCredencial }}
                 </span>
@@ -241,7 +241,7 @@
                     <br>
 
                     <b>Cargo:</b>
-                    {{ $rolPrincipal ?: 'PROFESOR' }}
+                    {{ $rolPrincipal ?: $cargo ?? 'PROFESOR' }}
                     <br>
 
                     <b>CURP:</b>
@@ -258,6 +258,7 @@
                     <br>
                 </div>
 
+                {{-- Director del nivel seleccionado --}}
                 <span class="director">
                     {{ $nombreDirector }}
                     <br>
