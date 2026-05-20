@@ -3,6 +3,7 @@
 namespace App\Livewire\Inscripcion;
 
 use App\Models\Ciclo;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -17,6 +18,8 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use App\Models\TrayectoriaAcademica;
+use Illuminate\Support\Facades\DB;
 
 class CrearInscripcion extends Component
 {
@@ -42,6 +45,7 @@ class CrearInscripcion extends Component
 
     public ?string $fecha_inscripcion = null;
     public ?int $ciclo_id = null;
+    public ?int $ciclo_escolar_id = null;
 
     public ?string $fecha_baja = null;
     public ?string $motivo_baja = null;
@@ -79,6 +83,7 @@ class CrearInscripcion extends Component
     public Collection $semestresOptions;
     public array $gruposOptions = [];
     public Collection $ciclosOptions;
+    public Collection $cicloEscolaresOptions;
     public Collection $tutores;
 
     public function mount(): void
@@ -89,9 +94,12 @@ class CrearInscripcion extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
         $this->ciclosOptions = $this->loadCiclos();
+        $this->cicloEscolaresOptions = $this->loadCicloEscolares();
+        $this->ciclo_escolar_id = $this->cicloEscolaresOptions->first()?->id;
         $this->tutores = $this->loadTutores();
 
         $this->fecha_inscripcion = now()->toDateString();
+        $this->ciclo_escolar_id = $this->ciclo_escolar_id ?: $this->cicloEscolaresOptions->first()?->id;
         $this->fecha_baja = null;
         $this->motivo_baja = null;
         $this->observaciones_baja = null;
@@ -164,6 +172,11 @@ class CrearInscripcion extends Component
             'fecha_inscripcion' => [
                 'required',
                 'date',
+            ],
+            'ciclo_escolar_id' => [
+                'required',
+                'integer',
+                Rule::exists('ciclo_escolares', 'id'),
             ],
             'ciclo_id' => [
                 'required',
@@ -290,6 +303,7 @@ class CrearInscripcion extends Component
             'genero.required' => 'El género es obligatorio.',
 
             'fecha_inscripcion.required' => 'La fecha de inscripción es obligatoria.',
+            'ciclo_escolar_id.required' => 'Selecciona un ciclo escolar.',
             'ciclo_id.required' => 'Selecciona un ciclo.',
 
             'fecha_baja.date' => 'La fecha de baja no es válida.',
@@ -971,6 +985,14 @@ class CrearInscripcion extends Component
             ->get(['id', 'ciclo']);
     }
 
+    protected function loadCicloEscolares(): Collection
+    {
+        return CicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio']);
+    }
+
     public function updatedNivelId($value): void
     {
         $this->nivel_id = $value ? (int) $value : null;
@@ -1231,47 +1253,65 @@ class CrearInscripcion extends Component
             $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
         }
 
-        Inscripcion::query()->create([
-            'curp' => $data['curp'],
-            'matricula' => $data['matricula'],
-            'folio' => $data['folio'] ?? null,
+        DB::transaction(function () use ($data, $fotoPath) {
+            $inscripcion = Inscripcion::query()->create([
+                'curp' => $data['curp'],
+                'matricula' => $data['matricula'],
+                'folio' => $data['folio'] ?? null,
 
-            'nombre' => $data['nombre'],
-            'apellido_paterno' => $data['apellido_paterno'],
-            'apellido_materno' => $data['apellido_materno'] ?? null,
-            'fecha_nacimiento' => $data['fecha_nacimiento'],
-            'genero' => $data['genero'],
+                'nombre' => $data['nombre'],
+                'apellido_paterno' => $data['apellido_paterno'],
+                'apellido_materno' => $data['apellido_materno'] ?? null,
+                'fecha_nacimiento' => $data['fecha_nacimiento'],
+                'genero' => $data['genero'],
 
-            'fecha_inscripcion' => $data['fecha_inscripcion'],
-            'ciclo_id' => (int) $data['ciclo_id'],
+                'fecha_inscripcion' => $data['fecha_inscripcion'],
+                'ciclo_id' => (int) $data['ciclo_id'],
 
-            'fecha_baja' => null,
-            'motivo_baja' => null,
-            'observaciones_baja' => null,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => null,
 
-            'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
-            'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
-            'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
+                'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
+                'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
+                'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
 
-            'calle' => $data['calle'] ?? null,
-            'numero_exterior' => $data['numero_exterior'] ?? null,
-            'numero_interior' => $data['numero_interior'] ?? null,
-            'colonia' => $data['colonia'] ?? null,
-            'codigo_postal' => $data['codigo_postal'] ?? null,
-            'municipio' => $data['municipio'] ?? null,
-            'estado_residencia' => $data['estado_residencia'] ?? null,
-            'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
+                'calle' => $data['calle'] ?? null,
+                'numero_exterior' => $data['numero_exterior'] ?? null,
+                'numero_interior' => $data['numero_interior'] ?? null,
+                'colonia' => $data['colonia'] ?? null,
+                'codigo_postal' => $data['codigo_postal'] ?? null,
+                'municipio' => $data['municipio'] ?? null,
+                'estado_residencia' => $data['estado_residencia'] ?? null,
+                'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
 
-            'nivel_id' => (int) $data['nivel_id'],
-            'grado_id' => (int) $data['grado_id'],
-            'generacion_id' => (int) $data['generacion_id'],
-            'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
-            'grupo_id' => (int) $data['grupo_id'],
+                'nivel_id' => (int) $data['nivel_id'],
+                'grado_id' => (int) $data['grado_id'],
+                'generacion_id' => (int) $data['generacion_id'],
+                'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                'grupo_id' => (int) $data['grupo_id'],
 
-            'foto_path' => $fotoPath,
-            'tutor_id' => $data['tutor_id'] ?? null,
-            'activo' => true,
-        ]);
+                'foto_path' => $fotoPath,
+                'tutor_id' => $data['tutor_id'] ?? null,
+                'activo' => true,
+            ]);
+
+            TrayectoriaAcademica::query()->create([
+                'inscripcion_id' => $inscripcion->id,
+                'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
+                'ciclo_id' => (int) $data['ciclo_id'],
+                'nivel_id' => (int) $data['nivel_id'],
+                'grado_id' => (int) $data['grado_id'],
+                'generacion_id' => (int) $data['generacion_id'],
+                'grupo_id' => (int) $data['grupo_id'],
+                'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                'activo' => true,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => null,
+                'fecha_inscripcion' => $data['fecha_inscripcion'],
+            ]);
+        });
 
         $this->dispatch('swal', [
             'title' => '¡Creado correctamente!',
@@ -1340,6 +1380,7 @@ class CrearInscripcion extends Component
             'semestre_id' => $this->semestre_id,
             'grupo_id' => $this->grupo_id,
             'esBachillerato' => $this->esBachillerato,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
         ];
 
         $camposParaLimpiar = [
@@ -1352,6 +1393,7 @@ class CrearInscripcion extends Component
             'fecha_nacimiento',
             'genero',
             'fecha_inscripcion',
+            'ciclo_escolar_id',
             'ciclo_id',
             'matriculaEditadaManual',
 
@@ -1407,11 +1449,13 @@ class CrearInscripcion extends Component
             $this->semestre_id = $asignacionEscolar['semestre_id'];
             $this->grupo_id = $asignacionEscolar['grupo_id'];
             $this->esBachillerato = $asignacionEscolar['esBachillerato'];
+            $this->ciclo_escolar_id = $asignacionEscolar['ciclo_escolar_id'];
         }
 
         $this->recargarOpcionesAsignacionEscolar();
 
         $this->ciclosOptions = $this->loadCiclos();
+        $this->cicloEscolaresOptions = $this->loadCicloEscolares();
         $this->tutores = $this->loadTutores();
 
         $this->fecha_inscripcion = now()->toDateString();
@@ -1433,6 +1477,7 @@ class CrearInscripcion extends Component
             'grupos' => $this->gruposOptions,
             'esBachillerato' => $this->esBachillerato,
             'ciclos' => $this->ciclosOptions,
+            'cicloEscolares' => $this->cicloEscolaresOptions,
             'tutores' => $this->tutores,
         ]);
     }

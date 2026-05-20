@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Accion;
 
+use App\Exports\EstadisticaGeneralExport;
 use App\Models\Ciclo;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
-use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\TrayectoriaAcademica;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class Generales extends Component
 {
@@ -18,10 +22,11 @@ class Generales extends Component
     public Collection $niveles;
     public Collection $grados;
     public Collection $generaciones;
+    public Collection $cicloEscolares;
 
     public string $slug_nivel = '';
-
     public string $generacion_id = '';
+    public string $ciclo_escolar_id = '';
 
     public function mount(string $slug_nivel): void
     {
@@ -48,157 +53,277 @@ class Generales extends Component
             ->where('status', 1)
             ->orderBy('anio_ingreso', 'desc')
             ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
+
+        $this->cicloEscolares = CicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get(['id', 'inicio_anio', 'fin_anio']);
+
+        // Se selecciona el ciclo escolar más reciente para cargar la estadística al entrar.
+        $this->ciclo_escolar_id = (string) ($this->cicloEscolares->first()?->id ?? '');
     }
 
     public function updatedGeneracionId(): void
     {
-        // Livewire actualiza la tabla automáticamente.
+        // Livewire actualiza las tablas automáticamente.
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        // Livewire actualiza las tablas automáticamente.
     }
 
     public function limpiarFiltroEstadistica(): void
     {
         $this->generacion_id = '';
+        $this->ciclo_escolar_id = (string) ($this->cicloEscolares->first()?->id ?? '');
     }
 
+    public function getEstadisticaInicioCursoProperty(): Collection
+    {
+        return $this->construirEstadisticaPorCorte('inicio');
+    }
+
+    public function getTotalesInicioCursoProperty(): array
+    {
+        return $this->crearTotalesPorBloques($this->estadisticaInicioCurso, [
+            'inicial',
+            'altas',
+            'inscripcion_total',
+            'bajas',
+            'existencia',
+        ]);
+    }
+
+    public function getEstadisticaMedioCursoProperty(): Collection
+    {
+        return $this->construirEstadisticaPorCorte('medio');
+    }
+
+    public function getTotalesMedioCursoProperty(): array
+    {
+        return $this->crearTotalesPorBloques($this->estadisticaMedioCurso, [
+            'inicial',
+            'altas',
+            'inscripcion_total',
+            'bajas',
+            'existencia',
+        ]);
+    }
+
+    public function getEstadisticaFinCursoProperty(): Collection
+    {
+        return $this->construirEstadisticaPorCorte('fin');
+    }
+
+    public function getTotalesFinCursoProperty(): array
+    {
+        return $this->crearTotalesPorBloques($this->estadisticaFinCurso, [
+            'altas',
+            'inscripcion_total',
+            'bajas',
+            'existencia',
+            'promovidos',
+            'no_promovidos',
+        ]);
+    }
+
+    // Se mantiene para compatibilidad con partes antiguas del Blade.
     public function getEstadisticaGeneralProperty(): Collection
     {
+        return $this->estadisticaMedioCurso;
+    }
+
+    // Se mantiene para compatibilidad con partes antiguas del Blade.
+    public function getTotalesEstadisticaProperty(): array
+    {
+        return $this->totalesMedioCurso;
+    }
+
+    private function construirEstadisticaPorCorte(string $corte): Collection
+    {
+        if ($this->ciclo_escolar_id === '') {
+            return collect();
+        }
+
         $idInicio = $this->obtenerIdCiclo('inicio', 1);
         $idMedio = $this->obtenerIdCiclo('medio', 2);
+        $idFin = $this->obtenerIdCiclo('fin', 3);
 
         return $this->grados
-            ->map(function ($grado) use ($idInicio, $idMedio) {
-                $base = Inscripcion::query()
-                    ->where('nivel_id', $this->nivel->id)
-                    ->where('grado_id', $grado->id)
-                    ->when($this->generacion_id !== '', function ($consulta) {
-                        $consulta->where('generacion_id', $this->generacion_id);
-                    });
+            ->map(function ($grado) use ($corte, $idInicio, $idMedio, $idFin) {
+                $base = $this->consultaBaseTrayectoria($grado);
 
-                $inicialH = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'H',
-                    cicloId: $idInicio
-                );
+                $inicioH = $this->obtenerAlumnos($base, 'H', [$idInicio]);
+                $inicioM = $this->obtenerAlumnos($base, 'M', [$idInicio]);
 
-                $inicialM = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'M',
-                    cicloId: $idInicio
-                );
+                $medioH = $this->obtenerAlumnos($base, 'H', [$idMedio]);
+                $medioM = $this->obtenerAlumnos($base, 'M', [$idMedio]);
 
-                $altasH = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'H',
-                    cicloId: $idMedio
-                );
+                $finH = $this->obtenerAlumnos($base, 'H', [$idFin]);
+                $finM = $this->obtenerAlumnos($base, 'M', [$idFin]);
 
-                $altasM = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'M',
-                    cicloId: $idMedio
-                );
+                if ($corte === 'inicio') {
+                    $altasH = collect();
+                    $altasM = collect();
 
-                $bajasH = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'H',
-                    soloBajas: true
-                );
+                    $inscripcionTotalH = $inicioH->merge($altasH)->unique('id')->values();
+                    $inscripcionTotalM = $inicioM->merge($altasM)->unique('id')->values();
 
-                $bajasM = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'M',
-                    soloBajas: true
-                );
+                    return [
+                        'grado_id' => $grado->id,
+                        'grado' => $grado->nombre,
+                        'inicial' => $this->crearGrupoEstadistica($inicioH, $inicioM),
+                        'altas' => $this->crearGrupoEstadistica($altasH, $altasM),
+                        'inscripcion_total' => $this->crearGrupoEstadistica($inscripcionTotalH, $inscripcionTotalM),
+                        'bajas' => $this->crearGrupoEstadistica(
+                            $this->filtrarBajas($inscripcionTotalH),
+                            $this->filtrarBajas($inscripcionTotalM)
+                        ),
+                        'existencia' => $this->crearGrupoEstadistica(
+                            $this->filtrarActivos($inscripcionTotalH),
+                            $this->filtrarActivos($inscripcionTotalM)
+                        ),
+                    ];
+                }
 
-                $existenciaH = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'H',
-                    soloActivos: true
-                );
+                if ($corte === 'medio') {
+                    $altasH = $medioH;
+                    $altasM = $medioM;
 
-                $existenciaM = $this->obtenerAlumnos(
-                    base: $base,
-                    genero: 'M',
-                    soloActivos: true
-                );
+                    $inscripcionTotalH = $inicioH->merge($altasH)->unique('id')->values();
+                    $inscripcionTotalM = $inicioM->merge($altasM)->unique('id')->values();
 
-                $inscripcionTotalH = $inicialH
+                    return [
+                        'grado_id' => $grado->id,
+                        'grado' => $grado->nombre,
+                        'inicial' => $this->crearGrupoEstadistica($inicioH, $inicioM),
+                        'altas' => $this->crearGrupoEstadistica($altasH, $altasM),
+                        'inscripcion_total' => $this->crearGrupoEstadistica($inscripcionTotalH, $inscripcionTotalM),
+                        'bajas' => $this->crearGrupoEstadistica(
+                            $this->filtrarBajas($inscripcionTotalH),
+                            $this->filtrarBajas($inscripcionTotalM)
+                        ),
+                        'existencia' => $this->crearGrupoEstadistica(
+                            $this->filtrarActivos($inscripcionTotalH),
+                            $this->filtrarActivos($inscripcionTotalM)
+                        ),
+                    ];
+                }
+
+                $altasH = $finH;
+                $altasM = $finM;
+
+                $inscripcionTotalH = $inicioH
+                    ->merge($medioH)
                     ->merge($altasH)
                     ->unique('id')
                     ->values();
 
-                $inscripcionTotalM = $inicialM
+                $inscripcionTotalM = $inicioM
+                    ->merge($medioM)
                     ->merge($altasM)
                     ->unique('id')
                     ->values();
 
+                $existenciaH = $this->filtrarActivos($inscripcionTotalH);
+                $existenciaM = $this->filtrarActivos($inscripcionTotalM);
+
                 return [
                     'grado_id' => $grado->id,
                     'grado' => $grado->nombre,
-
-                    'inicial' => $this->crearGrupoEstadistica($inicialH, $inicialM),
-
                     'altas' => $this->crearGrupoEstadistica($altasH, $altasM),
-
                     'inscripcion_total' => $this->crearGrupoEstadistica($inscripcionTotalH, $inscripcionTotalM),
-
-                    'bajas' => $this->crearGrupoEstadistica($bajasH, $bajasM),
-
-                    'existencia_actual' => $this->crearGrupoEstadistica($existenciaH, $existenciaM),
+                    'bajas' => $this->crearGrupoEstadistica(
+                        $this->filtrarBajas($inscripcionTotalH),
+                        $this->filtrarBajas($inscripcionTotalM)
+                    ),
+                    'existencia' => $this->crearGrupoEstadistica($existenciaH, $existenciaM),
+                    'promovidos' => $this->crearGrupoEstadistica(
+                        $this->filtrarPromovidos($existenciaH),
+                        $this->filtrarPromovidos($existenciaM)
+                    ),
+                    'no_promovidos' => $this->crearGrupoEstadistica(
+                        $this->filtrarNoPromovidos($existenciaH),
+                        $this->filtrarNoPromovidos($existenciaM)
+                    ),
                 ];
             });
     }
 
-    public function getTotalesEstadisticaProperty(): array
+    private function consultaBaseTrayectoria(Grado $grado): Builder
     {
-        $filas = $this->estadisticaGeneral;
-
-        return [
-            'inicial' => $this->crearTotalEstadistica($filas, 'inicial'),
-            'altas' => $this->crearTotalEstadistica($filas, 'altas'),
-            'inscripcion_total' => $this->crearTotalEstadistica($filas, 'inscripcion_total'),
-            'bajas' => $this->crearTotalEstadistica($filas, 'bajas'),
-            'existencia_actual' => $this->crearTotalEstadistica($filas, 'existencia_actual'),
-        ];
+        return TrayectoriaAcademica::query()
+            ->with('inscripcion:id,matricula,nombre,apellido_paterno,apellido_materno,genero')
+            ->where('trayectorias_academicas.ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('trayectorias_academicas.nivel_id', $this->nivel->id)
+            ->where('trayectorias_academicas.grado_id', $grado->id)
+            ->when($this->generacion_id !== '', function ($consulta) {
+                $consulta->where('trayectorias_academicas.generacion_id', $this->generacion_id);
+            });
     }
 
-    private function obtenerAlumnos(
-        Builder $base,
-        string $genero,
-        ?int $cicloId = null,
-        bool $soloBajas = false,
-        bool $soloActivos = false
-    ): Collection {
+    private function obtenerAlumnos(Builder $base, string $genero, ?array $ciclosIds = null): Collection
+    {
         return (clone $base)
-            ->select([
-                'id',
-                'matricula',
-                'nombre',
-                'apellido_paterno',
-                'apellido_materno',
-                'genero',
-                'activo',
-                'fecha_baja',
-                'ciclo_id',
-            ])
-            ->where('genero', $genero)
-            ->when($cicloId, function ($consulta) use ($cicloId) {
-                $consulta->where('ciclo_id', $cicloId);
+            ->join('inscripciones', 'inscripciones.id', '=', 'trayectorias_academicas.inscripcion_id')
+            ->where('inscripciones.genero', $genero)
+            ->whereNull('inscripciones.deleted_at')
+            ->when(!empty($ciclosIds), function ($consulta) use ($ciclosIds) {
+                $consulta->whereIn('trayectorias_academicas.ciclo_id', $ciclosIds);
             })
-            ->when($soloBajas, function ($consulta) {
-                $consulta->where(function ($subconsulta) {
-                    $subconsulta->where('activo', false)
-                        ->orWhereNotNull('fecha_baja');
-                });
+            ->orderBy('inscripciones.apellido_paterno')
+            ->orderBy('inscripciones.apellido_materno')
+            ->orderBy('inscripciones.nombre')
+            ->select('trayectorias_academicas.*')
+            ->get()
+            ->map(function ($trayectoria) {
+                $alumno = $trayectoria->inscripcion;
+
+                if (!$alumno) {
+                    return null;
+                }
+
+                // Se toma el estado desde la trayectoria del ciclo escolar consultado.
+                $alumno->activo = (bool) $trayectoria->activo;
+                $alumno->fecha_baja = $trayectoria->fecha_baja;
+                $alumno->ciclo_id = $trayectoria->ciclo_id;
+                $alumno->promovido = (bool) ($trayectoria->promovido ?? false);
+                $alumno->fecha_promocion = $trayectoria->fecha_promocion ?? null;
+
+                return $alumno;
             })
-            ->when($soloActivos, function ($consulta) {
-                $consulta->where('activo', true)
-                    ->whereNull('fecha_baja');
-            })
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
+    private function filtrarBajas(Collection $alumnos): Collection
+    {
+        return $alumnos
+            ->filter(fn($alumno) => !$alumno->activo || filled($alumno->fecha_baja))
+            ->values();
+    }
+
+    private function filtrarActivos(Collection $alumnos): Collection
+    {
+        return $alumnos
+            ->filter(fn($alumno) => $alumno->activo && blank($alumno->fecha_baja))
+            ->values();
+    }
+
+    private function filtrarPromovidos(Collection $alumnos): Collection
+    {
+        return $alumnos
+            ->filter(fn($alumno) => (bool) ($alumno->promovido ?? false))
+            ->values();
+    }
+
+    private function filtrarNoPromovidos(Collection $alumnos): Collection
+    {
+        return $alumnos
+            ->filter(fn($alumno) => !(bool) ($alumno->promovido ?? false))
+            ->values();
     }
 
     private function crearGrupoEstadistica(Collection $hombres, Collection $mujeres): array
@@ -217,11 +342,21 @@ class Generales extends Component
             'h' => $hombres->count(),
             'm' => $mujeres->count(),
             't' => $todos->count(),
-
             'nombres_h' => $this->obtenerNombresAlumnos($hombres),
             'nombres_m' => $this->obtenerNombresAlumnos($mujeres),
             'nombres_t' => $this->obtenerNombresAlumnos($todos),
         ];
+    }
+
+    private function crearTotalesPorBloques(Collection $filas, array $bloques): array
+    {
+        $totales = [];
+
+        foreach ($bloques as $bloque) {
+            $totales[$bloque] = $this->crearTotalEstadistica($filas, $bloque);
+        }
+
+        return $totales;
     }
 
     private function crearTotalEstadistica(Collection $filas, string $grupo): array
@@ -245,7 +380,6 @@ class Generales extends Component
             'h' => $filas->sum($grupo . '.h'),
             'm' => $filas->sum($grupo . '.m'),
             't' => $filas->sum($grupo . '.t'),
-
             'nombres_h' => $nombresH,
             'nombres_m' => $nombresM,
             'nombres_t' => $nombresT,
@@ -258,8 +392,8 @@ class Generales extends Component
             ->map(function ($alumno) {
                 $nombreCompleto = trim(
                     ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '') . ' ' .
-                    ($alumno->nombre ?? '')
+                        ($alumno->apellido_materno ?? '') . ' ' .
+                        ($alumno->nombre ?? '')
                 );
 
                 if ($alumno->matricula) {
@@ -282,6 +416,41 @@ class Generales extends Component
         return $ciclo?->id ?? $respaldo;
     }
 
+
+    public function exportarEstadisticaExcel(): BinaryFileResponse
+    {
+        $nombreNivel = str($this->nivel->nombre ?? 'nivel')
+            ->lower()
+            ->ascii()
+            ->replace(' ', '-')
+            ->replaceMatches('/[^a-z0-9\-]/', '')
+            ->value();
+
+        $nombreCiclo = $this->ciclo_escolar_id !== ''
+            ? str($this->textoCicloEscolar((int) $this->ciclo_escolar_id))
+            ->replace(' ', '')
+            ->replace('-', '_')
+            ->value()
+            : 'sin_ciclo';
+
+        $archivo = 'estadistica_general_' . $nombreNivel . '_' . $nombreCiclo . '.xlsx';
+
+        return Excel::download(
+            new EstadisticaGeneralExport(
+                nivelNombre: $this->nivel->nombre ?? 'Sin nivel',
+                cicloEscolarTexto: $this->textoCicloEscolar($this->ciclo_escolar_id ? (int) $this->ciclo_escolar_id : null),
+                generacionTexto: $this->textoGeneracion($this->generacion_id ? (int) $this->generacion_id : null),
+                inicioCurso: $this->estadisticaInicioCurso->toArray(),
+                totalesInicioCurso: $this->totalesInicioCurso,
+                medioCurso: $this->estadisticaMedioCurso->toArray(),
+                totalesMedioCurso: $this->totalesMedioCurso,
+                finCurso: $this->estadisticaFinCurso->toArray(),
+                totalesFinCurso: $this->totalesFinCurso,
+            ),
+            $archivo
+        );
+    }
+
     public function textoGeneracion(?int $generacionId = null): string
     {
         if (!$generacionId) {
@@ -295,6 +464,21 @@ class Generales extends Component
         }
 
         return $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso;
+    }
+
+    public function textoCicloEscolar(?int $cicloEscolarId = null): string
+    {
+        if (!$cicloEscolarId) {
+            return 'Sin ciclo escolar seleccionado';
+        }
+
+        $cicloEscolar = $this->cicloEscolares->firstWhere('id', $cicloEscolarId);
+
+        if (!$cicloEscolar) {
+            return 'Ciclo escolar no encontrado';
+        }
+
+        return $cicloEscolar->inicio_anio . ' - ' . $cicloEscolar->fin_anio;
     }
 
     public function render()

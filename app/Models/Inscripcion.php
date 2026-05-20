@@ -121,4 +121,15 @@ class Inscripcion extends Model
     {
         return $this->hasMany(BitacoraCalificacion::class);
     }
+
+    public function trayectoriasAcademicas()
+    {
+        return $this->hasMany(TrayectoriaAcademica::class, 'inscripcion_id');
+    }
+
+    public function trayectoriaActual()
+    {
+        return $this->hasOne(TrayectoriaAcademica::class, 'inscripcion_id')
+            ->latestOfMany();
+    }
 }

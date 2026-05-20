@@ -413,6 +413,30 @@
 
                         <div>
                             <div class="mb-1 flex items-center gap-2">
+                                <flux:label>Ciclo escolar</flux:label>
+                                <span
+                                    class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    Obligatorio
+                                </span>
+                            </div>
+
+                            <flux:select wire:model="ciclo_escolar_id">
+                                <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
+
+                                @foreach ($cicloEscolares as $cicloEscolar)
+                                    <flux:select.option value="{{ $cicloEscolar->id }}">
+                                        {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+
+                            @error('ciclo_escolar_id')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Periodo de inscripción</flux:label>
                                 <span
                                     class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">

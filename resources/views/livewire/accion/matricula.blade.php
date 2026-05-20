@@ -25,6 +25,7 @@
     guardarFiltros() {
         const filtros = {
             slug_nivel: @js($slug_nivel),
+            ciclo_escolar_id: this.$wire.get('ciclo_escolar_id'),
             generacion_id: this.$wire.get('generacion_id'),
             grado_id: this.$wire.get('grado_id'),
             semestre_id: this.$wire.get('semestre_id'),
@@ -262,10 +263,24 @@
         <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
 
         <div class="p-5 sm:p-6">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <div
+                class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $esBachillerato ? 'xl:grid-cols-7' : 'xl:grid-cols-6' }}">
                 <div>
                     <flux:label>Nivel</flux:label>
                     <flux:input readonly variant="filled" value="{{ $nivel?->nombre ?? '—' }}" disabled />
+                </div>
+
+                <div>
+                    <flux:label>Ciclo escolar</flux:label>
+                    <flux:select id="ciclo_escolar_id" wire:model.live="ciclo_escolar_id">
+                        <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
+
+                        @foreach ($cicloEscolares as $cicloEscolar)
+                            <flux:select.option value="{{ $cicloEscolar->id }}">
+                                {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
                 </div>
 
                 <div>
@@ -312,8 +327,8 @@
                     <flux:select id="grupo_id" wire:model.live="grupo_id"
                         wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                         :disabled="$esBachillerato
-                                                                                                                                                                                                                                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                                                                                                                                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                                                                                                                                                                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                                                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
                         <flux:select.option value="">Selecciona un grupo</flux:select.option>
                         @foreach ($grupos as $grupo)
                             <flux:select.option value="{{ (string) $grupo->id }}">
@@ -331,6 +346,20 @@
 
             <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap items-center gap-2">
+                    @if ($ciclo_escolar_id)
+                        @php
+                            $cicloEscolarSeleccionado = $cicloEscolares->firstWhere('id', $ciclo_escolar_id);
+                        @endphp
+
+                        @if ($cicloEscolarSeleccionado)
+                            <span
+                                class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                Ciclo escolar: {{ $cicloEscolarSeleccionado->inicio_anio }} -
+                                {{ $cicloEscolarSeleccionado->fin_anio }}
+                            </span>
+                        @endif
+                    @endif
+
                     @if ($generacionGrupoLabel)
                         <span
                             class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
@@ -388,7 +417,7 @@
                 <section class="mb-3">
                     <div class="relative">
                         <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
+                            wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
                             @if ($personal->isEmpty())
                                 <div
                                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
@@ -489,14 +518,21 @@
                             <div class="mb-5 flex flex-col gap-4">
                                 <div class="flex flex-col gap-1">
                                     <h3 class="text-sm font-bold text-slate-800 dark:text-white">
-                                        {{ $esBachillerato ? 'Cambio masivo de grado, semestre y grupo' : 'Cambio masivo de grado y grupo' }}
+                                        {{ $esBachillerato ? 'Corrección administrativa de grado, semestre y grupo' : 'Corrección administrativa de grado y grupo' }}
                                     </h3>
 
                                     <p class="text-xs text-slate-500 dark:text-slate-400">
                                         {{ $esBachillerato
-                                            ? 'Para bachillerato se actualiza el grado, semestre y grupo destino para evitar inconsistencias.'
-                                            : 'Para básica se actualiza el grado y también el grupo destino para evitar inconsistencias.' }}
+                                            ? 'Este cambio corrige la asignación actual del alumno dentro del ciclo escolar seleccionado. No crea una promoción oficial.'
+                                            : 'Este cambio corrige la asignación actual del alumno dentro del ciclo escolar seleccionado. No crea una promoción oficial.' }}
                                     </p>
+                                </div>
+
+                                <div
+                                    class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                                    Este apartado sirve para corregir errores de asignación dentro del mismo ciclo
+                                    escolar.
+                                    Para pasar alumnos a otro ciclo escolar, usa el módulo de Promoción de alumnos.
                                 </div>
 
 
@@ -511,7 +547,7 @@
                                     </label>
 
                                     <select id="nuevo_grado_id" wire:model.live="nuevo_grado_id"
-                                        @disabled($this->selectedCount === 0 || !$generacion_id)
+                                        @disabled($this->selectedCount === 0 || !$ciclo_escolar_id || !$generacion_id)
                                         class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
                                         <option value="">Selecciona un grado</option>
 
@@ -535,7 +571,12 @@
                                         </label>
 
                                         <select id="nuevo_semestre_id" wire:model.live="nuevo_semestre_id"
-                                            @disabled($this->selectedCount === 0 || !$generacion_id || !$nuevo_grado_id || $nuevosSemestres->isEmpty())
+                                            @disabled(
+                                                $this->selectedCount === 0 ||
+                                                    !$ciclo_escolar_id ||
+                                                    !$generacion_id ||
+                                                    !$nuevo_grado_id ||
+                                                    $nuevosSemestres->isEmpty())
                                             class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-violet-900/40">
                                             <option value="">Selecciona un semestre</option>
 
@@ -567,6 +608,7 @@
                                     <select id="nuevo_grupo_id" wire:model.live="nuevo_grupo_id"
                                         @disabled(
                                             $this->selectedCount === 0 ||
+                                                !$ciclo_escolar_id ||
                                                 !$generacion_id ||
                                                 !$nuevo_grado_id ||
                                                 ($esBachillerato && !$nuevo_semestre_id) ||
@@ -610,6 +652,7 @@
                                 <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
                                     wire:target="aplicarCambiarGrado" @disabled(
                                         $this->selectedCount === 0 ||
+                                            !$ciclo_escolar_id ||
                                             !$generacion_id ||
                                             !$nuevo_grado_id ||
                                             ($esBachillerato && !$nuevo_semestre_id) ||
@@ -625,7 +668,11 @@
                                 </button>
                             </div>
 
-                            @if (!$generacion_id)
+                            @if (!$ciclo_escolar_id)
+                                <p class="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    Selecciona un ciclo escolar para actualizar también la trayectoria académica.
+                                </p>
+                            @elseif (!$generacion_id)
                                 <p class="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
                                     Selecciona una generación para poder cargar los destinos disponibles.
                                 </p>
@@ -746,9 +793,9 @@
                     </div>
 
                     <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
+                        wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
                         <div wire:loading.flex
-                            wire:target="generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado"
+                            wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado"
                             class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
                             <div
                                 class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">

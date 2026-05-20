@@ -3,6 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Exports\MatriculaExport;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -10,6 +11,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\Semestre;
+use App\Models\TrayectoriaAcademica;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,9 @@ class Matricula extends Component
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
 
+    public ?int $ciclo_escolar_id = null;
+
+    public Collection $cicloEscolares;
     public Collection $generaciones;
     public Collection $semestres;
     public Collection $grupos;
@@ -74,6 +79,13 @@ class Matricula extends Component
             ->select('id', 'nombre', 'slug')
             ->orderBy('id')
             ->get();
+
+        $this->cicloEscolares = CicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio']);
+
+        $this->ciclo_escolar_id = $this->cicloEscolares->first()?->id;
 
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
@@ -198,8 +210,7 @@ class Matricula extends Component
                 'generacion:id,anio_ingreso,anio_egreso',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', 1)
-        ;
+            ->where('activo', 1);
 
         if ($this->generacion_id) {
             $query->where('generacion_id', $this->generacion_id);
@@ -312,6 +323,17 @@ class Matricula extends Component
         $this->nuevo_grupo_id = null;
         $this->nuevosSemestres = collect();
         $this->nuevosGrupos = collect();
+    }
+
+    public function updatedCicloEscolarId($value): void
+    {
+        $this->ciclo_escolar_id = $value ? (int) $value : null;
+
+        $this->limpiarSeleccion();
+        $this->limpiarDestinoCambio();
+
+        $this->resetPage();
+        $this->recalcularResumen();
     }
 
     public function updatedGeneracionId($value): void
@@ -500,6 +522,16 @@ class Matricula extends Component
             return;
         }
 
+        if (!$this->ciclo_escolar_id) {
+            $this->dispatch('swal', [
+                'title' => 'Selecciona un ciclo escolar.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
         if (!$this->generacion_id) {
             $this->addError('nuevo_grado_id', 'Primero filtra una generación.');
 
@@ -570,8 +602,21 @@ class Matricula extends Component
         }
 
         DB::transaction(function () use ($alumnosValidos, $grupoDestino) {
+            // Se actualiza la asignación actual del alumno.
             Inscripcion::query()
                 ->whereIn('id', $alumnosValidos)
+                ->update([
+                    'grado_id' => (int) $this->nuevo_grado_id,
+                    'grupo_id' => (int) $grupoDestino->id,
+                    'semestre_id' => null,
+                ]);
+
+            // Se actualiza la trayectoria del ciclo escolar seleccionado para que las estadísticas no queden desfasadas.
+            TrayectoriaAcademica::query()
+                ->whereIn('inscripcion_id', $alumnosValidos)
+                ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+                ->where('nivel_id', (int) $this->nivel->id)
+                ->where('generacion_id', (int) $this->generacion_id)
                 ->update([
                     'grado_id' => (int) $this->nuevo_grado_id,
                     'grupo_id' => (int) $grupoDestino->id,
@@ -594,6 +639,16 @@ class Matricula extends Component
 
     protected function aplicarCambiarBachillerato(): void
     {
+        if (!$this->ciclo_escolar_id) {
+            $this->dispatch('swal', [
+                'title' => 'Selecciona un ciclo escolar.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
         $this->validate([
             'nuevo_grado_id' => ['required', 'integer', 'exists:grados,id'],
             'nuevo_semestre_id' => ['required', 'integer', 'exists:semestres,id'],
@@ -665,8 +720,21 @@ class Matricula extends Component
         }
 
         DB::transaction(function () use ($alumnosValidos, $grupoDestino) {
+            // Se actualiza la asignación actual del alumno.
             Inscripcion::query()
                 ->whereIn('id', $alumnosValidos)
+                ->update([
+                    'grado_id' => (int) $this->nuevo_grado_id,
+                    'semestre_id' => (int) $this->nuevo_semestre_id,
+                    'grupo_id' => (int) $grupoDestino->id,
+                ]);
+
+            // Se actualiza la trayectoria del ciclo escolar seleccionado para que las estadísticas no queden desfasadas.
+            TrayectoriaAcademica::query()
+                ->whereIn('inscripcion_id', $alumnosValidos)
+                ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+                ->where('nivel_id', (int) $this->nivel->id)
+                ->where('generacion_id', (int) $this->generacion_id)
                 ->update([
                     'grado_id' => (int) $this->nuevo_grado_id,
                     'semestre_id' => (int) $this->nuevo_semestre_id,
@@ -765,6 +833,15 @@ class Matricula extends Component
 
     public function restaurarFiltrosMatricula(array $filtros): void
     {
+        // Se restaura el ciclo escolar antes de los filtros dependientes.
+        $cicloEscolarId = !empty($filtros['ciclo_escolar_id'])
+            ? (int) $filtros['ciclo_escolar_id']
+            : null;
+
+        $this->ciclo_escolar_id = $cicloEscolarId && $this->cicloEscolares->contains('id', $cicloEscolarId)
+            ? $cicloEscolarId
+            : $this->cicloEscolares->first()?->id;
+
         // Se restauran los filtros en el mismo orden de dependencia de los selects.
         $this->generacion_id = !empty($filtros['generacion_id'])
             ? (int) $filtros['generacion_id']
