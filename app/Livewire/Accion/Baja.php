@@ -228,15 +228,29 @@ class Baja extends Component
         }
 
         return Grupo::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->grado_id)
+            ->with('asignacionGrupo:id,nombre')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->select('grupos.*')
+            ->where('grupos.nivel_id', $this->nivel_id)
+            ->where('grupos.generacion_id', $this->generacion_id)
+            ->where('grupos.grado_id', $this->grado_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id)
+                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('grupos.semestre_id')
             )
-            ->orderBy('nombre')
+            ->orderBy('asignacion_grupos.nombre')
+            ->orderBy('grupos.id')
             ->get();
+    }
+
+    public function textoGrupo($grupo): string
+    {
+        if (!$grupo) {
+            return '—';
+        }
+
+        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
     }
 
     public function getGeneracionGrupoLabelProperty(): ?string
@@ -478,7 +492,7 @@ class Baja extends Component
             ->with([
                 'generacion',
                 'grado',
-                'grupo',
+                'grupo.asignacionGrupo',
                 'semestre',
             ])
             ->where('nivel_id', $this->nivel_id)
@@ -486,7 +500,8 @@ class Baja extends Component
             ->where('grado_id', $this->grado_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id)
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
             )
             ->where('grupo_id', $this->grupo_id)
             ->where('activo', true)
@@ -522,7 +537,7 @@ class Baja extends Component
             ->with([
                 'generacion',
                 'grado',
-                'grupo',
+                'grupo.asignacionGrupo',
                 'semestre',
             ])
             ->where('nivel_id', $this->nivel_id)
@@ -530,7 +545,8 @@ class Baja extends Component
             ->where('grado_id', $this->grado_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id)
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
             )
             ->where('grupo_id', $this->grupo_id)
             ->where(function ($query) {

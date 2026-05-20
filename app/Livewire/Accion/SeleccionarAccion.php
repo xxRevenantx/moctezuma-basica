@@ -28,10 +28,20 @@ class SeleccionarAccion extends Component
         }
 
         $this->accionActual = request()->route('accion') ?? request('accion');
+
+        // Evita que "fichas" quede activa si no es preescolar.
+        if ($this->accionActual === 'fichas' && $this->slug_nivel !== 'preescolar') {
+            $this->accionActual = null;
+        }
     }
 
     public function ir(string $accion): void
     {
+        // Bloquea el acceso a fichas si no corresponde a preescolar.
+        if ($accion === 'fichas' && $this->slug_nivel !== 'preescolar') {
+            return;
+        }
+
         $this->accionActual = $accion;
 
         if ($this->slug_nivel) {
