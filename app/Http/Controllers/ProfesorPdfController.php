@@ -70,9 +70,16 @@ class ProfesorPdfController extends Controller
             ? 'lista-asistencia-profesor.pdf'
             : 'lista-evaluacion-profesor.pdf';
 
+
+        $escuela = \App\Models\Escuela::query()->first();
+
+
+
+
         $pdf = Pdf::loadView($vista, [
             'profesor' => $profesor,
             'bloques' => $bloques,
+            'escuela' => $escuela,
             'fecha' => now()->locale('es')->translatedFormat('d \\d\\e F \\d\\e Y'),
         ])->setPaper('letter', 'portrait');
 

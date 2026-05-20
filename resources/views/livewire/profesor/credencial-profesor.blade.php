@@ -1,49 +1,14 @@
-<div x-data="{
-    abierto: localStorage.getItem('collapse_credenciales_profesor') ?? 'credenciales_profesor',
-
-    cambiar(seccion) {
-        this.abierto = this.abierto === seccion ? null : seccion;
-
-        if (this.abierto) {
-            localStorage.setItem('collapse_credenciales_profesor', this.abierto);
-        } else {
-            localStorage.removeItem('collapse_credenciales_profesor');
-        }
-    },
-
-    guardarScroll() {
-        localStorage.setItem('scroll_credenciales_profesor', window.scrollY || 0);
-    },
-
-    restaurarScroll() {
-        const posicion = localStorage.getItem('scroll_credenciales_profesor');
-
-        if (posicion !== null) {
-            requestAnimationFrame(() => {
-                window.scrollTo(0, Number(posicion));
-            });
-        }
-    }
-}" x-init="document.addEventListener('livewire:init', () => {
-    Livewire.hook('commit', ({ succeed }) => {
-        guardarScroll();
-
-        succeed(() => {
-            setTimeout(() => restaurarScroll(), 30);
-        });
-    });
-});" class="space-y-6">
-
+<div x-data="scrollLockPro('credenciales_profesor')" x-init="iniciar()" x-on:click.capture="guardarScroll()"
+    x-on:change.capture="guardarScroll()" x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click="cambiar('credenciales_profesor')"
+            <button type="button" x-on:click.prevent="cambiar('credenciales_profesor')"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
-
                 <div class="flex items-center gap-4">
                     <span
-                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-500/20 transition group-hover:scale-105">
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white shadow-lg shadow-blue-500/20 transition group-hover:scale-105">
                         <flux:icon.identification class="h-5 w-5" />
                     </span>
 
@@ -53,14 +18,21 @@
                         </span>
 
                         <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                            Busca personal docente, selecciónalo y descarga sus credenciales en PDF.
+                            Selecciona el nivel académico, busca profesores y genera sus credenciales en PDF.
                         </span>
                     </span>
                 </div>
 
                 <div class="flex items-center gap-3">
+                    @if ($this->nivelSeleccionado)
+                        <span
+                            class="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/60 sm:inline-flex">
+                            {{ $this->nivelSeleccionado->nombre }}
+                        </span>
+                    @endif
+
                     <span
-                        class="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/60 sm:inline-flex">
+                        class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/60 sm:inline-flex">
                         PDF
                     </span>
 
@@ -86,7 +58,7 @@
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
                     <div wire:loading.delay.flex
-                        wire:target="modo_descarga,buscar_persona,persona_individual_id,personas_seleccionadas,cct,vigencia,cargo,limpiarFiltros,limpiarSeleccion,seleccionarTodosVisibles,quitarPersonaSeleccionada"
+                        wire:target="nivel_id,modo_descarga,buscar_persona,persona_individual_id,personas_seleccionadas,vigencia,cargo,limpiarFiltros,limpiarSeleccion,seleccionarTodosVisibles,quitarPersonaSeleccionada"
                         class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
                         <div
                             class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -110,7 +82,8 @@
                                 </h3>
 
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    Configura los datos generales y selecciona al personal que aparecerá en el PDF.
+                                    El nivel seleccionado define el C.C.T., logo y director que aparecerán en la
+                                    credencial.
                                 </p>
                             </div>
 
@@ -129,7 +102,56 @@
                             </div>
                         </div>
 
+                        <div
+                            class="mb-5 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200">
+                                    <flux:icon.information-circle class="h-5 w-5" />
+                                </div>
+
+                                <div>
+                                    <p class="font-black">
+                                        Selección por nivel académico
+                                    </p>
+
+                                    <p class="mt-1 text-sm">
+                                        Si un profesor está asignado a varios niveles, primero elige el nivel de la
+                                        credencial.
+                                        Solo se mostrarán profesores relacionados con ese nivel.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <flux:field>
+                                <flux:label>Nivel académico</flux:label>
+
+                                <flux:select wire:model.live="nivel_id" x-on:change="guardarScroll()">
+                                    <flux:select.option value="">
+                                        Selecciona el nivel
+                                    </flux:select.option>
+
+                                    @foreach ($this->niveles as $nivel)
+                                        <flux:select.option value="{{ $nivel->id }}">
+                                            {{ $nivel->nombre }}
+                                            @if ($nivel->cct)
+                                                - C.C.T. {{ $nivel->cct }}
+                                            @endif
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+
+                                <flux:error name="nivel_id" />
+
+                                @if ($this->nivelSeleccionado)
+                                    <p class="mt-2 text-xs font-bold text-blue-600 dark:text-blue-300">
+                                        Se usará el logo, C.C.T. y director de {{ $this->nivelSeleccionado->nombre }}.
+                                    </p>
+                                @endif
+                            </flux:field>
+
                             <flux:field>
                                 <flux:label>Modo de descarga</flux:label>
 
@@ -147,15 +169,9 @@
                             <flux:field>
                                 <flux:label>Buscar profesor</flux:label>
 
-                                <flux:input type="search" wire:model.live.debounce.400ms="buscar_persona"
-                                    x-on:input="guardarScroll()" placeholder="Nombre, CURP, RFC o correo..." />
-                            </flux:field>
-
-                            <flux:field>
-                                <flux:label>C.C.T.</flux:label>
-
-                                <flux:input type="text" wire:model.live.debounce.400ms="cct"
-                                    placeholder="Ej. 12PES0105U" />
+                                <flux:input type="search" wire:model.live.debounce.600ms="buscar_persona"
+                                    x-on:input="guardarScroll()" :disabled="!$nivel_id"
+                                    placeholder="{{ $nivel_id ? 'Nombre, CURP, RFC o correo...' : 'Primero selecciona un nivel' }}" />
                             </flux:field>
 
                             <flux:field>
@@ -166,7 +182,7 @@
                             </flux:field>
 
                             <flux:field>
-                                <flux:label>Cargo</flux:label>
+                                <flux:label>Cargo general</flux:label>
 
                                 <flux:input type="text" wire:model.live.debounce.400ms="cargo"
                                     placeholder="Ej. Profesor" />
@@ -176,9 +192,10 @@
                                 <flux:field class="xl:col-span-2">
                                     <flux:label>Profesor individual</flux:label>
 
-                                    <flux:select wire:model.live="persona_individual_id" x-on:change="guardarScroll()">
+                                    <flux:select wire:model.live="persona_individual_id" x-on:change="guardarScroll()"
+                                        :disabled="!$nivel_id">
                                         <flux:select.option value="">
-                                            Selecciona un profesor
+                                            {{ $nivel_id ? 'Selecciona un profesor' : 'Primero selecciona un nivel' }}
                                         </flux:select.option>
 
                                         @foreach ($this->personas as $persona)
@@ -198,6 +215,18 @@
                                 class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
                                 Modo: {{ $this->textoModoDescarga }}
                             </span>
+
+                            @if ($this->nivelSeleccionado)
+                                <span
+                                    class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
+                                    Nivel: {{ $this->nivelSeleccionado->nombre }}
+                                </span>
+
+                                <span
+                                    class="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300">
+                                    C.C.T. {{ $this->nivelSeleccionado->cct ?? 'No especificado' }}
+                                </span>
+                            @endif
 
                             @if ($modo_descarga === 'seleccionados')
                                 <span
@@ -233,8 +262,8 @@
                                         </div>
 
                                         <button type="button" wire:click="seleccionarTodosVisibles"
-                                            x-on:click="guardarScroll()"
-                                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 dark:bg-white dark:text-slate-900">
+                                            x-on:click="guardarScroll()" :disabled="!$nivel_id"
+                                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900">
                                             <flux:icon.check class="h-4 w-4" />
                                             Seleccionar visibles
                                         </button>
@@ -262,49 +291,80 @@
                                             </thead>
 
                                             <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                                                @forelse ($this->personas as $persona)
-                                                    <tr wire:key="resultado-persona-{{ $persona->id }}"
-                                                        class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
-                                                        <td class="px-4 py-3">
-                                                            <input type="checkbox" value="{{ $persona->id }}"
-                                                                wire:model.live="personas_seleccionadas"
-                                                                x-on:change="guardarScroll()"
-                                                                class="h-4 w-4 rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-neutral-700">
-                                                        </td>
-
-                                                        <td class="px-4 py-3">
-                                                            <p class="font-black text-slate-900 dark:text-white">
-                                                                {{ $this->nombrePersona($persona) }}
-                                                            </p>
-
-                                                            <p
-                                                                class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                                {{ $persona->correo ?? 'Sin correo' }}
-                                                            </p>
-                                                        </td>
-
-                                                        <td
-                                                            class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
-                                                            {{ $persona->rfc ?? 'No especificado' }}
-                                                        </td>
-
-                                                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
-                                                            {{ $persona->telefono_movil ?? ($persona->telefono_fijo ?? 'No especificado') }}
-                                                        </td>
-                                                    </tr>
-                                                @empty
+                                                @if (!$nivel_id)
                                                     <tr>
                                                         <td colspan="4" class="px-4 py-10 text-center">
                                                             <p class="font-black text-slate-700 dark:text-slate-200">
-                                                                No hay profesores para mostrar.
+                                                                Selecciona un nivel académico.
                                                             </p>
 
                                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                                Escribe en el buscador para consultar personal.
+                                                                Después podrás buscar profesores asignados a ese nivel.
                                                             </p>
                                                         </td>
                                                     </tr>
-                                                @endforelse
+                                                @else
+                                                    @forelse ($this->personas as $persona)
+                                                        <tr wire:key="resultado-persona-{{ $persona->id }}"
+                                                            class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
+                                                            <td class="px-4 py-3">
+                                                                <input type="checkbox" value="{{ $persona->id }}"
+                                                                    wire:model.live="personas_seleccionadas"
+                                                                    x-on:change="guardarScroll()"
+                                                                    class="h-4 w-4 rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-neutral-700">
+                                                            </td>
+
+                                                            <td class="px-4 py-3">
+                                                                <p class="font-black text-slate-900 dark:text-white">
+                                                                    {{ $this->nombrePersona($persona) }}
+                                                                </p>
+
+                                                                <div class="mt-1 flex flex-wrap gap-1.5">
+                                                                    <span
+                                                                        class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
+                                                                        {{ $this->rolPrincipal($persona) }}
+                                                                    </span>
+
+                                                                    @if ($this->nivelSeleccionado)
+                                                                        <span
+                                                                            class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/40">
+                                                                            {{ $this->nivelSeleccionado->nombre }}
+                                                                        </span>
+                                                                    @endif
+                                                                </div>
+
+                                                                <p
+                                                                    class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                                    {{ $persona->correo ?? 'Sin correo' }}
+                                                                </p>
+                                                            </td>
+
+                                                            <td
+                                                                class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
+                                                                {{ $persona->rfc ?? 'No especificado' }}
+                                                            </td>
+
+                                                            <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
+                                                                {{ $persona->telefono_movil ?? ($persona->telefono_fijo ?? 'No especificado') }}
+                                                            </td>
+                                                        </tr>
+                                                    @empty
+                                                        <tr>
+                                                            <td colspan="4" class="px-4 py-10 text-center">
+                                                                <p
+                                                                    class="font-black text-slate-700 dark:text-slate-200">
+                                                                    No hay profesores para mostrar.
+                                                                </p>
+
+                                                                <p
+                                                                    class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                                    Escribe en el buscador o revisa que existan
+                                                                    profesores asignados al nivel.
+                                                                </p>
+                                                            </td>
+                                                        </tr>
+                                                    @endforelse
+                                                @endif
                                             </tbody>
                                         </table>
                                     </div>
@@ -427,18 +487,19 @@
                                             </p>
 
                                             <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                Alcance seleccionado: {{ $this->textoModoDescarga }}.
+                                                Nivel seleccionado:
+                                                {{ $this->nivelSeleccionado?->nombre ?? 'No especificado' }}.
                                             </p>
                                         @else
                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                Completa la selección del personal para habilitar la descarga.
+                                                Selecciona un nivel académico y completa la selección del personal.
                                             </p>
                                         @endif
                                     </div>
                                 </div>
 
                                 @if ($this->puedeDescargar)
-                                    <a href="{{ $this->urlDescarga }}" target="_blank"
+                                    <a href="{{ $this->urlDescarga }}" target="_blank" x-on:click="guardarScroll()"
                                         class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
                                         <flux:icon.document-arrow-down class="h-5 w-5" />
                                         Descargar credenciales
@@ -457,4 +518,90 @@
             </div>
         </article>
     </section>
+
+    @script
+        <script>
+            Alpine.data('scrollLockPro', (nombre) => ({
+                abierto: localStorage.getItem(`collapse_${nombre}`) ?? nombre,
+                nombre,
+                llaveCollapse: `collapse_${nombre}`,
+                llaveScroll: `scroll_${nombre}`,
+                restaurando: false,
+
+                iniciar() {
+                    history.scrollRestoration = 'manual';
+
+                    this.restaurarScroll();
+
+                    document.addEventListener('livewire:init', () => {
+                        Livewire.hook('commit', ({
+                            succeed
+                        }) => {
+                            this.guardarScroll();
+
+                            succeed(() => {
+                                this.restaurarScrollSeguro();
+                            });
+                        });
+                    });
+                },
+
+                cambiar(seccion) {
+                    this.guardarScroll();
+
+                    this.abierto = this.abierto === seccion ? null : seccion;
+
+                    if (this.abierto) {
+                        localStorage.setItem(this.llaveCollapse, this.abierto);
+                    } else {
+                        localStorage.removeItem(this.llaveCollapse);
+                    }
+
+                    this.restaurarScrollSeguro();
+                },
+
+                guardarScroll() {
+                    if (this.restaurando) {
+                        return;
+                    }
+
+                    localStorage.setItem(this.llaveScroll, window.scrollY || 0);
+                },
+
+                restaurarScroll() {
+                    const posicion = localStorage.getItem(this.llaveScroll);
+
+                    if (posicion === null) {
+                        return;
+                    }
+
+                    window.scrollTo(0, Number(posicion));
+                },
+
+                restaurarScrollSeguro() {
+                    const posicion = localStorage.getItem(this.llaveScroll);
+
+                    if (posicion === null) {
+                        return;
+                    }
+
+                    const y = Number(posicion);
+
+                    this.restaurando = true;
+
+                    requestAnimationFrame(() => {
+                        window.scrollTo(0, y);
+                    });
+
+                    setTimeout(() => window.scrollTo(0, y), 40);
+                    setTimeout(() => window.scrollTo(0, y), 120);
+                    setTimeout(() => window.scrollTo(0, y), 250);
+
+                    setTimeout(() => {
+                        this.restaurando = false;
+                    }, 300);
+                },
+            }));
+        </script>
+    @endscript
 </div>

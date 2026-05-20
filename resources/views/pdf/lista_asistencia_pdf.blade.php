@@ -20,7 +20,7 @@
         }
 
         @page {
-            margin: 22px 24px 28px 24px;
+            margin: 20px 22px 18px 22px;
         }
 
         * {
@@ -29,7 +29,7 @@
 
         body {
             font-family: 'calibri';
-            font-size: 12px;
+            font-size: 11px;
             color: #0f172a;
         }
 
@@ -39,59 +39,125 @@
 
         .hoja {
             position: relative;
-            min-height: 730px;
+            min-height: 735px;
         }
 
         .marca {
             position: absolute;
-            top: 135px;
+            top: 145px;
             left: 170px;
             width: 430px;
-            opacity: 0.08;
+            opacity: 0.06;
             z-index: -1;
         }
 
         .encabezado {
             width: 100%;
-            margin-bottom: 12px;
+            margin-bottom: 9px;
+            border-bottom: 2px solid #1e40af;
+            padding-bottom: 6px;
         }
 
         .logo {
-            width: 90px;
+            width: 88px;
         }
 
         .escudo {
-            width: 78px;
+            width: 76px;
         }
 
         .titulo {
             text-align: center;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 20px;
             letter-spacing: 1px;
+            color: #0f172a;
         }
 
         .subtitulo {
             text-align: center;
             font-size: 15px;
             font-weight: bold;
+            margin-top: 3px;
+            color: #1e293b;
+        }
+
+        .folio {
+            display: inline-block;
             margin-top: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            font-size: 10px;
+            font-weight: bold;
         }
 
         .datos {
-            margin-top: 14px;
+            width: 100%;
+            margin-top: 8px;
+            margin-bottom: 6px;
+            border-collapse: collapse;
+        }
+
+        .datos td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 6px;
             font-size: 11px;
-            line-height: 1.8;
+            vertical-align: top;
         }
 
-        .datos b {
-            text-decoration: underline;
+        .datos .label {
+            width: 80px;
+            background: #f1f5f9;
+            font-weight: bold;
+            color: #334155;
         }
 
-        .centrado {
+        .datos .valor {
+            font-weight: bold;
+            color: #0f172a;
+        }
+
+        .bloque-info {
+            width: 100%;
+            margin: 7px 0 8px 0;
+            border-collapse: collapse;
+        }
+
+        .bloque-info td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 5px;
+            font-size: 11px;
             text-align: center;
-            margin: 12px 0;
-            font-size: 12px;
+        }
+
+        .bloque-info .label {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: bold;
+        }
+
+        .bloque-info .valor {
+            background: #ffffff;
+            color: #0f172a;
+            font-weight: bold;
+        }
+
+        .leyenda {
+            width: 100%;
+            margin: 6px 0 7px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 5px 0px 5px;
+            font-size: 10.5px;
+            text-align: center;
+        }
+
+        .leyenda b {
+            color: #1e40af;
         }
 
         table {
@@ -101,40 +167,133 @@
 
         .tabla th,
         .tabla td {
-            border: 1px solid #555;
-            padding: 2px 4px;
+            border: 1px solid #64748b;
+            padding: 2px 3px;
         }
 
         .tabla th {
-            background: #d9d9d9;
-            font-size: 8px;
-            font-weight: normal;
+            background: #dbeafe;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            color: #0f172a;
+        }
+
+        .tabla .subhead {
+            background: #eff6ff;
+            color: #1e3a8a;
+        }
+
+        .tabla .head-resumen {
+            background: #dcfce7;
+            color: #14532d;
         }
 
         .numero {
-            width: 22px;
+            width: 20px;
             text-align: center;
         }
 
         .alumno {
-            width: 235px;
+            width: 160px;
         }
 
         .dia {
-            width: 16px;
+            width: 15px;
             text-align: center;
         }
 
-        .footer {
-            position: absolute;
-            bottom: 0;
-            left: 30px;
-            right: 30px;
-            border-top: 1px solid #cbd5e1;
-            padding-top: 8px;
+        .resumen {
+            width: 18px;
             text-align: center;
-            color: #64748b;
-            font-size: 9px;
+            background: #f8fafc;
+        }
+
+        .porcentaje {
+            width: 15px;
+            text-align: center;
+            background: #f8fafc;
+        }
+
+        .fila-alumno td {
+            height: 18px;
+        }
+
+        .nombre-alumno {
+            font-size: 11px;
+        }
+
+        .observaciones {
+            margin-top: 10px;
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-collapse: collapse;
+        }
+
+        .observaciones td {
+            border: 1px solid #cbd5e1;
+            padding: 5px 7px;
+            font-size: 10.5px;
+        }
+
+        .observaciones .titulo-observaciones {
+            background: #f1f5f9;
+            font-weight: bold;
+            color: #334155;
+            width: 150px;
+        }
+
+        .linea-observacion {
+            display: block;
+            border-bottom: 1px solid #cbd5e1;
+            height: 18px;
+            margin-bottom: 3px;
+        }
+
+        .firmas {
+            width: 100%;
+            margin-top: 100px;
+            border-collapse: collapse;
+        }
+
+        .firmas td {
+            width: 50%;
+            text-align: center;
+            font-size: 11px;
+            color: #0f172a;
+            padding: 0 30px;
+        }
+
+        .linea-firma {
+            border-top: 1px solid #0f172a;
+            padding-top: 4px;
+            display: block;
+            font-weight: bold;
+        }
+
+        .nota {
+            margin-top: 7px;
+            font-size: 9.5px;
+            color: #475569;
+            text-align: justify;
+        }
+
+        .footer {
+            position: fixed;
+            left: 26px;
+            right: 26px;
+            bottom: 8px;
+            text-align: center;
+            font-size: 10px;
+            color: #475569;
+            border-top: 1px solid #94a3b8;
+            padding-top: 3px;
+            z-index: 3;
+        }
+
+        .footer p {
+            margin: 0;
+            line-height: 10px;
         }
     </style>
 </head>
@@ -165,6 +324,18 @@
                     ? $periodo->inicio_anio . '-' . $periodo->fin_anio
                     : 'No especificado';
 
+            $nombreMes = $periodo?->meses ?? ($parcial?->meses ?? '—');
+
+            $folio =
+                'LA-' .
+                mb_strtoupper($nivel?->slug ?? 'NIVEL', 'UTF-8') .
+                '-' .
+                str_pad($horario->grado_id ?? 0, 2, '0', STR_PAD_LEFT) .
+                '-' .
+                str_pad($grupo?->id ?? 0, 2, '0', STR_PAD_LEFT) .
+                '-' .
+                now()->format('Ymd-His');
+
             $logoNivel =
                 $nivel?->logo && file_exists(public_path('storage/logos/' . $nivel->logo))
                     ? public_path('storage/logos/' . $nivel->logo)
@@ -173,6 +344,19 @@
             $logoPrincipal = file_exists(public_path('imagenes/logo-letra.png'))
                 ? public_path('imagenes/logo-letra.png')
                 : null;
+
+            /*
+                Se intenta mostrar horario si el modelo tiene relaciones cargadas.
+                Si no existen esas relaciones, simplemente se muestra una línea para llenarse a mano.
+            */
+            $horaInicio = $horario->hora?->hora_inicio ?? null;
+            $horaFin = $horario->hora?->hora_fin ?? null;
+            $diaHorario = $horario->dia?->nombre ?? null;
+
+            $horarioTexto =
+                $horaInicio && $horaFin
+                    ? trim(($diaHorario ? $diaHorario . ' ' : '') . $horaInicio . ' - ' . $horaFin)
+                    : '________________';
         @endphp
 
         <div class="hoja">
@@ -188,10 +372,11 @@
                         @endif
                     </td>
 
-                    <td style="width: 50%; text-align: center;">
+                    <td style="width: 50%; text-align: center; line-height:13px;">
                         <div class="titulo">LISTA DE ASISTENCIA</div>
                         <div class="subtitulo">Ciclo escolar {{ $ciclo }}</div>
                         <div class="subtitulo">C.C.T. {{ $nivel?->cct ?? 'No especificado' }}</div>
+
                     </td>
 
                     <td style="width: 25%; text-align: right;">
@@ -202,63 +387,96 @@
                 </tr>
             </table>
 
-            <div class="datos">
-                NIVEL: <b>{{ mb_strtoupper($nivel?->nombre ?? 'No especificado', 'UTF-8') }}</b><br>
-                DOCENTE: <b>{{ mb_strtoupper($nombreProfesor, 'UTF-8') }}</b><br>
-                MATERIA: <b>{{ mb_strtoupper($materia?->materia ?? 'No especificada', 'UTF-8') }}</b>
-            </div>
+            <table class="datos">
+                <tr>
+                    <td class="label">NIVEL</td>
+                    <td class="valor">{{ mb_strtoupper($nivel?->nombre ?? 'No especificado', 'UTF-8') }}</td>
 
-            <div class="centrado">
-                @if ($esBachillerato)
-                    Parcial:
-                    <b>{{ $parcial?->parcial ?? '—' }}</b>
-                @else
-                    Periodo:
-                    <b>{{ $periodo?->periodo ?? '—' }}</b>
-                @endif
+                    <td class="label">DOCENTE</td>
+                    <td class="valor">{{ mb_strtoupper($nombreProfesor ?: 'No especificado', 'UTF-8') }}</td>
+                </tr>
 
-                &nbsp;&nbsp;&nbsp;
-                Mes:
-                <b>{{ $periodo?->meses ?? ($parcial?->meses ?? '—') }}</b>
+                <tr>
+                    <td class="label">MATERIA</td>
+                    <td class="valor" colspan="3">
+                        {{ mb_strtoupper($materia?->materia ?? 'No especificada', 'UTF-8') }}</td>
+                </tr>
+            </table>
 
-                &nbsp;&nbsp;&nbsp;
-                Grado:
-                <b>{{ $horario->grado?->nombre ?? '—' }}°</b>
+            <table class="bloque-info">
+                <tr>
+                    <td class="label">
+                        @if ($esBachillerato)
+                            Parcial
+                        @else
+                            Periodo
+                        @endif
+                    </td>
 
-                &nbsp;&nbsp;&nbsp;
-                Grupo:
-                <b>"{{ $grupo?->asignacionGrupo?->nombre ?? '—' }}"</b>
+                    <td class="label">Mes</td>
+                    <td class="label">Grado</td>
+                    <td class="label">Grupo</td>
+                    <td class="label">Turno</td>
 
-                &nbsp;&nbsp;&nbsp;
-                Estatus:
-                <b>ACTIVO</b>
+                    @if ($horario->semestre)
+                        <td class="label">Semestre</td>
+                    @endif
+                </tr>
 
-                &nbsp;&nbsp;&nbsp;
-                Turno:
-                <b>Matutino</b>
+                <tr>
+                    <td class="valor">
+                        @if ($esBachillerato)
+                            {{ $parcial?->parcial ?? '—' }}
+                        @else
+                            {{ $periodo?->periodo ?? '—' }}
+                        @endif
+                    </td>
 
-                @if ($horario->semestre)
-                    &nbsp;&nbsp;&nbsp;
-                    Semestre:
-                    <b>{{ $horario->semestre->numero }}°</b>
-                @endif
+                    <td class="valor">{{ $nombreMes }}</td>
+                    <td class="valor">{{ $horario->grado?->nombre ?? '—' }}°</td>
+                    <td class="valor">"{{ $grupo?->asignacionGrupo?->nombre ?? '—' }}"</td>
+                    <td class="valor">Matutino</td>
+
+                    @if ($horario->semestre)
+                        <td class="valor">{{ $horario->semestre->numero }}°</td>
+                    @endif
+                </tr>
+            </table>
+
+            <div class="leyenda">
+                <b>Registro sugerido:</b>
+                A = Asistencia &nbsp;|&nbsp;
+                F = Falta &nbsp;|&nbsp;
+                R = Retardo &nbsp;|&nbsp;
+                J = Justificante &nbsp;|&nbsp;
+                P = Permiso
             </div>
 
             <table class="tabla">
                 <thead>
                     <tr>
-                        <th rowspan="2" class="numero">No.</th>
-                        <th rowspan="2" class="alumno">Nombre del alumno</th>
-                        <th colspan="20">Mes:</th>
+                        <th rowspan="3" class="numero">No.</th>
+                        <th rowspan="3" class="alumno">Nombre del alumno</th>
+                        <th colspan="20">
+                            MES:
+                        </th>
+                        <th colspan="6" class="head-resumen">Resumen</th>
                     </tr>
+
                     <tr>
                         @for ($i = 1; $i <= 4; $i++)
-                            <th colspan="5">SEM. {{ $i }}</th>
+                            <th colspan="5" class="subhead">SEM. {{ $i }}</th>
                         @endfor
+
+                        <th rowspan="2" class="head-resumen resumen">A</th>
+                        <th rowspan="2" class="head-resumen resumen">F</th>
+                        <th rowspan="2" class="head-resumen resumen">R</th>
+                        <th rowspan="2" class="head-resumen resumen">J</th>
+                        <th rowspan="2" class="head-resumen resumen">P</th>
+                        <th rowspan="2" class="head-resumen porcentaje">%</th>
                     </tr>
+
                     <tr>
-                        <th></th>
-                        <th></th>
                         @for ($i = 1; $i <= 4; $i++)
                             <th class="dia">L</th>
                             <th class="dia">M</th>
@@ -271,24 +489,102 @@
 
                 <tbody>
                     @foreach ($bloque['alumnos'] as $i => $alumno)
-                        <tr>
+                        <tr class="fila-alumno">
                             <td class="numero">{{ $i + 1 }}</td>
-                            <td>
+
+                            <td class="nombre-alumno">
                                 {{ $alumno->apellido_paterno }}
                                 {{ $alumno->apellido_materno }}
                                 {{ $alumno->nombre }}
                             </td>
 
                             @for ($c = 1; $c <= 20; $c++)
-                                <td style="height: 18px;"></td>
+                                <td class="dia"></td>
                             @endfor
+
+                            <td class="resumen"></td>
+                            <td class="resumen"></td>
+                            <td class="resumen"></td>
+                            <td class="resumen"></td>
+                            <td class="resumen"></td>
+                            <td class="porcentaje"></td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
 
+            <table class="observaciones">
+                <tr>
+                    <td class="titulo-observaciones">
+                        Observaciones del docente
+                    </td>
+
+                    <td>
+                        <span class="linea-observacion"></span>
+                        <span class="linea-observacion"></span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="titulo-observaciones">
+                        Incidencias del mes
+                    </td>
+
+                    <td>
+                        Faltas recurrentes: ____________________
+                        &nbsp;&nbsp;&nbsp;
+                        Retardos recurrentes: ____________________
+                        &nbsp;&nbsp;&nbsp;
+                        Justificantes: ____________________
+                    </td>
+                </tr>
+            </table>
+
+            <table class="firmas">
+                <tr>
+                    <td>
+                        <span class="linea-firma">
+                            Nombre y firma del docente
+                        </span>
+                    </td>
+
+                    <td>
+                        <span class="linea-firma">
+                            Vo. Bo. Dirección / Coordinación
+                        </span>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="nota">
+                Nota: Este formato permite registrar asistencia, faltas, retardos, justificantes y permisos.
+                El resumen puede llenarse al finalizar el mes para dar seguimiento académico y administrativo.
+            </div>
+
             <div class="footer">
-                CENTRO UNIVERSITARIO MOCTEZUMA - LISTA DE ASISTENCIA - {{ mb_strtoupper($fecha, 'UTF-8') }}
+                <p>
+                    {{ strtoupper($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA') }}
+                    · C.C.T. {{ $nivel->cct ?? '—' }}
+                </p>
+
+                <p>
+                    C.
+                    {{ $escuela->calle ?? '' }}
+                    No.
+                    {{ $escuela->no_exterior ?? '' }},
+                    Col.
+                    {{ $escuela->colonia ?? '' }},
+                    C.P.
+                    {{ $escuela->codigo_postal ?? '' }},
+                    Cd.
+                    {{ $escuela->ciudad ?? '' }},
+                    {{ $escuela->estado ?? '' }}.
+                </p>
+
+                <p>
+                    Fecha de expedición:
+                    {{ now()->translatedFormat('d \\d\\e F \\d\\e\\l Y \\a \\l\\a\\s H:i') }}
+                </p>
             </div>
         </div>
 

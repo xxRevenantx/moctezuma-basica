@@ -33,49 +33,52 @@ class PDFController extends Controller
 
     public function credencial_profesor_pdf(Request $request)
     {
+        $request->validate([
+            'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
+            'modo_descarga' => ['required', 'string'],
+        ]);
+
+        $nivel = Nivel::query()
+            ->with('director:id,titulo,nombre,apellido_paterno,apellido_materno,cargo,status')
+            ->select('id', 'nombre', 'slug', 'cct', 'logo', 'color', 'director_id')
+            ->findOrFail((int) $request->query('nivel_id'));
+
         $modoDescarga = $request->query('modo_descarga', 'seleccionados');
 
-        $personas = $this->obtenerPersonas($request, $modoDescarga);
+        $personas = $this->obtenerPersonas($request, $modoDescarga, $nivel->id);
 
         if ($personas->isEmpty()) {
             abort(404, 'No se encontraron profesores para generar credenciales.');
         }
 
         $pdf = Pdf::loadView('pdf.credenciales_profesores_pdf', [
+            'nivel' => $nivel,
             'personas' => $personas,
             'vigencia' => $request->query(
                 'vigencia',
                 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year
             ),
             'cargo' => $request->query('cargo', 'PROFESOR'),
-
-            /*
-         * Se mantiene como respaldo.
-         * Si la persona tiene nivel, el PDF tomará el CCT del nivel.
-         */
-            'cct' => $request->query('cct', ''),
         ])->setPaper('letter', 'portrait');
 
-        return $pdf->stream('credenciales-profesores.pdf');
+        return $pdf->stream('credenciales-profesores-' . $nivel->slug . '.pdf');
     }
 
-    private function obtenerPersonas(Request $request, string $modoDescarga)
+    private function obtenerPersonas(Request $request, string $modoDescarga, int $nivelId)
     {
         $query = Persona::query()
             ->with([
                 'personaRoles.rolePersona:id,nombre,slug,status',
-
-                /*
-             * Se carga el nivel del profesor.
-             * Desde el nivel se obtiene logo, CCT y director.
-             */
-                'personaNiveles' => function ($consulta) {
-                    $consulta->orderBy('orden');
+                'personaNiveles' => function ($consulta) use ($nivelId) {
+                    $consulta->where('nivel_id', $nivelId)
+                        ->orderBy('orden');
                 },
                 'personaNiveles.nivel:id,nombre,slug,cct,logo,color,director_id',
-                'personaNiveles.nivel.director:id,titulo,nombre,apellido_paterno,apellido_materno,cargo,status',
             ])
             ->where('status', 1)
+            ->whereHas('personaNiveles', function ($consulta) use ($nivelId) {
+                $consulta->where('nivel_id', $nivelId);
+            })
             ->whereHas('personaRoles.rolePersona', function ($consulta) {
                 $consulta->where(function ($rol) {
                     $rol->where('slug', 'like', '%docente%')
