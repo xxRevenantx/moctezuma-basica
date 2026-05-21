@@ -2193,87 +2193,102 @@ class PDFController extends Controller
     }
 
 
-    // CREDENCIALES
-    public function credenciales(Request $request, string $slug_nivel)
+    public function credenciales_pdf(Request $request)
     {
         $nivel = Nivel::query()
-            ->with('director')
-            ->where('slug', $slug_nivel)
+            ->where('slug', $request->slug_nivel)
             ->firstOrFail();
 
-        $cicloEscolar = CicloEscolar::query()
-            ->orderByDesc('id')
-            ->first();
-
-        $modoDescarga = $request->string('modo_descarga')->toString();
+        $modoDescarga = $request->get('modo_descarga', 'grupo');
 
         $query = Inscripcion::query()
             ->with([
-                'nivel:id,nombre,slug',
-                'grado:id,nombre',
-                'generacion:id,anio_ingreso,anio_egreso',
-                'grupo.asignacionGrupo:id,nombre',
-                'semestre:id',
+                'nivel',
+                'grado',
+                'generacion',
+                'grupo.asignacionGrupo',
+                'semestre',
             ])
             ->where('nivel_id', $nivel->id);
 
-        if ($modoDescarga === 'individual') {
-            $query->where('id', $request->integer('alumno_id'));
-        }
-
-        if ($modoDescarga === 'seleccionados') {
-            $ids = collect(explode(',', (string) $request->input('alumnos')))
-                ->filter()
-                ->map(fn($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->toArray();
-
-            $query->whereIn('id', $ids);
+        if ($modoDescarga === 'nivel') {
+            /*
+         * No se agrega ningún filtro extra.
+         * Se descargan todos los alumnos del nivel seleccionado.
+         */
         }
 
         if ($modoDescarga === 'generacion') {
-            $query->where('generacion_id', $request->integer('generacion_id'));
+            $query->where('generacion_id', $request->generacion_id);
         }
 
         if ($modoDescarga === 'grado') {
-            $query->where('generacion_id', $request->integer('generacion_id'))
-                ->where('grado_id', $request->integer('grado_id'));
+            $query->where('generacion_id', $request->generacion_id)
+                ->where('grado_id', $request->grado_id);
         }
 
         if ($modoDescarga === 'semestre') {
-            $query->where('generacion_id', $request->integer('generacion_id'))
-                ->where('grado_id', $request->integer('grado_id'));
+            $query->where('generacion_id', $request->generacion_id)
+                ->where('grado_id', $request->grado_id);
 
             if (Schema::hasColumn('inscripciones', 'semestre_id')) {
-                $query->where('semestre_id', $request->integer('semestre_id'));
+                $query->where('semestre_id', $request->semestre_id);
             }
         }
 
         if ($modoDescarga === 'grupo') {
-            $query->where('generacion_id', $request->integer('generacion_id'))
-                ->where('grado_id', $request->integer('grado_id'))
-                ->where('grupo_id', $request->integer('grupo_id'));
+            $query->where('generacion_id', $request->generacion_id)
+                ->where('grado_id', $request->grado_id)
+                ->where('grupo_id', $request->grupo_id);
 
-            if ($nivel->slug === 'bachillerato' && Schema::hasColumn('inscripciones', 'semestre_id')) {
-                $query->where('semestre_id', $request->integer('semestre_id'));
+            if (
+                ((int) $nivel->id === 4 || $nivel->slug === 'bachillerato')
+                && Schema::hasColumn('inscripciones', 'semestre_id')
+                && $request->filled('semestre_id')
+            ) {
+                $query->where('semestre_id', $request->semestre_id);
             }
         }
 
+        if ($modoDescarga === 'individual') {
+            $query->where('id', $request->alumno_id);
+        }
+
+        if ($modoDescarga === 'seleccionados') {
+            $ids = collect(explode(',', (string) $request->alumnos))
+                ->map(fn($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            $query->whereIn('id', $ids);
+        }
+
         $alumnos = $query
+            ->orderBy('grado_id')
+            ->orderBy('grupo_id')
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
             ->get();
 
-        $pdf = Pdf::loadView('pdf.credenciales_pdf', [
-            'nivel' => $nivel,
-            'alumnos' => $alumnos,
-            'modoDescarga' => $modoDescarga,
-            'cicloEscolar' => $cicloEscolar,
-        ])->setPaper('letter', 'portrait');
+        if ($alumnos->isEmpty()) {
+            abort(404, 'No se encontraron alumnos para generar credenciales.');
+        }
 
-        return $pdf->stream('credenciales_' . $nivel->slug . '.pdf');
+        $cicloEscolar = CicloEscolar::query()
+            ->first();
+
+        $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';
+
+        return Pdf::loadView('pdf.credenciales_pdf', [
+            'alumnos' => $alumnos,
+            'nivel' => $nivel,
+            'cicloEscolar' => $cicloEscolar,
+            'modoDescarga' => $modoDescarga,
+        ])
+            ->setPaper('letter', 'portrait')
+            ->stream($nombreArchivo);
     }
 
 

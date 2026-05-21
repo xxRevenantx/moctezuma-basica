@@ -112,7 +112,7 @@ Route::get('/profesor/listas/evaluacion/pdf', [ProfesorPdfController::class, 'ev
 Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
     ->name('lista.evaluacion.word');
 
-Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales'])
+Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales_pdf'])
     ->name('generales.credenciales.pdf');
 
 Route::prefix('nivel')->group(function () {

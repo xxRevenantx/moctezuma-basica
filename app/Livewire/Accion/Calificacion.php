@@ -1467,6 +1467,432 @@ class Calificacion extends Component
             : $texto;
     }
 
+
+    public function getDiagnosticoCalificacionesProperty(): array
+    {
+        if (empty($this->inscripciones) || empty($this->materias)) {
+            return [
+                'hay_datos' => false,
+                'titulo' => 'Selecciona los filtros para generar el diagnóstico',
+                'descripcion' => 'El diagnóstico académico se mostrará cuando existan alumnos, materias y periodo cargado.',
+                'color' => 'slate',
+                'salud' => 0,
+                'tarjetas' => [],
+                'alertas' => collect(),
+                'ranking_alumnos' => collect(),
+                'alumnos_riesgo' => collect(),
+                'alumnos_captura_incompleta' => collect(),
+                'candidatos_diploma' => collect(),
+                'materias_resumen' => collect(),
+                'materia_mas_baja' => null,
+                'materia_mas_alta' => null,
+                'recomendaciones' => collect(),
+            ];
+        }
+
+        $totalCeldas = (int) $this->totalCeldas;
+        $celdasCapturadas = (int) $this->celdasCapturadas;
+        $pendientes = max(0, $totalCeldas - $celdasCapturadas);
+        $porcentajeCaptura = (int) $this->porcentajeCaptura;
+
+        $materiasPromediables = collect($this->materias)
+            ->filter(fn($materia) => empty($materia['extra']))
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->values();
+
+        $alumnosResumen = collect($this->inscripciones)
+            ->map(function ($fila) use ($materiasPromediables) {
+                $inscripcionId = (int) $fila['inscripcion_id'];
+                $materiasAlumno = collect($this->calificaciones[$inscripcionId] ?? []);
+
+                $valores = $materiasAlumno
+                    ->map(fn($valor, $asignacionMateriaId) => [
+                        'asignacion_materia_id' => (int) $asignacionMateriaId,
+                        'valor' => $this->normalizarCalificacion($valor),
+                    ])
+                    ->values();
+
+                $valoresPromediables = $valores
+                    ->filter(fn($item) => $materiasPromediables->contains((int) $item['asignacion_materia_id']));
+
+                $numericas = $valoresPromediables
+                    ->pluck('valor')
+                    ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
+                    ->map(fn($valor) => (float) $valor)
+                    ->values();
+
+                $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
+                $especiales = $valores->pluck('valor')->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
+                $pendientesAlumno = $valores->filter(fn($item) => blank($item['valor']))->count();
+
+                $promedio = $this->promedios[$inscripcionId] ?? null;
+                $promedioNumerico = is_numeric($promedio) ? (float) $promedio : null;
+
+                return [
+                    'inscripcion_id' => $inscripcionId,
+                    'matricula' => $fila['matricula'] ?? 'Sin matrícula',
+                    'alumno' => $fila['alumno'] ?? 'Sin alumno',
+                    'promedio' => $promedioNumerico,
+                    'promedio_texto' => $promedioNumerico !== null ? number_format($promedioNumerico, 1, '.', '') : '—',
+                    'reprobadas' => $reprobadas,
+                    'especiales' => $especiales,
+                    'pendientes' => $pendientesAlumno,
+                    'captura_completa' => $pendientesAlumno === 0,
+                    'estado' => $this->estadoAlumnoCalificacion($promedioNumerico, $reprobadas, $pendientesAlumno),
+                    'clase' => $this->claseEstadoAlumnoCalificacion($promedioNumerico, $reprobadas, $pendientesAlumno),
+                ];
+            })
+            ->values();
+
+        $rankingAlumnos = $alumnosResumen
+            ->filter(fn($alumno) => $alumno['promedio'] !== null)
+            ->sortByDesc('promedio')
+            ->values();
+
+        $alumnosRiesgo = $alumnosResumen
+            ->filter(fn($alumno) => ($alumno['promedio'] !== null && $alumno['promedio'] < 6) || $alumno['reprobadas'] >= 2)
+            ->sortBy('promedio')
+            ->values();
+
+        $alumnosCapturaIncompleta = $alumnosResumen
+            ->filter(fn($alumno) => $alumno['pendientes'] > 0)
+            ->sortByDesc('pendientes')
+            ->values();
+
+        $candidatosDiploma = $alumnosResumen
+            ->filter(fn($alumno) => $alumno['promedio'] !== null && $alumno['promedio'] >= 9.5 && $alumno['reprobadas'] === 0 && $alumno['captura_completa'])
+            ->sortByDesc('promedio')
+            ->values();
+
+        $materiasResumen = collect($this->materias)
+            ->map(function ($materia) {
+                $asignacionMateriaId = (int) $materia['id'];
+
+                $valores = collect($this->calificaciones)
+                    ->map(fn($materiasAlumno) => $this->normalizarCalificacion($materiasAlumno[$asignacionMateriaId] ?? null))
+                    ->values();
+
+                $numericas = $valores
+                    ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
+                    ->map(fn($valor) => (float) $valor)
+                    ->values();
+
+                $aprobadas = $numericas->filter(fn($valor) => $valor >= 6)->count();
+                $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
+                $pendientesMateria = $valores->filter(fn($valor) => blank($valor))->count();
+                $especiales = $valores->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
+                $promedio = $numericas->isEmpty() ? null : floor($numericas->avg() * 10) / 10;
+
+                return [
+                    'id' => $asignacionMateriaId,
+                    'materia' => $materia['materia'] ?? 'Sin materia',
+                    'profesor' => $materia['profesor'] ?? 'Sin profesor asignado',
+                    'extra' => (bool) ($materia['extra'] ?? false),
+                    'promedio' => $promedio,
+                    'promedio_texto' => $promedio !== null ? number_format($promedio, 1, '.', '') : '—',
+                    'aprobadas' => $aprobadas,
+                    'reprobadas' => $reprobadas,
+                    'pendientes' => $pendientesMateria,
+                    'especiales' => $especiales,
+                    'estado' => $this->estadoMateriaCalificacion($promedio, $reprobadas, $pendientesMateria),
+                    'clase' => $this->claseEstadoMateriaCalificacion($promedio, $reprobadas, $pendientesMateria),
+                ];
+            })
+            ->sortBy(fn($materia) => $materia['promedio'] === null ? 999 : $materia['promedio'])
+            ->values();
+
+        $materiasConPromedio = $materiasResumen->filter(fn($materia) => $materia['promedio'] !== null)->values();
+        $materiaMasBaja = $materiasConPromedio->sortBy('promedio')->first();
+        $materiaMasAlta = $materiasConPromedio->sortByDesc('promedio')->first();
+
+        $estadisticas = $this->estadisticasCalificaciones;
+        $promedioGlobal = $estadisticas['promedio_global'] ?? '—';
+        $porcentajeAprobacion = (int) ($estadisticas['porcentaje_aprobacion'] ?? 0);
+        $reprobadasGlobal = (int) ($estadisticas['reprobadas'] ?? 0);
+        $especialesGlobal = (int) ($estadisticas['especiales'] ?? 0);
+
+        $salud = 100;
+
+        if ($pendientes > 0) {
+            $salud -= 25;
+        }
+
+        if ($porcentajeAprobacion < 80) {
+            $salud -= 20;
+        }
+
+        if ($alumnosRiesgo->count() > 0) {
+            $salud -= 25;
+        }
+
+        if ($materiaMasBaja && $materiaMasBaja['promedio'] < 7) {
+            $salud -= 15;
+        }
+
+        if ($especialesGlobal > 0) {
+            $salud -= 5;
+        }
+
+        $salud = max(0, min(100, $salud));
+
+        $color = 'emerald';
+        $titulo = 'Grupo estable académicamente';
+        $descripcion = 'La captura y el rendimiento general del grupo se encuentran en buen estado.';
+
+        if ($salud < 75) {
+            $color = 'amber';
+            $titulo = 'Grupo con observaciones académicas';
+            $descripcion = 'Hay elementos que conviene revisar antes de generar boletas, diplomas o reportes.';
+        }
+
+        if ($salud < 50) {
+            $color = 'rose';
+            $titulo = 'Grupo con riesgo académico';
+            $descripcion = 'Se recomienda revisar alumnos en riesgo, materias con bajo promedio y calificaciones pendientes.';
+        }
+
+        $alertas = collect();
+
+        if ($pendientes > 0) {
+            $alertas->push([
+                'tipo' => 'warning',
+                'titulo' => 'Captura incompleta',
+                'mensaje' => 'Hay ' . $pendientes . ' calificación(es) pendiente(s) por capturar.',
+            ]);
+        }
+
+        if ($alumnosRiesgo->count() > 0) {
+            $alertas->push([
+                'tipo' => 'danger',
+                'titulo' => 'Alumnos en riesgo',
+                'mensaje' => 'Hay ' . $alumnosRiesgo->count() . ' alumno(s) con promedio bajo o varias materias reprobadas.',
+            ]);
+        }
+
+        if ($materiaMasBaja) {
+            $alertas->push([
+                'tipo' => ($materiaMasBaja['promedio'] < 7 ? 'warning' : 'info'),
+                'titulo' => 'Materia con menor rendimiento',
+                'mensaje' => $materiaMasBaja['materia'] . ' tiene el promedio más bajo con ' . $materiaMasBaja['promedio_texto'] . '.',
+            ]);
+        }
+
+        if ($candidatosDiploma->count() > 0) {
+            $alertas->push([
+                'tipo' => 'success',
+                'titulo' => 'Candidatos a diploma',
+                'mensaje' => 'Hay ' . $candidatosDiploma->count() . ' alumno(s) con promedio destacado y captura completa.',
+            ]);
+        }
+
+        if ($especialesGlobal > 0) {
+            $alertas->push([
+                'tipo' => 'info',
+                'titulo' => 'Valores especiales registrados',
+                'mensaje' => 'Hay ' . $especialesGlobal . ' valor(es) especiales como AC, ED, RA, NP o SD.',
+            ]);
+        }
+
+        $recomendaciones = collect();
+
+        if ($pendientes > 0) {
+            $recomendaciones->push('Completar las calificaciones pendientes antes de generar boletas o reportes finales.');
+        }
+
+        if ($alumnosRiesgo->count() > 0) {
+            $recomendaciones->push('Dar seguimiento a los alumnos en riesgo académico y revisar las materias reprobadas.');
+        }
+
+        if ($materiaMasBaja && $materiaMasBaja['promedio'] < 7) {
+            $recomendaciones->push('Revisar estrategias de apoyo en ' . $materiaMasBaja['materia'] . ', ya que presenta el promedio más bajo.');
+        }
+
+        if ($alumnosCapturaIncompleta->count() > 0) {
+            $recomendaciones->push('Revisar a los alumnos con captura incompleta para evitar boletas con datos faltantes.');
+        }
+
+        if ($candidatosDiploma->count() > 0) {
+            $recomendaciones->push('Validar los candidatos a diploma antes de descargar los reconocimientos.');
+        }
+
+        if ($recomendaciones->isEmpty()) {
+            $recomendaciones->push('El grupo no presenta observaciones críticas en este momento.');
+        }
+
+        return [
+            'hay_datos' => true,
+            'titulo' => $titulo,
+            'descripcion' => $descripcion,
+            'color' => $color,
+            'salud' => $salud,
+            'tarjetas' => [
+                [
+                    'titulo' => 'Salud académica',
+                    'valor' => $salud . '%',
+                    'detalle' => 'Estado general del grupo',
+                    'color' => $color,
+                ],
+                [
+                    'titulo' => 'Captura',
+                    'valor' => $porcentajeCaptura . '%',
+                    'detalle' => $celdasCapturadas . ' de ' . $totalCeldas . ' celdas',
+                    'color' => $pendientes > 0 ? 'amber' : 'emerald',
+                ],
+                [
+                    'titulo' => 'Aprobación',
+                    'valor' => $porcentajeAprobacion . '%',
+                    'detalle' => 'Calificaciones aprobatorias',
+                    'color' => $porcentajeAprobacion >= 80 ? 'emerald' : 'rose',
+                ],
+                [
+                    'titulo' => 'En riesgo',
+                    'valor' => $alumnosRiesgo->count(),
+                    'detalle' => 'Alumnos por revisar',
+                    'color' => $alumnosRiesgo->count() > 0 ? 'rose' : 'emerald',
+                ],
+                [
+                    'titulo' => 'Candidatos',
+                    'valor' => $candidatosDiploma->count(),
+                    'detalle' => 'Posibles diplomas',
+                    'color' => 'amber',
+                ],
+                [
+                    'titulo' => 'Pendientes',
+                    'valor' => $pendientes,
+                    'detalle' => 'Calificaciones faltantes',
+                    'color' => $pendientes > 0 ? 'amber' : 'emerald',
+                ],
+            ],
+            'promedio_global' => $promedioGlobal,
+            'reprobadas_global' => $reprobadasGlobal,
+            'especiales_global' => $especialesGlobal,
+            'alertas' => $alertas,
+            'ranking_alumnos' => $rankingAlumnos,
+            'alumnos_riesgo' => $alumnosRiesgo,
+            'alumnos_captura_incompleta' => $alumnosCapturaIncompleta,
+            'candidatos_diploma' => $candidatosDiploma,
+            'materias_resumen' => $materiasResumen,
+            'materia_mas_baja' => $materiaMasBaja,
+            'materia_mas_alta' => $materiaMasAlta,
+            'recomendaciones' => $recomendaciones,
+        ];
+    }
+
+    public function estadoAlumnoCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
+    {
+        if ($pendientes > 0) {
+            return 'Captura incompleta';
+        }
+
+        if ($promedio === null) {
+            return 'Sin promedio';
+        }
+
+        if ($promedio < 6 || $reprobadas >= 2) {
+            return 'En riesgo';
+        }
+
+        if ($promedio >= 9) {
+            return 'Excelente';
+        }
+
+        if ($promedio >= 8) {
+            return 'Bueno';
+        }
+
+        return 'Regular';
+    }
+
+    public function claseEstadoAlumnoCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
+    {
+        if ($pendientes > 0) {
+            return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300';
+        }
+
+        if ($promedio === null) {
+            return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
+        }
+
+        if ($promedio < 6 || $reprobadas >= 2) {
+            return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300';
+        }
+
+        if ($promedio >= 9) {
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300';
+        }
+
+        if ($promedio >= 8) {
+            return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300';
+        }
+
+        return 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300';
+    }
+
+    public function estadoMateriaCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
+    {
+        if ($pendientes > 0) {
+            return 'Captura incompleta';
+        }
+
+        if ($promedio === null) {
+            return 'Sin datos';
+        }
+
+        if ($promedio < 7 || $reprobadas > 0) {
+            return 'Atención';
+        }
+
+        if ($promedio >= 9) {
+            return 'Excelente';
+        }
+
+        return 'Estable';
+    }
+
+    public function claseEstadoMateriaCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
+    {
+        if ($pendientes > 0) {
+            return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300';
+        }
+
+        if ($promedio === null) {
+            return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
+        }
+
+        if ($promedio < 7 || $reprobadas > 0) {
+            return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300';
+        }
+
+        if ($promedio >= 9) {
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300';
+        }
+
+        return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300';
+    }
+
+    public function claseTarjetaDiagnosticoCalificacion(string $color): string
+    {
+        return match ($color) {
+            'emerald' => 'border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'amber' => 'border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+            'rose' => 'border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+            'sky' => 'border-sky-100 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300',
+            'indigo' => 'border-indigo-100 bg-indigo-50 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300',
+            default => 'border-slate-100 bg-slate-50 text-slate-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-slate-300',
+        };
+    }
+
+    public function claseAlertaDiagnosticoCalificacion(string $tipo): string
+    {
+        return match ($tipo) {
+            'danger' => 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200',
+            'warning' => 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200',
+            'success' => 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200',
+            default => 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200',
+        };
+    }
+
     public function exportarCalificaciones()
     {
         if (!$this->puedeExportarPdf) {

@@ -33,6 +33,7 @@
         });
     });
 });" class="space-y-6">
+
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
@@ -52,7 +53,7 @@
                         </span>
 
                         <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                            Descarga credenciales por generación, grado,
+                            Descarga credenciales por nivel, generación, grado,
                             {{ $this->esBachillerato() ? 'semestre,' : '' }}
                             grupo, alumno individual o selección manual.
                         </span>
@@ -129,6 +130,29 @@
                             </div>
                         </div>
 
+                        @if ($modo_descarga === 'nivel')
+                            <div
+                                class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+                                <div class="flex items-start gap-3">
+                                    <div
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                                        <flux:icon.information-circle class="h-5 w-5" />
+                                    </div>
+
+                                    <div>
+                                        <p class="font-black">
+                                            Descarga por nivel activo
+                                        </p>
+
+                                        <p class="mt-1 text-sm">
+                                            Se generarán las credenciales de todos los alumnos registrados en el nivel
+                                            {{ $nivel?->nombre ?? 'seleccionado' }}.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         @if ($this->esBachillerato())
                             <div
                                 class="mb-5 rounded-2xl border border-violet-200 bg-violet-50/80 p-4 text-sm text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
@@ -177,7 +201,7 @@
                                 <flux:label>Generación</flux:label>
 
                                 <flux:select id="generacion_id" wire:model.live="generacion_id"
-                                    x-on:change="guardarScroll()">
+                                    x-on:change="guardarScroll()" :disabled="$modo_descarga === 'nivel'">
                                     <flux:select.option value="">
                                         Selecciona una generación
                                     </flux:select.option>
@@ -196,7 +220,7 @@
                                 <flux:label>Grado</flux:label>
 
                                 <flux:select id="grado_id" wire:model.live="grado_id" x-on:change="guardarScroll()"
-                                    :disabled="!$generacion_id">
+                                    :disabled="$modo_descarga === 'nivel' || !$generacion_id">
                                     <flux:select.option value="">
                                         Selecciona un grado
                                     </flux:select.option>
@@ -217,7 +241,7 @@
 
                                     <flux:select id="semestre_id" wire:model.live="semestre_id"
                                         x-on:change="guardarScroll()"
-                                        :disabled="!$generacion_id || !$grado_id || $semestres->isEmpty()">
+                                        :disabled="$modo_descarga === 'nivel' || !$generacion_id || !$grado_id || $semestres->isEmpty()">
                                         <flux:select.option value="">
                                             Selecciona un semestre
                                         </flux:select.option>
@@ -238,9 +262,11 @@
 
                                 <flux:select id="grupo_id" wire:model.live="grupo_id" x-on:change="guardarScroll()"
                                     wire:key="credenciales-grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
-                                    :disabled="$this->esBachillerato()
-                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                    :disabled="$modo_descarga === 'nivel' || (
+                                                                            $this->esBachillerato()
+                                                                                ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                : (!$generacion_id || !$grado_id || $grupos->isEmpty())
+                                                                        )">
 
                                     <flux:select.option value="">
                                         Selecciona un grupo
@@ -255,13 +281,19 @@
 
                                 <flux:error name="grupo_id" />
 
-                                @if (!$this->esBachillerato() && $generacion_id && $grado_id && $grupos->isEmpty())
+                                @if ($modo_descarga !== 'nivel' && !$this->esBachillerato() && $generacion_id && $grado_id && $grupos->isEmpty())
                                     <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                         No hay grupos registrados para la generación y grado seleccionados.
                                     </p>
                                 @endif
 
-                                @if ($this->esBachillerato() && $generacion_id && $grado_id && $semestre_id && $grupos->isEmpty())
+                                @if (
+                                    $modo_descarga !== 'nivel' &&
+                                        $this->esBachillerato() &&
+                                        $generacion_id &&
+                                        $grado_id &&
+                                        $semestre_id &&
+                                        $grupos->isEmpty())
                                     <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                         No hay grupos registrados para la generación, grado y semestre seleccionados.
                                     </p>
@@ -302,7 +334,14 @@
                                 Modo: {{ $this->textoModoDescarga }}
                             </span>
 
-                            @if ($this->generacionSeleccionada)
+                            @if ($modo_descarga === 'nivel')
+                                <span
+                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                    Nivel completo: {{ $nivel?->nombre ?? '—' }}
+                                </span>
+                            @endif
+
+                            @if ($this->generacionSeleccionada && $modo_descarga !== 'nivel')
                                 <span
                                     class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
                                     Generación:
@@ -311,21 +350,21 @@
                                 </span>
                             @endif
 
-                            @if ($this->gradoSeleccionado)
+                            @if ($this->gradoSeleccionado && $modo_descarga !== 'nivel')
                                 <span
                                     class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
                                     Grado: {{ $this->gradoSeleccionado->nombre }}
                                 </span>
                             @endif
 
-                            @if ($this->esBachillerato() && $this->semestreSeleccionado)
+                            @if ($this->esBachillerato() && $this->semestreSeleccionado && $modo_descarga !== 'nivel')
                                 <span
                                     class="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
                                     {{ $this->textoSemestre($this->semestreSeleccionado) }}
                                 </span>
                             @endif
 
-                            @if ($this->grupoSeleccionado)
+                            @if ($this->grupoSeleccionado && $modo_descarga !== 'nivel')
                                 <span
                                     class="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300">
                                     Grupo: {{ $this->textoGrupo($this->grupoSeleccionado) }}

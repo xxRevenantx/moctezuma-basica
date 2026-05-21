@@ -475,6 +475,440 @@
         </div>
     @endif
 
+
+    {{-- DIAGNÓSTICO ACADÉMICO INTELIGENTE --}}
+    @if ($this->diagnosticoCalificaciones['hay_datos'])
+        <div x-data="{ abiertoDiagnosticoAcademico: false }"
+            class="mt-6 overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-xl shadow-slate-200/50 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
+            <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+
+            <button type="button" x-on:click="abiertoDiagnosticoAcademico = !abiertoDiagnosticoAcademico"
+                class="group flex w-full items-center justify-between gap-4 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-5 py-4 text-left transition hover:from-amber-100 hover:via-orange-100 hover:to-rose-100 dark:from-amber-950/20 dark:via-neutral-900 dark:to-rose-950/20 dark:hover:from-amber-950/30 dark:hover:to-rose-950/30">
+                <div class="flex min-w-0 items-start gap-4">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-white text-amber-700 shadow-sm dark:border-amber-900/40 dark:bg-neutral-950 dark:text-amber-300">
+                        <flux:icon.academic-cap class="h-6 w-6" />
+                    </div>
+
+                    <div class="min-w-0">
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-100 dark:bg-neutral-950 dark:text-amber-300 dark:ring-amber-900/40">
+                            <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                            Diagnóstico académico automático
+                        </div>
+
+                        <h3 class="mt-2 text-xl font-black tracking-tight text-neutral-900 dark:text-white">
+                            {{ $this->diagnosticoCalificaciones['titulo'] }}
+                        </h3>
+
+                        <p class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+                            {{ $this->diagnosticoCalificaciones['descripcion'] }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex shrink-0 items-center gap-3">
+                    <span
+                        class="hidden rounded-full border px-3 py-1 text-xs font-black sm:inline-flex {{ $this->claseTarjetaDiagnosticoCalificacion($this->diagnosticoCalificaciones['color']) }}">
+                        Salud {{ $this->diagnosticoCalificaciones['salud'] }}%
+                    </span>
+
+                    <span
+                        class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-neutral-500 shadow-sm ring-1 ring-neutral-200 transition group-hover:text-amber-600 dark:bg-neutral-950 dark:text-neutral-400 dark:ring-neutral-800 dark:group-hover:text-amber-300">
+                        <flux:icon.chevron-down class="h-5 w-5 transition-transform duration-300"
+                            x-bind:class="abiertoDiagnosticoAcademico ? 'rotate-180' : ''" />
+                    </span>
+                </div>
+            </button>
+
+            <div x-show="abiertoDiagnosticoAcademico" x-cloak x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2">
+                <div class="space-y-6 border-t border-neutral-200 p-5 sm:p-6 dark:border-neutral-800">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                <flux:icon.academic-cap class="h-7 w-7" />
+                            </div>
+
+                            <div>
+                                <div
+                                    class="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40">
+                                    <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                                    Diagnóstico académico automático
+                                </div>
+
+                                <h3 class="mt-3 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                    {{ $this->diagnosticoCalificaciones['titulo'] }}
+                                </h3>
+
+                                <p
+                                    class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                                    {{ $this->diagnosticoCalificaciones['descripcion'] }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="w-full xl:w-[360px]">
+                            <div
+                                class="rounded-3xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/70">
+                                <div class="flex items-center justify-between">
+                                    <p
+                                        class="text-xs font-black uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                                        Salud académica
+                                    </p>
+
+                                    <span
+                                        class="rounded-full border px-3 py-1 text-xs font-black {{ $this->claseTarjetaDiagnosticoCalificacion($this->diagnosticoCalificaciones['color']) }}">
+                                        {{ $this->diagnosticoCalificaciones['salud'] }}%
+                                    </span>
+                                </div>
+
+                                <div
+                                    class="mt-3 h-4 w-full overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-900">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 transition-all duration-500"
+                                        style="width: {{ $this->diagnosticoCalificaciones['salud'] }}%"></div>
+                                </div>
+
+                                <p class="mt-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                                    Este porcentaje combina captura, aprobación, alumnos en riesgo y rendimiento por
+                                    materia.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Tarjetas principales --}}
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                        @foreach ($this->diagnosticoCalificaciones['tarjetas'] as $tarjeta)
+                            <div
+                                class="rounded-3xl border p-4 shadow-sm {{ $this->claseTarjetaDiagnosticoCalificacion($tarjeta['color']) }}">
+                                <p class="text-[11px] font-black uppercase tracking-wide opacity-80">
+                                    {{ $tarjeta['titulo'] }}
+                                </p>
+
+                                <p class="mt-2 text-3xl font-black">
+                                    {{ $tarjeta['valor'] }}
+                                </p>
+
+                                <p class="mt-1 text-xs font-semibold opacity-80">
+                                    {{ $tarjeta['detalle'] }}
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- Alertas inteligentes --}}
+                    @if ($this->diagnosticoCalificaciones['alertas']->isNotEmpty())
+                        <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                            @foreach ($this->diagnosticoCalificaciones['alertas'] as $alerta)
+                                <div
+                                    class="rounded-3xl border p-4 {{ $this->claseAlertaDiagnosticoCalificacion($alerta['tipo']) }}">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/70 dark:bg-neutral-950/40">
+                                            @if ($alerta['tipo'] === 'danger')
+                                                <flux:icon.x-circle class="h-5 w-5" />
+                                            @elseif ($alerta['tipo'] === 'warning')
+                                                <flux:icon.exclamation-triangle class="h-5 w-5" />
+                                            @elseif ($alerta['tipo'] === 'success')
+                                                <flux:icon.check-circle class="h-5 w-5" />
+                                            @else
+                                                <flux:icon.information-circle class="h-5 w-5" />
+                                            @endif
+                                        </div>
+
+                                        <div>
+                                            <p class="text-sm font-black">
+                                                {{ $alerta['titulo'] }}
+                                            </p>
+
+                                            <p class="mt-1 text-xs font-semibold leading-relaxed opacity-90">
+                                                {{ $alerta['mensaje'] }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- Ranking, riesgo y candidatos --}}
+                    <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+                        <div class="overflow-hidden rounded-[24px] border border-neutral-200 dark:border-neutral-800">
+                            <div
+                                class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/70">
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Ranking académico
+                                </h4>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Alumnos con mejor promedio del periodo seleccionado.
+                                </p>
+                            </div>
+
+                            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                                @forelse ($this->diagnosticoCalificaciones['ranking_alumnos']->take(5) as $alumnoRanking)
+                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-xs font-black uppercase text-neutral-800 dark:text-white">
+                                                {{ $alumnoRanking['alumno'] }}
+                                            </p>
+                                            <p
+                                                class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                                                {{ $alumnoRanking['matricula'] }}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class="rounded-full border px-3 py-1 text-xs font-black {{ $alumnoRanking['clase'] }}">
+                                            {{ $alumnoRanking['promedio_texto'] }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div
+                                        class="px-4 py-6 text-center text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+                                        No hay promedios suficientes para generar ranking.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="overflow-hidden rounded-[24px] border border-neutral-200 dark:border-neutral-800">
+                            <div
+                                class="border-b border-neutral-200 bg-rose-50 px-4 py-3 dark:border-neutral-800 dark:bg-rose-950/20">
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Alumnos en riesgo
+                                </h4>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Promedio menor a 6 o varias materias reprobadas.
+                                </p>
+                            </div>
+
+                            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                                @forelse ($this->diagnosticoCalificaciones['alumnos_riesgo']->take(6) as $alumnoRiesgo)
+                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-xs font-black uppercase text-neutral-800 dark:text-white">
+                                                {{ $alumnoRiesgo['alumno'] }}
+                                            </p>
+                                            <p
+                                                class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                                                {{ $alumnoRiesgo['reprobadas'] }} reprobada(s) ·
+                                                {{ $alumnoRiesgo['pendientes'] }} pendiente(s)
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class="rounded-full border px-3 py-1 text-xs font-black {{ $alumnoRiesgo['clase'] }}">
+                                            {{ $alumnoRiesgo['promedio_texto'] }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div
+                                        class="px-4 py-6 text-center text-sm font-semibold text-emerald-600 dark:text-emerald-300">
+                                        No se detectaron alumnos en riesgo académico.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="overflow-hidden rounded-[24px] border border-neutral-200 dark:border-neutral-800">
+                            <div
+                                class="border-b border-neutral-200 bg-amber-50 px-4 py-3 dark:border-neutral-800 dark:bg-amber-950/20">
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Candidatos a diploma
+                                </h4>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Promedio mínimo 9.5, captura completa y sin materias reprobadas.
+                                </p>
+                            </div>
+
+                            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                                @forelse ($this->diagnosticoCalificaciones['candidatos_diploma']->take(6) as $candidato)
+                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-xs font-black uppercase text-neutral-800 dark:text-white">
+                                                {{ $candidato['alumno'] }}
+                                            </p>
+                                            <p
+                                                class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                                                {{ $candidato['matricula'] }}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                            {{ $candidato['promedio_texto'] }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div
+                                        class="px-4 py-6 text-center text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+                                        Aún no hay candidatos con criterios completos.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Resumen por materia y captura incompleta --}}
+                    <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                        <div class="overflow-hidden rounded-[24px] border border-neutral-200 dark:border-neutral-800">
+                            <div
+                                class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/70">
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Resumen académico por materia
+                                </h4>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Promedio, aprobación, pendientes y estado por asignatura.
+                                </p>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full border-collapse">
+                                    <thead class="bg-white dark:bg-neutral-950">
+                                        <tr>
+                                            <th
+                                                class="border-b border-r border-neutral-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                                Materia</th>
+                                            <th
+                                                class="border-b border-r border-neutral-200 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                                Prom.</th>
+                                            <th
+                                                class="border-b border-r border-neutral-200 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                                Rep.</th>
+                                            <th
+                                                class="border-b border-r border-neutral-200 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                                Pend.</th>
+                                            <th
+                                                class="border-b border-neutral-200 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                                                Estado</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody class="bg-white dark:bg-neutral-950/60">
+                                        @foreach ($this->diagnosticoCalificaciones['materias_resumen'] as $materiaResumen)
+                                            <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                                                <td
+                                                    class="border-b border-r border-neutral-200 px-4 py-3 align-top dark:border-neutral-800">
+                                                    <div
+                                                        class="text-xs font-black uppercase text-neutral-800 dark:text-white">
+                                                        {{ $materiaResumen['materia'] }}
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                                                        {{ $materiaResumen['profesor'] }}
+                                                    </div>
+                                                </td>
+
+                                                <td
+                                                    class="border-b border-r border-neutral-200 px-4 py-3 text-center dark:border-neutral-800">
+                                                    <span
+                                                        class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                                                        {{ $materiaResumen['promedio_texto'] }}
+                                                    </span>
+                                                </td>
+
+                                                <td
+                                                    class="border-b border-r border-neutral-200 px-4 py-3 text-center text-xs font-black text-rose-600 dark:border-neutral-800 dark:text-rose-300">
+                                                    {{ $materiaResumen['reprobadas'] }}
+                                                </td>
+
+                                                <td
+                                                    class="border-b border-r border-neutral-200 px-4 py-3 text-center text-xs font-black text-amber-600 dark:border-neutral-800 dark:text-amber-300">
+                                                    {{ $materiaResumen['pendientes'] }}
+                                                </td>
+
+                                                <td
+                                                    class="border-b border-neutral-200 px-4 py-3 text-center dark:border-neutral-800">
+                                                    <span
+                                                        class="rounded-full border px-3 py-1 text-xs font-black {{ $materiaResumen['clase'] }}">
+                                                        {{ $materiaResumen['estado'] }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="overflow-hidden rounded-[24px] border border-neutral-200 dark:border-neutral-800">
+                            <div
+                                class="border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/70">
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Captura incompleta por alumno
+                                </h4>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    Alumnos con materias pendientes de capturar.
+                                </p>
+                            </div>
+
+                            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                                @forelse ($this->diagnosticoCalificaciones['alumnos_captura_incompleta']->take(10) as $incompleto)
+                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-xs font-black uppercase text-neutral-800 dark:text-white">
+                                                {{ $incompleto['alumno'] }}
+                                            </p>
+                                            <p
+                                                class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+                                                {{ $incompleto['matricula'] }}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                            Faltan {{ $incompleto['pendientes'] }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div
+                                        class="px-4 py-6 text-center text-sm font-semibold text-emerald-600 dark:text-emerald-300">
+                                        Todos los alumnos tienen captura completa.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Recomendaciones --}}
+                    <div
+                        class="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-sky-50 to-cyan-50 p-4 dark:border-indigo-900/40 dark:from-indigo-950/20 dark:via-neutral-950 dark:to-cyan-950/20">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                    Recomendaciones automáticas
+                                </h4>
+
+                                <div class="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+                                    @foreach ($this->diagnosticoCalificaciones['recomendaciones'] as $recomendacion)
+                                        <div
+                                            class="rounded-2xl border border-white bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-600 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/60 dark:text-neutral-300">
+                                            {{ $recomendacion }}
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <span
+                                class="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-indigo-700 shadow-sm ring-1 ring-indigo-100 dark:bg-neutral-950 dark:text-indigo-300 dark:ring-indigo-900/40">
+                                Diagnóstico listo
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Tabla --}}
     <div
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -1207,6 +1641,11 @@
                 timer: null,
 
                 iniciar() {
+                    this.programarCarga();
+                },
+
+                actualizar(datosActualizados) {
+                    this.datos = datosActualizados || {};
                     this.programarCarga();
                 },
 

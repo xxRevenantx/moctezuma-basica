@@ -71,7 +71,11 @@ class Credenciales extends Component
         $this->semestres = $this->cargarSemestresIniciales();
         $this->grupos = collect();
 
-        $this->modo_descarga = $this->esBachillerato() ? 'semestre' : 'grupo';
+        /*
+     * Por defecto se deja por grupo como ya lo venías usando.
+     * Ahora también existe el modo nivel para descargar todo el nivel.
+     */
+        $this->modo_descarga = 'grupo';
     }
 
     private function cargarSemestresIniciales(): Collection
@@ -253,12 +257,12 @@ class Credenciales extends Component
         $busquedaLimpia = trim($this->buscar_alumno);
 
         /*
-         * Si no hay filtros ni búsqueda, no se cargan alumnos.
-         * Si el usuario escribe una búsqueda, sí se consulta aunque no haya filtros completos.
-         */
+     * Si el modo es nivel, sí se permite consultar alumnos del nivel completo.
+     */
         if (
             $busquedaLimpia === ''
             && !$this->generacion_id
+            && $this->modo_descarga !== 'nivel'
             && in_array($this->modo_descarga, ['grado', 'grupo', 'semestre', 'individual', 'seleccionados'])
         ) {
             return collect();
@@ -412,6 +416,7 @@ class Credenciales extends Component
     {
         if ($this->esBachillerato()) {
             return [
+                'nivel' => 'Por nivel',
                 'generacion' => 'Por generación',
                 'grado' => 'Por grado',
                 'semestre' => 'Por semestre',
@@ -422,6 +427,7 @@ class Credenciales extends Component
         }
 
         return [
+            'nivel' => 'Por nivel',
             'generacion' => 'Por generación',
             'grado' => 'Por grado',
             'grupo' => 'Por grupo',
@@ -433,6 +439,10 @@ class Credenciales extends Component
     #[Computed]
     public function puedeDescargar(): bool
     {
+        if ($this->modo_descarga === 'nivel') {
+            return filled($this->nivel?->id);
+        }
+
         if ($this->modo_descarga === 'generacion') {
             return filled($this->generacion_id);
         }
@@ -567,8 +577,8 @@ class Credenciales extends Component
     {
         return trim(
             ($alumno->apellido_paterno ?? '') . ' ' .
-            ($alumno->apellido_materno ?? '') . ' ' .
-            ($alumno->nombre ?? '')
+                ($alumno->apellido_materno ?? '') . ' ' .
+                ($alumno->nombre ?? '')
         );
     }
 
