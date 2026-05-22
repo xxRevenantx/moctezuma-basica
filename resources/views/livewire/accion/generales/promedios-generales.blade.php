@@ -301,6 +301,22 @@
                                     <th
                                         class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                         Estatus</th>
+
+                                    @if ($esBachillerato)
+                                        <th
+                                            class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Boleta semestral
+                                        </th>
+                                    @else
+                                        <th
+                                            class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Boleta anual
+                                        </th>
+                                        <th
+                                            class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Diploma
+                                        </th>
+                                    @endif
                                 </tr>
                             </thead>
 
@@ -370,6 +386,57 @@
                                                 {{ $alumno['estatus'] }}
                                             </span>
                                         </td>
+
+                                        @if ($esBachillerato)
+                                            <td class="px-4 py-3 text-center">
+                                                <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                    'slug_nivel' => $slug_nivel,
+                                                    'tipo' => 'semestral',
+                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                    'grado_id' => $alumno['grado_id'],
+                                                    'grupo_id' => $alumno['grupo_id'],
+                                                    'semestre_id' => $alumno['semestre_id'],
+                                                ]) }}"
+                                                    target="_blank"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                                                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                                                    PDF
+                                                </a>
+                                            </td>
+                                        @else
+                                            <td class="px-4 py-3 text-center">
+                                                <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                    'slug_nivel' => $slug_nivel,
+                                                    'tipo' => 'anual',
+                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                    'grado_id' => $alumno['grado_id'],
+                                                    'grupo_id' => $alumno['grupo_id'],
+                                                ]) }}"
+                                                    target="_blank"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                                                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                                                    PDF
+                                                </a>
+                                            </td>
+
+                                            <td class="px-4 py-3 text-center">
+                                                <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                    'slug_nivel' => $slug_nivel,
+                                                    'tipo' => 'diploma',
+                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                    'grado_id' => $alumno['grado_id'],
+                                                    'grupo_id' => $alumno['grupo_id'],
+                                                ]) }}"
+                                                    target="_blank"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                                                    <flux:icon.trophy class="h-4 w-4" />
+                                                    PDF
+                                                </a>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>

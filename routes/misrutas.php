@@ -82,6 +82,10 @@ Route::get('/materias', [MateriaController::class, 'index'])->name('misrutas.mat
 Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaController::class, 'editar'])
     ->name('misrutas.matricula.editar');
 
+
+Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletaPromedioPdf'])
+    ->name('misrutas.promedios.boleta.pdf');
+
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
 

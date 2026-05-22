@@ -155,14 +155,24 @@ class CrearMateria extends Component
 
     public function updatedReceso($value): void
     {
-        if ((bool) $value) {
+        $this->receso = (bool) $value;
+
+        if ($this->receso) {
             $this->calificable = false;
-            $this->extra = true;
 
             if (blank($this->materia)) {
                 $this->materia = 'Receso';
                 $this->slug = 'receso';
             }
+        }
+    }
+
+    public function updatedCalificable($value): void
+    {
+        $this->calificable = (bool) $value;
+
+        if ($this->calificable) {
+            $this->receso = false;
         }
     }
 
@@ -220,7 +230,7 @@ class CrearMateria extends Component
             ->get();
     }
 
-    protected function rules(): array
+    protected function rulesMateria(): array
     {
         return [
             'nivel_id' => [
@@ -228,47 +238,57 @@ class CrearMateria extends Component
                 'integer',
                 Rule::exists('niveles', 'id'),
             ],
+
             'grado_id' => [
                 'required',
                 'integer',
                 Rule::exists('grados', 'id')->where('nivel_id', $this->nivel_id),
             ],
+
             'semestre_id' => [
                 Rule::requiredIf($this->esBachilleratoFormulario),
                 'nullable',
                 'integer',
                 Rule::exists('semestres', 'id')->where('grado_id', $this->grado_id),
             ],
+
             'materia' => [
                 'required',
                 'string',
                 'min:2',
                 'max:150',
             ],
+
             'clave' => [
                 'nullable',
                 'string',
                 'max:50',
             ],
+
             'slug' => [
                 'required',
                 'string',
                 'max:180',
                 'alpha_dash',
             ],
+
             'calificable' => [
-                'required',
-                'boolean',
-            ],
-            'extra' => [
-                'required',
-                'boolean',
-            ],
-            'receso' => [
-                'required',
                 'boolean',
             ],
 
+            'extra' => [
+                'boolean',
+            ],
+
+            'receso' => [
+                'boolean',
+            ],
+        ];
+    }
+
+    protected function rulesImportacion(): array
+    {
+        return [
             'archivo_materias' => [
                 'required',
                 'file',
@@ -311,9 +331,9 @@ class CrearMateria extends Component
         ];
     }
 
-    public function importarMaterias()
+    public function importarMaterias(): void
     {
-        $this->validateOnly('archivo_materias');
+        $this->validate($this->rulesImportacion());
 
         $this->erroresImportacion = [];
 
@@ -350,6 +370,14 @@ class CrearMateria extends Component
         $this->slug = Str::slug($this->slug ?: $this->materia);
         $this->clave = filled($this->clave) ? mb_strtoupper(trim($this->clave)) : null;
 
+        $this->calificable = (bool) $this->calificable;
+        $this->extra = (bool) $this->extra;
+        $this->receso = (bool) $this->receso;
+
+        if ($this->receso) {
+            $this->calificable = false;
+        }
+
         if (!$this->esBachilleratoFormulario) {
             $this->semestre_id = null;
             $this->clave = null;
@@ -360,7 +388,7 @@ class CrearMateria extends Component
             $this->extra = true;
         }
 
-        $this->validate();
+        $this->validate($this->rulesMateria());
 
         if ($this->existeMateriaDuplicada()) {
             $this->addError('materia', 'Ya existe una materia con el mismo slug en este nivel, grado y semestre.');
@@ -379,15 +407,14 @@ class CrearMateria extends Component
             'materia' => $this->materia,
             'clave' => $this->esBachilleratoFormulario ? $this->clave : null,
             'slug' => $this->slug,
-            'calificable' => $this->calificable,
-            'extra' => $this->extra,
-            'receso' => $this->receso,
+            'calificable' => $this->calificable ? 1 : 0,
+            'extra' => $this->extra ? 1 : 0,
+            'receso' => $this->receso ? 1 : 0,
         ];
 
         if ($this->editandoId) {
-            Materia::query()
-                ->where('id', $this->editandoId)
-                ->update($datos);
+            $materia = Materia::query()->findOrFail($this->editandoId);
+            $materia->update($datos);
 
             $mensaje = '¡Materia actualizada correctamente!';
         } else {

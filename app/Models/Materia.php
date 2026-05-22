@@ -26,11 +26,7 @@ class Materia extends Model
         'orden',
     ];
 
-    protected $casts = [
-        'calificable' => 'boolean',
-        'extra' => 'boolean',
-        'receso' => 'boolean',
-    ];
+
 
     public function nivel()
     {

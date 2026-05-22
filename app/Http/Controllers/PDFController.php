@@ -317,6 +317,8 @@ class PDFController extends Controller
 
         $esBachillerato = (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
 
+        $esSecundaria = (int) $nivel->id === 3 || $nivel->slug === 'secundaria';
+
         $semestre = null;
 
         if ($esBachillerato) {
@@ -440,7 +442,7 @@ class PDFController extends Controller
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,
-        ])->setPaper('letter', $esBachillerato ? 'portrait' : 'landscape');
+        ])->setPaper('letter', $esBachillerato || $esSecundaria ? 'portrait' : 'landscape');
 
         $nombreArchivo = 'HORARIO_' .
             mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') . '_' .
