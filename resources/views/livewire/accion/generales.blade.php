@@ -463,6 +463,11 @@
 
         <div x-cloak x-show="colapsos.credenciales" x-transition.opacity.duration.200ms
             class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+            <livewire:generales.promedios-generales :slug_nivel="$slug_nivel" :key="'promedios-generales' . $slug_nivel" />
+        </div>
+
+        <div x-cloak x-show="colapsos.credenciales" x-transition.opacity.duration.200ms
+            class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
             <livewire:generales.credenciales :slug_nivel="$slug_nivel" :key="'credenciales-generales-' . $slug_nivel" />
         </div>
     </section>
