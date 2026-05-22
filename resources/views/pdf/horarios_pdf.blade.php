@@ -227,7 +227,8 @@
             background: #cfe0ef;
             color: #0f172a;
             font-size: 12px;
-            font-weight: 700;
+            line-height: 13px;
+            /* font-weight: 700; */
         }
 
         .celda-no-calificable {
@@ -249,7 +250,8 @@
             color: #000000;
             font-size: 14px;
             font-weight: 700;
-            height: 42px;
+            /* height: 42px; */
+            line-height: 10px;
             text-transform: uppercase;
         }
 
@@ -557,7 +559,7 @@
                                     @if ($textoMateria)
                                         {{ $textoMateria }}
                                     @else
-                                        <span class="sin-registro">Sin asignación</span>
+                                        <span class="sin-registro">---</span>
                                     @endif
                                 </td>
                             @endif

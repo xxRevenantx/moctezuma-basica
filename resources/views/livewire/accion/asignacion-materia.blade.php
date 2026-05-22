@@ -430,7 +430,7 @@
                 @endphp
 
                 {{-- Collapse principal de generación --}}
-                <div x-data="{ abiertoGeneracion: true }"
+                <div x-data="{ abiertoGeneracion: false }"
                     class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
                     <button type="button" x-on:click="abiertoGeneracion = !abiertoGeneracion"
                         class="flex w-full flex-col gap-3 border-b border-slate-200 bg-white px-5 py-5 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
@@ -497,7 +497,7 @@
                             @endphp
 
                             {{-- Subcollapse de grado y grupo --}}
-                            <div x-data="{ abiertoGrupo: true }"
+                            <div x-data="{ abiertoGrupo: false }"
                                 class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
                                 <button type="button" x-on:click="abiertoGrupo = !abiertoGrupo"
                                     class="flex w-full flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/70 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
@@ -571,7 +571,7 @@
                                         @endphp
 
                                         {{-- Subcollapse de semestre --}}
-                                        <div x-data="{ abiertoSemestre: true }"
+                                        <div x-data="{ abiertoSemestre: false }"
                                             class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
                                             <button type="button" x-on:click="abiertoSemestre = !abiertoSemestre"
                                                 class="flex w-full flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">

@@ -315,7 +315,7 @@ class PDFController extends Controller
             abort(404, 'Grupo no encontrado o no pertenece a la generación y grado seleccionados.');
         }
 
-        $esBachillerato = (int) $nivel->id === 4;
+        $esBachillerato = (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
 
         $semestre = null;
 
@@ -440,7 +440,7 @@ class PDFController extends Controller
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,
-        ])->setPaper('letter', 'landscape');
+        ])->setPaper('letter', $esBachillerato ? 'portrait' : 'landscape');
 
         $nombreArchivo = 'HORARIO_' .
             mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') . '_' .
@@ -2277,6 +2277,7 @@ class PDFController extends Controller
         }
 
         $cicloEscolar = CicloEscolar::query()
+            ->orderBy('id', 'desc')
             ->first();
 
         $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';

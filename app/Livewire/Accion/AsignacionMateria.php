@@ -155,9 +155,9 @@ class AsignacionMateria extends Component
 
                 $nombreCompleto = trim(
                     ($persona->titulo ?? '') . ' ' .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
+                        ($persona->nombre ?? '') . ' ' .
+                        ($persona->apellido_paterno ?? '') . ' ' .
+                        ($persona->apellido_materno ?? '')
                 );
 
                 return [
@@ -410,15 +410,41 @@ class AsignacionMateria extends Component
 
         $this->ultimoRegistroId = $asignacion->id;
 
-        $this->limpiarFormulario();
+        /*
+ * Se limpia solo lo necesario para capturar otra materia.
+ * El grupo se conserva para seguir asignando materias al mismo grupo.
+ */
+        $this->limpiarFormularioDespuesDeGuardar();
 
-        $this->dispatch('cerrar-formulario-materia');
+        /*
+ * Se mantiene abierto el collapse de nueva asignación.
+ */
+        $this->dispatch('abrir-formulario-materia');
 
         $this->dispatch('swal', [
             'title' => 'Asignación guardada correctamente',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
+    }
+
+    public function limpiarFormularioDespuesDeGuardar()
+    {
+        /*
+     * Se conserva el grupo seleccionado para no obligar a elegirlo otra vez.
+     */
+        $grupoSeleccionado = $this->grupo_id;
+
+        $this->reset([
+            'editandoId',
+            'materia_id',
+            'profesor_id',
+            'buscarProfesor',
+        ]);
+
+        $this->grupo_id = $grupoSeleccionado;
+
+        $this->resetValidation();
     }
 
     public function editar($id)
@@ -438,9 +464,9 @@ class AsignacionMateria extends Component
 
         $this->buscarProfesor = trim(
             ($asignacion->profesor?->titulo ?? '') . ' ' .
-            ($asignacion->profesor?->nombre ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_materno ?? '')
+                ($asignacion->profesor?->nombre ?? '') . ' ' .
+                ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
+                ($asignacion->profesor?->apellido_materno ?? '')
         );
 
         $this->dispatch('abrir-formulario-materia');
