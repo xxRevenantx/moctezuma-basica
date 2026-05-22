@@ -3,6 +3,7 @@
         estadistica: false,
         promocion: false,
         listas: false,
+        promedios: false,
         credenciales: false,
     },
 
@@ -33,6 +34,7 @@
                 estadistica: guardados.estadistica === true,
                 promocion: guardados.promocion === true,
                 listas: guardados.listas === true,
+                promedios: guardados.promedios === true,
                 credenciales: guardados.credenciales === true,
             };
         } catch (error) {
@@ -425,6 +427,52 @@
             <livewire:accion.generales.listas :slug_nivel="$slug_nivel" :key="'listas-generales-' . $slug_nivel" />
         </div>
     </section>
+    {{-- COLLAPSE: PROMEDIOS GENERALES --}}
+    <section
+        class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <button type="button" x-on:click="alternarCollapse('promedios')"
+            class="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/70 sm:px-6">
+            <div class="flex min-w-0 items-center gap-4">
+                <div
+                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-600 to-blue-700 text-white shadow-lg shadow-cyan-500/20">
+                    <flux:icon.chart-bar-square class="h-6 w-6" />
+                </div>
+
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-300">
+                        Promedios
+                    </p>
+                    <h2 class="truncate text-lg font-black text-slate-900 dark:text-white">
+                        Promedios generales
+                    </h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Consulta el concentrado de promedios por periodos en básica y parciales por semestre en
+                        bachillerato.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2">
+                <span class="hidden rounded-full border px-3 py-1 text-xs font-black sm:inline-flex"
+                    :class="colapsos.promedios ?
+                        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300' :
+                        'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300'"
+                    x-text="colapsos.promedios ? 'Abierto' : 'Cerrado'"></span>
+
+                <span
+                    class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition duration-300 group-hover:border-cyan-200 group-hover:text-cyan-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
+                    :class="colapsos.promedios ? 'rotate-180' : 'rotate-0'">
+                    <flux:icon.chevron-down class="h-5 w-5" />
+                </span>
+            </div>
+        </button>
+
+        <div x-cloak x-show="colapsos.promedios" x-transition.opacity.duration.200ms
+            class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+            <livewire:accion.generales.promedios-generales :slug_nivel="$slug_nivel" :key="'promedios-generales-' . $slug_nivel" />
+        </div>
+    </section>
+
 
     {{-- COLLAPSE: CREDENCIALES --}}
     <section
@@ -460,11 +508,6 @@
                 </span>
             </div>
         </button>
-
-        <div x-cloak x-show="colapsos.credenciales" x-transition.opacity.duration.200ms
-            class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
-            <livewire:generales.promedios-generales :slug_nivel="$slug_nivel" :key="'promedios-generales' . $slug_nivel" />
-        </div>
 
         <div x-cloak x-show="colapsos.credenciales" x-transition.opacity.duration.200ms
             class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
