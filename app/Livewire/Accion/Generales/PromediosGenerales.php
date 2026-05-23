@@ -194,6 +194,7 @@ class PromediosGenerales extends Component
             ->when($this->semestre_id !== '', fn($query) => $query->where('calificaciones.semestre_id', $this->semestre_id))
             ->groupBy(
                 'calificaciones.inscripcion_id',
+                'calificaciones.generacion_id',
                 'calificaciones.grado_id',
                 'calificaciones.grupo_id',
                 'calificaciones.semestre_id',
@@ -209,6 +210,7 @@ class PromediosGenerales extends Component
             )
             ->selectRaw('
                 calificaciones.inscripcion_id,
+                calificaciones.generacion_id,
                 calificaciones.grado_id,
                 calificaciones.grupo_id,
                 calificaciones.semestre_id,
@@ -251,6 +253,7 @@ class PromediosGenerales extends Component
 
                 return [
                     'inscripcion_id' => (int) $primero->inscripcion_id,
+                    'generacion_id' => (int) $primero->generacion_id,
                     'matricula' => $primero->matricula,
                     'alumno' => trim(($primero->apellido_paterno ?? '') . ' ' . ($primero->apellido_materno ?? '') . ' ' . ($primero->nombre ?? '')),
                     'grado_id' => (int) $primero->grado_id,

@@ -387,16 +387,29 @@
                                             </span>
                                         </td>
 
+                                        @php
+                                            /*
+                                             * Se preparan los ids del alumno para generar los PDF.
+                                             * Así los botones funcionan aunque se esté consultando con filtros en "Todos".
+                                             */
+                                            $alumnoInscripcionId = $alumno['inscripcion_id'] ?? null;
+                                            $alumnoGeneracionId = $alumno['generacion_id'] ?? ($generacion_id ?? null);
+                                            $alumnoGradoId = $alumno['grado_id'] ?? ($grado_id ?? null);
+                                            $alumnoGrupoId = $alumno['grupo_id'] ?? ($grupo_id ?? null);
+                                            $alumnoSemestreId = $alumno['semestre_id'] ?? ($semestre_id ?? null);
+                                        @endphp
+
                                         @if ($esBachillerato)
                                             <td class="px-4 py-3 text-center">
                                                 <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                     'slug_nivel' => $slug_nivel,
                                                     'tipo' => 'semestral',
-                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'inscripcion_id' => $alumnoInscripcionId,
                                                     'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                    'grado_id' => $alumno['grado_id'],
-                                                    'grupo_id' => $alumno['grupo_id'],
-                                                    'semestre_id' => $alumno['semestre_id'],
+                                                    'generacion_id' => $alumnoGeneracionId,
+                                                    'grado_id' => $alumnoGradoId,
+                                                    'grupo_id' => $alumnoGrupoId,
+                                                    'semestre_id' => $alumnoSemestreId,
                                                 ]) }}"
                                                     target="_blank"
                                                     class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -409,10 +422,11 @@
                                                 <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                     'slug_nivel' => $slug_nivel,
                                                     'tipo' => 'anual',
-                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'inscripcion_id' => $alumnoInscripcionId,
                                                     'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                    'grado_id' => $alumno['grado_id'],
-                                                    'grupo_id' => $alumno['grupo_id'],
+                                                    'generacion_id' => $alumnoGeneracionId,
+                                                    'grado_id' => $alumnoGradoId,
+                                                    'grupo_id' => $alumnoGrupoId,
                                                 ]) }}"
                                                     target="_blank"
                                                     class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -425,10 +439,11 @@
                                                 <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                     'slug_nivel' => $slug_nivel,
                                                     'tipo' => 'diploma',
-                                                    'inscripcion_id' => $alumno['inscripcion_id'],
+                                                    'inscripcion_id' => $alumnoInscripcionId,
                                                     'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                    'grado_id' => $alumno['grado_id'],
-                                                    'grupo_id' => $alumno['grupo_id'],
+                                                    'generacion_id' => $alumnoGeneracionId,
+                                                    'grado_id' => $alumnoGradoId,
+                                                    'grupo_id' => $alumnoGrupoId,
                                                 ]) }}"
                                                     target="_blank"
                                                     class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
