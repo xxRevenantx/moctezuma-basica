@@ -323,6 +323,17 @@
             margin: 0;
             line-height: 1.2;
         }
+
+        .tabla tfoot td {
+            border: 1px solid #bfdbfe;
+            padding: 6px 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .tabla tfoot tr {
+            page-break-inside: avoid;
+        }
     </style>
 </head>
 
@@ -531,6 +542,46 @@
                 </tr>
             @endforelse
         </tbody>
+
+        <tfoot>
+            <tr>
+                @if ($esBachillerato)
+                    <td></td>
+                @endif
+
+                <td class="materia text-center" style="background:#eff6ff; color:#1e3a8a;">
+                    Promedio {{ $esBachillerato ? 'semestral' : 'por periodo' }}
+                </td>
+
+                @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
+                    <td class="text-center" style="background:#eff6ff; color:#1e3a8a; font-weight:bold;">
+                        {{ $promediosPeriodos[$numeroPeriodo] ?? '—' }}
+                    </td>
+                @endforeach
+
+                <td class="text-center" style="background:#ecfdf5; color:#166534; font-weight:bold;">
+                    {{ $promedio }}
+                </td>
+
+                <td class="text-center" style="background:#ecfdf5;">
+                    @php
+                        $badgePromedioClass = 'badge-empty';
+
+                        if ($estadoPromedio === 'Aprobado') {
+                            $badgePromedioClass = 'badge-ok';
+                        } elseif ($estadoPromedio === 'Regular') {
+                            $badgePromedioClass = 'badge-regular';
+                        } elseif ($estadoPromedio === 'Reprobado' || $estadoPromedio === 'En riesgo') {
+                            $badgePromedioClass = 'badge-risk';
+                        }
+                    @endphp
+
+                    <span class="badge {{ $badgePromedioClass }}">
+                        {{ $estadoPromedio }}
+                    </span>
+                </td>
+            </tr>
+        </tfoot>
     </table>
 
     @if ($mostrarLeyendaCualitativa)
