@@ -262,16 +262,13 @@ class Calificacion extends Component
     public function updatedCalificaciones($value = null, $key = null): void
     {
         /*
-         * Cuando cambia una calificación en la tabla, se recalculan los promedios
-         * con la misma regla que usa la boleta.
+         * Cada vez que cambia una calificación, se recalculan los promedios.
+         * Se suma solo lo numérico y se divide entre numero_materias.
          */
         $this->calcularPromedios();
-
-        /*
-         * Si existe un orden por promedio, se vuelve a aplicar para refrescar la tabla.
-         */
         $this->aplicarFiltroEstado();
     }
+
     private function resetEstadoAcademico(array $camposExtra = []): void
     {
         $campos = array_merge($camposExtra, [
@@ -439,27 +436,6 @@ class Calificacion extends Component
         $this->cargarMaterias();
         $this->cargarCalificaciones();
         $this->calcularPromedios();
-
-        /*
-         * Si no hay promedios reales, se limpia el alumno seleccionado
-         * para reconocimiento.
-         */
-        if (!$this->hayPromediosParaReconocimiento) {
-            $this->reconocimiento_inscripcion_id = '';
-        } else {
-            $idsReconocimiento = collect($this->alumnosReconocimientoOrdenados)
-                ->pluck('inscripcion_id')
-                ->map(fn($id) => (string) $id)
-                ->values();
-
-            if (
-                filled($this->reconocimiento_inscripcion_id)
-                && !$idsReconocimiento->contains((string) $this->reconocimiento_inscripcion_id)
-            ) {
-                $this->reconocimiento_inscripcion_id = '';
-            }
-        }
-
         $this->aplicarFiltroEstado();
     }
 
@@ -874,31 +850,23 @@ class Calificacion extends Component
 
         $numeroMaterias = $query->value('numero_materias');
 
-        /*
-         * Si no existe configuración, no se calcula promedio.
-         */
         return $numeroMaterias !== null ? max(0, (int) $numeroMaterias) : null;
     }
 
-    private function obtenerMateriasPromediables(): Collection
+    private function obtenerMateriasOrdenadasParaPromedio(): Collection
     {
         $numeroMaterias = $this->obtenerNumeroMateriasPromediar();
 
-        /*
-         * Si no hay registro o el número configurado es 0,
-         * no se toma ninguna materia para promediar.
-         */
         if ($numeroMaterias === null || $numeroMaterias <= 0) {
             return collect();
         }
 
         /*
-         * Regla igual a la boleta:
-         * solo las materias no extra entran al promedio.
-         * Las materias cualitativas como AC, ED o RA no se suman.
+         * Solo se consideran materias no extra.
+         * Después se toman las primeras según el número configurado.
          */
         return collect($this->materias)
-            ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
+            ->filter(fn($materia) => empty($materia['extra']))
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,
                 fn($materia) => $materia['orden'] ?? 999,
@@ -908,26 +876,26 @@ class Calificacion extends Component
             ->values();
     }
 
-    private function calcularPromedioAlumnoComoBoleta(
+    private function calcularPromedioAlumno(
         int $inscripcionId,
         ?int $numeroMateriasPromediar = null,
-        ?Collection $materiasPromediables = null
+        ?Collection $materiasOrdenadas = null
     ): string {
         $numeroMateriasPromediar ??= $this->obtenerNumeroMateriasPromediar();
-        $materiasPromediables ??= $this->obtenerMateriasPromediables();
+        $materiasOrdenadas ??= $this->obtenerMateriasOrdenadasParaPromedio();
 
         if (
             $inscripcionId <= 0 ||
             $numeroMateriasPromediar === null ||
             $numeroMateriasPromediar <= 0 ||
-            $materiasPromediables->isEmpty()
+            $materiasOrdenadas->isEmpty()
         ) {
             return '0.0';
         }
 
-        $sumaPromedio = 0;
+        $suma = 0;
 
-        foreach ($materiasPromediables as $materia) {
+        foreach ($materiasOrdenadas as $materia) {
             $asignacionMateriaId = (int) ($materia['id'] ?? 0);
 
             if ($asignacionMateriaId <= 0) {
@@ -939,24 +907,35 @@ class Calificacion extends Component
 
             /*
              * Solo se suman calificaciones numéricas.
-             * AC, ED, RA, NP, SD y vacíos no suman.
-             * Al dividir entre numero_materias, cuentan como 0.
+             * AC, ED, RA, NP, SD, vacíos y textos no se suman.
              */
             if (!$this->esCalificacionNumerica($valor)) {
                 continue;
             }
 
-            $sumaPromedio += (float) $valor;
+            $suma += (float) $valor;
         }
 
         /*
-         * Misma regla de la boleta:
-         * suma de calificaciones numéricas / numero_materias de materia_promediar.
+         * La división se hace entre numero_materias de materia_promediar.
+         * Las materias promediables sin calificación cuentan como 0.
          */
-        $promedioCalculado = $sumaPromedio / $numeroMateriasPromediar;
-        $promedioTruncado = floor($promedioCalculado * 10) / 10;
+        $promedio = $suma / $numeroMateriasPromediar;
+        $promedio = floor($promedio * 10) / 10;
 
-        return number_format($promedioTruncado, 1, '.', '');
+        return number_format($promedio, 1, '.', '');
+    }
+
+    public function promedioAlumnoTabla(int $inscripcionId): string
+    {
+        /*
+         * Se calcula directo para evitar mostrar promedios viejos en la tabla.
+         */
+        return $this->calcularPromedioAlumno(
+            inscripcionId: $inscripcionId,
+            numeroMateriasPromediar: $this->obtenerNumeroMateriasPromediar(),
+            materiasOrdenadas: $this->obtenerMateriasOrdenadasParaPromedio()
+        );
     }
 
     public function calcularPromedios(): void
@@ -964,7 +943,7 @@ class Calificacion extends Component
         $this->promedios = [];
 
         $numeroMateriasPromediar = $this->obtenerNumeroMateriasPromediar();
-        $materiasPromediables = $this->obtenerMateriasPromediables();
+        $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
 
         foreach ($this->inscripciones as $fila) {
             $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
@@ -973,13 +952,14 @@ class Calificacion extends Component
                 continue;
             }
 
-            $this->promedios[$inscripcionId] = $this->calcularPromedioAlumnoComoBoleta(
+            $this->promedios[$inscripcionId] = $this->calcularPromedioAlumno(
                 inscripcionId: $inscripcionId,
                 numeroMateriasPromediar: $numeroMateriasPromediar,
-                materiasPromediables: $materiasPromediables
+                materiasOrdenadas: $materiasOrdenadas
             );
         }
     }
+
 
     private function aplicarFiltroEstado(): void
     {
@@ -1502,47 +1482,41 @@ class Calificacion extends Component
             ->map(fn($valor) => $this->normalizarCalificacion($valor))
             ->values();
 
-        $numericas = $valores
-            ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
-            ->map(fn($valor) => (float) $valor)
-            ->values();
-
-        /*
-         * El promedio global se calcula con base en los promedios finales
-         * de cada alumno, no con todas las calificaciones individuales.
-         */
-        $promediosAlumnos = collect($this->promedios)
-            ->filter(fn($valor) => is_numeric($valor))
-            ->map(fn($valor) => (float) $valor)
-            ->values();
-
-        $hayMateriasPromediables = $this->obtenerMateriasPromediables()->isNotEmpty();
-
-        $promedioGlobal = $hayMateriasPromediables && $promediosAlumnos->isNotEmpty()
-            ? floor($promediosAlumnos->sum() / $promediosAlumnos->count() * 10) / 10
-            : 0;
-
-        $aprobadas = $promediosAlumnos
-            ->filter(fn($valor) => $hayMateriasPromediables && $valor >= 6)
-            ->count();
-
-        $reprobadas = $promediosAlumnos
-            ->filter(fn($valor) => $hayMateriasPromediables && $valor < 6)
-            ->count();
-
         $especiales = $valores
             ->filter(fn($valor) => $this->esCalificacionEspecial($valor))
             ->count();
 
         $pendientes = max(0, $this->totalCeldas - $this->celdasCapturadas);
+        $hayMateriasPromediables = $this->tieneMateriasPromediables();
+
+        /*
+         * Promedio global correcto:
+         * suma de promedios finales de alumnos / total de alumnos con promedio.
+         */
+        $promediosAlumnos = collect($this->promedios)
+            ->filter(fn($valor) => $hayMateriasPromediables && is_numeric($valor))
+            ->map(fn($valor) => (float) $valor)
+            ->values();
+
+        $promedioGlobal = $promediosAlumnos->isNotEmpty()
+            ? floor(($promediosAlumnos->sum() / $promediosAlumnos->count()) * 10) / 10
+            : 0;
+
+        $aprobados = $promediosAlumnos
+            ->filter(fn($valor) => $valor >= 6)
+            ->count();
+
+        $reprobados = $promediosAlumnos
+            ->filter(fn($valor) => $valor < 6)
+            ->count();
 
         return [
             'promedio_global' => number_format($promedioGlobal, 1, '.', ''),
-            'porcentaje_aprobacion' => $hayMateriasPromediables && $promediosAlumnos->isNotEmpty()
-                ? (int) round(($aprobadas / $promediosAlumnos->count()) * 100)
+            'porcentaje_aprobacion' => $promediosAlumnos->isNotEmpty()
+                ? (int) round(($aprobados / $promediosAlumnos->count()) * 100)
                 : 0,
             'pendientes' => $pendientes,
-            'reprobadas' => $hayMateriasPromediables ? $reprobadas : 0,
+            'reprobadas' => $hayMateriasPromediables ? $reprobados : 0,
             'especiales' => $especiales,
             'porcentaje_captura' => $this->porcentajeCaptura,
         ];
@@ -1550,15 +1524,11 @@ class Calificacion extends Component
 
     public function getGraficasCalificacionesProperty(): array
     {
-        $hayMateriasPromediables = $this->obtenerMateriasPromediables()->isNotEmpty();
+        $hayMateriasPromediables = $this->tieneMateriasPromediables();
 
-        /*
-         * Promedio por alumno.
-         * Se toman los promedios ya calculados en calcularPromedios().
-         */
         $alumnos = collect($this->inscripciones)
             ->map(function ($fila) use ($hayMateriasPromediables) {
-                $inscripcionId = (int) $fila['inscripcion_id'];
+                $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
                 $promedio = $this->promedios[$inscripcionId] ?? null;
 
                 if (!$hayMateriasPromediables || !is_numeric($promedio)) {
@@ -1573,15 +1543,12 @@ class Calificacion extends Component
             ->filter()
             ->values();
 
-        /*
-         * Promedio por materia.
-         * Se mantiene por materia, pero solo con materias promediables.
-         */
-        $materiasPromediables = $this->obtenerMateriasPromediables();
+        $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
+        $numeroMateriasPromediar = $this->obtenerNumeroMateriasPromediar();
 
-        $materias = $materiasPromediables
+        $materias = $materiasOrdenadas
             ->map(function ($materia) {
-                $asignacionMateriaId = (int) $materia['id'];
+                $asignacionMateriaId = (int) ($materia['id'] ?? 0);
 
                 $valores = collect($this->calificaciones)
                     ->map(fn($materiasAlumno) => $materiasAlumno[$asignacionMateriaId] ?? null)
@@ -1602,12 +1569,9 @@ class Calificacion extends Component
                 ];
             })
             ->filter()
+            ->when($numeroMateriasPromediar, fn($coleccion) => $coleccion->take((int) $numeroMateriasPromediar))
             ->values();
 
-        /*
-         * Promedio global real:
-         * suma de todos los promedios de alumnos / total de promedios.
-         */
         $promediosAlumnos = collect($this->promedios)
             ->filter(fn($valor) => $hayMateriasPromediables && is_numeric($valor))
             ->map(fn($valor) => (float) $valor)
@@ -1682,7 +1646,8 @@ class Calificacion extends Component
         $pendientes = max(0, $totalCeldas - $celdasCapturadas);
         $porcentajeCaptura = (int) $this->porcentajeCaptura;
 
-        $materiasPromediables = $this->obtenerMateriasPromediables()
+        $materiasPromediables = collect($this->materias)
+            ->filter(fn($materia) => empty($materia['extra']))
             ->pluck('id')
             ->map(fn($id) => (int) $id)
             ->values();
@@ -1964,9 +1929,15 @@ class Calificacion extends Component
             'recomendaciones' => $recomendaciones,
         ];
     }
+
+
     private function tieneMateriasPromediables(): bool
     {
-        return $this->obtenerMateriasPromediables()->isNotEmpty();
+        $numeroMaterias = $this->obtenerNumeroMateriasPromediar();
+
+        return $numeroMaterias !== null
+            && $numeroMaterias > 0
+            && $this->obtenerMateriasOrdenadasParaPromedio()->isNotEmpty();
     }
 
     private function obtenerPromediosRealesParaReconocimiento(): Collection
@@ -1993,19 +1964,19 @@ class Calificacion extends Component
     public function getAlumnosReconocimientoOrdenadosProperty(): array
     {
         /*
-         * Si no hay promedios reales, no se consultan alumnos
-         * para el select de reconocimiento.
+         * Este accessor evita el error PropertyNotFoundException del Blade.
+         * El Blade puede llamar $this->alumnosReconocimientoOrdenados.
          */
         if (!$this->hayPromediosParaReconocimiento) {
             return [];
         }
 
-        $alumnosOrdenados = collect($this->inscripciones)
+        $alumnosBase = collect($this->inscripciones)
             ->map(function ($fila) {
-                $inscripcionId = (int) $fila['inscripcion_id'];
+                $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
                 $promedio = $this->promedios[$inscripcionId] ?? null;
 
-                if (!is_numeric($promedio) || (float) $promedio <= 0) {
+                if ($inscripcionId <= 0 || !is_numeric($promedio) || (float) $promedio <= 0) {
                     return null;
                 }
 
@@ -2020,27 +1991,22 @@ class Calificacion extends Component
                     'promedio_clave' => number_format($promedioNumerico, 2, '.', ''),
                 ];
             })
-            ->filter();
+            ->filter()
+            ->values();
 
         /*
-         * El mismo filtro superior ordena la tabla y el select de reconocimiento.
-         * El lugar siempre se calcula por promedio de mayor a menor.
+         * El lugar siempre se calcula de mayor a menor,
+         * aunque el usuario cambie el orden visual del select.
          */
-        $alumnosOrdenados = match ($this->orden_promedio) {
-            'menor_mayor' => $alumnosOrdenados->sortBy('promedio'),
-            default => $alumnosOrdenados->sortByDesc('promedio'),
-        };
-
-        $alumnosOrdenados = $alumnosOrdenados->values();
-
-        $promediosUnicos = $alumnosOrdenados
+        $promediosUnicosDesc = $alumnosBase
+            ->sortByDesc('promedio')
             ->pluck('promedio_clave')
             ->unique()
             ->values();
 
-        return $alumnosOrdenados
-            ->map(function ($alumno) use ($promediosUnicos) {
-                $indiceLugar = $promediosUnicos->search($alumno['promedio_clave']);
+        $alumnosConLugar = $alumnosBase
+            ->map(function ($alumno) use ($promediosUnicosDesc) {
+                $indiceLugar = $promediosUnicosDesc->search($alumno['promedio_clave']);
 
                 $lugar = $indiceLugar !== false
                     ? $indiceLugar + 1
@@ -2050,16 +2016,20 @@ class Calificacion extends Component
                 $alumno['texto_lugar'] = $lugar ? $lugar . '° lugar' : 'Pendiente';
 
                 return $alumno;
-            })
+            });
+
+        $alumnosOrdenados = match ($this->orden_promedio) {
+            'menor_mayor' => $alumnosConLugar->sortBy('promedio'),
+            default => $alumnosConLugar->sortByDesc('promedio'),
+        };
+
+        return $alumnosOrdenados
             ->values()
             ->toArray();
     }
+
     public function estadoAlumnoCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
     {
-        /*
-         * Si no hay materias configuradas para promediar,
-         * el estado no debe marcarse como riesgo.
-         */
         if (!$this->tieneMateriasPromediables()) {
             return 'Pendiente';
         }
@@ -2089,9 +2059,6 @@ class Calificacion extends Component
 
     public function claseEstadoAlumnoCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
     {
-        /*
-         * Estado visual cuando no hay materias configuradas para promediar.
-         */
         if (!$this->tieneMateriasPromediables()) {
             return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
         }
@@ -2121,10 +2088,6 @@ class Calificacion extends Component
 
     public function estadoMateriaCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
     {
-        /*
-         * Si no hay materias para promediar,
-         * la materia queda como pendiente.
-         */
         if (!$this->tieneMateriasPromediables()) {
             return 'Pendiente';
         }
@@ -2150,9 +2113,6 @@ class Calificacion extends Component
 
     public function claseEstadoMateriaCalificacion(?float $promedio, int $reprobadas, int $pendientes): string
     {
-        /*
-         * Estado visual cuando no hay materias configuradas para promediar.
-         */
         if (!$this->tieneMateriasPromediables()) {
             return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
         }
