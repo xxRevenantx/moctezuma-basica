@@ -1,11 +1,14 @@
-<div x-data="scrollLockPro('credenciales_profesor')" x-init="iniciar()" x-on:click.capture="guardarScroll()"
-    x-on:change.capture="guardarScroll()" x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
+<div x-data="scrollLockPro('credenciales_profesor')" x-init="iniciar()" x-on:pointerdown.capture="guardarScroll()"
+    x-on:keydown.capture="guardarScroll()" x-on:change.capture="guardarScroll()"
+    x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
+
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
             <button type="button" x-on:click.prevent="cambiar('credenciales_profesor')"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
+
                 <div class="flex items-center gap-4">
                     <span
                         class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white shadow-lg shadow-blue-500/20 transition group-hover:scale-105">
@@ -57,21 +60,6 @@
                 <div
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
-                    <div wire:loading.delay.flex
-                        wire:target="nivel_id,modo_descarga,buscar_persona,persona_individual_id,personas_seleccionadas,vigencia,cargo,limpiarFiltros,limpiarSeleccion,seleccionarTodosVisibles,quitarPersonaSeleccionada"
-                        class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
-                        <div
-                            class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                            <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                    stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z">
-                                </path>
-                            </svg>
-                            Actualizando información...
-                        </div>
-                    </div>
-
                     <div class="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900"></div>
 
                     <div class="p-5 sm:p-6">
@@ -88,13 +76,13 @@
                             </div>
 
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="limpiarSeleccion" x-on:click="guardarScroll()"
+                                <button type="button" wire:click="limpiarSeleccion"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
                                     <flux:icon.x-mark class="h-4 w-4" />
                                     Limpiar selección
                                 </button>
 
-                                <button type="button" wire:click="limpiarFiltros" x-on:click="guardarScroll()"
+                                <button type="button" wire:click="limpiarFiltros"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
                                     <flux:icon.arrow-path class="h-4 w-4" />
                                     Limpiar filtros
@@ -117,8 +105,7 @@
 
                                     <p class="mt-1 text-sm">
                                         Si un profesor está asignado a varios niveles, primero elige el nivel de la
-                                        credencial.
-                                        Solo se mostrarán profesores relacionados con ese nivel.
+                                        credencial. Solo se mostrarán profesores relacionados con ese nivel.
                                     </p>
                                 </div>
                             </div>
@@ -128,7 +115,7 @@
                             <flux:field>
                                 <flux:label>Nivel académico</flux:label>
 
-                                <flux:select wire:model.live="nivel_id" x-on:change="guardarScroll()">
+                                <flux:select wire:model.live="nivel_id">
                                     <flux:select.option value="">
                                         Selecciona el nivel
                                     </flux:select.option>
@@ -155,7 +142,7 @@
                             <flux:field>
                                 <flux:label>Modo de descarga</flux:label>
 
-                                <flux:select wire:model.live="modo_descarga" x-on:change="guardarScroll()">
+                                <flux:select wire:model.live="modo_descarga">
                                     @foreach ($this->modosDescarga() as $valor => $texto)
                                         <flux:select.option value="{{ $valor }}">
                                             {{ $texto }}
@@ -170,7 +157,7 @@
                                 <flux:label>Buscar profesor</flux:label>
 
                                 <flux:input type="search" wire:model.live.debounce.600ms="buscar_persona"
-                                    x-on:input="guardarScroll()" :disabled="!$nivel_id"
+                                    :disabled="!$nivel_id"
                                     placeholder="{{ $nivel_id ? 'Nombre, CURP, RFC o correo...' : 'Primero selecciona un nivel' }}" />
                             </flux:field>
 
@@ -192,8 +179,7 @@
                                 <flux:field class="xl:col-span-2">
                                     <flux:label>Profesor individual</flux:label>
 
-                                    <flux:select wire:model.live="persona_individual_id" x-on:change="guardarScroll()"
-                                        :disabled="!$nivel_id">
+                                    <flux:select wire:model.live="persona_individual_id" :disabled="!$nivel_id">
                                         <flux:select.option value="">
                                             {{ $nivel_id ? 'Selecciona un profesor' : 'Primero selecciona un nivel' }}
                                         </flux:select.option>
@@ -248,6 +234,7 @@
                             <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-12">
                                 <div
                                     class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 xl:col-span-7">
+
                                     <div
                                         class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/50 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
@@ -262,7 +249,7 @@
                                         </div>
 
                                         <button type="button" wire:click="seleccionarTodosVisibles"
-                                            x-on:click="guardarScroll()" :disabled="!$nivel_id"
+                                            :disabled="!$nivel_id"
                                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900">
                                             <flux:icon.check class="h-4 w-4" />
                                             Seleccionar visibles
@@ -307,10 +294,10 @@
                                                     @forelse ($this->personas as $persona)
                                                         <tr wire:key="resultado-persona-{{ $persona->id }}"
                                                             class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
+
                                                             <td class="px-4 py-3">
                                                                 <input type="checkbox" value="{{ $persona->id }}"
                                                                     wire:model.live="personas_seleccionadas"
-                                                                    x-on:change="guardarScroll()"
                                                                     class="h-4 w-4 rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-neutral-700">
                                                             </td>
 
@@ -372,6 +359,7 @@
 
                                 <div
                                     class="overflow-hidden rounded-[1.4rem] border border-blue-200 bg-blue-50/50 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/10 xl:col-span-5">
+
                                     <div
                                         class="border-b border-blue-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 p-4 text-white dark:border-blue-900/50">
                                         <div class="flex items-center justify-between gap-3">
@@ -386,7 +374,6 @@
                                             </div>
 
                                             <button type="button" wire:click="limpiarSeleccion"
-                                                x-on:click="guardarScroll()"
                                                 class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs font-black text-white ring-1 ring-white/20 transition hover:bg-white/25">
                                                 <flux:icon.x-mark class="h-4 w-4" />
                                                 Limpiar
@@ -435,7 +422,6 @@
                                                         <td class="px-4 py-3 text-right">
                                                             <button type="button"
                                                                 wire:click="quitarPersonaSeleccionada({{ $persona->id }})"
-                                                                x-on:click="guardarScroll()"
                                                                 class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
                                                                 <flux:icon.trash class="h-4 w-4" />
                                                             </button>
@@ -499,7 +485,7 @@
                                 </div>
 
                                 @if ($this->puedeDescargar)
-                                    <a href="{{ $this->urlDescarga }}" target="_blank" x-on:click="guardarScroll()"
+                                    <a href="{{ $this->urlDescarga }}" target="_blank"
                                         class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
                                         <flux:icon.document-arrow-down class="h-5 w-5" />
                                         Descargar credenciales
@@ -524,25 +510,51 @@
             Alpine.data('scrollLockPro', (nombre) => ({
                 abierto: localStorage.getItem(`collapse_${nombre}`) ?? nombre,
                 nombre,
+
                 llaveCollapse: `collapse_${nombre}`,
-                llaveScroll: `scroll_${nombre}`,
+                llaveScroll: `scroll_actual_${nombre}`,
+
                 restaurando: false,
 
                 iniciar() {
                     history.scrollRestoration = 'manual';
 
-                    this.restaurarScroll();
+                    this.guardarScroll();
+                    this.registrarHookLivewire();
+                },
 
-                    document.addEventListener('livewire:init', () => {
+                registrarHookLivewire() {
+                    if (!window.__scrollLockProHooks) {
+                        window.__scrollLockProHooks = {};
+                    }
+
+                    if (window.__scrollLockProHooks[this.nombre]) {
+                        return;
+                    }
+
+                    window.__scrollLockProHooks[this.nombre] = true;
+
+                    const registrar = () => {
                         Livewire.hook('commit', ({
                             succeed
                         }) => {
-                            this.guardarScroll();
+                            const posicion = this.obtenerScrollGuardado();
 
                             succeed(() => {
-                                this.restaurarScrollSeguro();
+                                this.restaurarScrollSeguro(posicion);
                             });
                         });
+                    };
+
+                    if (window.Livewire) {
+                        registrar();
+                        return;
+                    }
+
+                    document.addEventListener('livewire:init', () => {
+                        registrar();
+                    }, {
+                        once: true
                     });
                 },
 
@@ -557,7 +569,7 @@
                         localStorage.removeItem(this.llaveCollapse);
                     }
 
-                    this.restaurarScrollSeguro();
+                    this.restaurarScrollSeguro(this.obtenerScrollGuardado());
                 },
 
                 guardarScroll() {
@@ -565,41 +577,72 @@
                         return;
                     }
 
-                    localStorage.setItem(this.llaveScroll, window.scrollY || 0);
-                },
+                    const y = window.scrollY ||
+                        document.documentElement.scrollTop ||
+                        document.body.scrollTop ||
+                        0;
 
-                restaurarScroll() {
-                    const posicion = localStorage.getItem(this.llaveScroll);
+                    sessionStorage.setItem(this.llaveScroll, String(y));
 
-                    if (posicion === null) {
-                        return;
+                    if (!window.__scrollLockProUltimo) {
+                        window.__scrollLockProUltimo = {};
                     }
 
-                    window.scrollTo(0, Number(posicion));
+                    window.__scrollLockProUltimo[this.nombre] = y;
                 },
 
-                restaurarScrollSeguro() {
-                    const posicion = localStorage.getItem(this.llaveScroll);
+                obtenerScrollGuardado() {
+                    const desdeSesion = sessionStorage.getItem(this.llaveScroll);
 
-                    if (posicion === null) {
-                        return;
+                    if (desdeSesion !== null) {
+                        const y = Number(desdeSesion);
+
+                        if (!Number.isNaN(y)) {
+                            return y;
+                        }
                     }
 
-                    const y = Number(posicion);
+                    if (
+                        window.__scrollLockProUltimo &&
+                        window.__scrollLockProUltimo[this.nombre] !== undefined
+                    ) {
+                        const y = Number(window.__scrollLockProUltimo[this.nombre]);
+
+                        if (!Number.isNaN(y)) {
+                            return y;
+                        }
+                    }
+
+                    return window.scrollY || 0;
+                },
+
+                restaurarScrollSeguro(posicion = null) {
+                    const y = Number(posicion ?? this.obtenerScrollGuardado());
+
+                    if (Number.isNaN(y)) {
+                        return;
+                    }
 
                     this.restaurando = true;
 
-                    requestAnimationFrame(() => {
-                        window.scrollTo(0, y);
-                    });
+                    const restaurar = () => {
+                        window.scrollTo({
+                            top: y,
+                            left: 0,
+                            behavior: 'auto',
+                        });
+                    };
 
-                    setTimeout(() => window.scrollTo(0, y), 40);
-                    setTimeout(() => window.scrollTo(0, y), 120);
-                    setTimeout(() => window.scrollTo(0, y), 250);
+                    requestAnimationFrame(restaurar);
+
+                    setTimeout(restaurar, 20);
+                    setTimeout(restaurar, 60);
+                    setTimeout(restaurar, 120);
+                    setTimeout(restaurar, 220);
 
                     setTimeout(() => {
                         this.restaurando = false;
-                    }, 300);
+                    }, 260);
                 },
             }));
         </script>

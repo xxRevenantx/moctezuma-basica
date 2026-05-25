@@ -165,12 +165,14 @@
                         ($persona->apellido_materno ?? ''),
                 );
 
+                $personaNivel = $persona->personaNiveles->firstWhere('nivel_id', $nivelPrincipal?->id);
+
                 $rolPrincipal =
-                    $persona->personaRoles
-                        ->map(fn($personaRole) => $personaRole->rolePersona?->nombre)
+                    $personaNivel?->detalles
+                        ?->map(fn($detalle) => $detalle->personaRole?->rolePersona?->nombre)
                         ->filter()
                         ->first() ??
-                    ($cargo ?? 'PROFESOR');
+                    ($cargo ?? 'PERSONAL');
 
                 $nombreDirector = $director
                     ? mb_strtoupper(

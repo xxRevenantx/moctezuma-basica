@@ -262,9 +262,9 @@ class Calificacion extends Component
     public function updatedCalificaciones($value = null, $key = null): void
     {
         /*
-         * Cada vez que cambia una calificación, se recalculan los promedios.
-         * Se suma solo lo numérico y se divide entre numero_materias.
-         */
+     * Cada vez que cambia una calificación, se recalculan los promedios.
+     * Solo se suman valores numéricos y se divide entre las calificaciones numéricas capturadas.
+     */
         $this->calcularPromedios();
         $this->aplicarFiltroEstado();
     }
@@ -607,8 +607,8 @@ class Calificacion extends Component
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
-                        ($inscripcion->apellido_materno ?? '') . ' ' .
-                        ($inscripcion->nombre ?? '')
+                            ($inscripcion->apellido_materno ?? '') . ' ' .
+                            ($inscripcion->nombre ?? '')
                     ),
                 ];
             })
@@ -669,8 +669,8 @@ class Calificacion extends Component
                     'profesor' => $profesor
                         ? trim(
                             ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                                ($profesor->apellido_paterno ?? '') . ' ' .
+                                ($profesor->apellido_materno ?? '')
                         )
                         : 'SIN PROFESOR ASIGNADO',
                 ];
@@ -881,19 +881,17 @@ class Calificacion extends Component
         ?int $numeroMateriasPromediar = null,
         ?Collection $materiasOrdenadas = null
     ): string {
-        $numeroMateriasPromediar ??= $this->obtenerNumeroMateriasPromediar();
         $materiasOrdenadas ??= $this->obtenerMateriasOrdenadasParaPromedio();
 
         if (
             $inscripcionId <= 0 ||
-            $numeroMateriasPromediar === null ||
-            $numeroMateriasPromediar <= 0 ||
             $materiasOrdenadas->isEmpty()
         ) {
             return '0.0';
         }
 
         $suma = 0;
+        $totalNumericas = 0;
 
         foreach ($materiasOrdenadas as $materia) {
             $asignacionMateriaId = (int) ($materia['id'] ?? 0);
@@ -906,21 +904,31 @@ class Calificacion extends Component
             $valor = $this->normalizarCalificacion($valor);
 
             /*
-             * Solo se suman calificaciones numéricas.
-             * AC, ED, RA, NP, SD, vacíos y textos no se suman.
-             */
+         * Solo se toman calificaciones numéricas.
+         * Las calificaciones vacías, pendientes o claves como AC, ED, RA, NP y SD
+         * no se suman y tampoco se cuentan para dividir.
+         */
             if (!$this->esCalificacionNumerica($valor)) {
                 continue;
             }
 
             $suma += (float) $valor;
+            $totalNumericas++;
         }
 
         /*
-         * La división se hace entre numero_materias de materia_promediar.
-         * Las materias promediables sin calificación cuentan como 0.
-         */
-        $promedio = $suma / $numeroMateriasPromediar;
+     * Si el alumno no tiene ninguna calificación numérica,
+     * su promedio queda como 0.0 para evitar marcarlo como reprobado real.
+     */
+        if ($totalNumericas === 0) {
+            return '0.0';
+        }
+
+        /*
+     * Se divide únicamente entre las calificaciones numéricas capturadas.
+     * No se divide entre todas las materias.
+     */
+        $promedio = $suma / $totalNumericas;
         $promedio = floor($promedio * 10) / 10;
 
         return number_format($promedio, 1, '.', '');
@@ -942,7 +950,6 @@ class Calificacion extends Component
     {
         $this->promedios = [];
 
-        $numeroMateriasPromediar = $this->obtenerNumeroMateriasPromediar();
         $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
 
         foreach ($this->inscripciones as $fila) {
@@ -954,7 +961,6 @@ class Calificacion extends Component
 
             $this->promedios[$inscripcionId] = $this->calcularPromedioAlumno(
                 inscripcionId: $inscripcionId,
-                numeroMateriasPromediar: $numeroMateriasPromediar,
                 materiasOrdenadas: $materiasOrdenadas
             );
         }
@@ -973,16 +979,25 @@ class Calificacion extends Component
                 $valores = collect($materiasAlumno)
                     ->map(fn($valor) => $this->normalizarCalificacion($valor));
 
+                $tieneNumericas = $this->alumnoTieneCalificacionesNumericas($inscripcionId);
+
                 return match ($this->filtro_estado) {
-                    'pendientes' => $valores->contains(fn($valor) => $valor === null || $valor === ''),
-                    'aprobados' => $valores
+                    'pendientes' => !$tieneNumericas || $valores->contains(fn($valor) => $valor === null || $valor === ''),
+
+                    'aprobados' => $tieneNumericas
+                        && $valores
                         ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
                         ->every(fn($valor) => (float) $valor >= 6),
-                    'reprobados' => $valores->contains(
-                        fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6
-                    ),
+
+                    'reprobados' => $tieneNumericas
+                        && $valores->contains(
+                            fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6
+                        ),
+
                     'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
+
                     'cambios' => $this->tieneCambiosInscripcion($inscripcionId),
+
                     default => true,
                 };
             });
@@ -1433,8 +1448,8 @@ class Calificacion extends Component
 
         return $this->grupos->firstWhere('id', (int) $this->grupo_id)
             ?? Grupo::query()
-                ->with('asignacionGrupo:id,nombre')
-                ->find($this->grupo_id);
+            ->with('asignacionGrupo:id,nombre')
+            ->find($this->grupo_id);
     }
 
     public function getClaseEstadoPeriodoProperty(): string
@@ -1489,12 +1504,12 @@ class Calificacion extends Component
         $pendientes = max(0, $this->totalCeldas - $this->celdasCapturadas);
         $hayMateriasPromediables = $this->tieneMateriasPromediables();
 
-        /*
-         * Promedio global correcto:
-         * suma de promedios finales de alumnos / total de alumnos con promedio.
-         */
         $promediosAlumnos = collect($this->promedios)
-            ->filter(fn($valor) => $hayMateriasPromediables && is_numeric($valor))
+            ->filter(function ($valor, $inscripcionId) use ($hayMateriasPromediables) {
+                return $hayMateriasPromediables
+                    && is_numeric($valor)
+                    && $this->alumnoTieneCalificacionesNumericas((int) $inscripcionId);
+            })
             ->map(fn($valor) => (float) $valor)
             ->values();
 
@@ -1531,7 +1546,11 @@ class Calificacion extends Component
                 $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
                 $promedio = $this->promedios[$inscripcionId] ?? null;
 
-                if (!$hayMateriasPromediables || !is_numeric($promedio)) {
+                if (
+                    !$hayMateriasPromediables ||
+                    !is_numeric($promedio) ||
+                    !$this->alumnoTieneCalificacionesNumericas($inscripcionId)
+                ) {
                     return null;
                 }
 
@@ -1573,7 +1592,11 @@ class Calificacion extends Component
             ->values();
 
         $promediosAlumnos = collect($this->promedios)
-            ->filter(fn($valor) => $hayMateriasPromediables && is_numeric($valor))
+            ->filter(function ($valor, $inscripcionId) use ($hayMateriasPromediables) {
+                return $hayMateriasPromediables
+                    && is_numeric($valor)
+                    && $this->alumnoTieneCalificacionesNumericas((int) $inscripcionId);
+            })
             ->map(fn($valor) => (float) $valor)
             ->values();
 
@@ -1678,7 +1701,12 @@ class Calificacion extends Component
                 $pendientesAlumno = $valores->filter(fn($item) => blank($item['valor']))->count();
 
                 $promedio = $this->promedios[$inscripcionId] ?? null;
-                $promedioNumerico = is_numeric($promedio) ? (float) $promedio : null;
+
+                $tieneNumericas = $this->alumnoTieneCalificacionesNumericas($inscripcionId);
+
+                $promedioNumerico = $tieneNumericas && is_numeric($promedio)
+                    ? (float) $promedio
+                    : null;
 
                 return [
                     'inscripcion_id' => $inscripcionId,
@@ -2034,12 +2062,12 @@ class Calificacion extends Component
             return 'Pendiente';
         }
 
-        if ($pendientes > 0) {
-            return 'Captura incompleta';
+        if ($promedio === null) {
+            return 'Pendiente';
         }
 
-        if ($promedio === null) {
-            return 'Sin promedio';
+        if ($pendientes > 0) {
+            return 'Captura incompleta';
         }
 
         if ($promedio < 6 || $reprobadas >= 2) {
@@ -2063,12 +2091,12 @@ class Calificacion extends Component
             return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
         }
 
-        if ($pendientes > 0) {
+        if ($promedio === null) {
             return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300';
         }
 
-        if ($promedio === null) {
-            return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300';
+        if ($pendientes > 0) {
+            return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300';
         }
 
         if ($promedio < 6 || $reprobadas >= 2) {
@@ -2199,6 +2227,33 @@ class Calificacion extends Component
             $nombreArchivo
         );
     }
+
+
+    private function alumnoTieneCalificacionesNumericas(int $inscripcionId): bool
+    {
+        $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
+
+        if ($inscripcionId <= 0 || $materiasOrdenadas->isEmpty()) {
+            return false;
+        }
+
+        foreach ($materiasOrdenadas as $materia) {
+            $asignacionMateriaId = (int) ($materia['id'] ?? 0);
+
+            if ($asignacionMateriaId <= 0) {
+                continue;
+            }
+
+            $valor = $this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null;
+
+            if ($this->esCalificacionNumerica($valor)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     public function render()
     {

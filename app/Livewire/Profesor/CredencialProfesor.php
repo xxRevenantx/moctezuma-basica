@@ -4,7 +4,9 @@ namespace App\Livewire\Profesor;
 
 use App\Models\Nivel;
 use App\Models\Persona;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -26,7 +28,7 @@ class CredencialProfesor extends Component
 
     public function mount(): void
     {
-        $this->vigencia = 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year;
+        $this->vigencia = 'Agosto ' . now()->year;
     }
 
     public function updatedNivelId(): void
@@ -73,56 +75,19 @@ class CredencialProfesor extends Component
     #[Computed]
     public function personas(): Collection
     {
-        $busqueda = trim($this->buscar_persona);
-
         if (!$this->nivel_id) {
             return collect();
         }
 
-        if ($busqueda === '' && in_array($this->modo_descarga, ['individual', 'seleccionados'])) {
-            return collect();
-        }
-
-        return $this->consultaProfesores($busqueda)
+        return $this->consultaPersonalDelNivel(trim($this->buscar_persona))
             ->limit(500)
             ->get();
-    }
-
-    #[Computed]
-    public function personasSeleccionadasLista(): Collection
-    {
-        $ids = collect($this->personas_seleccionadas)
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($ids->isEmpty() || !$this->nivel_id) {
-            return collect();
-        }
-
-        $personas = Persona::query()
-            ->with([
-                'personaRoles.rolePersona:id,nombre,slug,status',
-                'personaNiveles' => function ($consulta) {
-                    $consulta->where('nivel_id', $this->nivel_id);
-                },
-                'personaNiveles.nivel:id,nombre,slug,cct,logo,color,director_id',
-            ])
-            ->whereIn('id', $ids->all())
-            ->whereHas('personaNiveles', function ($consulta) {
-                $consulta->where('nivel_id', $this->nivel_id);
-            })
-            ->get();
-
-        return $personas
-            ->sortBy(fn ($persona) => $ids->search((int) $persona->id))
-            ->values();
     }
 
     private function consultaProfesores(string $busqueda = '')
     {
         return Persona::query()
+            ->select('personas.*')
             ->with([
                 'personaRoles.rolePersona:id,nombre,slug,status',
                 'personaNiveles' => function ($consulta) {
@@ -130,7 +95,7 @@ class CredencialProfesor extends Component
                 },
                 'personaNiveles.nivel:id,nombre,slug,cct,logo,color,director_id',
             ])
-            ->where('status', 1)
+            ->where('personas.status', 1)
             ->whereHas('personaNiveles', function ($consulta) {
                 $consulta->where('nivel_id', $this->nivel_id);
             })
@@ -152,37 +117,108 @@ class CredencialProfesor extends Component
             })
             ->when($busqueda !== '', function ($consulta) use ($busqueda) {
                 $consulta->where(function ($q) use ($busqueda) {
-                    $q->where('nombre', 'like', '%' . $busqueda . '%')
-                        ->orWhere('apellido_paterno', 'like', '%' . $busqueda . '%')
-                        ->orWhere('apellido_materno', 'like', '%' . $busqueda . '%')
-                        ->orWhere('curp', 'like', '%' . $busqueda . '%')
-                        ->orWhere('rfc', 'like', '%' . $busqueda . '%')
-                        ->orWhere('correo', 'like', '%' . $busqueda . '%')
+                    $q->where('personas.nombre', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.apellido_paterno', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.apellido_materno', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.curp', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.rfc', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.correo', 'like', '%' . $busqueda . '%')
                         ->orWhereRaw(
-                            "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
+                            "CONCAT_WS(' ', personas.apellido_paterno, personas.apellido_materno, personas.nombre) LIKE ?",
                             ['%' . $busqueda . '%']
                         )
                         ->orWhereRaw(
-                            "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                            "CONCAT_WS(' ', personas.nombre, personas.apellido_paterno, personas.apellido_materno) LIKE ?",
                             ['%' . $busqueda . '%']
                         );
                 });
             })
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre');
+            ->orderBy('personas.apellido_paterno')
+            ->orderBy('personas.apellido_materno')
+            ->orderBy('personas.nombre');
+    }
+
+    #[Computed]
+    public function personasSeleccionadasLista(): Collection
+    {
+        $ids = collect($this->personas_seleccionadas)
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty() || !$this->nivel_id) {
+            return collect();
+        }
+
+        $personas = $this->consultaPersonalDelNivel()
+            ->whereIn('personas.id', $ids->all())
+            ->get();
+
+        return $personas
+            ->sortBy(fn($persona) => $ids->search((int) $persona->id))
+            ->values();
+    }
+
+    private function consultaPersonalDelNivel(string $busqueda = ''): Builder
+    {
+        return Persona::query()
+            ->select('personas.*')
+            ->with([
+                'personaRoles.rolePersona:id,nombre,slug,status',
+                'personaNiveles' => function ($consulta) {
+                    $consulta->where('nivel_id', $this->nivel_id)
+                        ->with([
+                            'nivel:id,nombre,slug,cct,logo,color,director_id',
+                            'detalles.personaRole.rolePersona:id,nombre,slug,status',
+                        ]);
+                },
+            ])
+            ->where('personas.status', 1)
+
+            /*
+         * Se trae todo el personal asignado al nivel seleccionado.
+         * No se filtra por rol, porque en plantilla el conteo es por persona asignada al nivel,
+         * no solamente por docentes.
+         */
+            ->whereHas('personaNiveles', function ($consulta) {
+                $consulta->where('nivel_id', $this->nivel_id);
+            })
+
+            ->when($busqueda !== '', function ($consulta) use ($busqueda) {
+                $consulta->where(function ($q) use ($busqueda) {
+                    $q->where('personas.nombre', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.apellido_paterno', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.apellido_materno', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.curp', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.rfc', 'like', '%' . $busqueda . '%')
+                        ->orWhere('personas.correo', 'like', '%' . $busqueda . '%')
+                        ->orWhereRaw(
+                            "CONCAT_WS(' ', personas.apellido_paterno, personas.apellido_materno, personas.nombre) LIKE ?",
+                            ['%' . $busqueda . '%']
+                        )
+                        ->orWhereRaw(
+                            "CONCAT_WS(' ', personas.nombre, personas.apellido_paterno, personas.apellido_materno) LIKE ?",
+                            ['%' . $busqueda . '%']
+                        );
+                });
+            })
+
+            ->orderBy('personas.apellido_paterno')
+            ->orderBy('personas.apellido_materno')
+            ->orderBy('personas.nombre');
     }
 
     public function seleccionarTodosVisibles(): void
     {
         $idsVisibles = $this->personas
             ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->values()
             ->toArray();
 
         $seleccionados = collect($this->personas_seleccionadas)
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->values()
             ->toArray();
 
@@ -200,8 +236,8 @@ class CredencialProfesor extends Component
     public function quitarPersonaSeleccionada(int $personaId): void
     {
         $this->personas_seleccionadas = collect($this->personas_seleccionadas)
-            ->map(fn ($id) => (int) $id)
-            ->reject(fn ($id) => $id === $personaId)
+            ->map(fn($id) => (int) $id)
+            ->reject(fn($id) => $id === $personaId)
             ->values()
             ->toArray();
     }
@@ -288,18 +324,23 @@ class CredencialProfesor extends Component
     {
         return trim(
             ($persona->titulo ? $persona->titulo . ' ' : '') .
-            ($persona->nombre ?? '') . ' ' .
-            ($persona->apellido_paterno ?? '') . ' ' .
-            ($persona->apellido_materno ?? '')
+                ($persona->nombre ?? '') . ' ' .
+                ($persona->apellido_paterno ?? '') . ' ' .
+                ($persona->apellido_materno ?? '')
         );
     }
 
     public function rolPrincipal($persona): string
     {
-        return $persona->personaRoles
-            ->map(fn ($personaRole) => $personaRole->rolePersona?->nombre)
+        $personaNivel = $persona->personaNiveles
+            ->firstWhere('nivel_id', (int) $this->nivel_id);
+
+        $rolDelNivel = $personaNivel?->detalles
+            ?->map(fn($detalle) => $detalle->personaRole?->rolePersona?->nombre)
             ->filter()
-            ->first() ?? 'Profesor';
+            ->first();
+
+        return $rolDelNivel ?? 'Personal asignado';
     }
 
     public function render()

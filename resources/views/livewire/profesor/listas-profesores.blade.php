@@ -1,44 +1,11 @@
-<div x-data="{
-    abierto: localStorage.getItem('collapse_materias_profesor') ?? 'materias_profesor',
-
-    cambiar(seccion) {
-        this.abierto = this.abierto === seccion ? null : seccion;
-
-        if (this.abierto) {
-            localStorage.setItem('collapse_materias_profesor', this.abierto);
-        } else {
-            localStorage.removeItem('collapse_materias_profesor');
-        }
-    },
-
-    guardarScroll() {
-        localStorage.setItem('scroll_materias_profesor', window.scrollY || 0);
-    },
-
-    restaurarScroll() {
-        const posicion = localStorage.getItem('scroll_materias_profesor');
-
-        if (posicion !== null) {
-            requestAnimationFrame(() => {
-                window.scrollTo(0, Number(posicion));
-            });
-        }
-    }
-}" x-init="document.addEventListener('livewire:init', () => {
-    Livewire.hook('commit', ({ succeed }) => {
-        guardarScroll();
-
-        succeed(() => {
-            setTimeout(() => restaurarScroll(), 30);
-        });
-    });
-});" class="space-y-6">
-
+<div x-data="scrollLockPro('materias_profesor')" x-init="iniciar()" x-on:pointerdown.capture="guardarScroll()"
+    x-on:keydown.capture="guardarScroll()" x-on:change.capture="guardarScroll()"
+    x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click="cambiar('materias_profesor')"
+            <button type="button" x-on:click.prevent="cambiar('materias_profesor')"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
 
                 <div class="flex items-center gap-4">
@@ -86,21 +53,6 @@
                 <div
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
-                    <div wire:loading.delay.flex
-                        wire:target="buscar_profesor,profesor_id,buscar_materia,filtro_nivel,filtro_grado,filtro_grupo,filtro_generacion,filtro_semestre,filtro_dia,periodos_por_materia,parciales_por_materia,limpiarTodo,limpiarFiltrosMaterias,seleccionarProfesor"
-                        class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
-                        <div
-                            class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                            <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                    stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z">
-                                </path>
-                            </svg>
-                            Consultando información...
-                        </div>
-                    </div>
-
                     <div class="h-1.5 w-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700"></div>
 
                     <div class="p-5 sm:p-6">
@@ -116,13 +68,13 @@
                             </div>
 
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" wire:click="limpiarFiltrosMaterias" x-on:click="guardarScroll()"
+                                <button type="button" wire:click="limpiarFiltrosMaterias"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
                                     <flux:icon.funnel class="h-4 w-4" />
                                     Limpiar filtros
                                 </button>
 
-                                <button type="button" wire:click="limpiarTodo" x-on:click="guardarScroll()"
+                                <button type="button" wire:click="limpiarTodo"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
                                     <flux:icon.x-mark class="h-4 w-4" />
                                     Limpiar todo
@@ -150,7 +102,7 @@
                                             <flux:label>Profesor</flux:label>
 
                                             <flux:input type="search" wire:model.live.debounce.400ms="buscar_profesor"
-                                                x-on:input="guardarScroll()" placeholder="Buscar profesor..." />
+                                                placeholder="Buscar profesor..." />
                                         </flux:field>
 
                                         @if ($this->profesorSeleccionado)
@@ -185,7 +137,6 @@
                                                 @foreach ($this->profesores as $profesor)
                                                     <button type="button"
                                                         wire:click="seleccionarProfesor({{ $profesor->id }})"
-                                                        x-on:click="guardarScroll()"
                                                         class="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-indigo-900/60 dark:hover:bg-indigo-950/20">
                                                         <p class="text-sm font-black text-slate-900 dark:text-white">
                                                             {{ $this->nombreProfesor($profesor) }}
@@ -630,4 +581,154 @@
             </div>
         </article>
     </section>
+
+    @script
+        <script>
+            Alpine.data('scrollLockPro', (nombre) => ({
+                /*
+                 * El collapse inicia cerrado siempre.
+                 * No se lee localStorage para evitar que se abra automáticamente.
+                 */
+                abierto: null,
+
+                nombre,
+                llaveScroll: `scroll_actual_${nombre}`,
+                restaurando: false,
+
+                iniciar() {
+                    history.scrollRestoration = 'manual';
+
+                    /*
+                     * Se elimina cualquier estado anterior del collapse.
+                     * Así siempre carga cerrado al entrar o recargar.
+                     */
+                    localStorage.removeItem(`collapse_${this.nombre}`);
+
+                    this.guardarScroll();
+                    this.registrarHookLivewire();
+                },
+
+                registrarHookLivewire() {
+                    if (!window.__scrollLockProHooks) {
+                        window.__scrollLockProHooks = {};
+                    }
+
+                    if (window.__scrollLockProHooks[this.nombre]) {
+                        return;
+                    }
+
+                    window.__scrollLockProHooks[this.nombre] = true;
+
+                    const registrar = () => {
+                        Livewire.hook('commit', ({
+                            succeed
+                        }) => {
+                            const posicion = this.obtenerScrollGuardado();
+
+                            succeed(() => {
+                                this.restaurarScrollSeguro(posicion);
+                            });
+                        });
+                    };
+
+                    if (window.Livewire) {
+                        registrar();
+                        return;
+                    }
+
+                    document.addEventListener('livewire:init', () => {
+                        registrar();
+                    }, {
+                        once: true
+                    });
+                },
+
+                cambiar(seccion) {
+                    this.guardarScroll();
+
+                    this.abierto = this.abierto === seccion ? null : seccion;
+
+                    /*
+                     * No se guarda el collapse en localStorage.
+                     * Así no queda abierto cuando se recarga la página.
+                     */
+                    this.restaurarScrollSeguro(this.obtenerScrollGuardado());
+                },
+
+                guardarScroll() {
+                    if (this.restaurando) {
+                        return;
+                    }
+
+                    const y = window.scrollY ||
+                        document.documentElement.scrollTop ||
+                        document.body.scrollTop ||
+                        0;
+
+                    sessionStorage.setItem(this.llaveScroll, String(y));
+
+                    if (!window.__scrollLockProUltimo) {
+                        window.__scrollLockProUltimo = {};
+                    }
+
+                    window.__scrollLockProUltimo[this.nombre] = y;
+                },
+
+                obtenerScrollGuardado() {
+                    const desdeSesion = sessionStorage.getItem(this.llaveScroll);
+
+                    if (desdeSesion !== null) {
+                        const y = Number(desdeSesion);
+
+                        if (!Number.isNaN(y)) {
+                            return y;
+                        }
+                    }
+
+                    if (
+                        window.__scrollLockProUltimo &&
+                        window.__scrollLockProUltimo[this.nombre] !== undefined
+                    ) {
+                        const y = Number(window.__scrollLockProUltimo[this.nombre]);
+
+                        if (!Number.isNaN(y)) {
+                            return y;
+                        }
+                    }
+
+                    return window.scrollY || 0;
+                },
+
+                restaurarScrollSeguro(posicion = null) {
+                    const y = Number(posicion ?? this.obtenerScrollGuardado());
+
+                    if (Number.isNaN(y)) {
+                        return;
+                    }
+
+                    this.restaurando = true;
+
+                    const restaurar = () => {
+                        window.scrollTo({
+                            top: y,
+                            left: 0,
+                            behavior: 'auto',
+                        });
+                    };
+
+                    requestAnimationFrame(restaurar);
+
+                    setTimeout(restaurar, 20);
+                    setTimeout(restaurar, 60);
+                    setTimeout(restaurar, 120);
+                    setTimeout(restaurar, 220);
+
+                    setTimeout(() => {
+                        this.restaurando = false;
+                    }, 260);
+                },
+            }));
+        </script>
+    @endscript
+
 </div>
