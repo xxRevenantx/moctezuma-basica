@@ -10,7 +10,6 @@
             margin: 18px 16px 0px 16px;
         }
 
-
         @font-face {
             font-family: 'calibri';
             font-style: normal;
@@ -80,7 +79,6 @@
             margin-top: 5px;
             padding: 4px 10px;
             border-radius: 999px;
-            /* background: #e0f2fe; */
             color: #0369a1;
             font-size: 8px;
             font-weight: bold;
@@ -101,7 +99,6 @@
         .info-label {
             width: 110px;
             font-weight: bold;
-            /* background: #eff6ff; */
             color: #1e3a8a;
         }
 
@@ -118,32 +115,6 @@
             border: 1px solid #e2e8f0;
         }
 
-        /*
-        .card-blue {
-            background: #eff6ff;
-            border-color: #bfdbfe;
-        }
-
-        .card-green {
-            background: #ecfdf5;
-            border-color: #bbf7d0;
-        } */
-
-        /* .card-yellow {
-            background: #fffbeb;
-            border-color: #fde68a;
-        }
-
-        .card-red {
-            background: #fff1f2;
-            border-color: #fecdd3;
-        }
-
-        .card-purple {
-            background: #f5f3ff;
-            border-color: #ddd6fe;
-        }
-
         .card-title {
             font-size: 7.5px;
             font-weight: bold;
@@ -156,7 +127,7 @@
             font-size: 16px;
             font-weight: bold;
             color: #0f172a;
-        } */
+        }
 
         .section-title {
             font-size: 11px;
@@ -165,7 +136,6 @@
             margin: 10px 0 6px 0;
             padding: 6px 8px;
             border-radius: 10px;
-            /* background: #f8fafc; */
             border-left: 4px solid #93c5fd;
         }
 
@@ -182,7 +152,6 @@
             font-weight: bold;
             text-align: center;
             border: 1px solid #ffffff;
-            /* padding: 5px 3px; */
         }
 
         .tabla th:nth-child(2n) {
@@ -192,14 +161,9 @@
 
         .tabla td {
             border: 1px solid #e2e8f0;
-            /* padding: 4px 3px; */
             font-size: 8px;
             vertical-align: middle;
             word-wrap: break-word;
-        }
-
-        .tabla tbody tr:nth-child(even) {
-            /* background: #f8fafc; */
         }
 
         .text-center {
@@ -218,32 +182,12 @@
 
         .alumno {
             color: #0f172a;
-            /* font-weight: bold; */
         }
 
         .calificacion {
             font-weight: bold;
-            border-radius: 6px;
-        }
-
-        .cal-buena {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .cal-regular {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .cal-baja {
-            background: #ffe4e6;
-            color: #be123c;
-        }
-
-        .cal-especial {
-            background: #ede9fe;
-            color: #6d28d9;
+            color: #0f172a;
+            background: transparent;
         }
 
         .promedio {
@@ -388,6 +332,13 @@
             background: #dcfce7;
             color: #166534;
         }
+
+        .lugar-pendiente {
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 7px;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -410,7 +361,7 @@
                     <span class="pill">
                         {{ $nivel->nombre ?? 'Nivel' }} ·
                         {{ $grado->nombre ?? 'Grado' }} ·
-                        Grupo {{ $grupo->nombre ?? '—' }}
+                        Grupo {{ $grupo->asignacionGrupo->nombre ?? '—' }}
                         @if ($esBachillerato)
                             · Semestre {{ $semestre?->numero ?? '—' }}
                         @endif
@@ -442,7 +393,7 @@
 
         <tr>
             <td class="info-label">Grupo</td>
-            <td>{{ $grupo->nombre ?? '—' }}</td>
+            <td>{{ $grupo->asignacionGrupo->nombre ?? '—' }}</td>
 
             <td class="info-label">Periodo</td>
             <td>
@@ -512,9 +463,9 @@
 
     @php
         /*
-        Ordeno los alumnos por promedio de mayor a menor.
-        Los alumnos sin promedio numérico se mandan al final.
-    */
+         * Ordeno los alumnos por promedio de mayor a menor.
+         * Los alumnos sin promedio numérico se mandan al final.
+         */
         $inscripcionesOrdenadas = collect($inscripciones)
             ->sortByDesc(function ($fila) use ($promedios) {
                 $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
@@ -524,27 +475,33 @@
             ->values();
 
         /*
-        Obtengo los primeros 3 lugares por promedio único.
-        Si varios alumnos tienen el mismo promedio, comparten el mismo lugar.
-    */
-        $promediosUnicos = $inscripcionesOrdenadas
-            ->map(function ($fila) use ($promedios) {
-                $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
-
-                return is_numeric($promedioAlumno) ? number_format((float) $promedioAlumno, 2, '.', '') : null;
-            })
-            ->filter()
-            ->unique()
-            ->values()
-            ->take(3);
+         * Se valida si realmente hay promedios para asignar lugares.
+         * Si todos están en 0.0, el lugar se mostrará como Pendiente.
+         */
+        $hayPromediosParaLugar = collect($promedios)
+            ->filter(fn($valor) => is_numeric($valor) && (float) $valor > 0)
+            ->isNotEmpty();
 
         /*
-        Relaciono cada promedio con su lugar.
-        Ejemplo:
-        10.00 => 1
-        9.80  => 2
-        9.50  => 3
-    */
+         * Obtengo los primeros 3 lugares solo cuando sí existen promedios reales.
+         */
+        $promediosUnicos = $hayPromediosParaLugar
+            ? $inscripcionesOrdenadas
+                ->map(function ($fila) use ($promedios) {
+                    $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
+
+                    if (!is_numeric($promedioAlumno) || (float) $promedioAlumno <= 0) {
+                        return null;
+                    }
+
+                    return number_format((float) $promedioAlumno, 2, '.', '');
+                })
+                ->filter()
+                ->unique()
+                ->values()
+                ->take(3)
+            : collect();
+
         $lugaresPorPromedio = [];
 
         foreach ($promediosUnicos as $index => $promedioUnico) {
@@ -578,16 +535,18 @@
                 @php
                     $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? '—';
 
-                    $promedioClave = is_numeric($promedioAlumno)
-                        ? number_format((float) $promedioAlumno, 2, '.', '')
-                        : null;
+                    $promedioClave = null;
+
+                    if ($hayPromediosParaLugar && is_numeric($promedioAlumno) && (float) $promedioAlumno > 0) {
+                        $promedioClave = number_format((float) $promedioAlumno, 2, '.', '');
+                    }
 
                     $lugarAlumno =
                         $promedioClave && isset($lugaresPorPromedio[$promedioClave])
                             ? $lugaresPorPromedio[$promedioClave]
                             : null;
 
-                    $claseLugar = '';
+                    $claseLugar = $lugarAlumno ? '' : 'lugar-pendiente';
 
                     if ($lugarAlumno === 1) {
                         $claseLugar = 'lugar-uno';
@@ -603,7 +562,7 @@
                         @if ($lugarAlumno)
                             {{ $lugarAlumno }}°
                         @else
-                            —
+                            Pendiente
                         @endif
                     </td>
 
@@ -618,26 +577,10 @@
                             $clave = $fila['inscripcion_id'] . '-' . $materia['id'];
                             $valor = $calificaciones[$clave] ?? '';
                             $valorNormalizado = strtoupper(trim((string) $valor));
-
-                            $claseCalificacion = '';
-
-                            if ($valorNormalizado !== '' && is_numeric($valorNormalizado)) {
-                                $numero = (float) $valorNormalizado;
-
-                                if ($numero < 6) {
-                                    $claseCalificacion = 'cal-baja';
-                                } elseif ($numero < 8) {
-                                    $claseCalificacion = 'cal-regular';
-                                } else {
-                                    $claseCalificacion = 'cal-buena';
-                                }
-                            } elseif ($valorNormalizado !== '') {
-                                $claseCalificacion = 'cal-especial';
-                            }
                         @endphp
 
-                        <td class="text-center calificacion {{ $claseCalificacion }}">
-                            {{ $valorNormalizado }}
+                        <td class="text-center calificacion">
+                            {{ $valorNormalizado !== '' ? $valorNormalizado : '—' }}
                         </td>
                     @endforeach
 

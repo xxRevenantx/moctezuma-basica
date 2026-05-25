@@ -37,7 +37,7 @@
         }
 
         body {
-            font-family: 'calibri';
+            font-family: 'ARIAL';
             font-size: 10px;
             color: #334155;
             background: #ffffff;
@@ -397,7 +397,17 @@
     <table class="student-card">
         <tr>
             <td class="label">Alumno</td>
-            <td class="value" colspan="3">{{ $nombreAlumno }}</td>
+            <td class="value" style="text-align: center; text-transform: uppercase;">
+                {{ $inscripcion->apellido_paterno }}</td>
+            <td class="value" style="text-align: center; text-transform: uppercase;">
+                {{ $inscripcion->apellido_materno }}</td>
+            <td class="value" style="text-align: center; text-transform: uppercase;">{{ $inscripcion->nombre }}</td>
+        </tr>
+        <tr>
+            <td style="text-align: center"></td>
+            <td style="text-align: center">Apellido Paterno</td>
+            <td style="text-align: center">Apellido Materno</td>
+            <td style="text-align: center">Nombre(s)</td>
         </tr>
 
         <tr>
@@ -427,7 +437,7 @@
         @else
             <tr>
                 <td class="label">Documento</td>
-                <td>{{ $tipo === 'anual' ? 'Boleta anual' : 'Boleta de promedio' }}</td>
+                <td>{{ $tipo === 'anual' ? 'Boleta' : 'Boleta Semestral' }}</td>
 
                 <td class="label">Ciclo escolar</td>
                 <td>{{ $cicloEscolarTexto }}</td>
@@ -435,43 +445,15 @@
         @endif
     </table>
 
-    <table class="cards">
-        <tr>
-            <td class="card card-blue">
-                <div class="card-title">Promedio final</div>
-                <div class="card-value">{{ $promedio }}</div>
-            </td>
-
-            <td class="card card-green">
-                <div class="card-title">Estado</div>
-                <div class="card-value">{{ $estadoPromedio }}</div>
-            </td>
-
-            <td class="card card-yellow">
-                <div class="card-title">Captura</div>
-                <div class="card-value">{{ $porcentajeCaptura }}%</div>
-            </td>
-
-            <td class="card card-purple">
-                <div class="card-title">Materias</div>
-                <div class="card-value">{{ $totalMaterias }}</div>
-            </td>
-
-            <td class="card card-red">
-                <div class="card-title">En riesgo</div>
-                <div class="card-value">{{ $reprobadas }}</div>
-            </td>
-        </tr>
-    </table>
 
     <table class="tabla">
         <thead>
             <tr>
                 @if ($esBachillerato)
-                    <th style="width: 11%;">Clave</th>
+                    <th style="width: 11%;">CLAVE</th>
                 @endif
 
-                <th style="width: 25%;">Materia</th>
+                <th style="width: 25%;">MATERIA</th>
 
                 @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
                     <th style="width: 11%;">
@@ -479,8 +461,8 @@
                     </th>
                 @endforeach
 
-                <th style="width: 11%;">Promedio</th>
-                <th style="width: 14%;">Estado</th>
+                <th style="width: 11%;">PROMEDIO</th>
+                <th style="width: 14%;">STATUS</th>
             </tr>
         </thead>
 

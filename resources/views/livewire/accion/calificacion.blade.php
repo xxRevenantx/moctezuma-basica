@@ -20,7 +20,7 @@
         this.$watch('$wire.filtro_estado', () => this.guardarFiltros());
         this.$watch('$wire.orden_promedio', () => this.guardarFiltros());
         this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
-        this.$watch('$wire.diploma_inscripcion_id', () => this.guardarFiltros());
+        this.$watch('$wire.reconocimiento_inscripcion_id', () => this.guardarFiltros());
     },
 
     async restaurarFiltros() {
@@ -87,8 +87,8 @@
             await this.$wire.set('boleta_inscripcion_id', filtros.boleta_inscripcion_id);
         }
 
-        if (filtros.diploma_inscripcion_id) {
-            await this.$wire.set('diploma_inscripcion_id', filtros.diploma_inscripcion_id);
+        if (filtros.reconocimiento_inscripcion_id) {
+            await this.$wire.set('reconocimiento_inscripcion_id', filtros.reconocimiento_inscripcion_id);
         }
 
         this.restaurandoFiltros = false;
@@ -119,7 +119,7 @@
             filtro_estado: this.$wire.filtro_estado || '',
             orden_promedio: this.$wire.orden_promedio || '',
             boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
-            diploma_inscripcion_id: this.$wire.diploma_inscripcion_id || '',
+            reconocimiento_inscripcion_id: this.$wire.reconocimiento_inscripcion_id || '',
         };
 
         localStorage.setItem(this.storageKey, JSON.stringify(filtros));
@@ -721,7 +721,7 @@
                             <div
                                 class="border-b border-neutral-200 bg-amber-50 px-4 py-3 dark:border-neutral-800 dark:bg-amber-950/20">
                                 <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                    Candidatos a diploma
+                                    Candidatos a reconocimiento
                                 </h4>
                                 <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                                     Promedio mínimo 9.5, captura completa y sin materias reprobadas.
@@ -729,7 +729,7 @@
                             </div>
 
                             <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                                @forelse ($this->diagnosticoCalificaciones['candidatos_diploma']->take(6) as $candidato)
+                                @forelse ($this->diagnosticoCalificaciones['candidatos_reconocimiento']->take(6) as $candidato)
                                     <div class="flex items-center justify-between gap-3 px-4 py-3">
                                         <div class="min-w-0">
                                             <p
@@ -928,8 +928,10 @@
             <div class="border-b border-neutral-200 p-4 dark:border-neutral-800">
                 <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
                     <div>
-                        <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Buscar alumno o
-                            matrícula</label>
+                        <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                            Buscar alumno o matrícula
+                        </label>
+
                         <input type="text" wire:model.live.debounce.300ms="busqueda"
                             placeholder="Escribe nombre o matrícula..."
                             class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
@@ -943,6 +945,14 @@
                             <flux:select.option value="reprobados">Reprobados</flux:select.option>
                             <flux:select.option value="especiales">Valores especiales</flux:select.option>
                             <flux:select.option value="cambios">Con cambios</flux:select.option>
+                        </flux:select>
+                    </div>
+
+                    <div>
+                        <flux:select label="Ordenar promedios" wire:model.live="orden_promedio">
+                            <flux:select.option value="">Normal</flux:select.option>
+                            <flux:select.option value="mayor_menor">Promedio mayor a menor</flux:select.option>
+                            <flux:select.option value="menor_mayor">Promedio menor a mayor</flux:select.option>
                         </flux:select>
                     </div>
                 </div>
@@ -1022,7 +1032,7 @@
                                     </div>
                                 </div>
 
-                                {{-- Diploma por alumno --}}
+                                {{-- Reconocimiento por alumno --}}
                                 <div
                                     class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-neutral-900 dark:to-orange-950/20">
                                     <div class="flex items-start gap-3">
@@ -1033,46 +1043,66 @@
 
                                         <div class="min-w-0 flex-1">
                                             <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                                Descargar diploma
+                                                Descargar reconocimiento
                                             </h4>
 
                                             <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-                                                Selecciona un alumno para descargar su diploma del
+                                                Selecciona un alumno para descargar su reconocimiento del
                                                 {{ $this->esBachillerato ? 'parcial' : 'periodo' }} seleccionado.
                                             </p>
 
                                             <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                                                 <div class="flex-1">
+                                                    @php($alumnosReconocimientoOrdenados = $this->alumnosReconocimientoOrdenados)
+
                                                     <flux:select
-                                                        label="{{ $this->esBachillerato ? 'Diploma por parcial' : 'Diploma por periodo' }}"
-                                                        wire:model.live="diploma_inscripcion_id"
-                                                        :disabled="count($inscripciones) === 0 || !$periodo_id">
+                                                        label="{{ $this->esBachillerato ? 'Reconocimiento por parcial' : 'Reconocimiento por periodo' }}"
+                                                        wire:model.live="reconocimiento_inscripcion_id"
+                                                        :disabled="!$periodo_id || !$this->hayPromediosParaReconocimiento || count($alumnosReconocimientoOrdenados) === 0">
 
-                                                        <flux:select.option value="">
-                                                            -- Selecciona un alumno --
-                                                        </flux:select.option>
-
-                                                        @foreach ($inscripciones as $alumnoDiploma)
-                                                            <flux:select.option
-                                                                value="{{ $alumnoDiploma['inscripcion_id'] }}">
-                                                                {{ $alumnoDiploma['matricula'] }} -
-                                                                {{ $alumnoDiploma['alumno'] }}
+                                                        @if (!$this->hayPromediosParaReconocimiento)
+                                                            <flux:select.option value="">
+                                                                -- No hay promedios para reconocimiento --
                                                             </flux:select.option>
-                                                        @endforeach
+                                                        @else
+                                                            <flux:select.option value="">
+                                                                -- Selecciona un alumno --
+                                                            </flux:select.option>
+
+                                                            @foreach ($alumnosReconocimientoOrdenados as $alumnoReconocimiento)
+                                                                <flux:select.option
+                                                                    value="{{ $alumnoReconocimiento['inscripcion_id'] }}">
+                                                                    {{ $alumnoReconocimiento['texto_lugar'] }} · Prom.
+                                                                    {{ $alumnoReconocimiento['promedio_texto'] }} ·
+                                                                    {{ $alumnoReconocimiento['matricula'] }} -
+                                                                    {{ $alumnoReconocimiento['alumno'] }}
+                                                                </flux:select.option>
+                                                            @endforeach
+                                                        @endif
                                                     </flux:select>
+
+                                                    @if ($periodo_id && !$this->hayPromediosParaReconocimiento)
+                                                        <div
+                                                            class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                                                            No hay promedios disponibles para generar reconocimientos.
+                                                            Verifica que existan materias
+                                                            configuradas en materia_promediar y calificaciones
+                                                            capturadas.
+                                                        </div>
+                                                    @endif
                                                 </div>
 
                                                 <button type="button"
-                                                    @if (!$this->puedeExportarDiploma) disabled @endif
+                                                    @if (!$this->puedeExportarReconocimiento) disabled @endif
                                                     x-on:click="window.open('{{ route(
-                                                        'misrutas.diploma.calificaciones.pdf',
+                                                        'misrutas.reconocimiento.calificaciones.pdf',
                                                         array_filter([
                                                             'slug_nivel' => $slug_nivel,
                                                             'generacion_id' => $generacion_id,
                                                             'grado_id' => $grado_id,
                                                             'grupo_id' => $grupo_id,
                                                             'periodo_id' => $periodo_id,
-                                                            'inscripcion_id' => $diploma_inscripcion_id,
+                                                            'inscripcion_id' => $reconocimiento_inscripcion_id,
                                                             'semestre_id' => $this->esBachillerato ? $semestre_id : null,
                                                             'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
                                                             'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
@@ -1080,12 +1110,13 @@
                                                     ) }}', '_blank')"
                                                     class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-amber-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
                                                     <flux:icon.trophy class="h-4 w-4" />
-                                                    Diploma
+                                                    Reconocimiento
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+
 
                             </div>
 

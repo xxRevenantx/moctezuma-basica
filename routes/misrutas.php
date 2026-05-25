@@ -99,8 +99,16 @@ Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificacion
     ->name('misrutas.boleta.calificaciones.pdf');
 
 
-Route::get('/calificaciones/diploma/pdf', [PDFController::class, 'diploma_calificaciones_pdf'])
-    ->name('misrutas.diploma.calificaciones.pdf');
+
+// Ruta nueva para reconocimiento
+Route::get('/reconocimiento/calificaciones/pdf', [PDFController::class, 'reconocimiento_calificaciones_pdf'])
+    ->name('misrutas.reconocimiento.calificaciones.pdf');
+
+// Opcional: conserva la ruta anterior si ya existen enlaces guardados o código viejo.
+// Route::get('/diploma/calificaciones/pdf', [PDFController::class, 'reconocimiento_calificaciones_pdf'])
+//     ->name('misrutas.diploma.calificaciones.pdf');
+
+
 
 Route::get('/credenciales/profesores/pdf', [PDFController::class, 'credencial_profesor_pdf'])
     ->name('credenciales.profesores.pdf');

@@ -96,6 +96,7 @@
             right: 300px;
             text-align: center;
             z-index: 6;
+            line-height: 0;
         }
 
         .secretaria {
@@ -143,13 +144,13 @@
 
         .titulo-diploma {
             position: absolute;
-            top: 232px;
+            top: 250px;
             left: 0;
             right: 0;
             z-index: 6;
             text-align: center;
             font-family: 'ARIAL', sans-serif;
-            font-size: 120px;
+            font-size: 90px;
             line-height: 1;
             font-weight: 700;
             letter-spacing: 3px;
@@ -160,8 +161,8 @@
 
         .adorno-izquierdo {
             position: absolute;
-            top: 306px;
-            left: 120px;
+            top: 350px;
+            left: 100px;
             width: 95px;
             height: 1.5px;
             background: #b5792f;
@@ -170,8 +171,8 @@
 
         .adorno-derecho {
             position: absolute;
-            top: 306px;
-            right: 120px;
+            top: 350px;
+            right: 100px;
             width: 95px;
             height: 1.5px;
             background: #b5792f;
@@ -461,7 +462,7 @@
         <div class="adorno-derecho"></div>
 
         <div class="titulo-diploma">
-            Diploma
+            RECONOCIMIENTO
         </div>
 
         <div class="a-texto">
@@ -485,7 +486,7 @@
             @endif
 
             @if (!empty($grado))
-                del <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8') }}</strong> grado
+                del <strong>{{ mb_strtoupper($grado->nombre ?? '° GRADO', 'UTF-8') }}</strong>° grado
             @endif
 
             de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') }}</strong>,
@@ -504,37 +505,11 @@
                     {{ $cicloEscolarTexto ?? '—' }}
                 </td>
 
-                <td>
-                    <strong>Documento:</strong>
-                    {{ !empty($esBachillerato) ? 'Semestral' : 'Anual' }}
-                </td>
+
             </tr>
         </table>
 
-        <div class="periodos-box">
-            <div class="periodos-titulo">
-                {{ !empty($esBachillerato) ? 'Promedio por parcial' : 'Promedio por periodo' }}
-            </div>
 
-            <table class="periodos-tabla">
-                @forelse ($periodosResumen as $numeroPeriodo => $periodoResumen)
-                    <tr>
-                        <td>
-                            {{ $periodoResumen['nombre'] ?? (!empty($esBachillerato) ? 'Parcial ' . $numeroPeriodo : 'Periodo ' . $numeroPeriodo) }}
-                        </td>
-
-                        <td class="valor">
-                            {{ $promediosPeriodos[$numeroPeriodo] ?? '—' }}
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td>Sin periodos</td>
-                        <td class="valor">—</td>
-                    </tr>
-                @endforelse
-            </table>
-        </div>
 
         <div class="promedio-box">
             <div class="promedio-label">
@@ -546,15 +521,7 @@
             </div>
         </div>
 
-        <div class="estado-box">
-            <div class="estado-label">
-                Estado académico
-            </div>
 
-            <div class="estado">
-                {{ $estadoTexto }}
-            </div>
-        </div>
 
         <table class="firmas">
             <tr>

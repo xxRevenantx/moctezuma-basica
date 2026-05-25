@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>{{ $titulo ?? 'Diploma' }}</title>
+    <title>{{ $titulo ?? 'Reconocimiento' }}</title>
 
     <style>
         @font-face {
@@ -52,7 +52,7 @@
             color: #071846;
         }
 
-        .diploma {
+        .reconocimiento {
             position: relative;
             width: 100%;
             height: 100%;
@@ -142,15 +142,15 @@
             line-height: 1.15;
         }
 
-        .titulo-diploma {
+        .titulo-reconocimiento {
             position: absolute;
-            top: 232px;
+            top: 245px;
             left: 0;
             right: 0;
             z-index: 6;
             text-align: center;
             font-family: 'ARIAL', sans-serif;
-            font-size: 120px;
+            font-size: 90px;
             line-height: 1;
             font-weight: 700;
             letter-spacing: 3px;
@@ -161,7 +161,7 @@
 
         .adorno-izquierdo {
             position: absolute;
-            top: 306px;
+            top: 350px;
             left: 120px;
             width: 95px;
             height: 1.5px;
@@ -171,7 +171,7 @@
 
         .adorno-derecho {
             position: absolute;
-            top: 306px;
+            top: 350px;
             right: 120px;
             width: 95px;
             height: 1.5px;
@@ -341,7 +341,7 @@
 </head>
 
 <body>
-    <div class="diploma">
+    <div class="reconocimiento">
 
         <div class="logo-izquierdo">
             @if (!empty($logoIzquierdo))
@@ -361,11 +361,11 @@
             </div>
 
             <div class="escuela">
-                {{ mb_strtoupper($nombreEscuelaDiploma ?? ($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA')) }}
+                {{ mb_strtoupper($nombreEscuelaReconocimiento ?? ($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA')) }}
             </div>
 
             <div class="cct">
-                {{ mb_strtoupper($cctDiploma ?? 'C.C.T. PENDIENTE') }}
+                {{ mb_strtoupper($cctReconocimiento ?? 'C.C.T. PENDIENTE') }}
             </div>
 
             <div class="otorga">
@@ -380,8 +380,8 @@
         <div class="adorno-izquierdo"></div>
         <div class="adorno-derecho"></div>
 
-        <div class="titulo-diploma">
-            Diploma
+        <div class="titulo-reconocimiento">
+            Reconocimiento
         </div>
 
         <div class="a-texto">
@@ -395,19 +395,27 @@
         <div class="linea-alumno"></div>
 
         <div class="descripcion">
-            Por haber obtenido el @if (!empty($lugarAlumno))
-                <b><u> {{ $textoLugarAlumno ?? '—' }} </u></b>
-            @endif en aprovechamiento académico durante el
-            <strong> {{ $nombrePeriodo ?? '—' }}° {{ !empty($esBachillerato) ? 'parcial' : 'periodo' }}</strong>,
+            @if (!empty($lugarAlumno))
+                Por haber obtenido el
+                <b><u>{{ $textoLugarAlumno ?? '—' }}</u></b>
+                en aprovechamiento académico durante el
+            @else
+                Promedio de aprovechamiento durante el
+            @endif
+
+            <strong>
+                {{ $nombrePeriodo ?? '—' }}° {{ !empty($esBachillerato) ? 'parcial' : 'periodo' }}
+            </strong>,
+
             correspondiente al
+
             @if (!empty($esBachillerato) && !empty($semestre))
                 <strong>{{ $semestre->numero ?? '—' }}° Semestre</strong>
             @endif
+
             del <strong>{{ mb_strtoupper($grado->nombre ?? 'GRADO') }}</strong>° grado
             de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL') }}</strong>,
             grupo "<strong>{{ mb_strtoupper($grupo->asignacionGrupo?->nombre ?? 'GRUPO') }}</strong>".
-
-
         </div>
 
         <table class="datos-extra">

@@ -491,15 +491,7 @@
                 <div class="card-value">{{ $promedio }}</div>
             </td>
 
-            <td class="card card-green">
-                <div class="card-title">Estado</div>
-                <div class="card-value">{{ $estadoPromedio }}</div>
-            </td>
 
-            <td class="card card-yellow">
-                <div class="card-title">Captura</div>
-                <div class="card-value">{{ $porcentajeCaptura }}%</div>
-            </td>
 
             <td class="card card-purple">
                 <div class="card-title">Especiales</div>
