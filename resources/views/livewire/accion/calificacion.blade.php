@@ -1180,7 +1180,7 @@
                                                 wire:key="input-calificacion-{{ $insId }}-{{ $asigId }}"
                                                 id="cal-{{ $insId }}-{{ $asigId }}" type="text"
                                                 maxlength="5" inputmode="text"
-                                                wire:model.live.debounce.500ms="calificaciones.{{ $insId }}.{{ $asigId }}"
+                                                wire:model.live="calificaciones.{{ $insId }}.{{ $asigId }}"
                                                 @focus="$event.target.select()"
                                                 @keydown.enter.prevent="move({{ $insId }}, {{ $asigId }}, $event.shiftKey ? 'up' : 'down')"
                                                 @keydown.tab.prevent="move({{ $insId }}, {{ $asigId }}, $event.shiftKey ? 'left' : 'right')"
