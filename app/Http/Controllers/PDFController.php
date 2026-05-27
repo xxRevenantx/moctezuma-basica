@@ -1871,10 +1871,10 @@ class PDFController extends Controller
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Periodo correcto según nivel
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Periodo correcto según nivel
+            |--------------------------------------------------------------------------
+            */
 
         $datosPeriodo = $this->obtenerPeriodoPdf(
             nivel: $nivel,
@@ -1909,10 +1909,10 @@ class PDFController extends Controller
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Materias calificables
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Materias calificables
+            |--------------------------------------------------------------------------
+            */
 
         $queryMaterias = AsignacionMateria::query()
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
@@ -1952,10 +1952,10 @@ class PDFController extends Controller
             ->toArray();
 
         /*
-        |--------------------------------------------------------------------------
-        | Inscripciones
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Inscripciones
+            |--------------------------------------------------------------------------
+            */
 
         $queryInscripciones = $this->queryInscripcionesPorContextoPdf(
             nivel: $nivel,
@@ -2005,10 +2005,10 @@ class PDFController extends Controller
         $idsMaterias = collect($materias)->pluck('id')->values()->all();
 
         /*
-        |--------------------------------------------------------------------------
-        | Calificaciones guardadas
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Calificaciones guardadas
+            |--------------------------------------------------------------------------
+            */
 
         $calificaciones = [];
 
@@ -2079,17 +2079,15 @@ class PDFController extends Controller
 
         $registroPromedio = $queryMateriaPromediar->first();
 
-        /*
-         * Si no existe registro en materia_promediar,
-         * o el número de materias es 0, no se promedia ninguna materia.
-         */
         $numeroMateriasPromediar = $registroPromedio
             ? (int) $registroPromedio->numero_materias
             : 0;
 
         /*
-         * Solo las materias no extra pueden entrar al promedio.
-         */
+            * Solo las materias no extra pueden entrar al promedio.
+            * materia_promediar define cuántas materias se toman,
+            * pero el promedio se divide solo entre las calificaciones numéricas capturadas.
+            */
         $materiasPromediables = collect($materias)
             ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
             ->sortBy([
@@ -2099,10 +2097,6 @@ class PDFController extends Controller
             ])
             ->values();
 
-        /*
-         * Si hay número configurado, se toman únicamente esas materias.
-         * Si no hay configuración válida, se deja la colección vacía.
-         */
         if ($numeroMateriasPromediar > 0) {
             $materiasPromediables = $materiasPromediables
                 ->take($numeroMateriasPromediar)
@@ -2118,112 +2112,172 @@ class PDFController extends Controller
             ->toArray();
 
         /*
+            |--------------------------------------------------------------------------
+            | Helpers internos para calificaciones
+            |--------------------------------------------------------------------------
+            */
+
+        $obtenerNumeroValido = function ($valor): ?float {
+            $valor = strtoupper(trim((string) $valor));
+
+            if ($valor === '' || !is_numeric($valor)) {
+                return null;
+            }
+
+            $numero = (float) $valor;
+
+            if ($numero < 0 || $numero > 10) {
+                return null;
+            }
+
+            return $numero;
+        };
+
+        /*
         |--------------------------------------------------------------------------
         | Promedios por alumno
         |--------------------------------------------------------------------------
         */
 
         $promedios = [];
+        $totalNumericasPorAlumno = [];
 
         foreach ($inscripciones as $fila) {
             $inscripcionId = (int) $fila['inscripcion_id'];
 
-            /*
-             * Si no hay materias asignadas para promediar,
-             * el promedio queda en 0.0.
-             */
             if ($numeroMateriasPromediar <= 0 || empty($idsMateriasPromediables)) {
-                $promedios[$inscripcionId] = '0.0';
+                $promedios[$inscripcionId] = 'Pendiente';
+                $totalNumericasPorAlumno[$inscripcionId] = 0;
                 continue;
             }
 
             $suma = 0;
+            $totalNumericas = 0;
 
             foreach ($materiasPromediables as $materia) {
                 $clave = $inscripcionId . '-' . $materia['id'];
-                $valor = $calificaciones[$clave] ?? null;
+                $numero = $obtenerNumeroValido($calificaciones[$clave] ?? null);
 
-                if ($valor === null || $valor === '') {
+                if ($numero === null) {
                     continue;
                 }
 
-                $valor = strtoupper(trim((string) $valor));
+                $suma += $numero;
+                $totalNumericas++;
+            }
 
-                if (!is_numeric($valor)) {
-                    continue;
-                }
+            $totalNumericasPorAlumno[$inscripcionId] = $totalNumericas;
 
-                $numero = (float) $valor;
-
-                if ($numero >= 0 && $numero <= 10) {
-                    $suma += $numero;
-                }
+            /*
+         * Si el alumno no tiene calificaciones numéricas,
+         * no se marca como reprobado; queda pendiente.
+         */
+            if ($totalNumericas === 0) {
+                $promedios[$inscripcionId] = 'Pendiente';
+                continue;
             }
 
             /*
-             * Se divide entre el número configurado.
-             * Si falta una calificación, esa materia cuenta como 0.
-             */
-            $promedio = $suma / $numeroMateriasPromediar;
+         * Se divide solo entre calificaciones numéricas capturadas.
+         */
+            $promedio = $suma / $totalNumericas;
             $promedioTruncado = floor($promedio * 10) / 10;
 
             $promedios[$inscripcionId] = number_format($promedioTruncado, 1, '.', '');
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Promedios por materia
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | Promedio por materia
+            |--------------------------------------------------------------------------
+            | Solo se toman calificaciones numéricas.
+            | AC, ED, RA, NP, SD, vacíos o textos no se suman ni se cuentan.
+            */
 
         $promediosPorMateria = [];
 
-        foreach ($materiasPromediables as $materia) {
+        foreach ($materias as $materia) {
+            $asignacionMateriaId = (int) ($materia['id'] ?? 0);
+
+            if ($asignacionMateriaId <= 0) {
+                continue;
+            }
+
             $sumaMateria = 0;
-            $totalMateria = 0;
+            $totalNumericasMateria = 0;
+            $totalPendientesMateria = 0;
+            $totalEspecialesMateria = 0;
 
             foreach ($inscripciones as $fila) {
-                $clave = $fila['inscripcion_id'] . '-' . $materia['id'];
-                $valor = $calificaciones[$clave] ?? null;
+                $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
+                $clave = $inscripcionId . '-' . $asignacionMateriaId;
 
-                if ($valor === null || $valor === '') {
+                $valor = strtoupper(trim((string) ($calificaciones[$clave] ?? '')));
+
+                if ($valor === '') {
+                    $totalPendientesMateria++;
                     continue;
                 }
 
-                $valor = strtoupper(trim((string) $valor));
+                if (in_array($valor, ['AC', 'ED', 'RA', 'NP', 'SD'], true)) {
+                    $totalEspecialesMateria++;
+                    continue;
+                }
 
                 if (!is_numeric($valor)) {
+                    $totalPendientesMateria++;
                     continue;
                 }
 
                 $numero = (float) $valor;
 
                 if ($numero < 0 || $numero > 10) {
+                    $totalPendientesMateria++;
                     continue;
                 }
 
                 $sumaMateria += $numero;
-                $totalMateria++;
+                $totalNumericasMateria++;
             }
 
-            $promedioMateria = $totalMateria > 0
-                ? floor(($sumaMateria / $totalMateria) * 10) / 10
-                : 0;
+            if ($totalNumericasMateria > 0) {
+                $promedioMateria = $sumaMateria / $totalNumericasMateria;
+                $promedioMateria = floor($promedioMateria * 10) / 10;
+
+                $promedioTexto = number_format($promedioMateria, 1, '.', '');
+                $porcentaje = min(100, max(0, $promedioMateria * 10));
+
+                if ($promedioMateria < 6) {
+                    $estado = 'En riesgo';
+                } elseif ($promedioMateria < 8) {
+                    $estado = 'Regular';
+                } else {
+                    $estado = 'Aprobatorio';
+                }
+            } else {
+                $promedioTexto = 'Pendiente';
+                $porcentaje = 0;
+                $estado = 'Sin datos';
+            }
 
             $promediosPorMateria[] = [
-                'id' => $materia['id'],
-                'materia' => $materia['materia'],
-                'promedio' => number_format($promedioMateria, 1, '.', ''),
-                'porcentaje' => min(100, $promedioMateria * 10),
-                'total_capturadas' => $totalMateria,
+                'id' => $asignacionMateriaId,
+                'asignacion_materia_id' => $asignacionMateriaId,
+                'materia' => $materia['materia'] ?? 'Materia',
+                'promedio' => $promedioTexto,
+                'porcentaje' => $porcentaje,
+                'total_capturadas' => $totalNumericasMateria,
+                'total_pendientes' => $totalPendientesMateria,
+                'total_especiales' => $totalEspecialesMateria,
+                'estado' => $estado,
             ];
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Promedio general del grupo
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | Promedio general del grupo
+    |--------------------------------------------------------------------------
+    */
 
         $promediosNumericosGrupo = collect($promedios)
             ->filter(fn($valor) => is_numeric($valor))
@@ -2239,12 +2293,14 @@ class PDFController extends Controller
         $porcentajePromedioGeneral = min(100, $promedioGeneralGrupo * 10);
 
         /*
-        |--------------------------------------------------------------------------
-        | Estadísticas generales
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | Estadísticas generales
+    |--------------------------------------------------------------------------
+    */
 
         $totalAlumnos = count($inscripciones);
+
+        $totalConPromedio = $promediosNumericosGrupo->count();
 
         $totalAprobados = collect($promedios)
             ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 6)
@@ -2254,19 +2310,21 @@ class PDFController extends Controller
             ->filter(fn($valor) => is_numeric($valor) && (float) $valor < 6)
             ->count();
 
-        $totalSinPromedio = collect($promedios)
-            ->filter(fn($valor) => !is_numeric($valor))
-            ->count();
+        $totalSinPromedio = max(0, $totalAlumnos - $totalConPromedio);
 
-        $porcentajeAprobacion = $totalAlumnos > 0
-            ? round(($totalAprobados / $totalAlumnos) * 100)
+        /*
+     * La aprobación se calcula solo con alumnos que ya tienen promedio numérico.
+     * Los pendientes no cuentan como reprobados.
+     */
+        $porcentajeAprobacion = $totalConPromedio > 0
+            ? round(($totalAprobados / $totalConPromedio) * 100)
             : 0;
 
         /*
-        |--------------------------------------------------------------------------
-        | Periodos por materia
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | Periodos por materia
+    |--------------------------------------------------------------------------
+    */
 
         $periodosPorMateria = collect($materiasPromediables)
             ->map(function ($materia) use ($periodo, $nombrePeriodo, $esBachillerato) {
@@ -2286,10 +2344,10 @@ class PDFController extends Controller
             ->toArray();
 
         /*
-        |--------------------------------------------------------------------------
-        | Logos e imagen por nivel
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | Logos e imagen por nivel
+    |--------------------------------------------------------------------------
+    */
 
         $logoIzquierdo = public_path('storage/logos/' . $nivel->logo);
         $logoDerecho = public_path('imagenes/logo-letra.png');
@@ -2309,6 +2367,7 @@ class PDFController extends Controller
 
         $pdf = Pdf::loadView('pdf.calificaciones_pdf', [
             'titulo' => 'REPORTE DE CALIFICACIONES',
+
             'escuela' => $escuela,
             'nivel' => $nivel,
             'grado' => $grado,
@@ -2325,24 +2384,27 @@ class PDFController extends Controller
             'mesBasicaId' => $mesBasicaId,
             'mesBachilleratoId' => $mesBachilleratoId,
             'tipoPeriodo' => $tipoPeriodo,
-
             'busqueda' => $busqueda,
+
             'materias' => $materias,
             'inscripciones' => $inscripciones,
             'calificaciones' => $calificaciones,
             'promedios' => $promedios,
 
             'promediosPorMateria' => $promediosPorMateria,
+
             'promedioGeneralGrupo' => $promedioGeneralGrupoTexto,
             'porcentajePromedioGeneral' => $porcentajePromedioGeneral,
+            'porcentajeAprobacion' => $porcentajeAprobacion,
             'totalAlumnos' => $totalAlumnos,
             'totalAprobados' => $totalAprobados,
             'totalReprobados' => $totalReprobados,
             'totalSinPromedio' => $totalSinPromedio,
-            'porcentajeAprobacion' => $porcentajeAprobacion,
-            'periodosPorMateria' => $periodosPorMateria,
+            'totalConPromedio' => $totalConPromedio,
+            'totalNumericasPorAlumno' => $totalNumericasPorAlumno,
 
-            'fecha_impresion' => now(),
+            'periodosPorMateria' => $periodosPorMateria ?? [],
+
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,

@@ -1162,8 +1162,9 @@
                         @forelse ($inscripcionesTabla as $index => $fila)
                             @php($insId = (int) $fila['inscripcion_id'])
 
-                            <tr wire:key="fila-calificacion-{{ $insId }}-{{ md5(json_encode($calificaciones[$insId] ?? [])) }}"
+                            <tr wire:key="fila-calificacion-{{ $insId }}"
                                 class="hover:bg-neutral-50/70 dark:hover:bg-neutral-950/40">
+
                                 <td class="px-4 py-3 text-neutral-700 dark:text-neutral-200">{{ $index + 1 }}</td>
                                 <td
                                     class="sticky left-0 z-10 min-w-[140px] bg-white px-4 py-3 font-medium text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
@@ -1180,7 +1181,7 @@
                                                 wire:key="input-calificacion-{{ $insId }}-{{ $asigId }}"
                                                 id="cal-{{ $insId }}-{{ $asigId }}" type="text"
                                                 maxlength="5" inputmode="text"
-                                                wire:model.live="calificaciones.{{ $insId }}.{{ $asigId }}"
+                                                wire:model.blur="calificaciones.{{ $insId }}.{{ $asigId }}"
                                                 @focus="$event.target.select()"
                                                 @keydown.enter.prevent="move({{ $insId }}, {{ $asigId }}, $event.shiftKey ? 'up' : 'down')"
                                                 @keydown.tab.prevent="move({{ $insId }}, {{ $asigId }}, $event.shiftKey ? 'left' : 'right')"

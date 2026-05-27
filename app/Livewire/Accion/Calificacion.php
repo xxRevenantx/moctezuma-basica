@@ -262,11 +262,18 @@ class Calificacion extends Component
     public function updatedCalificaciones($value = null, $key = null): void
     {
         /*
-     * Cada vez que cambia una calificación, se recalculan los promedios.
-     * Solo se suman valores numéricos y se divide entre las calificaciones numéricas capturadas.
+     * Solo se recalculan promedios cuando Livewire recibe el cambio.
+     * Con wire:model.blur ya no se ejecuta en cada tecla.
      */
         $this->calcularPromedios();
-        $this->aplicarFiltroEstado();
+
+        /*
+     * Solo se reaplica el filtro si realmente hay un filtro activo.
+     * Esto evita recorrer toda la tabla innecesariamente.
+     */
+        if ($this->filtro_estado !== '' || $this->orden_promedio !== '') {
+            $this->aplicarFiltroEstado();
+        }
     }
 
     private function resetEstadoAcademico(array $camposExtra = []): void

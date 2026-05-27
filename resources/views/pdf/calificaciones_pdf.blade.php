@@ -142,7 +142,6 @@
         .tabla {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
         }
 
         .tabla th {
@@ -162,8 +161,7 @@
         .tabla td {
             border: 1px solid #e2e8f0;
             font-size: 8px;
-            vertical-align: middle;
-            word-wrap: break-word;
+            padding: 2px 5px;
         }
 
         .text-center {
@@ -182,6 +180,7 @@
 
         .alumno {
             color: #0f172a;
+            /* width: 400px; */
         }
 
         .calificacion {
@@ -507,6 +506,14 @@
         foreach ($promediosUnicos as $index => $promedioUnico) {
             $lugaresPorPromedio[$promedioUnico] = $index + 1;
         }
+
+        /*
+         * Se crea un mapa por id de asignación de materia.
+         * Así el tfoot encuentra el promedio correcto de cada columna.
+         */
+        $promediosPorMateriaMapa = collect($promediosPorMateria ?? [])->keyBy(
+            fn($item) => (int) ($item['id'] ?? ($item['asignacion_materia_id'] ?? 0)),
+        );
     @endphp
 
     <div class="section-title">Listado de calificaciones</div>
@@ -516,7 +523,7 @@
             <tr>
                 <th style="width: 42px;">LUGAR</th>
 
-                <th style="width: 450px;">ALUMNO</th>
+                <th>ALUMNO</th>
 
                 @if ($esBachillerato)
                     <th style="width: 42px;">SEM.</th>
@@ -597,12 +604,15 @@
                             } else {
                                 $clasePromedio .= ' promedio-bueno';
                             }
+                        } else {
+                            $clasePromedio .= ' lugar-pendiente';
                         }
                     @endphp
 
                     <td class="text-center {{ $clasePromedio }}">
                         {{ $promedioAlumno }}
                     </td>
+
                 </tr>
             @empty
                 <tr>
@@ -613,6 +623,66 @@
                 </tr>
             @endforelse
         </tbody>
+
+        <tfoot>
+            <tr>
+                <td class="text-center promedio" colspan="{{ $esBachillerato ? 3 : 2 }}">
+                    PROMEDIO POR MATERIA
+                </td>
+
+                @foreach ($materias as $materia)
+                    @php
+                        $promedioMateriaFooter = $promediosPorMateriaMapa->get((int) $materia['id']);
+
+                        $promedioMateriaTexto = $promedioMateriaFooter['promedio'] ?? 'Pendiente';
+
+                        $clasePromedioMateria = 'promedio';
+
+                        if (is_numeric($promedioMateriaTexto)) {
+                            $promedioMateriaNumero = (float) $promedioMateriaTexto;
+
+                            if ($promedioMateriaNumero < 6) {
+                                $clasePromedioMateria .= ' promedio-bajo';
+                            } elseif ($promedioMateriaNumero < 8) {
+                                $clasePromedioMateria .= ' promedio-regular';
+                            } else {
+                                $clasePromedioMateria .= ' promedio-bueno';
+                            }
+                        } else {
+                            $clasePromedioMateria .= ' lugar-pendiente';
+                        }
+                    @endphp
+
+                    <td class="text-center {{ $clasePromedioMateria }}">
+                        {{ $promedioMateriaTexto }}
+                    </td>
+                @endforeach
+
+                <td class="text-center promedio">
+                    {{ $promedioGeneralGrupo ?? '—' }}
+                </td>
+            </tr>
+
+            <tr>
+                <td class="text-center lugar-pendiente" colspan="{{ $esBachillerato ? 3 : 2 }}">
+                    CAPTURADAS
+                </td>
+
+                @foreach ($materias as $materia)
+                    @php
+                        $promedioMateriaFooter = $promediosPorMateriaMapa->get((int) $materia['id']);
+                    @endphp
+
+                    <td class="text-center lugar-pendiente">
+                        {{ $promedioMateriaFooter['total_capturadas'] ?? 0 }}
+                    </td>
+                @endforeach
+
+                <td class="text-center lugar-pendiente">
+                    —
+                </td>
+            </tr>
+        </tfoot>
     </table>
 
     <div style="page-break-after: always;"></div>
