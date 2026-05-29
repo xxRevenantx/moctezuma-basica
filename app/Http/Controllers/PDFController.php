@@ -2459,6 +2459,15 @@ class PDFController extends Controller
         $esBachillerato = $this->esBachillerato($nivel);
         $esSecundaria = $this->esSecundaria($nivel);
 
+        /*
+         * Se detecta primaria para separar sus materias extra en el PDF.
+         * Las materias extra no se toman en cuenta para el promedio.
+         */
+        $esPrimaria = \Illuminate\Support\Str::contains(
+            mb_strtolower((string) ($nivel->slug ?? $nivel->nombre ?? '')),
+            'primaria'
+        );
+
         $generacion = Generacion::query()
             ->where('id', $generacionId)
             ->where('nivel_id', $nivel->id)
@@ -2787,9 +2796,32 @@ class PDFController extends Controller
             }
         }
 
-        $totalMaterias = count($filasMaterias);
+        /*
+         * En primaria se separan las materias normales y las materias extra.
+         * Las materias extra se muestran en una tabla aparte y no afectan el promedio.
+         */
+        $filasMateriasRegulares = collect($filasMaterias)
+            ->filter(fn($fila) => (int) ($fila['extra'] ?? 0) === 0)
+            ->values()
+            ->toArray();
 
-        $pendientes = collect($filasMaterias)
+        $filasMateriasExtras = collect($filasMaterias)
+            ->filter(fn($fila) => (int) ($fila['extra'] ?? 0) === 1)
+            ->values()
+            ->toArray();
+
+        if (!$esPrimaria) {
+            $filasMateriasRegulares = $filasMaterias;
+            $filasMateriasExtras = [];
+        }
+
+        /*
+         * Para primaria, el avance de captura se calcula solo con materias normales.
+         * Así las materias extra no afectan el resumen principal.
+         */
+        $totalMaterias = count($filasMateriasRegulares);
+
+        $pendientes = collect($filasMateriasRegulares)
             ->filter(fn($fila) => $fila['calificacion'] === '—')
             ->count();
 
@@ -2842,6 +2874,7 @@ class PDFController extends Controller
             'semestre' => $semestre,
             'esBachillerato' => $esBachillerato,
             'esSecundaria' => $esSecundaria,
+            'esPrimaria' => $esPrimaria,
             'director' => $director,
             'docente' => $docente,
 
@@ -2859,6 +2892,8 @@ class PDFController extends Controller
             'inscripcion' => $inscripcion,
             'nombreAlumno' => $nombreAlumno,
             'filasMaterias' => $filasMaterias,
+            'filasMateriasRegulares' => $filasMateriasRegulares,
+            'filasMateriasExtras' => $filasMateriasExtras,
             'promedio' => $promedio,
             'promedioNumero' => $promedioNumero,
             'numeroMateriasPromediar' => $numeroMateriasPromediar,

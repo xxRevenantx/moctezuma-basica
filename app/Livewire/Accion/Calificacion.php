@@ -3,6 +3,8 @@
 namespace App\Livewire\Accion;
 
 use App\Exports\CalificacionExport;
+use App\Exports\PlantillaCalificacionesImportExport;
+use App\Imports\CalificacionesImport;
 use App\Models\AsignacionMateria;
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion as ModelsCalificacion;
@@ -22,11 +24,16 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\WithFileUploads;
+use Throwable;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
 class Calificacion extends Component
 {
+    use WithFileUploads;
+
     public string $slug_nivel = '';
 
     public $nivel_id = null;
@@ -59,6 +66,9 @@ class Calificacion extends Component
 
     public array $resumenRevision = [];
     public string $motivo_guardado = '';
+
+    public $archivo_calificaciones = null;
+    public array $resumenImportacion = [];
 
     public $boleta_inscripcion_id = '';
     public $reconocimiento_inscripcion_id = '';
@@ -296,6 +306,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'archivo_calificaciones',
+            'resumenImportacion',
         ]);
 
         $this->reset($campos);
@@ -400,6 +412,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'archivo_calificaciones',
+            'resumenImportacion',
             'boleta_inscripcion_id',
             'reconocimiento_inscripcion_id',
         ]);
@@ -427,6 +441,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'archivo_calificaciones',
+            'resumenImportacion',
         ]);
 
         if (!$this->puedeCargarDatos()) {
@@ -1337,6 +1353,11 @@ class Calificacion extends Component
             && count($this->materias) > 0;
     }
 
+    public function getPuedeUsarPlantillaImportacionProperty(): bool
+    {
+        return $this->puedeGuardar;
+    }
+
     public function getPuedeExportarPdfProperty(): bool
     {
         return filled($this->slug_nivel)
@@ -2191,6 +2212,237 @@ class Calificacion extends Component
             'success' => 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200',
             default => 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200',
         };
+    }
+
+    private function periodoSeleccionadoValido(): bool
+    {
+        if (blank($this->periodo_id) || blank($this->ciclo_escolar_id)) {
+            return false;
+        }
+
+        $query = Periodos::query()
+            ->whereKey((int) $this->periodo_id)
+            ->where('nivel_id', (int) $this->nivel_id);
+
+        if ($this->esBachillerato) {
+            return $query
+                ->where('generacion_id', (int) $this->generacion_id)
+                ->where('semestre_id', (int) $this->semestre_id)
+                ->where('parcial_bachillerato_id', (int) $this->parcial_bachillerato_id)
+                ->exists();
+        }
+
+        return $query
+            ->where('periodo_basica_id', (int) $this->periodo_basica_id)
+            ->exists();
+    }
+
+    private function tipoPeriodoImportacion(): string
+    {
+        return $this->esBachillerato ? 'bachillerato' : 'basica';
+    }
+
+    private function periodoReferenciaIdImportacion(): int
+    {
+        return $this->esBachillerato
+            ? (int) $this->parcial_bachillerato_id
+            : (int) $this->periodo_basica_id;
+    }
+
+    private function etiquetaPeriodoParaArchivo(): string
+    {
+        if (!$this->periodoSeleccionado) {
+            return $this->esBachillerato ? 'sin_parcial' : 'sin_periodo';
+        }
+
+        if ($this->esBachillerato) {
+            return $this->periodoSeleccionado['parcial'] ?? 'sin_parcial';
+        }
+
+        return $this->periodoSeleccionado['parcial'] ?? 'sin_periodo';
+    }
+
+    private function nombreArchivoPlantillaImportacion(string $nivel, string $grado, string $grupo): string
+    {
+        $segmentoPeriodo = $this->esBachillerato ? 'PARCIAL' : 'PERIODO';
+
+        return 'PLANTILLA_IMPORTAR_CALIFICACIONES_' .
+            Str::slug($nivel, '_') .
+            '_GRADO_' . Str::slug($grado, '_') .
+            '_GRUPO_' . Str::slug($grupo, '_') .
+            '_' . $segmentoPeriodo . '_' . Str::slug($this->etiquetaPeriodoParaArchivo(), '_') .
+            '_P' . ((int) $this->periodo_id) .
+            '.xlsx';
+    }
+
+    public function descargarPlantillaImportacion()
+    {
+        if (!$this->puedeUsarPlantillaImportacion) {
+            $this->dispatch('swal', [
+                'title' => 'Selecciona todos los filtros antes de descargar la plantilla.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return null;
+        }
+
+        if (!$this->periodoSeleccionadoValido()) {
+            $this->dispatch('swal', [
+                'title' => 'El periodo seleccionado no coincide con los filtros actuales.',
+                'text' => 'Vuelve a seleccionar el periodo o parcial y descarga nuevamente la plantilla.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return null;
+        }
+
+        $nivel = Nivel::query()->find($this->nivel_id);
+        $grado = Grado::query()->find($this->grado_id);
+        $grupo = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
+            ->find($this->grupo_id);
+        $generacion = Generacion::query()->find($this->generacion_id);
+        $semestre = $this->esBachillerato ? Semestre::query()->find($this->semestre_id) : null;
+
+        $contexto = [
+            'nivel_id' => (int) $this->nivel_id,
+            'grado_id' => (int) $this->grado_id,
+            'grupo_id' => (int) $this->grupo_id,
+            'generacion_id' => (int) $this->generacion_id,
+            'semestre_id' => $this->esBachillerato ? (int) $this->semestre_id : 0,
+            'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
+            'periodo_id' => (int) $this->periodo_id,
+            'tipo_periodo' => $this->tipoPeriodoImportacion(),
+            'periodo_referencia_id' => $this->periodoReferenciaIdImportacion(),
+
+            'nivel' => $nivel?->nombre,
+            'grado' => $grado?->nombre,
+            'grupo' => $this->textoGrupo($grupo),
+            'generacion' => $generacion
+                ? trim(($generacion->anio_ingreso ?? '') . ' - ' . ($generacion->anio_egreso ?? ''))
+                : null,
+            'semestre' => $semestre?->numero,
+            'periodo' => $this->etiquetaPeriodoParaArchivo(),
+        ];
+
+        $nombreArchivo = $this->nombreArchivoPlantillaImportacion(
+            nivel: $nivel?->nombre ?? $this->slug_nivel,
+            grado: $grado?->nombre ?? 'grado',
+            grupo: $this->textoGrupo($grupo)
+        );
+
+        return Excel::download(
+            new PlantillaCalificacionesImportExport(
+                inscripciones: $this->inscripciones,
+                materias: $this->materias,
+                calificaciones: $this->calificaciones,
+                observaciones: $this->observaciones,
+                contexto: $contexto
+            ),
+            $nombreArchivo
+        );
+    }
+
+    public function importarPlantillaCalificaciones(): void
+    {
+        if (!$this->puedeUsarPlantillaImportacion) {
+            $this->addError('archivo_calificaciones', 'Selecciona todos los filtros antes de importar calificaciones.');
+            return;
+        }
+
+        if (!$this->periodoSeleccionadoValido()) {
+            $this->addError('archivo_calificaciones', 'El periodo seleccionado no coincide con los filtros actuales. Vuelve a seleccionar el periodo o parcial.');
+            return;
+        }
+
+        $this->validate([
+            'archivo_calificaciones' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls',
+                'max:10240',
+            ],
+        ], [
+            'archivo_calificaciones.required' => 'Selecciona una plantilla de calificaciones.',
+            'archivo_calificaciones.file' => 'El archivo seleccionado no es válido.',
+            'archivo_calificaciones.mimes' => 'El archivo debe ser Excel: xlsx o xls.',
+            'archivo_calificaciones.max' => 'El archivo no debe pesar más de 10 MB.',
+        ]);
+
+        try {
+            $import = new CalificacionesImport(
+                nivelId: (int) $this->nivel_id,
+                gradoId: (int) $this->grado_id,
+                grupoId: (int) $this->grupo_id,
+                generacionId: (int) $this->generacion_id,
+                semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                periodoId: (int) $this->periodo_id,
+                esBachillerato: $this->esBachillerato,
+                tipoPeriodo: $this->tipoPeriodoImportacion(),
+                periodoReferenciaId: $this->periodoReferenciaIdImportacion(),
+                inscripcionIdsPermitidas: collect($this->inscripciones)
+                    ->pluck('inscripcion_id')
+                    ->map(fn($id) => (int) $id)
+                    ->values()
+                    ->all(),
+                materiasPermitidas: $this->materias,
+                userId: Auth::id(),
+                ip: request()->ip(),
+                motivo: 'Importación desde plantilla Excel'
+            );
+
+            Excel::import($import, $this->archivo_calificaciones);
+
+            $this->resumenImportacion = $import->resumen;
+            $this->reset('archivo_calificaciones');
+            $this->cargarDatos();
+
+            $this->dispatch('swal', [
+                'title' => 'Calificaciones importadas correctamente.',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (ValidationException $e) {
+            $errores = collect($e->errors())
+                ->flatten()
+                ->values()
+                ->all();
+
+            $this->resumenImportacion = [
+                'creadas' => 0,
+                'editadas' => 0,
+                'eliminadas' => 0,
+                'sin_cambios' => 0,
+                'errores' => $errores,
+            ];
+
+            $this->addError(
+                'archivo_calificaciones',
+                'La plantilla tiene errores. Revisa el resumen mostrado debajo del formulario.'
+            );
+
+            $this->dispatch('swal', [
+                'title' => 'La plantilla tiene errores.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            $this->addError(
+                'archivo_calificaciones',
+                'Ocurrió un error al importar la plantilla. Verifica el archivo e inténtalo nuevamente.'
+            );
+
+            $this->dispatch('swal', [
+                'title' => 'No se pudo importar la plantilla.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
     }
 
     public function exportarCalificaciones()

@@ -147,12 +147,12 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 6px;
-            margin: 4px 0 10px 0;
+            margin: 0px 0 10px 0;
         }
 
         .card {
             border-radius: 14px;
-            padding: 3px 10px;
+            padding: 1px 10px;
             border: 1px solid #e2e8f0;
         }
 
@@ -223,7 +223,7 @@
 
         .tabla td {
             border: 1px solid #e2e8f0;
-            padding: 3px 5px;
+            padding: 1px 5px;
             font-size: 12px;
             vertical-align: middle;
         }
@@ -333,7 +333,7 @@
 
         .leyenda-cualitativa td {
             border: 1px solid #cbd5e1;
-            padding: 2px 2px;
+            padding: 1px 2px;
             text-align: center;
         }
 
@@ -382,7 +382,7 @@
 
         .firmas {
             width: 100%;
-            margin-top: 20px;
+            margin-top: 10px;
             font-size: 15px;
             color: #000000;
         }
@@ -505,6 +505,20 @@
         </tr>
     </table>
 
+    @php
+        /*
+         * En primaria se separan las materias normales y las materias extra.
+         * En secundaria y bachillerato se conserva la lista normal.
+         */
+        $materiasPrincipales = $esPrimaria ?? false ? $filasMateriasRegulares ?? [] : $filasMaterias ?? [];
+
+        $materiasExtrasPrimaria = $esPrimaria ?? false ? $filasMateriasExtras ?? [] : [];
+    @endphp
+
+    <div class="section-title">
+        Materias que se toman en cuenta para el promedio
+    </div>
+
     <table class="tabla">
         <thead>
             <tr>
@@ -519,23 +533,18 @@
         </thead>
 
         <tbody>
-            @forelse ($filasMaterias as $fila)
+            @forelse ($materiasPrincipales as $fila)
                 @php
                     $badgeClass = 'badge-empty';
-                    $barClass = 'bar-special';
 
                     if ($fila['estado'] === 'Aprobado') {
                         $badgeClass = 'badge-ok';
-                        $barClass = 'bar-ok';
                     } elseif ($fila['estado'] === 'Regular') {
                         $badgeClass = 'badge-regular';
-                        $barClass = 'bar-regular';
                     } elseif ($fila['estado'] === 'En riesgo') {
                         $badgeClass = 'badge-risk';
-                        $barClass = 'bar-risk';
                     } elseif ($fila['estado'] === 'Especial') {
                         $badgeClass = 'badge-special';
-                        $barClass = 'bar-special';
                     }
                 @endphp
 
@@ -546,10 +555,6 @@
 
                     <td class="materia">
                         {{ $fila['materia'] }}
-
-                        @if ($fila['extra'])
-                            <span style="font-size: 7px; color:#64748b;">(Extra)</span>
-                        @endif
                     </td>
 
                     <td class="text-center">
@@ -569,6 +574,58 @@
             @endforelse
         </tbody>
     </table>
+
+    @if (($esPrimaria ?? false) && count($materiasExtrasPrimaria) > 0)
+        <div class="section-title" style="border-left-color: #c4b5fd; background: #f5f3ff;">
+            Materias extra no consideradas en el promedio
+        </div>
+
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Materia extra</th>
+                    <th style="width: 20%;">Calificación</th>
+                    <th style="width: 20%;">Estado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach ($materiasExtrasPrimaria as $fila)
+                    @php
+                        $badgeClass = 'badge-empty';
+
+                        if ($fila['estado'] === 'Aprobado') {
+                            $badgeClass = 'badge-ok';
+                        } elseif ($fila['estado'] === 'Regular') {
+                            $badgeClass = 'badge-regular';
+                        } elseif ($fila['estado'] === 'En riesgo') {
+                            $badgeClass = 'badge-risk';
+                        } elseif ($fila['estado'] === 'Especial') {
+                            $badgeClass = 'badge-special';
+                        }
+                    @endphp
+
+                    <tr>
+                        <td class="materia">
+                            {{ $fila['materia'] }}
+                        </td>
+
+                        <td class="text-center">
+                            <strong>{{ $fila['calificacion'] }}</strong>
+                        </td>
+
+                        <td class="text-center">
+                            <span class="badge {{ $badgeClass }}">{{ $fila['estado'] }}</span>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <div style="margin-top: 6px; font-size: 9px; color: #64748b;">
+            Nota: estas materias se muestran como información adicional y no afectan el promedio general del alumno.
+        </div>
+    @endif
 
     @php
         /*

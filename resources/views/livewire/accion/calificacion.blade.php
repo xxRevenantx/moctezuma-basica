@@ -368,15 +368,7 @@
                         </div>
                     </div>
 
-                    <div
-                        class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
-                        <div
-                            class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                            <span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>Periodo escolar
-                        </div>
-                        <div class="mt-2 text-xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                            {{ $this->nombrePeriodo }}</div>
-                    </div>
+
 
                     <div
                         class="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/50">
@@ -431,6 +423,138 @@
             </div>
         </div>
     @endif
+
+
+    {{-- Importación de calificaciones por Excel --}}
+    <div
+        class="mt-6 overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-xl shadow-slate-200/50 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
+        <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600"></div>
+
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <div
+                        class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40">
+                        Importación Excel
+                    </div>
+
+                    <h3 class="mt-3 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
+                        Plantilla profesional para importar calificaciones
+                    </h3>
+
+                    <p class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                        Descarga la plantilla del grupo seleccionado, captura las calificaciones y vuelve a subir el
+                        archivo.
+                        Solo edita las columnas de las materias. Las observaciones no se importan desde esta plantilla.
+                    </p>
+                </div>
+
+                <button type="button" wire:click="descargarPlantillaImportacion" wire:loading.attr="disabled"
+                    wire:target="descargarPlantillaImportacion" @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
+                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
+                    <span wire:loading.remove wire:target="descargarPlantillaImportacion">
+                        Descargar plantilla
+                    </span>
+                    <span wire:loading wire:target="descargarPlantillaImportacion">
+                        Generando...
+                    </span>
+                </button>
+            </div>
+
+            @if (!$this->puedeUsarPlantillaImportacion)
+                <div
+                    class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                    Primero selecciona todos los filtros requeridos y asegúrate de que existan alumnos y materias
+                    cargadas.
+                </div>
+            @endif
+
+            <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                    <label class="mb-2 block text-sm font-bold text-neutral-700 dark:text-neutral-200">
+                        Archivo Excel de calificaciones
+                    </label>
+
+                    <input type="file" wire:model="archivo_calificaciones" accept=".xlsx,.xls"
+                        @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
+                        class="block w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-sky-700 hover:file:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-sky-950/40 dark:file:text-sky-300">
+
+                    <div wire:loading wire:target="archivo_calificaciones"
+                        class="mt-2 text-xs font-semibold text-sky-600 dark:text-sky-300">
+                        Cargando archivo...
+                    </div>
+
+                    @error('archivo_calificaciones')
+                        <div
+                            class="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                </div>
+
+                <button type="button" wire:click="importarPlantillaCalificaciones" wire:loading.attr="disabled"
+                    wire:target="importarPlantillaCalificaciones" @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
+                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
+                    <span wire:loading.remove wire:target="importarPlantillaCalificaciones">
+                        Importar calificaciones
+                    </span>
+                    <span wire:loading wire:target="importarPlantillaCalificaciones">
+                        Importando...
+                    </span>
+                </button>
+            </div>
+
+            @if (!empty($resumenImportacion))
+                <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <div
+                        class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <p class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                            Creadas</p>
+                        <p class="mt-1 text-2xl font-black text-emerald-900 dark:text-emerald-100">
+                            {{ $resumenImportacion['creadas'] ?? 0 }}</p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-sky-100 bg-sky-50 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
+                        <p class="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">Editadas
+                        </p>
+                        <p class="mt-1 text-2xl font-black text-sky-900 dark:text-sky-100">
+                            {{ $resumenImportacion['editadas'] ?? 0 }}</p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-rose-100 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+                        <p class="text-xs font-black uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                            Eliminadas</p>
+                        <p class="mt-1 text-2xl font-black text-rose-900 dark:text-rose-100">
+                            {{ $resumenImportacion['eliminadas'] ?? 0 }}</p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                        <p class="text-xs font-black uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            Sin cambios</p>
+                        <p class="mt-1 text-2xl font-black text-neutral-900 dark:text-neutral-100">
+                            {{ $resumenImportacion['sin_cambios'] ?? 0 }}</p>
+                    </div>
+                </div>
+
+                @if (!empty($resumenImportacion['errores']))
+                    <div
+                        class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+                        <p class="text-sm font-black text-rose-800 dark:text-rose-200">Errores detectados</p>
+
+                        <ul
+                            class="mt-3 max-h-56 list-disc space-y-1 overflow-y-auto pl-5 text-sm font-semibold text-rose-700 dark:text-rose-300">
+                            @foreach ($resumenImportacion['errores'] as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            @endif
+        </div>
+    </div>
 
     @php($estadisticas = $this->estadisticasCalificaciones)
 
