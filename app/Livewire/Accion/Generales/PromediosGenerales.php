@@ -226,6 +226,10 @@ class PromediosGenerales extends Component
                 AVG(calificaciones.valor_numerico) as promedio_periodo,
                 COUNT(calificaciones.id) as materias_capturadas
             ')
+            ->orderBy('calificaciones.inscripcion_id')
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('asignacion_materias.id')
             ->get();
 
         $alumnos = $filas
@@ -239,7 +243,7 @@ class PromediosGenerales extends Component
                     $registroPeriodo = $registros->firstWhere('numero_periodo', $periodo);
                     $valor = $registroPeriodo ? (float) $registroPeriodo->promedio_periodo : null;
 
-                    $periodos[$periodo] = $valor !== null ? floor($valor * 10) / 10 : null;
+                    $periodos[$periodo] = $valor !== null ? $this->redondearPromedio($valor) : null;
                     $materiasCapturadas += (int) ($registroPeriodo->materias_capturadas ?? 0);
                 }
 
@@ -248,7 +252,7 @@ class PromediosGenerales extends Component
                 $totalEsperado = count($limitePeriodos);
 
                 $promedioFinal = $periodosCapturados > 0
-                    ? floor(($sumaPeriodos / $periodosCapturados) * 10) / 10
+                    ? $this->redondearPromedio($sumaPeriodos / $periodosCapturados)
                     : null;
 
                 return [
@@ -264,7 +268,7 @@ class PromediosGenerales extends Component
                     'semestre_id' => $primero->semestre_id ? (int) $primero->semestre_id : null,
                     'semestre' => $primero->semestre_numero ? (int) $primero->semestre_numero : null,
                     'periodos' => $periodos,
-                    'suma_periodos' => floor($sumaPeriodos * 10) / 10,
+                    'suma_periodos' => $this->redondearPromedio($sumaPeriodos),
                     'promedio_final' => $promedioFinal,
                     'periodos_capturados' => $periodosCapturados,
                     'periodos_faltantes' => max($totalEsperado - $periodosCapturados, 0),
@@ -365,13 +369,22 @@ class PromediosGenerales extends Component
         return 'Aprobado';
     }
 
+    private function redondearPromedio(float|int|string $valor): float
+    {
+        /*
+         * Se redondea a un decimal para evitar truncar valores.
+         * Ejemplo: 8.86 debe mostrarse como 8.9, no como 8.8.
+         */
+        return round((float) $valor, 1);
+    }
+
     public function formatearDecimal(null|int|float|string $valor): string
     {
         if ($valor === null || $valor === '') {
             return '0.0';
         }
 
-        return number_format(floor(((float) $valor) * 10) / 10, 1, '.', '');
+        return number_format($this->redondearPromedio($valor), 1, '.', '');
     }
 
     public function render()
