@@ -170,9 +170,9 @@ class PromediosGenerales extends Component
         $limitePeriodos = $this->esBachillerato ? [1, 2] : [1, 2, 3];
 
         /*
-     * Se consultan las calificaciones numéricas sin agrupar en SQL.
-     * El promedio se calcula en PHP para aplicar promedio-numerico-pro.
-     */
+         * Se consultan las calificaciones sin agrupar en SQL.
+         * El promedio por periodo se calcula en PHP para aplicar promedio-numerico-pro.
+         */
         $filas = DB::table('calificaciones')
             ->join('periodos', 'periodos.id', '=', 'calificaciones.periodo_id')
             ->join('inscripciones', 'inscripciones.id', '=', 'calificaciones.inscripcion_id')
@@ -192,37 +192,31 @@ class PromediosGenerales extends Component
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)
-            /*
-             * promedio-numerico-pro:
-             * Aquí ya se ignoran AC, NP, SD, ED, RA, textos y vacíos
-             * porque solo pasan calificaciones numéricas con valor_numerico.
-             * No se usa take(), para no dejar fuera materias numéricas.
-             */
             ->whereIn(DB::raw($campoPeriodo), $limitePeriodos)
             ->when($this->generacion_id !== '', fn($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($query) => $query->where('calificaciones.grado_id', $this->grado_id))
             ->when($this->grupo_id !== '', fn($query) => $query->where('calificaciones.grupo_id', $this->grupo_id))
             ->when($this->semestre_id !== '', fn($query) => $query->where('calificaciones.semestre_id', $this->semestre_id))
             ->selectRaw('
-            calificaciones.id as calificacion_id,
-            calificaciones.inscripcion_id,
-            calificaciones.generacion_id,
-            calificaciones.grado_id,
-            calificaciones.grupo_id,
-            calificaciones.semestre_id,
-            calificaciones.asignacion_materia_id,
-            calificaciones.valor_numerico,
-            inscripciones.matricula,
-            inscripciones.nombre,
-            inscripciones.apellido_paterno,
-            inscripciones.apellido_materno,
-            grados.nombre as grado_nombre,
-            grados.orden as grado_orden,
-            asignacion_grupos.nombre as grupo_nombre,
-            semestres.numero as semestre_numero,
-            ' . $campoPeriodo . ' as numero_periodo,
-            asignacion_materias.orden as orden_materia
-        ')
+                calificaciones.id as calificacion_id,
+                calificaciones.inscripcion_id,
+                calificaciones.generacion_id,
+                calificaciones.grado_id,
+                calificaciones.grupo_id,
+                calificaciones.semestre_id,
+                calificaciones.asignacion_materia_id,
+                calificaciones.valor_numerico,
+                inscripciones.matricula,
+                inscripciones.nombre,
+                inscripciones.apellido_paterno,
+                inscripciones.apellido_materno,
+                grados.nombre as grado_nombre,
+                grados.orden as grado_orden,
+                asignacion_grupos.nombre as grupo_nombre,
+                semestres.numero as semestre_numero,
+                ' . $campoPeriodo . ' as numero_periodo,
+                asignacion_materias.orden as orden_materia
+            ')
             ->orderBy('inscripciones.apellido_paterno')
             ->orderBy('inscripciones.apellido_materno')
             ->orderBy('inscripciones.nombre')
@@ -242,10 +236,10 @@ class PromediosGenerales extends Component
 
                 foreach ($limitePeriodos as $periodo) {
                     /*
-                 * Aquí se aplica promedio-numerico-pro por periodo.
-                 * Solo se suman valores numéricos válidos.
-                 * AC, NP, SD, ED, RA, textos y vacíos no entran.
-                 */
+                     * promedio-numerico-pro por periodo:
+                     * Se recorren las materias ordenadas por asignacion_materias.orden.
+                     * Solo se suman valores numéricos y no se usa take().
+                     */
                     $registrosPeriodo = $registros
                         ->filter(fn($registro) => (int) $registro->numero_periodo === (int) $periodo)
                         ->sortBy([
@@ -258,8 +252,19 @@ class PromediosGenerales extends Component
                         ->map(fn(Collection $items) => $items->last())
                         ->values();
 
-                    $periodos[$periodo] = $valor !== null ? floor($valor * 10) / 10 : null;
-                    $materiasCapturadas += (int) ($registroPeriodo->materias_capturadas ?? 0);
+                    $valoresNumericos = $registrosPeriodo
+                        ->pluck('valor_numerico')
+                        ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 0 && (float) $valor <= 10)
+                        ->map(fn($valor) => (float) $valor)
+                        ->values();
+
+                    $totalNumericas = $valoresNumericos->count();
+
+                    $periodos[$periodo] = $totalNumericas > 0
+                        ? $this->redondearPromedio($valoresNumericos->sum() / $totalNumericas)
+                        : null;
+
+                    $materiasCapturadas += $totalNumericas;
                 }
 
                 $periodosCapturados = collect($periodos)
@@ -280,11 +285,7 @@ class PromediosGenerales extends Component
                     'inscripcion_id' => (int) $primero->inscripcion_id,
                     'generacion_id' => (int) $primero->generacion_id,
                     'matricula' => $primero->matricula,
-                    'alumno' => trim(
-                        ($primero->apellido_paterno ?? '') . ' ' .
-                            ($primero->apellido_materno ?? '') . ' ' .
-                            ($primero->nombre ?? '')
-                    ),
+                    'alumno' => trim(($primero->apellido_paterno ?? '') . ' ' . ($primero->apellido_materno ?? '') . ' ' . ($primero->nombre ?? '')),
                     'grado_id' => (int) $primero->grado_id,
                     'grado' => $primero->grado_nombre,
                     'grado_orden' => (int) ($primero->grado_orden ?? 0),
@@ -392,6 +393,15 @@ class PromediosGenerales extends Component
         }
 
         return 'Aprobado';
+    }
+
+    private function redondearPromedio(float $valor): float
+    {
+        /*
+         * Se redondea a un decimal para evitar cortes incorrectos.
+         * No se usa floor porque puede bajar promedios válidos.
+         */
+        return round($valor, 1);
     }
 
     public function formatearDecimal(null|int|float|string $valor): string
