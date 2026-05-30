@@ -187,6 +187,12 @@ class PromediosGenerales extends Component
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)
+            /*
+             * promedio-numerico-pro:
+             * Aquí ya se ignoran AC, NP, SD, ED, RA, textos y vacíos
+             * porque solo pasan calificaciones numéricas con valor_numerico.
+             * No se usa take(), para no dejar fuera materias numéricas.
+             */
             ->whereIn(DB::raw($campoPeriodo), $limitePeriodos)
             ->when($this->generacion_id !== '', fn($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($query) => $query->where('calificaciones.grado_id', $this->grado_id))
@@ -226,10 +232,6 @@ class PromediosGenerales extends Component
                 AVG(calificaciones.valor_numerico) as promedio_periodo,
                 COUNT(calificaciones.id) as materias_capturadas
             ')
-            ->orderBy('calificaciones.inscripcion_id')
-            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('asignacion_materias.orden')
-            ->orderBy('asignacion_materias.id')
             ->get();
 
         $alumnos = $filas
@@ -369,13 +371,13 @@ class PromediosGenerales extends Component
         return 'Aprobado';
     }
 
-    private function redondearPromedio(float|int|string $valor): float
+    private function redondearPromedio(float $valor): float
     {
         /*
-         * Se redondea a un decimal para evitar truncar valores.
-         * Ejemplo: 8.86 debe mostrarse como 8.9, no como 8.8.
+         * Se redondea a un decimal para evitar cortes incorrectos.
+         * No se usa floor porque puede bajar promedios válidos.
          */
-        return round((float) $valor, 1);
+        return round($valor, 1);
     }
 
     public function formatearDecimal(null|int|float|string $valor): string
@@ -384,7 +386,7 @@ class PromediosGenerales extends Component
             return '0.0';
         }
 
-        return number_format($this->redondearPromedio($valor), 1, '.', '');
+        return number_format($this->redondearPromedio((float) $valor), 1, '.', '');
     }
 
     public function render()
