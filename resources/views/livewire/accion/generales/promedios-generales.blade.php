@@ -30,11 +30,11 @@
 
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
                         @if ($esBachillerato)
-                            Calcula el promedio semestral sumando los 2 parciales capturados por semestre y dividiendo
-                            entre los parciales disponibles. Solo toma materias calificables, no extra y no receso.
+                            Calcula el promedio semestral con calificaciones numéricas, ignorando textos como AC, NP,
+                            SD, ED o RA. Solo toma materias calificables, no extra y no receso.
                         @else
-                            Calcula el promedio anual sumando los 3 periodos de básica y dividiendo entre los periodos
-                            disponibles. Solo toma materias calificables, no extra y no receso.
+                            Calcula el promedio anual con calificaciones numéricas, ignorando textos como AC, NP, SD, ED
+                            o RA. Solo toma materias calificables, no extra y no receso.
                         @endif
                     </p>
 
@@ -48,7 +48,7 @@
                         <span
                             class="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
                             <flux:icon.calculator class="h-3.5 w-3.5" />
-                            Promedio sin redondear
+                            Promedio redondeado
                         </span>
                     </div>
                 </div>

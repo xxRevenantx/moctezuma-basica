@@ -272,15 +272,15 @@ class Calificacion extends Component
     public function updatedCalificaciones($value = null, $key = null): void
     {
         /*
-     * Solo se recalculan promedios cuando Livewire recibe el cambio.
-     * Con wire:model.blur ya no se ejecuta en cada tecla.
-     */
+         * Solo se recalculan promedios cuando Livewire recibe el cambio.
+         * Con wire:model.blur ya no se ejecuta en cada tecla.
+         */
         $this->calcularPromedios();
 
         /*
-     * Solo se reaplica el filtro si realmente hay un filtro activo.
-     * Esto evita recorrer toda la tabla innecesariamente.
-     */
+         * Solo se reaplica el filtro si realmente hay un filtro activo.
+         * Esto evita recorrer toda la tabla innecesariamente.
+         */
         if ($this->filtro_estado !== '' || $this->orden_promedio !== '') {
             $this->aplicarFiltroEstado();
         }
@@ -630,8 +630,8 @@ class Calificacion extends Component
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
-                            ($inscripcion->apellido_materno ?? '') . ' ' .
-                            ($inscripcion->nombre ?? '')
+                        ($inscripcion->apellido_materno ?? '') . ' ' .
+                        ($inscripcion->nombre ?? '')
                     ),
                 ];
             })
@@ -666,10 +666,10 @@ class Calificacion extends Component
                 }
             })
 
-            // Se ordenan las materias por la columna orden de asignacion_materias.
-            ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('orden')
-            ->orderBy('id')
+            // Se respeta el orden de la asignación de materias.
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('asignacion_materias.id')
             ->get();
 
         $this->materias = $asignaciones
@@ -682,7 +682,6 @@ class Calificacion extends Component
 
                     // Se manda el orden al Blade por si se desea mostrar.
                     'orden' => $asignacion->orden,
-
                     'materia' => $asignacion->materia?->materia ?? 'Materia',
                     'clave' => $asignacion->materia?->clave,
                     'slug' => $asignacion->materia?->slug,
@@ -692,8 +691,8 @@ class Calificacion extends Component
                     'profesor' => $profesor
                         ? trim(
                             ($profesor->nombre ?? '') . ' ' .
-                                ($profesor->apellido_paterno ?? '') . ' ' .
-                                ($profesor->apellido_materno ?? '')
+                            ($profesor->apellido_paterno ?? '') . ' ' .
+                            ($profesor->apellido_materno ?? '')
                         )
                         : 'SIN PROFESOR ASIGNADO',
                 ];
@@ -878,15 +877,13 @@ class Calificacion extends Component
 
     private function obtenerMateriasOrdenadasParaPromedio(): Collection
     {
-        $numeroMaterias = $this->obtenerNumeroMateriasPromediar();
-
-        if ($numeroMaterias === null || $numeroMaterias <= 0) {
-            return collect();
-        }
-
         /*
-         * Solo se consideran materias no extra.
-         * Después se toman las primeras según el número configurado.
+         * Se toman todas las materias normales, no extras.
+         * No se usa take(), porque si una materia contiene AC, NP, SD
+         * o cualquier texto, se ignora al calcular el promedio.
+         *
+         * Si se limita aquí con take(10), puede dejar fuera materias numéricas
+         * y meter materias con AC dentro de las primeras posiciones.
          */
         return collect($this->materias)
             ->filter(fn($materia) => empty($materia['extra']))
@@ -895,8 +892,17 @@ class Calificacion extends Component
                 fn($materia) => $materia['orden'] ?? 999,
                 fn($materia) => $materia['id'] ?? 999,
             ])
-            ->take($numeroMaterias)
             ->values();
+    }
+
+    private function redondearPromedio(float $valor): float
+    {
+        /*
+         * Se usa round para evitar errores de precisión decimal.
+         * Con floor, valores como 9.8 pueden terminar mostrándose como 9.7.
+         */
+
+        return round($valor, 1);
     }
 
     private function calcularPromedioAlumno(
@@ -906,10 +912,7 @@ class Calificacion extends Component
     ): string {
         $materiasOrdenadas ??= $this->obtenerMateriasOrdenadasParaPromedio();
 
-        if (
-            $inscripcionId <= 0 ||
-            $materiasOrdenadas->isEmpty()
-        ) {
+        if ($inscripcionId <= 0 || $materiasOrdenadas->isEmpty()) {
             return '0.0';
         }
 
@@ -927,10 +930,10 @@ class Calificacion extends Component
             $valor = $this->normalizarCalificacion($valor);
 
             /*
-         * Solo se toman calificaciones numéricas.
-         * Las calificaciones vacías, pendientes o claves como AC, ED, RA, NP y SD
-         * no se suman y tampoco se cuentan para dividir.
-         */
+             * Solo se suman valores numéricos.
+             * AC, NP, SD, ED, RA, textos y vacíos no se suman
+             * y tampoco cuentan como divisor.
+             */
             if (!$this->esCalificacionNumerica($valor)) {
                 continue;
             }
@@ -939,20 +942,11 @@ class Calificacion extends Component
             $totalNumericas++;
         }
 
-        /*
-     * Si el alumno no tiene ninguna calificación numérica,
-     * su promedio queda como 0.0 para evitar marcarlo como reprobado real.
-     */
         if ($totalNumericas === 0) {
             return '0.0';
         }
 
-        /*
-     * Se divide únicamente entre las calificaciones numéricas capturadas.
-     * No se divide entre todas las materias.
-     */
-        $promedio = $suma / $totalNumericas;
-        $promedio = floor($promedio * 10) / 10;
+        $promedio = $this->redondearPromedio($suma / $totalNumericas);
 
         return number_format($promedio, 1, '.', '');
     }
@@ -1008,14 +1002,14 @@ class Calificacion extends Component
                     'pendientes' => !$tieneNumericas || $valores->contains(fn($valor) => $valor === null || $valor === ''),
 
                     'aprobados' => $tieneNumericas
-                        && $valores
+                    && $valores
                         ->filter(fn($valor) => $this->esCalificacionNumerica($valor))
                         ->every(fn($valor) => (float) $valor >= 6),
 
                     'reprobados' => $tieneNumericas
-                        && $valores->contains(
-                            fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6
-                        ),
+                    && $valores->contains(
+                        fn($valor) => $this->esCalificacionNumerica($valor) && (float) $valor < 6
+                    ),
 
                     'especiales' => $valores->contains(fn($valor) => $this->esCalificacionEspecial($valor)),
 
@@ -1476,8 +1470,8 @@ class Calificacion extends Component
 
         return $this->grupos->firstWhere('id', (int) $this->grupo_id)
             ?? Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->find($this->grupo_id);
+                ->with('asignacionGrupo:id,nombre')
+                ->find($this->grupo_id);
     }
 
     public function getClaseEstadoPeriodoProperty(): string
@@ -1542,7 +1536,7 @@ class Calificacion extends Component
             ->values();
 
         $promedioGlobal = $promediosAlumnos->isNotEmpty()
-            ? floor(($promediosAlumnos->sum() / $promediosAlumnos->count()) * 10) / 10
+            ? $this->redondearPromedio($promediosAlumnos->sum() / $promediosAlumnos->count())
             : 0;
 
         $aprobados = $promediosAlumnos
@@ -1608,7 +1602,7 @@ class Calificacion extends Component
                     return null;
                 }
 
-                $promedioMateria = floor($valores->avg() * 10) / 10;
+                $promedioMateria = $this->redondearPromedio($valores->avg());
 
                 return [
                     'materia' => $this->recortarTexto($materia['materia'] ?? 'Materia', 18),
@@ -1629,7 +1623,7 @@ class Calificacion extends Component
             ->values();
 
         $promedioGlobal = $promediosAlumnos->isNotEmpty()
-            ? floor(($promediosAlumnos->sum() / $promediosAlumnos->count()) * 10) / 10
+            ? $this->redondearPromedio($promediosAlumnos->sum() / $promediosAlumnos->count())
             : 0;
 
         $aprobadas = $promediosAlumnos
@@ -1789,7 +1783,7 @@ class Calificacion extends Component
                 $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
                 $pendientesMateria = $valores->filter(fn($valor) => blank($valor))->count();
                 $especiales = $valores->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
-                $promedio = $numericas->isEmpty() ? null : floor($numericas->avg() * 10) / 10;
+                $promedio = $numericas->isEmpty() ? null : $this->redondearPromedio($numericas->avg());
 
                 return [
                     'id' => $asignacionMateriaId,

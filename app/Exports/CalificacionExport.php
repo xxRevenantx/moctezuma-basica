@@ -156,7 +156,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->values();
 
         $promedioGlobal = $promediosNumericos->isNotEmpty()
-            ? $this->truncarDecimal($promediosNumericos->avg(), 1)
+            ? round($promediosNumericos->avg(), 1)
             : 0;
 
         $totalAlumnos = count($this->inscripciones);
@@ -1059,16 +1059,21 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
         }
 
+        /*
+         * Se respeta el orden de la asignación de materias.
+         * Las materias sin orden se mandan al final.
+         */
         $query
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('asignacion_materias.orden')
-            ->orderBy('materias.orden')
-            ->orderBy('materias.materia');
+            ->orderBy('asignacion_materias.id');
 
         return $query->get()
             ->map(function ($item) {
                 return [
                     'id' => (int) $item->id,
                     'materia' => $item->materia ?: 'MATERIA',
+                    'orden' => $item->orden,
                     'extra' => (int) ($item->extra ?? 0),
                 ];
             })
@@ -1219,6 +1224,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
 
             $suma = 0;
+            $totalNumericas = 0;
 
             foreach ($materiasPromediables as $materia) {
                 $clave = $inscripcionId . '-' . $materia['id'];
@@ -1229,14 +1235,18 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 }
 
                 $suma += (float) $valor;
+                $totalNumericas++;
             }
 
             /*
-             * Se divide entre el número configurado.
-             * Si falta una calificación, cuenta como 0.
+             * AC, NP o cualquier texto no suma y tampoco cuenta como divisor.
              */
-            $promedio = $suma / $numeroMaterias;
-            $promedio = $this->truncarDecimal($promedio, 1);
+            if ($totalNumericas === 0) {
+                $promedios[$inscripcionId] = '0.0';
+                continue;
+            }
+
+            $promedio = round($suma / $totalNumericas, 1);
 
             $promedios[$inscripcionId] = number_format($promedio, 1, '.', '');
         }
@@ -1267,7 +1277,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
 
             $promedio = $total > 0
-                ? $this->truncarDecimal($suma / $total, 1)
+                ? round($suma / $total, 1)
                 : 0;
 
             $promedios[] = [
@@ -1367,7 +1377,6 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 fn($materia) => $materia['orden'] ?? 999,
                 fn($materia) => $materia['id'] ?? 999,
             ])
-            ->take($numeroMaterias)
             ->values()
             ->toArray();
     }
@@ -1387,11 +1396,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         return $numero >= 0 && $numero <= 10;
     }
 
-    protected function truncarDecimal(float $valor, int $decimales = 1): float
+    protected function redondearPromedio(float $valor, int $decimales = 1): float
     {
-        $factor = pow(10, $decimales);
-
-        return floor($valor * $factor) / $factor;
+        /*
+         * Se redondea el promedio para evitar cortes incorrectos.
+         * No se usa floor porque puede bajar valores como 8.79 a 8.7.
+         */
+        return round($valor, $decimales);
     }
 
     protected function estadoPromedio($promedio): string

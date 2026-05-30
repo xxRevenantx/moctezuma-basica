@@ -192,6 +192,12 @@ class PromediosGenerales extends Component
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)
+            /*
+             * promedio-numerico-pro:
+             * Aquí ya se ignoran AC, NP, SD, ED, RA, textos y vacíos
+             * porque solo pasan calificaciones numéricas con valor_numerico.
+             * No se usa take(), para no dejar fuera materias numéricas.
+             */
             ->whereIn(DB::raw($campoPeriodo), $limitePeriodos)
             ->when($this->generacion_id !== '', fn($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($query) => $query->where('calificaciones.grado_id', $this->grado_id))
@@ -252,19 +258,8 @@ class PromediosGenerales extends Component
                         ->map(fn(Collection $items) => $items->last())
                         ->values();
 
-                    $valoresNumericos = $registrosPeriodo
-                        ->pluck('valor_numerico')
-                        ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 0 && (float) $valor <= 10)
-                        ->map(fn($valor) => (float) $valor)
-                        ->values();
-
-                    $totalNumericas = $valoresNumericos->count();
-
-                    $periodos[$periodo] = $totalNumericas > 0
-                        ? $this->redondearPromedio($valoresNumericos->sum() / $totalNumericas)
-                        : null;
-
-                    $materiasCapturadas += $totalNumericas;
+                    $periodos[$periodo] = $valor !== null ? floor($valor * 10) / 10 : null;
+                    $materiasCapturadas += (int) ($registroPeriodo->materias_capturadas ?? 0);
                 }
 
                 $periodosCapturados = collect($periodos)
@@ -397,15 +392,6 @@ class PromediosGenerales extends Component
         }
 
         return 'Aprobado';
-    }
-
-    private function redondearPromedio(float $valor): float
-    {
-        /*
-     * Se redondea a un decimal para usar el mismo criterio
-     * de promedio-numerico-pro.
-     */
-        return round($valor, 1);
     }
 
     public function formatearDecimal(null|int|float|string $valor): string
