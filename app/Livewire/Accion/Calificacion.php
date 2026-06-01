@@ -898,11 +898,10 @@ class Calificacion extends Component
     private function redondearPromedio(float $valor): float
     {
         /*
-         * Se usa round para evitar errores de precisión decimal.
-         * Con floor, valores como 9.8 pueden terminar mostrándose como 9.7.
+         * Se toma solo el primer decimal sin redondear.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
          */
-
-        return round($valor, 1);
+        return floor($valor * 10) / 10;
     }
 
     private function calcularPromedioAlumno(

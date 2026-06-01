@@ -413,6 +413,28 @@
 </head>
 
 <body>
+
+    @php
+        /*
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
+         */
+        $truncarPromedio = function ($valor): ?float {
+            if (!is_numeric($valor)) {
+                return null;
+            }
+
+            return floor(((float) $valor) * 10) / 10;
+        };
+
+        $formatearPromedio = function ($valor) use ($truncarPromedio): string {
+            $promedioTruncado = $truncarPromedio($valor);
+
+            return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : '—';
+        };
+    @endphp
+
     <div class="header">
 
         <table class="encabezado">
@@ -488,7 +510,7 @@
         <tr>
             <td class="card card-blue">
                 <div class="card-title">Promedio</div>
-                <div class="card-value">{{ $promedio }}</div>
+                <div class="card-value">{{ $formatearPromedio($promedio ?? null) }}</div>
             </td>
 
 

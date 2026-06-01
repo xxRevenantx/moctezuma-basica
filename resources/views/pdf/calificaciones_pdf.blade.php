@@ -462,14 +462,34 @@
 
     @php
         /*
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
+         */
+        $truncarPromedio = function ($valor): ?float {
+            if (!is_numeric($valor)) {
+                return null;
+            }
+
+            return floor(((float) $valor) * 10) / 10;
+        };
+
+        $formatearPromedio = function ($valor) use ($truncarPromedio): string {
+            $promedioTruncado = $truncarPromedio($valor);
+
+            return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : (string) $valor;
+        };
+
+        /*
          * Ordeno los alumnos por promedio de mayor a menor.
          * Los alumnos sin promedio numérico se mandan al final.
          */
         $inscripcionesOrdenadas = collect($inscripciones)
-            ->sortByDesc(function ($fila) use ($promedios) {
+            ->sortByDesc(function ($fila) use ($promedios, $truncarPromedio) {
                 $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
+                $promedioTruncado = $truncarPromedio($promedioAlumno);
 
-                return is_numeric($promedioAlumno) ? (float) $promedioAlumno : -1;
+                return $promedioTruncado !== null ? $promedioTruncado : -1;
             })
             ->values();
 
@@ -486,14 +506,16 @@
          */
         $promediosUnicos = $hayPromediosParaLugar
             ? $inscripcionesOrdenadas
-                ->map(function ($fila) use ($promedios) {
+                ->map(function ($fila) use ($promedios, $truncarPromedio) {
                     $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? null;
 
                     if (!is_numeric($promedioAlumno) || (float) $promedioAlumno <= 0) {
                         return null;
                     }
 
-                    return number_format((float) $promedioAlumno, 2, '.', '');
+                    $promedioTruncado = $truncarPromedio($promedioAlumno);
+
+                    return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : null;
                 })
                 ->filter()
                 ->unique()
@@ -540,12 +562,12 @@
         <tbody>
             @forelse ($inscripcionesOrdenadas as $fila)
                 @php
-                    $promedioAlumno = $promedios[$fila['inscripcion_id']] ?? '—';
+                    $promedioAlumno = $formatearPromedio($promedios[$fila['inscripcion_id']] ?? '—');
 
                     $promedioClave = null;
 
                     if ($hayPromediosParaLugar && is_numeric($promedioAlumno) && (float) $promedioAlumno > 0) {
-                        $promedioClave = number_format((float) $promedioAlumno, 2, '.', '');
+                        $promedioClave = number_format((float) $promedioAlumno, 1, '.', '');
                     }
 
                     $lugarAlumno =
@@ -635,6 +657,9 @@
                         $promedioMateriaFooter = $promediosPorMateriaMapa->get((int) $materia['id']);
 
                         $promedioMateriaTexto = $promedioMateriaFooter['promedio'] ?? 'Pendiente';
+                        $promedioMateriaTexto = is_numeric($promedioMateriaTexto)
+                            ? $formatearPromedio($promedioMateriaTexto)
+                            : $promedioMateriaTexto;
 
                         $clasePromedioMateria = 'promedio';
 
@@ -703,6 +728,9 @@
             @forelse ($promediosPorMateria ?? [] as $item)
                 @php
                     $promedioMateria = $item['promedio'] ?? '—';
+                    $promedioMateria = is_numeric($promedioMateria)
+                        ? $formatearPromedio($promedioMateria)
+                        : $promedioMateria;
                     $estadoMateria = 'Sin datos';
 
                     if (is_numeric($promedioMateria)) {
@@ -763,6 +791,9 @@
             @forelse ($promediosPorMateria ?? [] as $index => $item)
                 @php
                     $promedioMateria = $item['promedio'] ?? '—';
+                    $promedioMateria = is_numeric($promedioMateria)
+                        ? $formatearPromedio($promedioMateria)
+                        : $promedioMateria;
                     $porcentaje = $item['porcentaje'] ?? 0;
 
                     $barClass = 'bar-blue';

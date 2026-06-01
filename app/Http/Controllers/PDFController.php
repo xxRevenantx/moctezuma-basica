@@ -982,7 +982,7 @@ class PDFController extends Controller
         abort(422, 'Tipo de reanudación inválido.');
     }
 
-    // HORARIO PDF
+
     public function reconocimiento_calificaciones_pdf(Request $request)
     {
         $slugNivel = $request->input('slug_nivel');
@@ -1195,8 +1195,9 @@ class PDFController extends Controller
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
         $materias = $queryMaterias
+            // Se respeta el orden de la asignación de materias.
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('asignacion_materias.orden')
-            ->orderBy('materias.orden')
             ->orderBy('asignacion_materias.id')
             ->get();
 
@@ -1279,22 +1280,24 @@ class PDFController extends Controller
             : 0;
 
         /*
-         * Solo las materias no extra pueden entrar al promedio.
-         * Se toma únicamente la cantidad configurada en materia_promediar.
+         * promedio-numerico-pro:
+         * Se toman todas las materias normales, no extra y no receso.
+         * No se usa take(numero_materias), porque puede dejar fuera materias
+         * numéricas cuando antes aparecen AC, NP, SD, ED, RA, textos o vacíos.
          */
-        $materiasPromediables = collect();
-
-        if ($numeroMateriasPromediar > 0) {
-            $materiasPromediables = $materias
-                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0)
+        $materiasPromediables = $numeroMateriasPromediar > 0
+            ? $materias
+                ->filter(function ($materia) {
+                    return (int) ($materia->extra ?? 0) === 0
+                        && (int) ($materia->receso ?? 0) === 0;
+                })
                 ->sortBy([
                     fn($materia) => $materia->orden === null ? 1 : 0,
                     fn($materia) => $materia->orden ?? 999,
                     fn($materia) => $materia->id ?? 999,
                 ])
-                ->take($numeroMateriasPromediar)
-                ->values();
-        }
+                ->values()
+            : collect();
 
         $idsMateriasPromediables = $materiasPromediables
             ->pluck('id')
@@ -1303,6 +1306,31 @@ class PDFController extends Controller
             ->toArray();
 
         $hayMateriasPromediables = $numeroMateriasPromediar > 0 && !empty($idsMateriasPromediables);
+
+        $obtenerNumeroValido = function ($valor): ?float {
+            $valor = strtoupper(trim((string) $valor));
+
+            if ($valor === '' || !is_numeric($valor)) {
+                return null;
+            }
+
+            $numero = (float) $valor;
+
+            if ($numero < 0 || $numero > 10) {
+                return null;
+            }
+
+            return $numero;
+        };
+
+        $truncarPromedio = function (float $valor): float {
+            /*
+             * promedio-numerico-pro:
+             * Se toma solo el primer decimal sin redondear.
+             * Ejemplo: 8.777777777777778 se muestra como 8.7.
+             */
+            return floor(($valor + 0.000000001) * 10) / 10;
+        };
 
         /*
         |--------------------------------------------------------------------------
@@ -1314,6 +1342,7 @@ class PDFController extends Controller
 
         $suma = 0;
         $capturadasNumericas = 0;
+        $capturadasNumericasPromedio = 0;
         $especiales = 0;
         $reprobadas = 0;
         $aprobadas = 0;
@@ -1329,28 +1358,26 @@ class PDFController extends Controller
 
             $estado = 'Sin captura';
             $porcentaje = 0;
+            $numero = $obtenerNumeroValido($valor);
 
-            if (is_numeric($valor)) {
-                $numero = (float) $valor;
+            if ($numero !== null) {
+                $porcentaje = min(100, $numero * 10);
+                $capturadasNumericas++;
 
-                if ($numero >= 0 && $numero <= 10) {
-                    $porcentaje = min(100, $numero * 10);
-                    $capturadasNumericas++;
+                if ($hayMateriasPromediables && in_array((int) $materia->id, $idsMateriasPromediables, true)) {
+                    $suma += $numero;
+                    $capturadasNumericasPromedio++;
+                }
 
-                    if (in_array((int) $materia->id, $idsMateriasPromediables, true)) {
-                        $suma += $numero;
-                    }
-
-                    if ($numero < 6) {
-                        $estado = 'En riesgo';
-                        $reprobadas++;
-                    } elseif ($numero < 8) {
-                        $estado = 'Regular';
-                        $aprobadas++;
-                    } else {
-                        $estado = 'Aprobado';
-                        $aprobadas++;
-                    }
+                if ($numero < 6) {
+                    $estado = 'En riesgo';
+                    $reprobadas++;
+                } elseif ($numero < 8) {
+                    $estado = 'Regular';
+                    $aprobadas++;
+                } else {
+                    $estado = 'Aprobado';
+                    $aprobadas++;
                 }
             } elseif ($valor !== '') {
                 $estado = 'Especial';
@@ -1365,6 +1392,8 @@ class PDFController extends Controller
                 'porcentaje' => $porcentaje,
                 'observacion' => $observacion ?: '—',
                 'extra' => (int) ($materia->extra ?? 0),
+                'receso' => (int) ($materia->receso ?? 0),
+                'promediable' => $hayMateriasPromediables && in_array((int) $materia->id, $idsMateriasPromediables, true),
             ];
         }
 
@@ -1373,13 +1402,13 @@ class PDFController extends Controller
         $porcentajePromedio = 0;
         $estadoPromedio = 'Pendiente';
 
-        if ($hayMateriasPromediables) {
+        if ($hayMateriasPromediables && $capturadasNumericasPromedio > 0) {
             /*
-             * Se divide entre el número configurado.
-             * Las materias promediables sin calificación numérica cuentan como 0.
+             * promedio-numerico-pro:
+             * Se divide únicamente entre calificaciones numéricas encontradas.
              */
-            $promedioCalculado = $suma / $numeroMateriasPromediar;
-            $promedioTruncado = floor($promedioCalculado * 10) / 10;
+            $promedioCalculado = $suma / $capturadasNumericasPromedio;
+            $promedioTruncado = $truncarPromedio($promedioCalculado);
 
             $promedioNumero = $promedioTruncado;
             $promedio = number_format($promedioTruncado, 1, '.', '');
@@ -1412,8 +1441,8 @@ class PDFController extends Controller
         | - Se toman todos los alumnos del mismo contexto.
         | - Se consultan sus calificaciones del mismo periodo.
         | - Se promedian solo materias extra = 0.
-        | - Se divide entre $numeroMateriasPromediar.
-        | - Se trunca a 1 decimal.
+        | - Se divide solo entre calificaciones numéricas encontradas.
+        | - Se toma solo el primer decimal sin redondear.
         | - Se ordena de mayor a menor.
         | - Los empates comparten lugar.
         | - Solo se consideran los primeros 3 lugares.
@@ -1513,35 +1542,32 @@ class PDFController extends Controller
             $inscripcionLugarId = (int) $filaLugar['inscripcion_id'];
 
             if (!$hayMateriasPromediables) {
-                $promediosLugar[$inscripcionLugarId] = '0.0';
+                $promediosLugar[$inscripcionLugarId] = 'Pendiente';
                 continue;
             }
 
             $sumaLugar = 0;
+            $totalNumericasLugar = 0;
 
             foreach ($materiasPromediables as $materia) {
                 $claveLugar = $inscripcionLugarId . '-' . $materia->id;
-                $valorLugar = $calificacionesLugar[$claveLugar] ?? null;
+                $numeroLugar = $obtenerNumeroValido($calificacionesLugar[$claveLugar] ?? null);
 
-                if ($valorLugar === null || $valorLugar === '') {
+                if ($numeroLugar === null) {
                     continue;
                 }
 
-                $valorLugar = strtoupper(trim((string) $valorLugar));
-
-                if (!is_numeric($valorLugar)) {
-                    continue;
-                }
-
-                $numeroLugar = (float) $valorLugar;
-
-                if ($numeroLugar >= 0 && $numeroLugar <= 10) {
-                    $sumaLugar += $numeroLugar;
-                }
+                $sumaLugar += $numeroLugar;
+                $totalNumericasLugar++;
             }
 
-            $promedioLugarCalculado = $sumaLugar / $numeroMateriasPromediar;
-            $promedioLugarTruncado = floor($promedioLugarCalculado * 10) / 10;
+            if ($totalNumericasLugar === 0) {
+                $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                continue;
+            }
+
+            $promedioLugarCalculado = $sumaLugar / $totalNumericasLugar;
+            $promedioLugarTruncado = $truncarPromedio($promedioLugarCalculado);
 
             $promediosLugar[$inscripcionLugarId] = number_format($promedioLugarTruncado, 1, '.', '');
         }
@@ -1556,14 +1582,14 @@ class PDFController extends Controller
 
         $promediosUnicosLugar = $hayMateriasPromediables
             ? $inscripcionesOrdenadasLugar
-                ->map(function ($filaLugar) use ($promediosLugar) {
+                ->map(function ($filaLugar) use ($promediosLugar, $truncarPromedio) {
                     $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
 
                     if (!is_numeric($promedioAlumnoLugar) || (float) $promedioAlumnoLugar <= 0) {
                         return null;
                     }
 
-                    return number_format((float) $promedioAlumnoLugar, 1, '.', '');
+                    return number_format($truncarPromedio((float) $promedioAlumnoLugar), 1, '.', '');
                 })
                 ->filter()
                 ->unique()
@@ -1578,7 +1604,7 @@ class PDFController extends Controller
         }
 
         $promedioClaveAlumno = $hayMateriasPromediables && is_numeric($promedio) && (float) $promedio > 0
-            ? number_format((float) $promedio, 1, '.', '')
+            ? number_format($truncarPromedio((float) $promedio), 1, '.', '')
             : null;
 
         $lugarAlumno = $promedioClaveAlumno && isset($lugaresPorPromedio[$promedioClaveAlumno])
@@ -2130,6 +2156,15 @@ class PDFController extends Controller
             return $numero;
         };
 
+        $truncarPromedio = function (float $valor): float {
+            /*
+             * promedio-numerico-pro:
+             * Se toma solo el primer decimal sin redondear.
+             * Ejemplo: 8.777777777777778 se muestra como 8.7.
+             */
+            return floor(($valor + 0.000000001) * 10) / 10;
+        };
+
         /*
         |--------------------------------------------------------------------------
         | Promedios por alumno
@@ -2177,7 +2212,7 @@ class PDFController extends Controller
             /*
              * Se divide solo entre calificaciones numéricas capturadas.
              */
-            $promedio = round($suma / $totalNumericas, 1);
+            $promedio = $truncarPromedio($suma / $totalNumericas);
 
             $promedios[$inscripcionId] = number_format($promedio, 1, '.', '');
         }
@@ -2237,7 +2272,7 @@ class PDFController extends Controller
             }
 
             if ($totalNumericasMateria > 0) {
-                $promedioMateria = round($sumaMateria / $totalNumericasMateria, 1);
+                $promedioMateria = $truncarPromedio($sumaMateria / $totalNumericasMateria);
 
                 $promedioTexto = number_format($promedioMateria, 1, '.', '');
                 $porcentaje = min(100, max(0, $promedioMateria * 10));
@@ -2280,7 +2315,7 @@ class PDFController extends Controller
             ->values();
 
         $promedioGeneralGrupo = $promediosNumericosGrupo->isNotEmpty()
-            ? round($promediosNumericosGrupo->avg(), 1)
+            ? $truncarPromedio($promediosNumericosGrupo->avg())
             : 0;
 
         $promedioGeneralGrupoTexto = number_format($promedioGeneralGrupo, 1, '.', '');
@@ -2599,8 +2634,8 @@ class PDFController extends Controller
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
         $materias = $queryMaterias
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('asignacion_materias.orden')
-            ->orderBy('materias.orden')
             ->orderBy('asignacion_materias.id')
             ->get();
 
@@ -2636,6 +2671,10 @@ class PDFController extends Controller
             $queryCalificaciones->where('grupo_id', $grupo->id);
         }
 
+        if (!blank($periodo->ciclo_escolar_id) && Schema::hasColumn('calificaciones', 'ciclo_escolar_id')) {
+            $queryCalificaciones->where('ciclo_escolar_id', $periodo->ciclo_escolar_id);
+        }
+
         if (Schema::hasColumn('calificaciones', 'semestre_id')) {
             if ($esBachillerato) {
                 $queryCalificaciones->where('semestre_id', $semestre->id);
@@ -2650,7 +2689,7 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Promedio
+        | Configuración de materias a promediar
         |--------------------------------------------------------------------------
         */
 
@@ -2671,22 +2710,31 @@ class PDFController extends Controller
         $registroPromedio = $queryMateriaPromediar->first();
 
         /*
-         * Si no existe registro en materia_promediar,
-         * o el número de materias es 0, no se promedia ninguna materia.
+         * Si no existe configuración o el número es 0,
+         * el promedio queda pendiente.
          */
         $numeroMateriasPromediar = $registroPromedio
             ? max(0, (int) $registroPromedio->numero_materias)
             : 0;
 
         /*
-         * Solo las materias no extra pueden entrar al promedio.
-         * Se toman en el mismo orden en que aparecen en la boleta.
+         * promedio-numerico-pro:
+         * Se toman todas las materias normales ordenadas por asignación.
+         * No se usa take(), porque los textos como AC, NP, SD, ED o RA
+         * no deben dejar fuera otras materias numéricas.
          */
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? $materias
-                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0)
+                ->filter(function ($materia) {
+                    return (int) ($materia->extra ?? 0) === 0
+                        && (int) ($materia->receso ?? 0) === 0;
+                })
+                ->sortBy([
+                    fn($materia) => $materia->orden === null ? 1 : 0,
+                    fn($materia) => $materia->orden ?? 999,
+                    fn($materia) => $materia->id ?? 999,
+                ])
                 ->values()
-                ->take($numeroMateriasPromediar)
             : collect();
 
         $idsMateriasPromediables = $materiasPromediables
@@ -2696,6 +2744,37 @@ class PDFController extends Controller
             ->toArray();
 
         $hayMateriasPromediables = $numeroMateriasPromediar > 0 && !empty($idsMateriasPromediables);
+
+        $obtenerNumeroValido = function ($valor): ?float {
+            $valor = strtoupper(trim((string) $valor));
+
+            if ($valor === '' || !is_numeric($valor)) {
+                return null;
+            }
+
+            $numero = (float) $valor;
+
+            if ($numero < 0 || $numero > 10) {
+                return null;
+            }
+
+            return $numero;
+        };
+
+        $truncarPromedio = function (float $valor): float {
+            /*
+             * promedio-numerico-pro:
+             * Se toma solo el primer decimal sin truncar.
+             * Ejemplo: 8.777777777777778 se muestra como 8.7.
+             */
+            return floor(($valor + 0.000000001) * 10) / 10;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filas de materias y promedio del alumno
+        |--------------------------------------------------------------------------
+        */
 
         $filasMaterias = [];
         $sumaPromedio = 0;
@@ -2717,32 +2796,26 @@ class PDFController extends Controller
             $estado = 'Sin captura';
             $porcentaje = 0;
 
-            if (is_numeric($valor)) {
-                $numero = (float) $valor;
+            $numero = $obtenerNumeroValido($valor);
 
-                if ($numero >= 0 && $numero <= 10) {
-                    $porcentaje = min(100, $numero * 10);
-                    $capturadasNumericas++;
+            if ($numero !== null) {
+                $porcentaje = min(100, $numero * 10);
+                $capturadasNumericas++;
 
-                    /*
-                     * El promedio solo suma las materias configuradas
-                     * en materia_promediar. Las demás no afectan el promedio.
-                     */
-                    if ($hayMateriasPromediables && in_array((int) $materia->id, $idsMateriasPromediables, true)) {
-                        $sumaPromedio += $numero;
-                        $capturadasNumericasPromedio++;
-                    }
+                if ($hayMateriasPromediables && in_array((int) $materia->id, $idsMateriasPromediables, true)) {
+                    $sumaPromedio += $numero;
+                    $capturadasNumericasPromedio++;
+                }
 
-                    if ($numero < 6) {
-                        $estado = 'En riesgo';
-                        $reprobadas++;
-                    } elseif ($numero < 8) {
-                        $estado = 'Regular';
-                        $aprobadas++;
-                    } else {
-                        $estado = 'Aprobado';
-                        $aprobadas++;
-                    }
+                if ($numero < 6) {
+                    $estado = 'En riesgo';
+                    $reprobadas++;
+                } elseif ($numero < 8) {
+                    $estado = 'Regular';
+                    $aprobadas++;
+                } else {
+                    $estado = 'Aprobado';
+                    $aprobadas++;
                 }
             } elseif ($valor !== '') {
                 $estado = 'Especial';
@@ -2757,34 +2830,28 @@ class PDFController extends Controller
                 'porcentaje' => $porcentaje,
                 'observacion' => $observacion ?: '—',
                 'extra' => (int) ($materia->extra ?? 0),
+                'receso' => (int) ($materia->receso ?? 0),
                 'promediable' => $hayMateriasPromediables && in_array((int) $materia->id, $idsMateriasPromediables, true),
             ];
         }
 
-        /*
-         * Si no hay materias a promediar, el promedio queda en 0.0
-         * y el estado queda pendiente.
-         */
         $promedio = '0.0';
         $promedioNumero = 0.0;
         $porcentajePromedio = 0;
         $estadoPromedio = 'Pendiente';
 
-        if ($hayMateriasPromediables) {
+        if ($hayMateriasPromediables && $capturadasNumericasPromedio > 0) {
             /*
-             * Se divide entre el número configurado.
-             * Si falta una calificación numérica, esa materia cuenta como 0.
+             * Se divide únicamente entre las calificaciones numéricas encontradas.
+             * AC, NP, SD, ED, RA, textos y vacíos no suman ni dividen.
              */
-            $promedioCalculado = $sumaPromedio / $numeroMateriasPromediar;
-            $promedioTruncado = floor($promedioCalculado * 10) / 10;
+            $promedioNumero = $truncarPromedio($sumaPromedio / $capturadasNumericasPromedio);
+            $promedio = number_format($promedioNumero, 1, '.', '');
+            $porcentajePromedio = min(100, $promedioNumero * 10);
 
-            $promedioNumero = $promedioTruncado;
-            $promedio = number_format($promedioTruncado, 1, '.', '');
-            $porcentajePromedio = min(100, $promedioTruncado * 10);
-
-            if ($promedioTruncado < 6) {
+            if ($promedioNumero < 6) {
                 $estadoPromedio = 'Reprobado';
-            } elseif ($promedioTruncado < 8) {
+            } elseif ($promedioNumero < 8) {
                 $estadoPromedio = 'Regular';
             } else {
                 $estadoPromedio = 'Aprobado';
@@ -2823,6 +2890,176 @@ class PDFController extends Controller
         $porcentajeCaptura = $totalMaterias > 0
             ? round((($totalMaterias - $pendientes) / $totalMaterias) * 100)
             : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lugar del alumno por promedio
+        |--------------------------------------------------------------------------
+        */
+
+        $queryInscripcionesLugar = $this->queryInscripcionesPorContextoPdf(
+            nivel: $nivel,
+            generacion: $generacion,
+            grado: $grado,
+            grupo: $grupo,
+            esBachillerato: $esBachillerato
+        );
+
+        $inscripcionesLugar = $queryInscripcionesLugar
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'inscripcion_id' => (int) $item->id,
+                    'matricula' => $item->matricula ?: '—',
+                    'alumno' => trim(
+                        ($item->nombre ?? '') . ' ' .
+                        ($item->apellido_paterno ?? '') . ' ' .
+                        ($item->apellido_materno ?? '')
+                    ) ?: '—',
+                    'grado' => $item->grado?->nombre ?? '—',
+                    'grupo' => $this->nombreGrupo($item->grupo),
+                    'semestre' => $item->semestre?->numero ?? '—',
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        $idsInscripcionesLugar = collect($inscripcionesLugar)
+            ->pluck('inscripcion_id')
+            ->values()
+            ->all();
+
+        $idsMateriasLugar = $materiasPromediables
+            ->pluck('id')
+            ->values()
+            ->all();
+
+        $calificacionesLugar = [];
+
+        if (!empty($idsInscripcionesLugar) && !empty($idsMateriasLugar)) {
+            $queryCalificacionesLugar = Calificacion::query()
+                ->whereIn('inscripcion_id', $idsInscripcionesLugar)
+                ->whereIn('asignacion_materia_id', $idsMateriasLugar)
+                ->where('periodo_id', $periodoId);
+
+            if (Schema::hasColumn('calificaciones', 'nivel_id')) {
+                $queryCalificacionesLugar->where('nivel_id', $nivel->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'generacion_id')) {
+                $queryCalificacionesLugar->where('generacion_id', $generacion->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'grado_id')) {
+                $queryCalificacionesLugar->where('grado_id', $grado->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'grupo_id')) {
+                $queryCalificacionesLugar->where('grupo_id', $grupo->id);
+            }
+
+            if (!blank($periodo->ciclo_escolar_id) && Schema::hasColumn('calificaciones', 'ciclo_escolar_id')) {
+                $queryCalificacionesLugar->where('ciclo_escolar_id', $periodo->ciclo_escolar_id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'semestre_id')) {
+                if ($esBachillerato) {
+                    $queryCalificacionesLugar->where('semestre_id', $semestre->id);
+                } else {
+                    $queryCalificacionesLugar->whereNull('semestre_id');
+                }
+            }
+
+            $calificacionesLugar = $queryCalificacionesLugar
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    $clave = $item->inscripcion_id . '-' . $item->asignacion_materia_id;
+
+                    return [
+                        $clave => strtoupper(trim((string) $item->calificacion)),
+                    ];
+                })
+                ->toArray();
+        }
+
+        $promediosLugar = [];
+
+        foreach ($inscripcionesLugar as $filaLugar) {
+            $inscripcionLugarId = (int) $filaLugar['inscripcion_id'];
+
+            if (!$hayMateriasPromediables) {
+                $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                continue;
+            }
+
+            $sumaLugar = 0;
+            $totalNumericasLugar = 0;
+
+            foreach ($materiasPromediables as $materia) {
+                $claveLugar = $inscripcionLugarId . '-' . $materia->id;
+                $numeroLugar = $obtenerNumeroValido($calificacionesLugar[$claveLugar] ?? null);
+
+                if ($numeroLugar === null) {
+                    continue;
+                }
+
+                $sumaLugar += $numeroLugar;
+                $totalNumericasLugar++;
+            }
+
+            if ($totalNumericasLugar === 0) {
+                $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                continue;
+            }
+
+            $promedioLugar = $truncarPromedio($sumaLugar / $totalNumericasLugar);
+
+            $promediosLugar[$inscripcionLugarId] = number_format($promedioLugar, 1, '.', '');
+        }
+
+        $inscripcionesOrdenadasLugar = collect($inscripcionesLugar)
+            ->sortByDesc(function ($filaLugar) use ($promediosLugar) {
+                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+
+                return is_numeric($promedioAlumnoLugar) ? (float) $promedioAlumnoLugar : -1;
+            })
+            ->values();
+
+        $promediosUnicosLugar = $inscripcionesOrdenadasLugar
+            ->map(function ($filaLugar) use ($promediosLugar) {
+                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+
+                if (!is_numeric($promedioAlumnoLugar) || (float) $promedioAlumnoLugar <= 0) {
+                    return null;
+                }
+
+                return number_format((float) $promedioAlumnoLugar, 1, '.', '');
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->take(3);
+
+        $lugaresPorPromedio = [];
+
+        foreach ($promediosUnicosLugar as $index => $promedioUnicoLugar) {
+            $lugaresPorPromedio[$promedioUnicoLugar] = $index + 1;
+        }
+
+        $promedioClaveAlumno = is_numeric($promedio)
+            ? number_format((float) $promedio, 1, '.', '')
+            : null;
+
+        $lugarAlumno = $promedioClaveAlumno && isset($lugaresPorPromedio[$promedioClaveAlumno])
+            ? $lugaresPorPromedio[$promedioClaveAlumno]
+            : null;
+
+        $textoLugarAlumno = $lugarAlumno
+            ? $lugarAlumno . '° LUGAR'
+            : 'SIN LUGAR';
 
         /*
         |--------------------------------------------------------------------------
@@ -2886,9 +3123,11 @@ class PDFController extends Controller
             'cicloEscolarTexto' => $cicloEscolarTexto,
             'inscripcion' => $inscripcion,
             'nombreAlumno' => $nombreAlumno,
+
             'filasMaterias' => $filasMaterias,
             'filasMateriasRegulares' => $filasMateriasRegulares,
             'filasMateriasExtras' => $filasMateriasExtras,
+
             'promedio' => $promedio,
             'promedioNumero' => $promedioNumero,
             'numeroMateriasPromediar' => $numeroMateriasPromediar,
@@ -2896,12 +3135,18 @@ class PDFController extends Controller
             'capturadasNumericasPromedio' => $capturadasNumericasPromedio,
             'porcentajePromedio' => $porcentajePromedio,
             'estadoPromedio' => $estadoPromedio,
+
             'totalMaterias' => $totalMaterias,
             'pendientes' => $pendientes,
             'especiales' => $especiales,
             'aprobadas' => $aprobadas,
             'reprobadas' => $reprobadas,
             'porcentajeCaptura' => $porcentajeCaptura,
+
+            'lugarAlumno' => $lugarAlumno,
+            'textoLugarAlumno' => $textoLugarAlumno,
+            'promediosLugar' => $promediosLugar,
+
             'fecha_impresion' => now(),
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
@@ -2914,6 +3159,7 @@ class PDFController extends Controller
 
         return $pdf->stream($nombreArchivo);
     }
+
 
     public function diploma_calificaciones_pdf(Request $request)
     {

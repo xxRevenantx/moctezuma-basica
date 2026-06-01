@@ -183,64 +183,23 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
-        <div
-            class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-            <div
-                class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-neutral-800">
-                <div>
-                    <h3 class="text-base font-black text-slate-950 dark:text-white">Comparativa por grupo</h3>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Promedio final, aprobados, alumnos en riesgo e incompletos.
-                    </p>
-                </div>
-            </div>
 
-            <div wire:key="grafica-promedios-{{ md5(json_encode($grafica)) }}" x-data="graficaPromediosGenerales(@js($grafica))"
-                x-init="iniciar()" class="p-4">
-                <div x-ref="contenedor" class="min-h-[320px] w-full"></div>
-            </div>
+
+    <button type="button" wire:click="exportarExcel" wire:loading.attr="disabled" wire:target="exportarExcel"
+        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-70">
+
+        <div class="flex justify-between">
+            <span wire:loading.remove wire:target="exportarExcel" class="inline-flex items-center gap-2">
+                <flux:icon.document-arrow-down class="h-4 w-4" />
+                Exportar Excel
+            </span>
+
+            <span wire:loading wire:target="exportarExcel" class="inline-flex items-center gap-2">
+                <flux:icon.arrow-path class="h-4 w-4 animate-spin" />
+                Exportando...
+            </span>
         </div>
-
-        <div
-            class="rounded-[1.7rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-            <div class="flex items-center gap-3">
-                <div
-                    class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
-                    <flux:icon.sparkles class="h-5 w-5" />
-                </div>
-                <div>
-                    <h3 class="font-black text-slate-950 dark:text-white">Lectura rápida</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Indicadores accionables</p>
-                </div>
-            </div>
-
-            <div class="mt-5 space-y-3">
-                <div class="rounded-2xl bg-slate-50 p-4 dark:bg-neutral-950/40">
-                    <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Captura
-                        pendiente</p>
-                    <p class="mt-1 text-2xl font-black text-slate-950 dark:text-white">{{ $resumen['incompletos'] }}
-                    </p>
-                    <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        Alumnos con algún {{ $esBachillerato ? 'parcial' : 'periodo' }} faltante.
-                    </p>
-                </div>
-
-                <div class="rounded-2xl bg-slate-50 p-4 dark:bg-neutral-950/40">
-                    <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Fórmula
-                        aplicada</p>
-                    <p class="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        @if ($esBachillerato)
-                            (Parcial 1 + Parcial 2) / parciales capturados
-                        @else
-                            (Periodo 1 + Periodo 2 + Periodo 3)
-                            / periodos capturados
-                        @endif
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
+    </button>
 
     <div class="space-y-4">
         @forelse ($gruposPromedios as $grupoPromedio)
@@ -271,6 +230,8 @@
                         </span>
                     </div>
                 </button>
+
+
 
                 <div x-cloak x-show="abierto" x-transition.opacity.duration.200ms
                     class="border-t border-slate-200 dark:border-neutral-800">

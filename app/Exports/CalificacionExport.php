@@ -156,7 +156,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->values();
 
         $promedioGlobal = $promediosNumericos->isNotEmpty()
-            ? round($promediosNumericos->avg(), 1)
+            ? $this->truncarPromedio((float) $promediosNumericos->avg())
             : 0;
 
         $totalAlumnos = count($this->inscripciones);
@@ -246,7 +246,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                         return null;
                     }
 
-                    return number_format((float) $promedio, 2, '.', '');
+                    return number_format($this->truncarPromedio((float) $promedio), 1, '.', '');
                 })
                 ->filter()
                 ->unique()
@@ -287,12 +287,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
         foreach ($inscripcionesOrdenadas as $inscripcion) {
             $inscripcionId = (int) $inscripcion['inscripcion_id'];
-            $promedio = $this->promedios[$inscripcionId] ?? '0.0';
+            $promedio = $this->promedios[$inscripcionId] ?? 'Pendiente';
 
             $promedioClave = null;
 
             if ($hayPromediosParaLugar && is_numeric($promedio) && (float) $promedio > 0) {
-                $promedioClave = number_format((float) $promedio, 2, '.', '');
+                $promedioClave = number_format($this->truncarPromedio((float) $promedio), 1, '.', '');
             }
 
             $lugar = $promedioClave && isset($lugaresPorPromedio[$promedioClave])
@@ -350,7 +350,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
         foreach ($inscripcionesOrdenadas as $inscripcion) {
             $inscripcionId = (int) $inscripcion['inscripcion_id'];
-            $promedio = $this->promedios[$inscripcionId] ?? '0.0';
+            $promedio = $this->promedios[$inscripcionId] ?? 'Pendiente';
 
             if (!is_numeric($promedio)) {
                 continue;
@@ -1075,6 +1075,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                     'materia' => $item->materia ?: 'MATERIA',
                     'orden' => $item->orden,
                     'extra' => (int) ($item->extra ?? 0),
+                    'receso' => (int) ($item->receso ?? 0),
                 ];
             })
             ->values()
@@ -1216,10 +1217,10 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
             /*
              * Si no hay materias asignadas para promediar,
-             * el promedio queda en 0.0.
+             * el promedio queda como pendiente.
              */
             if ($numeroMaterias <= 0 || empty($materiasPromediables)) {
-                $promedios[$inscripcionId] = '0.0';
+                $promedios[$inscripcionId] = 'Pendiente';
                 continue;
             }
 
@@ -1242,11 +1243,11 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
              * AC, NP o cualquier texto no suma y tampoco cuenta como divisor.
              */
             if ($totalNumericas === 0) {
-                $promedios[$inscripcionId] = '0.0';
+                $promedios[$inscripcionId] = 'Pendiente';
                 continue;
             }
 
-            $promedio = round($suma / $totalNumericas, 1);
+            $promedio = $this->truncarPromedio($suma / $totalNumericas);
 
             $promedios[$inscripcionId] = number_format($promedio, 1, '.', '');
         }
@@ -1277,7 +1278,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
 
             $promedio = $total > 0
-                ? round($suma / $total, 1)
+                ? $this->truncarPromedio($suma / $total)
                 : 0;
 
             $promedios[] = [
@@ -1371,7 +1372,10 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         }
 
         return collect($materias)
-            ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
+            ->filter(function ($materia) {
+                return (int) ($materia['extra'] ?? 0) === 0
+                    && (int) ($materia['receso'] ?? 0) === 0;
+            })
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,
                 fn($materia) => $materia['orden'] ?? 999,
@@ -1396,13 +1400,16 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         return $numero >= 0 && $numero <= 10;
     }
 
-    protected function redondearPromedio(float $valor, int $decimales = 1): float
+    protected function truncarPromedio(float $valor, int $decimales = 1): float
     {
         /*
-         * Se redondea el promedio para evitar cortes incorrectos.
-         * No se usa floor porque puede bajar valores como 8.79 a 8.7.
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
          */
-        return round($valor, $decimales);
+        $factor = pow(10, $decimales);
+
+        return floor(($valor + 0.000000001) * $factor) / $factor;
     }
 
     protected function estadoPromedio($promedio): string

@@ -11,6 +11,10 @@ use App\Models\Semestre;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
+use App\Exports\PromediosGeneralesExport;
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PromediosGenerales extends Component
 {
@@ -398,10 +402,11 @@ class PromediosGenerales extends Component
     private function redondearPromedio(float $valor): float
     {
         /*
-         * Se redondea a un decimal para evitar cortes incorrectos.
-         * No se usa floor porque puede bajar promedios válidos.
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
          */
-        return round($valor, 1);
+        return floor(($valor + 0.000000001) * 10) / 10;
     }
 
     public function formatearDecimal(null|int|float|string $valor): string
@@ -411,6 +416,41 @@ class PromediosGenerales extends Component
         }
 
         return number_format($this->redondearPromedio((float) $valor), 1, '.', '');
+    }
+
+    public function exportarExcel(): BinaryFileResponse
+    {
+        $concentrado = $this->concentrado;
+
+        $nombreArchivo = 'PROMEDIOS_GENERALES_' .
+            Str::slug($this->nivel?->nombre ?? $this->slug_nivel, '_') .
+            '_' .
+            now()->format('Y_m_d_H_i_s') .
+            '.xlsx';
+
+        return Excel::download(
+            new PromediosGeneralesExport(
+                nivelNombre: $this->nivel?->nombre ?? 'Nivel',
+                esBachillerato: $this->esBachillerato,
+                encabezadosPeriodos: $this->encabezadosPeriodos,
+                resumen: $concentrado['resumen'],
+                gruposPromedios: $concentrado['grupos'],
+                filtros: [
+                    'Nivel' => $this->nivel?->nombre ?? 'Sin nivel',
+                    'Ciclo escolar' => $this->ciclo_escolar_id ?: 'Sin seleccionar',
+                    'Generación' => $this->generacion_id ?: 'Todas',
+                    'Grado' => $this->grado_id ?: 'Todos',
+                    'Grupo' => $this->grupo_id ?: 'Todos',
+                    'Semestre' => $this->esBachillerato ? ($this->semestre_id ?: 'Todos') : 'No aplica',
+                    'Orden' => match ($this->orden) {
+                        'promedio_asc' => 'Promedio menor a mayor',
+                        'nombre_asc' => 'Nombre A-Z',
+                        default => 'Promedio mayor a menor',
+                    },
+                ],
+            ),
+            $nombreArchivo
+        );
     }
 
     public function render()
