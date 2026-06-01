@@ -1,4 +1,247 @@
     <div class="space-y-6">
+
+
+        {{-- IMPORTAR Y EXPORTAR ALUMNOS --}}
+        <div
+            class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
+
+            <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
+
+            <div class="p-5 sm:p-6 lg:p-8">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <flux:icon.arrow-down-tray class="h-5 w-5" />
+                            </div>
+
+                            <div>
+                                <h2 class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">
+                                    Importar y exportar alumnos
+                                </h2>
+
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    Descarga la plantilla, llena los datos y vuelve a cargar el archivo desde este
+                                    módulo.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <flux:button type="button" variant="ghost" wire:click="descargarPlantillaAlumnos"
+                            wire:loading.attr="disabled" wire:target="descargarPlantillaAlumnos"
+                            class="cursor-pointer rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+
+                            <span wire:loading.remove wire:target="descargarPlantillaAlumnos"
+                                class="inline-flex items-center gap-2">
+                                <flux:icon.document-arrow-down class="h-4 w-4" />
+                                Descargar plantilla
+                            </span>
+
+                            <span wire:loading wire:target="descargarPlantillaAlumnos"
+                                class="inline-flex items-center gap-2">
+                                <span
+                                    class="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600"></span>
+                                Preparando...
+                            </span>
+                        </flux:button>
+
+                        <flux:button type="button" variant="ghost" wire:click="exportarAlumnos"
+                            wire:loading.attr="disabled" wire:target="exportarAlumnos"
+                            class="cursor-pointer rounded-2xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+
+                            <span wire:loading.remove wire:target="exportarAlumnos"
+                                class="inline-flex items-center gap-2">
+                                <flux:icon.table-cells class="h-4 w-4" />
+                                Exportar alumnos
+                            </span>
+
+                            <span wire:loading wire:target="exportarAlumnos" class="inline-flex items-center gap-2">
+                                <span
+                                    class="h-4 w-4 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600"></span>
+                                Exportando...
+                            </span>
+                        </flux:button>
+                    </div>
+                </div>
+
+                <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+                    <div>
+                        <div class="mb-1 flex items-center gap-2">
+                            <flux:label>Archivo Excel</flux:label>
+
+                            <span
+                                class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                XLSX, XLS o CSV
+                            </span>
+                        </div>
+
+                        <label
+                            class="group relative flex cursor-pointer flex-col justify-center rounded-2xl border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 px-4 py-4 transition duration-300 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
+
+                            <input type="file" wire:model="archivoAlumnos" accept=".xlsx,.xls,.csv" class="hidden">
+
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-sky-600 shadow-sm dark:bg-neutral-800 dark:text-sky-300">
+                                        <flux:icon.cloud-arrow-up class="h-5 w-5" />
+                                    </div>
+
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                            Selecciona el archivo de alumnos
+                                        </p>
+
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                            Usa la plantilla descargada para evitar errores de columnas.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-xs font-semibold text-sky-700 shadow-sm ring-1 ring-sky-100 dark:bg-neutral-800 dark:text-sky-300 dark:ring-sky-900/30">
+                                    Buscar archivo
+                                </div>
+                            </div>
+                        </label>
+
+                        <div wire:loading wire:target="archivoAlumnos"
+                            class="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                            Cargando archivo...
+                        </div>
+
+                        @if ($archivoAlumnos)
+                            <div
+                                class="mt-2 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                <flux:icon.check-circle class="h-4 w-4" />
+                                Archivo seleccionado correctamente
+                            </div>
+                        @endif
+
+                        @error('archivoAlumnos')
+                            <p class="mt-2 text-xs font-semibold text-rose-600">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <flux:button type="button" variant="primary" wire:click="importarAlumnos"
+                        wire:loading.attr="disabled" wire:target="importarAlumnos,archivoAlumnos"
+                        class="cursor-pointer rounded-2xl">
+
+                        <span wire:loading.remove wire:target="importarAlumnos" class="inline-flex items-center gap-2">
+                            <flux:icon.arrow-up-tray class="h-4 w-4" />
+                            Importar alumnos
+                        </span>
+
+                        <span wire:loading wire:target="importarAlumnos" class="inline-flex items-center gap-2">
+                            <span
+                                class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            Importando...
+                        </span>
+                    </flux:button>
+
+                    <flux:button type="button" variant="ghost" wire:click="limpiarArchivoAlumnos"
+                        class="cursor-pointer rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:bg-neutral-700">
+
+                        <span class="inline-flex items-center gap-2">
+                            <flux:icon.x-mark class="h-4 w-4" />
+                            Limpiar
+                        </span>
+                    </flux:button>
+                </div>
+
+                @if ($mensajeImportacionAlumnos)
+                    <div
+                        class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                        {{ $mensajeImportacionAlumnos }}
+                    </div>
+                @endif
+
+                @if ($errorImportacionAlumnos)
+                    <div
+                        class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                        {{ $errorImportacionAlumnos }}
+                    </div>
+                @endif
+
+                @if (!empty($erroresImportacionAlumnos))
+                    <div
+                        class="mt-5 overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-sm dark:border-rose-900/40 dark:bg-neutral-900">
+                        <div
+                            class="flex flex-col gap-1 border-b border-rose-100 bg-rose-50 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-950/30">
+                            <h3 class="text-sm font-bold text-rose-700 dark:text-rose-300">
+                                Errores encontrados en el archivo
+                            </h3>
+
+                            <p class="text-xs text-rose-600 dark:text-rose-300">
+                                Corrige las filas marcadas y vuelve a importar la plantilla.
+                            </p>
+                        </div>
+
+                        <div class="max-h-80 overflow-auto">
+                            <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-neutral-800">
+                                <thead class="sticky top-0 bg-slate-50 dark:bg-neutral-800">
+                                    <tr>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                            Fila
+                                        </th>
+
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                            Campo
+                                        </th>
+
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                            Error
+                                        </th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                    @foreach ($erroresImportacionAlumnos as $error)
+                                        <tr class="transition hover:bg-rose-50/60 dark:hover:bg-rose-950/20">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-200">
+                                                {{ $error['fila'] }}
+                                            </td>
+
+                                            <td
+                                                class="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-200">
+                                                {{ $error['campo'] }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-rose-600 dark:text-rose-300">
+                                                {{ implode(', ', $error['errores']) }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <div wire:loading.flex wire:target="importarAlumnos"
+                class="absolute inset-0 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
+                <div
+                    class="rounded-3xl border border-slate-200 bg-white px-6 py-5 text-center shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+                    <div
+                        class="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600">
+                    </div>
+
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Importando alumnos...
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <form wire:submit.prevent="guardar" class="space-y-6">
             <div
                 class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">

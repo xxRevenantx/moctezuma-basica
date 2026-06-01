@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Inscripcion;
 
+use App\Exports\Inscripciones\InscripcionesExport;
+use App\Exports\Inscripciones\PlantillaInscripcionesExport;
+use App\Imports\Inscripciones\InscripcionesImport;
 use App\Models\Ciclo;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
@@ -11,15 +14,17 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
+use App\Models\TrayectoriaAcademica;
 use App\Services\CurpService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use App\Models\TrayectoriaAcademica;
-use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Validators\ValidationException;
 
 class CrearInscripcion extends Component
 {
@@ -85,6 +90,11 @@ class CrearInscripcion extends Component
     public Collection $ciclosOptions;
     public Collection $cicloEscolaresOptions;
     public Collection $tutores;
+
+    public $archivoAlumnos = null;
+    public array $erroresImportacionAlumnos = [];
+    public ?string $mensajeImportacionAlumnos = null;
+    public ?string $errorImportacionAlumnos = null;
 
     public function mount(): void
     {
@@ -276,12 +286,19 @@ class CrearInscripcion extends Component
             'tutor_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('tutors', 'id'),
+                Rule::exists('tutores', 'id'),
             ],
             'foto' => [
                 'nullable',
                 'image',
                 'max:2048',
+            ],
+
+            'archivoAlumnos' => [
+                'nullable',
+                'file',
+                'mimes:xlsx,xls,csv',
+                'max:10240',
             ],
         ];
     }
@@ -320,8 +337,13 @@ class CrearInscripcion extends Component
 
             'codigo_postal.regex' => 'El código postal debe tener 5 dígitos.',
             'tutor_id.exists' => 'El tutor seleccionado no es válido.',
+
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe exceder 2MB.',
+
+            'archivoAlumnos.file' => 'Selecciona un archivo válido.',
+            'archivoAlumnos.mimes' => 'El archivo debe ser Excel o CSV.',
+            'archivoAlumnos.max' => 'El archivo no debe superar 10MB.',
         ];
     }
 
@@ -1133,7 +1155,7 @@ class CrearInscripcion extends Component
     {
         $this->sanitizeStrings();
 
-        if ($property === 'foto' || $property === 'curp') {
+        if ($property === 'foto' || $property === 'curp' || $property === 'archivoAlumnos') {
             return;
         }
 
@@ -1241,8 +1263,6 @@ class CrearInscripcion extends Component
 
         $data = $this->validate();
 
-
-
         if (!$this->validarRelacionAcademica($data)) {
             return;
         }
@@ -1321,6 +1341,92 @@ class CrearInscripcion extends Component
 
         $this->cancelar(true);
         $this->dispatch('refreshInscripciones');
+    }
+
+    public function descargarPlantillaAlumnos()
+    {
+        return Excel::download(
+            new PlantillaInscripcionesExport(),
+            'PLANTILLA_IMPORTAR_ALUMNOS.xlsx'
+        );
+    }
+
+    public function exportarAlumnos()
+    {
+        return Excel::download(
+            new InscripcionesExport(),
+            'ALUMNOS_REGISTRADOS.xlsx'
+        );
+    }
+
+    public function importarAlumnos(): void
+    {
+        $this->reset([
+            'erroresImportacionAlumnos',
+            'mensajeImportacionAlumnos',
+            'errorImportacionAlumnos',
+        ]);
+
+        $this->validate([
+            'archivoAlumnos' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls,csv',
+                'max:10240',
+            ],
+        ], [
+            'archivoAlumnos.required' => 'Selecciona un archivo para importar.',
+            'archivoAlumnos.file' => 'Selecciona un archivo válido.',
+            'archivoAlumnos.mimes' => 'El archivo debe ser Excel o CSV.',
+            'archivoAlumnos.max' => 'El archivo no debe superar 10MB.',
+        ]);
+
+        try {
+            $import = new InscripcionesImport();
+
+            Excel::import($import, $this->archivoAlumnos);
+
+            $this->mensajeImportacionAlumnos = "Importación terminada. Creados: {$import->creados}. Actualizados: {$import->actualizados}.";
+
+            $this->reset('archivoAlumnos');
+
+            $this->dispatch('swal', [
+                'title' => 'Importación terminada',
+                'text' => $this->mensajeImportacionAlumnos,
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+
+            $this->dispatch('refreshInscripciones');
+        } catch (ValidationException $e) {
+            $errores = [];
+
+            foreach ($e->failures() as $failure) {
+                $errores[] = [
+                    'fila' => $failure->row(),
+                    'campo' => $failure->attribute(),
+                    'errores' => $failure->errors(),
+                    'valor' => $failure->values()[$failure->attribute()] ?? null,
+                ];
+            }
+
+            $this->erroresImportacionAlumnos = $errores;
+            $this->errorImportacionAlumnos = 'El archivo contiene errores. Revisa las filas marcadas.';
+        } catch (\Throwable $e) {
+            $this->errorImportacionAlumnos = 'No se pudo importar el archivo: ' . $e->getMessage();
+        }
+    }
+
+    public function limpiarArchivoAlumnos(): void
+    {
+        $this->reset([
+            'archivoAlumnos',
+            'erroresImportacionAlumnos',
+            'mensajeImportacionAlumnos',
+            'errorImportacionAlumnos',
+        ]);
+
+        $this->resetValidation('archivoAlumnos');
     }
 
     private function recargarOpcionesAsignacionEscolar(): void
@@ -1421,6 +1527,11 @@ class CrearInscripcion extends Component
             'curpAdvertencia',
             'curpSuccess',
             'ultimaCurpConsultada',
+
+            'archivoAlumnos',
+            'erroresImportacionAlumnos',
+            'mensajeImportacionAlumnos',
+            'errorImportacionAlumnos',
         ];
 
         /*
