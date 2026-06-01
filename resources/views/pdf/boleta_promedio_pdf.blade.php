@@ -123,58 +123,6 @@
             font-weight: bold;
         }
 
-        .cards {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 6px;
-            margin: 4px 0 10px 0;
-        }
-
-        .card {
-            border-radius: 14px;
-            padding: 3px 10px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .card-blue {
-            background: #eff6ff;
-            border-color: #bfdbfe;
-        }
-
-        .card-green {
-            background: #ecfdf5;
-            border-color: #bbf7d0;
-        }
-
-        .card-yellow {
-            background: #fffbeb;
-            border-color: #fde68a;
-        }
-
-        .card-red {
-            background: #fff1f2;
-            border-color: #fecdd3;
-        }
-
-        .card-purple {
-            background: #f5f3ff;
-            border-color: #ddd6fe;
-        }
-
-        .card-title {
-            font-size: 7.5px;
-            color: #64748b;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .card-value {
-            margin-top: 3px;
-            font-size: 17px;
-            color: #0f172a;
-            font-weight: bold;
-        }
-
         .tabla {
             width: 100%;
             border-collapse: collapse;
@@ -340,6 +288,26 @@
 <body>
     @php
         /*
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Se agrega un ajuste mínimo para evitar errores internos de precisión.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
+         */
+        $truncarPromedio = function ($valor): ?float {
+            if (!is_numeric($valor)) {
+                return null;
+            }
+
+            return floor((((float) $valor) + 0.000000001) * 10) / 10;
+        };
+
+        $formatearPromedio = function ($valor) use ($truncarPromedio): string {
+            $promedioTruncado = $truncarPromedio($valor);
+
+            return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : '—';
+        };
+
+        /*
          * Se normalizan los periodos para pintar encabezados.
          * En bachillerato normalmente serán dos parciales.
          * En básica normalmente serán tres periodos.
@@ -348,7 +316,7 @@
 
         $cantidadColumnas = $esBachillerato ? 5 : 4;
 
-        $mostrarLeyendaCualitativa = collect($filasMaterias)->contains(function ($fila) {
+        $mostrarLeyendaCualitativa = collect($filasMaterias ?? [])->contains(function ($fila) {
             foreach ($fila['calificaciones'] ?? [] as $calificacionPeriodo) {
                 $valor = mb_strtoupper((string) ($calificacionPeriodo['calificacion'] ?? ''));
 
@@ -445,7 +413,6 @@
         @endif
     </table>
 
-
     <table class="tabla">
         <thead>
             <tr>
@@ -507,7 +474,7 @@
                     @endforeach
 
                     <td class="text-center">
-                        <strong>{{ $fila['promedio'] ?? '—' }}</strong>
+                        <strong>{{ $formatearPromedio($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
                     </td>
 
                     <td class="text-center">
@@ -537,12 +504,12 @@
 
                 @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
                     <td class="text-center" style="background:#eff6ff; color:#1e3a8a; font-weight:bold;">
-                        {{ $promediosPeriodos[$numeroPeriodo] ?? '—' }}
+                        {{ $formatearPromedio($promediosPeriodos[$numeroPeriodo] ?? null) }}
                     </td>
                 @endforeach
 
                 <td class="text-center" style="background:#ecfdf5; color:#166534; font-weight:bold;">
-                    {{ $promedio }}
+                    {{ $formatearPromedio($promedioNumero ?? ($promedio ?? null)) }}
                 </td>
 
                 <td class="text-center" style="background:#ecfdf5;">

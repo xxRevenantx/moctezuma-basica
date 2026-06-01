@@ -83,7 +83,7 @@ Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaContr
     ->name('misrutas.matricula.editar');
 
 
-Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletaPromedioPdf'])
+Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])
     ->name('misrutas.promedios.boleta.pdf');
 
 // PDF
@@ -97,6 +97,9 @@ Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])-
 
 Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificaciones_pdf'])
     ->name('misrutas.boleta.calificaciones.pdf');
+
+Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_pdf'])
+    ->name('misrutas.diploma.pdf');
 
 
 

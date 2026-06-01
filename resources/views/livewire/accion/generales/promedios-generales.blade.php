@@ -48,7 +48,7 @@
                         <span
                             class="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
                             <flux:icon.calculator class="h-3.5 w-3.5" />
-                            Promedio redondeado
+                            Promedio truncado
                         </span>
                     </div>
                 </div>
@@ -156,7 +156,7 @@
             class="rounded-[1.4rem] border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/20">
             <p class="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">Promedio general</p>
             <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ $resumen['promedio_general'] }}</p>
-            <p class="mt-1 text-xs font-bold text-sky-700 dark:text-sky-300">Cálculo global</p>
+            <p class="mt-1 text-xs font-bold text-sky-700 dark:text-sky-300">Cálculo global truncado</p>
         </div>
 
         <div
@@ -243,6 +243,9 @@
                                         class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                         #</th>
                                     <th
+                                        class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                        Lugar por grupo</th>
+                                    <th
                                         class="min-w-[260px] px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                         Alumno</th>
                                     <th
@@ -275,6 +278,10 @@
                                         </th>
                                         <th
                                             class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            RECONOCIMIENTO ANUAL
+                                        </th>
+                                        <th
+                                            class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                             Diploma
                                         </th>
                                     @endif
@@ -285,6 +292,12 @@
                                 @foreach ($grupoPromedio['alumnos'] as $index => $alumno)
                                     <tr class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/50">
                                         <td class="px-4 py-3 font-black text-slate-400">{{ $index + 1 }}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span
+                                                class="inline-flex min-w-20 justify-center rounded-xl bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50">
+                                                {{ $alumno['texto_lugar'] ?? 'Pendiente' }}
+                                            </span>
+                                        </td>
                                         <td class="px-4 py-3">
                                             <p class="font-black text-slate-900 dark:text-white">
                                                 {{ $alumno['alumno'] }}</p>
@@ -382,7 +395,7 @@
                                             <td class="px-4 py-3 text-center">
                                                 <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                     'slug_nivel' => $slug_nivel,
-                                                    'tipo' => 'anual',
+                                                    'tipo' => 'boleta',
                                                     'inscripcion_id' => $alumnoInscripcionId,
                                                     'ciclo_escolar_id' => $ciclo_escolar_id,
                                                     'generacion_id' => $alumnoGeneracionId,
@@ -398,6 +411,22 @@
 
                                             <td class="px-4 py-3 text-center">
                                                 <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                    'slug_nivel' => $slug_nivel,
+                                                    'tipo' => 'reconocimiento',
+                                                    'inscripcion_id' => $alumnoInscripcionId,
+                                                    'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                    'generacion_id' => $alumnoGeneracionId,
+                                                    'grado_id' => $alumnoGradoId,
+                                                    'grupo_id' => $alumnoGrupoId,
+                                                ]) }}"
+                                                    target="_blank"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                                                    <flux:icon.trophy class="h-4 w-4" />
+                                                    PDF
+                                                </a>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <a href="{{ route('misrutas.diploma.pdf', [
                                                     'slug_nivel' => $slug_nivel,
                                                     'tipo' => 'diploma',
                                                     'inscripcion_id' => $alumnoInscripcionId,

@@ -31,7 +31,8 @@ use Illuminate\Support\Str;
 class PDFController extends Controller
 {
 
-    public function boletaPromedioPdf(Request $request, string $slug_nivel, string $tipo)
+    // BOLET ANUAL DE LOS PERIODOS Y PARCIALES Y DIPLOMA ANUAL DE LOS PERIODOS Y PARCIALES
+    public function boletareconocimientoPromedioPdf(Request $request, string $slug_nivel, string $tipo)
     {
         $slugNivel = $slug_nivel;
 
@@ -70,7 +71,7 @@ class PDFController extends Controller
         $esSecundaria = $this->esSecundaria($nivel);
 
         abort_if($esBachillerato && $tipo !== 'semestral', 404);
-        abort_if(!$esBachillerato && !in_array($tipo, ['anual', 'diploma'], true), 404);
+        abort_if(!$esBachillerato && !in_array($tipo, ['boleta', 'reconocimiento'], true), 404);
 
         $generacion = Generacion::query()
             ->where('id', $generacionId)
@@ -276,8 +277,8 @@ class PDFController extends Controller
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
         $materias = $queryMaterias
+            ->orderByRaw('CASE WHEN asignacion_materias.orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('asignacion_materias.orden')
-            ->orderBy('materias.orden')
             ->orderBy('asignacion_materias.id')
             ->get();
 
@@ -367,6 +368,24 @@ class PDFController extends Controller
                 })
                 ->count();
         }
+
+        /*
+         * promedio-numerico-pro:
+         * Se toma solo el primer decimal sin redondear.
+         * Se agrega un ajuste mínimo para evitar errores internos de precisión.
+         * Ejemplo: 8.777777777777778 se muestra como 8.7.
+         */
+        $truncarPromedio = function (float $valor): float {
+            return floor(($valor + 0.000000001) * 10) / 10;
+        };
+
+        $formatearPromedio = function (?float $valor) use ($truncarPromedio): string {
+            if ($valor === null) {
+                return '—';
+            }
+
+            return number_format($truncarPromedio($valor), 1, '.', '');
+        };
 
         /*
         |--------------------------------------------------------------------------
@@ -461,8 +480,8 @@ class PDFController extends Controller
             $estadoMateria = 'Sin datos';
 
             if ($capturadasMateria > 0) {
-                $promedioMateriaNumero = floor(($sumaMateria / $capturadasMateria) * 10) / 10;
-                $promedioMateria = number_format($promedioMateriaNumero, 1);
+                $promedioMateriaNumero = $truncarPromedio($sumaMateria / $capturadasMateria);
+                $promedioMateria = number_format($promedioMateriaNumero, 1, '.', '');
 
                 if ($promedioMateriaNumero < 6) {
                     $estadoMateria = 'En riesgo';
@@ -501,13 +520,18 @@ class PDFController extends Controller
         foreach ($numerosPeriodos as $numeroPeriodo) {
             $promedioPeriodo = null;
 
-            if ($numeroMateriasPromediar > 0 && $capturadasPorPeriodo[$numeroPeriodo] > 0) {
-                $promedioPeriodo = floor(($sumasPorPeriodo[$numeroPeriodo] / $numeroMateriasPromediar) * 10) / 10;
+            if ($capturadasPorPeriodo[$numeroPeriodo] > 0) {
+                /*
+                 * promedio-numerico-pro:
+                 * Se divide únicamente entre las calificaciones numéricas encontradas.
+                 * AC, NP, SD, ED, RA, textos y vacíos no suman ni dividen.
+                 */
+                $promedioPeriodo = $truncarPromedio(
+                    $sumasPorPeriodo[$numeroPeriodo] / $capturadasPorPeriodo[$numeroPeriodo]
+                );
             }
 
-            $promediosPeriodos[$numeroPeriodo] = $promedioPeriodo !== null
-                ? number_format($promedioPeriodo, 1)
-                : '—';
+            $promediosPeriodos[$numeroPeriodo] = $formatearPromedio($promedioPeriodo);
 
             if ($promedioPeriodo !== null) {
                 $sumaPromediosPeriodos += $promedioPeriodo;
@@ -521,10 +545,17 @@ class PDFController extends Controller
         $estadoPromedio = 'Sin datos';
 
         if ($periodosCapturados > 0) {
-            $promedioTruncado = floor(($sumaPromediosPeriodos / $periodosCapturados) * 10) / 10;
+            /*
+             * En básica el promedio final se divide siempre entre los 3 periodos.
+             * Si falta un periodo, no se cambia el divisor porque así se conserva la lógica de Promedios Generales.
+             * En bachillerato se divide entre los parciales numéricos encontrados.
+             */
+            $divisorPromedioFinal = $esBachillerato ? $periodosCapturados : count($numerosPeriodos);
+
+            $promedioTruncado = $truncarPromedio($sumaPromediosPeriodos / max(1, $divisorPromedioFinal));
 
             $promedioNumero = $promedioTruncado;
-            $promedio = number_format($promedioTruncado, 1);
+            $promedio = number_format($promedioTruncado, 1, '.', '');
             $porcentajePromedio = min(100, $promedioTruncado * 10);
 
             if ($promedioTruncado < 6) {
@@ -534,6 +565,188 @@ class PDFController extends Controller
             } else {
                 $estadoPromedio = 'Aprobado';
             }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lugar por grupo para el reconocimiento
+        |--------------------------------------------------------------------------
+        |
+        | Se calcula igual que en Promedios Generales:
+        | - Cada grupo tiene sus propios lugares.
+        | - Los empates comparten el mismo lugar.
+        | - En básica se divide entre los 3 periodos aunque falte captura.
+        | - Solo se usan calificaciones numéricas de materias normales.
+        */
+
+        $lugarAlumno = null;
+        $textoLugarAlumno = 'Pendiente';
+
+        $queryInscripcionesGrupo = \App\Models\Inscripcion::query()
+            ->select(['id', 'matricula', 'nombre', 'apellido_paterno', 'apellido_materno'])
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id)
+            ->where('grupo_id', $grupo->id);
+
+        if (Schema::hasColumn('inscripciones', 'semestre_id')) {
+            if ($esBachillerato && $semestre) {
+                $queryInscripcionesGrupo->where('semestre_id', $semestre->id);
+            } else {
+                $queryInscripcionesGrupo->whereNull('semestre_id');
+            }
+        }
+
+        $inscripcionesGrupo = $queryInscripcionesGrupo->get();
+        $idsInscripcionesGrupo = $inscripcionesGrupo->pluck('id')->filter()->values()->all();
+
+        $calificacionesGrupoPorAlumno = collect();
+
+        if (!empty($idsInscripcionesGrupo)) {
+            $queryCalificacionesGrupo = Calificacion::query()
+                ->whereIn('inscripcion_id', $idsInscripcionesGrupo);
+
+            if (!empty($idsPeriodos)) {
+                $queryCalificacionesGrupo->whereIn('periodo_id', $idsPeriodos);
+            }
+
+            if (!empty($idsMaterias)) {
+                $queryCalificacionesGrupo->whereIn('asignacion_materia_id', $idsMaterias);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'nivel_id')) {
+                $queryCalificacionesGrupo->where('nivel_id', $nivel->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'generacion_id')) {
+                $queryCalificacionesGrupo->where('generacion_id', $generacion->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'grado_id')) {
+                $queryCalificacionesGrupo->where('grado_id', $grado->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'grupo_id')) {
+                $queryCalificacionesGrupo->where('grupo_id', $grupo->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'ciclo_escolar_id')) {
+                $queryCalificacionesGrupo->where('ciclo_escolar_id', $cicloEscolar->id);
+            }
+
+            if (Schema::hasColumn('calificaciones', 'semestre_id')) {
+                if ($esBachillerato && $semestre) {
+                    $queryCalificacionesGrupo->where('semestre_id', $semestre->id);
+                } else {
+                    $queryCalificacionesGrupo->whereNull('semestre_id');
+                }
+            }
+
+            $calificacionesGrupoPorAlumno = $queryCalificacionesGrupo
+                ->get()
+                ->groupBy('inscripcion_id')
+                ->map(function ($registrosAlumno) {
+                    return $registrosAlumno
+                        ->groupBy('asignacion_materia_id')
+                        ->map(function ($registrosMateria) {
+                            return $registrosMateria->keyBy('periodo_id');
+                        });
+                });
+        }
+
+        $calcularPromedioFinalAlumno = function (int $inscripcionAlumnoId) use ($calificacionesGrupoPorAlumno, $materias, $periodos, $numerosPeriodos, $esBachillerato, $truncarPromedio): ?float {
+            $mapaAlumno = $calificacionesGrupoPorAlumno->get($inscripcionAlumnoId, collect());
+
+            $sumasPeriodoAlumno = [];
+            $capturadasPeriodoAlumno = [];
+
+            foreach ($numerosPeriodos as $numeroPeriodo) {
+                $sumasPeriodoAlumno[$numeroPeriodo] = 0;
+                $capturadasPeriodoAlumno[$numeroPeriodo] = 0;
+            }
+
+            foreach ($materias as $materia) {
+                if ((int) ($materia->extra ?? 0) === 1 || (int) ($materia->receso ?? 0) === 1) {
+                    continue;
+                }
+
+                foreach ($numerosPeriodos as $numeroPeriodo) {
+                    $periodo = $periodos->get($numeroPeriodo);
+
+                    if (!$periodo) {
+                        continue;
+                    }
+
+                    $registro = $mapaAlumno->get($materia->id)?->get($periodo->id);
+                    $valor = $registro ? trim((string) $registro->calificacion) : '';
+
+                    if (!is_numeric($valor)) {
+                        continue;
+                    }
+
+                    $numero = (float) $valor;
+
+                    if ($numero < 0 || $numero > 10) {
+                        continue;
+                    }
+
+                    $sumasPeriodoAlumno[$numeroPeriodo] += $numero;
+                    $capturadasPeriodoAlumno[$numeroPeriodo]++;
+                }
+            }
+
+            $sumaPromediosAlumno = 0;
+            $periodosCapturadosAlumno = 0;
+
+            foreach ($numerosPeriodos as $numeroPeriodo) {
+                if ($capturadasPeriodoAlumno[$numeroPeriodo] <= 0) {
+                    continue;
+                }
+
+                $promedioPeriodoAlumno = $truncarPromedio(
+                    $sumasPeriodoAlumno[$numeroPeriodo] / $capturadasPeriodoAlumno[$numeroPeriodo]
+                );
+
+                $sumaPromediosAlumno += $promedioPeriodoAlumno;
+                $periodosCapturadosAlumno++;
+            }
+
+            if ($periodosCapturadosAlumno <= 0) {
+                return null;
+            }
+
+            $divisorAlumno = $esBachillerato ? $periodosCapturadosAlumno : count($numerosPeriodos);
+
+            return $truncarPromedio($sumaPromediosAlumno / max(1, $divisorAlumno));
+        };
+
+        $promediosAlumnosGrupo = $inscripcionesGrupo
+            ->map(function ($inscripcionGrupo) use ($calcularPromedioFinalAlumno) {
+                return [
+                    'inscripcion_id' => (int) $inscripcionGrupo->id,
+                    'promedio_final' => $calcularPromedioFinalAlumno((int) $inscripcionGrupo->id),
+                ];
+            });
+
+        $promediosUnicosDesc = $promediosAlumnosGrupo
+            ->filter(fn(array $alumnoGrupo) => ($alumnoGrupo['promedio_final'] ?? null) !== null && (float) $alumnoGrupo['promedio_final'] > 0)
+            ->pluck('promedio_final')
+            ->map(fn($valor) => number_format((float) $valor, 1, '.', ''))
+            ->unique()
+            ->sortByDesc(fn($valor) => (float) $valor)
+            ->values();
+
+        $promedioClaveAlumno = $promedioNumero !== null
+            ? number_format((float) $promedioNumero, 1, '.', '')
+            : null;
+
+        $indiceLugarAlumno = $promedioClaveAlumno !== null
+            ? $promediosUnicosDesc->search($promedioClaveAlumno)
+            : false;
+
+        if ($indiceLugarAlumno !== false) {
+            $lugarAlumno = ((int) $indiceLugarAlumno) + 1;
+            $textoLugarAlumno = $lugarAlumno . '° lugar';
         }
 
         $totalMaterias = count($filasMaterias);
@@ -564,8 +777,9 @@ class PDFController extends Controller
 
         $director = Nivel::query()
             ->where('id', $nivel->id)
-            ->with(['director'])
+            ->with(['director', 'supervisor'])
             ->first();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -578,8 +792,8 @@ class PDFController extends Controller
 
         $titulo = match ($tipo) {
             'semestral' => 'BOLETA SEMESTRAL',
-            'anual' => 'BOLETA ',
-            'diploma' => 'RECONOCIMIENTO',
+            'boleta' => 'BOLETA ',
+            'reconocimiento' => 'RECONOCIMIENTO',
             default => 'BOLETA DE PROMEDIO',
         };
 
@@ -603,6 +817,8 @@ class PDFController extends Controller
                 ->filter(fn($valor) => is_numeric($valor))
                 ->count(),
             'materias_capturadas' => $totalMaterias - $pendientes,
+            'lugar' => $lugarAlumno,
+            'texto_lugar' => $textoLugarAlumno,
             'estatus' => match ($estadoPromedio) {
                 'Aprobado' => ($promedioNumero >= 9 ? 'Destacado' : 'Aprobado'),
                 'Regular' => 'Aprobado',
@@ -649,6 +865,8 @@ class PDFController extends Controller
             'filasMaterias' => $filasMaterias,
             'promedio' => $promedio,
             'promedioNumero' => $promedioNumero,
+            'lugarAlumno' => $lugarAlumno,
+            'textoLugarAlumno' => $textoLugarAlumno,
             'porcentajePromedio' => $porcentajePromedio,
             'estadoPromedio' => $estadoPromedio,
 
@@ -667,17 +885,17 @@ class PDFController extends Controller
 
         $nombreArchivo = match ($tipo) {
             'semestral' => 'BOLETA_SEMESTRAL_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
-            'anual' => 'BOLETA_ANUAL_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
-            'diploma' => 'DIPLOMA_ANUAL_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
+            'boleta' => 'BOLETA_ANUAL_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
+            'reconocimiento' => 'RECONOCIMIENTO_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
             default => 'BOLETA_PROMEDIO_' . str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) . '.pdf',
         };
 
-        $vista = $tipo === 'diploma'
-            ? 'pdf.diploma_promedio_pdf'
+        $vista = $tipo === 'reconocimiento'
+            ? 'pdf.reconocimiento_promedio_pdf'
             : 'pdf.boleta_promedio_pdf';
 
         return Pdf::loadView($vista, $data)
-            ->setPaper('letter', $tipo === 'diploma' ? 'landscape' : 'portrait')
+            ->setPaper('letter', $tipo === 'reconocimiento' ? 'landscape' : 'portrait')
             ->stream($nombreArchivo);
     }
 
@@ -1768,6 +1986,9 @@ class PDFController extends Controller
 
             'marcaAgua' => $marcaAgua,
         ];
+
+
+
 
         /*
         |--------------------------------------------------------------------------
@@ -3163,6 +3384,7 @@ class PDFController extends Controller
 
     public function diploma_calificaciones_pdf(Request $request)
     {
+
         $slugNivel = $request->input('slug_nivel');
         $generacionId = $request->integer('generacion_id');
         $gradoId = $request->integer('grado_id');
@@ -3179,6 +3401,7 @@ class PDFController extends Controller
         ) {
             abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id, grupo_id e inscripcion_id son obligatorios.');
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -3889,6 +4112,8 @@ class PDFController extends Controller
 
             'marcaAgua' => $marcaAgua,
         ];
+
+
 
         /*
         |--------------------------------------------------------------------------

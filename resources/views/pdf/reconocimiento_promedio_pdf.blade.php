@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>{{ $titulo ?? 'Diploma de promedio' }}</title>
+    <title>{{ $titulo ?? 'Reconocimiento de promedio' }}</title>
 
     <style>
         @font-face {
@@ -247,7 +247,7 @@
         }
 
         .datos-extra td {
-            width: 33.33%;
+            width: 50%;
             text-align: center;
             font-family: 'calibri', 'ARIAL', sans-serif;
             font-size: 15px;
@@ -260,113 +260,59 @@
             font-weight: 700;
         }
 
-        .promedio-box {
+        .promedio-box,
+        .lugar-box {
             position: absolute;
             top: 605px;
-            left: 50%;
-            margin-left: -85px;
-            width: 170px;
+            width: 190px;
             z-index: 6;
             text-align: center;
             border: 1.5px solid #c98626;
             border-radius: 12px;
-            padding: 6px 6px;
+            padding: 7px 8px;
             background: rgba(255, 255, 255, .88);
         }
 
-        .promedio-label {
+        .promedio-box {
+            left: 335px;
+        }
+
+        .lugar-box {
+            right: 335px;
+        }
+
+        .promedio-label,
+        .lugar-label {
             font-family: 'ARIAL', sans-serif;
             font-size: 10px;
             font-weight: 700;
             color: #c98626;
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        .promedio,
+        .lugar {
+            margin-top: 1px;
+            font-family: 'ARIAL', sans-serif;
+            font-weight: 700;
+            color: #071846;
+            text-transform: uppercase;
         }
 
         .promedio {
-            margin-top: 1px;
-            font-family: 'ARIAL', sans-serif;
             font-size: 26px;
-            font-weight: 700;
-            color: #071846;
         }
 
-        .periodos-box {
-            position: absolute;
-            top: 605px;
-            left: 150px;
-            width: 250px;
-            z-index: 6;
-            border: 1.5px solid #c98626;
-            border-radius: 12px;
-            padding: 7px 10px;
-            background: rgba(255, 255, 255, .88);
-        }
-
-        .periodos-titulo {
-            font-family: 'ARIAL', sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            color: #c98626;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-align: center;
-            margin-bottom: 4px;
-        }
-
-        .periodos-tabla {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .periodos-tabla td {
-            font-family: 'calibri', 'ARIAL', sans-serif;
-            font-size: 12px;
-            color: #071846;
-            padding: 1px 3px;
-            border-bottom: 1px solid rgba(201, 134, 38, .25);
-        }
-
-        .periodos-tabla .valor {
-            text-align: right;
-            font-weight: 700;
-        }
-
-        .estado-box {
-            position: absolute;
-            top: 605px;
-            right: 150px;
-            width: 250px;
-            z-index: 6;
-            text-align: center;
-            border: 1.5px solid #c98626;
-            border-radius: 12px;
-            padding: 8px 10px;
-            background: rgba(255, 255, 255, .88);
-        }
-
-        .estado-label {
-            font-family: 'ARIAL', sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            color: #c98626;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .estado {
-            margin-top: 3px;
-            font-family: 'ARIAL', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            color: #071846;
-            text-transform: uppercase;
+        .lugar {
+            font-size: 22px;
         }
 
         .firmas {
             font-family: 'ARIAL', sans-serif;
-            width: 100%;
-            margin-top: 690px;
+            width: 70%;
+            /* margin-top: 690px; */
+            margin: 650px auto 0;
             font-size: 15px;
             color: #071846;
         }
@@ -414,16 +360,45 @@
 
         $alumnoNombreFinal = mb_strtoupper($alumnoNombre ?? ($nombreAlumno ?? 'NOMBRE DEL ALUMNO'), 'UTF-8');
 
-        $periodosResumen = collect($periodosResumen ?? []);
-        $promediosPeriodos = collect($promediosPeriodos ?? []);
-
         $textoDocumento = !empty($esBachillerato) ? 'promedio semestral' : 'promedio anual';
 
         $textoPeriodoDocumento = !empty($esBachillerato)
             ? 'los parciales correspondientes'
             : 'los periodos correspondientes';
 
-        $estadoTexto = mb_strtoupper($estadoPromedio ?? 'SIN DATOS', 'UTF-8');
+        /*
+         * Datos basados en Promedios Generales.
+         * Si llegan por la URL, tienen prioridad para respetar el mismo promedio y lugar
+         * que se muestran en la tabla de Promedios Generales.
+         */
+        $promedioReconocimientoValor = $promedioNumero ?? ($promedio ?? request()->query('promedio_final'));
+
+        $truncarPromedio = function ($valor): ?float {
+            if (!is_numeric($valor)) {
+                return null;
+            }
+
+            return floor(((float) $valor + 0.000000001) * 10) / 10;
+        };
+
+        $promedioReconocimientoNumero = $truncarPromedio($promedioReconocimientoValor);
+
+        $promedioReconocimientoTexto =
+            $promedioReconocimientoNumero !== null ? number_format($promedioReconocimientoNumero, 1, '.', '') : '—';
+
+        $lugarReconocimiento = $lugarAlumno ?? request()->query('lugar_alumno');
+
+        $textoLugarReconocimiento = $textoLugarAlumno ?? request()->query('texto_lugar_alumno');
+
+        if (blank($textoLugarReconocimiento) && filled($lugarReconocimiento)) {
+            $textoLugarReconocimiento = $lugarReconocimiento . '° lugar';
+        }
+
+        if (blank($textoLugarReconocimiento)) {
+            $textoLugarReconocimiento = 'Pendiente';
+        }
+
+        $textoLugarReconocimiento = mb_strtoupper((string) $textoLugarReconocimiento, 'UTF-8');
     @endphp
 
     <div class="diploma">
@@ -476,9 +451,11 @@
         <div class="linea-alumno"></div>
 
         <div class="descripcion">
-            Por haber obtenido un destacado desempeño académico con
-            <strong>{{ $textoDocumento }}</strong> durante
-            <strong>{{ $textoPeriodoDocumento }}</strong>
+            Por haber obtenido el
+            <strong>{{ $textoLugarReconocimiento }}</strong>
+            con <strong>{{ $textoDocumento }}</strong>
+            de <strong>{{ $promedioReconocimientoTexto }}</strong>
+            durante <strong>{{ $textoPeriodoDocumento }}</strong>
             del ciclo escolar <strong>{{ $cicloEscolarTexto ?? '—' }}</strong>,
             correspondiente al
             @if (!empty($esBachillerato) && !empty($semestre))
@@ -504,34 +481,49 @@
                     <strong>Ciclo escolar:</strong>
                     {{ $cicloEscolarTexto ?? '—' }}
                 </td>
-
-
             </tr>
         </table>
 
-
-
-        <div class="promedio-box">
+        {{-- <div class="promedio-box">
             <div class="promedio-label">
                 Promedio final
             </div>
 
             <div class="promedio">
-                {{ $promedio ?? '—' }}
+                {{ $promedioReconocimientoTexto }}
             </div>
         </div>
 
+        <div class="lugar-box">
+            <div class="lugar-label">
+                Lugar por grupo
+            </div>
 
+            <div class="lugar">
+                {{ $textoLugarReconocimiento }}
+            </div>
+        </div> --}}
 
         <table class="firmas">
             <tr>
-                <td style="width: 100%; padding-top: 60px; text-align: center;">
+                <td style="width: 50%; padding-top: 0px; text-align: center;">
                     <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
 
                     @if (optional($director->director)->genero === 'F')
                         Firma de la directora de la escuela
                     @else
                         Firma del director de la escuela
+                    @endif
+                </td>
+                <td style="width: 50%; padding-top: 0px; text-align: center;">
+                    <u>{{ mb_strtoupper(trim((optional($director->supervisor)->titulo ?? '') . ' ' . (optional($director->supervisor)->nombre ?? '') . ' ' . (optional($director->supervisor)->apellido_paterno ?? '') . ' ' . (optional($director->supervisor)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
+
+                    @if (optional($director->supervisor)->genero === 'F')
+                        Firma de la supervisora escolar<br>
+                        Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
+                    @else
+                        Firma del supervisor escolar <br>
+                        Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
                     @endif
                 </td>
             </tr>

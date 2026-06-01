@@ -34,7 +34,7 @@ class PromediosGenerales extends Component
     public string $grupo_id = '';
     public string $semestre_id = '';
 
-    public string $orden = 'promedio_desc';
+    public string $orden = 'nombre_asc';
 
     public function mount(string $slug_nivel): void
     {
@@ -281,9 +281,21 @@ class PromediosGenerales extends Component
 
                 $totalEsperado = count($limitePeriodos);
 
-                $promedioFinal = $periodosCapturados > 0
-                    ? $this->redondearPromedio($sumaPeriodos / $periodosCapturados)
-                    : null;
+                /*
+                 * Para primaria y secundaria el promedio final se divide entre los 3 periodos,
+                 * aunque un periodo todavía no tenga promedio capturado.
+                 * Si no existe ninguna captura numérica, se mantiene como pendiente.
+                 * En bachillerato se conserva el promedio semestral con los parciales capturados.
+                 */
+                if (!$this->esBachillerato) {
+                    $promedioFinal = $periodosCapturados > 0
+                        ? $this->redondearPromedio($sumaPeriodos / $totalEsperado)
+                        : null;
+                } else {
+                    $promedioFinal = $periodosCapturados > 0
+                        ? $this->redondearPromedio($sumaPeriodos / $periodosCapturados)
+                        : null;
+                }
 
                 return [
                     'inscripcion_id' => (int) $primero->inscripcion_id,
@@ -308,7 +320,66 @@ class PromediosGenerales extends Component
             })
             ->values();
 
+        $alumnos = $this->asignarLugaresPorGrupo($alumnos);
+
         return $this->ordenarAlumnos($alumnos);
+    }
+
+    private function asignarLugaresPorGrupo(Collection $alumnos): Collection
+    {
+        /*
+         * Los lugares se calculan por separado dentro de cada grupo.
+         * Ejemplo: 1° de primaria grupo A tiene sus propios lugares,
+         * y 1° de primaria grupo B inicia nuevamente desde 1° lugar.
+         * Los empates comparten el mismo lugar.
+         */
+        return $alumnos
+            ->groupBy(fn(array $alumno) => $this->claveGrupoAlumno($alumno))
+            ->flatMap(function (Collection $items) {
+                $promediosUnicosDesc = $items
+                    ->filter(fn(array $alumno) => ($alumno['promedio_final'] ?? null) !== null && (float) $alumno['promedio_final'] > 0)
+                    ->sortByDesc('promedio_final')
+                    ->pluck('promedio_final')
+                    ->map(fn($promedio) => number_format((float) $promedio, 2, '.', ''))
+                    ->unique()
+                    ->values();
+
+                return $items->map(function (array $alumno) use ($promediosUnicosDesc) {
+                    $promedio = $alumno['promedio_final'] ?? null;
+
+                    if ($promedio === null || !is_numeric($promedio) || (float) $promedio <= 0) {
+                        $alumno['lugar'] = null;
+                        $alumno['texto_lugar'] = 'Pendiente';
+
+                        return $alumno;
+                    }
+
+                    $clavePromedio = number_format((float) $promedio, 2, '.', '');
+                    $indiceLugar = $promediosUnicosDesc->search($clavePromedio);
+
+                    $lugar = $indiceLugar !== false
+                        ? $indiceLugar + 1
+                        : null;
+
+                    $alumno['lugar'] = $lugar;
+                    $alumno['texto_lugar'] = $lugar ? $lugar . '° lugar' : 'Pendiente';
+
+                    return $alumno;
+                });
+            })
+            ->values();
+    }
+
+    private function claveGrupoAlumno(array $alumno): string
+    {
+        /*
+         * Esta clave evita que los lugares se mezclen entre grados, grupos o semestres.
+         */
+        return implode('|', [
+            $alumno['grado_id'] ?? 'grado',
+            $alumno['grupo_id'] ?? 'grupo',
+            $this->esBachillerato ? ($alumno['semestre_id'] ?? 'semestre') : 'basica',
+        ]);
     }
 
     private function ordenarAlumnos(Collection $alumnos): Collection
@@ -404,6 +475,7 @@ class PromediosGenerales extends Component
         /*
          * promedio-numerico-pro:
          * Se toma solo el primer decimal sin redondear.
+         * El pequeño ajuste evita cortes incorrectos por precisión decimal.
          * Ejemplo: 8.777777777777778 se muestra como 8.7.
          */
         return floor(($valor + 0.000000001) * 10) / 10;
