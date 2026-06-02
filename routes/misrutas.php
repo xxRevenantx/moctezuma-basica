@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\DirectorController;
+use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
@@ -58,6 +59,11 @@ Route::get('/plantilla', [PersonaNivelController::class, 'plantilla'])->name('mi
 
 // Ruta profesores
 Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');
+
+//Documentación
+Route::get('/constancias', [DocumentosController::class, 'constancias'])->name('misrutas.constancias');
+Route::get('/oficios', [DocumentosController::class, 'oficios'])->name('misrutas.oficios');
+
 
 // RUTAS DE GRADOS
 Route::get('/grados', [GradoController::class, 'index'])->name('misrutas.grados');

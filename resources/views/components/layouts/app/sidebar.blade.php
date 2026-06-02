@@ -91,6 +91,22 @@
                     </flux:navlist.item>
 
 
+                    <flux:sidebar.group expandable :expanded="false" heading="DOCUMENTACIÓN"
+                        class="grid text-xs gap-1 text-zinc-300">
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.constancias')"
+                            :current="request()->routeIs('misrutas.constancias')" wire:navigate>
+                            Constancias
+                        </flux:navlist.item>
+
+                        <flux:navlist.item icon="home" :href="route('misrutas.oficios')"
+                            :current="request()->routeIs('misrutas.oficios')" wire:navigate>
+                            Oficios
+                        </flux:navlist.item>
+
+                    </flux:sidebar.group>
+
+
                     <flux:sidebar.group expandable :expanded="false" heading="ACADÉMICA"
                         class="grid text-xs gap-1 text-zinc-300">
 
