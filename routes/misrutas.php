@@ -3,6 +3,7 @@
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\DocumentosController;
+use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
@@ -135,6 +136,13 @@ Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
 
 Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales_pdf'])
     ->name('generales.credenciales.pdf');
+
+Route::get('/constancias/descargar/zip', [DocumentosPDFController::class, 'constanciasZip'])
+    ->name('misrutas.constancias.zip');
+
+Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'constanciaPdf'])
+    ->name('misrutas.constancias.pdf');
+
 
 Route::prefix('nivel')->group(function () {
 

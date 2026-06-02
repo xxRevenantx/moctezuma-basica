@@ -3,6 +3,8 @@
 
 <head>
     @include('partials.head')
+
+    <x-head.tinymce-config />
 </head>
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
@@ -273,6 +275,8 @@
 
 
     @fluxScripts
+    @stack('scripts')
+
 </body>
 
 

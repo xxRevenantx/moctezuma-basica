@@ -132,4 +132,9 @@ class Inscripcion extends Model
         return $this->hasOne(TrayectoriaAcademica::class, 'inscripcion_id')
             ->latestOfMany();
     }
+
+    public function constancias()
+    {
+        return $this->hasMany(\App\Models\Constancia::class, 'inscripcion_id');
+    }
 }
