@@ -22,7 +22,7 @@ class DocumentosPDFController extends Controller
         // dd($constancia);
 
         $constancia->load([
-            'alumno.nivel',
+            'alumno.nivel.director',
             'alumno.grado',
             'alumno.generacion',
             'alumno.grupo.asignacionGrupo',
@@ -123,8 +123,8 @@ class DocumentosPDFController extends Controller
 
             $nombreAlumno = trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
             );
 
             $nombreArchivo = Str::slug($folioTemporal . '_' . $nombreAlumno, '_') . '.pdf';
@@ -166,8 +166,8 @@ class DocumentosPDFController extends Controller
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                '-' .
-                ($alumno->generacion->anio_egreso ?? '')
+                    '-' .
+                    ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -175,8 +175,8 @@ class DocumentosPDFController extends Controller
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '')
+                    ($alumno->apellido_paterno ?? '') . ' ' .
+                    ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp,
             'matricula' => $alumno->matricula,

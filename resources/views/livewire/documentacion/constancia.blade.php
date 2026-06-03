@@ -1,5 +1,6 @@
 <div x-data="{
     open: false,
+    historialAbierto: false,
 }" class="space-y-6">
     @once
         <style>
@@ -11,7 +12,6 @@
 
     <div
         class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-
         {{-- Encabezado --}}
         <div class="bg-indigo-500 px-6 py-4">
             <h2 class="text-xl font-semibold tracking-wide text-white">
@@ -67,23 +67,16 @@
                                         <tr>
                                             <th
                                                 class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
-                                                Título
-                                            </th>
-
+                                                Título</th>
                                             <th
                                                 class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
-                                                Clave
-                                            </th>
-
+                                                Clave</th>
                                             <th
                                                 class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
-                                                Estado
-                                            </th>
-
+                                                Estado</th>
                                             <th
                                                 class="px-4 py-3 text-right font-semibold text-zinc-700 dark:text-zinc-200">
-                                                Acciones
-                                            </th>
+                                                Acciones</th>
                                         </tr>
                                     </thead>
 
@@ -110,13 +103,9 @@
 
                                                 <td class="px-4 py-3">
                                                     @if ($plantilla->activo)
-                                                        <flux:badge color="green">
-                                                            Activa
-                                                        </flux:badge>
+                                                        <flux:badge color="green">Activa</flux:badge>
                                                     @else
-                                                        <flux:badge color="red">
-                                                            Inactiva
-                                                        </flux:badge>
+                                                        <flux:badge color="red">Inactiva</flux:badge>
                                                     @endif
                                                 </td>
 
@@ -196,9 +185,7 @@
                     </div>
 
                     <flux:field>
-                        <flux:label>
-                            Tipo de constancia
-                        </flux:label>
+                        <flux:label>Tipo de constancia</flux:label>
 
                         <flux:select wire:model.live="tipo_constancia">
                             @foreach ($plantillasActivas as $plantilla)
@@ -229,28 +216,17 @@
 
                 <div class="grid gap-5 md:grid-cols-2">
                     <flux:field>
-                        <flux:label>
-                            Fecha
-                        </flux:label>
-
+                        <flux:label>Fecha</flux:label>
                         <flux:input type="date" wire:model.live="fecha_expedicion" />
-
-                        <flux:description>
-                            En caso de no asignar una fecha, se asignará la fecha de hoy.
+                        <flux:description>En caso de no asignar una fecha, se asignará la fecha de hoy.
                         </flux:description>
-
                         <flux:error name="fecha_expedicion" />
                     </flux:field>
 
                     <flux:field>
-                        <flux:label>
-                            Dirigido a
-                        </flux:label>
-
+                        <flux:label>Dirigido a</flux:label>
                         <flux:input type="text" wire:model.live="dirigido_a" placeholder="A QUIEN CORRESPONDA" />
-
-                        <flux:description>
-                            En caso de quedar vacío este campo se dirigirá a A QUIEN CORRESPONDA.
+                        <flux:description>En caso de quedar vacío este campo se dirigirá a A QUIEN CORRESPONDA.
                         </flux:description>
                     </flux:field>
                 </div>
@@ -267,10 +243,7 @@
                     @if ($modo_descarga !== 'alumno')
                         <div class="mt-5 grid gap-4 md:grid-cols-3">
                             <flux:field>
-                                <flux:label>
-                                    Nivel
-                                </flux:label>
-
+                                <flux:label>Nivel</flux:label>
                                 <flux:select wire:model.live="nivel_id" placeholder="Selecciona nivel">
                                     @foreach ($niveles as $nivel)
                                         <flux:select.option value="{{ $nivel['id'] }}">
@@ -278,16 +251,12 @@
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
-
                                 <flux:error name="nivel_id" />
                             </flux:field>
 
                             @if (in_array($modo_descarga, ['grado', 'grupo']))
                                 <flux:field>
-                                    <flux:label>
-                                        Grado
-                                    </flux:label>
-
+                                    <flux:label>Grado</flux:label>
                                     <flux:select wire:model.live="grado_id" placeholder="Selecciona grado"
                                         :disabled="!$nivel_id">
                                         @foreach ($grados as $grado)
@@ -298,17 +267,13 @@
                                             @endif
                                         @endforeach
                                     </flux:select>
-
                                     <flux:error name="grado_id" />
                                 </flux:field>
                             @endif
 
                             @if ($modo_descarga === 'grupo')
                                 <flux:field>
-                                    <flux:label>
-                                        Grupo
-                                    </flux:label>
-
+                                    <flux:label>Grupo</flux:label>
                                     <flux:select wire:model.live="grupo_id" placeholder="Selecciona grupo"
                                         :disabled="!$nivel_id">
                                         @foreach ($grupos as $grupo)
@@ -319,7 +284,6 @@
                                             @endif
                                         @endforeach
                                     </flux:select>
-
                                     <flux:error name="grupo_id" />
                                 </flux:field>
                             @endif
@@ -330,10 +294,7 @@
                 @if ($modo_descarga === 'alumno')
                     <div class="relative">
                         <flux:field>
-                            <flux:label>
-                                Alumno
-                            </flux:label>
-
+                            <flux:label>Alumno</flux:label>
                             <flux:input type="text" wire:model.live.debounce.500ms="query"
                                 wire:keydown.arrow-down.prevent="selectIndexDown"
                                 wire:keydown.arrow-up.prevent="selectIndexUp"
@@ -341,22 +302,16 @@
                                 x-on:focus="open = true" x-on:input="open = true"
                                 x-on:blur="setTimeout(() => open = false, 200)"
                                 placeholder="Buscar por nombre, matrícula, CURP o folio" />
-
                             <flux:error name="selectedAlumno" />
                         </flux:field>
 
                         @if ($selectedAlumno)
                             <div
                                 class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
-                                <p class="font-semibold">
-                                    {{ $selectedAlumno['nombre_completo'] }}
-                                </p>
-
+                                <p class="font-semibold">{{ $selectedAlumno['nombre_completo'] }}</p>
                                 <p class="text-xs">
-                                    {{ $selectedAlumno['matricula'] }}
-                                    · {{ $selectedAlumno['nivel'] }}
-                                    · {{ $selectedAlumno['grado'] }}
-                                    · Grupo {{ $selectedAlumno['grupo'] }}
+                                    {{ $selectedAlumno['matricula'] }} · {{ $selectedAlumno['nivel'] }} ·
+                                    {{ $selectedAlumno['grado'] }} · Grupo {{ $selectedAlumno['grupo'] }}
                                 </p>
 
                                 <div class="mt-2">
@@ -373,17 +328,13 @@
                                 class="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
                                 @foreach ($alumnos as $index => $alumno)
                                     <li wire:click="selectAlumno({{ $index }})"
-                                        class="cursor-pointer px-4 py-3 text-sm hover:bg-indigo-50 dark:hover:bg-zinc-800
-                                            {{ $selectedIndex === $index ? 'bg-indigo-50 dark:bg-zinc-800' : '' }}">
+                                        class="cursor-pointer px-4 py-3 text-sm hover:bg-indigo-50 dark:hover:bg-zinc-800 {{ $selectedIndex === $index ? 'bg-indigo-50 dark:bg-zinc-800' : '' }}">
                                         <p class="font-semibold text-zinc-800 dark:text-zinc-100">
                                             {{ $alumno['nombre_completo'] }}
                                         </p>
-
                                         <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                            {{ $alumno['matricula'] }}
-                                            · {{ $alumno['nivel'] }}
-                                            · {{ $alumno['grado'] }}
-                                            · Grupo {{ $alumno['grupo'] }}
+                                            {{ $alumno['matricula'] }} · {{ $alumno['nivel'] }} ·
+                                            {{ $alumno['grado'] }} · Grupo {{ $alumno['grupo'] }}
                                         </p>
                                     </li>
                                 @endforeach
@@ -399,18 +350,14 @@
 
                     <div class="flex flex-wrap gap-4">
                         <flux:checkbox wire:model.live="primer_periodo" label="1° Periodo" />
-
                         <flux:checkbox wire:model.live="segundo_periodo" label="2° Periodo" />
-
                         <flux:checkbox wire:model.live="tercer_periodo" label="3° Periodo" />
                     </div>
                 </div>
 
                 <div class="flex justify-start">
                     <flux:button type="button" variant="primary"
-                        x-on:click="
-                            window.ventanaConstancia = window.open('', '_blank');
-                        "
+                        x-on:click="window.ventanaConstancia = window.open('', '_blank');"
                         wire:click="descargarConstancia" wire:loading.attr="disabled"
                         wire:target="descargarConstancia">
                         <span wire:loading.remove wire:target="descargarConstancia">
@@ -424,6 +371,198 @@
                 </div>
             @endif
         </div>
+
+        {{-- CRUD de constancias generadas --}}
+        <div class="border-t border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+            <div
+                class="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+                <button type="button" x-on:click="historialAbierto = !historialAbierto"
+                    class="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-zinc-100 dark:hover:bg-zinc-700/60">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12h6m-6 4h6M7 4h7l3 3v13H7V4z" />
+                            </svg>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-800 dark:text-zinc-100">
+                                Constancias generadas
+                            </h3>
+
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                Consulta, edita, elimina o vuelve a abrir una constancia generada.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="hidden rounded-full bg-white px-3 py-1 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700 sm:inline-flex">
+                            {{ $constanciasGeneradas->total() }} registro(s)
+                        </span>
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-zinc-500 transition"
+                            x-bind:class="historialAbierto ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7" />
+                        </svg>
+                    </div>
+                </button>
+
+                <div x-show="historialAbierto" x-cloak
+                    class="border-t border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h4 class="text-base font-semibold text-zinc-800 dark:text-zinc-100">
+                                Historial de constancias
+                            </h4>
+
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                Solo aparecen las constancias individuales guardadas en la base de datos.
+                            </p>
+                        </div>
+
+                        <div class="w-full sm:w-80">
+                            <flux:input type="search" wire:model.live.debounce.500ms="buscar_constancia"
+                                placeholder="Buscar folio, alumno o matrícula..." />
+                        </div>
+                    </div>
+
+                    @if ($constanciasGeneradas->count() > 0)
+                        <div class="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                                    <thead class="bg-zinc-50 dark:bg-zinc-800">
+                                        <tr>
+                                            <th
+                                                class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
+                                                Folio</th>
+                                            <th
+                                                class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
+                                                Alumno</th>
+                                            <th
+                                                class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
+                                                Plantilla</th>
+                                            <th
+                                                class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">
+                                                Fecha</th>
+                                            <th
+                                                class="px-4 py-3 text-right font-semibold text-zinc-700 dark:text-zinc-200">
+                                                Acciones</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody
+                                        class="divide-y divide-zinc-200 bg-white dark:divide-zinc-700 dark:bg-zinc-900">
+                                        @foreach ($constanciasGeneradas as $constanciaGenerada)
+                                            @php
+                                                $alumnoConstancia = $constanciaGenerada->alumno;
+                                                $nombreAlumnoConstancia = trim(
+                                                    ($alumnoConstancia->nombre ?? '') .
+                                                        ' ' .
+                                                        ($alumnoConstancia->apellido_paterno ?? '') .
+                                                        ' ' .
+                                                        ($alumnoConstancia->apellido_materno ?? ''),
+                                                );
+                                            @endphp
+
+                                            <tr class="transition hover:bg-zinc-50 dark:hover:bg-zinc-800/70">
+                                                <td class="px-4 py-3">
+                                                    <div
+                                                        class="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                                                        {{ $constanciaGenerada->folio }}
+                                                    </div>
+
+                                                    <div class="mt-0.5 text-xs text-zinc-500">
+                                                        {{ $constanciaGenerada->created_at?->format('d/m/Y H:i') }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-3">
+                                                    <div class="font-medium text-zinc-800 dark:text-zinc-100">
+                                                        {{ $nombreAlumnoConstancia ?: 'Sin alumno' }}
+                                                    </div>
+
+                                                    <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                                        {{ $alumnoConstancia?->matricula ?? 'Sin matrícula' }}
+
+                                                        @if ($alumnoConstancia?->nivel?->nombre)
+                                                            · {{ $alumnoConstancia->nivel->nombre }}
+                                                        @endif
+
+                                                        @if ($alumnoConstancia?->grado?->nombre)
+                                                            · {{ $alumnoConstancia->grado->nombre }}
+                                                        @endif
+
+                                                        @if ($alumnoConstancia?->grupo?->asignacionGrupo?->nombre)
+                                                            · Grupo
+                                                            {{ $alumnoConstancia->grupo->asignacionGrupo->nombre }}
+                                                        @endif
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-3">
+                                                    <div class="text-zinc-700 dark:text-zinc-200">
+                                                        {{ $constanciaGenerada->plantilla?->titulo ?? 'Sin plantilla' }}
+                                                    </div>
+
+                                                    <div class="mt-0.5 text-xs text-zinc-500">
+                                                        {{ $constanciaGenerada->modo_descarga }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-3 text-zinc-700 dark:text-zinc-200">
+                                                    {{ $constanciaGenerada->fecha_expedicion?->format('d/m/Y') }}
+                                                </td>
+
+                                                <td class="px-4 py-3">
+                                                    <div class="flex flex-wrap justify-end gap-2">
+                                                        <flux:button type="button" size="xs" variant="primary"
+                                                            wire:click="abrirPdfConstancia({{ $constanciaGenerada->id }})">
+                                                            PDF
+                                                        </flux:button>
+
+                                                        <flux:button type="button" size="xs" variant="filled"
+                                                            wire:click="abrirEditarConstancia({{ $constanciaGenerada->id }})">
+                                                            Editar
+                                                        </flux:button>
+
+                                                        <flux:button type="button" size="xs" variant="danger"
+                                                            wire:click="eliminarConstanciaGenerada({{ $constanciaGenerada->id }})"
+                                                            wire:confirm="¿Seguro que deseas eliminar esta constancia?">
+                                                            Eliminar
+                                                        </flux:button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            {{ $constanciasGeneradas->links() }}
+                        </div>
+                    @else
+                        <div
+                            class="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-700 dark:bg-zinc-800">
+                            <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">
+                                No hay constancias registradas.
+                            </p>
+
+                            <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                Cuando generes una constancia por alumno, aparecerá en este historial.
+                            </p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- Modal de crear / editar plantilla --}}
@@ -432,6 +571,7 @@
     }" x-cloak x-show="mostrar"
         x-on:keydown.escape.window="$wire.cerrarFormularioPlantilla()" class="fixed inset-0 z-[999] overflow-y-auto"
         role="dialog" aria-modal="true">
+
         <div x-show="mostrar" x-transition.opacity.duration.200ms
             class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm" x-on:click="$wire.cerrarFormularioPlantilla()">
         </div>
@@ -445,6 +585,7 @@
                 x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
                 class="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-900/10 dark:bg-zinc-900 dark:ring-white/10"
                 x-on:click.stop>
+
                 <div
                     class="flex items-center justify-between bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-6 py-4">
                     <div>
@@ -470,62 +611,38 @@
                 <div class="max-h-[75vh] overflow-y-auto p-6">
                     <div class="grid gap-5 md:grid-cols-2">
                         <flux:field>
-                            <flux:label>
-                                Clave
-                            </flux:label>
-
+                            <flux:label>Clave</flux:label>
                             <flux:input type="text" wire:model.live="nueva_clave"
                                 placeholder="estudios, conducta, permiso" />
-
-                            <flux:description>
-                                Solo minúsculas, números y guion bajo.
-                            </flux:description>
-
+                            <flux:description>Solo minúsculas, números y guion bajo.</flux:description>
                             <flux:error name="nueva_clave" />
                         </flux:field>
 
                         <flux:field>
-                            <flux:label>
-                                Título
-                            </flux:label>
-
+                            <flux:label>Título</flux:label>
                             <flux:input type="text" wire:model.live="nuevo_titulo"
                                 placeholder="CONSTANCIA DE ESTUDIOS" />
-
-                            <flux:description>
-                                El título es el que aparecerá en el encabezado de la constancia.
+                            <flux:description>El título es el que aparecerá en el encabezado de la constancia.
                             </flux:description>
-
                             <flux:error name="nuevo_titulo" />
                         </flux:field>
                     </div>
 
                     <div class="mt-5">
                         <flux:field>
-                            <flux:label>
-                                Contenido de la plantilla
-                            </flux:label>
-
+                            <flux:label>Contenido de la plantilla</flux:label>
                             <div wire:ignore>
                                 <textarea id="editor_plantilla"></textarea>
                             </div>
-
                             <flux:error name="nuevo_contenido_html" />
                         </flux:field>
                     </div>
 
                     <div class="mt-5 grid gap-5 md:grid-cols-2">
                         <flux:field>
-                            <flux:label>
-                                Variables disponibles
-                            </flux:label>
-
+                            <flux:label>Variables disponibles</flux:label>
                             <flux:textarea wire:model.live="nuevas_variables" rows="8" />
-
-                            <flux:description>
-                                Escribe una variable por línea.
-                            </flux:description>
-
+                            <flux:description>Escribe una variable por línea.</flux:description>
                             <flux:error name="nuevas_variables" />
                         </flux:field>
 
@@ -573,6 +690,108 @@
                         </span>
 
                         <span wire:loading wire:target="guardarPlantillaSistema">
+                            Guardando...
+                        </span>
+                    </flux:button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal de editar constancia generada --}}
+    <div x-data="{
+        mostrar: @entangle('mostrar_modal_editar_constancia'),
+    }" x-cloak x-show="mostrar" x-on:keydown.escape.window="$wire.cerrarEditarConstancia()"
+        class="fixed inset-0 z-[1000] overflow-y-auto" role="dialog" aria-modal="true">
+
+        <div x-show="mostrar" x-transition.opacity.duration.200ms
+            class="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm" x-on:click="$wire.cerrarEditarConstancia()"></div>
+
+        <div class="relative flex min-h-full items-center justify-center p-4 sm:p-6">
+            <div x-show="mostrar" x-transition:enter="duration-300 ease-out"
+                x-transition:enter-start="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100 blur-0"
+                x-transition:leave="duration-200 ease-in"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100 blur-0"
+                x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
+                class="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-900/10 dark:bg-zinc-900 dark:ring-white/10"
+                x-on:click.stop>
+
+                <div
+                    class="flex items-center justify-between bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-6 py-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">
+                            Editar constancia
+                        </h3>
+
+                        <p class="text-sm text-white/80">
+                            Modifica la fecha, dirigido a, periodos o contenido generado.
+                        </p>
+                    </div>
+
+                    <button type="button" x-on:click="$wire.cerrarEditarConstancia()"
+                        class="rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white"
+                        aria-label="Cerrar modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="max-h-[75vh] overflow-y-auto p-6">
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <flux:field>
+                            <flux:label>Fecha de expedición</flux:label>
+                            <flux:input type="date" wire:model.live="editar_fecha_expedicion" />
+                            <flux:error name="editar_fecha_expedicion" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>Dirigido a</flux:label>
+                            <flux:input type="text" wire:model.live="editar_dirigido_a"
+                                placeholder="A QUIEN CORRESPONDA" />
+                            <flux:error name="editar_dirigido_a" />
+                        </flux:field>
+                    </div>
+
+                    <div class="mt-5">
+                        <p class="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                            Periodos de calificaciones
+                        </p>
+
+                        <div class="flex flex-wrap gap-4">
+                            <flux:checkbox wire:model.live="editar_primer_periodo" label="1° Periodo" />
+                            <flux:checkbox wire:model.live="editar_segundo_periodo" label="2° Periodo" />
+                            <flux:checkbox wire:model.live="editar_tercer_periodo" label="3° Periodo" />
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <flux:field>
+                            <flux:label>Contenido de la constancia</flux:label>
+                            <div wire:ignore>
+                                <textarea id="editor_constancia_edicion"></textarea>
+                            </div>
+                            <flux:error name="editar_contenido_generado_html" />
+                        </flux:field>
+                    </div>
+                </div>
+
+                <div
+                    class="flex justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-6 py-4 dark:border-zinc-700 dark:bg-zinc-800">
+                    <flux:button type="button" variant="ghost" wire:click="cerrarEditarConstancia">
+                        Cancelar
+                    </flux:button>
+
+                    <flux:button type="button" variant="primary"
+                        x-on:click="window.sincronizarEditorConstanciaEdicion?.()" wire:click="actualizarConstancia"
+                        wire:loading.attr="disabled" wire:target="actualizarConstancia">
+                        <span wire:loading.remove wire:target="actualizarConstancia">
+                            Guardar cambios
+                        </span>
+
+                        <span wire:loading wire:target="actualizarConstancia">
                             Guardando...
                         </span>
                     </flux:button>
@@ -660,7 +879,6 @@
                                 ...configuracionBase,
                                 selector: '#editor_plantilla',
                                 height: 420,
-
                                 setup: function(editor) {
                                     editor.on('init', function() {
                                         editor.setContent(contenido ?? '');
@@ -682,9 +900,54 @@
                     });
                 };
 
+                const iniciarEditorConstanciaEdicion = (contenido = '') => {
+                    esperarTinyMCE(() => {
+                        setTimeout(() => {
+                            const elemento = document.getElementById('editor_constancia_edicion');
+
+                            if (!elemento) {
+                                return;
+                            }
+
+                            quitarEditor('editor_constancia_edicion');
+
+                            tinymce.init({
+                                ...configuracionBase,
+                                selector: '#editor_constancia_edicion',
+                                height: 420,
+                                setup: function(editor) {
+                                    editor.on('init', function() {
+                                        editor.setContent(contenido ?? '');
+                                    });
+
+                                    editor.on('change undo redo input keyup',
+                                function() {
+                                        @this.set(
+                                            'editar_contenido_generado_html',
+                                            editor.getContent(), false);
+                                    });
+
+                                    editor.on('blur', function() {
+                                        @this.set(
+                                            'editar_contenido_generado_html',
+                                            editor.getContent(), false);
+                                    });
+                                },
+                            });
+                        }, 250);
+                    });
+                };
+
                 window.sincronizarEditorPlantilla = () => {
                     if (window.tinymce && tinymce.get('editor_plantilla')) {
                         @this.set('nuevo_contenido_html', tinymce.get('editor_plantilla').getContent(), false);
+                    }
+                };
+
+                window.sincronizarEditorConstanciaEdicion = () => {
+                    if (window.tinymce && tinymce.get('editor_constancia_edicion')) {
+                        @this.set('editar_contenido_generado_html', tinymce.get('editor_constancia_edicion')
+                            .getContent(), false);
                     }
                 };
 
@@ -694,6 +957,14 @@
 
                 window.addEventListener('cerrar-modal-plantilla', () => {
                     quitarEditor('editor_plantilla');
+                });
+
+                window.addEventListener('abrir-modal-editar-constancia', (event) => {
+                    iniciarEditorConstanciaEdicion(event.detail.contenido ?? '');
+                });
+
+                window.addEventListener('cerrar-modal-editar-constancia', () => {
+                    quitarEditor('editor_constancia_edicion');
                 });
 
                 window.addEventListener('abrir-constancia-nueva-ventana', (event) => {
@@ -716,14 +987,9 @@
                     window.open(url, '_blank');
                 });
 
-                Livewire.hook('morph.updated', () => {
-                    if (document.getElementById('editor_plantilla') && !tinymce.get('editor_plantilla')) {
-                        iniciarEditorPlantilla(@js($nuevo_contenido_html ?? ''));
-                    }
-                });
-
                 document.addEventListener('livewire:navigating', () => {
                     quitarEditor('editor_plantilla');
+                    quitarEditor('editor_constancia_edicion');
                 });
             });
         </script>

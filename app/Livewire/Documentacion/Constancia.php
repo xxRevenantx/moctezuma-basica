@@ -11,9 +11,12 @@ use App\Models\Nivel;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Constancia extends Component
 {
+    use WithPagination;
+
     public string $query = '';
 
     public array $alumnos = [];
@@ -72,15 +75,31 @@ class Constancia extends Component
 
     public bool $nuevo_activo = true;
 
+    public string $buscar_constancia = '';
+
+    public bool $mostrar_modal_editar_constancia = false;
+
+    public ?int $constancia_editando_id = null;
+
+    public ?string $editar_fecha_expedicion = null;
+
+    public ?string $editar_dirigido_a = null;
+
+    public string $editar_contenido_generado_html = '';
+
+    public bool $editar_primer_periodo = false;
+
+    public bool $editar_segundo_periodo = false;
+
+    public bool $editar_tercer_periodo = false;
+
     public function mount(): void
     {
         $this->fecha_expedicion = now()->format('Y-m-d');
 
         $this->cargarCatalogos();
-
         $this->cargarPrimeraPlantilla();
     }
-
 
     private function variablesBase(): array
     {
@@ -101,6 +120,7 @@ class Constancia extends Component
             '@dirigido',
         ];
     }
+
     public function cargarCatalogos(): void
     {
         $this->niveles = Nivel::query()
@@ -144,12 +164,10 @@ class Constancia extends Component
 
         if (!$plantilla) {
             $this->limpiarPlantillaSeleccionada();
-
             return;
         }
 
         $this->tipo_constancia = $plantilla->clave;
-
         $this->cargarPlantilla();
     }
 
@@ -167,15 +185,13 @@ class Constancia extends Component
 
         if (!$plantilla) {
             $this->limpiarPlantillaSeleccionada();
-
             return;
         }
 
         $this->plantilla_id = $plantilla->id;
         $this->plantilla_titulo = $plantilla->titulo;
 
-        // Se mezclan las variables guardadas con las variables base del sistema.
-        // Así @sexo siempre estará disponible aunque la plantilla sea antigua.
+        // Se agregan las variables base para que siempre estén disponibles.
         $this->plantilla_variables = collect($plantilla->variables ?? [])
             ->merge($this->variablesBase())
             ->unique()
@@ -276,8 +292,8 @@ class Constancia extends Component
             'nuevo_titulo.max' => 'El título no puede tener más de 255 caracteres.',
             'nuevo_contenido_html.required' => 'El contenido HTML es obligatorio.',
             'nuevo_contenido_html.string' => 'El contenido HTML debe ser una cadena de texto.',
-
             'nuevas_variables.string' => 'Las variables deben ser una cadena de texto.',
+            'editar_contenido_generado_html.required' => 'El contenido de la constancia es obligatorio.',
         ];
     }
 
@@ -297,9 +313,6 @@ class Constancia extends Component
             'nuevo_contenido_html' => ['required', 'string'],
             'nuevas_variables' => ['nullable', 'string'],
             'nuevo_activo' => ['boolean'],
-        ], [
-            'nueva_clave.regex' => 'La clave solo puede llevar minúsculas, números y guion bajo.',
-            'nuevas_variables.string' => 'Las variables deben ser una cadena de texto.',
         ]);
 
         $variables = collect(preg_split('/\r\n|\r|\n/', $this->nuevas_variables))
@@ -322,7 +335,6 @@ class Constancia extends Component
         );
 
         $this->tipo_constancia = $plantilla->clave;
-
         $this->cargarPlantilla();
 
         $this->mostrar_modal_plantilla = false;
@@ -368,7 +380,6 @@ class Constancia extends Component
             }
 
             $this->dispatch('notificar', tipo: 'warning', mensaje: 'La plantilla tiene constancias generadas, por seguridad solo fue desactivada.');
-
             return;
         }
 
@@ -408,7 +419,6 @@ class Constancia extends Component
 
         if (strlen($texto) < 2) {
             $this->alumnos = [];
-
             return;
         }
 
@@ -448,9 +458,7 @@ class Constancia extends Component
         }
 
         $this->selectedAlumno = $this->alumnos[$index];
-
         $this->query = $this->selectedAlumno['nombre_completo'] . ' - ' . $this->selectedAlumno['nivel'];
-
         $this->alumnos = [];
         $this->selectedIndex = 0;
     }
@@ -515,13 +523,11 @@ class Constancia extends Component
                 'selectedAlumno' => ['required'],
             ]);
 
-            // Solo en descarga individual se guarda historial en la base de datos.
+            // Solo la constancia individual se guarda en el historial.
             $constancia = $this->crearConstanciaIndividual((int) $this->selectedAlumno['id']);
-
             $url = route('misrutas.constancias.pdf', $constancia);
 
             $this->dispatch('abrir-constancia-nueva-ventana', url: $url);
-
             return;
         }
 
@@ -548,16 +554,14 @@ class Constancia extends Component
         $alumnos = $this->obtenerAlumnosParaDescarga();
 
         if ($alumnos->isEmpty()) {
+            $this->dispatch('abrir-constancia-nueva-ventana', url: null);
             $this->dispatch('notificar', tipo: 'error', mensaje: 'No se encontraron alumnos para generar constancias.');
-
             return;
         }
 
-        // En descargas masivas no se guarda nada en la tabla constancias.
         session()->put('constancias_zip_payload', [
             'alumno_ids' => $alumnos->pluck('id')->values()->toArray(),
             'plantilla_id' => $this->plantilla_id,
-            'plantilla_titulo' => $this->plantilla_titulo,
             'contenido_html' => $this->contenido_html,
             'fecha_expedicion' => $this->fecha_expedicion ?: now()->format('Y-m-d'),
             'dirigido_a' => $this->dirigido_a,
@@ -565,9 +569,7 @@ class Constancia extends Component
             'periodos_calificaciones' => $this->periodosSeleccionados(),
         ]);
 
-        $url = route('misrutas.constancias.zip');
-
-        $this->dispatch('abrir-constancia-nueva-ventana', url: $url);
+        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.zip'));
     }
 
     private function obtenerAlumnosParaDescarga()
@@ -616,7 +618,6 @@ class Constancia extends Component
             ->findOrFail($inscripcionId);
 
         $alumnoArray = $this->formatearAlumno($alumno);
-
         $contenidoGenerado = $this->reemplazarVariablesConAlumno($this->contenido_html, $alumnoArray);
 
         return ConstanciaModelo::create([
@@ -639,43 +640,35 @@ class Constancia extends Component
             $generacion = trim(($alumno->generacion->anio_ingreso ?? '') . '-' . ($alumno->generacion->anio_egreso ?? ''));
         }
 
+        $sexo = strtoupper((string) ($alumno->sexo ?? $alumno->genero ?? ''));
+
         return [
             'id' => $alumno->id,
             'nombre_completo' => trim(($alumno->nombre ?? '') . ' ' . ($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? '')),
-            'curp' => $alumno->curp,
-            'matricula' => $alumno->matricula,
-            'genero' => $alumno->genero,
-            'nivel' => $alumno->nivel?->nombre,
-            'cct' => $alumno->nivel?->cct,
-            'grado' => $alumno->grado?->nombre,
-            'grupo' => $alumno->grupo?->asignacionGrupo?->nombre,
+            'curp' => $alumno->curp ?? '',
+            'matricula' => $alumno->matricula ?? '',
+            'grado' => $alumno->grado?->nombre ?? '',
+            'nivel' => $alumno->nivel?->nombre ?? '',
+            'grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? '',
             'generacion' => $generacion,
-            'ciclo' => $alumno->ciclo?->ciclo,
+            'ciclo' => $alumno->ciclo?->ciclo ?? '',
+            'cct' => $alumno->nivel?->cct ?? '',
+            'sexo_original' => $sexo,
         ];
     }
 
     private function reemplazarVariablesConAlumno(string $contenido, array $alumno): string
     {
-        $genero = mb_strtolower(trim((string) ($alumno['genero'] ?? '')));
+        $sexoOriginal = strtoupper((string) ($alumno['sexo_original'] ?? ''));
 
-        $esMujer = in_array($genero, [
-            'F',
-            'M',
-            'femenino',
-            'femenina',
-            'mujer',
-            'alumna',
-        ]);
-
-        $sexo = $esMujer ? 'La alumna' : 'El alumno';
-
-        $descripcion = $esMujer
-            ? 'inscrita'
-            : 'inscrito';
+        $esMasculino = str_contains($sexoOriginal, 'MASCULINO') || $sexoOriginal === 'H' || $sexoOriginal === 'HOMBRE';
+        $sexo = $esMasculino ? 'Que el alumno:' : 'Que la alumna:';
+        $descripcion = $esMasculino ? 'regularmente inscrito' : 'regularmente inscrita';
 
         $variables = [
-            '@alumno' => $alumno['nombre_completo'] ?? '',
+            '@sexo' => $sexo,
             '@nombre' => $alumno['nombre_completo'] ?? '',
+            '@alumno' => $alumno['nombre_completo'] ?? '',
             '@curp' => $alumno['curp'] ?? '',
             '@matricula' => $alumno['matricula'] ?? '',
             '@grado' => $alumno['grado'] ?? '',
@@ -684,7 +677,6 @@ class Constancia extends Component
             '@generacion' => $alumno['generacion'] ?? '',
             '@ciclo' => $alumno['ciclo'] ?? '',
             '@cct' => $alumno['cct'] ?? '',
-            '@sexo' => $sexo,
             '@descripcion' => $descripcion,
             '@fecha' => Carbon::parse($this->fecha_expedicion ?: now())->translatedFormat('d \d\e F \d\e Y'),
             '@dirigido' => $this->dirigido_a ?: 'A QUIEN CORRESPONDA',
@@ -709,8 +701,102 @@ class Constancia extends Component
         return 'CONST-' . now()->format('Y') . '-' . Str::padLeft((string) $siguiente, 5, '0');
     }
 
+    public function updatedBuscarConstancia(): void
+    {
+        $this->resetPage('constanciasPage');
+    }
+
+    public function abrirEditarConstancia(int $constanciaId): void
+    {
+        $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
+        $periodos = $constancia->periodos_calificaciones ?? [];
+
+        $this->constancia_editando_id = $constancia->id;
+        $this->editar_fecha_expedicion = $constancia->fecha_expedicion?->format('Y-m-d');
+        $this->editar_dirigido_a = $constancia->dirigido_a;
+        $this->editar_contenido_generado_html = $constancia->contenido_generado_html ?? '';
+
+        $this->editar_primer_periodo = (bool) ($periodos['primer_periodo'] ?? false);
+        $this->editar_segundo_periodo = (bool) ($periodos['segundo_periodo'] ?? false);
+        $this->editar_tercer_periodo = (bool) ($periodos['tercer_periodo'] ?? false);
+
+        $this->mostrar_modal_editar_constancia = true;
+
+        $this->resetValidation([
+            'editar_fecha_expedicion',
+            'editar_dirigido_a',
+            'editar_contenido_generado_html',
+        ]);
+
+        $this->dispatch('abrir-modal-editar-constancia', contenido: $this->editar_contenido_generado_html);
+    }
+
+    public function cerrarEditarConstancia(): void
+    {
+        $this->mostrar_modal_editar_constancia = false;
+        $this->constancia_editando_id = null;
+        $this->editar_fecha_expedicion = null;
+        $this->editar_dirigido_a = null;
+        $this->editar_contenido_generado_html = '';
+        $this->editar_primer_periodo = false;
+        $this->editar_segundo_periodo = false;
+        $this->editar_tercer_periodo = false;
+
+        $this->resetValidation([
+            'editar_fecha_expedicion',
+            'editar_dirigido_a',
+            'editar_contenido_generado_html',
+        ]);
+
+        $this->dispatch('cerrar-modal-editar-constancia');
+    }
+
+    public function actualizarConstancia(): void
+    {
+        $this->validate([
+            'constancia_editando_id' => ['required', 'exists:constancias,id'],
+            'editar_fecha_expedicion' => ['nullable', 'date'],
+            'editar_dirigido_a' => ['nullable', 'string', 'max:255'],
+            'editar_contenido_generado_html' => ['required', 'string'],
+        ]);
+
+        $constancia = ConstanciaModelo::query()->findOrFail($this->constancia_editando_id);
+
+        $constancia->update([
+            'fecha_expedicion' => $this->editar_fecha_expedicion ?: now()->format('Y-m-d'),
+            'dirigido_a' => $this->editar_dirigido_a,
+            'periodos_calificaciones' => [
+                'primer_periodo' => $this->editar_primer_periodo,
+                'segundo_periodo' => $this->editar_segundo_periodo,
+                'tercer_periodo' => $this->editar_tercer_periodo,
+            ],
+            'contenido_generado_html' => $this->editar_contenido_generado_html,
+        ]);
+
+        $this->cerrarEditarConstancia();
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'Constancia actualizada correctamente.');
+    }
+
+    public function eliminarConstanciaGenerada(int $constanciaId): void
+    {
+        $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
+        $constancia->delete();
+
+        $this->resetPage('constanciasPage');
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'Constancia eliminada correctamente.');
+    }
+
+    public function abrirPdfConstancia(int $constanciaId): void
+    {
+        $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
+
+        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.pdf', $constancia));
+    }
+
     public function render()
     {
+        $buscar = trim($this->buscar_constancia);
+
         return view('livewire.documentacion.constancia', [
             'plantillas' => ConstanciaPlantilla::query()
                 ->orderBy('titulo')
@@ -720,6 +806,30 @@ class Constancia extends Component
                 ->where('activo', true)
                 ->orderBy('titulo')
                 ->get(),
+
+            'constanciasGeneradas' => ConstanciaModelo::query()
+                ->with([
+                    'alumno:id,nombre,apellido_paterno,apellido_materno,matricula,nivel_id,grado_id,grupo_id',
+                    'alumno.nivel:id,nombre',
+                    'alumno.grado:id,nombre',
+                    'alumno.grupo:id,asignacion_grupo_id',
+                    'alumno.grupo.asignacionGrupo:id,nombre',
+                    'plantilla:id,titulo,clave',
+                ])
+                ->when($buscar !== '', function ($consulta) use ($buscar) {
+                    $consulta->where(function ($query) use ($buscar) {
+                        $query->where('folio', 'like', "%{$buscar}%")
+                            ->orWhere('dirigido_a', 'like', "%{$buscar}%")
+                            ->orWhereHas('alumno', function ($alumno) use ($buscar) {
+                                $alumno->where('nombre', 'like', "%{$buscar}%")
+                                    ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                                    ->orWhere('apellido_materno', 'like', "%{$buscar}%")
+                                    ->orWhere('matricula', 'like', "%{$buscar}%");
+                            });
+                    });
+                })
+                ->latest()
+                ->paginate(8, pageName: 'constanciasPage'),
         ]);
     }
 }
