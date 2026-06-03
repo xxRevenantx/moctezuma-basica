@@ -18,6 +18,9 @@ class DocumentosPDFController extends Controller
      */
     public function constanciaPdf(Constancia $constancia)
     {
+
+        // dd($constancia);
+
         $constancia->load([
             'alumno.nivel',
             'alumno.grado',
@@ -26,7 +29,7 @@ class DocumentosPDFController extends Controller
             'alumno.ciclo',
             'plantilla',
         ]);
-        dd($constancia);
+        // dd($constancia);
 
         $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
             'constancia' => $constancia,
@@ -120,8 +123,8 @@ class DocumentosPDFController extends Controller
 
             $nombreAlumno = trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '') . ' ' .
-                    ($alumno->nombre ?? '')
+                ($alumno->apellido_materno ?? '') . ' ' .
+                ($alumno->nombre ?? '')
             );
 
             $nombreArchivo = Str::slug($folioTemporal . '_' . $nombreAlumno, '_') . '.pdf';
@@ -163,8 +166,8 @@ class DocumentosPDFController extends Controller
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                    '-' .
-                    ($alumno->generacion->anio_egreso ?? '')
+                '-' .
+                ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -172,8 +175,8 @@ class DocumentosPDFController extends Controller
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                    ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '')
+                ($alumno->apellido_paterno ?? '') . ' ' .
+                ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp,
             'matricula' => $alumno->matricula,
@@ -192,9 +195,15 @@ class DocumentosPDFController extends Controller
      */
     private function reemplazarVariablesConAlumno(string $contenido, array $alumno, array $payload): string
     {
-        $genero = mb_strtolower((string) ($alumno['genero'] ?? ''));
+        $genero = mb_strtolower(trim((string) ($alumno['genero'] ?? '')));
 
-        $esMujer = in_array($genero, ['f', 'femenino', 'mujer', 'femenina']);
+        $esMujer = in_array($genero, [
+            'f',
+            'femenino',
+            'femenina',
+            'mujer',
+            'alumna',
+        ]);
 
         $sexo = $esMujer ? 'La alumna' : 'El alumno';
 

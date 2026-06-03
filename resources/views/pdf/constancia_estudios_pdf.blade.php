@@ -11,8 +11,35 @@
             margin: 35px 45px;
         }
 
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: 'ARIAL', 'calibri', sans-serif;
             font-size: 13px;
             color: #111827;
             line-height: 1.6;
@@ -72,10 +99,93 @@
             text-align: justify;
             min-height: 260px;
             margin-top: 20px;
+            font-size: 13px;
+            line-height: 1.6;
         }
 
+        /* Permite que el contenido de TinyMCE conserve sus estilos */
+        .contenido * {
+            box-sizing: border-box;
+        }
+
+        /* Párrafos de TinyMCE */
         .contenido p {
-            margin: 0 0 12px 0;
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+
+        /* Negritas, cursivas, subrayado y tachado */
+        .contenido strong,
+        .contenido b {
+            font-weight: bold;
+        }
+
+        .contenido em,
+        .contenido i {
+            font-style: italic;
+        }
+
+        .contenido u {
+            text-decoration: underline;
+        }
+
+        .contenido s,
+        .contenido strike {
+            text-decoration: line-through;
+        }
+
+        /* Alineaciones de TinyMCE */
+        .contenido [style*="text-align: center"] {
+            text-align: center;
+        }
+
+        .contenido [style*="text-align: right"] {
+            text-align: right;
+        }
+
+        .contenido [style*="text-align: justify"] {
+            text-align: justify;
+        }
+
+        .contenido [style*="text-align: left"] {
+            text-align: left;
+        }
+
+        /* Listas de TinyMCE */
+        .contenido ul,
+        .contenido ol {
+            margin-top: 8px;
+            margin-bottom: 8px;
+            padding-left: 28px;
+        }
+
+        .contenido li {
+            margin-bottom: 4px;
+        }
+
+        /* Tablas creadas desde TinyMCE */
+        .contenido table {
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .contenido table td,
+        .contenido table th {
+            border: 1px solid #111827;
+            padding: 5px 7px;
+            vertical-align: top;
+        }
+
+        .contenido table th {
+            font-weight: bold;
+            background: #f3f4f6;
+        }
+
+        /* Imágenes si después decides agregarlas en TinyMCE */
+        .contenido img {
+            max-width: 100%;
+            height: auto;
         }
 
         .tabla-periodos {

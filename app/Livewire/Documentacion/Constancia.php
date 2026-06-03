@@ -81,6 +81,26 @@ class Constancia extends Component
         $this->cargarPrimeraPlantilla();
     }
 
+
+    private function variablesBase(): array
+    {
+        return [
+            '@sexo',
+            '@nombre',
+            '@alumno',
+            '@curp',
+            '@matricula',
+            '@grado',
+            '@nivel',
+            '@grupo',
+            '@generacion',
+            '@ciclo',
+            '@cct',
+            '@descripcion',
+            '@fecha',
+            '@dirigido',
+        ];
+    }
     public function cargarCatalogos(): void
     {
         $this->niveles = Nivel::query()
@@ -153,7 +173,15 @@ class Constancia extends Component
 
         $this->plantilla_id = $plantilla->id;
         $this->plantilla_titulo = $plantilla->titulo;
-        $this->plantilla_variables = $plantilla->variables ?? [];
+
+        // Se mezclan las variables guardadas con las variables base del sistema.
+        // Así @sexo siempre estará disponible aunque la plantilla sea antigua.
+        $this->plantilla_variables = collect($plantilla->variables ?? [])
+            ->merge($this->variablesBase())
+            ->unique()
+            ->values()
+            ->toArray();
+
         $this->contenido_html = $plantilla->contenido_html;
 
         $this->dispatch('actualizar-editor-constancia', contenido: $this->contenido_html);
@@ -179,7 +207,7 @@ class Constancia extends Component
         $this->nueva_clave = '';
         $this->nuevo_titulo = '';
         $this->nuevo_contenido_html = '';
-        $this->nuevas_variables = "@nombre\n@curp\n@matricula\n@grado\n@nivel\n@grupo\n@generacion\n@ciclo\n@cct\n@sexo\n@descripcion\n@fecha\n@dirigido";
+        $this->nuevas_variables = implode("\n", $this->variablesBase());
         $this->nuevo_activo = true;
 
         $this->resetValidation([
@@ -277,6 +305,7 @@ class Constancia extends Component
         $variables = collect(preg_split('/\r\n|\r|\n/', $this->nuevas_variables))
             ->map(fn($variable) => trim($variable))
             ->filter()
+            ->merge($this->variablesBase())
             ->unique()
             ->values()
             ->toArray();
@@ -627,15 +656,22 @@ class Constancia extends Component
 
     private function reemplazarVariablesConAlumno(string $contenido, array $alumno): string
     {
-        $genero = mb_strtolower((string) ($alumno['genero'] ?? ''));
+        $genero = mb_strtolower(trim((string) ($alumno['genero'] ?? '')));
 
-        $esMujer = in_array($genero, ['f', 'femenino', 'mujer', 'femenina']);
+        $esMujer = in_array($genero, [
+            'F',
+            'M',
+            'femenino',
+            'femenina',
+            'mujer',
+            'alumna',
+        ]);
 
         $sexo = $esMujer ? 'La alumna' : 'El alumno';
 
         $descripcion = $esMujer
-            ? 'se encuentra inscrita'
-            : 'se encuentra inscrito';
+            ? 'inscrita'
+            : 'inscrito';
 
         $variables = [
             '@alumno' => $alumno['nombre_completo'] ?? '',

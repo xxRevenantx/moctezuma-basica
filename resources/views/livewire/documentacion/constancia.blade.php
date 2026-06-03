@@ -12,6 +12,7 @@
     <div
         class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
 
+        {{-- Encabezado --}}
         <div class="bg-indigo-500 px-6 py-4">
             <h2 class="text-xl font-semibold tracking-wide text-white">
                 CONSTANCIAS
@@ -175,34 +176,42 @@
                     Primero crea una plantilla activa para poder generar constancias.
                 </div>
             @else
-                <flux:field>
-                    <flux:label>
-                        Tipo de constancia
-                    </flux:label>
+                <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-700 dark:bg-zinc-800">
+                    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-zinc-800 dark:text-zinc-100">
+                                Generar constancia
+                            </h3>
 
-                    <flux:select wire:model.live="tipo_constancia">
-                        @foreach ($plantillasActivas as $plantilla)
-                            <flux:select.option value="{{ $plantilla->clave }}">
-                                {{ $plantilla->titulo }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </flux:field>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                Selecciona una plantilla activa y el modo de descarga.
+                            </p>
+                        </div>
 
-                {{-- <div wire:key="editor-generar-constancia">
-                    <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200">
-                        {{ $plantilla_titulo ?: 'Plantilla de constancia' }}
-                    </h3>
-
-                    <div wire:ignore>
-                        <textarea id="editor_constancia">{!! $contenido_html !!}</textarea>
+                        @if ($plantilla_titulo)
+                            <flux:badge color="blue">
+                                {{ $plantilla_titulo }}
+                            </flux:badge>
+                        @endif
                     </div>
 
-                    <flux:error name="contenido_html" />
+                    <flux:field>
+                        <flux:label>
+                            Tipo de constancia
+                        </flux:label>
+
+                        <flux:select wire:model.live="tipo_constancia">
+                            @foreach ($plantillasActivas as $plantilla)
+                                <flux:select.option value="{{ $plantilla->clave }}">
+                                    {{ $plantilla->titulo }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
 
                     @if (count($plantilla_variables) > 0)
                         <div
-                            class="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+                            class="mt-4 rounded-xl border border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
                             <p class="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200">
                                 Variables disponibles de esta plantilla
                             </p>
@@ -216,22 +225,7 @@
                             </ul>
                         </div>
                     @endif
-
-                    <div class="mt-4">
-                        <flux:button type="button" variant="primary"
-                            x-on:click="window.sincronizarEditoresConstancia?.()"
-                            wire:click="guardarCambiosContenidoActual" wire:loading.attr="disabled"
-                            wire:target="guardarCambiosContenidoActual">
-                            <span wire:loading.remove wire:target="guardarCambiosContenidoActual">
-                                Guardar cambios del contenido actual
-                            </span>
-
-                            <span wire:loading wire:target="guardarCambiosContenidoActual">
-                                Guardando...
-                            </span>
-                        </flux:button>
-                    </div>
-                </div> --}}
+                </div>
 
                 <div class="grid gap-5 md:grid-cols-2">
                     <flux:field>
@@ -415,14 +409,12 @@
                 <div class="flex justify-start">
                     <flux:button type="button" variant="primary"
                         x-on:click="
-        window.sincronizarEditoresConstancia?.();
-
-        window.ventanaConstancia = window.open('', '_blank');
-    "
+                            window.ventanaConstancia = window.open('', '_blank');
+                        "
                         wire:click="descargarConstancia" wire:loading.attr="disabled"
                         wire:target="descargarConstancia">
                         <span wire:loading.remove wire:target="descargarConstancia">
-                            {{ $modo_descarga === 'alumno' ? 'Descargar constancia' : 'Descargar constancias ZIP' }}
+                            {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Descargar constancias ZIP' }}
                         </span>
 
                         <span wire:loading wire:target="descargarConstancia">
@@ -503,6 +495,7 @@
                             <flux:description>
                                 El título es el que aparecerá en el encabezado de la constancia.
                             </flux:description>
+
                             <flux:error name="nuevo_titulo" />
                         </flux:field>
                     </div>
@@ -544,7 +537,9 @@
                                 </p>
 
                                 <div class="grid grid-cols-2 gap-1 text-xs font-mono text-zinc-600 dark:text-zinc-300">
+                                    <span>@sexo</span>
                                     <span>@nombre</span>
+                                    <span>@alumno</span>
                                     <span>@curp</span>
                                     <span>@matricula</span>
                                     <span>@grado</span>
@@ -553,7 +548,6 @@
                                     <span>@generacion</span>
                                     <span>@ciclo</span>
                                     <span>@cct</span>
-                                    <span>@sexo</span>
                                     <span>@descripcion</span>
                                     <span>@fecha</span>
                                     <span>@dirigido</span>
@@ -571,9 +565,9 @@
                         Cancelar
                     </flux:button>
 
-                    <flux:button type="button" variant="primary"
-                        x-on:click="window.sincronizarEditoresConstancia?.()" wire:click="guardarPlantillaSistema"
-                        wire:loading.attr="disabled" wire:target="guardarPlantillaSistema">
+                    <flux:button type="button" variant="primary" x-on:click="window.sincronizarEditorPlantilla?.()"
+                        wire:click="guardarPlantillaSistema" wire:loading.attr="disabled"
+                        wire:target="guardarPlantillaSistema">
                         <span wire:loading.remove wire:target="guardarPlantillaSistema">
                             {{ $editando_plantilla ? 'Actualizar plantilla' : 'Guardar plantilla' }}
                         </span>
@@ -591,7 +585,6 @@
         <script>
             document.addEventListener('livewire:init', () => {
                 let temporizadorPlantilla = null;
-                let temporizadorConstancia = null;
 
                 const esperarTinyMCE = (callback) => {
                     if (window.tinymce) {
@@ -613,7 +606,7 @@
                             clearInterval(intervalo);
                             console.error(
                                 'TinyMCE no se pudo cargar. Revisa la API Key o la conexión a Tiny Cloud.'
-                            );
+                                );
                         }
                     }, 250);
                 };
@@ -624,21 +617,11 @@
                     }
                 };
 
-                const enviarConDebounce = (propiedadLivewire, contenido, tipo) => {
-                    if (tipo === 'plantilla') {
-                        clearTimeout(temporizadorPlantilla);
+                const enviarPlantillaConDebounce = (contenido) => {
+                    clearTimeout(temporizadorPlantilla);
 
-                        temporizadorPlantilla = setTimeout(() => {
-                            @this.set(propiedadLivewire, contenido, false);
-                        }, 700);
-
-                        return;
-                    }
-
-                    clearTimeout(temporizadorConstancia);
-
-                    temporizadorConstancia = setTimeout(() => {
-                        @this.set(propiedadLivewire, contenido, false);
+                    temporizadorPlantilla = setTimeout(() => {
+                        @this.set('nuevo_contenido_html', contenido, false);
                     }, 700);
                 };
 
@@ -648,7 +631,7 @@
                     promotion: false,
                     language: 'es',
                     plugins: 'lists link table code preview fullscreen searchreplace wordcount autoresize',
-                    toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist | table link | searchreplace preview fullscreen code',
+                    toolbar: 'undo redo | blocks | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist | table link | searchreplace preview fullscreen code',
                     content_style: `
                         body {
                             font-family: Arial, Helvetica, sans-serif;
@@ -662,81 +645,48 @@
                     `,
                 };
 
-                const iniciarEditor = ({
-                    id,
-                    propiedadLivewire,
-                    contenidoInicial = '',
-                    altura = 360,
-                    tipo = 'constancia'
-                }) => {
-                    const elemento = document.getElementById(id);
-
-                    if (!elemento || !window.tinymce) {
-                        return;
-                    }
-
-                    quitarEditor(id);
-
-                    tinymce.init({
-                        ...configuracionBase,
-                        selector: `#${id}`,
-                        height: altura,
-
-                        setup: function(editor) {
-                            editor.on('init', function() {
-                                editor.setContent(contenidoInicial ?? '');
-                            });
-
-                            editor.on('change undo redo input', function() {
-                                enviarConDebounce(propiedadLivewire, editor.getContent(), tipo);
-                            });
-
-                            editor.on('blur', function() {
-                                @this.set(propiedadLivewire, editor.getContent(), false);
-                            });
-                        },
-                    });
-                };
-
-                const iniciarEditorConstancia = (contenido = @js($contenido_html ?? '')) => {
-                    esperarTinyMCE(() => {
-                        setTimeout(() => {
-                            iniciarEditor({
-                                id: 'editor_constancia',
-                                propiedadLivewire: 'contenido_html',
-                                contenidoInicial: contenido,
-                                altura: 380,
-                                tipo: 'constancia',
-                            });
-                        }, 150);
-                    });
-                };
-
                 const iniciarEditorPlantilla = (contenido = '') => {
                     esperarTinyMCE(() => {
                         setTimeout(() => {
-                            iniciarEditor({
-                                id: 'editor_plantilla',
-                                propiedadLivewire: 'nuevo_contenido_html',
-                                contenidoInicial: contenido,
-                                altura: 420,
-                                tipo: 'plantilla',
+                            const elemento = document.getElementById('editor_plantilla');
+
+                            if (!elemento) {
+                                return;
+                            }
+
+                            quitarEditor('editor_plantilla');
+
+                            tinymce.init({
+                                ...configuracionBase,
+                                selector: '#editor_plantilla',
+                                height: 420,
+
+                                setup: function(editor) {
+                                    editor.on('init', function() {
+                                        editor.setContent(contenido ?? '');
+                                    });
+
+                                    editor.on('change undo redo input keyup',
+                                function() {
+                                        enviarPlantillaConDebounce(editor
+                                            .getContent());
+                                    });
+
+                                    editor.on('blur', function() {
+                                        @this.set('nuevo_contenido_html', editor
+                                            .getContent(), false);
+                                    });
+                                },
                             });
                         }, 250);
                     });
                 };
 
-                window.sincronizarEditoresConstancia = () => {
+                window.sincronizarEditorPlantilla = () => {
                     if (window.tinymce && tinymce.get('editor_plantilla')) {
                         @this.set('nuevo_contenido_html', tinymce.get('editor_plantilla').getContent(), false);
                     }
-
-                    if (window.tinymce && tinymce.get('editor_constancia')) {
-                        @this.set('contenido_html', tinymce.get('editor_constancia').getContent(), false);
-                    }
                 };
-
-                iniciarEditorConstancia();
 
                 window.addEventListener('abrir-modal-plantilla', (event) => {
                     iniciarEditorPlantilla(event.detail.contenido ?? '');
@@ -744,33 +694,6 @@
 
                 window.addEventListener('cerrar-modal-plantilla', () => {
                     quitarEditor('editor_plantilla');
-                });
-
-                window.addEventListener('actualizar-editor-constancia', (event) => {
-                    const contenido = event.detail.contenido ?? '';
-
-                    esperarTinyMCE(() => {
-                        if (tinymce.get('editor_constancia')) {
-                            tinymce.get('editor_constancia').setContent(contenido);
-                        }
-
-                        @this.set('contenido_html', contenido, false);
-                    });
-                });
-
-                Livewire.hook('morph.updated', () => {
-                    if (document.getElementById('editor_constancia') && !tinymce.get('editor_constancia')) {
-                        iniciarEditorConstancia(@js($contenido_html ?? ''));
-                    }
-
-                    if (document.getElementById('editor_plantilla') && !tinymce.get('editor_plantilla')) {
-                        iniciarEditorPlantilla(@js($nuevo_contenido_html ?? ''));
-                    }
-                });
-
-                document.addEventListener('livewire:navigating', () => {
-                    quitarEditor('editor_plantilla');
-                    quitarEditor('editor_constancia');
                 });
 
                 window.addEventListener('abrir-constancia-nueva-ventana', (event) => {
@@ -791,6 +714,16 @@
                     }
 
                     window.open(url, '_blank');
+                });
+
+                Livewire.hook('morph.updated', () => {
+                    if (document.getElementById('editor_plantilla') && !tinymce.get('editor_plantilla')) {
+                        iniciarEditorPlantilla(@js($nuevo_contenido_html ?? ''));
+                    }
+                });
+
+                document.addEventListener('livewire:navigating', () => {
+                    quitarEditor('editor_plantilla');
                 });
             });
         </script>
