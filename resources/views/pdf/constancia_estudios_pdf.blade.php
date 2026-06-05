@@ -34,7 +34,7 @@
             font-family: 'ARIAL', sans-serif;
             font-size: 14px;
             color: #000;
-            line-height: 1.45;
+            line-height: 1;
         }
 
         .pagina {
@@ -89,7 +89,7 @@
             text-align: center;
             vertical-align: top;
             font-size: 11px;
-            line-height: 1.2;
+            line-height: 1;
             font-weight: bold;
             text-transform: uppercase;
             width: 400px;
@@ -99,7 +99,7 @@
             margin-top: 24px;
             text-align: right;
             font-size: 14px;
-            line-height: 1.65;
+            line-height: 1;
             font-weight: bold;
         }
 
@@ -107,15 +107,20 @@
             text-decoration: underline;
         }
 
+        .bloque-datos.conducta {
+            margin-top: 35px;
+            line-height: 2.4;
+        }
+
         .dirigido {
-            margin-top: 70px;
+            margin-top: 60px;
             margin-bottom: 22px;
             text-align: left;
             font-size: 13px;
-            line-height: 1.35;
             font-weight: bold;
             text-transform: uppercase;
             white-space: pre-line;
+            line-height: 8px;
         }
 
         .dirigido.relaciones-exteriores {
@@ -126,11 +131,15 @@
             margin-top: 0;
         }
 
+        .contenido-principal.conducta {
+            margin-top: 52px;
+        }
+
         .parrafo {
             margin: 0 0 18px 0;
             text-align: justify;
-            font-size: 14.5px;
-            line-height: 1.45;
+            font-size: 15px;
+            line-height: 1.2;
         }
 
         .titulo-hace-constar {
@@ -144,11 +153,20 @@
             text-decoration: underline;
         }
 
+        .titulo-hace-constar.conducta {
+            margin: 45px 0 38px 0;
+            text-align: center;
+            font-size: 19px;
+            text-transform: none;
+            letter-spacing: 0;
+            text-decoration: none;
+        }
+
         .contenido {
             margin-top: 0;
             text-align: justify;
             font-size: 14.5px;
-            line-height: 1.45;
+            line-height: 1.2;
         }
 
         .contenido p {
@@ -228,11 +246,66 @@
             height: auto;
         }
 
-        .parrafo-final {
-            margin-top: 26px;
+        .tabla-calificaciones {
+            width: 100%;
+            margin-top: 10px;
+            margin-bottom: 16px;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 8px;
+        }
+
+        .texto-calificaciones {
             text-align: justify;
             font-size: 14.5px;
-            line-height: 1.45;
+        }
+
+        .tabla-calificaciones th,
+        .tabla-calificaciones td {
+            border: 1px solid #555;
+            padding: 3px 2px;
+            text-align: center;
+            vertical-align: middle;
+            line-height: 1.08;
+        }
+
+        .tabla-calificaciones th {
+            background: #d9d9d9;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .tabla-calificaciones .celda-periodo {
+            width: 50px;
+            background: #6b7280;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .tabla-calificaciones .celda-promedio {
+            width: 52px;
+            font-weight: bold;
+        }
+
+        .tabla-calificaciones .materia-nombre {
+            font-size: 5.5px;
+            line-height: 1.05;
+            word-break: normal;
+        }
+
+        .buena-conducta {
+            margin: 38px 0 28px 0;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .parrafo-final {
+            margin-top: 18px;
+            text-align: justify;
+            font-size: 16px;
+            line-height: 1.2;
         }
 
         .firma {
@@ -240,13 +313,23 @@
             text-align: center;
         }
 
+        .firma.conducta {
+            margin-top: 42px;
+        }
+
         .atentamente {
             margin-bottom: 34px;
             text-align: center;
             font-size: 12px;
-            line-height: 1.15;
+            line-height: 1;
             font-weight: bold;
             letter-spacing: 3px;
+        }
+
+        .atentamente.conducta {
+            margin-bottom: 58px;
+            letter-spacing: 0;
+            font-size: 13px;
         }
 
         .cargo-firma {
@@ -263,10 +346,21 @@
             border-top: 1px solid #777;
         }
 
+        .linea-firma.conducta {
+            width: 265px;
+        }
+
         .nombre-firma {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
             text-transform: uppercase;
+        }
+
+        .cargo-final-conducta {
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 3px;
         }
 
         .pie {
@@ -292,6 +386,14 @@
         $grupo = $alumno?->grupo?->asignacionGrupo;
         $ciclo = $alumno?->ciclo;
         $director = $nivel?->director ?? null;
+
+        $clavePlantilla = mb_strtolower($plantilla?->clave ?? '');
+        $tituloPlantilla = mb_strtolower($plantilla?->titulo ?? '');
+        $textoPlantilla = $clavePlantilla . ' ' . $tituloPlantilla;
+
+        $esRelacionesExteriores = str_contains($textoPlantilla, 'relaciones');
+        $esCartaConducta = str_contains($textoPlantilla, 'conducta');
+        $esConstanciaEstudios = !$esRelacionesExteriores && !$esCartaConducta;
 
         $nombreAlumno = trim(
             ($alumno->nombre ?? '') . ' ' . ($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? ''),
@@ -323,20 +425,14 @@
             ? $constancia->fecha_expedicion->translatedFormat('F \d\e Y')
             : now()->translatedFormat('F \d\e Y');
 
-        $nombreNivel = mb_strtoupper($nivel?->nombre ?? 'NIVEL EDUCATIVO');
+        $fechaConducta = $constancia?->fecha_expedicion
+            ? $constancia->fecha_expedicion->translatedFormat('j \d\e F \d\e Y')
+            : now()->translatedFormat('j \d\e F \d\e Y');
 
         $cct = $nivel?->cct ?? '';
-
         $cicloEscolar = $ciclo?->ciclo ?? '@ciclo';
 
-        // El asunto se mantiene igual para constancia de estudios y relaciones exteriores.
-        $asunto = 'Constancia de estudios';
-
-        // Se identifica si la plantilla corresponde a relaciones exteriores.
-        $esRelacionesExteriores = str_contains(
-            mb_strtolower($plantilla?->clave ?? ($plantilla?->titulo ?? '')),
-            'relaciones',
-        );
+        $asunto = $esCartaConducta ? 'Carta de conducta' : 'Constancia de estudios';
 
         $dirigidoTexto = trim((string) ($constancia?->dirigido_a ?? ''));
 
@@ -383,8 +479,7 @@
                         SECRETARIA DE EDUCACIÓN GUERRERO<br>
                         SUBSECRETARÍA DE EDUCACIÓN BÁSICA<br>
                         DIRECCIÓN GENERAL DE EDUCACIÓN PRIMARIA<br>
-                        {{ $nombreEscuela }}<br>
-                        {{ $cct }}<br>
+                        {{ $nombreEscuela }} C.C.T: {{ $cct }}<br>
                         FRANCISCO I. MADERO #800 OTE. COL. ESQUIPULAS. CD.<br>
                         ALTAMIRANO, GRO. TEL. 767 688 0774
                     </td>
@@ -401,62 +496,171 @@
             </table>
         </div>
 
-        <div class="bloque-datos">
-            Lugar y fecha: Cd. Altamirano, Gro., a {{ $fechaExpedicion }}.<br>
-            Asunto: <span class="subrayado">{{ $asunto }}.</span><br>
-            Ciclo escolar: {{ $cicloEscolar }}
-        </div>
-
-        <div class="dirigido {{ $esRelacionesExteriores ? 'relaciones-exteriores' : '' }}">
-            {!! nl2br(e($dirigidoTexto)) !!}
-        </div>
-
-        <div class="contenido-principal">
-            <p class="parrafo">
-                La que suscribe <b>{{ $nombreDirector }}</b>, Directora de la "{{ $nombreEscuela }}",
-                con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
-                Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
-                Guerrero, Región Tierra Caliente.
-            </p>
-
-            <div class="titulo-hace-constar">
-                HACE CONSTAR
+        @if ($esCartaConducta)
+            <div class="bloque-datos conducta">
+                ASUNTO: <span class="subrayado">{{ $asunto }}.</span><br>
+                Cd. Altamirano, Gro., a {{ $fechaConducta }}
+            </div>
+        @else
+            <div class="bloque-datos">
+                Lugar y fecha: Cd. Altamirano, Gro., a {{ $fechaExpedicion }}.<br>
+                Asunto: <span class="subrayado">{{ $asunto }}.</span><br>
             </div>
 
-            <div class="contenido">
-                @if ($contenidoHtml !== '')
-                    {!! $contenidoHtml !!}
-                @else
-                    <p>
-                        Que el alumno: <b><u>{{ $nombreAlumno }}</u></b>,
-                        CURP: <b><u>{{ $alumno?->curp }}</u></b>,
-                        matrícula: <b><u>{{ $alumno?->matricula }}</u></b>,
-                        se encuentra inscrito y cursando en el
-                        <b>{{ $grado?->nombre }}</b> de <b>{{ mb_strtolower($nivel?->nombre ?? '') }}</b>,
-                        {{ $grupoTexto }}, en esta institución educativa con Clave de Incorporación
-                        C.C.T: <b><u>{{ $cct }}</u></b>, en el ciclo escolar {{ $cicloEscolar }}.
+            <div class="dirigido {{ $esRelacionesExteriores ? 'relaciones-exteriores' : '' }}">
+                {!! nl2br(e($dirigidoTexto)) !!}
+            </div>
+        @endif
+
+        <div class="contenido-principal {{ $esCartaConducta ? 'conducta' : '' }}">
+            @if ($esCartaConducta)
+                <p class="parrafo">
+                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora de la "{{ $nombreEscuela }}",
+                    con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
+                    Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
+                    Guerrero, Región Tierra Caliente.
+                </p>
+
+                <div class="titulo-hace-constar conducta">
+                    Hace constar que:
+                    <b><u>{{ mb_strtoupper($nombreAlumno) }}</u></b>
+                </div>
+
+                <div class="contenido">
+                    @if ($contenidoHtml !== '')
+                        {!! $contenidoHtml !!}
+                    @else
+                        <p>
+                            de acuerdo a la documentación que obra en el archivo de la escuela, cursó el
+                            <b>{{ $grado?->nombre }}</b>, {{ $grupoTexto }} en esta institución a mi cargo,
+                            durante el ciclo escolar {{ $cicloEscolar }} y en su estancia en la misma observó
+                        </p>
+                    @endif
+
+                    <div class="buena-conducta">
+                        BUENA CONDUCTA
+                    </div>
+                </div>
+
+                <p class="parrafo-final">
+                    Para fines legales que el interesado convenga, conforme a derecho se extiende la presente
+                    a los {{ $diaExpedicion }} días del mes de {{ $mesAnioExpedicion }} en Cd. Altamirano,
+                    municipio de Pungarabato, Gro.
+                </p>
+
+                <div class="firma conducta">
+                    <div class="atentamente conducta">
+                        ATENTAMENTE
+                    </div>
+
+                    <div class="linea-firma conducta"></div>
+
+                    <div class="cargo-final-conducta">
+                        {{ $cargoDirector }}
+                    </div>
+
+                    <div class="nombre-firma">
+                        {{ $nombreDirector }}
+                    </div>
+                </div>
+            @else
+                <p class="parrafo">
+                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora de la "{{ $nombreEscuela }}",
+                    con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
+                    Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
+                    Guerrero, Región Tierra Caliente.
+                </p>
+
+                <div class="titulo-hace-constar">
+                    HACE CONSTAR
+                </div>
+
+                <div class="contenido">
+                    @if ($contenidoHtml !== '')
+                        {!! $contenidoHtml !!}
+                    @else
+                        <p>
+                            Que el alumno: <b><u>{{ $nombreAlumno }}</u></b>,
+                            CURP: <b><u>{{ $alumno?->curp }}</u></b>,
+                            matrícula: <b><u>{{ $alumno?->matricula }}</u></b>,
+                            se encuentra inscrito y cursando en el
+                            <b>{{ $grado?->nombre }}</b> de <b>{{ mb_strtolower($nivel?->nombre ?? '') }}</b>,
+                            {{ $grupoTexto }}, en esta institución educativa con Clave de Incorporación
+                            C.C.T: <b><u>{{ $cct }}</u></b>, en el ciclo escolar {{ $cicloEscolar }}.
+                        </p>
+                    @endif
+                </div>
+
+                @if (
+                    $esConstanciaEstudios &&
+                        !empty($calificacionesConstancia['materias'] ?? []) &&
+                        !empty($calificacionesConstancia['filas'] ?? []))
+                    <p class="texto-calificaciones">
+                        Se anexan las calificaciones de los siguientes periodos:
                     </p>
+
+                    <table class="tabla-calificaciones">
+                        <thead>
+                            <tr>
+                                <th class="celda-periodo">
+                                    MATERIA
+                                </th>
+
+                                @foreach ($calificacionesConstancia['materias'] as $materiaCalificacion)
+                                    <th>
+                                        <div class="materia-nombre">
+                                            {{ mb_strtoupper($materiaCalificacion->materia) }}
+                                        </div>
+                                    </th>
+                                @endforeach
+
+                                <th class="celda-promedio">
+                                    PROMEDIO
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($calificacionesConstancia['filas'] as $filaCalificacion)
+                                <tr>
+                                    <td class="celda-periodo">
+                                        {{ $filaCalificacion['periodo'] }}
+                                    </td>
+
+                                    @foreach ($calificacionesConstancia['materias'] as $materiaCalificacion)
+                                        <td>
+                                            {{ $filaCalificacion['valores'][$materiaCalificacion->asignacion_materia_id] ?? '' }}
+                                        </td>
+                                    @endforeach
+
+                                    <td class="celda-promedio">
+                                        {{ $filaCalificacion['promedio'] }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 @endif
-            </div>
 
-            <p class="parrafo-final">
-                Para fines legales que el interesado convenga, conforme a derecho se extiende la presente
-                a los {{ $diaExpedicion }} días del mes de {{ $mesAnioExpedicion }} en Cd. Altamirano,
-                municipio de Pungarabato Guerrero, Región Tierra Caliente.
-            </p>
+                <p class="parrafo-final">
+                    Para fines legales que el interesado convenga, conforme a derecho se extiende la presente
+                    a los {{ $diaExpedicion }} días del mes de {{ $mesAnioExpedicion }} en Cd. Altamirano,
+                    municipio de Pungarabato Guerrero, Región Tierra Caliente.
+                </p>
 
-            <div class="firma">
-                <div class="atentamente">
-                    A T E N T A M E N T E
-                    <span class="cargo-firma">{{ $cargoDirector }}</span>
+                <div class="firma">
+                    <div class="atentamente">
+                        A T E N T A M E N T E
+                        <span class="cargo-firma">{{ $cargoDirector }}</span>
+                    </div>
+
+                    <div class="linea-firma"></div>
+
+                    <div class="nombre-firma">
+                        {{ $nombreDirector }}
+                    </div>
                 </div>
-
-                <div class="linea-firma"></div>
-
-                <div class="nombre-firma">
-                    {{ $nombreDirector }}
-                </div>
-            </div>
+            @endif
         </div>
 
         <div class="pie">

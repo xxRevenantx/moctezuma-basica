@@ -7,6 +7,7 @@ use App\Models\ConstanciaPlantilla;
 use App\Models\Inscripcion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -18,9 +19,6 @@ class DocumentosPDFController extends Controller
      */
     public function constanciaPdf(Constancia $constancia)
     {
-
-        // dd($constancia);
-
         $constancia->load([
             'alumno.nivel.director',
             'alumno.grado',
@@ -29,12 +27,18 @@ class DocumentosPDFController extends Controller
             'alumno.ciclo',
             'plantilla',
         ]);
-        // dd($constancia);
+
+        $calificacionesConstancia = $this->obtenerCalificacionesConstancia(
+            $constancia->alumno,
+            $constancia,
+            $constancia->plantilla
+        );
 
         $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
             'constancia' => $constancia,
             'alumno' => $constancia->alumno,
             'plantilla' => $constancia->plantilla,
+            'calificacionesConstancia' => $calificacionesConstancia,
         ])->setPaper('letter', 'portrait');
 
         $nombreArchivo = Str::slug($constancia->folio, '_') . '.pdf';
@@ -62,7 +66,7 @@ class DocumentosPDFController extends Controller
 
         $alumnos = Inscripcion::query()
             ->with([
-                'nivel:id,nombre,cct',
+                'nivel.director',
                 'grado:id,nombre',
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grupo:id,asignacion_grupo_id',
@@ -115,16 +119,23 @@ class DocumentosPDFController extends Controller
                 'plantilla' => $plantilla,
             ];
 
-            $pdf = Pdf::loadView('pdf.constancia_relaciones_pdf', [
+            $calificacionesConstancia = $this->obtenerCalificacionesConstancia(
+                $alumno,
+                $constanciaTemporal,
+                $plantilla
+            );
+
+            $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
                 'constancia' => $constanciaTemporal,
                 'alumno' => $alumno,
                 'plantilla' => $plantilla,
+                'calificacionesConstancia' => $calificacionesConstancia,
             ])->setPaper('letter', 'portrait');
 
             $nombreAlumno = trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '') . ' ' .
-                    ($alumno->nombre ?? '')
+                ($alumno->apellido_materno ?? '') . ' ' .
+                ($alumno->nombre ?? '')
             );
 
             $nombreArchivo = Str::slug($folioTemporal . '_' . $nombreAlumno, '_') . '.pdf';
@@ -166,8 +177,8 @@ class DocumentosPDFController extends Controller
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                    '-' .
-                    ($alumno->generacion->anio_egreso ?? '')
+                '-' .
+                ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -175,8 +186,8 @@ class DocumentosPDFController extends Controller
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                    ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '')
+                ($alumno->apellido_paterno ?? '') . ' ' .
+                ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp,
             'matricula' => $alumno->matricula,
@@ -199,11 +210,12 @@ class DocumentosPDFController extends Controller
 
         $esMujer = in_array($genero, [
             'f',
+            'm',
+            'mujer',
             'femenino',
             'femenina',
-            'mujer',
             'alumna',
-        ]);
+        ], true);
 
         $sexo = $esMujer ? 'La alumna' : 'El alumno';
 
@@ -229,6 +241,170 @@ class DocumentosPDFController extends Controller
         ];
 
         return str_replace(array_keys($variables), array_values($variables), $contenido);
+    }
+
+    /**
+     * Obtiene las calificaciones que se mostrarán en la constancia de estudios.
+     */
+    private function obtenerCalificacionesConstancia(?Inscripcion $alumno, object $constancia, ?ConstanciaPlantilla $plantilla): array
+    {
+        if (!$alumno || !$plantilla) {
+            return [];
+        }
+
+        $textoPlantilla = mb_strtolower(
+            trim(($plantilla->clave ?? '') . ' ' . ($plantilla->titulo ?? ''))
+        );
+
+        // Las calificaciones solo se muestran en constancia de estudios.
+        if (str_contains($textoPlantilla, 'relaciones') || str_contains($textoPlantilla, 'conducta')) {
+            return [];
+        }
+
+        $periodosSeleccionados = $this->obtenerPeriodosSeleccionadosConstancia(
+            $constancia->periodos_calificaciones ?? []
+        );
+
+        if (empty($periodosSeleccionados)) {
+            return [];
+        }
+
+        $cicloEscolarId = DB::table('calificaciones')
+            ->where('inscripcion_id', $alumno->id)
+            ->whereNotNull('ciclo_escolar_id')
+            ->orderByDesc('id')
+            ->value('ciclo_escolar_id');
+
+        $periodos = DB::table('periodos')
+            ->join('periodos_basica', 'periodos_basica.id', '=', 'periodos.periodo_basica_id')
+            ->where('periodos.nivel_id', $alumno->nivel_id)
+            ->whereIn('periodos.periodo_basica_id', array_keys($periodosSeleccionados))
+            ->when($cicloEscolarId, function ($consulta) use ($cicloEscolarId) {
+                $consulta->where('periodos.ciclo_escolar_id', $cicloEscolarId);
+            })
+            ->select(
+                'periodos.id',
+                'periodos.periodo_basica_id',
+                'periodos_basica.periodo',
+                'periodos_basica.descripcion'
+            )
+            ->orderBy('periodos_basica.periodo')
+            ->get()
+            ->keyBy('periodo_basica_id');
+
+        if ($periodos->isEmpty()) {
+            return [];
+        }
+
+        $materias = DB::table('asignacion_materias')
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->where('asignacion_materias.grupo_id', $alumno->grupo_id)
+            ->where('materias.calificable', true)
+            ->where('materias.extra', false)
+            ->where('materias.receso', false)
+            ->select(
+                'asignacion_materias.id as asignacion_materia_id',
+                'materias.materia',
+                'asignacion_materias.orden'
+            )
+            ->orderBy('asignacion_materias.orden')
+            ->orderBy('asignacion_materias.id')
+            ->get();
+
+        if ($materias->isEmpty()) {
+            return [];
+        }
+
+        $periodoIds = $periodos->pluck('id')->values()->toArray();
+
+        $calificaciones = DB::table('calificaciones')
+            ->where('inscripcion_id', $alumno->id)
+            ->whereIn('periodo_id', $periodoIds)
+            ->select(
+                'periodo_id',
+                'asignacion_materia_id',
+                'calificacion',
+                'valor_numerico',
+                'es_numerica'
+            )
+            ->get()
+            ->groupBy(function ($calificacion) {
+                return $calificacion->periodo_id . '_' . $calificacion->asignacion_materia_id;
+            });
+
+        $filas = [];
+
+        foreach ($periodosSeleccionados as $periodoBasicaId => $nombrePeriodo) {
+            $periodo = $periodos->get($periodoBasicaId);
+
+            if (!$periodo) {
+                continue;
+            }
+
+            $valores = [];
+            $numericas = [];
+
+            foreach ($materias as $materia) {
+                $llave = $periodo->id . '_' . $materia->asignacion_materia_id;
+                $calificacion = $calificaciones->get($llave)?->first();
+
+                $valor = $calificacion?->calificacion ?? '';
+                $valores[$materia->asignacion_materia_id] = $valor;
+
+                if ($calificacion && (bool) $calificacion->es_numerica && is_numeric($calificacion->valor_numerico)) {
+                    $numericas[] = (float) $calificacion->valor_numerico;
+                }
+            }
+
+            $promedio = count($numericas) > 0
+                ? floor((array_sum($numericas) / count($numericas)) * 10) / 10
+                : 0;
+
+            $filas[] = [
+                'periodo' => $nombrePeriodo,
+                'valores' => $valores,
+                'promedio' => number_format($promedio, 1, '.', ''),
+            ];
+        }
+
+        return [
+            'materias' => $materias,
+            'filas' => $filas,
+        ];
+    }
+
+    /**
+     * Convierte los checkboxes guardados en la constancia a periodos básicos.
+     */
+    private function obtenerPeriodosSeleccionadosConstancia(mixed $periodos): array
+    {
+        if (is_string($periodos)) {
+            $periodos = json_decode($periodos, true) ?: [];
+        }
+
+        if (is_object($periodos)) {
+            $periodos = (array) $periodos;
+        }
+
+        if (!is_array($periodos)) {
+            $periodos = [];
+        }
+
+        $seleccionados = [];
+
+        if ((bool) ($periodos['primer_periodo'] ?? false)) {
+            $seleccionados[1] = '1° PERIODO';
+        }
+
+        if ((bool) ($periodos['segundo_periodo'] ?? false)) {
+            $seleccionados[2] = '2° PERIODO';
+        }
+
+        if ((bool) ($periodos['tercer_periodo'] ?? false)) {
+            $seleccionados[3] = '3° PERIODO';
+        }
+
+        return $seleccionados;
     }
 
     /**
