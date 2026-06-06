@@ -144,6 +144,10 @@ Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'co
     ->name('misrutas.constancias.pdf');
 
 
+Route::get('/oficios/{oficio}/pdf', [DocumentosPDFController::class, 'oficioPdf'])
+    ->name('misrutas.oficios.pdf');
+
+
 Route::prefix('nivel')->group(function () {
 
     Route::get('{slug_nivel}', [SeleccionarNivelController::class, 'index'])->name('niveles.seleccionar-nivel');

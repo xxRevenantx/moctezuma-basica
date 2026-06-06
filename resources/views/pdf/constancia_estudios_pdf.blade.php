@@ -8,7 +8,7 @@
 
     <style>
         @page {
-            margin: 22px 70px 35px 70px;
+            margin: 22px 70px 25px 70px;
         }
 
         @font-face {
@@ -34,7 +34,8 @@
             font-family: 'ARIAL', sans-serif;
             font-size: 14px;
             color: #000;
-            line-height: 1;
+            line-height: 1.4;
+
         }
 
         .pagina {
@@ -89,17 +90,16 @@
             text-align: center;
             vertical-align: top;
             font-size: 11px;
-            line-height: 1;
             font-weight: bold;
             text-transform: uppercase;
             width: 400px;
+            line-height: 1.2;
         }
 
         .bloque-datos {
             margin-top: 24px;
             text-align: right;
             font-size: 14px;
-            line-height: 1;
             font-weight: bold;
         }
 
@@ -109,18 +109,16 @@
 
         .bloque-datos.conducta {
             margin-top: 35px;
-            line-height: 2.4;
         }
 
         .dirigido {
-            margin-top: 60px;
+            margin-top: 40px;
             margin-bottom: 22px;
             text-align: left;
             font-size: 13px;
             font-weight: bold;
             text-transform: uppercase;
             white-space: pre-line;
-            line-height: 8px;
         }
 
         .dirigido.relaciones-exteriores {
@@ -139,14 +137,12 @@
             margin: 0 0 18px 0;
             text-align: justify;
             font-size: 15px;
-            line-height: 1.2;
         }
 
         .titulo-hace-constar {
-            margin: 28px 0 24px 0;
+            margin: 18px 0 24px 0;
             text-align: center;
             font-size: 24px;
-            line-height: 1;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -166,7 +162,6 @@
             margin-top: 0;
             text-align: justify;
             font-size: 14.5px;
-            line-height: 1.2;
         }
 
         .contenido p {
@@ -305,7 +300,7 @@
             margin-top: 18px;
             text-align: justify;
             font-size: 16px;
-            line-height: 1.2;
+
         }
 
         .firma {
@@ -321,7 +316,7 @@
             margin-bottom: 34px;
             text-align: center;
             font-size: 12px;
-            line-height: 1;
+
             font-weight: bold;
             letter-spacing: 3px;
         }
