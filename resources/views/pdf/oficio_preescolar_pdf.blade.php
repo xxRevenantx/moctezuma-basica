@@ -8,13 +8,26 @@
 
     <style>
         @page {
-            margin: 25px 38px 35px 38px;
+            margin: 25px 55px 35px 55px;
+        }
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
         }
 
         body {
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 13px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 15px;
             color: #000;
         }
 
@@ -43,7 +56,7 @@
         }
 
         .datos-superiores {
-            text-align: center;
+            text-align: right;
             font-size: 12px;
             line-height: 1.15;
             letter-spacing: 0.5px;
@@ -51,14 +64,14 @@
 
         .datos-superiores .titulo {
             font-size: 14px;
-            letter-spacing: 2px;
+            font-family: 'Times New Roman', serif;
         }
 
         .bloque-info {
-            width: 265px;
+            width: 380px;
             margin-left: auto;
             margin-top: 15px;
-            font-size: 15px;
+            font-size: 17px;
             line-height: 1.28;
         }
 
@@ -66,11 +79,10 @@
             font-weight: bold;
         }
 
-        .anio {
+        .lema {
             margin-top: 7px;
             font-weight: bold;
             font-style: italic;
-            text-align: center;
         }
 
         .nivel-rojo {
@@ -85,16 +97,16 @@
         .fecha {
             margin-top: 28px;
             text-align: center;
-            font-size: 16px;
+            font-size: 20px;
         }
 
         .dirigidos {
             width: 100%;
             margin-top: 18px;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
-            line-height: 1.35;
+            line-height: 1.2;
         }
 
         .tabla-dirigidos {
@@ -103,7 +115,7 @@
         }
 
         .dirigido-izquierdo {
-            width: 50%;
+            width: 70%;
             vertical-align: top;
         }
 
@@ -117,7 +129,7 @@
         .contenido {
             margin-top: 16px;
             text-align: justify;
-            font-size: 13.5px;
+            font-size: 14px;
             line-height: 1.2;
         }
 
@@ -182,19 +194,15 @@
 
         .pie {
             position: fixed;
-            left: 38px;
-            right: 38px;
-            bottom: 18px;
+            left: 0;
+            right: 0;
+            bottom: -16px;
+            padding-top: 9px;
+            text-align: center;
         }
 
-        .linea-pie {
-            border-top: 1px solid #000;
-            margin-bottom: 8px;
-        }
-
-        .greca {
+        .tira {
             width: 100%;
-            height: 14px;
             object-fit: cover;
         }
     </style>
@@ -220,26 +228,65 @@
         $grupo = $alumno?->grupo?->asignacionGrupo?->nombre ?? '';
         $cct = $nivel?->cct ?? '';
 
+        $generoAlumno = mb_strtoupper(trim($alumno?->genero ?? ''));
+
+        $esMujer = $generoAlumno === 'M';
+
+        $textoNino = $esMujer ? 'niña' : 'niño';
+        $textoNinoMayuscula = $esMujer ? 'NIÑA' : 'NIÑO';
+
+        $textoAlumno = $esMujer ? 'alumna' : 'alumno';
+        $textoAlumnoMayuscula = $esMujer ? 'ALUMNA' : 'ALUMNO';
+
+        $textoDelAlumno = $esMujer ? 'de la alumna' : 'del alumno';
+        $textoSiguienteNino = $esMujer ? 'siguiente niña' : 'siguiente niño';
+
         $asunto = $oficio->asunto ?: ($oficio->tipo_oficio === 'Alta' ? 'ALTA POR TRASLADO' : 'BAJA POR TRASLADO');
+
+        $tipoOficio = mb_strtoupper($oficio->tipo_oficio ?? '');
 
         $descripcion = trim((string) $oficio->descripcion_html);
 
         if ($descripcion === '') {
-            $descripcion =
-                '
-            <p>
-                La que suscribe C. ' .
-                e($nombreDirector) .
-                ', directora del Jardín de Niños Centro Universitario Moctezuma C.C.T. ' .
-                e($cct) .
-                ',
-                ubicada en Francisco I. Madero Ote. 800. Col. Esquipulas. Cd. Altamirano, Gro., perteneciente a la zona escolar 137,
-                sector 013. Me dirijo a usted de la manera más atenta y respetuosa para solicitar la <strong>' .
-                e(mb_strtoupper($oficio->tipo_oficio)) .
-                '</strong>
-                de escuela del siguiente niño:
-            </p>
-        ';
+            if ($oficio->tipo_oficio === 'Alta') {
+                $descripcion =
+                    '
+                    <p>
+                        La que suscribe C. ' .
+                    e($nombreDirector) .
+                    ', directora del Jardín de Niños Centro Universitario Moctezuma C.C.T. ' .
+                    e($cct) .
+                    ',
+                        ubicada en Francisco I. Madero Ote. 800. Col. Esquipulas. Cd. Altamirano, Gro.,
+                        perteneciente a la zona escolar 137, sector 013.
+                        Me dirijo a usted de la manera más atenta y respetuosa para solicitar la
+                        <strong>ALTA</strong> ' .
+                    e($textoDelAlumno) .
+                    ' a esta institución educativa. A continuación se presentan los datos de la ' .
+                    e($textoSiguienteNino) .
+                    ':
+                    </p>
+                ';
+            } else {
+                $descripcion =
+                    '
+                    <p>
+                        La que suscribe C. ' .
+                    e($nombreDirector) .
+                    ', directora del Jardín de Niños Centro Universitario Moctezuma C.C.T. ' .
+                    e($cct) .
+                    ',
+                        ubicada en Francisco I. Madero Ote. 800. Col. Esquipulas. Cd. Altamirano, Gro.,
+                        perteneciente a la zona escolar 137, sector 013.
+                        Me dirijo a usted de la manera más atenta y respetuosa para solicitar la
+                        <strong>BAJA</strong> ' .
+                    e($textoDelAlumno) .
+                    ' de esta institución educativa. A continuación se presentan los datos de la ' .
+                    e($textoSiguienteNino) .
+                    ':
+                    </p>
+                ';
+            }
         }
     @endphp
 
@@ -268,13 +315,10 @@
                 <strong>C.C.T:</strong> {{ $cct }}<br>
                 <strong>ASUNTO:</strong> {{ $asunto }}<br>
                 <strong>NÚM. DE OFICIO:</strong> {{ $oficio->folio }}
-                <div class="anio">"2025, AÑO DE LA MUJER INDÍGENA "</div>
+                <div class="lema">"{{ $lema }}"</div>
             </div>
         </div>
 
-        <div class="nivel-rojo">
-            PREESCOLAR
-        </div>
 
         <div class="fecha">
             {{ $oficio->fecha_lugar }}
@@ -307,7 +351,7 @@
         <table class="tabla-alumno">
             <thead>
                 <tr>
-                    <th>Nombre del niño</th>
+                    <th>Nombre {{ $esMujer ? 'de la niña' : 'del niño' }}</th>
                     <th>CURP</th>
                     <th>GRADO Y GRUPO</th>
                 </tr>
@@ -335,14 +379,10 @@
         </div>
 
         <div class="pie">
-            <div class="linea-pie"></div>
-
-            @if (file_exists(public_path('imagenes/greca.png')))
-                <img class="greca" src="{{ public_path('imagenes/greca.png') }}">
-            @elseif(file_exists(public_path('imagenes/tira.png')))
-                <img class="greca" src="{{ public_path('imagenes/tira.png') }}">
-            @elseif(file_exists(public_path('imagenes/tira.jpg')))
-                <img class="greca" src="{{ public_path('imagenes/tira.jpg') }}">
+            @if (file_exists(public_path('imagenes/tira.jpg')))
+                <img class="tira" src="{{ public_path('imagenes/tira.jpg') }}" alt="">
+            @elseif (file_exists(public_path('imagenes/tira.png')))
+                <img class="tira" src="{{ public_path('imagenes/tira.png') }}" alt="">
             @endif
         </div>
 
