@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Constancia;
 use App\Models\ConstanciaPlantilla;
+use App\Models\Escuela;
 use App\Models\Inscripcion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -136,8 +137,8 @@ class DocumentosPDFController extends Controller
 
             $nombreAlumno = trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '') . ' ' .
-                    ($alumno->nombre ?? '')
+                ($alumno->apellido_materno ?? '') . ' ' .
+                ($alumno->nombre ?? '')
             );
 
             $nombreArchivo = Str::slug($folioTemporal . '_' . $nombreAlumno, '_') . '.pdf';
@@ -179,8 +180,8 @@ class DocumentosPDFController extends Controller
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                    '-' .
-                    ($alumno->generacion->anio_egreso ?? '')
+                '-' .
+                ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -188,8 +189,8 @@ class DocumentosPDFController extends Controller
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                    ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '')
+                ($alumno->apellido_paterno ?? '') . ' ' .
+                ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp,
             'matricula' => $alumno->matricula,
@@ -436,11 +437,16 @@ class DocumentosPDFController extends Controller
             ? 'pdf.oficio_preescolar_pdf'
             : 'pdf.oficio_general_pdf';
 
+        $lema = Escuela::query()->value('lema') ?? '';
+
+
+
         $pdf = Pdf::loadView($vistaPdf, [
             'oficio' => $oficio,
             'alumno' => $oficio->alumno,
             'nivel' => $oficio->nivel ?? $oficio->alumno?->nivel,
             'director' => $oficio->director ?? $oficio->nivel?->director,
+            'lema' => $lema,
         ])->setPaper('letter', 'portrait');
 
         $nombreArchivo = Str::slug($oficio->folio, '_') . '.pdf';

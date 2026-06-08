@@ -63,12 +63,208 @@ class Oficio extends Component
 
     public array $directores = [];
 
+    public bool $modalEditar = false;
+
+    public ?int $oficio_editando_id = null;
+
+    public string $editar_folio = '';
+
+    public string $editar_tipo_oficio = '';
+
+    public ?int $editar_nivel_id = null;
+
+    public ?int $editar_director_id = null;
+
+    public string $editar_seccion = '';
+
+    public string $editar_fecha_lugar = '';
+
+    public string $editar_asunto = '';
+
+    public string $editar_dirigido_1_nombre = '';
+
+    public string $editar_dirigido_1_cargo = '';
+
+    public string $editar_dirigido_1_lugar = '';
+
+    public string $editar_dirigido_2_nombre = '';
+
+    public string $editar_dirigido_2_cargo = '';
+
+    public string $editar_dirigido_2_lugar = '';
+
+    public string $editar_descripcion_html = '';
+
+    public bool $editar_primer_periodo = false;
+
+    public bool $editar_segundo_periodo = false;
+
+    public bool $editar_tercer_periodo = false;
+
+    public ?array $editarAlumno = null;
+
     public function mount(): void
     {
         $this->fecha_lugar = 'Cd. Altamirano, Gro., a ' . now()->translatedFormat('j \d\e F \d\e Y');
         $this->folio = $this->generarFolio();
 
         $this->cargarCatalogos();
+    }
+
+    public function editarOficio(int $oficioId): void
+    {
+        $oficio = OficioModel::query()
+            ->with([
+                'alumno.nivel:id,nombre',
+                'alumno.grado:id,nombre',
+                'alumno.grupo.asignacionGrupo:id,nombre',
+                'nivel:id,nombre,director_id',
+                'director:id,titulo,nombre,apellido_paterno,apellido_materno,cargo',
+            ])
+            ->findOrFail($oficioId);
+
+        $this->oficio_editando_id = $oficio->id;
+
+        $this->editarAlumno = [
+            'id' => $oficio->alumno?->id,
+            'nombre_completo' => trim(
+                ($oficio->alumno?->nombre ?? '') . ' ' .
+                ($oficio->alumno?->apellido_paterno ?? '') . ' ' .
+                ($oficio->alumno?->apellido_materno ?? '')
+            ),
+            'matricula' => $oficio->alumno?->matricula ?? '',
+            'nivel' => $oficio->alumno?->nivel?->nombre ?? '',
+            'grado' => $oficio->alumno?->grado?->nombre ?? '',
+            'grupo' => $oficio->alumno?->grupo?->asignacionGrupo?->nombre ?? '',
+        ];
+
+        $this->editar_folio = $oficio->folio ?? '';
+        $this->editar_tipo_oficio = $oficio->tipo_oficio ?? '';
+        $this->editar_nivel_id = $oficio->nivel_id;
+        $this->editar_director_id = $oficio->director_id;
+        $this->editar_seccion = $oficio->seccion ?? '';
+        $this->editar_fecha_lugar = $oficio->fecha_lugar ?? '';
+        $this->editar_asunto = $oficio->asunto ?? '';
+
+        $this->editar_dirigido_1_nombre = $oficio->dirigido_1_nombre ?? '';
+        $this->editar_dirigido_1_cargo = $oficio->dirigido_1_cargo ?? '';
+        $this->editar_dirigido_1_lugar = $oficio->dirigido_1_lugar ?? '';
+
+        $this->editar_dirigido_2_nombre = $oficio->dirigido_2_nombre ?? '';
+        $this->editar_dirigido_2_cargo = $oficio->dirigido_2_cargo ?? '';
+        $this->editar_dirigido_2_lugar = $oficio->dirigido_2_lugar ?? '';
+
+        $this->editar_descripcion_html = $oficio->descripcion_html ?? '';
+
+        $periodos = $oficio->periodos_calificaciones ?? [];
+
+        if (is_string($periodos)) {
+            $periodos = json_decode($periodos, true) ?: [];
+        }
+
+        $this->editar_primer_periodo = (bool) ($periodos['primer_periodo'] ?? false);
+        $this->editar_segundo_periodo = (bool) ($periodos['segundo_periodo'] ?? false);
+        $this->editar_tercer_periodo = (bool) ($periodos['tercer_periodo'] ?? false);
+
+        $this->modalEditar = true;
+
+        $this->dispatch('cargar-editor-oficio-editar', contenido: $this->editar_descripcion_html);
+    }
+
+    public function actualizarOficio(): void
+    {
+        $this->validate([
+            'oficio_editando_id' => ['required', 'exists:oficios,id'],
+            'editar_folio' => ['required', 'string', 'max:255', 'unique:oficios,folio,' . $this->oficio_editando_id],
+            'editar_tipo_oficio' => ['required', 'in:Alta,Baja'],
+            'editar_nivel_id' => ['required', 'exists:niveles,id'],
+            'editar_director_id' => ['nullable', 'exists:directores,id'],
+            'editar_seccion' => ['nullable', 'string', 'max:255'],
+            'editar_fecha_lugar' => ['nullable', 'string', 'max:255'],
+            'editar_asunto' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_1_nombre' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_1_cargo' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_1_lugar' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_2_nombre' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_2_cargo' => ['nullable', 'string', 'max:255'],
+            'editar_dirigido_2_lugar' => ['nullable', 'string', 'max:255'],
+            'editar_descripcion_html' => ['nullable', 'string'],
+        ]);
+
+        $oficio = OficioModel::query()->findOrFail($this->oficio_editando_id);
+
+        $oficio->update([
+            'folio' => $this->editar_folio,
+            'tipo_oficio' => $this->editar_tipo_oficio,
+            'nivel_id' => $this->editar_nivel_id,
+            'director_id' => $this->editar_director_id,
+            'seccion' => $this->editar_seccion,
+            'fecha_lugar' => $this->editar_fecha_lugar,
+            'asunto' => $this->editar_asunto,
+
+            'dirigido_1_nombre' => $this->editar_dirigido_1_nombre,
+            'dirigido_1_cargo' => $this->editar_dirigido_1_cargo,
+            'dirigido_1_lugar' => $this->editar_dirigido_1_lugar,
+
+            'dirigido_2_nombre' => $this->editar_dirigido_2_nombre,
+            'dirigido_2_cargo' => $this->editar_dirigido_2_cargo,
+            'dirigido_2_lugar' => $this->editar_dirigido_2_lugar,
+
+            'periodos_calificaciones' => [
+                'primer_periodo' => $this->editar_primer_periodo,
+                'segundo_periodo' => $this->editar_segundo_periodo,
+                'tercer_periodo' => $this->editar_tercer_periodo,
+            ],
+
+            'descripcion_html' => $this->editar_descripcion_html,
+        ]);
+
+        $this->cerrarModalEditar();
+
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'Oficio actualizado correctamente.');
+    }
+
+    public function cerrarModalEditar(): void
+    {
+        $this->modalEditar = false;
+
+        $this->oficio_editando_id = null;
+        $this->editarAlumno = null;
+
+        $this->editar_folio = '';
+        $this->editar_tipo_oficio = '';
+        $this->editar_nivel_id = null;
+        $this->editar_director_id = null;
+        $this->editar_seccion = '';
+        $this->editar_fecha_lugar = '';
+        $this->editar_asunto = '';
+
+        $this->editar_dirigido_1_nombre = '';
+        $this->editar_dirigido_1_cargo = '';
+        $this->editar_dirigido_1_lugar = '';
+
+        $this->editar_dirigido_2_nombre = '';
+        $this->editar_dirigido_2_cargo = '';
+        $this->editar_dirigido_2_lugar = '';
+
+        $this->editar_descripcion_html = '';
+
+        $this->editar_primer_periodo = false;
+        $this->editar_segundo_periodo = false;
+        $this->editar_tercer_periodo = false;
+
+        $this->dispatch('limpiar-editor-oficio-editar');
+    }
+
+    public function updatedEditarTipoOficio(): void
+    {
+        if ($this->editar_tipo_oficio === 'Alta') {
+            $this->editar_asunto = 'Alta por traslado.';
+        }
+
+        if ($this->editar_tipo_oficio === 'Baja') {
+            $this->editar_asunto = 'Baja por traslado.';
+        }
     }
 
     /**
@@ -92,9 +288,9 @@ class Oficio extends Component
                     'id' => $director->id,
                     'nombre_completo' => trim(
                         ($director->titulo ?? '') . ' ' .
-                            ($director->nombre ?? '') . ' ' .
-                            ($director->apellido_paterno ?? '') . ' ' .
-                            ($director->apellido_materno ?? '')
+                        ($director->nombre ?? '') . ' ' .
+                        ($director->apellido_paterno ?? '') . ' ' .
+                        ($director->apellido_materno ?? '')
                     ),
                     'cargo' => $director->cargo,
                 ];
@@ -279,7 +475,6 @@ class Oficio extends Component
     {
         OficioModel::query()->findOrFail($oficioId)->delete();
 
-        $this->resetPage('oficiosPage');
         $this->dispatch('notificar', tipo: 'success', mensaje: 'Oficio eliminado correctamente.');
     }
 
@@ -327,8 +522,8 @@ class Oficio extends Component
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                    '-' .
-                    ($alumno->generacion->anio_egreso ?? '')
+                '-' .
+                ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -336,8 +531,8 @@ class Oficio extends Component
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                    ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '')
+                ($alumno->apellido_paterno ?? '') . ' ' .
+                ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp ?? '',
             'matricula' => $alumno->matricula ?? '',
