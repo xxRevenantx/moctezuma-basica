@@ -83,6 +83,7 @@
             margin-top: 7px;
             font-weight: bold;
             font-style: italic;
+            text-transform: uppercase;
         }
 
         .nivel-rojo {
@@ -127,14 +128,14 @@
         }
 
         .contenido {
-            margin-top: 16px;
+            margin-top: 20px;
             text-align: justify;
-            font-size: 14px;
-            line-height: 1.2;
+            font-size: 16px;
+            line-height: 1.1;
         }
 
         .contenido p {
-            margin: 0 0 9px 0;
+            /* margin: 0 0 9px 0; */
             text-align: justify;
         }
 
@@ -151,7 +152,7 @@
             width: 100%;
             margin-top: 12px;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 14px;
         }
 
         .tabla-alumno th,
@@ -167,22 +168,22 @@
 
         .despedida {
             margin-top: 14px;
-            font-size: 13px;
+            font-size: 16px;
         }
 
         .firma {
             margin-top: 42px;
             text-align: center;
-            font-size: 13px;
+            font-size: 16px;
         }
 
         .firma .atentamente {
-            font-size: 13px;
+            font-size: 16px;
             margin-bottom: 2px;
         }
 
         .firma .cargo {
-            font-size: 13px;
+            font-size: 16px;
             margin-bottom: 50px;
         }
 
@@ -372,7 +373,7 @@
 
         <div class="firma">
             <div class="atentamente">ATENTAMENTE</div>
-            <div class="cargo">{{ $director?->cargo ?? 'Directora' }}</div>
+            <div class="cargo">Directora</div>
 
             <div class="linea-firma"></div>
             <div>{{ $nombreDirector }}</div>
