@@ -112,6 +112,10 @@
                     <flux:sidebar.group expandable :expanded="false" heading="ACADÉMICA"
                         class="grid text-xs gap-1 text-zinc-300">
 
+                        <flux:navlist.item icon="home" :href="route('misrutas.alumnos')"
+                            :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
+                            Alumnos
+                        </flux:navlist.item>
                         <flux:navlist.item icon="home" :href="route('misrutas.escuela')"
                             :current="request()->routeIs('misrutas.escuela')" wire:navigate>
                             Escuela

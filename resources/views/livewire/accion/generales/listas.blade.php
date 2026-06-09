@@ -39,7 +39,7 @@
 
                         <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
                             Filtra por generación, grado, {{ $this->esBachillerato() ? 'semestre,' : '' }} grupo y tipo
-                            de documento. En preescolar, la lista de evaluación se descarga en Word.
+                            de documento. También puedes descargar todas las listas del nivel.
                         </span>
                     </span>
                 </div>
@@ -74,7 +74,7 @@
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
                     <div wire:loading.flex
-                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,tipo_descarga,opcion_descarga,limpiarFiltros"
+                        wire:target="modo_descarga,generacion_id,grado_id,semestre_id,grupo_id,tipo_descarga,opcion_descarga,limpiarFiltros"
                         class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
                         <div
                             class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -117,6 +117,29 @@
                                 Limpiar
                             </button>
                         </div>
+
+                        @if ($modo_descarga === 'nivel')
+                            <div
+                                class="mb-5 rounded-2xl border border-purple-200 bg-purple-50/80 p-4 text-sm text-purple-800 dark:border-purple-900/60 dark:bg-purple-950/30 dark:text-purple-200">
+                                <div class="flex items-start gap-3">
+                                    <div
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200">
+                                        <flux:icon.information-circle class="h-5 w-5" />
+                                    </div>
+
+                                    <div>
+                                        <p class="font-black">
+                                            Descarga por nivel activa
+                                        </p>
+
+                                        <p class="mt-1 text-sm">
+                                            En este modo se descargan todas las listas del nivel seleccionado. No es
+                                            necesario elegir grado, semestre ni grupo.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
 
                         @if ($this->esBachillerato())
                             <div
@@ -194,6 +217,22 @@
                             </flux:field>
 
                             <flux:field>
+                                <flux:label>Alcance de descarga</flux:label>
+
+                                <flux:select id="modo_descarga" wire:model.live="modo_descarga">
+                                    <flux:select.option value="grupo">
+                                        Grupo seleccionado
+                                    </flux:select.option>
+
+                                    <flux:select.option value="nivel">
+                                        Todas las listas del nivel
+                                    </flux:select.option>
+                                </flux:select>
+
+                                <flux:error name="modo_descarga" />
+                            </flux:field>
+
+                            <flux:field>
                                 <flux:label>Generación</flux:label>
 
                                 <flux:select id="generacion_id" wire:model.live="generacion_id">
@@ -214,7 +253,8 @@
                             <flux:field>
                                 <flux:label>Grado</flux:label>
 
-                                <flux:select id="grado_id" wire:model.live="grado_id" :disabled="!$generacion_id">
+                                <flux:select id="grado_id" wire:model.live="grado_id"
+                                    :disabled="!$generacion_id || $modo_descarga === 'nivel'">
                                     <flux:select.option value="">
                                         Selecciona un grado
                                     </flux:select.option>
@@ -227,6 +267,12 @@
                                 </flux:select>
 
                                 <flux:error name="grado_id" />
+
+                                @if ($modo_descarga === 'nivel')
+                                    <p class="mt-2 text-xs font-semibold text-purple-600 dark:text-purple-400">
+                                        No se requiere grado cuando la descarga es por nivel.
+                                    </p>
+                                @endif
                             </flux:field>
 
                             @if ($this->esBachillerato())
@@ -234,7 +280,7 @@
                                     <flux:label>Semestre</flux:label>
 
                                     <flux:select id="semestre_id" wire:model.live="semestre_id"
-                                        :disabled="!$generacion_id || !$grado_id || $semestres->isEmpty()">
+                                        :disabled="$modo_descarga === 'nivel' || !$generacion_id || !$grado_id || $semestres->isEmpty()">
                                         <flux:select.option value="">
                                             Selecciona un semestre
                                         </flux:select.option>
@@ -247,6 +293,12 @@
                                     </flux:select>
 
                                     <flux:error name="semestre_id" />
+
+                                    @if ($modo_descarga === 'nivel')
+                                        <p class="mt-2 text-xs font-semibold text-purple-600 dark:text-purple-400">
+                                            No se requiere semestre cuando la descarga es por nivel.
+                                        </p>
+                                    @endif
                                 </flux:field>
                             @endif
 
@@ -254,10 +306,14 @@
                                 <flux:label>Grupo</flux:label>
 
                                 <flux:select id="grupo_id" wire:model.live="grupo_id"
-                                    wire:key="lista-grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
-                                    :disabled="$this->esBachillerato()
-                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
+                                    wire:key="lista-grupo-select-{{ $slug_nivel }}-{{ $modo_descarga }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
+                                    :disabled="$modo_descarga === 'nivel'
+                                                                            ? true
+                                                                            : (
+                                                                                $this->esBachillerato()
+                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())
+                                                                            )">
 
                                     <flux:select.option value="">
                                         Selecciona un grupo
@@ -272,13 +328,25 @@
 
                                 <flux:error name="grupo_id" />
 
-                                @if (!$this->esBachillerato() && $generacion_id && $grado_id && $grupos->isEmpty())
+                                @if ($modo_descarga === 'nivel')
+                                    <p class="mt-2 text-xs font-semibold text-purple-600 dark:text-purple-400">
+                                        No se requiere grupo cuando la descarga es por nivel.
+                                    </p>
+                                @endif
+
+                                @if ($modo_descarga === 'grupo' && !$this->esBachillerato() && $generacion_id && $grado_id && $grupos->isEmpty())
                                     <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                         No hay grupos registrados para la generación y grado seleccionados.
                                     </p>
                                 @endif
 
-                                @if ($this->esBachillerato() && $generacion_id && $grado_id && $semestre_id && $grupos->isEmpty())
+                                @if (
+                                    $modo_descarga === 'grupo' &&
+                                        $this->esBachillerato() &&
+                                        $generacion_id &&
+                                        $grado_id &&
+                                        $semestre_id &&
+                                        $grupos->isEmpty())
                                     <p class="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                         No hay grupos registrados para la generación, grado y semestre seleccionados.
                                     </p>
@@ -323,7 +391,7 @@
                                 @endif
                             </flux:field>
 
-                            @if ($tipo_descarga === 'grupo')
+                            @if ($tipo_descarga === 'grupo' && $modo_descarga === 'grupo')
                                 <div
                                     class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/30">
                                     <label class="flex cursor-pointer items-start gap-3">
@@ -347,6 +415,11 @@
                         </div>
 
                         <div class="mt-5 flex flex-wrap items-center gap-2">
+                            <span
+                                class="inline-flex items-center rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-300">
+                                Alcance: {{ $this->textoAlcanceDescarga }}
+                            </span>
+
                             @if ($this->generacionSeleccionada)
                                 <span
                                     class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
@@ -429,7 +502,9 @@
                                             </p>
                                         @else
                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                @if ($this->esBachillerato())
+                                                @if ($modo_descarga === 'nivel')
+                                                    Selecciona generación, tipo de documento y periodo.
+                                                @elseif ($this->esBachillerato())
                                                     Selecciona generación, grado, semestre, grupo y documento.
                                                 @else
                                                     Selecciona generación, grado, grupo y documento.

@@ -32,6 +32,8 @@ class Listas extends Component
 
     public bool $mostrar_motivo = false;
 
+    public string $modo_descarga = 'grupo';
+
     public string $tipo_descarga = 'evaluacion';
     public string $opcion_descarga = 'primer_periodo';
 
@@ -103,11 +105,24 @@ class Listas extends Component
             ->get(['id', 'parcial', 'descripcion']);
     }
 
+    public function updatedModoDescarga(): void
+    {
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->mostrar_motivo = false;
+        $this->grupos = collect();
+        $this->semestres = $this->cargarSemestresIniciales();
+    }
+
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = null;
+        $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->grupos = collect();
 
-        $this->cargarGrupos();
+        $this->semestres = $this->cargarSemestresIniciales();
     }
 
     public function updatedGradoId(): void
@@ -130,6 +145,10 @@ class Listas extends Component
     {
         if (($this->esBachillerato() || $this->esSecundaria()) && in_array($this->tipo_descarga, ['evaluacion', 'asistencia'])) {
             $this->tipo_descarga = 'grupo';
+        }
+
+        if ($this->tipo_descarga !== 'grupo') {
+            $this->mostrar_motivo = false;
         }
 
         $this->opcion_descarga = array_key_first($this->opcionesDescarga()) ?? '';
@@ -157,13 +176,13 @@ class Listas extends Component
             $columnas[] = 'grado_id';
         }
 
-        $query = Semestre::query();
+        $consulta = Semestre::query();
 
         if ($this->grado_id && Schema::hasColumn('semestres', 'grado_id')) {
-            $query->where('grado_id', $this->grado_id);
+            $consulta->where('grado_id', $this->grado_id);
         }
 
-        $this->semestres = $query
+        $this->semestres = $consulta
             ->orderBy('id')
             ->get($columnas);
     }
@@ -171,6 +190,10 @@ class Listas extends Component
     public function cargarGrupos(): void
     {
         $this->grupos = collect();
+
+        if ($this->modo_descarga === 'nivel') {
+            return;
+        }
 
         if (!$this->generacion_id || !$this->grado_id) {
             return;
@@ -198,7 +221,7 @@ class Listas extends Component
             $columnas[] = 'grupos.semestre_id';
         }
 
-        $query = Grupo::query()
+        $consulta = Grupo::query()
             ->with([
                 'asignacionGrupo:id,nombre',
             ])
@@ -207,22 +230,22 @@ class Listas extends Component
             ->where('grupos.nivel_id', $this->nivel->id);
 
         if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $query->where('grupos.generacion_id', $this->generacion_id);
+            $consulta->where('grupos.generacion_id', $this->generacion_id);
         }
 
         if (Schema::hasColumn('grupos', 'grado_id')) {
-            $query->where('grupos.grado_id', $this->grado_id);
+            $consulta->where('grupos.grado_id', $this->grado_id);
         }
 
         if ($this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $query->where('grupos.semestre_id', $this->semestre_id);
+            $consulta->where('grupos.semestre_id', $this->semestre_id);
         }
 
         if (!$this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $query->whereNull('grupos.semestre_id');
+            $consulta->whereNull('grupos.semestre_id');
         }
 
-        $this->grupos = $query
+        $this->grupos = $consulta
             ->orderBy('asignacion_grupos.nombre')
             ->get();
     }
@@ -233,6 +256,8 @@ class Listas extends Component
         $this->grado_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+
+        $this->modo_descarga = 'grupo';
 
         $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
 
@@ -313,6 +338,14 @@ class Listas extends Component
     #[Computed]
     public function puedeDescargar(): bool
     {
+        if (!$this->tipo_descarga || !$this->opcion_descarga) {
+            return false;
+        }
+
+        if ($this->modo_descarga === 'nivel') {
+            return true;
+        }
+
         if (!$this->generacion_id) {
             return false;
         }
@@ -329,10 +362,6 @@ class Listas extends Component
             return false;
         }
 
-        if (!$this->tipo_descarga || !$this->opcion_descarga) {
-            return false;
-        }
-
         return true;
     }
 
@@ -340,14 +369,23 @@ class Listas extends Component
     public function parametrosDescarga(): array
     {
         return [
-            'slug_nivel' => $this->slug_nivel,
-            'generacion_id' => $this->generacion_id,
-            'grado_id' => $this->grado_id,
-            'semestre_id' => $this->semestre_id,
-            'grupo_id' => $this->grupo_id,
+            'modo_descarga' => $this->modo_descarga,
+
+            /*
+         * En modo nivel no se manda generación, grado, semestre ni grupo.
+         * Así el PDF traerá todas las listas del nivel completo.
+         */
+            'generacion_id' => $this->modo_descarga === 'grupo' ? $this->generacion_id : null,
+            'grado_id' => $this->modo_descarga === 'grupo' ? $this->grado_id : null,
+            'semestre_id' => $this->modo_descarga === 'grupo' ? $this->semestre_id : null,
+            'grupo_id' => $this->modo_descarga === 'grupo' ? $this->grupo_id : null,
+
             'tipo_descarga' => $this->tipo_descarga,
             'opcion_descarga' => $this->opcion_descarga,
-            'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
+
+            'mostrar_motivo' => $this->tipo_descarga === 'grupo'
+                && $this->modo_descarga === 'grupo'
+                && $this->mostrar_motivo ? 1 : 0,
         ];
     }
 
@@ -358,7 +396,10 @@ class Listas extends Component
             return null;
         }
 
-        return route('accion.generales.listas.pdf', $this->parametrosDescarga);
+        return route('accion.generales.listas.pdf', array_merge(
+            ['slug_nivel' => $this->slug_nivel],
+            $this->parametrosDescarga
+        ));
     }
 
     #[Computed]
@@ -401,15 +442,33 @@ class Listas extends Component
     #[Computed]
     public function textoBotonDescarga(): string
     {
+        if ($this->modo_descarga === 'nivel') {
+            return $this->esWordPreescolarEvaluacion
+                ? 'Descargar Word por nivel'
+                : 'Descargar PDF por nivel';
+        }
+
         return $this->esWordPreescolarEvaluacion ? 'Descargar Word' : 'Descargar PDF';
     }
 
     #[Computed]
     public function textoModoDescarga(): string
     {
+        if ($this->modo_descarga === 'nivel') {
+            return 'Se descargarán todas las listas del nivel seleccionado, sin necesidad de elegir generación, grado ni grupo.';
+        }
+
         return $this->esWordPreescolarEvaluacion
             ? 'Este documento se generará en Word porque corresponde a evaluación de preescolar.'
             : 'Este documento se generará en PDF.';
+    }
+
+    #[Computed]
+    public function textoAlcanceDescarga(): string
+    {
+        return $this->modo_descarga === 'nivel'
+            ? 'Todas las listas del nivel'
+            : 'Grupo seleccionado';
     }
 
     #[Computed]

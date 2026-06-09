@@ -14,5 +14,8 @@ class InscripcionController extends Controller
         return view('inscripcion.index');
     }
 
-
+    public function alumnos()
+    {
+        return view('alumnos.index');
+    }
 }
