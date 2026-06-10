@@ -11,6 +11,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -36,6 +37,7 @@ class AlumnosGenerales extends Component
     public string $genero = '';
     public string $estatus = 'activos';
     public string $orden = 'apellidos';
+
     public int $perPage = 25;
 
     public int $total = 0;
@@ -55,7 +57,7 @@ class AlumnosGenerales extends Component
 
         $this->ciclos = Ciclo::query()
             ->select('id', 'ciclo')
-            ->orderBy('id')
+            ->orderByDesc('id')
             ->get();
 
         $this->grados = collect();
@@ -81,8 +83,7 @@ class AlumnosGenerales extends Component
         $this->semestres = collect();
         $this->grupos = collect();
 
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedGradoId($value): void
@@ -95,8 +96,7 @@ class AlumnosGenerales extends Component
         $this->cargarSemestres();
         $this->cargarGrupos();
 
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedGeneracionId($value): void
@@ -107,8 +107,7 @@ class AlumnosGenerales extends Component
 
         $this->cargarGrupos();
 
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedSemestreId($value): void
@@ -119,42 +118,34 @@ class AlumnosGenerales extends Component
 
         $this->cargarGrupos();
 
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedGrupoId($value): void
     {
         $this->grupo_id = $value ? (int) $value : null;
-
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedCicloId($value): void
     {
         $this->ciclo_id = $value ? (int) $value : null;
-
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedBuscar(): void
     {
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedGenero(): void
     {
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedEstatus(): void
     {
-        $this->resetPage();
-        $this->recalcularResumen();
+        $this->actualizarVista();
     }
 
     public function updatedOrden(): void
@@ -169,21 +160,18 @@ class AlumnosGenerales extends Component
 
     public function limpiarFiltros(): void
     {
-        $this->reset([
-            'nivel_id',
-            'grado_id',
-            'generacion_id',
-            'semestre_id',
-            'grupo_id',
-            'ciclo_id',
-            'buscar',
-            'genero',
-            'estatus',
-            'orden',
-        ]);
+        $this->nivel_id = null;
+        $this->grado_id = null;
+        $this->generacion_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->ciclo_id = null;
 
+        $this->buscar = '';
+        $this->genero = '';
         $this->estatus = 'activos';
         $this->orden = 'apellidos';
+        $this->perPage = 25;
 
         $this->grados = collect();
         $this->semestres = collect();
@@ -191,6 +179,27 @@ class AlumnosGenerales extends Component
 
         $this->cargarGeneraciones();
 
+        $this->actualizarVista();
+    }
+
+    public function eliminarAlumno(int $alumnoId): void
+    {
+        $alumno = Inscripcion::query()->find($alumnoId);
+
+        if (!$alumno) {
+            $this->dispatch('notify', type: 'error', message: 'El alumno no existe o ya fue eliminado.');
+            return;
+        }
+
+        $alumno->delete();
+
+        $this->dispatch('notify', type: 'success', message: 'Alumno eliminado correctamente.');
+
+        $this->actualizarVista();
+    }
+
+    private function actualizarVista(): void
+    {
         $this->resetPage();
         $this->recalcularResumen();
     }
@@ -199,12 +208,11 @@ class AlumnosGenerales extends Component
     {
         if (!$this->nivel_id) {
             $this->grados = collect();
-
             return;
         }
 
         $this->grados = Grado::query()
-            ->select('id', 'nivel_id', 'nombre', 'orden')
+            ->select('id', 'nivel_id', 'nombre', 'slug', 'orden')
             ->where('nivel_id', $this->nivel_id)
             ->orderBy('orden')
             ->orderBy('nombre')
@@ -230,7 +238,6 @@ class AlumnosGenerales extends Component
     {
         if (!$this->esBachillerato() || !$this->grado_id) {
             $this->semestres = collect();
-
             return;
         }
 
@@ -245,37 +252,41 @@ class AlumnosGenerales extends Component
     {
         if (!$this->nivel_id || !$this->grado_id || !$this->generacion_id) {
             $this->grupos = collect();
-
             return;
         }
 
         if ($this->esBachillerato() && !$this->semestre_id) {
             $this->grupos = collect();
-
             return;
         }
 
         $consulta = Grupo::query()
-            ->select('grupos.id', 'grupos.nivel_id', 'grupos.grado_id', 'grupos.generacion_id', 'grupos.semestre_id', 'grupos.asignacion_grupo_id')
+            ->select([
+                'id',
+                'asignacion_grupo_id',
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'semestre_id',
+            ])
             ->with('asignacionGrupo:id,nombre')
-            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->where('grupos.nivel_id', $this->nivel_id)
-            ->where('grupos.grado_id', $this->grado_id)
-            ->where('grupos.generacion_id', $this->generacion_id);
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $this->generacion_id);
 
         if ($this->esBachillerato()) {
-            $consulta->where('grupos.semestre_id', $this->semestre_id);
+            $consulta->where('semestre_id', $this->semestre_id);
         } else {
-            $consulta->whereNull('grupos.semestre_id');
+            $consulta->whereNull('semestre_id');
         }
 
         $this->grupos = $consulta
-            ->orderBy('asignacion_grupos.nombre')
-            ->orderBy('grupos.id')
-            ->get();
+            ->get()
+            ->sortBy(fn($grupo) => $grupo->asignacionGrupo?->nombre ?? '')
+            ->values();
     }
 
-    private function consultaBase(): Builder
+    private function consultaBase(bool $conRelaciones = true, bool $conOrden = true): Builder
     {
         $consulta = Inscripcion::query()
             ->select([
@@ -297,19 +308,31 @@ class AlumnosGenerales extends Component
                 'foto_path',
                 'activo',
                 'fecha_baja',
+                'motivo_baja',
+                'observaciones_baja',
                 'fecha_inscripcion',
-            ])
-            ->with([
+                'created_at',
+            ]);
+
+        if ($conRelaciones) {
+            $consulta->with([
                 'nivel:id,nombre,slug,color',
-                'grado:id,nombre,orden',
+                'grado:id,nombre,slug,orden',
                 'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
-                'semestre:id,numero,grado_id',
+                'semestre:id,grado_id,numero,orden_global',
                 'ciclo:id,ciclo',
                 'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id')
-                        ->with('asignacionGrupo:id,nombre');
+                    $query->select([
+                        'id',
+                        'asignacion_grupo_id',
+                        'nivel_id',
+                        'grado_id',
+                        'generacion_id',
+                        'semestre_id',
+                    ])->with('asignacionGrupo:id,nombre');
                 },
             ]);
+        }
 
         if ($this->nivel_id) {
             $consulta->where('nivel_id', $this->nivel_id);
@@ -348,33 +371,47 @@ class AlumnosGenerales extends Component
         }
 
         if (trim($this->buscar) !== '') {
-            $busqueda = trim($this->buscar);
+            $buscar = trim($this->buscar);
 
-            $consulta->where(function ($query) use ($busqueda) {
-                $query->where('matricula', 'like', "%{$busqueda}%")
-                    ->orWhere('curp', 'like', "%{$busqueda}%")
-                    ->orWhere('folio', 'like', "%{$busqueda}%")
-                    ->orWhere('nombre', 'like', "%{$busqueda}%")
-                    ->orWhere('apellido_paterno', 'like', "%{$busqueda}%")
-                    ->orWhere('apellido_materno', 'like', "%{$busqueda}%");
+            $consulta->where(function ($query) use ($buscar) {
+                $query->where('matricula', 'like', "%{$buscar}%")
+                    ->orWhere('curp', 'like', "%{$buscar}%")
+                    ->orWhere('folio', 'like', "%{$buscar}%")
+                    ->orWhere('nombre', 'like', "%{$buscar}%")
+                    ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                    ->orWhere('apellido_materno', 'like', "%{$buscar}%");
             });
         }
 
-        return $this->aplicarOrden($consulta);
+        if ($conOrden) {
+            $this->aplicarOrden($consulta);
+        }
+
+        return $consulta;
     }
 
-    private function aplicarOrden(Builder $consulta): Builder
+    private function aplicarOrden(Builder $consulta): void
     {
-        return match ($this->orden) {
+        match ($this->orden) {
             'recientes' => $consulta->orderByDesc('created_at'),
-            'matricula' => $consulta->orderBy('matricula'),
-            'nivel' => $consulta
-                ->join('niveles', 'niveles.id', '=', 'inscripciones.nivel_id')
-                ->orderBy('niveles.nombre')
+
+            'matricula' => $consulta
+                ->orderBy('matricula')
                 ->orderBy('apellido_paterno')
                 ->orderBy('apellido_materno')
-                ->orderBy('nombre')
-                ->select('inscripciones.*'),
+                ->orderBy('nombre'),
+
+            'nivel' => $consulta
+                ->orderBy(
+                    Nivel::query()
+                        ->select('nombre')
+                        ->whereColumn('niveles.id', 'inscripciones.nivel_id')
+                        ->limit(1)
+                )
+                ->orderBy('apellido_paterno')
+                ->orderBy('apellido_materno')
+                ->orderBy('nombre'),
+
             default => $consulta
                 ->orderBy('apellido_paterno')
                 ->orderBy('apellido_materno')
@@ -384,7 +421,7 @@ class AlumnosGenerales extends Component
 
     private function recalcularResumen(): void
     {
-        $base = $this->consultaBase();
+        $base = $this->consultaBase(false, false);
 
         $this->total = (clone $base)->count();
         $this->hombres = (clone $base)->where('genero', 'H')->count();
@@ -401,21 +438,25 @@ class AlumnosGenerales extends Component
 
         $nivel = $this->niveles->firstWhere('id', $this->nivel_id);
 
-        return $nivel && str($nivel->slug)->contains('bachillerato');
+        if (!$nivel) {
+            return false;
+        }
+
+        return Str::contains(Str::lower($nivel->slug . ' ' . $nivel->nombre), 'bachillerato');
     }
 
     public function nombreCompleto($alumno): string
     {
-        return trim($alumno->apellido_paterno . ' ' . $alumno->apellido_materno . ' ' . $alumno->nombre);
+        return trim(
+            ($alumno->apellido_paterno ?? '') . ' ' .
+            ($alumno->apellido_materno ?? '') . ' ' .
+            ($alumno->nombre ?? '')
+        );
     }
 
     public function textoGrupo($grupo): string
     {
-        if (!$grupo) {
-            return '—';
-        }
-
-        return $grupo->asignacionGrupo?->nombre ?? '—';
+        return $grupo?->asignacionGrupo?->nombre ?? '—';
     }
 
     public function textoGeneracion($generacion): string
@@ -424,7 +465,16 @@ class AlumnosGenerales extends Component
             return '—';
         }
 
-        return $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso;
+        return $generacion->anio_ingreso . '-' . $generacion->anio_egreso;
+    }
+
+    public function textoGenero(?string $genero): string
+    {
+        return match ($genero) {
+            'H' => 'Hombre',
+            'M' => 'Mujer',
+            default => '—',
+        };
     }
 
     public function render()
