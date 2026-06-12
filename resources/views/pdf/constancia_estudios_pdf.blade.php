@@ -150,7 +150,7 @@
         }
 
         .titulo-hace-constar.conducta {
-            margin: 45px 0 38px 0;
+            margin: 25px 0 38px 0;
             text-align: center;
             font-size: 19px;
             text-transform: none;
@@ -346,9 +346,10 @@
         }
 
         .nombre-firma {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
             text-transform: uppercase;
+            line-height: 0.8;
         }
 
         .cargo-final-conducta {
@@ -495,6 +496,10 @@
             <div class="bloque-datos conducta">
                 ASUNTO: <span class="subrayado">{{ $asunto }}.</span><br>
                 Cd. Altamirano, Gro., a {{ $fechaConducta }}
+            </div>
+
+            <div class="dirigido {{ $esRelacionesExteriores ? 'relaciones-exteriores' : '' }}">
+                {!! nl2br(e($dirigidoTexto)) !!}
             </div>
         @else
             <div class="bloque-datos">

@@ -97,6 +97,96 @@
         </div>
     </div>
 
+
+    <div class="overflow-hidden rounded-2xl border border-[#c8ae82] shadow-sm">
+        <div class="bg-[#9d2034] px-4 py-3 text-center">
+            <h3 class="text-lg font-black tracking-wide text-white sm:text-xl">
+                Distribución Escolar
+            </h3>
+        </div>
+
+        <div class="overflow-x-auto bg-[#efe1cb]">
+            <table class="min-w-full border-separate border-spacing-0 text-sm">
+                <thead>
+                    <tr class="bg-[#b8925a] text-center text-black">
+                        <th class="border border-white px-3 py-2 font-black">Nivel</th>
+                        <th class="border border-white px-3 py-2 font-black">Turno</th>
+                        <th class="border border-white px-3 py-2 font-black">Grado</th>
+                        <th class="border border-white px-3 py-2 font-black">Grupo</th>
+                        <th class="border border-white px-3 py-2 font-black">Hombres</th>
+                        <th class="border border-white px-3 py-2 font-black">Mujeres</th>
+                        <th class="border border-white px-3 py-2 font-black">Total</th>
+                        <th class="border border-white px-3 py-2 font-black">Maestro</th>
+                        <th class="border border-white px-3 py-2 font-black">Director</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @forelse ($this->distribucionEscolar as $fila)
+                        <tr class="bg-[#e8d5b9] text-center text-slate-900">
+                            <td class="border border-white px-3 py-2 font-semibold">
+                                {{ $fila['nivel'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2">
+                                {{ $fila['turno'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 font-semibold">
+                                {{ $fila['grado'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 font-semibold">
+                                {{ $fila['grupo'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2">
+                                {{ $fila['hombres'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2">
+                                {{ $fila['mujeres'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 font-black">
+                                {{ $fila['total'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 text-left">
+                                {{ $fila['maestro'] ?: '—' }}
+                            </td>
+                            <td class="border border-white px-3 py-2 text-left">
+                                {{ $fila['director'] }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9"
+                                class="border border-white px-4 py-6 text-center text-sm font-semibold text-slate-600">
+                                No hay datos disponibles para mostrar la distribución escolar.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+
+                @if ($this->distribucionEscolar->count())
+                    <tfoot>
+                        <tr class="bg-[#d9bd91] text-center text-black">
+                            <td colspan="4" class="border border-white px-3 py-2 font-black">
+                                TOTALES
+                            </td>
+                            <td class="border border-white px-3 py-2 font-black">
+                                {{ $this->totalesDistribucionEscolar['hombres'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 font-black">
+                                {{ $this->totalesDistribucionEscolar['mujeres'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2 font-black">
+                                {{ $this->totalesDistribucionEscolar['total'] }}
+                            </td>
+                            <td class="border border-white px-3 py-2"></td>
+                            <td class="border border-white px-3 py-2"></td>
+                        </tr>
+                    </tfoot>
+                @endif
+            </table>
+        </div>
+    </div>
+
+
     {{-- COLLAPSE: ESTADÍSTICA GENERAL --}}
     <section
         class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -255,7 +345,8 @@
 
                     <div
                         class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
-                        <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Medio
+                        <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                            Medio
                             curso</p>
                         <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
                             {{ $this->totalesMedioCurso['existencia']['t'] ?? 0 }}</p>
@@ -264,7 +355,8 @@
 
                     <div
                         class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                        <p class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Fin
+                        <p class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                            Fin
                             de curso</p>
                         <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
                             {{ $this->totalesFinCurso['existencia']['t'] ?? 0 }}</p>
@@ -280,6 +372,10 @@
                         <p class="mt-1 text-xs font-bold text-lime-700 dark:text-lime-300">Al cierre del curso</p>
                     </div>
                 </div>
+
+
+
+
 
                 @include('partials.tabla-estadistica', [
                     'titulo' => 'Inicio de curso',

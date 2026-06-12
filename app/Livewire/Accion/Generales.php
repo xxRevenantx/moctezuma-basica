@@ -15,6 +15,8 @@ use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
+use Illuminate\Support\Facades\DB;
+
 class Generales extends Component
 {
     public $nivel;
@@ -33,7 +35,8 @@ class Generales extends Component
         $this->slug_nivel = $slug_nivel;
 
         $this->nivel = Nivel::query()
-            ->select('id', 'nombre', 'slug')
+            ->with('director')
+            ->select('id', 'nombre', 'slug', 'director_id')
             ->where('slug', $slug_nivel)
             ->firstOrFail();
 
@@ -392,8 +395,8 @@ class Generales extends Component
             ->map(function ($alumno) {
                 $nombreCompleto = trim(
                     ($alumno->apellido_paterno ?? '') . ' ' .
-                        ($alumno->apellido_materno ?? '') . ' ' .
-                        ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
                 );
 
                 if ($alumno->matricula) {
@@ -428,9 +431,9 @@ class Generales extends Component
 
         $nombreCiclo = $this->ciclo_escolar_id !== ''
             ? str($this->textoCicloEscolar((int) $this->ciclo_escolar_id))
-            ->replace(' ', '')
-            ->replace('-', '_')
-            ->value()
+                ->replace(' ', '')
+                ->replace('-', '_')
+                ->value()
             : 'sin_ciclo';
 
         $archivo = 'estadistica_general_' . $nombreNivel . '_' . $nombreCiclo . '.xlsx';
@@ -481,8 +484,162 @@ class Generales extends Component
         return $cicloEscolar->inicio_anio . ' - ' . $cicloEscolar->fin_anio;
     }
 
+    public function getDistribucionEscolarProperty(): Collection
+    {
+        if ($this->ciclo_escolar_id === '') {
+            return collect();
+        }
+
+        return DB::table('trayectorias_academicas as ta')
+            ->join('inscripciones as i', 'i.id', '=', 'ta.inscripcion_id')
+            ->join('grados as gr', 'gr.id', '=', 'ta.grado_id')
+            ->leftJoin('grupos as gp', 'gp.id', '=', 'ta.grupo_id')
+            ->leftJoin('asignacion_grupos as ag', 'ag.id', '=', 'gp.asignacion_grupo_id')
+            ->where('ta.ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('ta.nivel_id', $this->nivel->id)
+            ->where('ta.activo', true)
+            ->whereNull('ta.fecha_baja')
+            ->whereNull('i.deleted_at')
+            ->when($this->generacion_id !== '', function ($query) {
+                $query->where('ta.generacion_id', $this->generacion_id);
+            })
+            ->selectRaw("
+            ta.nivel_id,
+            ta.grado_id,
+            ta.grupo_id,
+            gr.nombre as grado,
+            gr.orden as grado_orden,
+            COALESCE(ag.nombre, 'A') as grupo,
+            SUM(CASE WHEN i.genero = 'H' THEN 1 ELSE 0 END) as hombres,
+            SUM(CASE WHEN i.genero = 'M' THEN 1 ELSE 0 END) as mujeres,
+            COUNT(DISTINCT i.id) as total
+        ")
+            ->groupBy(
+                'ta.nivel_id',
+                'ta.grado_id',
+                'ta.grupo_id',
+                'gr.nombre',
+                'gr.orden',
+                'ag.nombre'
+            )
+            ->orderBy('gr.orden')
+            ->orderBy('ag.nombre')
+            ->get()
+            ->map(function ($fila) {
+                return [
+                    'nivel' => mb_strtoupper($this->nivel->nombre ?? 'N/A'),
+                    'turno' => 'Matutino',
+                    'grado' => $fila->grado,
+                    'grupo' => $fila->grupo,
+                    'hombres' => (int) $fila->hombres,
+                    'mujeres' => (int) $fila->mujeres,
+                    'total' => (int) $fila->total,
+                    'maestro' => $this->mostrarMaestroEnDistribucion()
+                        ? $this->obtenerMaestroDesdePersonaNivelDetalles(
+                            gradoId: $fila->grado_id ? (int) $fila->grado_id : null,
+                            grupoId: $fila->grupo_id ? (int) $fila->grupo_id : null
+                        )
+                        : '',
+                    'director' => $this->obtenerDirectorNivel(),
+                ];
+            })
+            ->values();
+    }
+
+    private function mostrarMaestroEnDistribucion(): bool
+    {
+        $slug = str($this->nivel->slug ?? '')
+            ->lower()
+            ->ascii()
+            ->value();
+
+        $nombre = str($this->nivel->nombre ?? '')
+            ->lower()
+            ->ascii()
+            ->value();
+
+        return in_array($slug, ['preescolar', 'primaria'], true)
+            || str_contains($nombre, 'preescolar')
+            || str_contains($nombre, 'primaria');
+    }
+
+    public function getTotalesDistribucionEscolarProperty(): array
+    {
+        return [
+            'hombres' => $this->distribucionEscolar->sum('hombres'),
+            'mujeres' => $this->distribucionEscolar->sum('mujeres'),
+            'total' => $this->distribucionEscolar->sum('total'),
+        ];
+    }
+
+    private function obtenerMaestroDesdePersonaNivelDetalles(?int $gradoId, ?int $grupoId): string
+    {
+        if (!$gradoId || !$grupoId) {
+            return '—';
+        }
+
+        $maestros = DB::table('persona_nivel_detalles as pnd')
+            ->join('persona_nivel as pn', 'pn.id', '=', 'pnd.persona_nivel_id')
+            ->join('persona_role as pr', 'pr.id', '=', 'pnd.persona_role_id')
+            ->join('role_personas as rp', 'rp.id', '=', 'pr.role_persona_id')
+            ->join('personas as p', 'p.id', '=', 'pn.persona_id')
+            ->where('pn.nivel_id', $this->nivel->id)
+            ->where('pnd.grado_id', $gradoId)
+            ->where('pnd.grupo_id', $grupoId)
+            ->where('p.status', true)
+            ->whereIn('rp.slug', [
+                'maestro_frente_a_grupo',
+                'docente',
+                'director_con_grupo',
+            ])
+            ->orderByRaw("
+            CASE
+                WHEN rp.slug = 'maestro_frente_a_grupo' THEN 1
+                WHEN rp.slug = 'director_con_grupo' THEN 2
+                WHEN rp.slug = 'docente' THEN 3
+                ELSE 4
+            END
+        ")
+            ->orderBy('pnd.orden')
+            ->selectRaw("
+            TRIM(CONCAT_WS(' ', p.titulo, p.nombre, p.apellido_paterno, p.apellido_materno)) as nombre_completo
+        ")
+            ->pluck('nombre_completo')
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $maestros->isNotEmpty()
+            ? $maestros->implode(', ')
+            : '—';
+    }
+
+    private function obtenerDirectorNivel(): string
+    {
+        $director = $this->nivel->director ?? null;
+
+        if (!$director && !empty($this->nivel->director_id)) {
+            $director = DB::table('directores')
+                ->where('id', $this->nivel->director_id)
+                ->first();
+        }
+
+        if (!$director) {
+            return '—';
+        }
+
+        return trim(collect([
+            $director->titulo ?? null,
+            $director->nombre ?? null,
+            $director->apellido_paterno ?? null,
+            $director->apellido_materno ?? null,
+        ])->filter()->implode(' '));
+    }
+
+
     public function render()
     {
         return view('livewire.accion.generales');
     }
+
 }
