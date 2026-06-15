@@ -115,7 +115,15 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
         $badges = $badges ?? ['bajas' => 0];
 
         $accionesVisibles = collect($acciones)->filter(function ($accion) use ($slug_nivel) {
-            return !($accion->slug === 'fichas' && $slug_nivel !== 'preescolar');
+            if ($slug_nivel === 'preescolar' && $accion->slug === 'calificaciones') {
+                return false;
+            }
+
+            if ($slug_nivel !== 'preescolar' && $accion->slug === 'fichas') {
+                return false;
+            }
+
+            return true;
         });
 
         $accionActiva = $accionesVisibles->firstWhere('slug', $accionActual);

@@ -141,4 +141,10 @@ class Inscripcion extends Model
     {
         return $this->hasMany(\App\Models\Oficio::class, 'inscripcion_id');
     }
+
+    // Relación con ficha descriptiva
+    public function fichasDescriptivas()
+    {
+        return $this->hasMany(FichaDescriptiva::class, 'inscripcion_id');
+    }
 }

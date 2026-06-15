@@ -9,6 +9,7 @@ use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
+use App\Http\Controllers\FichaController;
 use App\Http\Controllers\SubmoduloNivelController;
 use App\Http\Controllers\WordController;
 use Illuminate\Support\Facades\Route;
@@ -95,6 +96,17 @@ Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaContr
 
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])
     ->name('misrutas.promedios.boleta.pdf');
+
+
+// FICHAS DESCRIPTIVAS PREESCOLAR
+Route::get('/fichas/preescolar/excel', [FichaController::class, 'excel'])
+    ->name('misrutas.fichas.excel');
+
+Route::get('/fichas/preescolar/grupo/pdf', [FichaController::class, 'grupoPdf'])
+    ->name('misrutas.fichas.grupo.pdf');
+
+Route::get('/fichas/preescolar/alumno/{inscripcion}/pdf', [FichaController::class, 'alumnoPdf'])
+    ->name('misrutas.fichas.alumno.pdf');
 
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
