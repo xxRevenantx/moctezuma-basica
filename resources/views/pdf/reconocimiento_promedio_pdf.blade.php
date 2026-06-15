@@ -78,15 +78,15 @@
 
         .logo-derecho {
             position: absolute;
-            top: 112px;
+            top: 110px;
             right: 90px;
-            width: 190px;
+            width: 110px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-derecho img {
-            max-width: 190px;
+            max-width: 110px;
         }
 
         .encabezado {

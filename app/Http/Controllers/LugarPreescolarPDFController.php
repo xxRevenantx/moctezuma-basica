@@ -17,6 +17,7 @@ class LugarPreescolarPDFController extends Controller
         $lugarPreescolar->load([
             'alumno.nivel.director',
             'alumno.grado',
+            'alumno.generacion',
             'alumno.grupo.asignacionGrupo',
             'cicloEscolar',
         ]);
@@ -132,6 +133,7 @@ class LugarPreescolarPDFController extends Controller
         $lugarPreescolar->load([
             'alumno.nivel.director',
             'alumno.grado',
+            'alumno.generacion',
             'alumno.grupo.asignacionGrupo',
             'cicloEscolar',
         ]);

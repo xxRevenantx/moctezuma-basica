@@ -7,215 +7,319 @@
     <title>Diploma Preescolar</title>
 
     <style>
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         @page {
-            margin: 24px 38px;
+            size: letter landscape;
+            margin: 0;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
-            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
-            color: #1f2937;
+            font-family: 'calibri', 'ARIAL', sans-serif;
             background: #ffffff;
+            color: #071846;
         }
 
-        .page {
+        .diploma {
             position: relative;
             width: 100%;
             height: 100%;
-            border: 7px solid #006492;
-            padding: 34px 48px;
+            overflow: hidden;
+            background-image: url("{{ public_path('imagenes/diploma_preescolar_2.jpg') }}");
+            background-size: 100% 100%;
+            background-position: center center;
+            background-repeat: no-repeat;
         }
 
-        .inner-border {
+        .logo-izquierdo {
             position: absolute;
-            inset: 16px;
-            border: 3px solid #88AC2E;
-        }
-
-        .corner {
-            position: absolute;
-            width: 95px;
-            height: 95px;
-            border: 5px solid #efc2ef;
-        }
-
-        .corner-tl {
-            top: 25px;
-            left: 25px;
-            border-right: 0;
-            border-bottom: 0;
-        }
-
-        .corner-tr {
-            top: 25px;
-            right: 25px;
-            border-left: 0;
-            border-bottom: 0;
-        }
-
-        .corner-bl {
-            bottom: 25px;
-            left: 25px;
-            border-right: 0;
-            border-top: 0;
-        }
-
-        .corner-br {
-            bottom: 25px;
-            right: 25px;
-            border-left: 0;
-            border-top: 0;
-        }
-
-        .watermark {
-            position: absolute;
-            top: 120px;
-            left: 245px;
-            width: 350px;
-            opacity: 0.06;
-        }
-
-        .content {
-            position: relative;
-            z-index: 2;
+            top: 104px;
+            left: 118px;
+            width: 100px;
             text-align: center;
+            z-index: 5;
         }
 
-        .header {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 6px;
+        .logo-izquierdo img {
+            max-width: 100px;
+            max-height: 100px;
         }
 
-        .header td {
-            vertical-align: top;
+        .logo-derecho {
+            position: absolute;
+            top: 110px;
+            right: 90px;
+            width: 110px;
+            text-align: center;
+            z-index: 5;
         }
 
-        .logo {
-            width: 265px;
-            max-height: 85px;
-            object-fit: contain;
+        .logo-derecho img {
+            max-width: 110px;
+            max-height: 110px;
         }
 
-        .mascota {
-            width: 85px;
-            max-height: 95px;
-            object-fit: contain;
+        .encabezado {
+            position: absolute;
+            top: 95px;
+            left: 280px;
+            right: 280px;
+            text-align: center;
+            z-index: 6;
+            line-height: 0;
         }
 
-        .institucion {
-            margin-top: 8px;
+        .secretaria {
+            font-family: 'ARIAL', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .escuela {
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 700;
+            color: #c98626;
+            letter-spacing: .4px;
             text-transform: uppercase;
-            color: #006492;
+            line-height: 1.15;
         }
 
-        .titulo {
-            margin-top: 20px;
-            font-size: 48px;
-            font-weight: bold;
-            color: #88AC2E;
-            letter-spacing: 3px;
+        .cct {
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
             text-transform: uppercase;
-        }
-
-        .subtitulo {
-            margin-top: 4px;
-            font-size: 16px;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
+            line-height: 1.15;
         }
 
         .otorga {
-            margin-top: 30px;
+            margin-top: 5px;
+            font-family: 'ARIAL', sans-serif;
             font-size: 18px;
-            color: #334155;
+            font-weight: 700;
+            color: #071846;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            line-height: 1.15;
+        }
+
+        .titulo-diploma {
+            position: absolute;
+            top: 250px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 90px;
+            line-height: 1;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #08265f;
+            text-transform: uppercase;
+            text-shadow: 5px 5px 0 #efa56f;
+        }
+
+        .adorno-izquierdo {
+            position: absolute;
+            top: 350px;
+            left: 100px;
+            width: 95px;
+            height: 1.5px;
+            background: #b5792f;
+            z-index: 6;
+        }
+
+        .adorno-derecho {
+            position: absolute;
+            top: 350px;
+            right: 100px;
+            width: 95px;
+            height: 1.5px;
+            background: #b5792f;
+            z-index: 6;
+        }
+
+        .a-texto {
+            position: absolute;
+            top: 374px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #071846;
+            text-transform: uppercase;
         }
 
         .alumno {
-            margin: 18px auto 0;
-            width: 84%;
-            border-bottom: 2px solid #006492;
-            padding-bottom: 8px;
-            font-size: 30px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #111827;
-        }
-
-        .motivo {
-            margin: 28px auto 0;
-            width: 82%;
-            font-size: 22px;
-            line-height: 1.55;
+            position: absolute;
+            top: 410px;
+            left: 145px;
+            right: 145px;
+            z-index: 6;
             text-align: center;
-            color: #1f2937;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 40px;
+            font-weight: 700;
+            color: #071846;
+            text-transform: uppercase;
+            letter-spacing: .6px;
         }
 
-        .nivel {
-            margin-top: 12px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #9d2034;
-            text-transform: uppercase;
+        .linea-alumno {
+            position: absolute;
+            top: 470px;
+            left: 145px;
+            right: 145px;
+            z-index: 6;
+            height: 3px;
+            background: #eba55f;
         }
 
-        .detalle {
-            margin-top: 18px;
-            font-size: 13px;
-            color: #475569;
+        .descripcion {
+            position: absolute;
+            top: 490px;
+            left: 145px;
+            right: 145px;
+            z-index: 6;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 21px;
+            line-height: 1.25;
+            color: #071846;
+        }
+
+        .descripcion strong {
+            font-weight: 700;
+            color: #071846;
+        }
+
+        .felicitacion {
+            position: absolute;
+            top: 545px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #c98626;
             text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .datos-extra {
+            position: absolute;
+            top: 585px;
+            left: 150px;
+            right: 150px;
+            z-index: 6;
+            width: calc(100% - 300px);
+            border-collapse: collapse;
+        }
+
+        .datos-extra td {
+            width: 50%;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 15px;
+            color: #071846;
+            padding: 2px 8px;
+        }
+
+        .datos-extra strong {
+            color: #071846;
+            font-weight: 700;
         }
 
         .fecha {
-            margin-top: 26px;
-            font-size: 13px;
-            color: #334155;
+            position: absolute;
+            top: 620px;
+            left: 0;
+            right: 0;
+            z-index: 6;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 14px;
+            color: #071846;
             text-transform: uppercase;
         }
 
         .firmas {
-            width: 100%;
+            position: absolute;
+            top: 660px;
+            left: 15%;
+            right: 15%;
+            z-index: 6;
+            width: 70%;
             border-collapse: collapse;
-            margin-top: 58px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 15px;
+            color: #071846;
         }
 
         .firmas td {
             width: 50%;
             text-align: center;
             vertical-align: top;
-            font-size: 12px;
-        }
-
-        .linea {
-            width: 240px;
-            border-top: 1px solid #1f2a44;
-            margin: 0 auto 6px;
+            padding: 0 20px;
         }
 
         .firma-nombre {
-            font-size: 12px;
-            font-weight: bold;
+            font-weight: 700;
             text-transform: uppercase;
+            text-decoration: underline;
         }
 
-        .firma-cargo {
+        .cargo {
             margin-top: 2px;
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #475569;
-        }
-
-        .footer {
-            position: absolute;
-            left: 46px;
-            right: 46px;
-            bottom: 18px;
-            text-align: center;
-            font-size: 8px;
-            color: #64748b;
+            font-size: 10px;
+            font-weight: 400;
             text-transform: uppercase;
         }
     </style>
@@ -227,97 +331,134 @@
             ($alumno->nombre ?? '') . ' ' . ($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? ''),
         );
 
-        $grado = $alumno->grado?->nombre ?? '';
-        $grupo = $alumno->grupo?->asignacionGrupo?->nombre ?? 'S/G';
+        $nombreAlumno = mb_strtoupper($nombreAlumno ?: 'NOMBRE DEL ALUMNO', 'UTF-8');
 
-        $ciclo = $cicloEscolar ? $cicloEscolar->inicio_anio . '-' . $cicloEscolar->fin_anio : '';
+        $nivel = $alumno->nivel ?? null;
+        $grado = $alumno->grado ?? null;
+        $grupo = $alumno->grupo ?? null;
+        $generacion = $alumno->generacion ?? null;
+
+        $secretariaTexto = 'SECRETARÍA DE EDUCACIÓN GUERRERO';
+
+        $nombreEscuelaDiploma = 'JARDÍN DE NIÑOS PART. CENTRO UNIVERSITARIO MOCTEZUMA';
+
+        $cctDiploma = data_get($nivel, 'cct') ?: 'C.C.T. 12PJN0226W';
+
+        $cicloEscolarTexto = $cicloEscolar
+            ? ($cicloEscolar->inicio_anio ?? '') . '-' . ($cicloEscolar->fin_anio ?? '')
+            : '—';
+
+        $gradoTexto = mb_strtoupper($grado->nombre ?? 'GRADO', 'UTF-8');
+
+        $grupoTexto = mb_strtoupper($grupo->asignacionGrupo?->nombre ?? 'S/G', 'UTF-8');
+
+        $logoIzquierdoFinal = $logoPrincipal ?? null;
+        $logoDerechoFinal = $logoPenacho ?? null;
+
+        $educadoraFinal = mb_strtoupper($educadoraNombre ?: 'EDUCADORA', 'UTF-8');
+        $directoraFinal = mb_strtoupper($directoraNombre ?: 'DIRECCIÓN', 'UTF-8');
     @endphp
 
-    <div class="page">
-        <div class="inner-border"></div>
+    <div class="diploma">
 
-        <div class="corner corner-tl"></div>
-        <div class="corner corner-tr"></div>
-        <div class="corner corner-bl"></div>
-        <div class="corner corner-br"></div>
+        <div class="logo-izquierdo">
+            @if (!empty($logoIzquierdoFinal))
+                <img src="{{ $logoIzquierdoFinal }}" alt="Logo Centro Universitario Moctezuma">
+            @endif
+        </div>
 
-        @if (!empty($marcaAgua))
-            <img class="watermark" src="{{ $marcaAgua }}" alt="Marca de agua">
-        @endif
+        <div class="logo-derecho">
+            @if (!empty($logoDerechoFinal))
+                <img src="{{ $logoDerechoFinal }}" alt="Preescolar">
+            @endif
+        </div>
 
-        <div class="content">
-            <table class="header">
-                <tr>
-                    <td style="text-align:left;">
-                        @if (!empty($logoPrincipal))
-                            <img class="logo" src="{{ $logoPrincipal }}" alt="Centro Universitario Moctezuma">
-                        @endif
-                    </td>
-
-                    <td style="text-align:right;">
-                        @if (!empty($logoPenacho))
-                            <img class="mascota" src="{{ $logoPenacho }}" alt="Preescolar">
-                        @endif
-                    </td>
-                </tr>
-            </table>
-
-            <div class="institucion">
-                Centro Universitario Moctezuma
+        <div class="encabezado">
+            <div class="secretaria">
+                {{ mb_strtoupper($secretariaTexto, 'UTF-8') }}
             </div>
 
-            <div class="titulo">
-                Diploma
+            <div class="escuela">
+                {{ mb_strtoupper($nombreEscuelaDiploma, 'UTF-8') }}
             </div>
 
-            <div class="subtitulo">
-                Nivel Preescolar
+            <div class="cct">
+                {{ mb_strtoupper($cctDiploma, 'UTF-8') }}
             </div>
 
             <div class="otorga">
-                Se otorga el presente diploma a:
+                Otorga el presente
             </div>
-
-            <div class="alumno">
-                {{ $nombreAlumno }}
-            </div>
-
-            <div class="motivo">
-                Por haber terminado tus estudios en el nivel preescolar.
-            </div>
-
-            <div class="nivel">
-                ¡Muchas felicidades!
-            </div>
-
-            <div class="detalle">
-                {{ $grado }} · Grupo {{ $grupo }} · Ciclo escolar {{ $ciclo }}
-            </div>
-
-            <div class="fecha">
-                Cd. Altamirano, Guerrero, a {{ $fechaPdf }}
-            </div>
-
-            <table class="firmas">
-                <tr>
-                    <td>
-                        <div class="linea"></div>
-                        <div class="firma-nombre">{{ $educadoraNombre ?: 'EDUCADORA' }}</div>
-                        <div class="firma-cargo">Educadora</div>
-                    </td>
-
-                    <td>
-                        <div class="linea"></div>
-                        <div class="firma-nombre">{{ $directoraNombre ?: 'DIRECCIÓN' }}</div>
-                        <div class="firma-cargo">Directora</div>
-                    </td>
-                </tr>
-            </table>
         </div>
 
-        <div class="footer">
-            Centro Universitario Moctezuma · Francisco I. Madero Ote #800, Col. Esquipulas, Cd. Altamirano, Gro.
+        <div class="adorno-izquierdo"></div>
+        <div class="adorno-derecho"></div>
+
+        <div class="titulo-diploma">
+            DIPLOMA
         </div>
+
+        <div class="a-texto">
+            A:
+        </div>
+
+        <div class="alumno">
+            {{ $nombreAlumno }}
+        </div>
+
+        <div class="linea-alumno"></div>
+
+        <div class="descripcion">
+            Por haber terminado satisfactoriamente sus estudios en el
+            <strong>nivel preescolar</strong>, demostrando dedicación, alegría
+            y esfuerzo durante su formación inicial.
+        </div>
+
+        <div class="felicitacion">
+            ¡Muchas felicidades!
+        </div>
+
+        <table class="datos-extra">
+            <tr>
+                <td>
+                    <strong>Grado y grupo:</strong>
+                    {{ $gradoTexto }} · Grupo {{ $grupoTexto }}
+                </td>
+
+                <td>
+                    <strong>Ciclo escolar:</strong>
+                    {{ $cicloEscolarTexto }}
+                </td>
+            </tr>
+        </table>
+
+        <div class="fecha">
+            Cd. Altamirano, Guerrero, a {{ $fechaPdf }}
+        </div>
+
+        <table class="firmas">
+            <tr>
+                <td>
+                    <div class="firma-nombre">
+                        {{ $educadoraFinal }}
+                    </div>
+
+                    <div class="cargo">
+                        Firma de la educadora
+                    </div>
+                </td>
+
+                <td>
+                    <div class="firma-nombre">
+                        {{ $directoraFinal }}
+                    </div>
+
+                    <div class="cargo">
+                        Firma de la directora de la escuela
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
 </body>
 
