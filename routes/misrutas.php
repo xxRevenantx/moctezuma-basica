@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
+use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
@@ -107,6 +108,12 @@ Route::get('/fichas/preescolar/grupo/pdf', [FichaController::class, 'grupoPdf'])
 
 Route::get('/fichas/preescolar/alumno/{inscripcion}/pdf', [FichaController::class, 'alumnoPdf'])
     ->name('misrutas.fichas.alumno.pdf');
+
+Route::get('/lugares-preescolar/{lugarPreescolar}/pdf', [LugarPreescolarPDFController::class, 'show'])
+    ->name('misrutas.lugares-preescolar.pdf');
+
+Route::get('/lugares-preescolar/{lugarPreescolar}/diploma', [LugarPreescolarPDFController::class, 'diploma'])
+    ->name('misrutas.lugares-preescolar.diploma');
 
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');

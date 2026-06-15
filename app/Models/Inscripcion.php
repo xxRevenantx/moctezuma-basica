@@ -147,4 +147,9 @@ class Inscripcion extends Model
     {
         return $this->hasMany(FichaDescriptiva::class, 'inscripcion_id');
     }
+
+    public function lugarPreescolar()
+    {
+        return $this->hasOne(LugarPreescolar::class, 'inscripcion_id');
+    }
 }
