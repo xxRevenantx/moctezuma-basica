@@ -67,10 +67,10 @@
             </flux:field>
 
             <flux:field>
-                <flux:label>Tipo</flux:label>
+                <flux:label>Opción</flux:label>
                 <flux:select wire:model.live="tipo_reconocimiento">
                     <flux:select.option value="periodo">Por periodo</flux:select.option>
-                    <flux:select.option value="anual">Anual</flux:select.option>
+                    <flux:select.option value="anual">Fin de curso</flux:select.option>
                 </flux:select>
             </flux:field>
 
@@ -93,7 +93,7 @@
                 <div class="flex items-end">
                     <div
                         class="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                        Reconocimiento anual
+                        Fin de curso · reconocimiento anual
                     </div>
                 </div>
             @endif
@@ -118,10 +118,9 @@
                         <th class="min-w-[150px] px-4 py-3 text-left">Lugar</th>
                         <th class="min-w-[360px] px-4 py-3 text-left">Motivo</th>
                         <th class="px-4 py-3 text-center">Guardar</th>
-                        <th class="px-4 py-3 text-center">Rec.</th>
-                        <th class="px-4 py-3 text-center">PDF</th>
+                        <th class="px-4 py-3 text-center">Reconocimiento</th>
 
-                        @if ($tipo_reconocimiento === 'periodo' && (int) $periodo === 3)
+                        @if ($tipo_reconocimiento === 'anual')
                             <th class="px-4 py-3 text-center">Diploma</th>
                         @endif
 
@@ -141,7 +140,7 @@
                             );
 
                             $pdfUrl = $this->urlPdf($alumno->id);
-                            $mostrarDiploma = $tipo_reconocimiento === 'periodo' && (int) $periodo === 3;
+                            $mostrarDiploma = $tipo_reconocimiento === 'anual';
                             $diplomaUrl = $mostrarDiploma ? $this->urlDiploma($alumno->id) : null;
                         @endphp
 
@@ -207,38 +206,38 @@
                                         Sin guardar
                                     </span>
                                 @endif
-
-                                @if ($tipo_reconocimiento === 'periodo' && (int) $periodo === 3)
-                            <td class="px-4 py-4 text-center">
-                                @if ($diplomaUrl)
-                                    <flux:button href="{{ $diplomaUrl }}" target="_blank" variant="primary"
-                                        size="sm" icon="academic-cap">
-                                        Diploma
-                                    </flux:button>
-                                @else
-                                    <span class="text-xs font-semibold text-slate-400">
-                                        Sin guardar
-                                    </span>
-                                @endif
                             </td>
-                    @endif
-                    </td>
 
-                    <td class="px-4 py-4 text-center">
-                        <flux:button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
-                            wire:confirm="¿Seguro que deseas eliminar este reconocimiento?" variant="danger"
-                            size="sm" icon="trash">
-                            Eliminar
-                        </flux:button>
-                    </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="{{ $tipo_reconocimiento === 'periodo' && (int) $periodo === 3 ? 9 : 8 }}"
-                            class="px-4 py-12 text-center text-slate-500">
-                            No hay alumnos con los filtros seleccionados.
-                        </td>
-                    </tr>
+                            @if ($tipo_reconocimiento === 'anual')
+                                <td class="px-4 py-4 text-center">
+                                    @if ($diplomaUrl)
+                                        <flux:button href="{{ $diplomaUrl }}" target="_blank" variant="primary"
+                                            size="sm" icon="academic-cap">
+                                            Diploma
+                                        </flux:button>
+                                    @else
+                                        <span class="text-xs font-semibold text-slate-400">
+                                            Sin guardar
+                                        </span>
+                                    @endif
+                                </td>
+                            @endif
+
+                            <td class="px-4 py-4 text-center">
+                                <flux:button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
+                                    wire:confirm="¿Seguro que deseas eliminar este reconocimiento?" variant="danger"
+                                    size="sm" icon="trash">
+                                    Eliminar
+                                </flux:button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ $tipo_reconocimiento === 'anual' ? 9 : 8 }}"
+                                class="px-4 py-12 text-center text-slate-500">
+                                No hay alumnos con los filtros seleccionados.
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

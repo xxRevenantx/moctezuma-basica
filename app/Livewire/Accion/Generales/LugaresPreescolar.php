@@ -306,19 +306,20 @@ class LugaresPreescolar extends Component
     {
         /*
         |--------------------------------------------------------------------------
-        | El diploma solo se muestra en 3er periodo
+        | El diploma solo se muestra en la opción Fin de curso
         |--------------------------------------------------------------------------
-        | No aplica para 1er periodo, 2do periodo ni reconocimiento anual.
+        | Fin de curso se guarda en la misma tabla como tipo_reconocimiento = anual
+        | y periodo = 0. No aplica para 1er, 2do ni 3er periodo.
         */
-        if ($this->tipo_reconocimiento !== 'periodo' || (int) $this->periodo !== 3) {
+        if ($this->tipo_reconocimiento !== 'anual') {
             return null;
         }
 
         $registro = LugarPreescolar::query()
             ->where('inscripcion_id', $inscripcionId)
             ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
-            ->where('tipo_reconocimiento', 'periodo')
-            ->where('periodo', 3)
+            ->where('tipo_reconocimiento', 'anual')
+            ->where('periodo', 0)
             ->first();
 
         if (!$registro) {

@@ -337,7 +337,7 @@
 
         $tipoTexto =
             $reconocimiento->tipo_reconocimiento === 'anual'
-                ? 'Reconocimiento anual'
+                ? 'Fin de curso'
                 : 'Reconocimiento del ' . $reconocimiento->periodo . '° periodo';
 
         $lugarTexto = $reconocimiento->texto_lugar ?: 'Reconocimiento especial';
