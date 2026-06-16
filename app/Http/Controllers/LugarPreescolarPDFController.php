@@ -33,8 +33,9 @@ class LugarPreescolarPDFController extends Controller
             'fechaPdf' => $fechaPdf,
             'educadoraNombre' => $this->obtenerEducadora($alumno),
             'directoraNombre' => $this->obtenerDirectora($alumno),
-            'logoPrincipal' => $this->publicImagePath('logo.png'),
-            'logoPenacho' => $this->publicImagePath('imagenes/personajes_preescolar.png') ?: $this->publicImagePath('penacho.jpg'),
+            'supervisoraNombre' => $this->obtenerSupervisora($alumno),
+            'logoPrincipal' => $this->publicImagePath('imagenes/logo-letra.png'),
+            'logoPenacho' => $this->publicImagePath('imagenes/logo-seg.png') ?: $this->publicImagePath('penacho.jpg'),
             'marcaAgua' => $this->publicImagePath('imagenes/logo-letra.png') ?: $this->publicImagePath('logo.png'),
         ])->setPaper('letter', 'landscape');
 
@@ -61,6 +62,22 @@ class LugarPreescolarPDFController extends Controller
             $director->nombre ?? null,
             $director->apellido_paterno ?? null,
             $director->apellido_materno ?? null,
+        ])->filter()->implode(' ')));
+    }
+
+    private function obtenerSupervisora($alumno): string
+    {
+        if (!$alumno->nivel?->supervisor) {
+            return 'SUPERVISIÓN';
+        }
+
+        $supervisora = $alumno->nivel->supervisor;
+
+        return trim(mb_strtoupper(collect([
+            $supervisora->titulo ?? null,
+            $supervisora->nombre ?? null,
+            $supervisora->apellido_paterno ?? null,
+            $supervisora->apellido_materno ?? null,
         ])->filter()->implode(' ')));
     }
 
@@ -149,8 +166,9 @@ class LugarPreescolarPDFController extends Controller
             'fechaPdf' => $fechaPdf,
             'educadoraNombre' => $this->obtenerEducadora($alumno),
             'directoraNombre' => $this->obtenerDirectora($alumno),
-            'logoPrincipal' => $this->publicImagePath('logo.png'),
-            'logoPenacho' => $this->publicImagePath('imagenes/personajes_preescolar.png') ?: $this->publicImagePath('penacho.jpg'),
+            'supervisoraNombre' => $this->obtenerSupervisora($alumno),
+            'logoPrincipal' => $this->publicImagePath('imagenes/logo-letra.png'),
+            'logoPenacho' => $this->publicImagePath('imagenes/logo-seg.png') ?: $this->publicImagePath('penacho.jpg'),
             'marcaAgua' => $this->publicImagePath('imagenes/logo-letra.png') ?: $this->publicImagePath('logo.png'),
         ])->setPaper('letter', 'landscape');
 

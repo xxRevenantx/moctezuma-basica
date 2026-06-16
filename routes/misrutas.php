@@ -23,6 +23,7 @@ use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
+use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
@@ -119,6 +120,9 @@ Route::get('/lugares-preescolar/{lugarPreescolar}/diploma', [LugarPreescolarPDFC
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
 
 Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
+
+Route::get('/profesores/{profesor}/horario/{nivel}/pdf', ProfesorHorarioPdfController::class)
+    ->name('profesor.horario.pdf');
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
     ->name('accion.generales.listas.pdf');

@@ -276,129 +276,302 @@
                     </p>
                 </div>
             @else
-                <div class="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-neutral-800">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full border-collapse">
-                            <thead class="bg-slate-50 dark:bg-neutral-900/70">
-                                <tr>
-                                    <th
-                                        class="min-w-[170px] border-b border-r border-slate-200 px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-800 dark:text-slate-400">
-                                        Hora
-                                    </th>
-
-                                    @foreach ($dias as $dia)
+                <div class="relative" x-data="{ open: @entangle('mostrarModalTraslapeProfesor').live }" x-cloak>
+                    <div class="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-neutral-800">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border-collapse">
+                                <thead class="bg-slate-50 dark:bg-neutral-900/70">
+                                    <tr>
                                         <th
-                                            class="min-w-[220px] border-b border-r border-slate-200 px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-800 dark:text-slate-400">
-                                            <div class="flex flex-col items-center gap-1">
-                                                <span>{{ $dia->dia }}</span>
-                                            </div>
+                                            class="min-w-[170px] border-b border-r border-slate-200 px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-800 dark:text-slate-400">
+                                            Hora
                                         </th>
-                                    @endforeach
-                                </tr>
-                            </thead>
-
-                            <tbody class="bg-white dark:bg-neutral-950/40">
-                                @foreach ($horas as $hora)
-                                    <tr class="transition hover:bg-slate-50/60 dark:hover:bg-neutral-800/40">
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-4 align-middle dark:border-neutral-800">
-                                            <div class="space-y-1">
-                                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                                    {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('h:i A') }}
-                                                    -
-                                                    {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('h:i A') }}
-                                                </p>
-                                            </div>
-                                        </td>
 
                                         @foreach ($dias as $dia)
-                                            @php
-                                                $claveCelda = $hora->id . '-' . $dia->id;
-                                                $horarioGuardado = $horariosGuardados->get($claveCelda);
-
-                                                $asignacionGuardada = $horarioGuardado
-                                                    ? $materiasDisponibles->firstWhere(
-                                                        'id',
-                                                        $horarioGuardado?->asignacion_materia_id,
-                                                    )
-                                                    : null;
-
-                                                $profesor = $asignacionGuardada?->profesor;
-
-                                                $nombreProfesor = $profesor
-                                                    ? trim(
-                                                        ($profesor->nombre ?? '') .
-                                                            ' ' .
-                                                            ($profesor->apellido_paterno ?? '') .
-                                                            ' ' .
-                                                            ($profesor->apellido_materno ?? ''),
-                                                    )
-                                                    : 'Sin profesor asignado';
-
-                                                $estiloProfesor = $this->obtenerEstiloProfesor($nombreProfesor);
-
-                                                $materiaGuardada = $asignacionGuardada?->materia;
-                                            @endphp
-
-                                            <td
-                                                class="h-28 border-b border-r border-slate-200 px-3 py-3 align-top dark:border-neutral-800">
-                                                <div class="space-y-2">
-                                                    <flux:field>
-                                                        <flux:select
-                                                            wire:model.live="seleccionesHorario.{{ $claveCelda }}">
-                                                            <flux:select.option value="">
-                                                                Selecciona una materia
-                                                            </flux:select.option>
-
-                                                            @foreach ($materiasDisponibles as $asignacion)
-                                                                @php
-                                                                    $materia = $asignacion->materia;
-                                                                @endphp
-
-                                                                <flux:select.option value="{{ $asignacion->id }}">
-                                                                    {{ $materia?->materia ?? 'Sin materia' }}
-
-                                                                    @if ($materia?->clave)
-                                                                        - {{ $materia->clave }}
-                                                                    @endif
-
-                                                                    @if ($materia?->extra)
-                                                                        - Extra
-                                                                    @endif
-
-                                                                    @if ($materia?->receso)
-                                                                        - Receso
-                                                                    @endif
-                                                                </flux:select.option>
-                                                            @endforeach
-                                                        </flux:select>
-                                                    </flux:field>
-
-                                                    @if ($horarioGuardado && $asignacionGuardada)
-                                                        <div class="rounded-2xl border px-3 py-2 text-center shadow-sm"
-                                                            style="
-                                                                background-color: {{ $estiloProfesor['background'] }};
-                                                                color: {{ $estiloProfesor['color'] }};
-                                                                border-color: {{ $estiloProfesor['border'] }};
-                                                            ">
-                                                            <p class="text-[12px] font-bold leading-tight">
-                                                                {{ $materiaGuardada?->materia ?? 'Sin materia' }}
-                                                            </p>
-
-                                                            <p class="mt-1 text-[11px] font-semibold opacity-90">
-                                                                {{ $nombreProfesor }}
-                                                            </p>
-                                                        </div>
-                                                    @endif
+                                            <th
+                                                class="min-w-[220px] border-b border-r border-slate-200 px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-800 dark:text-slate-400">
+                                                <div class="flex flex-col items-center gap-1">
+                                                    <span>{{ $dia->dia }}</span>
                                                 </div>
-                                            </td>
+                                            </th>
                                         @endforeach
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                </thead>
+
+                                <tbody class="bg-white dark:bg-neutral-950/40">
+                                    @foreach ($horas as $hora)
+                                        <tr wire:key="fila-horario-hora-{{ $hora->id }}"
+                                            class="transition hover:bg-slate-50/60 dark:hover:bg-neutral-800/40">
+                                            <td
+                                                class="border-b border-r border-slate-200 px-4 py-4 align-middle dark:border-neutral-800">
+                                                <div class="space-y-1">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                        {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('h:i A') }}
+                                                        -
+                                                        {{ \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('h:i A') }}
+                                                    </p>
+                                                </div>
+                                            </td>
+
+                                            @foreach ($dias as $dia)
+                                                @php
+                                                    $claveCelda = $hora->id . '-' . $dia->id;
+                                                    $horarioGuardado = $horariosGuardados->get($claveCelda);
+
+                                                    $asignacionGuardada = $horarioGuardado
+                                                        ? $materiasDisponibles->firstWhere(
+                                                            'id',
+                                                            $horarioGuardado?->asignacion_materia_id,
+                                                        )
+                                                        : null;
+
+                                                    $profesor = $asignacionGuardada?->profesor;
+
+                                                    $nombreProfesor = $profesor
+                                                        ? trim(
+                                                            ($profesor->nombre ?? '') .
+                                                                ' ' .
+                                                                ($profesor->apellido_paterno ?? '') .
+                                                                ' ' .
+                                                                ($profesor->apellido_materno ?? ''),
+                                                        )
+                                                        : 'Sin profesor asignado';
+
+                                                    $estiloProfesor = $this->obtenerEstiloProfesor($nombreProfesor);
+
+                                                    $materiaGuardada = $asignacionGuardada?->materia;
+                                                @endphp
+
+                                                <td wire:key="celda-horario-{{ $claveCelda }}"
+                                                    class="h-28 border-b border-r border-slate-200 px-3 py-3 align-top dark:border-neutral-800">
+                                                    <div class="space-y-2">
+                                                        <flux:field>
+                                                            <flux:select wire:key="select-horario-{{ $claveCelda }}"
+                                                                wire:model.change="seleccionesHorario.{{ $claveCelda }}"
+                                                                data-preservar-scroll-horario>
+
+                                                                <flux:select.option value="">
+                                                                    Selecciona una materia
+                                                                </flux:select.option>
+
+                                                                @foreach ($materiasDisponibles as $asignacion)
+                                                                    @php
+                                                                        $materia = $asignacion->materia;
+                                                                    @endphp
+
+                                                                    <flux:select.option value="{{ $asignacion->id }}">
+                                                                        {{ $materia?->materia ?? 'Sin materia' }}
+
+                                                                        @if ($materia?->clave)
+                                                                            - {{ $materia->clave }}
+                                                                        @endif
+
+                                                                        @if ($materia?->extra)
+                                                                            - Extra
+                                                                        @endif
+
+                                                                        @if ($materia?->receso)
+                                                                            - Receso
+                                                                        @endif
+                                                                    </flux:select.option>
+                                                                @endforeach
+                                                            </flux:select>
+                                                        </flux:field>
+
+                                                        @if ($horarioGuardado && $asignacionGuardada)
+                                                            <div class="rounded-2xl border px-3 py-2 text-center shadow-sm"
+                                                                style="
+                                                    background-color: {{ $estiloProfesor['background'] }};
+                                                    color: {{ $estiloProfesor['color'] }};
+                                                    border-color: {{ $estiloProfesor['border'] }};
+                                                ">
+                                                                <p class="text-[12px] font-bold leading-tight">
+                                                                    {{ $materiaGuardada?->materia ?? 'Sin materia' }}
+                                                                </p>
+
+                                                                <p class="mt-1 text-[11px] font-semibold opacity-90">
+                                                                    {{ $nombreProfesor }}
+                                                                </p>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- MODAL TRASLAPE PROFESOR SOLO SOBRE LA TABLA DEL HORARIO --}}
+                    <div x-show="open" x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+                        x-transition:leave-end="opacity-0"
+                        class="absolute inset-0 z-40 flex items-start justify-center bg-slate-950/55 p-4 pt-8 backdrop-blur-sm"
+                        wire:click="cancelarGuardarConTraslape">
+
+                        <div x-show="open" x-transition:enter="transition ease-out duration-300"
+                            x-transition:enter-start="opacity-0 translate-y-6 scale-95 blur-sm"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100 blur-0"
+                            x-transition:leave="transition ease-in duration-200"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100 blur-0"
+                            x-transition:leave-end="opacity-0 translate-y-4 scale-95 blur-sm"
+                            class="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900"
+                            wire:click.stop>
+
+                            <div class="h-1.5 w-full bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500"></div>
+
+                            <div class="space-y-5 p-5 sm:p-6">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
+                                            <flux:icon.exclamation-triangle class="h-6 w-6" />
+                                        </div>
+
+                                        <div>
+                                            <h3 class="text-lg font-bold text-slate-800 dark:text-white">
+                                                Traslape de profesor detectado
+                                            </h3>
+
+                                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                El profesor ya tiene una asignación en el mismo día y en un horario que
+                                                se cruza.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button type="button" wire:click="cancelarGuardarConTraslape"
+                                        class="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-neutral-800 dark:hover:text-slate-200">
+                                        <flux:icon.x-mark class="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                <div
+                                    class="rounded-3xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                                    ¿Deseas permitir que el profesor también quede asignado en este mismo horario?
+                                </div>
+
+                                <div
+                                    class="max-h-[340px] overflow-y-auto rounded-3xl border border-slate-200 dark:border-neutral-800">
+                                    <table class="min-w-full border-collapse">
+                                        <thead class="bg-slate-50 dark:bg-neutral-800/60">
+                                            <tr>
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Profesor
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Nivel
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Grado
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Grupo
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Materia
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Día
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Hora
+                                                </th>
+
+                                                <th
+                                                    class="border-b border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
+                                                    Semestre
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody class="bg-white dark:bg-neutral-900">
+                                            @foreach ($conflictosProfesor as $conflicto)
+                                                <tr class="hover:bg-slate-50 dark:hover:bg-neutral-800/40">
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['profesor'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['nivel'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['grado'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['grupo'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['materia'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['dia'] }}
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        @if (!empty($conflicto['hora_inicio']) && !empty($conflicto['hora_fin']))
+                                                            {{ \Carbon\Carbon::createFromFormat('H:i:s', $conflicto['hora_inicio'])->format('h:i A') }}
+                                                            -
+                                                            {{ \Carbon\Carbon::createFromFormat('H:i:s', $conflicto['hora_fin'])->format('h:i A') }}
+                                                        @else
+                                                            —
+                                                        @endif
+                                                    </td>
+
+                                                    <td
+                                                        class="border-b border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
+                                                        {{ $conflicto['semestre'] ?? '—' }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <flux:button type="button" variant="ghost"
+                                        wire:click="cancelarGuardarConTraslape">
+                                        Cancelar
+                                    </flux:button>
+
+                                    <flux:button type="button" wire:click="confirmarGuardarConTraslape">
+                                        Sí, guardar de todos modos
+                                    </flux:button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                {{-- TABLA DE DOCENTES DEL HORARIO --}}
 
                 {{-- TABLA DE DOCENTES DEL HORARIO --}}
                 <div
@@ -485,7 +658,8 @@
                                 </h4>
 
                                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                                    Cuando asignes materias al horario, aquí aparecerá el resumen completo por docente.
+                                    Cuando asignes materias al horario, aquí aparecerá el resumen completo por
+                                    docente.
                                 </p>
                             </div>
                         @else
@@ -676,7 +850,8 @@
                                             </p>
 
                                             <p class="mt-1 text-xs leading-relaxed">
-                                                Revisa las materias marcadas como “Sin profesor asignado” para completar
+                                                Revisa las materias marcadas como “Sin profesor asignado” para
+                                                completar
                                                 la información
                                                 antes de descargar o imprimir el horario.
                                             </p>
@@ -711,11 +886,13 @@
                                             Diagnóstico automático
                                         </div>
 
-                                        <h3 class="mt-3 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                                        <h3
+                                            class="mt-3 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                                             {{ $this->diagnosticoHorario['titulo'] }}
                                         </h3>
 
-                                        <p class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                                        <p
+                                            class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                                             {{ $this->diagnosticoHorario['descripcion'] }}
                                         </p>
                                     </div>
@@ -725,7 +902,8 @@
                                     <div
                                         class="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900/70">
                                         <div class="flex items-center justify-between">
-                                            <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            <p
+                                                class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                                 Salud general
                                             </p>
 
@@ -735,9 +913,11 @@
                                             </span>
                                         </div>
 
-                                        <div class="mt-3 h-4 w-full overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-950">
+                                        <div
+                                            class="mt-3 h-4 w-full overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-950">
                                             <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 transition-all duration-500"
-                                                style="width: {{ $this->diagnosticoHorario['porcentaje_salud'] }}%"></div>
+                                                style="width: {{ $this->diagnosticoHorario['porcentaje_salud'] }}%">
+                                            </div>
                                         </div>
 
                                         <p class="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -813,7 +993,8 @@
                                             </h4>
 
                                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                Materias asignadas al grupo que todavía no aparecen dentro del horario.
+                                                Materias asignadas al grupo que todavía no aparecen dentro del
+                                                horario.
                                             </p>
                                         </div>
 
@@ -828,7 +1009,8 @@
                                             <div
                                                 class="rounded-2xl border border-white bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/60">
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="text-xs font-black uppercase text-slate-800 dark:text-white">
+                                                    <span
+                                                        class="text-xs font-black uppercase text-slate-800 dark:text-white">
                                                         {{ $materiaPendiente['materia'] }}
                                                     </span>
 
@@ -854,7 +1036,8 @@
                                                     @endif
                                                 </div>
 
-                                                <p class="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                                <p
+                                                    class="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                                                     Docente: {{ $materiaPendiente['profesor'] }}
                                                 </p>
                                             </div>
@@ -882,23 +1065,30 @@
                                     <div class="mt-4 space-y-3">
                                         @foreach ($this->diagnosticoHorario['distribucion_dias'] as $dia)
                                             @php
-                                                $porcentajeDia = $this->horas->count() > 0
-                                                    ? min(100, round(($dia['modulos'] / $this->horas->count()) * 100))
-                                                    : 0;
+                                                $porcentajeDia =
+                                                    $this->horas->count() > 0
+                                                        ? min(
+                                                            100,
+                                                            round(($dia['modulos'] / $this->horas->count()) * 100),
+                                                        )
+                                                        : 0;
                                             @endphp
 
                                             <div>
                                                 <div class="flex items-center justify-between gap-3">
-                                                    <p class="text-xs font-black uppercase text-slate-600 dark:text-slate-300">
+                                                    <p
+                                                        class="text-xs font-black uppercase text-slate-600 dark:text-slate-300">
                                                         {{ $dia['dia'] }}
                                                     </p>
 
                                                     <p class="text-xs font-bold text-slate-500 dark:text-slate-400">
-                                                        {{ $dia['modulos'] }} módulo(s) · {{ $this->formatearMinutosHorario($dia['minutos']) }}
+                                                        {{ $dia['modulos'] }} módulo(s) ·
+                                                        {{ $this->formatearMinutosHorario($dia['minutos']) }}
                                                     </p>
                                                 </div>
 
-                                                <div class="mt-1 h-3 w-full overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-950">
+                                                <div
+                                                    class="mt-1 h-3 w-full overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-950">
                                                     <div class="h-full rounded-full bg-gradient-to-r from-sky-500 to-indigo-600"
                                                         style="width: {{ $porcentajeDia }}%"></div>
                                                 </div>
@@ -925,7 +1115,8 @@
 
                             {{-- Distribución semanal por materia + carga docente --}}
                             <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                                <div class="overflow-hidden rounded-[24px] border border-slate-200 dark:border-neutral-800">
+                                <div
+                                    class="overflow-hidden rounded-[24px] border border-slate-200 dark:border-neutral-800">
                                     <div
                                         class="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/80">
                                         <h4 class="text-sm font-black text-slate-900 dark:text-white">
@@ -965,7 +1156,8 @@
                                                         <td
                                                             class="border-b border-r border-slate-200 px-4 py-3 align-top dark:border-neutral-800">
                                                             <div class="flex flex-wrap items-center gap-2">
-                                                                <span class="text-xs font-black uppercase text-slate-800 dark:text-white">
+                                                                <span
+                                                                    class="text-xs font-black uppercase text-slate-800 dark:text-white">
                                                                     {{ $materia['materia'] }}
                                                                 </span>
 
@@ -987,7 +1179,8 @@
 
                                                         <td
                                                             class="border-b border-r border-slate-200 px-4 py-3 text-center dark:border-neutral-800">
-                                                            <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                                                            <span
+                                                                class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
                                                                 {{ $materia['modulos'] }}
                                                             </span>
                                                         </td>
@@ -1004,7 +1197,8 @@
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="4" class="px-6 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                                        <td colspan="4"
+                                                            class="px-6 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
                                                             Todavía no hay materias colocadas en el horario.
                                                         </td>
                                                     </tr>
@@ -1014,7 +1208,8 @@
                                     </div>
                                 </div>
 
-                                <div class="overflow-hidden rounded-[24px] border border-slate-200 dark:border-neutral-800">
+                                <div
+                                    class="overflow-hidden rounded-[24px] border border-slate-200 dark:border-neutral-800">
                                     <div
                                         class="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/80">
                                         <h4 class="text-sm font-black text-slate-900 dark:text-white">
@@ -1058,7 +1253,8 @@
 
                                                         <td
                                                             class="border-b border-r border-slate-200 px-4 py-3 text-center dark:border-neutral-800">
-                                                            <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                                                            <span
+                                                                class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
                                                                 {{ $docente['modulos'] }}
                                                             </span>
                                                         </td>
@@ -1068,15 +1264,18 @@
                                                             {{ $docente['horas'] }}
                                                         </td>
 
-                                                        <td class="border-b border-slate-200 px-4 py-3 text-center dark:border-neutral-800">
-                                                            <span class="rounded-full border px-3 py-1 text-xs font-black {{ $docente['clase'] }}">
+                                                        <td
+                                                            class="border-b border-slate-200 px-4 py-3 text-center dark:border-neutral-800">
+                                                            <span
+                                                                class="rounded-full border px-3 py-1 text-xs font-black {{ $docente['clase'] }}">
                                                                 {{ $docente['estado'] }}
                                                             </span>
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="4" class="px-6 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                                        <td colspan="4"
+                                                            class="px-6 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
                                                             Todavía no hay docentes para analizar.
                                                         </td>
                                                     </tr>
@@ -1095,8 +1294,10 @@
                                             Recomendación del sistema
                                         </h4>
 
-                                        <p class="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
-                                            Antes de descargar el horario, revisa que no existan materias pendientes,
+                                        <p
+                                            class="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
+                                            Antes de descargar el horario, revisa que no existan materias
+                                            pendientes,
                                             módulos sin profesor o días con carga muy desigual.
                                         </p>
                                     </div>
@@ -1142,7 +1343,8 @@
                                     </h3>
 
                                     <p class="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                                        Visualización de carga por docente, distribución por materia, módulos por día y
+                                        Visualización de carga por docente, distribución por materia, módulos por
+                                        día y
                                         avance general
                                         del horario seleccionado.
                                     </p>
@@ -1298,170 +1500,43 @@
         </div>
     </section>
 
-    {{-- MODAL TRASLAPE PROFESOR --}}
-    <div x-data="{ open: @entangle('mostrarModalTraslapeProfesor').live }" x-cloak>
-        <div x-show="open" x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-            wire:click="cancelarGuardarConTraslape">
 
-            <div x-show="open" x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95 blur-sm"
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100 blur-0"
-                x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100 blur-0"
-                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 blur-sm"
-                class="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900"
-                wire:click.stop>
 
-                <div class="h-1.5 w-full bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500"></div>
+    @once
+        <script>
+            document.addEventListener('livewire:init', () => {
+                let preservarScrollHorario = false;
+                let scrollHorarioY = 0;
 
-                <div class="space-y-5 p-5 sm:p-6">
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="flex items-start gap-3">
-                            <div
-                                class="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
-                                <flux:icon.exclamation-triangle class="h-6 w-6" />
-                            </div>
+                document.addEventListener('change', (event) => {
+                    const selectHorario = event.target.closest('[data-preservar-scroll-horario]');
 
-                            <div>
-                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">
-                                    Traslape de profesor detectado
-                                </h3>
+                    if (!selectHorario) {
+                        return;
+                    }
 
-                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    El profesor ya tiene una asignación en el mismo día y en un horario que se cruza.
-                                </p>
-                            </div>
-                        </div>
+                    preservarScrollHorario = true;
+                    scrollHorarioY = window.scrollY || document.documentElement.scrollTop || 0;
+                }, true);
 
-                        <button type="button" wire:click="cancelarGuardarConTraslape"
-                            class="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-neutral-800 dark:hover:text-slate-200">
-                            <flux:icon.x-mark class="h-5 w-5" />
-                        </button>
-                    </div>
+                Livewire.hook('morph.updated', () => {
+                    if (!preservarScrollHorario) {
+                        return;
+                    }
 
-                    <div
-                        class="rounded-3xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-                        ¿Deseas permitir que el profesor también quede asignado en este mismo horario?
-                    </div>
+                    requestAnimationFrame(() => {
+                        window.scrollTo({
+                            top: scrollHorarioY,
+                            left: 0,
+                            behavior: 'instant'
+                        });
 
-                    <div
-                        class="max-h-[340px] overflow-y-auto rounded-3xl border border-slate-200 dark:border-neutral-800">
-                        <table class="min-w-full border-collapse">
-                            <thead class="bg-slate-50 dark:bg-neutral-800/60">
-                                <tr>
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Profesor
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Nivel
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Grado
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Grupo
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Materia
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Día
-                                    </th>
-
-                                    <th
-                                        class="border-b border-r border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Hora
-                                    </th>
-
-                                    <th
-                                        class="border-b border-slate-200 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-neutral-700 dark:text-slate-400">
-                                        Semestre
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody class="bg-white dark:bg-neutral-900">
-                                @foreach ($conflictosProfesor as $conflicto)
-                                    <tr class="hover:bg-slate-50 dark:hover:bg-neutral-800/40">
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['profesor'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['nivel'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['grado'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['grupo'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['materia'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['dia'] }}
-                                        </td>
-
-                                        <td
-                                            class="border-b border-r border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            @if (!empty($conflicto['hora_inicio']) && !empty($conflicto['hora_fin']))
-                                                {{ \Carbon\Carbon::createFromFormat('H:i:s', $conflicto['hora_inicio'])->format('h:i A') }}
-                                                -
-                                                {{ \Carbon\Carbon::createFromFormat('H:i:s', $conflicto['hora_fin'])->format('h:i A') }}
-                                            @else
-                                                —
-                                            @endif
-                                        </td>
-
-                                        <td
-                                            class="border-b border-slate-200 px-4 py-3 text-sm text-slate-700 dark:border-neutral-800 dark:text-slate-200">
-                                            {{ $conflicto['semestre'] ?? '—' }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                        <flux:button type="button" variant="ghost" wire:click="cancelarGuardarConTraslape">
-                            Cancelar
-                        </flux:button>
-
-                        <flux:button type="button" wire:click="confirmarGuardarConTraslape">
-                            Sí, guardar de todos modos
-                        </flux:button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                        preservarScrollHorario = false;
+                    });
+                });
+            });
+        </script>
+    @endonce
 
     @once
         <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>

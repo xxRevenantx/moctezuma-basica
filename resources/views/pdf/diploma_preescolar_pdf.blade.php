@@ -67,28 +67,28 @@
             position: absolute;
             top: 104px;
             left: 118px;
-            width: 100px;
+            width: 130px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-izquierdo img {
-            max-width: 100px;
-            max-height: 100px;
+            max-width: 130px;
+            max-height: 130px;
         }
 
         .logo-derecho {
             position: absolute;
             top: 110px;
             right: 90px;
-            width: 110px;
+            width: 200px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-derecho img {
-            max-width: 110px;
-            max-height: 110px;
+            max-width: 200px;
+            max-height: 200px;
         }
 
         .encabezado {
@@ -112,7 +112,6 @@
         }
 
         .escuela {
-            margin-top: 5px;
             font-family: 'ARIAL', sans-serif;
             font-size: 18px;
             font-weight: 700;
@@ -123,7 +122,6 @@
         }
 
         .cct {
-            margin-top: 5px;
             font-family: 'ARIAL', sans-serif;
             font-size: 18px;
             font-weight: 700;
@@ -152,7 +150,7 @@
             z-index: 6;
             text-align: center;
             font-family: 'ARIAL', sans-serif;
-            font-size: 90px;
+            font-size: 120px;
             line-height: 1;
             font-weight: 700;
             letter-spacing: 3px;
@@ -222,14 +220,14 @@
 
         .descripcion {
             position: absolute;
-            top: 490px;
+            top: 480px;
             left: 145px;
             right: 145px;
             z-index: 6;
             text-align: center;
             font-family: 'calibri', 'ARIAL', sans-serif;
-            font-size: 21px;
-            line-height: 1.25;
+            font-size: 18px;
+            line-height: 1;
             color: #071846;
         }
 
@@ -238,24 +236,11 @@
             color: #071846;
         }
 
-        .felicitacion {
-            position: absolute;
-            top: 545px;
-            left: 0;
-            right: 0;
-            z-index: 6;
-            text-align: center;
-            font-family: 'ARIAL', sans-serif;
-            font-size: 22px;
-            font-weight: 700;
-            color: #c98626;
-            text-transform: uppercase;
-            letter-spacing: .8px;
-        }
+
 
         .datos-extra {
             position: absolute;
-            top: 585px;
+            top: 540px;
             left: 150px;
             right: 150px;
             z-index: 6;
@@ -279,7 +264,7 @@
 
         .fecha {
             position: absolute;
-            top: 620px;
+            top: 580px;
             left: 0;
             right: 0;
             z-index: 6;
@@ -307,7 +292,7 @@
             width: 50%;
             text-align: center;
             vertical-align: top;
-            padding: 0 20px;
+            padding: 10px 20px 0;
         }
 
         .firma-nombre {
@@ -357,6 +342,7 @@
 
         $educadoraFinal = mb_strtoupper($educadoraNombre ?: 'EDUCADORA', 'UTF-8');
         $directoraFinal = mb_strtoupper($directoraNombre ?: 'DIRECCIÓN', 'UTF-8');
+        $supervisoraFinal = mb_strtoupper($supervisoraNombre ?: 'SUPERVISIÓN', 'UTF-8');
     @endphp
 
     <div class="diploma">
@@ -414,9 +400,6 @@
             y esfuerzo durante su formación inicial.
         </div>
 
-        <div class="felicitacion">
-            ¡Muchas felicidades!
-        </div>
 
         <table class="datos-extra">
             <tr>
@@ -455,6 +438,18 @@
 
                     <div class="cargo">
                         Firma de la directora de la escuela
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div class="firma-nombre">
+                        {{ $supervisoraFinal }}
+                    </div>
+
+                    <div class="cargo">
+                        Firma de la supervisora escolar <br>
+                        Zona 137. Cd. Altamirano.
                     </div>
                 </td>
             </tr>

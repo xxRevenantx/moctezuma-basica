@@ -1200,6 +1200,399 @@ class PDFController extends Controller
         abort(422, 'Tipo de reanudación inválido.');
     }
 
+    // HORARIO PDF
+    // HORARIO PDF
+    public function horario_pdf(Request $request)
+    {
+        $slugNivel = $request->input('slug_nivel');
+        $generacionId = $request->integer('generacion_id');
+        $gradoId = $request->integer('grado_id');
+        $grupoId = $request->integer('grupo_id');
+        $semestreId = $request->integer('semestre_id');
+        $cicloEscolarId = $request->integer('ciclo_escolar_id');
+
+        if (
+            blank($slugNivel) ||
+            blank($generacionId) ||
+            blank($gradoId) ||
+            blank($grupoId)
+        ) {
+            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
+        }
+
+        $escuela = \App\Models\Escuela::query()->first();
+
+        if (!$escuela) {
+            abort(404, 'No se encontró la escuela.');
+        }
+
+        $nivel = Nivel::query()
+            ->where('slug', $slugNivel)
+            ->first();
+
+        if (!$nivel) {
+            abort(404, 'Nivel no encontrado.');
+        }
+
+        $esBachillerato = $this->esBachillerato($nivel);
+        $esSecundaria = $this->esSecundaria($nivel);
+        $esPreescolar = (int) $nivel->id === 1 || $nivel->slug === 'preescolar';
+        $esPrimaria = (int) $nivel->id === 2 || $nivel->slug === 'primaria';
+
+        $generacion = Generacion::query()
+            ->where('id', $generacionId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
+
+        if (!$generacion) {
+            abort(404, 'Generación no encontrada o no pertenece al nivel seleccionado.');
+        }
+
+        $grado = Grado::query()
+            ->where('id', $gradoId)
+            ->where('nivel_id', $nivel->id)
+            ->first();
+
+        if (!$grado) {
+            abort(404, 'Grado no encontrado o no pertenece al nivel seleccionado.');
+        }
+
+        $grupoQuery = Grupo::query()
+            ->with([
+                'asignacionGrupo',
+                'generacion',
+                'grado',
+                'semestre',
+            ])
+            ->where('id', $grupoId)
+            ->where('nivel_id', $nivel->id)
+            ->where('generacion_id', $generacion->id)
+            ->where('grado_id', $grado->id);
+
+        if ($esBachillerato) {
+            if (blank($semestreId)) {
+                abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
+            }
+
+            $grupoQuery->where('semestre_id', $semestreId);
+        } else {
+            if (Schema::hasColumn('grupos', 'semestre_id')) {
+                $grupoQuery->whereNull('semestre_id');
+            }
+        }
+
+        $grupo = $grupoQuery->first();
+
+        if (!$grupo) {
+            abort(404, 'Grupo no encontrado para el contexto seleccionado.');
+        }
+
+        $semestre = null;
+
+        if ($esBachillerato) {
+            $semestre = Semestre::query()
+                ->where('id', $semestreId)
+                ->where('grado_id', $grado->id)
+                ->first();
+
+            if (!$semestre) {
+                abort(404, 'Semestre no encontrado o no pertenece al grado seleccionado.');
+            }
+        }
+
+        $cicloEscolar = null;
+
+        if (!blank($cicloEscolarId)) {
+            $cicloEscolar = cicloEscolar::query()
+                ->where('id', $cicloEscolarId)
+                ->first();
+        }
+
+        if (!$cicloEscolar) {
+            $cicloEscolar = cicloEscolar::query()
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if (!$cicloEscolar) {
+            abort(404, 'No se encontró el ciclo escolar.');
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Horarios del contexto seleccionado
+    |--------------------------------------------------------------------------
+    */
+
+        $horariosQuery = Horario::query()
+            ->with([
+                'dia',
+                'hora',
+                'asignacionMateria' => function ($query) use ($esBachillerato, $semestre) {
+                    $query->with([
+                        'materia',
+                        'profesor',
+                    ]);
+
+                    if (Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                        if ($esBachillerato && $semestre) {
+                            $query->where('semestre_id', $semestre->id);
+                        } else {
+                            $query->whereNull('semestre_id');
+                        }
+                    }
+                },
+            ]);
+
+        if (Schema::hasColumn('horarios', 'nivel_id')) {
+            $horariosQuery->where('nivel_id', $nivel->id);
+        }
+
+        if (Schema::hasColumn('horarios', 'generacion_id')) {
+            $horariosQuery->where('generacion_id', $generacion->id);
+        }
+
+        if (Schema::hasColumn('horarios', 'grado_id')) {
+            $horariosQuery->where('grado_id', $grado->id);
+        }
+
+        if (Schema::hasColumn('horarios', 'grupo_id')) {
+            $horariosQuery->where('grupo_id', $grupo->id);
+        }
+
+        if (Schema::hasColumn('horarios', 'ciclo_escolar_id')) {
+            $horariosQuery->where('ciclo_escolar_id', $cicloEscolar->id);
+        }
+
+        if (Schema::hasColumn('horarios', 'semestre_id')) {
+            if ($esBachillerato && $semestre) {
+                $horariosQuery->where('semestre_id', $semestre->id);
+            } else {
+                $horariosQuery->whereNull('semestre_id');
+            }
+        }
+
+        /*
+     * Respaldo importante:
+     * Si horarios no guarda todos los filtros, se valida también contra asignacion_materias.
+     */
+        $horariosQuery->whereHas('asignacionMateria', function ($query) use ($grupo, $nivel, $grado, $esBachillerato, $semestre) {
+            if (Schema::hasColumn('asignacion_materias', 'grupo_id')) {
+                $query->where('grupo_id', $grupo->id);
+            }
+
+            if (Schema::hasColumn('asignacion_materias', 'semestre_id')) {
+                if ($esBachillerato && $semestre) {
+                    $query->where('semestre_id', $semestre->id);
+                } else {
+                    $query->whereNull('semestre_id');
+                }
+            }
+
+            $query->whereHas('materia', function ($materiaQuery) use ($nivel, $grado, $esBachillerato, $semestre) {
+                if (Schema::hasColumn('materias', 'nivel_id')) {
+                    $materiaQuery->where('nivel_id', $nivel->id);
+                }
+
+                if (Schema::hasColumn('materias', 'grado_id')) {
+                    $materiaQuery->where('grado_id', $grado->id);
+                }
+
+                if (Schema::hasColumn('materias', 'semestre_id')) {
+                    if ($esBachillerato && $semestre) {
+                        $materiaQuery->where('semestre_id', $semestre->id);
+                    } else {
+                        $materiaQuery->whereNull('semestre_id');
+                    }
+                }
+            });
+        });
+
+        $horarios = $horariosQuery
+            ->orderBy('hora_id')
+            ->orderBy('dia_id')
+            ->get();
+
+        if ($horarios->isEmpty()) {
+            abort(404, 'No se encontraron registros de horario para los filtros seleccionados.');
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Días corregidos
+    |--------------------------------------------------------------------------
+    | Soluciona la inconsistencia de BD:
+    | 1-5 = Lunes-Viernes
+    | 6-10 = Lunes-Viernes duplicados
+    |
+    | En vez de traer todos los días, solo se usan los días del horario actual.
+    */
+
+        $idsDiasHorario = $horarios
+            ->pluck('dia_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $dias = Dia::query()
+            ->whereIn('id', $idsDiasHorario)
+            ->get()
+            ->unique(function ($dia) {
+                return mb_strtolower(trim($dia->dia ?? $dia->nombre ?? ''), 'UTF-8');
+            })
+            ->sortBy(function ($dia) {
+                $nombre = mb_strtolower(trim($dia->dia ?? $dia->nombre ?? ''), 'UTF-8');
+
+                return match (true) {
+                    str_contains($nombre, 'lunes') => 1,
+                    str_contains($nombre, 'martes') => 2,
+                    str_contains($nombre, 'miércoles'),
+                    str_contains($nombre, 'miercoles') => 3,
+                    str_contains($nombre, 'jueves') => 4,
+                    str_contains($nombre, 'viernes') => 5,
+                    default => 99,
+                };
+            })
+            ->values();
+
+        if ($dias->isEmpty()) {
+            abort(404, 'No se encontraron días para el horario seleccionado.');
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Horas corregidas
+    |--------------------------------------------------------------------------
+    | También se toman solo las horas usadas por el horario actual para evitar
+    | filas duplicadas o vacías.
+    */
+
+        $idsHorasHorario = $horarios
+            ->pluck('hora_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $horas = Hora::query()
+            ->whereIn('id', $idsHorasHorario)
+            ->get()
+            ->sortBy([
+                ['hora_inicio', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
+
+        if ($horas->isEmpty()) {
+            abort(404, 'No se encontraron horas para el horario seleccionado.');
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Mapa de celdas del horario
+    |--------------------------------------------------------------------------
+    */
+
+        $horarioPorCelda = $horarios->keyBy(function ($horario) {
+            return $horario->hora_id . '-' . $horario->dia_id;
+        });
+
+        /*
+    |--------------------------------------------------------------------------
+    | Profesor titular
+    |--------------------------------------------------------------------------
+    */
+
+        $profesorTitular = null;
+
+        if ($esPreescolar || $esPrimaria) {
+            $personalAsignado = PersonaNivel::query()
+                ->with([
+                    'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero',
+                    'detalles' => function ($query) {
+                        $query->with([
+                            'grado:id,nombre',
+                            'grupo' => function ($query) {
+                                $query->select('id', 'asignacion_grupo_id')
+                                    ->with('asignacionGrupo:id,nombre');
+                            },
+                        ]);
+                    },
+                ])
+                ->where('nivel_id', $nivel->id)
+                ->whereHas('detalles', function ($query) use ($grado, $grupo) {
+                    $query->where('grado_id', $grado->id)
+                        ->where('grupo_id', $grupo->id);
+                })
+                ->first();
+
+            $profesorTitular = $this->nombrePersona($personalAsignado?->persona);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Imágenes
+    |--------------------------------------------------------------------------
+    */
+
+        $logoIzquierdo = $this->imagenBase64Publica('imagenes/logo-letra.png');
+
+        $logoDerecho = $this->imagenBase64Publica(
+            !empty($nivel->logo)
+                ? 'storage/logos/' . $nivel->logo
+                : 'imagenes/logo-letra.png'
+        );
+
+        $imagenesPorNivel = [
+            'preescolar' => 'imagenes/personajes_preescolar.png',
+            'primaria' => 'imagenes/personajes_primaria.png',
+            'secundaria' => 'imagenes/personajes_secundaria.png',
+            'bachillerato' => 'imagenes/personajes_bachillerato.png',
+        ];
+
+        $imagenNivel = $this->imagenBase64Publica($imagenesPorNivel[$nivel->slug] ?? null);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Nombre del archivo
+    |--------------------------------------------------------------------------
+    */
+
+        $nombreArchivo = 'HORARIO_' .
+            mb_strtoupper($nivel->slug) .
+            '_GRADO_' . Str::slug((string) ($grado->nombre ?? 'grado'), '_') .
+            '_GRUPO_' . Str::slug($this->nombreGrupo($grupo), '_') .
+            ($esBachillerato && $semestre ? '_SEMESTRE_' . $semestre->numero : '') .
+            '.pdf';
+
+        return Pdf::loadView('pdf.horarios_pdf', [
+            'escuela' => $escuela,
+            'nivel' => $nivel,
+            'generacion' => $generacion,
+            'grado' => $grado,
+            'grupo' => $grupo,
+            'semestre' => $semestre,
+            'ciclo_escolar' => $cicloEscolar,
+
+            'dias' => $dias,
+            'horas' => $horas,
+            'horarios' => $horarios,
+            'horarioPorCelda' => $horarioPorCelda,
+
+            'profesor_titular' => $profesorTitular,
+
+            'esBachillerato' => $esBachillerato,
+            'esSecundaria' => $esSecundaria,
+            'esPreescolar' => $esPreescolar,
+            'esPrimaria' => $esPrimaria,
+
+            'logo_izquierdo' => $logoIzquierdo,
+            'logo_derecho' => $logoDerecho,
+            'imagen_nivel' => $imagenNivel,
+        ])
+            ->setPaper('letter', 'portrait')
+            ->stream($nombreArchivo);
+    }
+
 
     public function reconocimiento_calificaciones_pdf(Request $request)
     {

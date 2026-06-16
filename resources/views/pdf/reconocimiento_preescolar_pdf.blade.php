@@ -67,28 +67,28 @@
             position: absolute;
             top: 104px;
             left: 118px;
-            width: 100px;
+            width: 130px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-izquierdo img {
-            max-width: 100px;
-            max-height: 100px;
+            max-width: 130px;
+            max-height: 130px;
         }
 
         .logo-derecho {
             position: absolute;
-            top: 110px;
+            top: 150px;
             right: 90px;
-            width: 110px;
+            width: 200px;
             text-align: center;
             z-index: 5;
         }
 
         .logo-derecho img {
-            max-width: 110px;
-            max-height: 110px;
+            max-width: 200px;
+            max-height: 200px;
         }
 
         .encabezado {
@@ -98,7 +98,7 @@
             right: 280px;
             text-align: center;
             z-index: 6;
-            line-height: 0;
+            line-height: 15px;
         }
 
         .secretaria {
@@ -277,7 +277,7 @@
 
         .firmas {
             position: absolute;
-            top: 650px;
+            top: 700px;
             left: 15%;
             right: 15%;
             z-index: 6;
@@ -412,7 +412,6 @@
             <strong>{{ $lugarTexto }}</strong>
             durante el
             <strong>{{ mb_strtoupper($tipoTexto, 'UTF-8') }}</strong>,
-            {{ $motivo }}
             correspondiente al
             <strong>{{ $gradoTexto }}</strong>,
             grupo "<strong>{{ $grupoTexto }}</strong>",

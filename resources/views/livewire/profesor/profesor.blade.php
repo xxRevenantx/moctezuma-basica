@@ -65,7 +65,7 @@
         </section>
 
         {{-- Accesos rápidos --}}
-        <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <button type="button" x-on:click.prevent="cambiar('lista')"
                 class="group rounded-3xl border border-emerald-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-emerald-900/40 dark:bg-zinc-900 dark:hover:border-emerald-800">
                 <div class="flex items-start justify-between gap-4">
@@ -122,6 +122,36 @@
                     </span>
                 </div>
             </button>
+
+            <button type="button" x-on:click.prevent="cambiar('horario')"
+                class="group rounded-3xl border border-indigo-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-indigo-900/40 dark:bg-zinc-900 dark:hover:border-indigo-800">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div
+                            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                            <flux:icon.calendar-days class="h-5 w-5" />
+                        </div>
+
+                        <h2 class="mt-4 text-base font-black text-slate-900 dark:text-white">
+                            Horario docente
+                        </h2>
+
+                        <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                            Consulta el horario del profesor por nivel o completo.
+                        </p>
+                    </div>
+
+                    <span
+                        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
+                        x-bind:class="abierto === 'horario' ?
+                            'rotate-180 border-indigo-200 text-indigo-600 dark:border-indigo-900 dark:text-indigo-300' :
+                            ''">
+                        <flux:icon.chevron-down class="h-5 w-5" />
+                    </span>
+                </div>
+            </button>
+
+
         </section>
 
         {{-- Contenido de collapses --}}
@@ -220,6 +250,39 @@
 
                 <div class="p-4 sm:p-5">
                     <livewire:profesor.credencial-profesor />
+                </div>
+            </div>
+
+
+            {{-- Horario docente --}}
+            <div x-cloak x-show="abierto === 'horario'" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
+                class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <div
+                    class="border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-white to-sky-50 px-5 py-4 dark:border-zinc-800 dark:from-indigo-950/20 dark:via-zinc-900 dark:to-sky-950/20">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-base font-black text-slate-900 dark:text-white">
+                                Horario del profesor
+                            </h2>
+
+                            <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                                Consulta el horario docente por nivel académico o descarga el horario completo en PDF.
+                            </p>
+                        </div>
+
+                        <div
+                            class="inline-flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                            <span class="h-2 w-2 rounded-full bg-indigo-500"></span>
+                            Horario académico
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 sm:p-5">
+                    <livewire:profesor.horario-profesor />
                 </div>
             </div>
 
