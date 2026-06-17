@@ -1,277 +1,426 @@
-<!DOCTYPE html>
-<html lang="es">
+    <!DOCTYPE html>
+    <html lang="es">
 
-<head>
-    <meta charset="UTF-8">
+    <head>
+        <meta charset="UTF-8">
 
-    <title>Horario del profesor</title>
+        <title>Horario del docente</title>
 
-    <style>
-        @page {
-            margin: 24px 28px;
-        }
+        <style>
+            @page {
+                margin: 18px 28px 22px 28px;
+            }
 
-        body {
-            margin: 0;
-            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
-            color: #1f2937;
-            font-size: 10px;
-        }
+            body {
+                margin: 0;
+                font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+                color: #00152e;
+                font-size: 10px;
+            }
 
-        .header {
-            border-bottom: 4px solid #006492;
-            padding-bottom: 10px;
-            margin-bottom: 14px;
-        }
+            .page {
+                position: relative;
+                width: 100%;
+            }
 
-        .institucion {
-            font-size: 11px;
-            font-weight: bold;
-            color: #006492;
-            text-transform: uppercase;
-        }
+            .watermark {
+                position: fixed;
+                top: 125px;
+                left: 150px;
+                width: 470px;
+                height: 470px;
+                opacity: 0.075;
+                z-index: -1;
+            }
 
-        .titulo {
-            margin-top: 4px;
-            font-size: 20px;
-            font-weight: bold;
-            color: #111827;
-        }
+            .header-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 8px;
+            }
 
-        .subtitulo {
-            margin-top: 4px;
-            font-size: 10px;
-            color: #4b5563;
-        }
+            .logo-cell {
+                width: 160px;
+                text-align: center;
+                vertical-align: top;
+            }
 
-        .datos {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-        }
+            .logo-left {
+                width: 115px;
+                max-height: 78px;
+            }
 
-        .datos td {
-            border: 1px solid #d1d5db;
-            padding: 6px 8px;
-        }
+            .logo-right {
+                width: 84px;
+                max-height: 76px;
+            }
 
-        .label {
-            width: 120px;
-            font-weight: bold;
-            background: #f3f4f6;
-            color: #374151;
-        }
+            .center-cell {
+                text-align: center;
+                vertical-align: top;
+            }
 
-        .nivel-box {
-            margin-top: 14px;
-            margin-bottom: 8px;
-            border-left: 6px solid #88AC2E;
-            background: #f8fafc;
-            padding: 8px 10px;
-        }
+            .school-title {
+                display: inline-block;
+                border-top: 2px solid #9ca3af;
+                border-bottom: 2px solid #9ca3af;
+                padding: 2px 16px;
+                color: #5f6f7f;
+                font-size: 20px;
+                font-weight: bold;
+                letter-spacing: .3px;
+                text-transform: uppercase;
+            }
 
-        .nivel-title {
-            font-size: 13px;
-            font-weight: bold;
-            color: #111827;
-        }
+            .main-title {
+                margin-top: 7px;
+                font-size: 18px;
+                line-height: 1.25;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #000d21;
+            }
 
-        .nivel-meta {
-            margin-top: 3px;
-            font-size: 9px;
-            color: #6b7280;
-        }
+            .address {
+                margin-top: 5px;
+                font-size: 10px;
+                line-height: 1.25;
+                color: #00152e;
+            }
 
-        table.horario {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-            table-layout: fixed;
-        }
+            .profesor-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 8px 0 14px 0;
+            }
 
-        .horario th {
-            border: 1px solid #94a3b8;
-            background: #006492;
-            color: white;
-            padding: 6px 5px;
-            font-size: 8px;
-            text-transform: uppercase;
-        }
+            .profesor-label {
+                width: 185px;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #00152e;
+                padding: 4px 5px;
+            }
 
-        .horario td {
-            border: 1px solid #cbd5e1;
-            padding: 5px;
-            vertical-align: top;
-            min-height: 42px;
-        }
+            .profesor-name {
+                border: 1px solid #9cb8c9;
+                background: #c7e0f2;
+                color: #00152e;
+                font-weight: bold;
+                text-align: center;
+                padding: 4px 6px;
+                text-transform: uppercase;
+            }
 
-        .hora {
-            width: 72px;
-            background: #f1f5f9;
-            font-weight: bold;
-            text-align: center;
-            color: #0f172a;
-        }
+            table.horario {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+                margin-top: 4px;
+            }
 
-        .materia {
-            font-weight: bold;
-            color: #111827;
-            font-size: 8.7px;
-            line-height: 1.25;
-        }
+            .horario th {
+                border: 1px solid #506273;
+                background: #bdd8ea;
+                color: #00152e;
+                padding: 9px 5px;
+                font-size: 12px;
+                font-weight: bold;
+                text-align: center;
+                text-transform: uppercase;
+            }
 
-        .grupo {
-            margin-top: 3px;
-            color: #006492;
-            font-size: 8px;
-            font-weight: bold;
-        }
+            .horario td {
+                border: 1px solid #6b7280;
+                height: 43px;
+                padding: 5px 4px;
+                vertical-align: middle;
+                text-align: center;
+                color: #00152e;
+            }
 
-        .extra {
-            margin-top: 2px;
-            color: #64748b;
-            font-size: 7.5px;
-        }
+            .hora-col {
+                width: 105px;
+                font-size: 12px;
+                line-height: 1.45;
+                font-weight: normal;
+            }
 
-        .libre {
-            color: #cbd5e1;
-            text-align: center;
-            font-size: 8px;
-            padding-top: 8px;
-        }
+            .materia {
+                font-size: 8.5px;
+                line-height: 1.08;
+                color: #00152e;
+            }
 
-        .empty {
-            margin-top: 40px;
-            text-align: center;
-            color: #64748b;
-            font-size: 13px;
-            font-weight: bold;
-        }
+            .materia strong {
+                font-size: 8.4px;
+                font-weight: bold;
+            }
 
-        .footer {
-            position: fixed;
-            bottom: -10px;
-            left: 0;
-            right: 0;
-            font-size: 8px;
-            color: #64748b;
-            text-align: right;
-        }
-    </style>
-</head>
+            .libre {
+                font-size: 11px;
+                font-weight: bold;
+                color: #00152e;
+            }
 
-<body>
-    <div class="header">
-        <div class="institucion">Centro Universitario Moctezuma</div>
-        <div class="titulo">Horario del profesor</div>
-        <div class="subtitulo">
-            Documento generado para consulta académica institucional.
-        </div>
-    </div>
+            .horas-dia td {
+                height: auto;
+                background: #e8f3fa;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 7px 4px;
+            }
 
-    <table class="datos">
-        <tr>
-            <td class="label">Profesor</td>
-            <td>{{ $profesorNombre }}</td>
+            .horas-dia .label {
+                background: #d5ebf8;
+                text-align: center;
+            }
 
-            <td class="label">Vista</td>
-            <td>
-                {{ $nivelSeleccionado ? $nivelSeleccionado->nombre : 'Horario completo' }}
-            </td>
-        </tr>
+            .section-title {
+                margin: 14px 0 8px 0;
+                font-size: 11px;
+                font-weight: bold;
+                color: #00152e;
+            }
 
-        <tr>
-            <td class="label">Correo</td>
-            <td>{{ $profesor->correo ?: 'Sin correo registrado' }}</td>
+            table.materias {
+                width: 94%;
+                margin-left: auto;
+                margin-right: auto;
+                border-collapse: collapse;
+                table-layout: fixed;
+            }
 
-            <td class="label">Teléfono</td>
-            <td>{{ $profesor->telefono_movil ?: 'Sin teléfono registrado' }}</td>
-        </tr>
-    </table>
+            .materias th {
+                background: #e8f3fa;
+                color: #00152e;
+                font-size: 10px;
+                font-weight: bold;
+                padding: 4px 5px;
+                text-align: center;
+            }
 
-    @forelse ($matriz as $bloque)
-        <div class="nivel-box">
-            <div class="nivel-title">
-                {{ $bloque['nivel']->nombre ?? 'Nivel no definido' }}
-            </div>
+            .materias td {
+                padding: 4px 5px;
+                font-size: 9.5px;
+                font-weight: bold;
+                text-align: center;
+                vertical-align: top;
+            }
 
-            <div class="nivel-meta">
-                {{ $bloque['total_clases'] }} clases ·
-                {{ $bloque['total_materias'] }} materias ·
-                {{ $bloque['total_grupos'] }} grupos
-                @if (!empty($bloque['nivel']->cct))
-                    · C.C.T. {{ $bloque['nivel']->cct }}
-                @endif
-            </div>
-        </div>
+            .materias .num {
+                width: 35px;
+            }
 
-        <table class="horario">
-            <thead>
+            .materias .mat {
+                width: 245px;
+            }
+
+            .materias .nivel {
+                width: 150px;
+            }
+
+            .materias .grado {
+                width: 80px;
+            }
+
+            .materias .grupo {
+                width: 80px;
+            }
+
+            .materias .bloques {
+                width: 80px;
+            }
+
+            .total-wrapper {
+                margin-top: 36px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .total-table {
+                margin: 0 auto;
+                border-collapse: collapse;
+            }
+
+            .total-label {
+                padding: 5px 14px;
+                font-size: 10px;
+                font-weight: bold;
+                text-align: right;
+            }
+
+            .total-value {
+                min-width: 36px;
+                border: 1px solid #9fd0bf;
+                background: #d9f4ea;
+                padding: 5px 12px;
+                font-size: 10px;
+                font-weight: bold;
+                text-align: center;
+            }
+
+            .empty {
+                margin-top: 60px;
+                text-align: center;
+                font-size: 14px;
+                font-weight: bold;
+                color: #64748b;
+            }
+
+            .page-break {
+                page-break-before: auto;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="page">
+
+            @if ($logoIzquierdo)
+                <img src="{{ $logoIzquierdo }}" class="watermark">
+            @endif
+
+            <table class="header-table">
                 <tr>
-                    <th class="hora">Hora</th>
+                    <td class="logo-cell">
+                        @if ($logoIzquierdo)
+                            <img src="{{ $logoIzquierdo }}" class="logo-left">
+                        @endif
+                    </td>
 
-                    @foreach ($bloque['dias'] as $dia)
-                        <th>{{ $dia->dia }}</th>
-                    @endforeach
+                    <td class="center-cell">
+                        <div class="school-title">
+                            CENTRO UNIVERSITARIO MOCTEZUMA
+                        </div>
+
+                        <div class="main-title">
+                            HORARIO DEL DOCENTE | CICLO<br>
+                            ESCOLAR 2025-2026
+                        </div>
+
+                        <div class="address">
+                            Francisco I. Madero Ote. #800, Col. Esquipulas, Cd.<br>
+                            Altamirano, Gro.
+                        </div>
+                    </td>
+
+                    <td class="logo-cell">
+                        @if ($logoDerecho)
+                            <img src="{{ $logoDerecho }}" class="logo-right">
+                        @endif
+                    </td>
                 </tr>
-            </thead>
+            </table>
 
-            <tbody>
-                @foreach ($bloque['horas'] as $hora)
-                    <tr>
-                        <td class="hora">
-                            {{ \Carbon\Carbon::parse($hora->hora_inicio)->format('H:i') }}
-                            <br>
-                            {{ \Carbon\Carbon::parse($hora->hora_fin)->format('H:i') }}
-                        </td>
+            <table class="profesor-table">
+                <tr>
+                    <td class="profesor-label">PROFESOR(A)</td>
+                    <td class="profesor-name">{{ $profesorNombre }}</td>
+                </tr>
+            </table>
 
-                        @foreach ($bloque['dias'] as $dia)
-                            @php
-                                $celdas = $bloque['celdas'][$hora->id][$dia->id] ?? [];
-                            @endphp
+            @if ($horarioGeneral['dias']->isNotEmpty() && $horarioGeneral['horas']->isNotEmpty())
+                <table class="horario">
+                    <thead>
+                        <tr>
+                            <th class="hora-col">Hora</th>
 
-                            <td>
-                                @forelse ($celdas as $horario)
-                                    <div class="materia">
-                                        {{ $horario->asignacionMateria?->materia?->materia ?? 'Materia no definida' }}
-                                    </div>
+                            @foreach ($horarioGeneral['dias'] as $dia)
+                                <th>{{ $dia['nombre'] }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
 
-                                    <div class="grupo">
-                                        {{ $horario->grado?->nombre ?? 'Grado' }}
-                                        @if ($horario->grupo?->asignacionGrupo?->nombre)
-                                            · Grupo {{ $horario->grupo->asignacionGrupo->nombre }}
-                                        @endif
-                                    </div>
+                    <tbody>
+                        @foreach ($horarioGeneral['horas'] as $hora)
+                            <tr>
+                                <td class="hora-col">
+                                    {{ $hora['inicio'] }} - {{ $hora['fin'] }}
+                                </td>
 
-                                    @if ($horario->generacion)
-                                        <div class="extra">
-                                            Gen.
-                                            {{ $horario->generacion->anio_ingreso }}-{{ $horario->generacion->anio_egreso }}
-                                        </div>
-                                    @endif
+                                @foreach ($horarioGeneral['dias'] as $dia)
+                                    @php
+                                        $celdas = $horarioGeneral['celdas'][$hora['key']][$dia['key']] ?? [];
+                                    @endphp
 
-                                    @if ($horario->semestre)
-                                        <div class="extra">
-                                            Semestre {{ $horario->semestre->numero }}
-                                        </div>
-                                    @endif
-                                @empty
-                                    <div class="libre">Libre</div>
-                                @endforelse
-                            </td>
+                                    <td>
+                                        @forelse ($celdas as $horario)
+                                            <div class="materia">
+                                                <strong>
+                                                    {{ $horario->grado?->nombre ?? 'Grado' }}
+                                                    @if ($horario->nivel?->nombre)
+                                                        {{ $horario->nivel->nombre }}
+                                                    @endif
+                                                </strong>
+                                                <br>
+                                                {{ $horario->asignacionMateria?->materia?->materia ?? 'Materia no definida' }}
+                                            </div>
+
+                                            @if (!$loop->last)
+                                                <br>
+                                            @endif
+                                        @empty
+                                            <div class="libre">---</div>
+                                        @endforelse
+                                    </td>
+                                @endforeach
+                            </tr>
                         @endforeach
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        @empty
-            <div class="empty">
-                No hay horario registrado para el profesor seleccionado.
-            </div>
-        @endforelse
 
-        <div class="footer">
-            Generado el {{ now()->format('d/m/Y H:i') }}
+                        <tr class="horas-dia">
+                            <td class="label">Horas por día</td>
+
+                            @foreach ($horarioGeneral['dias'] as $dia)
+                                <td>{{ $horasPorDia[$dia['key']] ?? 0 }}</td>
+                            @endforeach
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="section-title">
+                    Materias asignadas al docente
+                </div>
+
+                <table class="materias">
+                    <thead>
+                        <tr>
+                            <th class="num">#</th>
+                            <th class="mat">Materia</th>
+                            <th class="nivel">Nivel</th>
+                            <th class="grado">Grados</th>
+                            <th class="grupo">Grupos</th>
+                            <th class="bloques">Bloques</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach ($materiasAsignadas as $materia)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $materia['materia'] }}</td>
+                                <td>{{ $materia['nivel'] }}</td>
+                                <td>{{ $materia['grado'] }}</td>
+                                <td>{{ $materia['grupo'] }}</td>
+                                <td>{{ $materia['bloques'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                <div class="total-wrapper">
+                    <table class="total-table">
+                        <tr>
+                            <td class="total-label">Total de horas semanales</td>
+                            <td class="total-value">{{ $totalHorasSemanales }}</td>
+                        </tr>
+                    </table>
+                </div>
+            @else
+                <div class="empty">
+                    No hay horario registrado para el profesor seleccionado.
+                </div>
+            @endif
         </div>
     </body>
 

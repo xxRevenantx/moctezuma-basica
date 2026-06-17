@@ -3,23 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Horario;
-use App\Models\Persona;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
-class ProfesorHorarioPdfController extends Controller
+class TodosHorariosProfesoresPdfController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $profesorId = $request->integer('profesor_id');
-
-        abort_if(!$profesorId, 404);
-
-        $profesor = Persona::query()->findOrFail($profesorId);
-
         $horarios = Horario::query()
             ->with([
                 'nivel:id,nombre,color,cct',
@@ -32,9 +25,10 @@ class ProfesorHorarioPdfController extends Controller
                 'hora:id,nivel_id,hora_inicio,hora_fin,orden',
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,materia,nivel_id,grado_id,semestre_id,extra,receso,orden',
+                'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
             ])
-            ->whereHas('asignacionMateria', function ($query) use ($profesorId) {
-                $query->where('profesor_id', $profesorId);
+            ->whereHas('asignacionMateria', function ($query) {
+                $query->whereNotNull('profesor_id');
             })
             ->when($request->filled('nivel_id'), function ($query) use ($request) {
                 $query->where('nivel_id', $request->integer('nivel_id'));
@@ -66,6 +60,12 @@ class ProfesorHorarioPdfController extends Controller
                         })
                         ->orWhereHas('grupo.asignacionGrupo', function ($grupoQuery) use ($buscar) {
                             $grupoQuery->where('nombre', 'like', "%{$buscar}%");
+                        })
+                        ->orWhereHas('asignacionMateria.profesor', function ($profesorQuery) use ($buscar) {
+                            $profesorQuery
+                                ->where('nombre', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_materno', 'like', "%{$buscar}%");
                         });
                 });
             })
@@ -78,6 +78,7 @@ class ProfesorHorarioPdfController extends Controller
                 })->values();
             })
             ->sortBy([
+                fn($a, $b) => $this->nombreProfesor($a) <=> $this->nombreProfesor($b),
                 fn($a, $b) => $this->horaInicio($a) <=> $this->horaInicio($b),
                 fn($a, $b) => $this->ordenDia($a->dia?->dia) <=> $this->ordenDia($b->dia?->dia),
                 fn($a, $b) => ($a->nivel->id ?? 0) <=> ($b->nivel->id ?? 0),
@@ -85,34 +86,46 @@ class ProfesorHorarioPdfController extends Controller
             ])
             ->values();
 
-        $profesorNombre = trim(
-            ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-            $profesor->nombre . ' ' .
-            $profesor->apellido_paterno . ' ' .
-            ($profesor->apellido_materno ?? '')
-        );
+        $profesoresHorarios = $horarios
+            ->groupBy(fn($horario) => $horario->asignacionMateria?->profesor_id)
+            ->map(function (Collection $items) {
+                $profesor = $items->first()?->asignacionMateria?->profesor;
 
-        $horarioGeneral = $this->crearHorarioGeneral($horarios);
-        $materiasAsignadas = $this->crearMateriasAsignadas($horarios);
-        $horasPorDia = $this->crearHorasPorDia($horarioGeneral);
-        $totalHorasSemanales = array_sum($horasPorDia);
+                $profesorNombre = trim(
+                    ($profesor?->titulo ? $profesor->titulo . ' ' : '') .
+                    ($profesor?->nombre ?? '') . ' ' .
+                    ($profesor?->apellido_paterno ?? '') . ' ' .
+                    ($profesor?->apellido_materno ?? '')
+                );
+
+                $horarioGeneral = $this->crearHorarioGeneral($items);
+                $materiasAsignadas = $this->crearMateriasAsignadas($items);
+                $horasPorDia = $this->crearHorasPorDia($horarioGeneral);
+
+                return [
+                    'profesor' => $profesor,
+                    'profesorNombre' => $profesorNombre ?: 'Profesor no definido',
+                    'horarios' => $items,
+                    'horarioGeneral' => $horarioGeneral,
+                    'materiasAsignadas' => $materiasAsignadas,
+                    'horasPorDia' => $horasPorDia,
+                    'totalHorasSemanales' => array_sum($horasPorDia),
+                ];
+            })
+            ->sortBy('profesorNombre')
+            ->values();
 
         $logoIzquierdo = public_path('imagenes/logo-moctezuma.png');
         $logoDerecho = public_path('imagenes/guerrero-moctezuma.png');
 
-        $pdf = Pdf::loadView('pdf.profesor-horario', [
-            'profesor' => $profesor,
-            'profesorNombre' => $profesorNombre,
-            'horarios' => $horarios,
-            'horarioGeneral' => $horarioGeneral,
-            'materiasAsignadas' => $materiasAsignadas,
-            'horasPorDia' => $horasPorDia,
-            'totalHorasSemanales' => $totalHorasSemanales,
+        $pdf = Pdf::loadView('pdf.profesores-horarios-todos', [
+            'profesoresHorarios' => $profesoresHorarios,
             'logoIzquierdo' => file_exists($logoIzquierdo) ? $logoIzquierdo : null,
             'logoDerecho' => file_exists($logoDerecho) ? $logoDerecho : null,
+            'cicloEscolar' => '2025-2026',
         ])->setPaper('letter', 'portrait');
 
-        return $pdf->stream('horario-profesor-' . Str::slug($profesorNombre) . '.pdf');
+        return $pdf->stream('todos-los-horarios-docentes.pdf');
     }
 
     private function crearHorarioGeneral(Collection $horarios): array
@@ -232,6 +245,17 @@ class ProfesorHorarioPdfController extends Controller
         }
 
         return $totales;
+    }
+
+    private function nombreProfesor($horario): string
+    {
+        $profesor = $horario->asignacionMateria?->profesor;
+
+        return trim(
+            ($profesor?->apellido_paterno ?? '') . ' ' .
+            ($profesor?->apellido_materno ?? '') . ' ' .
+            ($profesor?->nombre ?? '')
+        );
     }
 
     private function gradoCorto(?string $grado): string

@@ -11,6 +11,7 @@ use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\FichaController;
 use App\Http\Controllers\SubmoduloNivelController;
+use App\Http\Controllers\TodosHorariosProfesoresPdfController;
 use App\Http\Controllers\WordController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GradoController;
@@ -121,8 +122,11 @@ Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('mis
 
 Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
 
-Route::get('/profesores/{profesor}/horario/{nivel}/pdf', ProfesorHorarioPdfController::class)
+Route::get('/profesores/horario-profesor/pdf', ProfesorHorarioPdfController::class)
     ->name('profesor.horario.pdf');
+
+Route::get('/profesores/horarios/todos/pdf', TodosHorariosProfesoresPdfController::class)
+    ->name('profesores.horarios.todos.pdf');
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
     ->name('accion.generales.listas.pdf');
