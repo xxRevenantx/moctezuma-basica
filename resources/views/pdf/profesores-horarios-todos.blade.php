@@ -11,11 +11,24 @@
             margin: 18px 28px 22px 28px;
         }
 
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/calibri-bold.ttf') }}') format('truetype');
+        }
+
         body {
-            margin: 0;
-            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
-            color: #00152e;
-            font-size: 10px;
+            font-family: 'calibri';
+            font-size: 14px;
+            color: #334155;
+            background: #ffffff;
         }
 
         .page {
@@ -33,7 +46,6 @@
             top: 125px;
             left: 150px;
             width: 470px;
-            height: 470px;
             opacity: 0.075;
             z-index: -1;
         }
@@ -52,12 +64,10 @@
 
         .logo-left {
             width: 115px;
-            max-height: 78px;
         }
 
         .logo-right {
-            width: 84px;
-            max-height: 76px;
+            width: 100px;
         }
 
         .center-cell {
@@ -80,7 +90,7 @@
         .main-title {
             margin-top: 7px;
             font-size: 18px;
-            line-height: 1.25;
+            line-height: 1;
             font-weight: bold;
             text-transform: uppercase;
             color: #000d21;
@@ -138,27 +148,26 @@
         .horario td {
             border: 1px solid #6b7280;
             height: 43px;
-            padding: 5px 4px;
-            vertical-align: middle;
+            /* padding: 5px 4px; */
+            font-size: 12px;
             text-align: center;
             color: #00152e;
         }
 
         .hora-col {
             width: 105px;
-            font-size: 12px;
-            line-height: 1.45;
+            font-size: 15px;
             font-weight: normal;
         }
 
         .materia {
-            font-size: 8.5px;
-            line-height: 1.08;
+            font-size: 12px;
             color: #00152e;
+            line-height: 11px;
         }
 
         .materia strong {
-            font-size: 8.4px;
+            font-size: 12px;
             font-weight: bold;
         }
 
@@ -189,11 +198,10 @@
         }
 
         table.materias {
-            width: 94%;
-            margin-left: auto;
-            margin-right: auto;
+            width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
+            border: 1px solid #9fd0bf;
+            /* table-layout: fixed; */
         }
 
         .materias th {
@@ -207,7 +215,7 @@
 
         .materias td {
             padding: 4px 5px;
-            font-size: 9.5px;
+            font-size: 12px;
             font-weight: bold;
             text-align: center;
             vertical-align: top;
@@ -238,7 +246,7 @@
         }
 
         .total-wrapper {
-            margin-top: 30px;
+            margin-top: 36px;
             width: 100%;
             text-align: center;
         }
@@ -250,7 +258,7 @@
 
         .total-label {
             padding: 5px 14px;
-            font-size: 10px;
+            font-size: 13px;
             font-weight: bold;
             text-align: right;
         }
@@ -260,7 +268,7 @@
             border: 1px solid #9fd0bf;
             background: #d9f4ea;
             padding: 5px 12px;
-            font-size: 10px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
         }
@@ -272,10 +280,31 @@
             font-weight: bold;
             color: #64748b;
         }
+
+        footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 5px;
+            text-align: center;
+            font-size: 10px;
+            color: #475569;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 6px;
+        }
+
+        footer p {
+            margin: 0;
+            line-height: 1.25;
+        }
     </style>
 </head>
 
 <body>
+    @php
+        use Carbon\Carbon;
+    @endphp
+
     @forelse ($profesoresHorarios as $bloque)
         <div class="page">
             @if ($logoIzquierdo)
@@ -296,14 +325,11 @@
                         </div>
 
                         <div class="main-title">
-                            HORARIO DEL DOCENTE | CICLO<br>
-                            ESCOLAR {{ $cicloEscolar }}
+                            HORARIO DEL DOCENTE <br>
+                            CICLO ESCOLAR {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}
                         </div>
 
-                        <div class="address">
-                            Francisco I. Madero Ote. #800, Col. Esquipulas, Cd.<br>
-                            Altamirano, Gro.
-                        </div>
+
                     </td>
 
                     <td class="logo-cell">
@@ -349,7 +375,7 @@
                                         @forelse ($celdas as $horario)
                                             <div class="materia">
                                                 <strong>
-                                                    {{ $horario->grado?->nombre ?? 'Grado' }}
+                                                    {{ $horario->grado?->nombre ?? '° Grado' }}°
                                                     @if ($horario->nivel?->nombre)
                                                         {{ $horario->nivel->nombre }}
                                                     @endif
@@ -430,6 +456,36 @@
             </div>
         </div>
     @endforelse
+
+
+    <footer>
+        <strong>{{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }}</strong>
+
+        @if (!empty($nivel->cct))
+            — C.C.T. {{ $nivel->cct }}
+        @endif
+
+        <br>
+
+        C. {{ $escuela->calle ?? '' }}
+        No.{{ $escuela->no_exterior ?? '' }},
+        Col. {{ $escuela->colonia ?? '' }},
+        C.P. {{ $escuela->codigo_postal ?? '' }},
+        {{ $escuela->ciudad ?? '' }},
+        {{ $escuela->estado ?? '' }}
+
+        @if (!empty($escuela->telefono))
+            · Tel. {{ $escuela->telefono }}
+        @endif
+
+        <br>
+
+        <strong>Fecha de expedición:</strong>
+        {{ Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
+    </footer>
+
+
+
 </body>
 
 </html>

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\cicloEscolar;
+use App\Models\Escuela;
 use App\Models\Horario;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -93,9 +95,9 @@ class TodosHorariosProfesoresPdfController extends Controller
 
                 $profesorNombre = trim(
                     ($profesor?->titulo ? $profesor->titulo . ' ' : '') .
-                    ($profesor?->nombre ?? '') . ' ' .
-                    ($profesor?->apellido_paterno ?? '') . ' ' .
-                    ($profesor?->apellido_materno ?? '')
+                        ($profesor?->nombre ?? '') . ' ' .
+                        ($profesor?->apellido_paterno ?? '') . ' ' .
+                        ($profesor?->apellido_materno ?? '')
                 );
 
                 $horarioGeneral = $this->crearHorarioGeneral($items);
@@ -115,14 +117,21 @@ class TodosHorariosProfesoresPdfController extends Controller
             ->sortBy('profesorNombre')
             ->values();
 
-        $logoIzquierdo = public_path('imagenes/logo-moctezuma.png');
-        $logoDerecho = public_path('imagenes/guerrero-moctezuma.png');
+        $logoIzquierdo = public_path('imagenes/logo-letra.png');
+        $logoDerecho = public_path('penacho.jpg');
+        $cicloEscolar = cicloEscolar::query()
+            ->orderBy('id', 'desc')
+            ->first();
+
+
+        $escuela = Escuela::query()->first();
 
         $pdf = Pdf::loadView('pdf.profesores-horarios-todos', [
             'profesoresHorarios' => $profesoresHorarios,
             'logoIzquierdo' => file_exists($logoIzquierdo) ? $logoIzquierdo : null,
             'logoDerecho' => file_exists($logoDerecho) ? $logoDerecho : null,
-            'cicloEscolar' => '2025-2026',
+            'cicloEscolar' => $cicloEscolar,
+            'escuela' => $escuela,
         ])->setPaper('letter', 'portrait');
 
         return $pdf->stream('todos-los-horarios-docentes.pdf');
@@ -253,8 +262,8 @@ class TodosHorariosProfesoresPdfController extends Controller
 
         return trim(
             ($profesor?->apellido_paterno ?? '') . ' ' .
-            ($profesor?->apellido_materno ?? '') . ' ' .
-            ($profesor?->nombre ?? '')
+                ($profesor?->apellido_materno ?? '') . ' ' .
+                ($profesor?->nombre ?? '')
         );
     }
 

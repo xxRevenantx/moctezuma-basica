@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\cicloEscolar;
+use App\Models\Escuela;
 use App\Models\Horario;
 use App\Models\Persona;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -19,6 +21,13 @@ class ProfesorHorarioPdfController extends Controller
         abort_if(!$profesorId, 404);
 
         $profesor = Persona::query()->findOrFail($profesorId);
+
+        $cicloEscolar = cicloEscolar::query()
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $escuela = Escuela::query()->first();
+
 
         $horarios = Horario::query()
             ->with([
@@ -87,9 +96,9 @@ class ProfesorHorarioPdfController extends Controller
 
         $profesorNombre = trim(
             ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-            $profesor->nombre . ' ' .
-            $profesor->apellido_paterno . ' ' .
-            ($profesor->apellido_materno ?? '')
+                $profesor->nombre . ' ' .
+                $profesor->apellido_paterno . ' ' .
+                ($profesor->apellido_materno ?? '')
         );
 
         $horarioGeneral = $this->crearHorarioGeneral($horarios);
@@ -97,8 +106,8 @@ class ProfesorHorarioPdfController extends Controller
         $horasPorDia = $this->crearHorasPorDia($horarioGeneral);
         $totalHorasSemanales = array_sum($horasPorDia);
 
-        $logoIzquierdo = public_path('imagenes/logo-moctezuma.png');
-        $logoDerecho = public_path('imagenes/guerrero-moctezuma.png');
+        $logoIzquierdo = public_path('imagenes/logo-letra.png');
+        $logoDerecho = public_path('penacho.jpg');
 
         $pdf = Pdf::loadView('pdf.profesor-horario', [
             'profesor' => $profesor,
@@ -110,6 +119,8 @@ class ProfesorHorarioPdfController extends Controller
             'totalHorasSemanales' => $totalHorasSemanales,
             'logoIzquierdo' => file_exists($logoIzquierdo) ? $logoIzquierdo : null,
             'logoDerecho' => file_exists($logoDerecho) ? $logoDerecho : null,
+            'cicloEscolar' => $cicloEscolar,
+            'escuela' => $escuela,
         ])->setPaper('letter', 'portrait');
 
         return $pdf->stream('horario-profesor-' . Str::slug($profesorNombre) . '.pdf');

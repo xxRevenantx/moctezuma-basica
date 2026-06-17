@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" data-preservar-scroll-root>
     {{-- ITERA NIVELES --}}
     <div class="overflow-hidden">
         <div>
@@ -115,7 +115,7 @@
                         Avance: {{ $this->avanceHorario }}%
                     </span>
 
-                    <button type="button" wire:click="limpiarFiltros"
+                    <button type="button" wire:click="limpiarFiltros" data-preservar-scroll-horario
                         class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700">
                         <flux:icon.arrow-path class="h-4 w-4" />
                         Limpiar
@@ -164,7 +164,7 @@
                     <flux:field>
                         <flux:label>Generación</flux:label>
 
-                        <flux:select wire:model.live="generacion_id">
+                        <flux:select wire:model.live="generacion_id" data-preservar-scroll-horario>
                             <option value="">Selecciona una generación</option>
 
                             @foreach ($generaciones as $generacion)
@@ -178,7 +178,7 @@
                     <flux:field>
                         <flux:label>Grado</flux:label>
 
-                        <flux:select wire:model.live="grado_id">
+                        <flux:select wire:model.live="grado_id" data-preservar-scroll-horario>
                             <option value="">Selecciona un grado</option>
 
                             @foreach ($grados as $grado)
@@ -193,7 +193,8 @@
                         <flux:field>
                             <flux:label>Semestre</flux:label>
 
-                            <flux:select wire:model.live="semestre_id" :disabled="!$grado_id">
+                            <flux:select wire:model.live="semestre_id" :disabled="!$grado_id"
+                                data-preservar-scroll-horario>
                                 <option value="">Selecciona un semestre</option>
 
                                 @foreach ($semestres as $semestre)
@@ -212,7 +213,8 @@
                             :disabled="$esBachillerato
                                 ?
                                 (!$generacion_id || !$grado_id || !$semestre_id) :
-                                (!$generacion_id || !$grado_id)">
+                                (!$generacion_id || !$grado_id)"
+                            data-preservar-scroll-horario>
                             <option value="">Selecciona un grupo</option>
 
                             @foreach ($grupos as $grupo)
@@ -1505,35 +1507,107 @@
     @once
         <script>
             document.addEventListener('livewire:init', () => {
-                let preservarScrollHorario = false;
+                let debeRestaurarScroll = false;
                 let scrollHorarioY = 0;
+                let scrollHorarioX = 0;
+                let frameScroll = null;
 
-                document.addEventListener('change', (event) => {
-                    const selectHorario = event.target.closest('[data-preservar-scroll-horario]');
+                const obtenerScrollActual = () => {
+                    const scrollElement = document.scrollingElement || document.documentElement;
 
-                    if (!selectHorario) {
-                        return;
+                    return {
+                        x: window.scrollX || scrollElement.scrollLeft || 0,
+                        y: window.scrollY || scrollElement.scrollTop || 0,
+                    };
+                };
+
+                const tieneAtributoWire = (elemento) => {
+                    if (!elemento || !elemento.getAttributeNames) {
+                        return false;
                     }
 
-                    preservarScrollHorario = true;
-                    scrollHorarioY = window.scrollY || document.documentElement.scrollTop || 0;
-                }, true);
-
-                Livewire.hook('morph.updated', () => {
-                    if (!preservarScrollHorario) {
-                        return;
-                    }
-
-                    requestAnimationFrame(() => {
-                        window.scrollTo({
-                            top: scrollHorarioY,
-                            left: 0,
-                            behavior: 'instant'
-                        });
-
-                        preservarScrollHorario = false;
+                    return elemento.getAttributeNames().some((atributo) => {
+                        return atributo.startsWith('wire:model') ||
+                            atributo.startsWith('wire:click') ||
+                            atributo.startsWith('wire:change');
                     });
+                };
+
+                const debePreservar = (event) => {
+                    const target = event.target;
+
+                    if (!(target instanceof Element)) {
+                        return false;
+                    }
+
+                    const root = target.closest('[data-preservar-scroll-root]');
+
+                    if (!root) {
+                        return false;
+                    }
+
+                    const control = target.closest(`
+                        [data-preservar-scroll-horario],
+                        select,
+                        input,
+                        textarea,
+                        button,
+                        [role="combobox"],
+                        [role="option"]
+                    `);
+
+                    if (!control) {
+                        return false;
+                    }
+
+                    return control.hasAttribute('data-preservar-scroll-horario') ||
+                        control.matches('select, input, textarea, button, [role="combobox"], [role="option"]') ||
+                        tieneAtributoWire(control);
+                };
+
+                const guardarScroll = (event) => {
+                    if (!debePreservar(event)) {
+                        return;
+                    }
+
+                    const scroll = obtenerScrollActual();
+
+                    debeRestaurarScroll = true;
+                    scrollHorarioX = scroll.x;
+                    scrollHorarioY = scroll.y;
+                };
+
+                const restaurarScroll = () => {
+                    if (!debeRestaurarScroll) {
+                        return;
+                    }
+
+                    if (frameScroll) {
+                        cancelAnimationFrame(frameScroll);
+                    }
+
+                    frameScroll = requestAnimationFrame(() => {
+                        window.scrollTo(scrollHorarioX, scrollHorarioY);
+
+                        setTimeout(() => {
+                            window.scrollTo(scrollHorarioX, scrollHorarioY);
+                        }, 40);
+
+                        setTimeout(() => {
+                            window.scrollTo(scrollHorarioX, scrollHorarioY);
+                            debeRestaurarScroll = false;
+                        }, 120);
+                    });
+                };
+
+                ['pointerdown', 'focusin', 'change', 'input', 'keydown'].forEach((evento) => {
+                    document.addEventListener(evento, guardarScroll, true);
                 });
+
+                Livewire.hook('morph.updated', restaurarScroll);
+                Livewire.hook('morphed', restaurarScroll);
+
+                document.addEventListener('livewire:navigated', restaurarScroll);
             });
         </script>
     @endonce
