@@ -255,7 +255,7 @@ class CrearMateria extends Component
             'materia' => [
                 'required',
                 'string',
-                'min:2',
+                'min:1',
                 'max:150',
             ],
 
@@ -311,7 +311,7 @@ class CrearMateria extends Component
             'semestre_id.exists' => 'El semestre no pertenece al grado seleccionado.',
 
             'materia.required' => 'Escribe el nombre de la materia.',
-            'materia.min' => 'El nombre de la materia debe tener al menos 2 caracteres.',
+            'materia.min' => 'El nombre de la materia debe tener al menos 1 carácter.',
             'materia.max' => 'El nombre de la materia no debe pasar de 150 caracteres.',
 
             'clave.max' => 'La clave no debe pasar de 50 caracteres.',
@@ -436,16 +436,33 @@ class CrearMateria extends Component
 
     private function existeMateriaDuplicada(): bool
     {
+        /*
+         * Las materias extra y los recesos pueden repetirse,
+         * aunque tengan el mismo slug, nivel, grado y semestre.
+         */
+        if ($this->extra || $this->receso) {
+            return false;
+        }
+
+        /*
+         * Para una materia normal, solamente se consideran duplicadas
+         * otras materias que también sean normales.
+         */
         return Materia::query()
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
             ->where('slug', $this->slug)
+            ->where('extra', false)
+            ->where('receso', false)
             ->when(
                 $this->esBachilleratoFormulario,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),
                 fn($query) => $query->whereNull('semestre_id')
             )
-            ->when($this->editandoId, fn($query) => $query->where('id', '!=', $this->editandoId))
+            ->when(
+                $this->editandoId,
+                fn($query) => $query->where('id', '!=', $this->editandoId)
+            )
             ->exists();
     }
 
