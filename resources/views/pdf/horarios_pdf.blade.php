@@ -279,14 +279,14 @@
             background: #b9d0e2;
             color: #0f172a;
             border: 1px solid #7f96a8;
-            padding: 6px;
+            padding: 3px;
             text-transform: uppercase;
             font-weight: 700;
         }
 
         .tabla-docentes td {
             border: 1px solid #7f96a8;
-            padding: 5px 7px;
+            padding: 2px 7px;
             text-align: center;
             vertical-align: middle;
             line-height: 1.35;
@@ -490,10 +490,7 @@
                         <div class="linea-titulo"></div>
 
                         <p class="titulo-principal">
-                            HORARIO DE CLASES
-                        </p>
-
-                        <p class="subtitulo-principal">
+                            HORARIO DE CLASES <br>
                             CICLO ESCOLAR
                             {{ $ciclo_escolar->inicio_anio ?? '' }}-{{ $ciclo_escolar->fin_anio ?? '' }}
                         </p>
@@ -669,8 +666,7 @@
                                     {{ mb_strtoupper($item['materias_texto'] ?? 'SIN MATERIA', 'UTF-8') }}
                                 </td>
 
-                                <td
-                                    class="{{ !empty($item['sin_docente']) ? 'sin-registro' : '' }}">
+                                <td class="{{ !empty($item['sin_docente']) ? 'sin-registro' : '' }}">
                                     {{ mb_strtoupper($item['docente'] ?? 'SIN DOCENTE', 'UTF-8') }}
                                 </td>
                             </tr>
