@@ -40,7 +40,7 @@
 
         @font-face {
             font-family: 'coolvetica';
-            font-style: regular;
+            font-style: normal;
             src: url('{{ storage_path('fonts/Coolveticaregular.ttf') }}') format('truetype');
         }
 
@@ -228,7 +228,6 @@
             color: #0f172a;
             font-size: 12px;
             line-height: 13px;
-            /* font-weight: 700; */
         }
 
         .celda-no-calificable {
@@ -250,7 +249,6 @@
             color: #000000;
             font-size: 14px;
             font-weight: 700;
-            /* height: 42px; */
             line-height: 10px;
             text-transform: uppercase;
         }
@@ -274,6 +272,7 @@
             margin-top: 16px;
             table-layout: fixed;
             font-size: 10px;
+            page-break-inside: avoid;
         }
 
         .tabla-docentes th {
@@ -287,8 +286,10 @@
 
         .tabla-docentes td {
             border: 1px solid #7f96a8;
-            padding: 4px 6px;
+            padding: 5px 7px;
             text-align: center;
+            vertical-align: middle;
+            line-height: 1.35;
         }
 
         .sin-registro {
@@ -332,10 +333,13 @@
 
         $tituloGrupo = 'GENERACIÓN: ' . $nombreGeneracion . ' · ' . $nombreGrado . '° GRADO, GRUPO: ' . $nombreGrupo;
 
-        $esPreescolar = (int) ($nivel->id ?? 0) === 1;
-        $esPrimaria = (int) ($nivel->id ?? 0) === 2;
-        $esSecundaria = (int) ($nivel->id ?? 0) === 3;
-        $esBachillerato = (int) ($nivel->id ?? 0) === 4;
+        $esPreescolar = (int) ($nivel->id ?? 0) === 1 || ($nivel->slug ?? '') === 'preescolar';
+
+        $esPrimaria = (int) ($nivel->id ?? 0) === 2 || ($nivel->slug ?? '') === 'primaria';
+
+        $esSecundaria = (int) ($nivel->id ?? 0) === 3 || ($nivel->slug ?? '') === 'secundaria';
+
+        $esBachillerato = (int) ($nivel->id ?? 0) === 4 || ($nivel->slug ?? '') === 'bachillerato';
 
         if ($esBachillerato && isset($semestre) && $semestre) {
             $tituloGrupo .= ' · SEMESTRE: ' . ($semestre->numero ?? ($semestre->nombre ?? ($semestre->semestre ?? '')));
@@ -343,89 +347,129 @@
 
         $profesorTitular = $profesor_titular ?? null;
 
+        /*
+         * La colección viene preparada desde el controlador:
+         * - Agrupada por docente.
+         * - Sin el profesor titular.
+         * - Sin recesos.
+         * - Con materias sin profesor agrupadas en "SIN DOCENTE".
+         */
+        $docentesPreescolar = collect($docentes_preescolar ?? []);
+
         $diasOrdenados = $dias->values();
 
         $encabezadosPorDia = [
-            0 => ['texto' => 'LUNES', 'class' => 'th-lunes'],
-            1 => ['texto' => 'MARTES', 'class' => 'th-martes'],
-            2 => ['texto' => 'MIÉRCOLES', 'class' => 'th-miercoles'],
-            3 => ['texto' => 'JUEVES', 'class' => 'th-jueves'],
-            4 => ['texto' => 'VIERNES', 'class' => 'th-viernes'],
+            0 => [
+                'texto' => 'LUNES',
+                'class' => 'th-lunes',
+            ],
+            1 => [
+                'texto' => 'MARTES',
+                'class' => 'th-martes',
+            ],
+            2 => [
+                'texto' => 'MIÉRCOLES',
+                'class' => 'th-miercoles',
+            ],
+            3 => [
+                'texto' => 'JUEVES',
+                'class' => 'th-jueves',
+            ],
+            4 => [
+                'texto' => 'VIERNES',
+                'class' => 'th-viernes',
+            ],
         ];
 
+        /*
+         * Esta colección se conserva para primaria,
+         * secundaria y bachillerato.
+         */
         $docentes = collect();
 
-        $slugsExcluidosDocentes = ['calculo-mental', 'caligrafia', 'lectura'];
+        if (!$esPreescolar) {
+            $slugsExcluidosDocentes = ['calculo-mental', 'caligrafia', 'lectura'];
 
-        foreach ($horas as $horaTmp) {
-            foreach ($diasOrdenados as $diaTmp) {
-                $registroTmp = $horarioPorCelda->get($horaTmp->id . '-' . $diaTmp->id);
-                $asignacionTmp = $registroTmp?->asignacionMateria;
-                $materiaTmp = $asignacionTmp?->materia;
+            foreach ($horas as $horaTmp) {
+                foreach ($diasOrdenados as $diaTmp) {
+                    $registroTmp = $horarioPorCelda->get($horaTmp->id . '-' . $diaTmp->id);
 
-                if (!$asignacionTmp || !$materiaTmp) {
-                    continue;
-                }
+                    $asignacionTmp = $registroTmp?->asignacionMateria;
+                    $materiaTmp = $asignacionTmp?->materia;
 
-                $nombreMateriaTmp = $materiaTmp->materia ?? 'Sin materia';
-                $slugMateriaTmp = mb_strtolower(trim($materiaTmp->slug ?? ''), 'UTF-8');
-                $calificableTmp = (int) ($materiaTmp->calificable ?? 0);
-                $extraTmp = (int) ($materiaTmp->extra ?? 0);
-                $recesoTmp = (int) ($materiaTmp->receso ?? 0);
-                $ordenTmp = (int) ($materiaTmp->orden ?? 999999);
-
-                // Se omiten recesos porque no son materias con docente.
-                if ($recesoTmp === 1) {
-                    continue;
-                }
-
-                if ($esSecundaria || $esBachillerato) {
-                    // En secundaria y bachillerato se muestran docentes de materias calificables.
-                    if ($calificableTmp !== 1) {
-                        continue;
-                    }
-                } else {
-                    // En preescolar y primaria solo se muestran materias extra calificables.
-                    if ($extraTmp !== 1 || $calificableTmp !== 1) {
+                    if (!$asignacionTmp || !$materiaTmp) {
                         continue;
                     }
 
-                    // Se excluyen materias especiales que no deben aparecer como docente extra.
-                    if (in_array($slugMateriaTmp, $slugsExcluidosDocentes, true)) {
+                    $nombreMateriaTmp = $materiaTmp->materia ?? 'Sin materia';
+
+                    $slugMateriaTmp = mb_strtolower(trim($materiaTmp->slug ?? ''), 'UTF-8');
+
+                    $calificableTmp = (int) ($materiaTmp->calificable ?? 0);
+                    $extraTmp = (int) ($materiaTmp->extra ?? 0);
+                    $recesoTmp = (int) ($materiaTmp->receso ?? 0);
+                    $ordenTmp = (int) ($materiaTmp->orden ?? 999999);
+
+                    /*
+                     * Los recesos no tienen docente.
+                     */
+                    if ($recesoTmp === 1) {
                         continue;
                     }
+
+                    if ($esSecundaria || $esBachillerato) {
+                        /*
+                         * Secundaria y bachillerato muestran
+                         * materias calificables.
+                         */
+                        if ($calificableTmp !== 1) {
+                            continue;
+                        }
+                    } else {
+                        /*
+                         * Primaria conserva su lógica:
+                         * materias extra calificables.
+                         */
+                        if ($extraTmp !== 1 || $calificableTmp !== 1) {
+                            continue;
+                        }
+
+                        if (in_array($slugMateriaTmp, $slugsExcluidosDocentes, true)) {
+                            continue;
+                        }
+                    }
+
+                    $profesorTmp = $asignacionTmp->profesor;
+
+                    $nombreProfesorTmp = $profesorTmp
+                        ? trim(
+                            ($profesorTmp->nombre ?? '') .
+                                ' ' .
+                                ($profesorTmp->apellido_paterno ?? '') .
+                                ' ' .
+                                ($profesorTmp->apellido_materno ?? ''),
+                        )
+                        : 'Sin profesor asignado';
+
+                    $docentes->push([
+                        'materia' => $nombreMateriaTmp,
+                        'docente' => $nombreProfesorTmp,
+                        'slug' => $slugMateriaTmp,
+                        'orden' => $ordenTmp,
+                        'calificable' => $calificableTmp,
+                        'extra' => $extraTmp,
+                        'receso' => $recesoTmp,
+                    ]);
                 }
-
-                $profesorTmp = $asignacionTmp->profesor;
-
-                $nombreProfesorTmp = $profesorTmp
-                    ? trim(
-                        ($profesorTmp->nombre ?? '') .
-                            ' ' .
-                            ($profesorTmp->apellido_paterno ?? '') .
-                            ' ' .
-                            ($profesorTmp->apellido_materno ?? ''),
-                    )
-                    : 'Sin profesor asignado';
-
-                $docentes->push([
-                    'materia' => $nombreMateriaTmp,
-                    'docente' => $nombreProfesorTmp,
-                    'slug' => $slugMateriaTmp,
-                    'orden' => $ordenTmp,
-                    'calificable' => $calificableTmp,
-                    'extra' => $extraTmp,
-                    'receso' => $recesoTmp,
-                ]);
             }
-        }
 
-        $docentes = $docentes
-            ->unique(function ($item) {
-                return mb_strtoupper(trim($item['materia'] . '|' . $item['docente']), 'UTF-8');
-            })
-            ->sortBy([['orden', 'asc'], ['materia', 'asc']])
-            ->values();
+            $docentes = $docentes
+                ->unique(function ($item) {
+                    return mb_strtoupper(trim($item['materia'] . '|' . $item['docente']), 'UTF-8');
+                })
+                ->sortBy([['orden', 'asc'], ['materia', 'asc']])
+                ->values();
+        }
     @endphp
 
     <div class="pagina">
@@ -439,13 +483,19 @@
                     </td>
 
                     <td class="centro">
-                        <p class="titulo-institucion">Centro Universitario Moctezuma</p>
+                        <p class="titulo-institucion">
+                            Centro Universitario Moctezuma
+                        </p>
+
                         <div class="linea-titulo"></div>
 
-                        <p class="titulo-principal">HORARIO DE CLASES</p>
+                        <p class="titulo-principal">
+                            HORARIO DE CLASES
+                        </p>
 
                         <p class="subtitulo-principal">
-                            CICLO ESCOLAR {{ $ciclo_escolar->inicio_anio ?? '' }}-{{ $ciclo_escolar->fin_anio ?? '' }}
+                            CICLO ESCOLAR
+                            {{ $ciclo_escolar->inicio_anio ?? '' }}-{{ $ciclo_escolar->fin_anio ?? '' }}
                         </p>
                     </td>
 
@@ -461,7 +511,8 @@
                 {{ $tituloGrupo }}
 
                 @if ($profesorTitular)
-                    · PROFESOR(A): {{ mb_strtoupper($profesorTitular, 'UTF-8') }}
+                    · PROFESOR(A):
+                    {{ mb_strtoupper($profesorTitular, 'UTF-8') }}
                 @endif
             </div>
         </div>
@@ -469,8 +520,13 @@
         <table class="tabla-horario">
             <thead>
                 <tr>
-                    <th class="th-grado" style="width: 125px;">GRADO</th>
-                    <th class="th-horario" style="width: 135px;">HORARIO</th>
+                    <th class="th-grado" style="width: 125px;">
+                        GRADO
+                    </th>
+
+                    <th class="th-horario" style="width: 135px;">
+                        HORARIO
+                    </th>
 
                     @foreach ($diasOrdenados as $index => $dia)
                         @php
@@ -494,8 +550,6 @@
                     <tr>
                         @if ($loop->first)
                             <td class="columna-grado" rowspan="{{ $horas->count() }}">
-
-
                                 @if (!empty($imagen_nivel))
                                     <div class="imagen-nivel">
                                         <img src="{{ $imagen_nivel }}" alt="Imagen del nivel">
@@ -521,26 +575,34 @@
                         @foreach ($diasOrdenados as $dia)
                             @php
                                 $registro = $horarioPorCelda->get($hora->id . '-' . $dia->id);
+
                                 $asignacion = $registro?->asignacionMateria;
+
                                 $materia = $asignacion?->materia;
 
                                 $textoMateria = $materia?->materia ?? null;
-                                $slugMateria = mb_strtolower(trim($materia?->slug ?? ''), 'UTF-8');
 
                                 $calificable = (int) ($materia?->calificable ?? 0);
+
                                 $extra = (int) ($materia?->extra ?? 0);
+
                                 $receso = (int) ($materia?->receso ?? 0);
 
                                 $esReceso = $receso === 1;
-
                                 $claseCelda = 'celda-materia';
 
-                                // En primaria se pinta diferente si la materia no es calificable.
+                                /*
+                                 * En primaria se marca diferente una
+                                 * materia que no es calificable.
+                                 */
                                 if ($esPrimaria && !$esReceso && $calificable === 0) {
                                     $claseCelda = 'celda-no-calificable';
                                 }
 
-                                // Las materias extra se pueden distinguir visualmente.
+                                /*
+                                 * Las materias extra se distinguen
+                                 * visualmente.
+                                 */
                                 if (!$esReceso && $extra === 1 && $calificable === 1) {
                                     $claseCelda = 'celda-extra';
                                 }
@@ -551,7 +613,9 @@
                                     @if ($textoMateria)
                                         {{ mb_strtoupper($textoMateria, 'UTF-8') }}
                                     @else
-                                        <span class="sin-registro">---</span>
+                                        <span class="sin-registro">
+                                            ---
+                                        </span>
                                     @endif
                                 </td>
                             @else
@@ -559,7 +623,9 @@
                                     @if ($textoMateria)
                                         {{ $textoMateria }}
                                     @else
-                                        <span class="sin-registro">---</span>
+                                        <span class="sin-registro">
+                                            ---
+                                        </span>
                                     @endif
                                 </td>
                             @endif
@@ -568,23 +634,74 @@
                 @empty
                     <tr>
                         <td colspan="{{ $diasOrdenados->count() + 2 }}" style="padding: 18px; text-align: center;">
-                            No hay registros de horario para los filtros seleccionados.
+                            No hay registros de horario para los filtros
+                            seleccionados.
                         </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
 
-        @if ($docentes->count())
+        {{--
+            PREESCOLAR:
+            Todos los docentes del horario agrupados por docente,
+            excepto el profesor titular del grado y grupo.
+        --}}
+        @if ($esPreescolar)
+            @if ($docentesPreescolar->isNotEmpty())
+                <table class="tabla-docentes">
+                    <thead>
+                        <tr>
+                            <th style="width: 58%;">
+                                MATERIA
+                            </th>
+
+                            <th>
+                                DOCENTE
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach ($docentesPreescolar as $item)
+                            <tr>
+                                <td>
+                                    {{ mb_strtoupper($item['materias_texto'] ?? 'SIN MATERIA', 'UTF-8') }}
+                                </td>
+
+                                <td
+                                    class="{{ !empty($item['sin_docente']) ? 'sin-registro' : '' }}">
+                                    {{ mb_strtoupper($item['docente'] ?? 'SIN DOCENTE', 'UTF-8') }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        @elseif ($docentes->isNotEmpty())
+            {{--
+                Tabla existente para primaria,
+                secundaria y bachillerato.
+            --}}
             <table class="tabla-docentes">
                 <thead>
                     <tr>
                         @if ($esSecundaria || $esBachillerato)
-                            <th style="width: 34%;">MATERIA</th>
-                            <th>DOCENTE</th>
+                            <th style="width: 34%;">
+                                MATERIA
+                            </th>
+
+                            <th>
+                                DOCENTE
+                            </th>
                         @else
-                            <th style="width: 34%;">MATERIA EXTRA</th>
-                            <th>DOCENTE EXTRA</th>
+                            <th style="width: 34%;">
+                                MATERIA EXTRA
+                            </th>
+
+                            <th>
+                                DOCENTE EXTRA
+                            </th>
                         @endif
                     </tr>
                 </thead>
@@ -592,8 +709,13 @@
                 <tbody>
                     @foreach ($docentes as $item)
                         <tr>
-                            <td>{{ mb_strtoupper($item['materia'], 'UTF-8') }}</td>
-                            <td>{{ mb_strtoupper($item['docente'] ?? 'SIN DOCENTE', 'UTF-8') }}</td>
+                            <td>
+                                {{ mb_strtoupper($item['materia'], 'UTF-8') }}
+                            </td>
+
+                            <td>
+                                {{ mb_strtoupper($item['docente'] ?? 'SIN DOCENTE', 'UTF-8') }}
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -601,7 +723,9 @@
         @endif
 
         <footer>
-            <strong>{{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }}</strong>
+            <strong>
+                {{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }}
+            </strong>
 
             @if (!empty($nivel->cct))
                 — C.C.T. {{ $nivel->cct }}
@@ -623,6 +747,7 @@
             <br>
 
             <strong>Fecha de expedición:</strong>
+
             {{ Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
         </footer>
     </div>

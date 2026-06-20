@@ -9,6 +9,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Horario as HorarioModel;
+use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use Illuminate\Database\Eloquent\Builder;
@@ -353,8 +354,8 @@ class Horario extends Component
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
-                    ($profesor->apellido_paterno ?? '') . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                ($profesor->apellido_paterno ?? '') . ' ' .
+                ($profesor->apellido_materno ?? '')
             );
 
             return [
@@ -594,8 +595,8 @@ class Horario extends Component
                 $nombreProfesor = $profesor
                     ? trim(
                         ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                     )
                     : 'Sin profesor asignado';
 
@@ -774,8 +775,8 @@ class Horario extends Component
                 $nombreProfesor = $profesor
                     ? trim(
                         ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                     )
                     : 'Sin profesor asignado';
 
@@ -1003,6 +1004,14 @@ class Horario extends Component
             return;
         }
 
+        /*
+         * El horario trabaja con asignacion_materias, no directamente con materias.
+         * Por eso, antes de construir el select, se crean únicamente las relaciones
+         * que falten para el grupo seleccionado. No se altera el profesor de las
+         * asignaciones existentes.
+         */
+        $this->sincronizarMateriasFaltantesDelGrupo();
+
         $this->materiasDisponibles = AsignacionMateria::query()
             ->with([
                 'materia',
@@ -1019,14 +1028,73 @@ class Horario extends Component
                     $query->whereNull('semestre_id');
                 }
             })
-            ->orderBy('asignacion_materias.orden')
             ->get()
             ->sortBy([
-                fn($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),
-                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
-                fn($a, $b) => strcmp($a->materia?->materia ?? '', $b->materia?->materia ?? ''),
+                // El orden real de la materia debe tener prioridad.
+                fn($a, $b) => ($a->materia?->orden ?? PHP_INT_MAX)
+                <=> ($b->materia?->orden ?? PHP_INT_MAX),
+                fn($a, $b) => ($a->orden ?? PHP_INT_MAX)
+                <=> ($b->orden ?? PHP_INT_MAX),
+                fn($a, $b) => strcmp(
+                    $a->materia?->materia ?? '',
+                    $b->materia?->materia ?? ''
+                ),
             ])
             ->values();
+    }
+
+    /**
+     * Garantiza que cada materia del nivel, grado y semestre seleccionado tenga
+     * una fila en asignacion_materias para el grupo actual.
+     *
+     * Las filas faltantes se crean sin profesor para que aparezcan en el horario
+     * y después puedan recibir docente desde Asignación de materias.
+     */
+    protected function sincronizarMateriasFaltantesDelGrupo(): void
+    {
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        if (!$grupo) {
+            return;
+        }
+
+        $materias = Materia::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $this->grado_id)
+            ->when(
+                $this->esBachillerato,
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
+            )
+            ->orderBy('orden')
+            ->orderBy('id')
+            ->get(['id', 'orden']);
+
+        if ($materias->isEmpty()) {
+            return;
+        }
+
+        $materiasYaAsignadas = AsignacionMateria::query()
+            ->where('grupo_id', $grupo->id)
+            ->whereIn('materia_id', $materias->pluck('id'))
+            ->pluck('materia_id')
+            ->map(fn($id) => (int) $id)
+            ->all();
+
+        $materias
+            ->reject(fn($materia) => in_array((int) $materia->id, $materiasYaAsignadas, true))
+            ->each(function ($materia) use ($grupo) {
+                AsignacionMateria::query()->firstOrCreate(
+                    [
+                        'grupo_id' => $grupo->id,
+                        'materia_id' => $materia->id,
+                    ],
+                    [
+                        'profesor_id' => null,
+                        'orden' => (int) ($materia->orden ?? 0),
+                    ]
+                );
+            });
     }
 
     protected function cargarHorariosGuardados(): void
@@ -1102,8 +1170,8 @@ class Horario extends Component
                 $nombreProfesor = $profesor
                     ? trim(
                         ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                     )
                     : 'Sin profesor asignado';
 
@@ -1129,8 +1197,8 @@ class Horario extends Component
                 $nombreProfesor = $profesor
                     ? trim(
                         ($profesor->nombre ?? '') . ' ' .
-                            ($profesor->apellido_paterno ?? '') . ' ' .
-                            ($profesor->apellido_materno ?? '')
+                        ($profesor->apellido_paterno ?? '') . ' ' .
+                        ($profesor->apellido_materno ?? '')
                     )
                     : 'Sin profesor asignado';
 
