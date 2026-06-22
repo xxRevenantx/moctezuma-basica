@@ -298,14 +298,15 @@
             border: 1px solid #7f96a8;
             background: #b9d0e2;
             color: #0f172a;
-            font-weight: 700;
+            border: 1px solid #7f96a8;
+            padding: 6px;
             text-transform: uppercase;
         }
 
         .tabla-docentes td {
             padding: 3px 6px;
             border: 1px solid #7f96a8;
-            line-height: 1.25;
+            padding: 5px 7px;
             text-align: center;
             vertical-align: middle;
         }
@@ -395,11 +396,11 @@
                         <div class="linea-titulo"></div>
 
                         <p class="titulo-principal">
-                            Horario de clases
+                            HORARIO DE CLASES
                         </p>
 
                         <p class="subtitulo-principal">
-                            Ciclo escolar
+                            CICLO ESCOLAR
                             {{ $ciclo_escolar->inicio_anio ?? '' }}-{{ $ciclo_escolar->fin_anio ?? '' }}
                         </p>
                     </td>
