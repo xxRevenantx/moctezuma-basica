@@ -22,9 +22,8 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
-    'openai' => [
-        'key' => env('OPENAI_API_KEY'),
-    ],
+
+
 
 
     'resend' => [

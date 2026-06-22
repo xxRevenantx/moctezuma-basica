@@ -10,8 +10,10 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\cicloEscolar;
+use App\Services\GroqFichaService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,11 +22,18 @@ use App\Exports\FichaDescriptivaPlantillaImportacionExport;
 use App\Imports\FichaDescriptivaImport;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class Ficha extends Component
 {
     use WithPagination;
     use WithFileUploads;
+
+    public string $descripcion = '';
+
+    public bool $generando_descripcion = false;
+
+    public string $observaciones_ia = '';
 
 
     protected string $paginationTheme = 'tailwind';
@@ -47,7 +56,11 @@ class Ficha extends Component
     public bool $modalAbierto = false;
     public ?int $inscripcion_id = null;
     public string $campo = '';
-    public string $descripcion = '';
+
+    public ?bool $groq_disponible = null;
+    public bool $groq_modelo_disponible = false;
+    public string $groq_mensaje = 'Sin verificar';
+    public string $groq_modelo = '';
 
     public array $campos = [];
 
@@ -124,6 +137,7 @@ class Ficha extends Component
         $this->slug_nivel = $slug_nivel;
         $this->slug_grado = $slug_grado;
         $this->campos = FichaController::CAMPOS;
+        $this->groq_modelo = (string) config('groq.model', 'llama-3.1-8b-instant');
 
         $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
         $this->nivel_id = $nivel->id;
@@ -161,6 +175,7 @@ class Ficha extends Component
 
         $this->inscripcion_id = $inscripcionId;
         $this->campo = $campo;
+        $this->observaciones_ia = '';
 
         $this->descripcion = (string) FichaDescriptiva::query()
             ->where('inscripcion_id', $inscripcionId)
@@ -169,10 +184,10 @@ class Ficha extends Component
             ->where('campo', $campo)
             ->value('descripcion');
 
-        $this->dispatch('abrir-modal-ficha', contenido: $this->descripcion ?? '');
-
         $this->resetValidation();
         $this->modalAbierto = true;
+
+        $this->dispatch('abrir-modal-ficha', contenido: $this->descripcion);
     }
 
     public function cerrarModal(): void
@@ -181,9 +196,111 @@ class Ficha extends Component
         $this->inscripcion_id = null;
         $this->campo = '';
         $this->descripcion = '';
+        $this->observaciones_ia = '';
+        $this->generando_descripcion = false;
+
         $this->resetValidation();
 
         $this->dispatch('cerrar-modal-ficha');
+    }
+
+    public function verificarGroq(GroqFichaService $groq): void
+    {
+        $estado = $groq->estado();
+
+        $this->groq_disponible = $estado['disponible'];
+        $this->groq_modelo_disponible = $estado['modelo_disponible'];
+        $this->groq_modelo = $estado['modelo'];
+        $this->groq_mensaje = $estado['mensaje'];
+    }
+
+    public function generarDescripcionIA(GroqFichaService $groq): void
+    {
+        $this->validate([
+            'inscripcion_id' => ['required', 'integer', 'exists:inscripciones,id'],
+            'campo' => ['required', 'string', 'in:' . implode(',', array_keys($this->campos))],
+            'observaciones_ia' => ['nullable', 'string', 'max:2500'],
+            'descripcion' => ['nullable', 'string', 'max:5000'],
+        ], [
+            'observaciones_ia.max' => 'Las observaciones no pueden superar los 2500 caracteres.',
+            'descripcion.max' => 'La descripción no puede superar los 5000 caracteres.',
+        ]);
+
+        $alumno = Inscripcion::query()
+            ->with('grado:id,nombre')
+            ->findOrFail($this->inscripcion_id);
+
+        $contexto = (bool) config('groq.include_context', false)
+            ? $this->obtenerContextoParaIA()
+            : '';
+
+        if (
+            blank(strip_tags($this->observaciones_ia))
+            && blank(strip_tags($this->descripcion))
+            && blank($contexto)
+        ) {
+            $this->addError(
+                'observaciones_ia',
+                $this->campo === 'recomendaciones'
+                    ? 'Captura primero algún campo formativo o escribe observaciones para generar recomendaciones.'
+                    : 'Escribe algunas observaciones para generar la descripción.'
+            );
+
+            return;
+        }
+
+        try {
+            $resultado = $groq->generarDescripcion(
+                campo: $this->campos[$this->campo]['label'] ?? $this->campo,
+                periodo: $this->periodoNombre(),
+                grado: $alumno->grado?->nombre ?? 'Preescolar',
+                referenciaAlumno: 'la persona estudiante',
+                observaciones: $this->observaciones_ia,
+                descripcionActual: $this->descripcion,
+                contextoAdicional: $contexto,
+                datosSensibles: [
+                    $alumno->nombre ?? null,
+                    $alumno->apellido_paterno ?? null,
+                    $alumno->apellido_materno ?? null,
+                    $alumno->curp ?? null,
+                    $alumno->matricula ?? null,
+                    $this->alumnoNombre($alumno),
+                ]
+            );
+
+            $this->descripcion = $this->convertirTextoAHtml($resultado);
+            $this->observaciones_ia = '';
+
+            $this->verificarGroq($groq);
+
+            $this->dispatch(
+                'actualizar-editor-ficha',
+                contenido: $this->descripcion
+            );
+
+            $this->dispatch('swal', [
+                'icon' => 'success',
+                'title' => 'Descripción generada con GroqCloud',
+                'text' => 'Revisa el texto y realiza los ajustes necesarios antes de guardarlo.',
+                'position' => 'top',
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('No se pudo generar la ficha con GroqCloud.', [
+                'inscripcion_id' => $this->inscripcion_id,
+                'campo' => $this->campo,
+                'modelo' => $this->groq_modelo,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->verificarGroq($groq);
+
+            $this->dispatch('swal', [
+                'icon' => 'error',
+                'title' => 'No se pudo usar GroqCloud',
+                'text' => $exception->getMessage(),
+                'position' => 'top',
+            ]);
+        }
     }
 
     public function guardar(): void
@@ -380,6 +497,58 @@ class Ficha extends Component
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'fecha_lugar' => $this->fecha_lugar,
         ], fn($value) => !blank($value));
+    }
+
+    private function obtenerContextoParaIA(): string
+    {
+        if (!$this->inscripcion_id || $this->campo !== 'recomendaciones') {
+            return '';
+        }
+
+        return FichaDescriptiva::query()
+            ->where('inscripcion_id', $this->inscripcion_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->where('campo', '!=', 'recomendaciones')
+            ->whereNotNull('descripcion')
+            ->get(['campo', 'descripcion'])
+            ->map(function (FichaDescriptiva $ficha) {
+                $etiqueta = $this->campos[$ficha->campo]['label'] ?? $ficha->campo;
+                $texto = trim(html_entity_decode(strip_tags((string) $ficha->descripcion)));
+
+                return $texto !== '' ? $etiqueta . ': ' . $texto : null;
+            })
+            ->filter()
+            ->implode("\n");
+    }
+
+    private function referenciaAlumno(Inscripcion $alumno): string
+    {
+        $valor = mb_strtoupper(trim((string) (
+            $alumno->genero
+            ?? $alumno->sexo
+            ?? ''
+        )));
+
+        if (in_array($valor, ['M', 'MUJER', 'F', 'FEMENINO'], true)) {
+            return 'la alumna';
+        }
+
+        if (in_array($valor, ['H', 'HOMBRE', 'MASCULINO'], true)) {
+            return 'el alumno';
+        }
+
+        return 'el alumno o la alumna';
+    }
+
+    private function convertirTextoAHtml(string $texto): string
+    {
+        $parrafos = preg_split('/\R{2,}/u', trim($texto)) ?: [];
+
+        return collect($parrafos)
+            ->map(fn(string $parrafo) => '<p>' . e(trim($parrafo)) . '</p>')
+            ->filter(fn(string $parrafo) => $parrafo !== '<p></p>')
+            ->implode('');
     }
 
     public function render()

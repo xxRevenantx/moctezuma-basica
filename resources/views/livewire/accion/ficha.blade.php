@@ -289,8 +289,10 @@
     @if ($modalAbierto)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 p-4 backdrop-blur-sm"
             wire:key="modal-ficha">
-            <div class="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-neutral-900">
-                <div class="flex items-start justify-between gap-4 bg-indigo-600 px-5 py-4 text-white">
+            <div
+                class="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-neutral-900">
+                <div
+                    class="sticky top-0 z-20 flex items-start justify-between gap-4 bg-indigo-600 px-5 py-4 text-white">
                     <h3 class="text-base font-black uppercase leading-6">
                         {{ $campos[$campo]['label'] ?? '' }} |
                         {{ $this->alumnoNombre($this->alumnoModal) }} |
@@ -298,17 +300,19 @@
                     </h3>
 
                     <flux:button type="button" wire:click="cerrarModal" variant="ghost" size="sm" square
-                        class="text-white hover:bg-white/15">
+                        class="text-white hover:bg-white/15" wire:loading.attr="disabled"
+                        wire:target="generarDescripcionIA,guardar">
                         ✕
                     </flux:button>
                 </div>
 
-                <div class="grid gap-5 p-5 lg:grid-cols-[270px_1fr]">
+                <div class="grid gap-5 p-5 lg:grid-cols-[270px_minmax(0,1fr)]">
                     @if ($campo !== 'recomendaciones')
                         <div
                             class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
                             <div class="border-b border-neutral-100 px-5 py-4 text-sm dark:border-neutral-800">
-                                Descripción | <strong>{{ $campos[$campo]['label'] ?? '' }}</strong>
+                                Descripción |
+                                <strong>{{ $campos[$campo]['label'] ?? '' }}</strong>
                             </div>
 
                             <div class="space-y-4 px-5 py-5 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
@@ -319,13 +323,196 @@
                                 <div
                                     class="grid min-h-32 place-items-center rounded-xl border border-dashed border-indigo-200 bg-indigo-50 p-4 text-center text-xs font-black uppercase tracking-wide text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
                                     <img src="{{ asset($campos[$campo]['imagen'] ?? '') }}"
-                                        class="max-h-40 object-contain  " alt="{{ $campos[$campo]['label'] ?? '' }}">
+                                        class="max-h-40 object-contain" alt="{{ $campos[$campo]['label'] ?? '' }}">
                                 </div>
                             </div>
                         </div>
                     @endif
 
-                    <div @class(['lg:col-span-2' => $campo === 'recomendaciones'])>
+                    <div @class(['min-w-0', 'lg:col-span-2' => $campo === 'recomendaciones'])>
+                        <div wire:init="verificarGroq"
+                            class="mb-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 shadow-sm dark:border-emerald-500/30 dark:from-emerald-500/10 dark:via-neutral-900 dark:to-cyan-500/10">
+                            <div class="border-b border-emerald-100 px-5 py-4 dark:border-emerald-500/20">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-600 text-xl text-white shadow-sm">
+                                            ✨
+                                        </div>
+
+                                        <div>
+                                            <h4 class="font-black text-emerald-950 dark:text-emerald-100">
+                                                Asistente de redacción con GroqCloud
+                                            </h4>
+
+                                            <p class="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">
+                                                La redacción se genera mediante GroqCloud. El sistema elimina
+                                                identificadores directos antes de enviar el texto.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span @class([
+                                            'rounded-full border px-3 py-1 text-xs font-bold',
+                                            'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300' => is_null(
+                                                $groq_disponible),
+                                            'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300' =>
+                                                $groq_disponible && $groq_modelo_disponible,
+                                            'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300' =>
+                                                $groq_disponible && !$groq_modelo_disponible,
+                                            'border-red-200 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300' =>
+                                                $groq_disponible === false,
+                                        ])>
+                                            @if (is_null($groq_disponible))
+                                                Verificando...
+                                            @elseif ($groq_disponible && $groq_modelo_disponible)
+                                                GroqCloud listo
+                                            @elseif ($groq_disponible)
+                                                Modelo no disponible
+                                            @else
+                                                GroqCloud sin conexión
+                                            @endif
+                                        </span>
+
+                                        <flux:button type="button" variant="ghost" size="sm" icon="arrow-path"
+                                            wire:click="verificarGroq" wire:loading.attr="disabled"
+                                            wire:target="verificarGroq,generarDescripcionIA">
+                                            <span wire:loading.remove wire:target="verificarGroq">
+                                                Verificar
+                                            </span>
+
+                                            <span wire:loading wire:target="verificarGroq">
+                                                Revisando...
+                                            </span>
+                                        </flux:button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 p-5">
+                                <div @class([
+                                    'rounded-xl border px-4 py-3 text-xs leading-5',
+                                    'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300' => is_null(
+                                        $groq_disponible),
+                                    'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200' =>
+                                        $groq_disponible && $groq_modelo_disponible,
+                                    'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200' =>
+                                        $groq_disponible && !$groq_modelo_disponible,
+                                    'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' =>
+                                        $groq_disponible === false,
+                                ])>
+                                    <div class="font-semibold">
+                                        {{ $groq_mensaje }}
+                                    </div>
+
+                                    <div class="mt-1">
+                                        Modelo configurado:
+                                        <code
+                                            class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">{{ $groq_modelo }}</code>
+                                    </div>
+
+                                    @if ($groq_disponible && !$groq_modelo_disponible)
+                                        <div class="mt-2">
+                                            Cambia <code
+                                                class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">GROQ_MODEL</code>
+                                            por un modelo activo de tu cuenta y ejecuta <code
+                                                class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">php
+                                                artisan optimize:clear</code>.
+                                        </div>
+                                    @elseif ($groq_disponible === false)
+                                        <div class="mt-2">
+                                            Revisa tu conexión a internet, la API key y pulsa
+                                            <strong>Verificar</strong>.
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <flux:field>
+                                    <flux:label>
+                                        @if ($campo === 'recomendaciones')
+                                            Observaciones adicionales para las recomendaciones
+                                        @else
+                                            Ideas u observaciones de la educadora
+                                        @endif
+                                    </flux:label>
+
+                                    <flux:textarea wire:model="observaciones_ia" rows="4"
+                                        placeholder="{{ $campo === 'recomendaciones'
+                                            ? 'Ejemplo: reforzar en casa la expresión de emociones, respetar turnos y mantener rutinas de lectura...'
+                                            : 'Ejemplo: reconoce algunas vocales, participa con entusiasmo, escribe su nombre con apoyo y requiere acompañamiento para respetar turnos...' }}" />
+
+                                    <flux:description>
+                                        @if ($campo === 'recomendaciones' && config('groq.include_context', false))
+                                            También se utilizarán los demás campos formativos capturados durante este
+                                            periodo.
+                                        @elseif ($campo === 'recomendaciones')
+                                            Solo se utilizarán las observaciones escritas en este cuadro y el texto
+                                            actual.
+                                        @else
+                                            Puedes escribir ideas breves; GroqCloud las convertirá en una descripción
+                                            pedagógica completa.
+                                        @endif
+                                        No escribas nombre, CURP, matrícula, domicilio, teléfono ni datos médicos.
+                                    </flux:description>
+
+                                    <flux:error name="observaciones_ia" />
+                                </flux:field>
+
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex flex-wrap gap-2">
+                                        <flux:button type="button" variant="primary" icon="sparkles"
+                                            x-on:click="window.generarDescripcionFichaIA?.()"
+                                            wire:loading.attr="disabled"
+                                            wire:target="generarDescripcionIA,verificarGroq"
+                                            :disabled="!($groq_disponible && $groq_modelo_disponible)">
+                                            <span wire:loading.remove wire:target="generarDescripcionIA">
+                                                @if ($campo === 'recomendaciones')
+                                                    Generar recomendaciones
+                                                @elseif (filled(strip_tags($descripcion ?? '')))
+                                                    Mejorar descripción
+                                                @else
+                                                    Generar descripción
+                                                @endif
+                                            </span>
+
+                                            <span wire:loading wire:target="generarDescripcionIA">
+                                                Generando descripción...
+                                            </span>
+                                        </flux:button>
+
+                                        @if (filled($observaciones_ia ?? ''))
+                                            <flux:button type="button" variant="ghost"
+                                                wire:click="$set('observaciones_ia', '')" wire:loading.attr="disabled"
+                                                wire:target="generarDescripcionIA">
+                                                Limpiar observaciones
+                                            </flux:button>
+                                        @endif
+                                    </div>
+
+                                    <div wire:loading wire:target="generarDescripcionIA"
+                                        class="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                stroke="currentColor" stroke-width="4" />
+
+                                            <path class="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z" />
+                                        </svg>
+
+                                        La respuesta normalmente tarda pocos segundos. No cierres esta ventana.
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                    <strong>Revisión docente:</strong>
+                                    GroqCloud crea una sugerencia. La educadora debe comprobar que el texto corresponda
+                                    realmente al desempeño del alumno antes de guardarlo.
+                                </div>
+                            </div>
+                        </div>
+
                         <flux:field>
                             <flux:label>
                                 {{ $campos[$campo]['label'] ?? 'Descripción' }}
@@ -335,23 +522,30 @@
                                 <textarea id="editor_ficha_descriptiva"></textarea>
                             </div>
 
-                            <div class="mt-1 flex items-center justify-between text-xs">
+                            <div class="mt-1 flex items-center justify-between gap-3 text-xs">
                                 <flux:description>
-                                    {{ mb_strlen($descripcion ?? '') }} caracteres
+                                    {{ mb_strlen(strip_tags($descripcion ?? '')) }} caracteres
                                 </flux:description>
 
                                 <flux:error name="descripcion" />
                             </div>
                         </flux:field>
 
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <flux:button type="button" x-on:click="window.sincronizarEditorFicha?.()"
-                                wire:click="guardar" wire:loading.attr="disabled" wire:target="guardar"
+                        <div class="mt-5 flex flex-wrap gap-2">
+                            <flux:button type="button" x-on:click="window.guardarFichaDesdeEditor?.()"
+                                wire:loading.attr="disabled" wire:target="guardar,generarDescripcionIA"
                                 variant="primary" icon="check">
-                                <span wire:loading.remove wire:target="guardar">Guardar</span>
-                                <span wire:loading wire:target="guardar">Guardando...</span>
+                                <span wire:loading.remove wire:target="guardar">
+                                    Guardar
+                                </span>
+
+                                <span wire:loading wire:target="guardar">
+                                    Guardando...
+                                </span>
                             </flux:button>
-                            <flux:button type="button" wire:click="cerrarModal" variant="outline">
+
+                            <flux:button type="button" wire:click="cerrarModal" wire:loading.attr="disabled"
+                                wire:target="guardar,generarDescripcionIA" variant="outline">
                                 Cancelar
                             </flux:button>
                         </div>
@@ -380,10 +574,12 @@
                         if (window.tinymce) {
                             clearInterval(intervalo);
                             callback();
+                            return;
                         }
 
                         if (intentos >= 40) {
                             clearInterval(intervalo);
+
                             console.error(
                                 'TinyMCE no se pudo cargar. Revisa que el script de TinyMCE esté en el layout.'
                             );
@@ -392,9 +588,18 @@
                 };
 
                 const quitarEditorFicha = () => {
-                    if (window.tinymce && tinymce.get('editor_ficha_descriptiva')) {
+                    if (
+                        window.tinymce &&
+                        tinymce.get('editor_ficha_descriptiva')
+                    ) {
                         tinymce.get('editor_ficha_descriptiva').remove();
                     }
+                };
+
+                const obtenerEditorFicha = () => {
+                    return window.tinymce ?
+                        tinymce.get('editor_ficha_descriptiva') :
+                        null;
                 };
 
                 const enviarDescripcionConDebounce = (contenido) => {
@@ -408,7 +613,9 @@
                 const iniciarEditorFicha = (contenido = '') => {
                     esperarTinyMCEFicha(() => {
                         setTimeout(() => {
-                            const elemento = document.getElementById('editor_ficha_descriptiva');
+                            const elemento = document.getElementById(
+                                'editor_ficha_descriptiva'
+                            );
 
                             if (!elemento) {
                                 return;
@@ -419,37 +626,71 @@
                             tinymce.init({
                                 selector: '#editor_ficha_descriptiva',
                                 height: 420,
+                                min_height: 360,
                                 menubar: true,
                                 branding: false,
                                 promotion: false,
                                 language: 'es',
-                                plugins: 'lists link table code preview fullscreen searchreplace wordcount autoresize',
-                                toolbar: 'undo redo | blocks | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist | table link | searchreplace preview fullscreen code',
+                                browser_spellcheck: true,
+                                contextmenu: false,
+                                plugins: [
+                                    'lists',
+                                    'link',
+                                    'table',
+                                    'code',
+                                    'preview',
+                                    'fullscreen',
+                                    'searchreplace',
+                                    'wordcount',
+                                    'autoresize'
+                                ].join(' '),
+                                toolbar: [
+                                    'undo redo',
+                                    'blocks',
+                                    'bold italic underline strikethrough',
+                                    'forecolor backcolor',
+                                    'alignleft aligncenter alignright alignjustify',
+                                    'bullist numlist',
+                                    'table link',
+                                    'searchreplace preview fullscreen code'
+                                ].join(' | '),
                                 content_style: `
-                                body {
-                                    font-family: Arial, Helvetica, sans-serif;
-                                    font-size: 14px;
-                                    line-height: 1.6;
-                                }
+                                    body {
+                                        font-family: Arial, Helvetica, sans-serif;
+                                        font-size: 14px;
+                                        line-height: 1.7;
+                                        padding: 12px;
+                                    }
 
-                                p {
-                                    margin: 0 0 10px;
-                                }
-                            `,
+                                    p {
+                                        margin: 0 0 10px;
+                                    }
+
+                                    ul,
+                                    ol {
+                                        margin: 0 0 10px;
+                                    }
+                                `,
                                 setup: function(editor) {
                                     editor.on('init', function() {
                                         editor.setContent(contenido ?? '');
                                     });
 
-                                    editor.on('change undo redo input keyup',
+                                    editor.on(
+                                        'change undo redo input keyup',
                                         function() {
-                                            enviarDescripcionConDebounce(editor
-                                                .getContent());
-                                        });
+                                            enviarDescripcionConDebounce(
+                                                editor.getContent()
+                                            );
+                                        }
+                                    );
 
                                     editor.on('blur', function() {
-                                        @this.set('descripcion', editor
-                                            .getContent(), false);
+                                        @this.set(
+                                            'descripcion',
+                                            editor.getContent(),
+                                            false
+                                        );
                                     });
                                 },
                             });
@@ -457,10 +698,26 @@
                     });
                 };
 
-                window.sincronizarEditorFicha = () => {
-                    if (window.tinymce && tinymce.get('editor_ficha_descriptiva')) {
-                        @this.set('descripcion', tinymce.get('editor_ficha_descriptiva').getContent(), false);
+                window.sincronizarEditorFicha = async () => {
+                    const editor = obtenerEditorFicha();
+
+                    if (editor) {
+                        await @this.set(
+                            'descripcion',
+                            editor.getContent(),
+                            false
+                        );
                     }
+                };
+
+                window.generarDescripcionFichaIA = async () => {
+                    await window.sincronizarEditorFicha?.();
+                    await @this.call('generarDescripcionIA');
+                };
+
+                window.guardarFichaDesdeEditor = async () => {
+                    await window.sincronizarEditorFicha?.();
+                    await @this.call('guardar');
                 };
 
                 window.addEventListener('abrir-modal-ficha', (event) => {
@@ -468,10 +725,34 @@
                 });
 
                 window.addEventListener('cerrar-modal-ficha', () => {
+                    clearTimeout(temporizadorFicha);
                     quitarEditorFicha();
                 });
 
+                window.addEventListener(
+                    'actualizar-editor-ficha',
+                    (event) => {
+                        const contenido = event.detail.contenido ?? '';
+                        const editor = obtenerEditorFicha();
+
+                        if (!editor) {
+                            iniciarEditorFicha(contenido);
+                            return;
+                        }
+
+                        editor.setContent(contenido);
+                        editor.focus();
+
+                        @this.set(
+                            'descripcion',
+                            contenido,
+                            false
+                        );
+                    }
+                );
+
                 document.addEventListener('livewire:navigating', () => {
+                    clearTimeout(temporizadorFicha);
                     quitarEditorFicha();
                 });
             });
