@@ -116,6 +116,14 @@
                     <span x-text="mostrarFormulario ? 'Ocultar asignación' : 'Nueva asignación'"></span>
                 </button>
 
+                @if ($nivel?->slug === 'secundaria')
+                    <button type="button" x-on:click="$dispatch('abrir-taller-conjunto')"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] hover:shadow-xl">
+                        <flux:icon.user-group class="h-4 w-4" />
+                        Taller conjunto
+                    </button>
+                @endif
+
                 <button type="button" x-on:click="$dispatch('toggle-materias-promediar')"
                     class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-pink-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-pink-500/20 transition hover:scale-[1.01] hover:shadow-xl">
                     <svg class="h-4 w-4 transition-transform duration-300"
@@ -130,6 +138,10 @@
             </div>
         </div>
     </section>
+
+    @if ($nivel?->slug === 'secundaria')
+        <livewire:accion.taller-conjunto :slug_nivel="$slug_nivel" :key="'taller-conjunto-asignacion-' . $nivel->id" />
+    @endif
 
     {{-- Collapse de materias a promediar --}}
     <section id="panel-materias-promediar" x-show="mostrarMateriasPromediar" x-cloak

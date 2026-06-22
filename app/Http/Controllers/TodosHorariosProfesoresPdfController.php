@@ -15,6 +15,11 @@ class TodosHorariosProfesoresPdfController extends Controller
 {
     public function __invoke(Request $request)
     {
+        $cicloEscolar = cicloEscolar::query()
+            ->when($request->filled('ciclo_escolar_id'), fn($query) => $query->where('id', $request->integer('ciclo_escolar_id')))
+            ->orderByDesc('id')
+            ->first();
+
         $horarios = Horario::query()
             ->with([
                 'nivel:id,nombre,color,cct',
@@ -28,10 +33,17 @@ class TodosHorariosProfesoresPdfController extends Controller
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,materia,nivel_id,grado_id,semestre_id,extra,receso,orden',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
+                'tallerSesion.taller:id,nivel_id,nombre,clave',
+                'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
+                'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'tallerSesion.grupos.grado:id,nombre,orden',
+                'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
-            ->whereHas('asignacionMateria', function ($query) {
-                $query->whereNotNull('profesor_id');
+            ->where(function ($query) {
+                $query->whereHas('asignacionMateria', fn($subQuery) => $subQuery->whereNotNull('profesor_id'))
+                    ->orWhereHas('tallerSesion', fn($subQuery) => $subQuery->whereNotNull('profesor_id'));
             })
+            ->when($cicloEscolar, fn($query) => $query->where('ciclo_escolar_id', $cicloEscolar->id))
             ->when($request->filled('nivel_id'), function ($query) use ($request) {
                 $query->where('nivel_id', $request->integer('nivel_id'));
             })
@@ -54,6 +66,9 @@ class TodosHorariosProfesoresPdfController extends Controller
                         ->whereHas('asignacionMateria.materia', function ($materiaQuery) use ($buscar) {
                             $materiaQuery->where('materia', 'like', "%{$buscar}%");
                         })
+                        ->orWhereHas('tallerSesion.taller', function ($tallerQuery) use ($buscar) {
+                            $tallerQuery->where('nombre', 'like', "%{$buscar}%");
+                        })
                         ->orWhereHas('nivel', function ($nivelQuery) use ($buscar) {
                             $nivelQuery->where('nombre', 'like', "%{$buscar}%");
                         })
@@ -68,10 +83,19 @@ class TodosHorariosProfesoresPdfController extends Controller
                                 ->where('nombre', 'like', "%{$buscar}%")
                                 ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
                                 ->orWhere('apellido_materno', 'like', "%{$buscar}%");
+                        })
+                        ->orWhereHas('tallerSesion.profesor', function ($profesorQuery) use ($buscar) {
+                            $profesorQuery
+                                ->where('nombre', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_materno', 'like', "%{$buscar}%");
                         });
                 });
             })
             ->get()
+            ->unique(fn($horario) => $horario->taller_sesion_id
+                ? 'taller-' . $horario->taller_sesion_id
+                : 'horario-' . $horario->id)
             ->when($request->filled('dia_key'), function (Collection $items) use ($request) {
                 $diaKey = (string) $request->input('dia_key');
 
@@ -89,15 +113,15 @@ class TodosHorariosProfesoresPdfController extends Controller
             ->values();
 
         $profesoresHorarios = $horarios
-            ->groupBy(fn($horario) => $horario->asignacionMateria?->profesor_id)
+            ->groupBy(fn($horario) => $horario->profesorActividad()?->id)
             ->map(function (Collection $items) {
-                $profesor = $items->first()?->asignacionMateria?->profesor;
+                $profesor = $items->first()?->profesorActividad();
 
                 $profesorNombre = trim(
                     ($profesor?->titulo ? $profesor->titulo . ' ' : '') .
-                        ($profesor?->nombre ?? '') . ' ' .
-                        ($profesor?->apellido_paterno ?? '') . ' ' .
-                        ($profesor?->apellido_materno ?? '')
+                    ($profesor?->nombre ?? '') . ' ' .
+                    ($profesor?->apellido_paterno ?? '') . ' ' .
+                    ($profesor?->apellido_materno ?? '')
                 );
 
                 $horarioGeneral = $this->crearHorarioGeneral($items);
@@ -119,11 +143,6 @@ class TodosHorariosProfesoresPdfController extends Controller
 
         $logoIzquierdo = public_path('imagenes/logo-letra.png');
         $logoDerecho = public_path('penacho.jpg');
-        $cicloEscolar = cicloEscolar::query()
-            ->orderBy('id', 'desc')
-            ->first();
-
-
         $escuela = Escuela::query()->first();
 
         $pdf = Pdf::loadView('pdf.profesores-horarios-todos', [
@@ -212,7 +231,12 @@ class TodosHorariosProfesoresPdfController extends Controller
     {
         return $horarios
             ->groupBy(function ($horario) {
+                if ($horario->esTallerConjunto()) {
+                    return 'taller|' . $horario->taller_sesion_id;
+                }
+
                 return implode('|', [
+                    'materia',
                     $horario->asignacionMateria?->materia_id,
                     $horario->nivel_id,
                     $horario->grado_id,
@@ -222,12 +246,32 @@ class TodosHorariosProfesoresPdfController extends Controller
             ->map(function (Collection $items) {
                 $primero = $items->first();
 
+                if ($primero->esTallerConjunto()) {
+                    $grupos = $primero->tallerSesion?->grupos
+                            ?->map(fn($grupo) => trim(
+                            $this->gradoCorto($grupo->grado?->nombre) . '° ' .
+                            ($grupo->asignacionGrupo?->nombre ?? '-')
+                        ))
+                        ->filter()
+                        ->implode(', ');
+
+                    return [
+                        'materia' => 'Taller conjunto: ' . $primero->nombreActividad(),
+                        'nivel' => $primero->nivel?->nombre ?? 'Nivel',
+                        'grado' => 'Varios',
+                        'grupo' => $grupos ?: '-',
+                        'bloques' => 1,
+                        'taller_conjunto' => true,
+                    ];
+                }
+
                 return [
-                    'materia' => $primero->asignacionMateria?->materia?->materia ?? 'Materia no definida',
+                    'materia' => $primero->nombreActividad(),
                     'nivel' => $primero->nivel?->nombre ?? 'Nivel',
                     'grado' => $this->gradoCorto($primero->grado?->nombre),
                     'grupo' => $primero->grupo?->asignacionGrupo?->nombre ?? '-',
                     'bloques' => $items->count(),
+                    'taller_conjunto' => false,
                 ];
             })
             ->sortBy([
@@ -258,12 +302,12 @@ class TodosHorariosProfesoresPdfController extends Controller
 
     private function nombreProfesor($horario): string
     {
-        $profesor = $horario->asignacionMateria?->profesor;
+        $profesor = $horario->profesorActividad();
 
         return trim(
             ($profesor?->apellido_paterno ?? '') . ' ' .
-                ($profesor?->apellido_materno ?? '') . ' ' .
-                ($profesor?->nombre ?? '')
+            ($profesor?->apellido_materno ?? '') . ' ' .
+            ($profesor?->nombre ?? '')
         );
     }
 

@@ -46,6 +46,10 @@
         <livewire:dia :nivel="$nivel" :key="'dia-' . $nivel->id" />
     </div>
 
+    @if ($nivel?->slug === 'secundaria')
+        <livewire:accion.taller-conjunto :slug_nivel="$slug_nivel" :key="'taller-conjunto-horario-' . $nivel->id" />
+    @endif
+
     {{-- TABLA BASE DEL HORARIO --}}
     <section
         class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
@@ -53,7 +57,7 @@
 
         {{-- Loader --}}
         <div wire:loading.flex
-            wire:target="refrescarHorasDias,generacion_id,grado_id,grupo_id,semestre_id,limpiarFiltros"
+            wire:target="refrescarHorasDias,ciclo_escolar_id,generacion_id,grado_id,grupo_id,semestre_id,limpiarFiltros"
             class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-black/50">
             <div
                 class="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 px-6 py-5 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900/90">
@@ -115,6 +119,14 @@
                         Avance: {{ $this->avanceHorario }}%
                     </span>
 
+                    @if ($nivel?->slug === 'secundaria')
+                        <button type="button" x-on:click="$dispatch('abrir-taller-conjunto')"
+                            class="inline-flex items-center gap-2 rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-500 to-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-cyan-700/50">
+                            <flux:icon.user-group class="h-4 w-4" />
+                            Taller conjunto
+                        </button>
+                    @endif
+
                     <button type="button" wire:click="limpiarFiltros" data-preservar-scroll-horario
                         class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700">
                         <flux:icon.arrow-path class="h-4 w-4" />
@@ -160,7 +172,21 @@
             {{-- FILTROS --}}
             <div
                 class="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/50">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                    <flux:field>
+                        <flux:label>Ciclo escolar</flux:label>
+
+                        <flux:select wire:model.live="ciclo_escolar_id" data-preservar-scroll-horario>
+                            <option value="">Selecciona un ciclo</option>
+
+                            @foreach ($ciclosEscolares as $ciclo)
+                                <option value="{{ $ciclo->id }}">
+                                    {{ $ciclo->inicio_anio }} - {{ $ciclo->fin_anio }}
+                                </option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+
                     <flux:field>
                         <flux:label>Generación</flux:label>
 
@@ -320,6 +346,7 @@
                                                 @php
                                                     $claveCelda = $hora->id . '-' . $dia->id;
                                                     $horarioGuardado = $horariosGuardados->get($claveCelda);
+                                                    $talleresCelda = $talleresGuardados->get($claveCelda, collect());
 
                                                     $asignacionGuardada = $horarioGuardado
                                                         ? $materiasDisponibles->firstWhere(
@@ -397,6 +424,45 @@
                                                                 </p>
                                                             </div>
                                                         @endif
+
+                                                        @foreach ($talleresCelda as $registroTaller)
+                                                            @php
+                                                                $sesionTaller = $registroTaller->tallerSesion;
+                                                                $profesorTaller = $sesionTaller?->profesor;
+                                                                $nombreProfesorTaller = $profesorTaller
+                                                                    ? trim(
+                                                                        ($profesorTaller->nombre ?? '') .
+                                                                            ' ' .
+                                                                            ($profesorTaller->apellido_paterno ?? '') .
+                                                                            ' ' .
+                                                                            ($profesorTaller->apellido_materno ?? ''),
+                                                                    )
+                                                                    : 'Sin profesor asignado';
+                                                            @endphp
+
+                                                            <button type="button"
+                                                                x-on:click="$dispatch('abrir-taller-conjunto', { sesionId: {{ $sesionTaller?->id ?? 0 }} })"
+                                                                class="w-full rounded-2xl border border-cyan-300 bg-gradient-to-br from-cyan-50 to-sky-100 px-3 py-2 text-center text-cyan-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-cyan-800/60 dark:from-cyan-950/50 dark:to-sky-950/40 dark:text-cyan-100">
+                                                                <span
+                                                                    class="block text-[10px] font-black uppercase tracking-wide text-cyan-600 dark:text-cyan-300">
+                                                                    Taller conjunto
+                                                                </span>
+                                                                <span
+                                                                    class="mt-0.5 block text-[12px] font-black leading-tight">
+                                                                    {{ $sesionTaller?->taller?->nombre ?? 'Taller' }}
+                                                                </span>
+                                                                <span
+                                                                    class="mt-1 block text-[11px] font-semibold opacity-90">
+                                                                    {{ $nombreProfesorTaller }}
+                                                                </span>
+                                                                @if ($sesionTaller?->conflicto_forzado)
+                                                                    <span
+                                                                        class="mt-1 inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                                                                        Conflicto autorizado
+                                                                    </span>
+                                                                @endif
+                                                            </button>
+                                                        @endforeach
                                                     </div>
                                                 </td>
                                             @endforeach
@@ -759,6 +825,13 @@
                                                                             </span>
                                                                         @endif
 
+                                                                        @if ($materia['taller_conjunto'] ?? false)
+                                                                            <span
+                                                                                class="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-300 dark:ring-cyan-900/40">
+                                                                                Taller conjunto
+                                                                            </span>
+                                                                        @endif
+
                                                                         @if ($materia['extra'])
                                                                             <span
                                                                                 class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40">
@@ -779,6 +852,12 @@
                                                                         {{ $materia['modulos'] }} módulo(s) ·
                                                                         {{ $this->formatearMinutosHorario($materia['minutos']) }}
                                                                     </p>
+                                                                    @if (!empty($materia['grupos']))
+                                                                        <p
+                                                                            class="mt-1 text-[10px] font-bold text-cyan-700 dark:text-cyan-300">
+                                                                            Grupos: {{ $materia['grupos'] }}
+                                                                        </p>
+                                                                    @endif
                                                                 </div>
                                                             @endforeach
                                                         </div>

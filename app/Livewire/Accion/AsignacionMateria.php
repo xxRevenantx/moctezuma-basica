@@ -134,6 +134,13 @@ class AsignacionMateria extends Component
             ->when(!$this->esBachillerato, function ($query) {
                 $query->whereNull('semestre_id');
             })
+            ->when($this->nivel?->slug === 'secundaria', function ($query) {
+                $query->where(function ($subQuery) {
+                    $subQuery->where('slug', '!=', 'taller')
+                        ->orWhere('extra', '!=', 1)
+                        ->orWhere('receso', '!=', 1);
+                });
+            })
             ->orderBy('orden')
             ->orderBy('materia')
             ->get();
@@ -201,6 +208,15 @@ class AsignacionMateria extends Component
             ])
             ->whereHas('grupo', function ($query) {
                 $query->where('nivel_id', $this->nivel?->id);
+            })
+            ->when($this->nivel?->slug === 'secundaria', function ($query) {
+                $query->whereHas('materia', function ($materiaQuery) {
+                    $materiaQuery->where(function ($subQuery) {
+                        $subQuery->where('slug', '!=', 'taller')
+                            ->orWhere('extra', '!=', 1)
+                            ->orWhere('receso', '!=', 1);
+                    });
+                });
             })
             ->when($this->buscar, function ($query) {
                 $buscar = '%' . trim($this->buscar) . '%';

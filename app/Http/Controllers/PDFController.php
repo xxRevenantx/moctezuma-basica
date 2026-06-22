@@ -1201,10 +1201,9 @@ class PDFController extends Controller
     }
 
     // HORARIO PDF
-    // HORARIO PDF
     public function horario_pdf(Request $request)
     {
-        $slugNivel = $request->input('slug_nivel');
+        $slugNivel = trim((string) $request->input('slug_nivel'));
         $generacionId = $request->integer('generacion_id');
         $gradoId = $request->integer('grado_id');
         $grupoId = $request->integer('grupo_id');
@@ -1212,12 +1211,15 @@ class PDFController extends Controller
         $cicloEscolarId = $request->integer('ciclo_escolar_id');
 
         if (
-            blank($slugNivel) ||
-            blank($generacionId) ||
-            blank($gradoId) ||
-            blank($grupoId)
+            $slugNivel === '' ||
+            !$generacionId ||
+            !$gradoId ||
+            !$grupoId
         ) {
-            abort(422, 'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.');
+            abort(
+                422,
+                'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.'
+            );
         }
 
         $escuela = \App\Models\Escuela::query()->first();
@@ -1240,7 +1242,7 @@ class PDFController extends Controller
         $esPrimaria = (int) $nivel->id === 2 || $nivel->slug === 'primaria';
 
         $generacion = Generacion::query()
-            ->where('id', $generacionId)
+            ->whereKey($generacionId)
             ->where('nivel_id', $nivel->id)
             ->first();
 
@@ -1249,7 +1251,7 @@ class PDFController extends Controller
         }
 
         $grado = Grado::query()
-            ->where('id', $gradoId)
+            ->whereKey($gradoId)
             ->where('nivel_id', $nivel->id)
             ->first();
 
@@ -1259,26 +1261,24 @@ class PDFController extends Controller
 
         $grupoQuery = Grupo::query()
             ->with([
-                'asignacionGrupo',
-                'generacion',
-                'grado',
-                'semestre',
+                'asignacionGrupo:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grado:id,nombre,orden',
+                'semestre:id,numero',
             ])
-            ->where('id', $grupoId)
+            ->whereKey($grupoId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id);
 
         if ($esBachillerato) {
-            if (blank($semestreId)) {
+            if (!$semestreId) {
                 abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
             }
 
             $grupoQuery->where('semestre_id', $semestreId);
-        } else {
-            if (Schema::hasColumn('grupos', 'semestre_id')) {
-                $grupoQuery->whereNull('semestre_id');
-            }
+        } elseif (Schema::hasColumn('grupos', 'semestre_id')) {
+            $grupoQuery->whereNull('semestre_id');
         }
 
         $grupo = $grupoQuery->first();
@@ -1291,7 +1291,7 @@ class PDFController extends Controller
 
         if ($esBachillerato) {
             $semestre = Semestre::query()
-                ->where('id', $semestreId)
+                ->whereKey($semestreId)
                 ->where('grado_id', $grado->id)
                 ->first();
 
@@ -1300,13 +1300,15 @@ class PDFController extends Controller
             }
         }
 
-        $cicloEscolar = null;
+        /*
+        |--------------------------------------------------------------------------
+        | Ciclo escolar
+        |--------------------------------------------------------------------------
+        */
 
-        if (!blank($cicloEscolarId)) {
-            $cicloEscolar = cicloEscolar::query()
-                ->where('id', $cicloEscolarId)
-                ->first();
-        }
+        $cicloEscolar = $cicloEscolarId
+            ? cicloEscolar::query()->find($cicloEscolarId)
+            : null;
 
         if (!$cicloEscolar) {
             $cicloEscolar = cicloEscolar::query()
@@ -1319,29 +1321,28 @@ class PDFController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Horarios del contexto seleccionado
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Horarios del grupo
+        |--------------------------------------------------------------------------
+        |
+        | Se recuperan materias normales y proyecciones de talleres conjuntos.
+        | Cada taller tiene una fila en horarios por cada grupo participante.
+        */
 
         $horariosQuery = Horario::query()
             ->with([
-                'dia',
-                'hora',
-                'asignacionMateria' => function ($query) use ($esBachillerato, $semestre) {
-                    $query->with([
-                        'materia',
-                        'profesor',
-                    ]);
+                'dia:id,nivel_id,dia,orden',
+                'hora:id,nivel_id,hora_inicio,hora_fin,orden',
 
-                    if (Schema::hasColumn('asignacion_materias', 'semestre_id')) {
-                        if ($esBachillerato && $semestre) {
-                            $query->where('semestre_id', $semestre->id);
-                        } else {
-                            $query->whereNull('semestre_id');
-                        }
-                    }
-                },
+                'asignacionMateria.materia',
+                'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+
+                'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,dia_id,hora_id,ubicacion,conflicto_forzado,motivo_conflicto',
+                'tallerSesion.taller:id,nivel_id,nombre,clave',
+                'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'tallerSesion.grupos.grado:id,nombre,orden',
+                'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ]);
 
         if (Schema::hasColumn('horarios', 'nivel_id')) {
@@ -1373,44 +1374,30 @@ class PDFController extends Controller
         }
 
         /*
-         * Respaldo importante:
-         * Si horarios no guarda todos los filtros, se valida también contra asignacion_materias.
+         * Se excluyen filas incompletas. Para los talleres se comprueba que la
+         * sesión todavía incluya al grupo mediante la tabla pivote.
          */
-        $horariosQuery->whereHas('asignacionMateria', function ($query) use ($grupo, $nivel, $grado, $esBachillerato, $semestre) {
-            if (Schema::hasColumn('asignacion_materias', 'grupo_id')) {
-                $query->where('grupo_id', $grupo->id);
-            }
-
-            if (Schema::hasColumn('asignacion_materias', 'semestre_id')) {
-                if ($esBachillerato && $semestre) {
-                    $query->where('semestre_id', $semestre->id);
-                } else {
-                    $query->whereNull('semestre_id');
-                }
-            }
-
-            $query->whereHas('materia', function ($materiaQuery) use ($nivel, $grado, $esBachillerato, $semestre) {
-                if (Schema::hasColumn('materias', 'nivel_id')) {
-                    $materiaQuery->where('nivel_id', $nivel->id);
-                }
-
-                if (Schema::hasColumn('materias', 'grado_id')) {
-                    $materiaQuery->where('grado_id', $grado->id);
-                }
-
-                if (Schema::hasColumn('materias', 'semestre_id')) {
-                    if ($esBachillerato && $semestre) {
-                        $materiaQuery->where('semestre_id', $semestre->id);
-                    } else {
-                        $materiaQuery->whereNull('semestre_id');
-                    }
-                }
-            });
+        $horariosQuery->where(function ($actividadQuery) use ($grupo) {
+            $actividadQuery
+                ->where(function ($materiaQuery) {
+                    $materiaQuery
+                        ->whereNull('taller_sesion_id')
+                        ->whereNotNull('asignacion_materia_id')
+                        ->whereHas('asignacionMateria');
+                })
+                ->orWhere(function ($tallerQuery) use ($grupo) {
+                    $tallerQuery
+                        ->whereNotNull('taller_sesion_id')
+                        ->whereHas('tallerSesion.grupos', function ($gruposQuery) use ($grupo) {
+                            $gruposQuery->where('grupos.id', $grupo->id);
+                        });
+                });
         });
 
         $horarios = $horariosQuery
             ->orderBy('hora_id')
             ->orderBy('dia_id')
+            ->orderBy('id')
             ->get();
 
         if ($horarios->isEmpty()) {
@@ -1418,93 +1405,122 @@ class PDFController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Días corregidos
-    |--------------------------------------------------------------------------
-    | Soluciona la inconsistencia de BD:
-    | 1-5 = Lunes-Viernes
-    | 6-10 = Lunes-Viernes duplicados
-    |
-    | En vez de traer todos los días, solo se usan los días del horario actual.
-    */
+        |--------------------------------------------------------------------------
+        | Días y horas del nivel
+        |--------------------------------------------------------------------------
+        |
+        | Se toma la configuración completa del nivel para que el PDF conserve
+        | sus cinco días y todos los bloques, incluso cuando alguna celda esté
+        | vacía. Las relaciones usadas por los registros se agregan como respaldo.
+        */
 
-        $idsDiasHorario = $horarios
-            ->pluck('dia_id')
-            ->filter()
-            ->unique()
-            ->values();
+        $normalizarDia = static function ($dia): string {
+            return Str::lower(
+                Str::ascii(
+                    trim((string) ($dia->dia ?? $dia->nombre ?? ''))
+                )
+            );
+        };
 
         $dias = Dia::query()
-            ->whereIn('id', $idsDiasHorario)
+            ->where('nivel_id', $nivel->id)
+            ->orderBy('orden')
+            ->orderBy('id')
             ->get()
-            ->unique(function ($dia) {
-                return mb_strtolower(trim($dia->dia ?? $dia->nombre ?? ''), 'UTF-8');
-            })
-            ->sortBy(function ($dia) {
-                $nombre = mb_strtolower(trim($dia->dia ?? $dia->nombre ?? ''), 'UTF-8');
+            ->concat($horarios->pluck('dia')->filter())
+            ->unique('id')
+            ->unique($normalizarDia)
+            ->sortBy(function ($dia) use ($normalizarDia) {
+                $nombre = $normalizarDia($dia);
 
-                return match (true) {
+                $ordenNombre = match (true) {
                     str_contains($nombre, 'lunes') => 1,
                     str_contains($nombre, 'martes') => 2,
-                    str_contains($nombre, 'miércoles'),
                     str_contains($nombre, 'miercoles') => 3,
                     str_contains($nombre, 'jueves') => 4,
                     str_contains($nombre, 'viernes') => 5,
                     default => 99,
                 };
+
+                return sprintf(
+                    '%02d-%06d-%06d',
+                    $ordenNombre,
+                    (int) ($dia->orden ?? 999999),
+                    (int) ($dia->id ?? 999999)
+                );
+            })
+            ->values();
+
+        $horas = Hora::query()
+            ->where('nivel_id', $nivel->id)
+            ->orderBy('orden')
+            ->orderBy('hora_inicio')
+            ->orderBy('id')
+            ->get()
+            ->concat($horarios->pluck('hora')->filter())
+            ->unique('id')
+            ->unique(function ($hora) {
+                return trim((string) $hora->hora_inicio)
+                    . '|'
+                    . trim((string) $hora->hora_fin);
+            })
+            ->sortBy(function ($hora) {
+                return sprintf(
+                    '%s-%s-%06d',
+                    (string) ($hora->hora_inicio ?? '99:99:99'),
+                    (string) ($hora->hora_fin ?? '99:99:99'),
+                    (int) ($hora->id ?? 999999)
+                );
             })
             ->values();
 
         if ($dias->isEmpty()) {
-            abort(404, 'No se encontraron días para el horario seleccionado.');
+            abort(404, 'No se encontraron días configurados para el nivel.');
         }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Horas corregidas
-    |--------------------------------------------------------------------------
-    | También se toman solo las horas usadas por el horario actual para evitar
-    | filas duplicadas o vacías.
-    */
-
-        $idsHorasHorario = $horarios
-            ->pluck('hora_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        $horas = Hora::query()
-            ->whereIn('id', $idsHorasHorario)
-            ->get()
-            ->sortBy([
-                ['hora_inicio', 'asc'],
-                ['id', 'asc'],
-            ])
-            ->values();
 
         if ($horas->isEmpty()) {
-            abort(404, 'No se encontraron horas para el horario seleccionado.');
+            abort(404, 'No se encontraron horas configuradas para el nivel.');
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Mapa de celdas del horario
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Mapas de celdas
+        |--------------------------------------------------------------------------
+        |
+        | Una materia normal ocupa una celda. Los talleres se mantienen como
+        | colección porque una autorización administrativa puede permitir más
+        | de uno en el mismo bloque.
+        */
 
-        $horarioPorCelda = $horarios->keyBy(function ($horario) {
-            return $horario->hora_id . '-' . $horario->dia_id;
-        });
+        $horarioPorCelda = $horarios
+            ->whereNull('taller_sesion_id')
+            ->groupBy(fn($horario) => $horario->hora_id . '-' . $horario->dia_id)
+            ->map(fn($registros) => $registros->first());
+
+        $talleresPorCelda = $horarios
+            ->whereNotNull('taller_sesion_id')
+            ->groupBy(fn($horario) => $horario->hora_id . '-' . $horario->dia_id)
+            ->map(function ($registros) {
+                return $registros
+                    ->unique('taller_sesion_id')
+                    ->sortBy(function ($horario) {
+                        return Str::lower(
+                            Str::ascii(
+                                trim((string) ($horario->tallerSesion?->taller?->nombre ?? ''))
+                            )
+                        );
+                    })
+                    ->values();
+            });
 
         /*
-    |--------------------------------------------------------------------------
-    | Profesor titular
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Profesor titular de preescolar y primaria
+        |--------------------------------------------------------------------------
+        */
 
         $profesorTitular = null;
         $profesorTitularId = null;
-        $docentesPreescolar = collect();
 
         if ($esPreescolar || $esPrimaria) {
             $personalAsignado = PersonaNivel::query()
@@ -1514,7 +1530,8 @@ class PDFController extends Controller
                         $query->with([
                             'grado:id,nombre',
                             'grupo' => function ($query) {
-                                $query->select('id', 'asignacion_grupo_id')
+                                $query
+                                    ->select('id', 'asignacion_grupo_id')
                                     ->with('asignacionGrupo:id,nombre');
                             },
                         ]);
@@ -1522,7 +1539,8 @@ class PDFController extends Controller
                 ])
                 ->where('nivel_id', $nivel->id)
                 ->whereHas('detalles', function ($query) use ($grado, $grupo) {
-                    $query->where('grado_id', $grado->id)
+                    $query
+                        ->where('grado_id', $grado->id)
                         ->where('grupo_id', $grupo->id);
                 })
                 ->first();
@@ -1532,22 +1550,29 @@ class PDFController extends Controller
                 : null;
 
             $profesorTitular = $this->nombrePersona($personalAsignado?->persona);
+
+            if ($profesorTitular === '') {
+                $profesorTitular = null;
+            }
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Docentes complementarios de preescolar
-    |--------------------------------------------------------------------------
-    | - Se toman todas las materias colocadas en el horario, sin importar si
-    |   son extra o calificables.
-    | - Se omiten los recesos.
-    | - Se excluye completamente al titular mediante persona_id.
-    | - Las materias se agrupan por docente.
-    | - Las asignaciones sin profesor se agrupan como "Sin docente".
-    */
+        |--------------------------------------------------------------------------
+        | Tabla de docentes
+        |--------------------------------------------------------------------------
+        |
+        | Preescolar conserva la exclusión del profesor titular.
+        | Primaria conserva solo materias extra calificables.
+        | Secundaria y bachillerato muestran materias calificables.
+        | Secundaria agrega además los talleres conjuntos no calificables.
+        */
+
+        $docentesPreescolar = collect();
+        $docentesHorario = collect();
 
         if ($esPreescolar) {
             $docentesPreescolar = $horarios
+                ->whereNull('taller_sesion_id')
                 ->map(function ($horario) use ($profesorTitularId) {
                     $asignacion = $horario->asignacionMateria;
                     $materia = $asignacion?->materia;
@@ -1564,78 +1589,177 @@ class PDFController extends Controller
                     $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                     if (
-                        $profesorTitularId !== null
-                        && $profesorId !== null
-                        && $profesorId === $profesorTitularId
+                        $profesorTitularId !== null &&
+                        $profesorId !== null &&
+                        $profesorId === $profesorTitularId
                     ) {
                         return null;
                     }
 
-                    $nombreMateria = trim((string) ($materia->materia ?? ''));
-
-                    if ($nombreMateria === '') {
-                        $nombreMateria = 'Sin materia';
-                    }
-
-                    $nombreDocente = $profesor
-                        ? $this->nombrePersona($profesor)
-                        : 'Sin docente';
-
-                    if ($nombreDocente === '') {
-                        $nombreDocente = 'Sin docente';
-                    }
-
                     return [
                         'profesor_id' => $profesorId,
-                        'docente' => $nombreDocente,
-                        'materia' => $nombreMateria,
+                        'docente' => $profesor
+                            ? ($this->nombrePersona($profesor) ?: 'Sin docente')
+                            : 'Sin docente',
+                        'materia' => trim((string) ($materia->materia ?? '')) ?: 'Sin materia',
                         'orden' => (int) ($materia->orden ?? 999999),
                         'sin_docente' => $profesorId === null,
                     ];
                 })
                 ->filter()
-                ->groupBy(function (array $item) {
-                    return $item['profesor_id'] !== null
-                        ? 'profesor-' . $item['profesor_id']
-                        : 'sin-docente';
-                })
+                ->groupBy(fn(array $item) => $item['profesor_id'] !== null
+                    ? 'profesor-' . $item['profesor_id']
+                    : 'sin-docente')
                 ->map(function ($items) {
-                    $primerRegistro = $items->first();
+                    $primero = $items->first();
 
-                    $materiasAgrupadas = $items
+                    $materias = $items
                         ->sortBy([
                             ['orden', 'asc'],
                             ['materia', 'asc'],
                         ])
                         ->pluck('materia')
                         ->filter()
-                        ->unique(function ($materia) {
-                            return mb_strtoupper(trim((string) $materia), 'UTF-8');
-                        })
+                        ->unique(fn($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
                         ->values();
 
                     return [
-                        'profesor_id' => $primerRegistro['profesor_id'],
-                        'docente' => $primerRegistro['docente'],
-                        'materias' => $materiasAgrupadas->all(),
-                        'materias_texto' => $materiasAgrupadas->implode(', '),
-                        'sin_docente' => (bool) $primerRegistro['sin_docente'],
+                        'profesor_id' => $primero['profesor_id'],
+                        'docente' => $primero['docente'],
+                        'materias' => $materias->all(),
+                        'materias_texto' => $materias->implode(', '),
+                        'sin_docente' => (bool) $primero['sin_docente'],
                     ];
                 })
                 ->sortBy(function (array $item) {
-                    $prioridad = $item['sin_docente'] ? 1 : 0;
-                    $nombre = mb_strtoupper((string) $item['docente'], 'UTF-8');
+                    return sprintf(
+                        '%d-%s',
+                        $item['sin_docente'] ? 1 : 0,
+                        mb_strtoupper(trim((string) $item['docente']), 'UTF-8')
+                    );
+                })
+                ->values();
+        } else {
+            $slugsExcluidosPrimaria = [
+                'calculo-mental',
+                'caligrafia',
+                'lectura',
+            ];
 
-                    return sprintf('%d-%s', $prioridad, $nombre);
+            foreach ($horarios->whereNull('taller_sesion_id') as $horario) {
+                $asignacion = $horario->asignacionMateria;
+                $materia = $asignacion?->materia;
+
+                if (!$asignacion || !$materia) {
+                    continue;
+                }
+
+                $calificable = (int) ($materia->calificable ?? 0);
+                $extra = (int) ($materia->extra ?? 0);
+                $receso = (int) ($materia->receso ?? 0);
+                $slugMateria = Str::lower(trim((string) ($materia->slug ?? '')));
+
+                if ($receso === 1) {
+                    continue;
+                }
+
+                if ($esSecundaria || $esBachillerato) {
+                    if ($calificable !== 1) {
+                        continue;
+                    }
+                } else {
+                    if ($extra !== 1 || $calificable !== 1) {
+                        continue;
+                    }
+
+                    if (in_array($slugMateria, $slugsExcluidosPrimaria, true)) {
+                        continue;
+                    }
+                }
+
+                $profesor = $asignacion->profesor;
+                $profesorId = $profesor?->id ? (int) $profesor->id : null;
+
+                $docentesHorario->push([
+                    'profesor_id' => $profesorId,
+                    'docente' => $profesor
+                        ? ($this->nombrePersona($profesor) ?: 'Sin docente')
+                        : 'Sin docente',
+                    'materia' => trim((string) ($materia->materia ?? '')) ?: 'Sin materia',
+                    'orden' => (int) ($materia->orden ?? 999999),
+                    'sin_docente' => $profesorId === null,
+                ]);
+            }
+
+            if ($esSecundaria) {
+                foreach (
+                    $horarios
+                        ->whereNotNull('taller_sesion_id')
+                        ->unique('taller_sesion_id')
+                    as $horarioTaller
+                ) {
+                    $sesion = $horarioTaller->tallerSesion;
+
+                    if (!$sesion) {
+                        continue;
+                    }
+
+                    $profesor = $sesion->profesor;
+                    $profesorId = $profesor?->id ? (int) $profesor->id : null;
+                    $nombreTaller = trim((string) ($sesion->taller?->nombre ?? '')) ?: 'Taller';
+
+                    $docentesHorario->push([
+                        'profesor_id' => $profesorId,
+                        'docente' => $profesor
+                            ? ($this->nombrePersona($profesor) ?: 'Sin docente')
+                            : 'Sin docente',
+                        'materia' => $nombreTaller,
+                        'orden' => 999998,
+                        'sin_docente' => $profesorId === null,
+                    ]);
+                }
+            }
+
+            $docentesHorario = $docentesHorario
+                ->groupBy(fn(array $item) => $item['profesor_id'] !== null
+                    ? 'profesor-' . $item['profesor_id']
+                    : 'sin-docente')
+                ->map(function ($items) {
+                    $primero = $items->first();
+
+                    $materias = $items
+                        ->sortBy([
+                            ['orden', 'asc'],
+                            ['materia', 'asc'],
+                        ])
+                        ->pluck('materia')
+                        ->filter()
+                        ->unique(fn($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
+                        ->values();
+
+                    return [
+                        'profesor_id' => $primero['profesor_id'],
+                        'docente' => $primero['docente'],
+                        'materias' => $materias->all(),
+                        'materias_texto' => $materias->implode(', '),
+                        'sin_docente' => (bool) $primero['sin_docente'],
+                    ];
+                })
+                ->sortBy(function (array $item) {
+                    return sprintf(
+                        '%d-%s',
+                        $item['sin_docente'] ? 1 : 0,
+                        mb_strtoupper(trim((string) $item['docente']), 'UTF-8')
+                    );
                 })
                 ->values();
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Imágenes
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Imágenes y nombre del archivo
+        |--------------------------------------------------------------------------
+        */
 
         $logoIzquierdo = $this->imagenBase64Publica('imagenes/logo-letra.png');
 
@@ -1652,19 +1776,17 @@ class PDFController extends Controller
             'bachillerato' => 'imagenes/personajes_bachillerato.png',
         ];
 
-        $imagenNivel = $this->imagenBase64Publica($imagenesPorNivel[$nivel->slug] ?? null);
-
-        /*
-    |--------------------------------------------------------------------------
-    | Nombre del archivo
-    |--------------------------------------------------------------------------
-    */
+        $imagenNivel = $this->imagenBase64Publica(
+            $imagenesPorNivel[$nivel->slug] ?? null
+        );
 
         $nombreArchivo = 'HORARIO_' .
-            mb_strtoupper($nivel->slug) .
+            mb_strtoupper((string) $nivel->slug, 'UTF-8') .
             '_GRADO_' . Str::slug((string) ($grado->nombre ?? 'grado'), '_') .
             '_GRUPO_' . Str::slug($this->nombreGrupo($grupo), '_') .
-            ($esBachillerato && $semestre ? '_SEMESTRE_' . $semestre->numero : '') .
+            ($esBachillerato && $semestre
+                ? '_SEMESTRE_' . $semestre->numero
+                : '') .
             '.pdf';
 
         return Pdf::loadView('pdf.horarios_pdf', [
@@ -1680,10 +1802,12 @@ class PDFController extends Controller
             'horas' => $horas,
             'horarios' => $horarios,
             'horarioPorCelda' => $horarioPorCelda,
+            'talleresPorCelda' => $talleresPorCelda,
 
             'profesor_titular' => $profesorTitular,
             'profesor_titular_id' => $profesorTitularId,
             'docentes_preescolar' => $docentesPreescolar,
+            'docentes_horario' => $docentesHorario,
 
             'esBachillerato' => $esBachillerato,
             'esSecundaria' => $esSecundaria,
@@ -1697,6 +1821,7 @@ class PDFController extends Controller
             ->setPaper('letter', 'portrait')
             ->stream($nombreArchivo);
     }
+
 
 
     public function reconocimiento_calificaciones_pdf(Request $request)

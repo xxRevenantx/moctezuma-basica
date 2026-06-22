@@ -3,6 +3,7 @@
 namespace App\Livewire\Profesor;
 
 use App\Models\Horario;
+use App\Models\cicloEscolar;
 use App\Models\Persona;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -17,19 +18,29 @@ class HorarioProfesor extends Component
     public ?int $materiaId = null;
     public ?int $gradoId = null;
     public ?int $grupoId = null;
+    public ?int $cicloEscolarId = null;
 
     public string $diaKey = '';
     public string $busqueda = '';
 
     public function mount(): void
     {
+        $this->cicloEscolarId = cicloEscolar::query()->orderByDesc('id')->value('id');
+
         $this->profesorId = Persona::query()
             ->select('personas.id')
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('asignacion_materias')
-                    ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
-                    ->whereNotNull('asignacion_materias.profesor_id');
+            ->where(function ($personasQuery) {
+                $personasQuery->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
+                        ->whereNotNull('asignacion_materias.profesor_id');
+                })->orWhereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('taller_sesiones')
+                        ->whereColumn('taller_sesiones.profesor_id', 'personas.id')
+                        ->whereNotNull('taller_sesiones.profesor_id');
+                });
             })
             ->where('personas.status', true)
             ->orderBy('personas.apellido_paterno')
@@ -60,6 +71,7 @@ class HorarioProfesor extends Component
     public function render()
     {
         $profesores = $this->obtenerProfesores();
+        $ciclosEscolares = cicloEscolar::query()->orderByDesc('id')->get();
 
         $horariosBase = $this->obtenerHorarios(false);
         $horarios = $this->obtenerHorarios(true);
@@ -79,6 +91,7 @@ class HorarioProfesor extends Component
                 'grupo_id' => $this->grupoId,
                 'dia_key' => $this->diaKey,
                 'busqueda' => $this->busqueda,
+                'ciclo_escolar_id' => $this->cicloEscolarId,
             ])
             : null;
 
@@ -89,10 +102,12 @@ class HorarioProfesor extends Component
             'grupo_id' => $this->grupoId,
             'dia_key' => $this->diaKey,
             'busqueda' => $this->busqueda,
+            'ciclo_escolar_id' => $this->cicloEscolarId,
         ], fn($value) => filled($value)));
 
         return view('livewire.profesor.horario-profesor', [
             'profesores' => $profesores,
+            'ciclosEscolares' => $ciclosEscolares,
             'profesorSeleccionado' => $profesorSeleccionado,
             'catalogos' => $catalogos,
             'horarios' => $horarios,
@@ -116,11 +131,18 @@ class HorarioProfesor extends Component
                 'personas.telefono_movil',
                 'personas.foto'
             )
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('asignacion_materias')
-                    ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
-                    ->whereNotNull('asignacion_materias.profesor_id');
+            ->where(function ($personasQuery) {
+                $personasQuery->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
+                        ->whereNotNull('asignacion_materias.profesor_id');
+                })->orWhereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('taller_sesiones')
+                        ->whereColumn('taller_sesiones.profesor_id', 'personas.id')
+                        ->whereNotNull('taller_sesiones.profesor_id');
+                });
             })
             ->where('personas.status', true)
             ->orderBy('personas.apellido_paterno')
@@ -157,10 +179,20 @@ class HorarioProfesor extends Component
                 'hora:id,nivel_id,hora_inicio,hora_fin,orden',
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,materia,nivel_id,grado_id,semestre_id,extra,receso,orden',
+                'tallerSesion.taller:id,nivel_id,nombre,clave',
+                'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'tallerSesion.grupos.grado:id,nombre,orden',
+                'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
-            ->whereHas('asignacionMateria', function ($query) {
-                $query->where('profesor_id', $this->profesorId);
+            ->where(function ($query) {
+                $query->whereHas('asignacionMateria', function ($subQuery) {
+                    $subQuery->where('profesor_id', $this->profesorId);
+                })->orWhereHas('tallerSesion', function ($subQuery) {
+                    $subQuery->where('profesor_id', $this->profesorId);
+                });
             })
+            ->when($this->cicloEscolarId, fn($query) => $query->where('ciclo_escolar_id', $this->cicloEscolarId))
             ->when($aplicarFiltros && $this->nivelId, function ($query) {
                 $query->where('nivel_id', $this->nivelId);
             })
@@ -190,6 +222,9 @@ class HorarioProfesor extends Component
                         ->whereHas('asignacionMateria.materia', function ($materiaQuery) use ($buscar) {
                             $materiaQuery->where('materia', 'like', "%{$buscar}%");
                         })
+                        ->orWhereHas('tallerSesion.taller', function ($tallerQuery) use ($buscar) {
+                            $tallerQuery->where('nombre', 'like', "%{$buscar}%");
+                        })
                         ->orWhereHas('nivel', function ($nivelQuery) use ($buscar) {
                             $nivelQuery->where('nombre', 'like', "%{$buscar}%");
                         })
@@ -202,6 +237,9 @@ class HorarioProfesor extends Component
                 });
             })
             ->get()
+            ->unique(fn($horario) => $horario->taller_sesion_id
+                ? 'taller-' . $horario->taller_sesion_id
+                : 'horario-' . $horario->id)
             ->sortBy([
                 fn($a, $b) => $this->horaInicio($a) <=> $this->horaInicio($b),
                 fn($a, $b) => $this->ordenDia($a->dia?->dia) <=> $this->ordenDia($b->dia?->dia),
@@ -237,9 +275,10 @@ class HorarioProfesor extends Component
 
             'grupos' => $horarios
                 ->pluck('grupo')
+                ->merge($horarios->pluck('tallerSesion.grupos')->filter()->flatten(1))
                 ->filter()
                 ->unique('id')
-                ->sortBy(fn($grupo) => $grupo->asignacionGrupo?->nombre)
+                ->sortBy(fn($grupo) => ($grupo->grado?->orden ?? 0) . '-' . ($grupo->asignacionGrupo?->nombre ?? ''))
                 ->values(),
 
             'dias' => $horarios
@@ -318,11 +357,24 @@ class HorarioProfesor extends Component
 
     private function crearEstadisticas(Collection $horarios): array
     {
+        $actividades = $horarios
+            ->map(fn($horario) => $horario->taller_sesion_id
+                ? 'taller-' . $horario->taller_sesion_id
+                : 'materia-' . $horario->asignacion_materia_id)
+            ->filter()
+            ->unique();
+
+        $grupos = $horarios
+            ->pluck('grupo_id')
+            ->merge($horarios->pluck('tallerSesion.grupos')->filter()->flatten(1)->pluck('id'))
+            ->filter()
+            ->unique();
+
         return [
             'clases' => $horarios->count(),
-            'materias' => $horarios->pluck('asignacion_materia_id')->unique()->count(),
+            'materias' => $actividades->count(),
             'niveles' => $horarios->pluck('nivel_id')->unique()->count(),
-            'grupos' => $horarios->pluck('grupo_id')->unique()->count(),
+            'grupos' => $grupos->count(),
         ];
     }
 

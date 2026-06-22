@@ -162,7 +162,23 @@
         </div>
 
         <div class="p-4 sm:p-5">
-            <div class="grid grid-cols-1 gap-4 xl:grid-cols-6">
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-7">
+                <div>
+                    <label
+                        class="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+                        <flux:icon.calendar-days class="h-4 w-4" />
+                        Ciclo escolar
+                    </label>
+
+                    <select wire:model.live="cicloEscolarId" class="flux-like-select">
+                        @foreach ($ciclosEscolares as $ciclo)
+                            <option value="{{ $ciclo->id }}">
+                                {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="xl:col-span-2">
                     <label
                         class="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-zinc-400">
@@ -247,7 +263,7 @@
 
                         @foreach ($catalogos['grupos'] as $grupo)
                             <option value="{{ $grupo->id }}">
-                                {{ $grupo->asignacionGrupo?->nombre ?? 'Grupo' }}
+                                {{ $grupo->grado?->nombre ? $grupo->grado->nombre . ' · ' : '' }}{{ $grupo->asignacionGrupo?->nombre ?? 'Grupo' }}
                             </option>
                         @endforeach
                     </select>
@@ -446,10 +462,15 @@
                                                 <div class="flex items-start justify-between gap-3">
                                                     <div
                                                         class="text-sm font-black leading-5 text-slate-900 dark:text-white">
-                                                        {{ $horario->asignacionMateria?->materia?->materia ?? 'Materia no definida' }}
+                                                        {{ $horario->nombreActividad() }}
                                                     </div>
 
-                                                    @if ($horario->asignacionMateria?->materia?->receso)
+                                                    @if ($horario->esTallerConjunto())
+                                                        <span
+                                                            class="rounded-full bg-cyan-100 px-2 py-1 text-[10px] font-black text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300">
+                                                            Taller conjunto · 1 hora
+                                                        </span>
+                                                    @elseif ($horario->asignacionMateria?->materia?->receso)
                                                         <span
                                                             class="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                                                             Receso
@@ -463,12 +484,22 @@
                                                         {{ $horario->nivel?->nombre ?? 'Nivel' }}
                                                     </span>
 
-                                                    <span
-                                                        class="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 shadow-sm dark:bg-zinc-900 dark:text-zinc-300">
-                                                        {{ $horario->grado?->nombre ?? 'Grado' }}
-                                                    </span>
+                                                    @if ($horario->esTallerConjunto())
+                                                        @foreach ($horario->tallerSesion?->grupos ?? collect() as $grupoTaller)
+                                                            <span
+                                                                class="rounded-full bg-cyan-50 px-2.5 py-1 text-[11px] font-black text-cyan-700 shadow-sm dark:bg-cyan-950/30 dark:text-cyan-300">
+                                                                {{ $grupoTaller->grado?->nombre ?? 'Grado' }} · Grupo
+                                                                {{ $grupoTaller->asignacionGrupo?->nombre ?? '-' }}
+                                                            </span>
+                                                        @endforeach
+                                                    @else
+                                                        <span
+                                                            class="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 shadow-sm dark:bg-zinc-900 dark:text-zinc-300">
+                                                            {{ $horario->grado?->nombre ?? 'Grado' }}
+                                                        </span>
+                                                    @endif
 
-                                                    @if ($horario->grupo?->asignacionGrupo?->nombre)
+                                                    @if (!$horario->esTallerConjunto() && $horario->grupo?->asignacionGrupo?->nombre)
                                                         <span
                                                             class="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 shadow-sm dark:bg-zinc-900 dark:text-zinc-300">
                                                             Grupo {{ $horario->grupo->asignacionGrupo->nombre }}

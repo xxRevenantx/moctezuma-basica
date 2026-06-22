@@ -35,6 +35,7 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
     protected Collection $horas;
     protected Collection $dias;
     protected Collection $horariosGuardados;
+    protected Collection $talleresGuardados;
 
     protected int $filaEncabezadoTabla = 9;
     protected int $filaFinalTabla = 9;
@@ -46,6 +47,7 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
         protected ?int $generacion_id,
         protected ?int $semestre_id = null,
         protected bool $esBachillerato = false,
+        protected ?int $ciclo_escolar_id = null,
     ) {
         $this->cargarDatos();
     }
@@ -69,8 +71,8 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             $this->nivel?->nombre ?? 'N/D',
             'Generación:',
             $this->generacion
-                ? $this->generacion->anio_ingreso . ' - ' . $this->generacion->anio_egreso
-                : 'N/D',
+            ? $this->generacion->anio_ingreso . ' - ' . $this->generacion->anio_egreso
+            : 'N/D',
         ];
 
         $filas[] = [
@@ -80,8 +82,8 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             $this->textoGrupo($this->grupo),
             $this->esBachillerato ? 'Semestre:' : '',
             $this->esBachillerato && $this->semestre
-                ? $this->semestre->numero . '° semestre'
-                : '',
+            ? $this->semestre->numero . '° semestre'
+            : '',
         ];
 
         $filas[] = [];
@@ -102,34 +104,49 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             foreach ($this->dias as $dia) {
                 $clave = $hora->id . '-' . $dia->id;
                 $horario = $this->horariosGuardados->get($clave);
+                $talleres = $this->talleresGuardados->get($clave, collect());
+                $contenidos = collect();
 
-                if (!$horario || !$horario->asignacionMateria) {
-                    $fila[] = 'Sin asignar';
-                    continue;
+                if ($horario?->asignacionMateria) {
+                    $materia = $horario->asignacionMateria?->materia;
+                    $profesor = $horario->asignacionMateria?->profesor;
+                    $nombreProfesor = $this->nombreProfesor($profesor);
+                    $texto = $materia?->materia ?? 'Sin materia';
+
+                    if (!empty($materia?->clave)) {
+                        $texto .= "\nClave: " . $materia->clave;
+                    }
+
+                    $texto .= "\nDocente: " . $nombreProfesor;
+
+                    if (!empty($materia?->receso)) {
+                        $texto .= "\nRECESO";
+                    }
+
+                    $contenidos->push($texto);
                 }
 
-                $materia = $horario->asignacionMateria?->materia;
-                $profesor = $horario->asignacionMateria?->profesor;
+                foreach ($talleres->unique('taller_sesion_id') as $tallerHorario) {
+                    $sesion = $tallerHorario->tallerSesion;
+                    $grupos = $sesion?->grupos
+                            ?->map(fn($grupo) => trim(($grupo->grado?->nombre ?? '') . ' ' . ($grupo->asignacionGrupo?->nombre ?? '')))
+                        ->filter()
+                        ->implode(', ');
 
-                $nombreProfesor = trim(
-                    ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
-                );
+                    $texto = "TALLER CONJUNTO\n" . ($sesion?->taller?->nombre ?? 'Taller');
 
-                $texto = $materia?->materia ?? 'Sin materia';
+                    if (!empty($sesion?->taller?->clave)) {
+                        $texto .= "\nClave: " . $sesion->taller->clave;
+                    }
 
-                if (!empty($materia?->clave)) {
-                    $texto .= "\nClave: " . $materia->clave;
+                    $texto .= "\nDocente: " . $this->nombreProfesor($sesion?->profesor);
+                    $texto .= "\nGrupos: " . ($grupos ?: 'Sin grupos');
+                    $contenidos->push($texto);
                 }
 
-                $texto .= "\nDocente: " . ($nombreProfesor !== '' ? $nombreProfesor : 'Sin profesor asignado');
-
-                if (!empty($materia?->receso)) {
-                    $texto .= "\nRECESO";
-                }
-
-                $fila[] = $texto;
+                $fila[] = $contenidos->isEmpty()
+                    ? 'Sin asignar'
+                    : $contenidos->implode("\n\n");
             }
 
             $filas[] = $fila;
@@ -138,7 +155,11 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
         $this->filaFinalTabla = count($filas);
 
         $totalCeldas = $this->horas->count() * $this->dias->count();
-        $celdasAsignadas = $this->horariosGuardados->count();
+        $celdasAsignadas = $this->horariosGuardados
+            ->keys()
+            ->merge($this->talleresGuardados->keys())
+            ->unique()
+            ->count();
         $avance = $totalCeldas > 0 ? round(($celdasAsignadas / $totalCeldas) * 100) : 0;
 
         $filas[] = [];
@@ -303,6 +324,17 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
                                         'startColor' => ['rgb' => 'F8FAFC'],
                                     ],
                                 ]);
+                            } elseif (str_contains($valor, 'TALLER CONJUNTO')) {
+                                $hoja->getStyle($celda)->applyFromArray([
+                                    'font' => [
+                                        'bold' => true,
+                                        'color' => ['rgb' => '0E7490'],
+                                    ],
+                                    'fill' => [
+                                        'fillType' => Fill::FILL_SOLID,
+                                        'startColor' => ['rgb' => 'CFFAFE'],
+                                    ],
+                                ]);
                             } elseif (str_contains($valor, 'RECESO')) {
                                 $hoja->getStyle($celda)->applyFromArray([
                                     'font' => [
@@ -422,11 +454,16 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             ->with([
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
+                'tallerSesion.taller',
+                'tallerSesion.profesor',
+                'tallerSesion.grupos.grado',
+                'tallerSesion.grupos.asignacionGrupo',
             ])
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
+            ->when($this->ciclo_escolar_id, fn($query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),
@@ -434,9 +471,29 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             )
             ->get();
 
-        $this->horariosGuardados = $horarios->keyBy(function ($horario) {
-            return $horario->hora_id . '-' . $horario->dia_id;
-        });
+        $this->horariosGuardados = $horarios
+            ->whereNull('taller_sesion_id')
+            ->keyBy(fn($horario) => $horario->hora_id . '-' . $horario->dia_id);
+
+        $this->talleresGuardados = $horarios
+            ->whereNotNull('taller_sesion_id')
+            ->groupBy(fn($horario) => $horario->hora_id . '-' . $horario->dia_id);
+    }
+
+    protected function nombreProfesor($profesor): string
+    {
+        if (!$profesor) {
+            return 'Sin profesor asignado';
+        }
+
+        $nombre = trim(
+            ($profesor->titulo ?? '') . ' ' .
+            ($profesor->nombre ?? '') . ' ' .
+            ($profesor->apellido_paterno ?? '') . ' ' .
+            ($profesor->apellido_materno ?? '')
+        );
+
+        return $nombre !== '' ? $nombre : 'Sin profesor asignado';
     }
 
     protected function textoGrupo(?Grupo $grupo, string $valorPorDefecto = 'Sin grupo'): string

@@ -20,11 +20,46 @@ class Horario extends Model
         'hora_id',
         'dia_id',
         'asignacion_materia_id',
+        'taller_sesion_id',
+        'ciclo_escolar_id',
     ];
 
     public function asignacionMateria()
     {
         return $this->belongsTo(AsignacionMateria::class, 'asignacion_materia_id');
+    }
+
+    public function tallerSesion()
+    {
+        return $this->belongsTo(TallerSesion::class, 'taller_sesion_id');
+    }
+
+    public function cicloEscolar()
+    {
+        return $this->belongsTo(cicloEscolar::class, 'ciclo_escolar_id');
+    }
+
+    public function esTallerConjunto(): bool
+    {
+        return filled($this->taller_sesion_id);
+    }
+
+    public function nombreActividad(): string
+    {
+        if ($this->esTallerConjunto()) {
+            return $this->tallerSesion?->taller?->nombre ?? 'Taller conjunto';
+        }
+
+        return $this->asignacionMateria?->materia?->materia ?? 'Materia no definida';
+    }
+
+    public function profesorActividad(): ?Persona
+    {
+        if ($this->esTallerConjunto()) {
+            return $this->tallerSesion?->profesor;
+        }
+
+        return $this->asignacionMateria?->profesor;
     }
 
     public function hora()

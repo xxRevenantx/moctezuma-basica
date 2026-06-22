@@ -3,6 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Models\AsignacionMateria;
+use App\Models\cicloEscolar;
 use App\Models\Dia;
 use App\Models\Generacion;
 use App\Models\Grado;
@@ -37,11 +38,14 @@ class Horario extends Component
     public Collection $semestres;
     public Collection $materiasDisponibles;
     public Collection $horariosGuardados;
+    public Collection $talleresGuardados;
+    public Collection $ciclosEscolares;
 
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
     public ?int $grupo_id = null;
     public ?int $semestre_id = null;
+    public ?int $ciclo_escolar_id = null;
 
     public bool $esBachillerato = false;
 
@@ -78,6 +82,12 @@ class Horario extends Component
         $this->semestres = collect();
         $this->materiasDisponibles = collect();
         $this->horariosGuardados = collect();
+        $this->talleresGuardados = collect();
+        $this->ciclosEscolares = cicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get();
+        $this->ciclo_escolar_id = $this->ciclosEscolares->first()?->id;
 
         $this->cargarGeneraciones();
         $this->cargarGrados();
@@ -87,6 +97,20 @@ class Horario extends Component
         $this->cargarDias();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
+        $this->sincronizarSeleccionesHorario();
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->cargarTalleresGuardados();
+    }
+
+    #[On('taller-conjunto-actualizado')]
+    public function refrescarTalleresConjuntos(): void
+    {
+        $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -98,6 +122,7 @@ class Horario extends Component
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -114,6 +139,7 @@ class Horario extends Component
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -122,6 +148,7 @@ class Horario extends Component
         $this->resetEstadoTraslapeProfesor();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -133,6 +160,7 @@ class Horario extends Component
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -144,6 +172,7 @@ class Horario extends Component
         $this->cargarHoras();
         $this->cargarDias();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
 
         $this->mensajeActualizacionHorario = 'Horario actualizado correctamente.';
@@ -183,13 +212,36 @@ class Horario extends Component
             return;
         }
 
+        if (filled($asignacionMateriaId)) {
+            $hayTallerConjunto = HorarioModel::query()
+                ->where('grupo_id', $this->grupo_id)
+                ->where('dia_id', $diaId)
+                ->where('hora_id', $horaId)
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->whereNotNull('taller_sesion_id')
+                ->exists();
+
+            if ($hayTallerConjunto) {
+                $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
+                $this->dispatch('swal', [
+                    'title' => 'La celda contiene un taller conjunto',
+                    'text' => 'Edita o elimina la sesión compartida antes de asignar una materia normal en este bloque.',
+                    'icon' => 'warning',
+                    'position' => 'top-end',
+                ]);
+                return;
+            }
+        }
+
         $consulta = HorarioModel::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->where('hora_id', $horaId)
-            ->where('dia_id', $diaId);
+            ->where('dia_id', $diaId)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereNull('taller_sesion_id');
 
         if ($this->esBachillerato) {
             $consulta->where('semestre_id', $this->semestre_id);
@@ -221,6 +273,14 @@ class Horario extends Component
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel->id)
                     ->where('grado_id', $this->grado_id);
+
+                if ($this->nivel?->slug === 'secundaria') {
+                    $query->where(function ($subQuery) {
+                        $subQuery->where('slug', '!=', 'taller')
+                            ->orWhere('extra', '!=', 1)
+                            ->orWhere('receso', '!=', 1);
+                    });
+                }
 
                 if ($this->esBachillerato) {
                     $query->where('semestre_id', $this->semestre_id);
@@ -299,12 +359,14 @@ class Horario extends Component
             'hora_id' => $horaId,
             'dia_id' => $diaId,
             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
         ];
 
         if ($horarioExistente) {
             $horarioExistente->update([
                 'asignacion_materia_id' => $asignacionMateriaId,
                 'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
             ]);
         } else {
             HorarioModel::query()->create([
@@ -315,6 +377,7 @@ class Horario extends Component
 
         $this->resetEstadoTraslapeProfesor();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
     }
 
@@ -325,6 +388,16 @@ class Horario extends Component
         string $horaFin,
         ?int $horarioActualId = null
     ): array {
+        $diaActual = Dia::query()->find($diaId);
+
+        if (!$diaActual) {
+            return [];
+        }
+
+        $diaIds = Dia::query()
+            ->whereRaw('LOWER(dia) = ?', [mb_strtolower($diaActual->dia)])
+            ->pluck('id');
+
         $conflictos = HorarioModel::query()
             ->with([
                 'hora',
@@ -335,22 +408,35 @@ class Horario extends Component
                 'semestre',
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
+                'tallerSesion.taller',
+                'tallerSesion.profesor',
+                'tallerSesion.grupos.asignacionGrupo',
+                'tallerSesion.grupos.grado',
             ])
-            ->where('dia_id', $diaId)
+            ->whereIn('dia_id', $diaIds)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->when($horarioActualId, function ($query) use ($horarioActualId) {
                 $query->where('id', '!=', $horarioActualId);
             })
-            ->whereHas('asignacionMateria', function ($query) use ($profesorId) {
-                $query->where('profesor_id', $profesorId);
+            ->where(function ($query) use ($profesorId) {
+                $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId);
+                })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId);
+                });
             })
             ->whereHas('hora', function ($query) use ($horaInicio, $horaFin) {
                 $query->where('hora_inicio', '<', $horaFin)
                     ->where('hora_fin', '>', $horaInicio);
             })
-            ->get();
+            ->get()
+            ->unique(fn($item) => $item->taller_sesion_id
+                ? 'taller-' . $item->taller_sesion_id
+                : 'horario-' . $item->id)
+            ->values();
 
         return $conflictos->map(function ($item) {
-            $profesor = $item->asignacionMateria?->profesor;
+            $profesor = $item->profesorActividad();
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
@@ -358,17 +444,27 @@ class Horario extends Component
                 ($profesor->apellido_materno ?? '')
             );
 
+            $grupos = $item->esTallerConjunto()
+                ? $item->tallerSesion?->grupos
+                        ?->map(fn($grupo) => trim(
+                        ($grupo->grado?->nombre ?? '') . ' ' .
+                        ($grupo->asignacionGrupo?->nombre ?? '')
+                    ))
+                    ->filter()
+                    ->implode(', ')
+                : $this->textoGrupo($item->grupo, 'N/D');
+
             return [
                 'id' => $item->id,
                 'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
                 'nivel' => $item->nivel?->nombre ?? 'N/D',
-                'grado' => $item->grado?->nombre ?? 'N/D',
-                'grupo' => $this->textoGrupo($item->grupo, 'N/D'),
+                'grado' => $item->esTallerConjunto() ? 'Varios grados' : ($item->grado?->nombre ?? 'N/D'),
+                'grupo' => $grupos ?: 'N/D',
                 'dia' => $item->dia?->dia ?? 'N/D',
                 'hora_inicio' => $item->hora?->hora_inicio,
                 'hora_fin' => $item->hora?->hora_fin,
                 'semestre' => $item->semestre?->numero ? $item->semestre->numero . '° semestre' : null,
-                'materia' => $item->asignacionMateria?->materia?->materia ?? 'N/D',
+                'materia' => $item->nombreActividad(),
             ];
         })->toArray();
     }
@@ -393,7 +489,9 @@ class Horario extends Component
             ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
             ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
-            ->where('dia_id', (int) $this->pendienteHorario['dia_id']);
+            ->where('dia_id', (int) $this->pendienteHorario['dia_id'])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereNull('taller_sesion_id');
 
         if ($this->esBachillerato) {
             $consulta->where('semestre_id', $this->semestre_id);
@@ -417,6 +515,7 @@ class Horario extends Component
 
         $this->resetEstadoTraslapeProfesor();
         $this->cargarHorariosGuardados();
+        $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
 
         if ($claveCelda) {
@@ -478,6 +577,7 @@ class Horario extends Component
             'grado_id' => $this->grado_id,
             'grupo_id' => $this->grupo_id,
             'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
         ]);
     }
 
@@ -555,6 +655,7 @@ class Horario extends Component
         $this->semestres = collect();
         $this->materiasDisponibles = collect();
         $this->horariosGuardados = collect();
+        $this->talleresGuardados = collect();
         $this->seleccionesHorario = [];
         $this->resetEstadoTraslapeProfesor();
     }
@@ -566,7 +667,11 @@ class Horario extends Component
 
     public function getCeldasAsignadasProperty(): int
     {
-        return $this->horariosGuardados->count();
+        return $this->horariosGuardados
+            ->keys()
+            ->merge($this->talleresGuardados->keys())
+            ->unique()
+            ->count();
     }
 
     public function getAvanceHorarioProperty(): int
@@ -580,64 +685,27 @@ class Horario extends Component
 
     public function getResumenDocentesHorarioProperty(): \Illuminate\Support\Collection
     {
-        if (!$this->filtrosCompletos() || $this->horariosGuardados->isEmpty()) {
+        $registros = $this->registrosCombinadosHorario();
+
+        if (!$this->filtrosCompletos() || $registros->isEmpty()) {
             return collect();
         }
 
-        return $this->horariosGuardados
-            ->map(function ($horario) {
-                $asignacion = $horario->asignacionMateria;
-                $materia = $asignacion?->materia;
-                $profesor = $asignacion?->profesor;
-                $hora = $this->horas->firstWhere('id', $horario->hora_id);
-                $dia = $this->dias->firstWhere('id', $horario->dia_id);
-
-                $nombreProfesor = $profesor
-                    ? trim(
-                        ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
-                    )
-                    : 'Sin profesor asignado';
-
-                $minutos = 0;
-
-                if ($hora?->hora_inicio && $hora?->hora_fin) {
-                    $inicio = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio);
-                    $fin = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin);
-                    $minutos = $inicio->diffInMinutes($fin);
-                }
-
-                return [
-                    'profesor_id' => $profesor?->id,
-                    'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
-                    'materia_id' => $materia?->id,
-                    'materia' => $materia?->materia ?? 'Sin materia',
-                    'clave' => $materia?->clave,
-                    'extra' => (bool) ($materia?->extra ?? false),
-                    'receso' => (bool) ($materia?->receso ?? false),
-                    'dia' => $dia?->dia ?? 'Sin día',
-                    'dia_id' => $dia?->id,
-                    'hora_inicio' => $hora?->hora_inicio,
-                    'hora_fin' => $hora?->hora_fin,
-                    'hora_texto' => $hora
-                        ? \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio)->format('h:i A') .
-                        ' - ' .
-                        \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin)->format('h:i A')
-                        : 'Sin hora',
-                    'minutos' => $minutos,
-                ];
-            })
+        return $registros
             ->groupBy('profesor')
             ->map(function ($items, $profesor) {
                 $materias = $items
-                    ->groupBy('materia')
-                    ->map(function ($materiasItems, $nombreMateria) {
+                    ->groupBy(fn($item) => ($item['taller_conjunto'] ? 'taller:' : 'materia:') . $item['materia'])
+                    ->map(function ($materiasItems) {
+                        $primero = $materiasItems->first();
+
                         return [
-                            'materia' => $nombreMateria,
-                            'clave' => $materiasItems->first()['clave'] ?? null,
-                            'extra' => (bool) ($materiasItems->first()['extra'] ?? false),
-                            'receso' => (bool) ($materiasItems->first()['receso'] ?? false),
+                            'materia' => $primero['materia'],
+                            'clave' => $primero['clave'] ?? null,
+                            'extra' => (bool) ($primero['extra'] ?? false),
+                            'receso' => (bool) ($primero['receso'] ?? false),
+                            'taller_conjunto' => (bool) ($primero['taller_conjunto'] ?? false),
+                            'grupos' => $primero['grupos'] ?? null,
                             'modulos' => $materiasItems->count(),
                             'minutos' => $materiasItems->sum('minutos'),
                             'horarios' => $materiasItems
@@ -737,21 +805,14 @@ class Horario extends Component
 
     public function getGraficasHorarioProperty(): array
     {
-        if (!$this->filtrosCompletos() || $this->horariosGuardados->isEmpty()) {
+        $registros = $this->registrosCombinadosHorario();
+
+        if (!$this->filtrosCompletos() || $registros->isEmpty()) {
             return [
                 'hay_datos' => false,
-                'docentes' => [
-                    'labels' => [],
-                    'series' => [],
-                ],
-                'materias' => [
-                    'labels' => [],
-                    'series' => [],
-                ],
-                'dias' => [
-                    'labels' => [],
-                    'series' => [],
-                ],
+                'docentes' => ['labels' => [], 'series' => []],
+                'materias' => ['labels' => [], 'series' => []],
+                'dias' => ['labels' => [], 'series' => []],
                 'global' => [
                     'avance' => 0,
                     'total_celdas' => $this->totalCeldas,
@@ -764,41 +825,6 @@ class Horario extends Component
             ];
         }
 
-        $registros = $this->horariosGuardados
-            ->map(function ($horario) {
-                $asignacion = $horario->asignacionMateria;
-                $materia = $asignacion?->materia;
-                $profesor = $asignacion?->profesor;
-                $dia = $this->dias->firstWhere('id', $horario->dia_id);
-                $hora = $this->horas->firstWhere('id', $horario->hora_id);
-
-                $nombreProfesor = $profesor
-                    ? trim(
-                        ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
-                    )
-                    : 'Sin profesor asignado';
-
-                $minutos = 0;
-
-                if ($hora?->hora_inicio && $hora?->hora_fin) {
-                    $inicio = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio);
-                    $fin = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin);
-
-                    $minutos = $inicio->diffInMinutes($fin);
-                }
-
-                return [
-                    'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
-                    'materia' => $materia?->materia ?? 'Sin materia',
-                    'dia' => $dia?->dia ?? 'Sin día',
-                    'minutos' => $minutos,
-                    'sin_profesor' => !$profesor,
-                ];
-            })
-            ->values();
-
         $docentes = $registros
             ->groupBy('profesor')
             ->map(fn($items, $profesor) => [
@@ -809,7 +835,7 @@ class Horario extends Component
             ->values();
 
         $materias = $registros
-            ->groupBy('materia')
+            ->groupBy(fn($item) => ($item['taller_conjunto'] ? 'Taller: ' : '') . $item['materia'])
             ->map(fn($items, $materia) => [
                 'materia' => $this->recortarTextoHorario($materia, 20),
                 'modulos' => $items->count(),
@@ -828,10 +854,9 @@ class Horario extends Component
         $totalCeldas = $this->totalCeldas;
         $celdasAsignadas = $this->celdasAsignadas;
         $celdasPendientes = max(0, $totalCeldas - $celdasAsignadas);
-        $avance = $this->avanceHorario;
 
         return [
-            'hay_datos' => $registros->isNotEmpty(),
+            'hay_datos' => true,
             'docentes' => [
                 'labels' => $docentes->pluck('profesor')->toArray(),
                 'series' => $docentes->pluck('modulos')->toArray(),
@@ -845,21 +870,113 @@ class Horario extends Component
                 'series' => $dias->pluck('modulos')->toArray(),
             ],
             'global' => [
-                'avance' => $avance,
+                'avance' => $this->avanceHorario,
                 'total_celdas' => $totalCeldas,
                 'celdas_asignadas' => $celdasAsignadas,
                 'celdas_pendientes' => $celdasPendientes,
                 'sin_profesor' => $registros->where('sin_profesor', true)->count(),
-                'docentes' => $registros
-                    ->where('sin_profesor', false)
-                    ->pluck('profesor')
-                    ->unique()
-                    ->count(),
-                'materias' => $registros
-                    ->pluck('materia')
-                    ->unique()
-                    ->count(),
+                'docentes' => $registros->where('sin_profesor', false)->pluck('profesor')->unique()->count(),
+                'materias' => $registros->map(fn($item) => ($item['taller_conjunto'] ? 'taller:' : 'materia:') . $item['materia'])->unique()->count(),
             ],
+        ];
+    }
+
+    protected function registrosCombinadosHorario(): Collection
+    {
+        $normales = $this->horariosGuardados->map(function ($horario) {
+            $asignacion = $horario->asignacionMateria;
+            $materia = $asignacion?->materia;
+            $profesor = $asignacion?->profesor;
+            $dia = $this->dias->firstWhere('id', $horario->dia_id);
+            $hora = $this->horas->firstWhere('id', $horario->hora_id);
+
+            return $this->crearRegistroResumenHorario(
+                profesor: $profesor,
+                materia: $materia?->materia ?? 'Sin materia',
+                clave: $materia?->clave,
+                extra: (bool) ($materia?->extra ?? false),
+                receso: (bool) ($materia?->receso ?? false),
+                tallerConjunto: false,
+                grupos: null,
+                dia: $dia,
+                hora: $hora,
+            );
+        });
+
+        $talleres = $this->talleresGuardados
+            ->flatten(1)
+            ->unique('taller_sesion_id')
+            ->map(function ($horario) {
+                $sesion = $horario->tallerSesion;
+                $grupos = $sesion?->grupos
+                        ?->map(fn($grupo) => trim(($grupo->grado?->nombre ?? '') . ' ' . ($grupo->asignacionGrupo?->nombre ?? '')))
+                    ->filter()
+                    ->implode(', ');
+
+                $dia = $this->dias->firstWhere('id', $horario->dia_id);
+                $hora = $this->horas->firstWhere('id', $horario->hora_id);
+
+                return $this->crearRegistroResumenHorario(
+                    profesor: $sesion?->profesor,
+                    materia: $sesion?->taller?->nombre ?? 'Taller conjunto',
+                    clave: $sesion?->taller?->clave,
+                    extra: false,
+                    receso: false,
+                    tallerConjunto: true,
+                    grupos: $grupos ?: null,
+                    dia: $dia,
+                    hora: $hora,
+                );
+            });
+
+        return $normales->concat($talleres)->values();
+    }
+
+    protected function crearRegistroResumenHorario(
+        $profesor,
+        string $materia,
+        ?string $clave,
+        bool $extra,
+        bool $receso,
+        bool $tallerConjunto,
+        ?string $grupos,
+        $dia,
+        $hora,
+    ): array {
+        $nombreProfesor = $profesor
+            ? trim(
+                ($profesor->nombre ?? '') . ' ' .
+                ($profesor->apellido_paterno ?? '') . ' ' .
+                ($profesor->apellido_materno ?? '')
+            )
+            : 'Sin profesor asignado';
+
+        $minutos = 0;
+        $horaTexto = 'Sin hora';
+
+        if ($hora?->hora_inicio && $hora?->hora_fin) {
+            $inicio = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio);
+            $fin = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin);
+            $minutos = $inicio->diffInMinutes($fin);
+            $horaTexto = $inicio->format('h:i A') . ' - ' . $fin->format('h:i A');
+        }
+
+        return [
+            'profesor_id' => $profesor?->id,
+            'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
+            'materia' => $materia,
+            'clave' => $clave,
+            'extra' => $extra,
+            'receso' => $receso,
+            'taller_conjunto' => $tallerConjunto,
+            'grupos' => $grupos,
+            'dia' => $dia?->dia ?? 'Sin día',
+            'dia_id' => $dia?->id,
+            'hora_inicio' => $hora?->hora_inicio,
+            'hora_fin' => $hora?->hora_fin,
+            'hora_texto' => $horaTexto,
+            'minutos' => $minutos,
+            'sin_profesor' => !$profesor,
         ];
     }
 
@@ -881,6 +998,10 @@ class Horario extends Component
 
     protected function filtrosCompletos(): bool
     {
+        if (!$this->ciclo_escolar_id) {
+            return false;
+        }
+
         if ($this->esBachillerato) {
             return filled($this->generacion_id)
                 && filled($this->grado_id)
@@ -1022,6 +1143,14 @@ class Horario extends Component
                 $query->where('nivel_id', $this->nivel->id)
                     ->where('grado_id', $this->grado_id);
 
+                if ($this->nivel?->slug === 'secundaria') {
+                    $query->where(function ($subQuery) {
+                        $subQuery->where('slug', '!=', 'taller')
+                            ->orWhere('extra', '!=', 1)
+                            ->orWhere('receso', '!=', 1);
+                    });
+                }
+
                 if ($this->esBachillerato) {
                     $query->where('semestre_id', $this->semestre_id);
                 } else {
@@ -1061,6 +1190,13 @@ class Horario extends Component
         $materias = Materia::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
+            ->when($this->nivel?->slug === 'secundaria', function ($query) {
+                $query->where(function ($subQuery) {
+                    $subQuery->where('slug', '!=', 'taller')
+                        ->orWhere('extra', '!=', 1)
+                        ->orWhere('receso', '!=', 1);
+                });
+            })
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),
@@ -1113,6 +1249,8 @@ class Horario extends Component
             ->where('grado_id', $this->grado_id)
             ->where('generacion_id', $this->generacion_id)
             ->where('grupo_id', $this->grupo_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereNull('taller_sesion_id')
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),
@@ -1123,6 +1261,50 @@ class Horario extends Component
         $this->horariosGuardados = $horarios->keyBy(function ($horario) {
             return $horario->hora_id . '-' . $horario->dia_id;
         });
+    }
+
+    protected function cargarTalleresGuardados(): void
+    {
+        if (!$this->filtrosCompletos() || !$this->ciclo_escolar_id) {
+            $this->talleresGuardados = collect();
+
+            return;
+        }
+
+        $talleres = HorarioModel::query()
+            ->with([
+                'tallerSesion.taller:id,nivel_id,nombre,clave',
+                'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'tallerSesion.grupos.asignacionGrupo:id,nombre',
+                'tallerSesion.grupos.grado:id,nombre,orden',
+            ])
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $this->grado_id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grupo_id', $this->grupo_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereNotNull('taller_sesion_id')
+            ->when(
+                $this->esBachillerato,
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
+            )
+            ->get();
+
+        /*
+         * groupBy() conserva Eloquent\Collection y coloca otras colecciones
+         * dentro de ella. Livewire intenta serializar esas colecciones internas
+         * como modelos y genera el error Collection::getMorphClass().
+         *
+         * toBase() convierte solamente la colección exterior en
+         * Illuminate\Support\Collection.
+         */
+        $this->talleresGuardados = $talleres
+            ->groupBy(function ($horario) {
+                return $horario->hora_id . '-' . $horario->dia_id;
+            })
+            ->toBase();
     }
 
 
@@ -1186,45 +1368,7 @@ class Horario extends Component
             })
             ->values();
 
-        $registros = $horarios
-            ->map(function ($horario) {
-                $asignacion = $horario->asignacionMateria;
-                $materia = $asignacion?->materia;
-                $profesor = $asignacion?->profesor;
-                $dia = $this->dias->firstWhere('id', $horario->dia_id);
-                $hora = $this->horas->firstWhere('id', $horario->hora_id);
-
-                $nombreProfesor = $profesor
-                    ? trim(
-                        ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
-                    )
-                    : 'Sin profesor asignado';
-
-                $minutos = 0;
-
-                if ($hora?->hora_inicio && $hora?->hora_fin) {
-                    $inicio = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_inicio);
-                    $fin = \Carbon\Carbon::createFromFormat('H:i:s', $hora->hora_fin);
-                    $minutos = $inicio->diffInMinutes($fin);
-                }
-
-                return [
-                    'profesor' => $nombreProfesor ?: 'Sin profesor asignado',
-                    'sin_profesor' => !$profesor,
-                    'materia' => $materia?->materia ?? 'Sin materia',
-                    'clave' => $materia?->clave,
-                    'extra' => (bool) ($materia?->extra ?? false),
-                    'receso' => (bool) ($materia?->receso ?? false),
-                    'dia' => $dia?->dia ?? 'Sin día',
-                    'dia_id' => $dia?->id,
-                    'hora_inicio' => $hora?->hora_inicio,
-                    'hora_fin' => $hora?->hora_fin,
-                    'minutos' => $minutos,
-                ];
-            })
-            ->values();
+        $registros = $this->registrosCombinadosHorario();
 
         $sinProfesor = $registros->where('sin_profesor', true)->count();
 
@@ -1519,7 +1663,8 @@ class Horario extends Component
                 grupo_id: $this->grupo_id ? (int) $this->grupo_id : null,
                 generacion_id: $this->generacion_id ? (int) $this->generacion_id : null,
                 semestre_id: $this->semestre_id ? (int) $this->semestre_id : null,
-                esBachillerato: $this->esBachillerato
+                esBachillerato: $this->esBachillerato,
+                ciclo_escolar_id: $this->ciclo_escolar_id ? (int) $this->ciclo_escolar_id : null,
             ),
             $nombreArchivo
         );

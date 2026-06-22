@@ -63,11 +63,11 @@
         }
 
         .logo-left {
-            width: 115px;
+            width: 90px;
         }
 
         .logo-right {
-            width: 100px;
+            width: 90px;
         }
 
         .center-cell {
@@ -161,14 +161,30 @@
         }
 
         .materia {
-            font-size: 12px;
+            font-size: 11px;
             color: #00152e;
-            line-height: 11px;
+            line-height: 9px;
         }
 
         .materia strong {
             font-size: 12px;
             font-weight: bold;
+        }
+
+        .taller-conjunto {
+            padding: 5px 3px;
+            line-height: 1.2;
+        }
+
+        .taller-conjunto strong {
+            color: #0369a1;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .separador-actividad {
+            margin: 4px 5px;
+            border-top: 1px solid #cbd5e1;
         }
 
         .libre {
@@ -200,7 +216,7 @@
         table.materias {
             width: 100%;
             border-collapse: collapse;
-            border: 1px solid #9fd0bf;
+
             /* table-layout: fixed; */
         }
 
@@ -214,11 +230,11 @@
         }
 
         .materias td {
-            padding: 4px 5px;
-            font-size: 12px;
+            padding: 2px 5px;
+            font-size: 11px;
             font-weight: bold;
             text-align: center;
-            vertical-align: top;
+            border: 1px solid #bbbbbb;
         }
 
         .materias .num {
@@ -246,7 +262,7 @@
         }
 
         .total-wrapper {
-            margin-top: 36px;
+            margin-top: 25px;
             width: 100%;
             text-align: center;
         }
@@ -373,19 +389,41 @@
 
                                     <td>
                                         @forelse ($celdas as $horario)
-                                            <div class="materia">
-                                                <strong>
-                                                    {{ $horario->grado?->nombre ?? '° Grado' }}°
-                                                    @if ($horario->nivel?->nombre)
-                                                        {{ $horario->nivel->nombre }}
-                                                    @endif
-                                                </strong>
-                                                <br>
-                                                {{ $horario->asignacionMateria?->materia?->materia ?? 'Materia no definida' }}
-                                            </div>
+                                            @php
+                                                $esTallerConjunto =
+                                                    !empty($horario->taller_sesion_id) ||
+                                                    $horario->tallerSesion !== null;
+
+                                                $nombreActividad = $esTallerConjunto
+                                                    ? $horario->tallerSesion?->taller?->nombre ?? 'Taller'
+                                                    : $horario->asignacionMateria?->materia?->materia ??
+                                                        'Materia no definida';
+                                            @endphp
+
+                                            @if ($esTallerConjunto)
+                                                {{-- Taller conjunto: mostrar solamente el nombre --}}
+                                                <div class="materia taller-conjunto">
+                                                    Taller: <strong>{{ $nombreActividad }}</strong>
+                                                </div>
+                                            @else
+                                                {{-- Materia normal --}}
+                                                <div class="materia">
+                                                    <strong>
+                                                        {{ $horario->grado?->nombre ?? 'Grado' }}°
+
+                                                        @if ($horario->nivel?->nombre)
+                                                            {{ $horario->nivel->nombre }}
+                                                        @endif
+                                                    </strong>
+
+                                                    <br>
+
+                                                    {{ $nombreActividad }}
+                                                </div>
+                                            @endif
 
                                             @if (!$loop->last)
-                                                <br>
+                                                <div class="separador-actividad"></div>
                                             @endif
                                         @empty
                                             <div class="libre">---</div>
