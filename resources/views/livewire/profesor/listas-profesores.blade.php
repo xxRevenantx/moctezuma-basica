@@ -1,9 +1,10 @@
-<div x-data="scrollLockPro('materias_profesor')" x-init="iniciar()" data-scroll-lock-pro="materias_profesor" class="space-y-6">
+<div x-data="{ abierto: null }" class="space-y-6">
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click.prevent="cambiar('materias_profesor')"
+            <button type="button"
+                x-on:click.prevent="abierto = abierto === 'materias_profesor' ? null : 'materias_profesor'"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
 
                 <div class="flex items-center gap-4">
@@ -583,133 +584,4 @@
             </div>
         </article>
     </section>
-
-    @script
-        <script>
-            Alpine.data('scrollLockPro', (nombre) => ({
-                abierto: null,
-                nombre,
-
-                iniciar() {
-                    this.registrarProteccionScroll();
-                },
-
-                cambiar(seccion) {
-                    const posicion = window.scrollY;
-
-                    this.abierto = this.abierto === seccion ? null : seccion;
-
-                    this.$nextTick(() => {
-                        requestAnimationFrame(() => {
-                            window.scrollTo({
-                                top: posicion,
-                                left: 0,
-                                behavior: 'auto',
-                            });
-                        });
-                    });
-                },
-
-                registrarProteccionScroll() {
-                    const registrar = () => {
-                        if (window.__proteccionScrollListasProfesoresRegistrada) {
-                            return;
-                        }
-
-                        window.__proteccionScrollListasProfesoresRegistrada = true;
-
-                        Livewire.hook('commit', ({
-                            component,
-                            succeed,
-                            fail
-                        }) => {
-                            const raiz = component?.el;
-
-                            if (
-                                !raiz ||
-                                !raiz.matches?.('[data-scroll-lock-pro="materias_profesor"]')
-                            ) {
-                                return;
-                            }
-
-                            /*
-                             * Se captura la posición justo antes de que Livewire procese
-                             * la actualización. No se usa sessionStorage ni eventos
-                             * debounce, porque podían guardar 0 después del salto.
-                             */
-                            const posicionX = window.scrollX;
-                            const posicionY = window.scrollY;
-
-                            const html = document.documentElement;
-                            const body = document.body;
-
-                            const scrollHtmlAnterior = html.style.scrollBehavior;
-                            const scrollBodyAnterior = body.style.scrollBehavior;
-
-                            html.style.scrollBehavior = 'auto';
-                            body.style.scrollBehavior = 'auto';
-
-                            let terminado = false;
-
-                            const restaurar = () => {
-                                if (terminado) {
-                                    return;
-                                }
-
-                                window.scrollTo({
-                                    top: posicionY,
-                                    left: posicionX,
-                                    behavior: 'auto',
-                                });
-                            };
-
-                            const finalizar = () => {
-                                restaurar();
-
-                                terminado = true;
-                                html.style.scrollBehavior = scrollHtmlAnterior;
-                                body.style.scrollBehavior = scrollBodyAnterior;
-                            };
-
-                            succeed(() => {
-                                /*
-                                 * Livewire y Flux pueden terminar de acomodar el DOM
-                                 * en más de un ciclo. Por eso se restaura durante
-                                 * varios ciclos cortos, siempre a la misma posición.
-                                 */
-                                queueMicrotask(restaurar);
-
-                                requestAnimationFrame(() => {
-                                    restaurar();
-
-                                    requestAnimationFrame(restaurar);
-                                });
-
-                                setTimeout(restaurar, 20);
-                                setTimeout(restaurar, 60);
-                                setTimeout(restaurar, 120);
-                                setTimeout(finalizar, 220);
-                            });
-
-                            fail(() => {
-                                terminado = true;
-                                html.style.scrollBehavior = scrollHtmlAnterior;
-                                body.style.scrollBehavior = scrollBodyAnterior;
-                            });
-                        });
-                    };
-
-                    if (window.Livewire) {
-                        registrar();
-                        return;
-                    }
-
-                    document.addEventListener('livewire:init', registrar, {
-                        once: true,
-                    });
-                },
-            }));
-        </script>
-    @endscript
-
 </div>

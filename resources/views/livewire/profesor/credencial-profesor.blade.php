@@ -1,12 +1,21 @@
-<div x-data="scrollLockPro('credenciales_profesor')" x-init="iniciar()" x-on:pointerdown.capture="guardarScroll()"
-    x-on:keydown.capture="guardarScroll()" x-on:change.capture="guardarScroll()"
-    x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
+<div x-data="{
+    abierto: localStorage.getItem('collapse_credenciales_profesor') ?? 'credenciales_profesor',
+    cambiar() {
+        this.abierto = this.abierto === 'credenciales_profesor' ? null : 'credenciales_profesor';
+
+        if (this.abierto) {
+            localStorage.setItem('collapse_credenciales_profesor', this.abierto);
+        } else {
+            localStorage.removeItem('collapse_credenciales_profesor');
+        }
+    }
+}" class="space-y-6">
 
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click.prevent="cambiar('credenciales_profesor')"
+            <button type="button" x-on:click.prevent="cambiar()"
                 class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
 
                 <div class="flex items-center gap-4">
@@ -504,147 +513,4 @@
             </div>
         </article>
     </section>
-
-    @script
-        <script>
-            Alpine.data('scrollLockPro', (nombre) => ({
-                abierto: localStorage.getItem(`collapse_${nombre}`) ?? nombre,
-                nombre,
-
-                llaveCollapse: `collapse_${nombre}`,
-                llaveScroll: `scroll_actual_${nombre}`,
-
-                restaurando: false,
-
-                iniciar() {
-                    history.scrollRestoration = 'manual';
-
-                    this.guardarScroll();
-                    this.registrarHookLivewire();
-                },
-
-                registrarHookLivewire() {
-                    if (!window.__scrollLockProHooks) {
-                        window.__scrollLockProHooks = {};
-                    }
-
-                    if (window.__scrollLockProHooks[this.nombre]) {
-                        return;
-                    }
-
-                    window.__scrollLockProHooks[this.nombre] = true;
-
-                    const registrar = () => {
-                        Livewire.hook('commit', ({
-                            succeed
-                        }) => {
-                            const posicion = this.obtenerScrollGuardado();
-
-                            succeed(() => {
-                                this.restaurarScrollSeguro(posicion);
-                            });
-                        });
-                    };
-
-                    if (window.Livewire) {
-                        registrar();
-                        return;
-                    }
-
-                    document.addEventListener('livewire:init', () => {
-                        registrar();
-                    }, {
-                        once: true
-                    });
-                },
-
-                cambiar(seccion) {
-                    this.guardarScroll();
-
-                    this.abierto = this.abierto === seccion ? null : seccion;
-
-                    if (this.abierto) {
-                        localStorage.setItem(this.llaveCollapse, this.abierto);
-                    } else {
-                        localStorage.removeItem(this.llaveCollapse);
-                    }
-
-                    this.restaurarScrollSeguro(this.obtenerScrollGuardado());
-                },
-
-                guardarScroll() {
-                    if (this.restaurando) {
-                        return;
-                    }
-
-                    const y = window.scrollY ||
-                        document.documentElement.scrollTop ||
-                        document.body.scrollTop ||
-                        0;
-
-                    sessionStorage.setItem(this.llaveScroll, String(y));
-
-                    if (!window.__scrollLockProUltimo) {
-                        window.__scrollLockProUltimo = {};
-                    }
-
-                    window.__scrollLockProUltimo[this.nombre] = y;
-                },
-
-                obtenerScrollGuardado() {
-                    const desdeSesion = sessionStorage.getItem(this.llaveScroll);
-
-                    if (desdeSesion !== null) {
-                        const y = Number(desdeSesion);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    if (
-                        window.__scrollLockProUltimo &&
-                        window.__scrollLockProUltimo[this.nombre] !== undefined
-                    ) {
-                        const y = Number(window.__scrollLockProUltimo[this.nombre]);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    return window.scrollY || 0;
-                },
-
-                restaurarScrollSeguro(posicion = null) {
-                    const y = Number(posicion ?? this.obtenerScrollGuardado());
-
-                    if (Number.isNaN(y)) {
-                        return;
-                    }
-
-                    this.restaurando = true;
-
-                    const restaurar = () => {
-                        window.scrollTo({
-                            top: y,
-                            left: 0,
-                            behavior: 'auto',
-                        });
-                    };
-
-                    requestAnimationFrame(restaurar);
-
-                    setTimeout(restaurar, 20);
-                    setTimeout(restaurar, 60);
-                    setTimeout(restaurar, 120);
-                    setTimeout(restaurar, 220);
-
-                    setTimeout(() => {
-                        this.restaurando = false;
-                    }, 260);
-                },
-            }));
-        </script>
-    @endscript
 </div>

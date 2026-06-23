@@ -183,39 +183,7 @@
                 </div>
 
                 <div class="p-4 sm:p-5">
-                    <livewire:profesor.listas-profesores />
-                </div>
-            </div>
-
-            {{-- Materias y listas --}}
-            <div x-cloak x-show="abierto === 'materias'" x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
-                class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                <div
-                    class="border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-white to-blue-50 px-5 py-4 dark:border-zinc-800 dark:from-indigo-950/20 dark:via-zinc-900 dark:to-blue-950/20">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 class="text-base font-black text-slate-900 dark:text-white">
-                                Materias y listas del profesor
-                            </h2>
-
-                            <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-                                Consulta materias desde horarios y descarga listas de asistencia o evaluación.
-                            </p>
-                        </div>
-
-                        <div
-                            class="inline-flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                            <span class="h-2 w-2 rounded-full bg-indigo-500"></span>
-                            Control académico
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-4 sm:p-5">
-                    <livewire:profesor.credencial-profesor />
+                    <livewire:profesor.listas-profesores wire:key="profesor-listas" />
                 </div>
             </div>
 
@@ -247,7 +215,7 @@
                 </div>
 
                 <div class="p-4 sm:p-5">
-                    <livewire:profesor.credencial-profesor />
+                    <livewire:profesor.credencial-profesor wire:key="profesor-credenciales" />
                 </div>
             </div>
 
@@ -280,7 +248,7 @@
                 </div>
 
                 <div class="p-4 sm:p-5">
-                    <livewire:profesor.horario-profesor />
+                    <livewire:profesor.horario-profesor wire:key="profesor-horario" />
                 </div>
             </div>
 
