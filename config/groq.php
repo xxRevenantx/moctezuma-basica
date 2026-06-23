@@ -31,6 +31,20 @@ return [
         'max_caracteres_totales' => (int) env('GROQ_FICHA_GRUPO_MAX_CARACTERES_TOTALES', 28000),
     ],
 
+    'horarios' => [
+        'model' => env('GROQ_HORARIO_MODEL', 'openai/gpt-oss-20b'),
+        'temperature' => (float) env('GROQ_HORARIO_TEMPERATURE', 0.20),
+        'conflicto_max_tokens' => (int) env('GROQ_HORARIO_CONFLICTO_MAX_TOKENS', 1200),
+        'analisis_max_tokens' => (int) env('GROQ_HORARIO_ANALISIS_MAX_TOKENS', 1600),
+        'max_alternativas' => (int) env('GROQ_HORARIO_MAX_ALTERNATIVAS', 8),
+    ],
+
+    'dashboard' => [
+        'model' => env('GROQ_DASHBOARD_MODEL', 'openai/gpt-oss-20b'),
+        'temperature' => (float) env('GROQ_DASHBOARD_TEMPERATURE', 0.20),
+        'max_tokens' => (int) env('GROQ_DASHBOARD_MAX_TOKENS', 1900),
+    ],
+
     // Por privacidad, permanece desactivado de forma predeterminada.
     // Cuando está activo, las recomendaciones pueden usar como contexto
     // los demás campos formativos guardados del mismo alumno.

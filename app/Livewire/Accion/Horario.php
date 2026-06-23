@@ -13,6 +13,7 @@ use App\Models\Horario as HorarioModel;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\GroqHorarioService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
@@ -62,6 +63,17 @@ class Horario extends Component
 
     public array $conflictosProfesor = [];
 
+    /** @var array<int, array<string, mixed>> */
+    public array $alternativasConflicto = [];
+
+    /** @var array<string, mixed>|null */
+    public ?array $analisisConflictoIa = null;
+
+    public string $tipoAnalisisHorarioIa = 'operativo';
+
+    /** @var array<string, mixed>|null */
+    public ?array $analisisHorarioIa = null;
+
     public function mount(): void
     {
         $this->nivel = Nivel::query()
@@ -103,12 +115,18 @@ class Horario extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        $this->invalidarAnalisisHorarioIa();
+        $this->resetEstadoTraslapeProfesor();
+        $this->cargarHorariosGuardados();
         $this->cargarTalleresGuardados();
+        $this->sincronizarSeleccionesHorario();
     }
 
     #[On('taller-conjunto-actualizado')]
     public function refrescarTalleresConjuntos(): void
     {
+        $this->invalidarAnalisisHorarioIa();
+        $this->resetEstadoTraslapeProfesor();
         $this->cargarHorariosGuardados();
         $this->cargarTalleresGuardados();
         $this->sincronizarSeleccionesHorario();
@@ -118,6 +136,7 @@ class Horario extends Component
     {
         $this->grupo_id = null;
 
+        $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
@@ -129,6 +148,7 @@ class Horario extends Component
     public function updatedGradoId(): void
     {
         $this->grupo_id = null;
+        $this->invalidarAnalisisHorarioIa();
 
         if ($this->esBachillerato) {
             $this->semestre_id = null;
@@ -145,6 +165,7 @@ class Horario extends Component
 
     public function updatedGrupoId(): void
     {
+        $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
@@ -156,6 +177,7 @@ class Horario extends Component
     {
         $this->grupo_id = null;
 
+        $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
@@ -167,6 +189,8 @@ class Horario extends Component
     #[On('refrescarHorasDias')]
     public function refrescarHorasDias(): void
     {
+        $this->invalidarAnalisisHorarioIa();
+        $this->resetEstadoTraslapeProfesor();
         $this->mensajeActualizacionHorario = 'Actualizando horarios...';
 
         $this->cargarHoras();
@@ -256,6 +280,7 @@ class Horario extends Component
                 $horarioExistente->delete();
             }
 
+            $this->invalidarAnalisisHorarioIa();
             $this->resetEstadoTraslapeProfesor();
             $this->cargarHorariosGuardados();
             $this->sincronizarSeleccionesHorario();
@@ -330,6 +355,13 @@ class Horario extends Component
             ];
 
             $this->conflictosProfesor = $conflictos;
+            $this->alternativasConflicto = $this->buscarAlternativasViables(
+                profesorId: (int) $asignacion->profesor_id,
+                diaSolicitadoId: $diaId,
+                horaSolicitadaId: $horaId,
+                horarioActualId: $horarioExistente?->id
+            );
+            $this->analisisConflictoIa = null;
             $this->mostrarModalTraslapeProfesor = true;
 
             $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
@@ -375,6 +407,7 @@ class Horario extends Component
             ]);
         }
 
+        $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
         $this->cargarHorariosGuardados();
         $this->cargarTalleresGuardados();
@@ -440,18 +473,18 @@ class Horario extends Component
 
             $nombreProfesor = trim(
                 ($profesor->nombre ?? '') . ' ' .
-                ($profesor->apellido_paterno ?? '') . ' ' .
-                ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
             );
 
             $grupos = $item->esTallerConjunto()
                 ? $item->tallerSesion?->grupos
-                        ?->map(fn($grupo) => trim(
-                        ($grupo->grado?->nombre ?? '') . ' ' .
+                ?->map(fn($grupo) => trim(
+                    ($grupo->grado?->nombre ?? '') . ' ' .
                         ($grupo->asignacionGrupo?->nombre ?? '')
-                    ))
-                    ->filter()
-                    ->implode(', ')
+                ))
+                ->filter()
+                ->implode(', ')
                 : $this->textoGrupo($item->grupo, 'N/D');
 
             return [
@@ -467,6 +500,283 @@ class Horario extends Component
                 'materia' => $item->nombreActividad(),
             ];
         })->toArray();
+    }
+
+    /**
+     * Devuelve bloques alternativos verificados por Laravel.
+     * Ninguna alternativa depende de la respuesta de la IA.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buscarAlternativasViables(
+        int $profesorId,
+        int $diaSolicitadoId,
+        int $horaSolicitadaId,
+        ?int $horarioActualId = null
+    ): array {
+        $diaSolicitado = $this->dias->firstWhere('id', $diaSolicitadoId);
+        $horaSolicitada = $this->horas->firstWhere('id', $horaSolicitadaId);
+
+        if (!$diaSolicitado || !$horaSolicitada || !$this->grupo_id || !$this->ciclo_escolar_id) {
+            return [];
+        }
+
+        $ordenDiaSolicitado = (int) ($diaSolicitado->orden ?? 0);
+        $ordenHoraSolicitada = (int) ($horaSolicitada->orden ?? 0);
+        $alternativas = collect();
+
+        foreach ($this->dias->sortBy('orden') as $dia) {
+            foreach ($this->horas->sortBy('orden') as $hora) {
+                if ((int) $dia->id === $diaSolicitadoId && (int) $hora->id === $horaSolicitadaId) {
+                    continue;
+                }
+
+                if ($this->grupoOcupadoEnBloque((int) $dia->id, (string) $hora->hora_inicio, (string) $hora->hora_fin)) {
+                    continue;
+                }
+
+                $conflictos = $this->buscarConflictosProfesor(
+                    profesorId: $profesorId,
+                    diaId: (int) $dia->id,
+                    horaInicio: (string) $hora->hora_inicio,
+                    horaFin: (string) $hora->hora_fin,
+                    horarioActualId: $horarioActualId
+                );
+
+                if (count($conflictos) > 0) {
+                    continue;
+                }
+
+                $mismoDia = (int) $dia->id === $diaSolicitadoId;
+                $distanciaDia = abs((int) ($dia->orden ?? 0) - $ordenDiaSolicitado);
+                $distanciaHora = abs((int) ($hora->orden ?? 0) - $ordenHoraSolicitada);
+
+                $alternativas->push([
+                    'dia_id' => (int) $dia->id,
+                    'hora_id' => (int) $hora->id,
+                    'dia' => (string) $dia->dia,
+                    'hora_inicio' => (string) $hora->hora_inicio,
+                    'hora_fin' => (string) $hora->hora_fin,
+                    'hora_texto' => $this->formatearBloqueHora((string) $hora->hora_inicio, (string) $hora->hora_fin),
+                    'motivo' => $mismoDia
+                        ? 'Mantiene la actividad en el mismo día y evita el traslape.'
+                        : 'El grupo y el docente están disponibles en este bloque.',
+                    'prioridad' => $mismoDia ? 'alta' : 'normal',
+                    'puntaje' => ($mismoDia ? 0 : 100) + ($distanciaDia * 10) + $distanciaHora,
+                ]);
+            }
+        }
+
+        return $alternativas
+            ->sortBy('puntaje')
+            ->take((int) config('groq.horarios.max_alternativas', 8))
+            ->values()
+            ->map(function (array $alternativa, int $indice) {
+                unset($alternativa['puntaje']);
+                $alternativa['indice'] = $indice;
+
+                return $alternativa;
+            })
+            ->all();
+    }
+
+    protected function grupoOcupadoEnBloque(int $diaId, string $horaInicio, string $horaFin): bool
+    {
+        $dia = Dia::query()->find($diaId);
+
+        if (!$dia || !$this->grupo_id || !$this->ciclo_escolar_id) {
+            return true;
+        }
+
+        $diaIds = Dia::query()
+            ->whereRaw('LOWER(dia) = ?', [mb_strtolower((string) $dia->dia)])
+            ->pluck('id');
+
+        return HorarioModel::query()
+            ->where('grupo_id', $this->grupo_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereIn('dia_id', $diaIds)
+            ->when(
+                $this->esBachillerato,
+                fn($query) => $query->where('semestre_id', $this->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
+            )
+            ->whereHas('hora', function ($query) use ($horaInicio, $horaFin) {
+                $query->where('hora_inicio', '<', $horaFin)
+                    ->where('hora_fin', '>', $horaInicio);
+            })
+            ->exists();
+    }
+
+    public function analizarConflictoConIa(GroqHorarioService $groq): void
+    {
+        if (!$this->mostrarModalTraslapeProfesor || empty($this->conflictosProfesor)) {
+            $this->dispatch('swal', [
+                'title' => 'No hay un conflicto pendiente para analizar.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->analisisConflictoIa = $groq->explicarConflicto(
+                $this->construirContextoConflictoIa()
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->dispatch('swal', [
+                'title' => 'No fue posible analizar el conflicto.',
+                'text' => $exception->getMessage(),
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
+    /**
+     * Aplica únicamente una alternativa que Laravel vuelve a validar.
+     */
+    public function aplicarAlternativaConflicto(int $indice): void
+    {
+        $alternativa = collect($this->alternativasConflicto)
+            ->firstWhere('indice', $indice);
+
+        $asignacionMateriaId = (int) ($this->pendienteHorario['asignacion_materia_id'] ?? 0);
+
+        if (!$alternativa || !$asignacionMateriaId) {
+            $this->dispatch('swal', [
+                'title' => 'La alternativa ya no está disponible.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        $asignacion = AsignacionMateria::query()->find($asignacionMateriaId);
+
+        if (!$asignacion?->profesor_id) {
+            $this->dispatch('swal', [
+                'title' => 'No se pudo validar al docente de la materia.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        $alternativasActuales = $this->buscarAlternativasViables(
+            profesorId: (int) $asignacion->profesor_id,
+            diaSolicitadoId: (int) ($this->pendienteHorario['dia_id'] ?? 0),
+            horaSolicitadaId: (int) ($this->pendienteHorario['hora_id'] ?? 0)
+        );
+
+        $continuaDisponible = collect($alternativasActuales)->contains(
+            fn(array $item) => (int) $item['dia_id'] === (int) $alternativa['dia_id']
+                && (int) $item['hora_id'] === (int) $alternativa['hora_id']
+        );
+
+        if (!$continuaDisponible) {
+            $this->dispatch('swal', [
+                'title' => 'La disponibilidad cambió.',
+                'text' => 'Actualiza el horario y selecciona otra alternativa.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        $diaId = (int) $alternativa['dia_id'];
+        $horaId = (int) $alternativa['hora_id'];
+        $claveCelda = $horaId . '-' . $diaId;
+
+        $this->resetEstadoTraslapeProfesor();
+
+        $this->procesarCambioHorario(
+            horaId: $horaId,
+            diaId: $diaId,
+            asignacionMateriaId: $asignacionMateriaId,
+            claveCelda: $claveCelda
+        );
+
+        $this->dispatch('swal', [
+            'title' => 'Materia colocada en una alternativa disponible.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function construirContextoConflictoIa(): array
+    {
+        $asignacion = AsignacionMateria::query()
+            ->with('materia:id,materia')
+            ->find((int) ($this->pendienteHorario['asignacion_materia_id'] ?? 0));
+
+        $dia = Dia::query()->find((int) ($this->pendienteHorario['dia_id'] ?? 0));
+        $hora = Hora::query()->find((int) ($this->pendienteHorario['hora_id'] ?? 0));
+        $grado = $this->grados->firstWhere('id', $this->grado_id);
+        $grupo = $this->grupos->firstWhere('id', $this->grupo_id) ?? $this->obtenerGrupoSeleccionado();
+        $semestre = $this->semestres->firstWhere('id', $this->semestre_id);
+
+        return [
+            'solicitud' => [
+                'nivel' => $this->nivel?->nombre ?? 'No definido',
+                'grado' => $grado?->nombre ?? 'No definido',
+                'grupo' => $this->textoGrupo($grupo),
+                'semestre' => $semestre?->numero ? $semestre->numero . '°' : null,
+                'materia' => $asignacion?->materia?->materia ?? 'Materia no definida',
+                'dia' => $dia?->dia ?? 'No definido',
+                'hora' => $hora
+                    ? $this->formatearBloqueHora((string) $hora->hora_inicio, (string) $hora->hora_fin)
+                    : 'No definida',
+            ],
+            'conflictos_detectados' => collect($this->conflictosProfesor)
+                ->map(fn(array $conflicto) => [
+                    'nivel' => $conflicto['nivel'] ?? 'N/D',
+                    'grado' => $conflicto['grado'] ?? 'N/D',
+                    'grupo' => $conflicto['grupo'] ?? 'N/D',
+                    'materia' => $conflicto['materia'] ?? 'N/D',
+                    'dia' => $conflicto['dia'] ?? 'N/D',
+                    'hora' => $this->formatearBloqueHora(
+                        (string) ($conflicto['hora_inicio'] ?? ''),
+                        (string) ($conflicto['hora_fin'] ?? '')
+                    ),
+                    'semestre' => $conflicto['semestre'] ?? null,
+                ])
+                ->values()
+                ->all(),
+            'alternativas_validas' => collect($this->alternativasConflicto)
+                ->map(fn(array $alternativa) => [
+                    'dia' => $alternativa['dia'],
+                    'hora' => $alternativa['hora_texto'],
+                    'motivo' => $alternativa['motivo'],
+                ])
+                ->values()
+                ->all(),
+            'regla' => 'Las alternativas fueron verificadas contra la disponibilidad actual del grupo y del docente.',
+        ];
+    }
+
+    protected function formatearBloqueHora(string $horaInicio, string $horaFin): string
+    {
+        if ($horaInicio === '' || $horaFin === '') {
+            return 'Hora no definida';
+        }
+
+        try {
+            return \Carbon\Carbon::createFromFormat('H:i:s', $horaInicio)->format('h:i A')
+                . ' - '
+                . \Carbon\Carbon::createFromFormat('H:i:s', $horaFin)->format('h:i A');
+        } catch (\Throwable) {
+            return $horaInicio . ' - ' . $horaFin;
+        }
     }
 
     public function confirmarGuardarConTraslape(): void
@@ -535,6 +845,8 @@ class Horario extends Component
         ];
 
         $this->conflictosProfesor = [];
+        $this->alternativasConflicto = [];
+        $this->analisisConflictoIa = null;
     }
 
     protected function sincronizarSeleccionesHorario(): void
@@ -657,6 +969,7 @@ class Horario extends Component
         $this->horariosGuardados = collect();
         $this->talleresGuardados = collect();
         $this->seleccionesHorario = [];
+        $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
     }
 
@@ -909,7 +1222,7 @@ class Horario extends Component
             ->map(function ($horario) {
                 $sesion = $horario->tallerSesion;
                 $grupos = $sesion?->grupos
-                        ?->map(fn($grupo) => trim(($grupo->grado?->nombre ?? '') . ' ' . ($grupo->asignacionGrupo?->nombre ?? '')))
+                    ?->map(fn($grupo) => trim(($grupo->grado?->nombre ?? '') . ' ' . ($grupo->asignacionGrupo?->nombre ?? '')))
                     ->filter()
                     ->implode(', ');
 
@@ -946,8 +1259,8 @@ class Horario extends Component
         $nombreProfesor = $profesor
             ? trim(
                 ($profesor->nombre ?? '') . ' ' .
-                ($profesor->apellido_paterno ?? '') . ' ' .
-                ($profesor->apellido_materno ?? '')
+                    ($profesor->apellido_paterno ?? '') . ' ' .
+                    ($profesor->apellido_materno ?? '')
             )
             : 'Sin profesor asignado';
 
@@ -1161,9 +1474,9 @@ class Horario extends Component
             ->sortBy([
                 // El orden real de la materia debe tener prioridad.
                 fn($a, $b) => ($a->materia?->orden ?? PHP_INT_MAX)
-                <=> ($b->materia?->orden ?? PHP_INT_MAX),
+                    <=> ($b->materia?->orden ?? PHP_INT_MAX),
                 fn($a, $b) => ($a->orden ?? PHP_INT_MAX)
-                <=> ($b->orden ?? PHP_INT_MAX),
+                    <=> ($b->orden ?? PHP_INT_MAX),
                 fn($a, $b) => strcmp(
                     $a->materia?->materia ?? '',
                     $b->materia?->materia ?? ''
@@ -1352,8 +1665,8 @@ class Horario extends Component
                 $nombreProfesor = $profesor
                     ? trim(
                         ($profesor->nombre ?? '') . ' ' .
-                        ($profesor->apellido_paterno ?? '') . ' ' .
-                        ($profesor->apellido_materno ?? '')
+                            ($profesor->apellido_paterno ?? '') . ' ' .
+                            ($profesor->apellido_materno ?? '')
                     )
                     : 'Sin profesor asignado';
 
@@ -1547,6 +1860,137 @@ class Horario extends Component
             'dia_mayor_carga' => $maxDia,
             'dia_menor_carga' => $minDia,
             'avance' => $avance,
+        ];
+    }
+
+    public function updatedTipoAnalisisHorarioIa(): void
+    {
+        $this->analisisHorarioIa = null;
+    }
+
+    public function generarAnalisisHorarioIa(GroqHorarioService $groq): void
+    {
+        if (!$this->filtrosCompletos()) {
+            $this->dispatch('swal', [
+                'title' => 'Completa los filtros del horario.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->analisisHorarioIa = $groq->analizarHorario(
+                datos: $this->construirResumenAnonimoHorarioIa(),
+                tipo: $this->tipoAnalisisHorarioIa
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->dispatch('swal', [
+                'title' => 'No fue posible generar las sugerencias.',
+                'text' => $exception->getMessage(),
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
+    public function limpiarAnalisisHorarioIa(): void
+    {
+        $this->analisisHorarioIa = null;
+    }
+
+    protected function invalidarAnalisisHorarioIa(): void
+    {
+        $this->analisisHorarioIa = null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function construirResumenAnonimoHorarioIa(): array
+    {
+        $diagnostico = $this->diagnosticoHorario;
+        $grado = $this->grados->firstWhere('id', $this->grado_id);
+        $grupo = $this->grupos->firstWhere('id', $this->grupo_id) ?? $this->obtenerGrupoSeleccionado();
+        $generacion = $this->generaciones->firstWhere('id', $this->generacion_id);
+        $semestre = $this->semestres->firstWhere('id', $this->semestre_id);
+        $ciclo = $this->ciclosEscolares->firstWhere('id', $this->ciclo_escolar_id);
+
+        return [
+            'contexto' => [
+                'nivel' => $this->nivel?->nombre ?? 'No definido',
+                'grado' => $grado?->nombre ?? 'No definido',
+                'grupo' => $this->textoGrupo($grupo),
+                'generacion' => $generacion
+                    ? $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso
+                    : 'No definida',
+                'semestre' => $semestre?->numero ? $semestre->numero . '°' : null,
+                'ciclo_escolar' => $ciclo
+                    ? $ciclo->inicio_anio . ' - ' . $ciclo->fin_anio
+                    : 'No definido',
+            ],
+            'estructura' => [
+                'total_celdas' => (int) $this->totalCeldas,
+                'celdas_asignadas' => (int) $this->celdasAsignadas,
+                'celdas_pendientes' => max(0, (int) $this->totalCeldas - (int) $this->celdasAsignadas),
+                'avance_porcentaje' => (int) $this->avanceHorario,
+                'salud_porcentaje' => (int) ($diagnostico['porcentaje_salud'] ?? 0),
+                'estado' => (string) ($diagnostico['estado'] ?? 'sin_datos'),
+            ],
+            'alertas' => collect($diagnostico['alertas'] ?? [])
+                ->map(fn(array $alerta) => [
+                    'tipo' => $alerta['tipo'] ?? 'info',
+                    'titulo' => $alerta['titulo'] ?? 'Observación',
+                    'mensaje' => $alerta['mensaje'] ?? '',
+                ])
+                ->values()
+                ->all(),
+            'materias_pendientes' => collect($diagnostico['materias_pendientes'] ?? [])
+                ->map(fn(array $materia) => [
+                    'materia' => $materia['materia'] ?? 'Sin materia',
+                    'sin_profesor' => ($materia['profesor'] ?? '') === 'Sin profesor asignado',
+                    'extra' => (bool) ($materia['extra'] ?? false),
+                    'receso' => (bool) ($materia['receso'] ?? false),
+                ])
+                ->values()
+                ->all(),
+            'distribucion_por_dia' => collect($diagnostico['distribucion_dias'] ?? [])
+                ->map(fn(array $dia) => [
+                    'dia' => $dia['dia'] ?? 'N/D',
+                    'modulos' => (int) ($dia['modulos'] ?? 0),
+                    'minutos' => (int) ($dia['minutos'] ?? 0),
+                ])
+                ->values()
+                ->all(),
+            'distribucion_por_materia' => collect($diagnostico['distribucion_materias'] ?? [])
+                ->map(fn(array $materia) => [
+                    'materia' => $materia['materia'] ?? 'Sin materia',
+                    'modulos' => (int) ($materia['modulos'] ?? 0),
+                    'dias' => $materia['dias'] ?? '',
+                    'extra' => (bool) ($materia['extra'] ?? false),
+                    'receso' => (bool) ($materia['receso'] ?? false),
+                ])
+                ->values()
+                ->all(),
+            'carga_docente_anonima' => collect($diagnostico['docentes_carga'] ?? [])
+                ->values()
+                ->map(fn(array $docente, int $indice) => [
+                    'referencia' => ($docente['sin_profesor'] ?? false)
+                        ? 'Sin profesor asignado'
+                        : 'Docente ' . ($indice + 1),
+                    'modulos' => (int) ($docente['modulos'] ?? 0),
+                    'minutos' => (int) ($docente['minutos'] ?? 0),
+                    'estado' => $docente['estado'] ?? 'N/D',
+                ])
+                ->all(),
+            'reglas' => [
+                'Los cálculos y la disponibilidad son determinados por Laravel.',
+                'La IA solo redacta explicaciones y sugerencias generales.',
+                'No se enviaron nombres de docentes ni datos personales.',
+            ],
         ];
     }
 

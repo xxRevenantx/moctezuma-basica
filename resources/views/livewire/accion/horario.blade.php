@@ -487,7 +487,7 @@
                             x-transition:leave="transition ease-in duration-200"
                             x-transition:leave-start="opacity-100 translate-y-0 scale-100 blur-0"
                             x-transition:leave-end="opacity-0 translate-y-4 scale-95 blur-sm"
-                            class="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900"
+                            class="max-h-[calc(100%_-_2rem)] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900"
                             wire:click.stop>
 
                             <div class="h-1.5 w-full bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500"></div>
@@ -622,6 +622,181 @@
                                             @endforeach
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {{-- ALTERNATIVAS VERIFICADAS POR LARAVEL --}}
+                                <div class="grid gap-4 xl:grid-cols-2">
+                                    <div
+                                        class="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                                        <div class="flex items-start gap-3">
+                                            <div
+                                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm dark:bg-neutral-900 dark:text-emerald-300">
+                                                <flux:icon.calendar-days class="h-5 w-5" />
+                                            </div>
+
+                                            <div>
+                                                <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                                    Alternativas disponibles
+                                                </h4>
+                                                <p
+                                                    class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                                                    Laravel verificó que el grupo y el docente estén libres. La IA no
+                                                    calcula estos espacios.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 space-y-2">
+                                            @forelse ($alternativasConflicto as $alternativa)
+                                                <div
+                                                    class="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-emerald-900/40 dark:bg-neutral-900">
+                                                    <div>
+                                                        <div class="flex flex-wrap items-center gap-2">
+                                                            <span
+                                                                class="text-sm font-black text-slate-900 dark:text-white">
+                                                                {{ $alternativa['dia'] }}
+                                                            </span>
+                                                            <span
+                                                                class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                                {{ $alternativa['hora_texto'] }}
+                                                            </span>
+                                                        </div>
+                                                        <p
+                                                            class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                                                            {{ $alternativa['motivo'] }}
+                                                        </p>
+                                                    </div>
+
+                                                    <button type="button"
+                                                        wire:click="aplicarAlternativaConflicto({{ $alternativa['indice'] }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="aplicarAlternativaConflicto({{ $alternativa['indice'] }})"
+                                                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                                        <flux:icon.check class="h-4 w-4" />
+                                                        Usar horario
+                                                    </button>
+                                                </div>
+                                            @empty
+                                                <div
+                                                    class="rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                                                    No se encontraron bloques libres dentro de los días y horas
+                                                    configurados para este nivel.
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white p-4 dark:border-violet-900/40 dark:from-violet-950/20 dark:via-fuchsia-950/10 dark:to-neutral-900">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div class="flex items-start gap-3">
+                                                <div
+                                                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm dark:bg-neutral-900 dark:text-violet-300">
+                                                    <flux:icon.sparkles class="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                                        Explicación con GroqCloud
+                                                    </h4>
+                                                    <p
+                                                        class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                                                        Explica el riesgo y orienta la decisión usando solo los datos
+                                                        detectados por Laravel.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <button type="button" wire:click="analizarConflictoConIa"
+                                                wire:loading.attr="disabled" wire:target="analizarConflictoConIa"
+                                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                                <span wire:loading.remove wire:target="analizarConflictoConIa"
+                                                    class="inline-flex items-center gap-2">
+                                                    <flux:icon.sparkles class="h-4 w-4" />
+                                                    Explicar
+                                                </span>
+                                                <span wire:loading wire:target="analizarConflictoConIa"
+                                                    class="inline-flex items-center gap-2">
+                                                    <span
+                                                        class="h-4 w-4 animate-spin rounded-full border-2 border-violet-200 border-t-white"></span>
+                                                    Analizando...
+                                                </span>
+                                            </button>
+                                        </div>
+
+                                        @if ($analisisConflictoIa)
+                                            @php
+                                                $prioridadConflicto = $analisisConflictoIa['prioridad'] ?? 'media';
+                                                $clasePrioridadConflicto = match ($prioridadConflicto) {
+                                                    'alta'
+                                                        => 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+                                                    'baja'
+                                                        => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                                                    default
+                                                        => 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                                                };
+                                            @endphp
+
+                                            <div class="mt-4 space-y-4">
+                                                <div
+                                                    class="rounded-2xl border border-violet-200 bg-white p-4 dark:border-violet-900/40 dark:bg-neutral-900">
+                                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                                        <h5 class="text-sm font-black text-slate-900 dark:text-white">
+                                                            {{ $analisisConflictoIa['titulo'] }}
+                                                        </h5>
+                                                        <span
+                                                            class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase {{ $clasePrioridadConflicto }}">
+                                                            Prioridad {{ $prioridadConflicto }}
+                                                        </span>
+                                                    </div>
+
+                                                    <p
+                                                        class="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                                                        {{ $analisisConflictoIa['explicacion'] }}
+                                                    </p>
+
+                                                    <div
+                                                        class="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold leading-relaxed text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                                                        {{ $analisisConflictoIa['riesgo_operativo'] }}
+                                                    </div>
+
+                                                    <div
+                                                        class="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold leading-relaxed text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                        {{ $analisisConflictoIa['recomendacion_principal'] }}
+                                                    </div>
+                                                </div>
+
+                                                @if (!empty($analisisConflictoIa['pasos_sugeridos']))
+                                                    <div>
+                                                        <p
+                                                            class="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                            Pasos sugeridos
+                                                        </p>
+                                                        <ol class="mt-2 space-y-2">
+                                                            @foreach ($analisisConflictoIa['pasos_sugeridos'] as $paso)
+                                                                <li
+                                                                    class="flex gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                                                                    <span
+                                                                        class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500"></span>
+                                                                    <span>{{ $paso }}</span>
+                                                                </li>
+                                                            @endforeach
+                                                        </ol>
+                                                    </div>
+                                                @endif
+
+                                                <p
+                                                    class="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                                    {{ $analisisConflictoIa['aviso'] }}
+                                                </p>
+                                            </div>
+                                        @else
+                                            <div
+                                                class="mt-4 rounded-2xl border border-dashed border-violet-300 bg-white/70 px-4 py-5 text-center text-xs font-semibold text-slate-500 dark:border-violet-900/40 dark:bg-neutral-900/60 dark:text-slate-400">
+                                                Presiona “Explicar” para obtener una orientación redactada. Las
+                                                alternativas ya están disponibles sin usar IA.
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
 
                                 <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1389,6 +1564,201 @@
                                     </span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ANÁLISIS GENERAL DEL HORARIO CON GROQCLOUD --}}
+                @if ($this->diagnosticoHorario['hay_datos'])
+                    <div
+                        class="overflow-hidden rounded-[28px] border border-violet-200/80 bg-white shadow-xl shadow-violet-100/60 dark:border-violet-900/40 dark:bg-neutral-950/50 dark:shadow-black/20">
+                        <div class="h-1.5 w-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-sky-500"></div>
+
+                        <div class="space-y-5 p-5 sm:p-6">
+                            <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                                <div class="flex items-start gap-4">
+                                    <div
+                                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
+                                        <flux:icon.sparkles class="h-7 w-7" />
+                                    </div>
+
+                                    <div>
+                                        <div
+                                            class="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40">
+                                            <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                            GroqCloud
+                                        </div>
+                                        <h3
+                                            class="mt-3 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                                            Explicación y sugerencias del horario
+                                        </h3>
+                                        <p
+                                            class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                                            Convierte el diagnóstico calculado por Laravel en un orden de revisión
+                                            claro. No modifica materias, docentes ni bloques.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_auto] xl:w-[520px]">
+                                    <flux:field>
+                                        <flux:label>Tipo de análisis</flux:label>
+                                        <flux:select wire:model.live="tipoAnalisisHorarioIa">
+                                            <option value="operativo">Operativo</option>
+                                            <option value="direccion">Para dirección</option>
+                                            <option value="consejo_tecnico">Consejo técnico</option>
+                                        </flux:select>
+                                    </flux:field>
+
+                                    <div class="flex items-end gap-2">
+                                        <button type="button" wire:click="generarAnalisisHorarioIa"
+                                            wire:loading.attr="disabled" wire:target="generarAnalisisHorarioIa"
+                                            class="inline-flex h-[42px] items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                            <span wire:loading.remove wire:target="generarAnalisisHorarioIa"
+                                                class="inline-flex items-center gap-2">
+                                                <flux:icon.sparkles class="h-4 w-4" />
+                                                Generar
+                                            </span>
+                                            <span wire:loading wire:target="generarAnalisisHorarioIa"
+                                                class="inline-flex items-center gap-2">
+                                                <span
+                                                    class="h-4 w-4 animate-spin rounded-full border-2 border-violet-200 border-t-white"></span>
+                                                Analizando...
+                                            </span>
+                                        </button>
+
+                                        @if ($analisisHorarioIa)
+                                            <button type="button" wire:click="limpiarAnalisisHorarioIa"
+                                                class="inline-flex h-[42px] w-[42px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400 dark:hover:bg-neutral-800"
+                                                title="Limpiar análisis">
+                                                <flux:icon.x-mark class="h-4 w-4" />
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if ($analisisHorarioIa)
+                                @php
+                                    $prioridadHorarioIa = $analisisHorarioIa['prioridad'] ?? 'media';
+                                    $clasePrioridadHorarioIa = match ($prioridadHorarioIa) {
+                                        'alta'
+                                            => 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+                                        'baja'
+                                            => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+                                        default
+                                            => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+                                    };
+                                @endphp
+
+                                <div class="grid gap-4 xl:grid-cols-3">
+                                    <div
+                                        class="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 xl:col-span-2 dark:border-violet-900/40 dark:from-violet-950/20 dark:to-neutral-900">
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <h4 class="text-lg font-black text-slate-900 dark:text-white">
+                                                {{ $analisisHorarioIa['titulo'] }}
+                                            </h4>
+                                            <span
+                                                class="rounded-full border px-3 py-1 text-[11px] font-black uppercase {{ $clasePrioridadHorarioIa }}">
+                                                Prioridad {{ $prioridadHorarioIa }}
+                                            </span>
+                                        </div>
+
+                                        <p class="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                            {{ $analisisHorarioIa['resumen'] }}
+                                        </p>
+
+                                        <div
+                                            class="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold leading-relaxed text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200">
+                                            <span class="font-black">Equilibrio de carga:</span>
+                                            {{ $analisisHorarioIa['equilibrio_carga'] }}
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/70">
+                                        <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                            Orden de revisión
+                                        </h4>
+                                        <ol class="mt-4 space-y-3">
+                                            @foreach ($analisisHorarioIa['orden_revision'] as $paso)
+                                                <li
+                                                    class="flex gap-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                                                    <span
+                                                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-black text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                                                        {{ $loop->iteration }}
+                                                    </span>
+                                                    <span class="pt-1">{{ $paso }}</span>
+                                                </li>
+                                            @endforeach
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-4 lg:grid-cols-2">
+                                    <div
+                                        class="rounded-3xl border border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+                                        <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                            Hallazgos
+                                        </h4>
+                                        <ul class="mt-4 space-y-3">
+                                            @forelse ($analisisHorarioIa['hallazgos'] as $hallazgo)
+                                                <li
+                                                    class="flex gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                                    <span
+                                                        class="mt-2 h-2 w-2 shrink-0 rounded-full bg-amber-500"></span>
+                                                    <span>{{ $hallazgo }}</span>
+                                                </li>
+                                            @empty
+                                                <li class="text-sm text-slate-500 dark:text-slate-400">
+                                                    No se generaron hallazgos adicionales.
+                                                </li>
+                                            @endforelse
+                                        </ul>
+                                    </div>
+
+                                    <div
+                                        class="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                                        <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                            Sugerencias
+                                        </h4>
+                                        <ul class="mt-4 space-y-3">
+                                            @forelse ($analisisHorarioIa['sugerencias'] as $sugerencia)
+                                                <li
+                                                    class="flex gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                                    <flux:icon.check-circle
+                                                        class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+                                                    <span>{{ $sugerencia }}</span>
+                                                </li>
+                                            @empty
+                                                <li class="text-sm text-slate-500 dark:text-slate-400">
+                                                    No se generaron sugerencias adicionales.
+                                                </li>
+                                            @endforelse
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-slate-400">
+                                    {{ $analisisHorarioIa['aviso'] }} No se enviaron nombres de docentes ni datos
+                                    personales.
+                                </div>
+                            @else
+                                <div
+                                    class="rounded-3xl border border-dashed border-violet-300 bg-violet-50/40 px-6 py-8 text-center dark:border-violet-900/40 dark:bg-violet-950/10">
+                                    <flux:icon.light-bulb
+                                        class="mx-auto h-7 w-7 text-violet-500 dark:text-violet-300" />
+                                    <p class="mt-3 text-sm font-black text-slate-800 dark:text-white">
+                                        El diagnóstico automático ya está listo
+                                    </p>
+                                    <p
+                                        class="mx-auto mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                                        Genera una explicación para convertir los pendientes, cargas y distribución
+                                        del horario en un orden práctico de trabajo.
+                                    </p>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 @endif

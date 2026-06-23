@@ -137,14 +137,65 @@ class PromediosGenerales extends Component
     private function cargarGrupos(): void
     {
         $this->grupos = Grupo::query()
-            ->with(['asignacionGrupo:id,nombre', 'grado:id,nombre,orden', 'semestre:id,numero,grado_id'])
+            ->with([
+                'asignacionGrupo:id,nombre',
+                'grado:id,nombre,orden',
+                'semestre:id,numero,grado_id',
+            ])
             ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id !== '', fn($query) => $query->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
-            ->orderBy('grado_id')
-            ->orderBy('semestre_id')
-            ->orderBy('asignacion_grupo_id')
-            ->get(['id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id']);
+            ->when(
+                $this->generacion_id !== '',
+                fn($query) => $query->where('generacion_id', $this->generacion_id)
+            )
+            ->when(
+                $this->grado_id !== '',
+                fn($query) => $query->where('grado_id', $this->grado_id)
+            )
+            ->get([
+                'id',
+                'asignacion_grupo_id',
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'semestre_id',
+            ])
+            ->sort(function (Grupo $grupoA, Grupo $grupoB): int {
+                /*
+             * Primero se ordena por el campo "orden" del grado.
+             */
+                $ordenGradoA = (int) ($grupoA->grado?->orden ?? PHP_INT_MAX);
+                $ordenGradoB = (int) ($grupoB->grado?->orden ?? PHP_INT_MAX);
+
+                $comparacion = $ordenGradoA <=> $ordenGradoB;
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                /*
+             * Después se ordena naturalmente por el nombre del grupo:
+             * A, B, C...
+             * 1, 2, 3, 10...
+             */
+                $nombreGrupoA = trim((string) ($grupoA->asignacionGrupo?->nombre ?? ''));
+                $nombreGrupoB = trim((string) ($grupoB->asignacionGrupo?->nombre ?? ''));
+
+                $comparacion = strnatcasecmp($nombreGrupoA, $nombreGrupoB);
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                /*
+             * Si es bachillerato y coinciden grado y grupo,
+             * finalmente se ordena por semestre.
+             */
+                $semestreA = (int) ($grupoA->semestre?->numero ?? PHP_INT_MAX);
+                $semestreB = (int) ($grupoB->semestre?->numero ?? PHP_INT_MAX);
+
+                return $semestreA <=> $semestreB;
+            })
+            ->values();
     }
 
     private function cargarSemestres(): void
@@ -397,25 +448,146 @@ class PromediosGenerales extends Component
     private function agruparAlumnos(Collection $alumnos): Collection
     {
         return $alumnos
-            ->groupBy(function (array $alumno) {
-                $base = $alumno['grado'] . ' · Grupo ' . $alumno['grupo'];
+            /*
+         * Se agrupa usando los identificadores reales del grado,
+         * grupo y semestre, evitando mezclar grupos con títulos iguales.
+         */
+            ->groupBy(
+                fn(array $alumno) => $this->claveGrupoAlumno($alumno)
+            )
+            ->map(function (Collection $items) {
+                $primero = $items->first();
+
+                $titulo = ($primero['grado'] ?? 'Sin grado')
+                    . ' · Grupo '
+                    . ($primero['grupo'] ?? 'Sin grupo');
 
                 if ($this->esBachillerato) {
-                    $base .= ' · Semestre ' . ($alumno['semestre'] ?? '—');
+                    $titulo .= ' · Semestre '
+                        . ($primero['semestre'] ?? '—');
                 }
 
-                return $base;
-            })
-            ->map(function (Collection $items, string $titulo) {
                 return [
+                    /*
+                 * Campos internos utilizados solamente para ordenar.
+                 */
+                    '_grado_orden' => (int) (
+                        $primero['grado_orden'] ?? PHP_INT_MAX
+                    ),
+
+                    '_grado_id' => (int) (
+                        $primero['grado_id'] ?? PHP_INT_MAX
+                    ),
+
+                    '_grupo_nombre' => trim(
+                        (string) ($primero['grupo'] ?? '')
+                    ),
+
+                    '_grupo_id' => (int) (
+                        $primero['grupo_id'] ?? PHP_INT_MAX
+                    ),
+
+                    '_semestre' => (int) (
+                        $primero['semestre'] ?? PHP_INT_MAX
+                    ),
+
                     'titulo' => $titulo,
+
                     'total' => $items->count(),
-                    'promedio' => $this->formatearDecimal($items->avg('promedio_final')),
-                    'aprobados' => $items->filter(fn($item) => ($item['promedio_final'] ?? 0) >= 6)->count(),
-                    'riesgo' => $items->filter(fn($item) => ($item['promedio_final'] ?? 0) > 0 && ($item['promedio_final'] ?? 0) < 6)->count(),
-                    'incompletos' => $items->filter(fn($item) => $item['periodos_faltantes'] > 0)->count(),
+
+                    'promedio' => $this->formatearDecimal(
+                        $items
+                            ->filter(
+                                fn(array $item) => ($item['promedio_final'] ?? null) !== null
+                            )
+                            ->avg('promedio_final')
+                    ),
+
+                    'aprobados' => $items
+                        ->filter(
+                            fn(array $item) => ($item['promedio_final'] ?? 0) >= 6
+                        )
+                        ->count(),
+
+                    'riesgo' => $items
+                        ->filter(
+                            fn(array $item) => ($item['promedio_final'] ?? 0) > 0
+                                && ($item['promedio_final'] ?? 0) < 6
+                        )
+                        ->count(),
+
+                    'incompletos' => $items
+                        ->filter(
+                            fn(array $item) => ($item['periodos_faltantes'] ?? 0) > 0
+                        )
+                        ->count(),
+
+                    /*
+                 * Los alumnos conservan el orden elegido:
+                 * promedio mayor, promedio menor o nombre.
+                 */
                     'alumnos' => $items->values(),
                 ];
+            })
+            ->sort(function (array $grupoA, array $grupoB): int {
+                /*
+             * 1. Orden del grado.
+             */
+                $comparacion = $grupoA['_grado_orden']
+                    <=> $grupoB['_grado_orden'];
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                /*
+             * 2. Nombre del grupo.
+             */
+                $comparacion = strnatcasecmp(
+                    $grupoA['_grupo_nombre'],
+                    $grupoB['_grupo_nombre']
+                );
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                /*
+             * 3. Semestre.
+             */
+                $comparacion = $grupoA['_semestre']
+                    <=> $grupoB['_semestre'];
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                /*
+             * 4. Identificadores como respaldo.
+             */
+                $comparacion = $grupoA['_grado_id']
+                    <=> $grupoB['_grado_id'];
+
+                if ($comparacion !== 0) {
+                    return $comparacion;
+                }
+
+                return $grupoA['_grupo_id']
+                    <=> $grupoB['_grupo_id'];
+            })
+            ->map(function (array $grupo): array {
+                /*
+             * Se eliminan los campos internos antes de enviarlos al Blade.
+             */
+                unset(
+                    $grupo['_grado_orden'],
+                    $grupo['_grado_id'],
+                    $grupo['_grupo_nombre'],
+                    $grupo['_grupo_id'],
+                    $grupo['_semestre']
+                );
+
+                return $grupo;
             })
             ->values();
     }

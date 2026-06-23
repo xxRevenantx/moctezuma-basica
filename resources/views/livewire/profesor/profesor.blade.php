@@ -1,6 +1,4 @@
-<div x-data="panelProfesoresPro()" x-init="iniciar()" x-on:pointerdown.capture="guardarScroll()"
-    x-on:keydown.capture="guardarScroll()" x-on:change.capture="guardarScroll()"
-    x-on:input.capture.debounce.150ms="guardarScroll()" class="min-h-screen dark:bg-zinc-950 sm:px-6">
+<div x-data="panelProfesoresPro()" class="min-h-screen dark:bg-zinc-950 sm:px-6">
     <div class="mx-auto space-y-6">
 
         {{-- Encabezado principal --}}
@@ -292,122 +290,10 @@
     @script
         <script>
             Alpine.data('panelProfesoresPro', () => ({
-                /*
-                 * Todos los collapses inician cerrados.
-                 * No se usa localStorage para evitar que queden abiertos al recargar.
-                 */
                 abierto: null,
 
-                llaveScroll: 'scroll_actual_panel_profesores',
-                restaurando: false,
-
-                iniciar() {
-                    history.scrollRestoration = 'manual';
-
-                    this.guardarScroll();
-                    this.registrarHookLivewire();
-                },
-
                 cambiar(seccion) {
-                    this.guardarScroll();
-
                     this.abierto = this.abierto === seccion ? null : seccion;
-
-                    this.restaurarScrollSeguro(this.obtenerScrollGuardado());
-                },
-
-                registrarHookLivewire() {
-                    if (!window.__scrollLockPanelProfesores) {
-                        window.__scrollLockPanelProfesores = true;
-
-                        const registrar = () => {
-                            Livewire.hook('commit', ({
-                                succeed
-                            }) => {
-                                const posicion = this.obtenerScrollGuardado();
-
-                                succeed(() => {
-                                    this.restaurarScrollSeguro(posicion);
-                                });
-                            });
-                        };
-
-                        if (window.Livewire) {
-                            registrar();
-                            return;
-                        }
-
-                        document.addEventListener('livewire:init', () => {
-                            registrar();
-                        }, {
-                            once: true
-                        });
-                    }
-                },
-
-                guardarScroll() {
-                    if (this.restaurando) {
-                        return;
-                    }
-
-                    const y = window.scrollY ||
-                        document.documentElement.scrollTop ||
-                        document.body.scrollTop ||
-                        0;
-
-                    sessionStorage.setItem(this.llaveScroll, String(y));
-                    window.__panelProfesoresUltimoScroll = y;
-                },
-
-                obtenerScrollGuardado() {
-                    const desdeSesion = sessionStorage.getItem(this.llaveScroll);
-
-                    if (desdeSesion !== null) {
-                        const y = Number(desdeSesion);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    if (window.__panelProfesoresUltimoScroll !== undefined) {
-                        const y = Number(window.__panelProfesoresUltimoScroll);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    return window.scrollY || 0;
-                },
-
-                restaurarScrollSeguro(posicion = null) {
-                    const y = Number(posicion ?? this.obtenerScrollGuardado());
-
-                    if (Number.isNaN(y)) {
-                        return;
-                    }
-
-                    this.restaurando = true;
-
-                    const restaurar = () => {
-                        window.scrollTo({
-                            top: y,
-                            left: 0,
-                            behavior: 'auto',
-                        });
-                    };
-
-                    requestAnimationFrame(restaurar);
-
-                    setTimeout(restaurar, 20);
-                    setTimeout(restaurar, 60);
-                    setTimeout(restaurar, 120);
-                    setTimeout(restaurar, 220);
-
-                    setTimeout(() => {
-                        this.restaurando = false;
-                    }, 260);
                 },
             }));
         </script>

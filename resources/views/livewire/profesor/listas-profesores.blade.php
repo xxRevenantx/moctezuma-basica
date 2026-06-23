@@ -1,6 +1,4 @@
-<div x-data="scrollLockPro('materias_profesor')" x-init="iniciar()" x-on:pointerdown.capture="guardarScroll()"
-    x-on:keydown.capture="guardarScroll()" x-on:change.capture="guardarScroll()"
-    x-on:input.capture.debounce.150ms="guardarScroll()" class="space-y-6">
+<div x-data="scrollLockPro('materias_profesor')" x-init="iniciar()" data-scroll-lock-pro="materias_profesor" class="space-y-6">
     <section class="space-y-4">
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
@@ -82,8 +80,8 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
-                            <div class="xl:col-span-4">
+                        <div class="space-y-5">
+                            <div class="w-full">
                                 <div
                                     class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                                     <div
@@ -106,7 +104,7 @@
                                         </flux:field>
 
                                         @if ($this->profesorSeleccionado)
-                                            <div
+                                            <div wire:key="profesor-seleccionado-{{ $this->profesorSeleccionado->id }}"
                                                 class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
                                                 <div class="flex items-start gap-3">
                                                     <div
@@ -133,9 +131,11 @@
                                         @endif
 
                                         @if ($this->profesores->isNotEmpty())
-                                            <div class="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                                            <div
+                                                class="grid max-h-[360px] grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
                                                 @foreach ($this->profesores as $profesor)
                                                     <button type="button"
+                                                        wire:key="profesor-resultado-{{ $profesor->id }}"
                                                         wire:click="seleccionarProfesor({{ $profesor->id }})"
                                                         class="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-indigo-900/60 dark:hover:bg-indigo-950/20">
                                                         <p class="text-sm font-black text-slate-900 dark:text-white">
@@ -170,7 +170,7 @@
                                 </div>
                             </div>
 
-                            <div class="xl:col-span-8">
+                            <div class="w-full">
                                 <div
                                     class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                                     <div
@@ -415,7 +415,7 @@
                                                                         );
                                                                     @endphp
 
-                                                                    <tr
+                                                                    <tr wire:key="materia-profesor-{{ $asignacionId }}"
                                                                         class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
                                                                         <td class="px-4 py-3">
                                                                             <p
@@ -492,6 +492,7 @@
                                                                         <td class="px-4 py-3">
                                                                             @if ($esBachillerato)
                                                                                 <flux:select
+                                                                                    wire:key="parcial-materia-{{ $asignacionId }}"
                                                                                     wire:model.live="parciales_por_materia.{{ $asignacionId }}">
                                                                                     <flux:select.option value="">
                                                                                         Selecciona parcial
@@ -516,6 +517,7 @@
                                                                                 </p>
                                                                             @else
                                                                                 <flux:select
+                                                                                    wire:key="periodo-materia-{{ $asignacionId }}"
                                                                                     wire:model.live="periodos_por_materia.{{ $asignacionId }}">
                                                                                     <flux:select.option value="">
                                                                                         Selecciona periodo
@@ -585,48 +587,114 @@
     @script
         <script>
             Alpine.data('scrollLockPro', (nombre) => ({
-                /*
-                 * El collapse inicia cerrado siempre.
-                 * No se lee localStorage para evitar que se abra automáticamente.
-                 */
                 abierto: null,
-
                 nombre,
-                llaveScroll: `scroll_actual_${nombre}`,
-                restaurando: false,
 
                 iniciar() {
-                    history.scrollRestoration = 'manual';
-
-                    /*
-                     * Se elimina cualquier estado anterior del collapse.
-                     * Así siempre carga cerrado al entrar o recargar.
-                     */
-                    localStorage.removeItem(`collapse_${this.nombre}`);
-
-                    this.guardarScroll();
-                    this.registrarHookLivewire();
+                    this.registrarProteccionScroll();
                 },
 
-                registrarHookLivewire() {
-                    if (!window.__scrollLockProHooks) {
-                        window.__scrollLockProHooks = {};
-                    }
+                cambiar(seccion) {
+                    const posicion = window.scrollY;
 
-                    if (window.__scrollLockProHooks[this.nombre]) {
-                        return;
-                    }
+                    this.abierto = this.abierto === seccion ? null : seccion;
 
-                    window.__scrollLockProHooks[this.nombre] = true;
+                    this.$nextTick(() => {
+                        requestAnimationFrame(() => {
+                            window.scrollTo({
+                                top: posicion,
+                                left: 0,
+                                behavior: 'auto',
+                            });
+                        });
+                    });
+                },
 
+                registrarProteccionScroll() {
                     const registrar = () => {
+                        if (window.__proteccionScrollListasProfesoresRegistrada) {
+                            return;
+                        }
+
+                        window.__proteccionScrollListasProfesoresRegistrada = true;
+
                         Livewire.hook('commit', ({
-                            succeed
+                            component,
+                            succeed,
+                            fail
                         }) => {
-                            const posicion = this.obtenerScrollGuardado();
+                            const raiz = component?.el;
+
+                            if (
+                                !raiz ||
+                                !raiz.matches?.('[data-scroll-lock-pro="materias_profesor"]')
+                            ) {
+                                return;
+                            }
+
+                            /*
+                             * Se captura la posición justo antes de que Livewire procese
+                             * la actualización. No se usa sessionStorage ni eventos
+                             * debounce, porque podían guardar 0 después del salto.
+                             */
+                            const posicionX = window.scrollX;
+                            const posicionY = window.scrollY;
+
+                            const html = document.documentElement;
+                            const body = document.body;
+
+                            const scrollHtmlAnterior = html.style.scrollBehavior;
+                            const scrollBodyAnterior = body.style.scrollBehavior;
+
+                            html.style.scrollBehavior = 'auto';
+                            body.style.scrollBehavior = 'auto';
+
+                            let terminado = false;
+
+                            const restaurar = () => {
+                                if (terminado) {
+                                    return;
+                                }
+
+                                window.scrollTo({
+                                    top: posicionY,
+                                    left: posicionX,
+                                    behavior: 'auto',
+                                });
+                            };
+
+                            const finalizar = () => {
+                                restaurar();
+
+                                terminado = true;
+                                html.style.scrollBehavior = scrollHtmlAnterior;
+                                body.style.scrollBehavior = scrollBodyAnterior;
+                            };
 
                             succeed(() => {
-                                this.restaurarScrollSeguro(posicion);
+                                /*
+                                 * Livewire y Flux pueden terminar de acomodar el DOM
+                                 * en más de un ciclo. Por eso se restaura durante
+                                 * varios ciclos cortos, siempre a la misma posición.
+                                 */
+                                queueMicrotask(restaurar);
+
+                                requestAnimationFrame(() => {
+                                    restaurar();
+
+                                    requestAnimationFrame(restaurar);
+                                });
+
+                                setTimeout(restaurar, 20);
+                                setTimeout(restaurar, 60);
+                                setTimeout(restaurar, 120);
+                                setTimeout(finalizar, 220);
+                            });
+
+                            fail(() => {
+                                terminado = true;
+                                html.style.scrollBehavior = scrollHtmlAnterior;
+                                body.style.scrollBehavior = scrollBodyAnterior;
                             });
                         });
                     };
@@ -636,96 +704,9 @@
                         return;
                     }
 
-                    document.addEventListener('livewire:init', () => {
-                        registrar();
-                    }, {
-                        once: true
+                    document.addEventListener('livewire:init', registrar, {
+                        once: true,
                     });
-                },
-
-                cambiar(seccion) {
-                    this.guardarScroll();
-
-                    this.abierto = this.abierto === seccion ? null : seccion;
-
-                    /*
-                     * No se guarda el collapse en localStorage.
-                     * Así no queda abierto cuando se recarga la página.
-                     */
-                    this.restaurarScrollSeguro(this.obtenerScrollGuardado());
-                },
-
-                guardarScroll() {
-                    if (this.restaurando) {
-                        return;
-                    }
-
-                    const y = window.scrollY ||
-                        document.documentElement.scrollTop ||
-                        document.body.scrollTop ||
-                        0;
-
-                    sessionStorage.setItem(this.llaveScroll, String(y));
-
-                    if (!window.__scrollLockProUltimo) {
-                        window.__scrollLockProUltimo = {};
-                    }
-
-                    window.__scrollLockProUltimo[this.nombre] = y;
-                },
-
-                obtenerScrollGuardado() {
-                    const desdeSesion = sessionStorage.getItem(this.llaveScroll);
-
-                    if (desdeSesion !== null) {
-                        const y = Number(desdeSesion);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    if (
-                        window.__scrollLockProUltimo &&
-                        window.__scrollLockProUltimo[this.nombre] !== undefined
-                    ) {
-                        const y = Number(window.__scrollLockProUltimo[this.nombre]);
-
-                        if (!Number.isNaN(y)) {
-                            return y;
-                        }
-                    }
-
-                    return window.scrollY || 0;
-                },
-
-                restaurarScrollSeguro(posicion = null) {
-                    const y = Number(posicion ?? this.obtenerScrollGuardado());
-
-                    if (Number.isNaN(y)) {
-                        return;
-                    }
-
-                    this.restaurando = true;
-
-                    const restaurar = () => {
-                        window.scrollTo({
-                            top: y,
-                            left: 0,
-                            behavior: 'auto',
-                        });
-                    };
-
-                    requestAnimationFrame(restaurar);
-
-                    setTimeout(restaurar, 20);
-                    setTimeout(restaurar, 60);
-                    setTimeout(restaurar, 120);
-                    setTimeout(restaurar, 220);
-
-                    setTimeout(() => {
-                        this.restaurando = false;
-                    }, 260);
                 },
             }));
         </script>

@@ -125,7 +125,7 @@
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-1 lg:grid-cols-1">
             <flux:field>
-                <flux:label>Ordenar</flux:label>
+                <flux:label>Ordenar alumnos</flux:label>
                 <flux:select wire:model.live="orden">
                     <flux:select.option value="promedio_desc">Promedio mayor a menor</flux:select.option>
                     <flux:select.option value="promedio_asc">Promedio menor a mayor</flux:select.option>

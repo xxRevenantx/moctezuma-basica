@@ -33,6 +33,15 @@ class ListasProfesores extends Component
 
     public array $parciales_por_materia = [];
 
+    /**
+     * Conserva la posición vertical después de cualquier cambio enviado
+     * desde los filtros, buscadores, periodos o parciales.
+     */
+    public function updated(string $propiedad, mixed $valor = null): void
+    {
+        $this->dispatch('restaurar-scroll-listas-profesor');
+    }
+
     public function updatedBuscarProfesor(): void
     {
         $this->profesor_id = null;
@@ -49,6 +58,8 @@ class ListasProfesores extends Component
         $this->profesor_id = $profesorId;
         $this->buscar_profesor = '';
         $this->limpiarFiltrosMaterias();
+
+        $this->dispatch('restaurar-scroll-listas-profesor');
     }
 
     public function limpiarTodo(): void
@@ -56,6 +67,8 @@ class ListasProfesores extends Component
         $this->buscar_profesor = '';
         $this->profesor_id = null;
         $this->limpiarFiltrosMaterias();
+
+        $this->dispatch('restaurar-scroll-listas-profesor');
     }
 
     public function limpiarFiltrosMaterias(): void
@@ -69,6 +82,8 @@ class ListasProfesores extends Component
         $this->filtro_dia = '';
         $this->periodos_por_materia = [];
         $this->parciales_por_materia = [];
+
+        $this->dispatch('restaurar-scroll-listas-profesor');
     }
 
     #[Computed]
@@ -441,9 +456,9 @@ class ListasProfesores extends Component
     {
         return trim(
             ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-            ($profesor->nombre ?? '') . ' ' .
-            ($profesor->apellido_paterno ?? '') . ' ' .
-            ($profesor->apellido_materno ?? '')
+                ($profesor->nombre ?? '') . ' ' .
+                ($profesor->apellido_paterno ?? '') . ' ' .
+                ($profesor->apellido_materno ?? '')
         );
     }
 
