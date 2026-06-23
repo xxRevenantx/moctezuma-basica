@@ -11,6 +11,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\cicloEscolar;
 use App\Services\GroqFichaService;
+use App\Services\GroqFichaGrupoService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +35,16 @@ class Ficha extends Component
     public bool $generando_descripcion = false;
 
     public string $observaciones_ia = '';
+
+    public string $tipo_informe_grupo_ia = 'pedagogico';
+
+    /** @var array<string, mixed> */
+    public array $informe_grupo_ia = [];
+
+    /** @var array<string, mixed> */
+    public array $resumen_informe_grupo_ia = [];
+
+    public ?string $informe_grupo_ia_generado_en = null;
 
 
     protected string $paginationTheme = 'tailwind';
@@ -124,6 +135,7 @@ class Ficha extends Component
 
         $this->archivo_fichas = null;
         $this->resetPage();
+        $this->limpiarInformeGrupoIa();
 
         $this->dispatch('swal', [
             'icon' => 'success',
@@ -137,7 +149,7 @@ class Ficha extends Component
         $this->slug_nivel = $slug_nivel;
         $this->slug_grado = $slug_grado;
         $this->campos = FichaController::CAMPOS;
-        $this->groq_modelo = (string) config('groq.model', 'llama-3.1-8b-instant');
+        $this->groq_modelo = (string) config('groq.model', 'openai/gpt-oss-20b');
 
         $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
         $this->nivel_id = $nivel->id;
@@ -155,6 +167,18 @@ class Ficha extends Component
         if (in_array($property, ['generacion_id', 'grado_id', 'grupo_id', 'periodo', 'busqueda'], true)) {
             $this->resetPage();
         }
+
+        if (
+            in_array($property, [
+                'generacion_id',
+                'grado_id',
+                'grupo_id',
+                'ciclo_escolar_id',
+                'periodo',
+            ], true)
+        ) {
+            $this->limpiarInformeGrupoIa();
+        }
     }
 
     public function cambiarPeriodo(int $periodo): void
@@ -165,6 +189,7 @@ class Ficha extends Component
 
         $this->periodo = $periodo;
         $this->resetPage();
+        $this->limpiarInformeGrupoIa();
     }
 
     public function abrirModal(int $inscripcionId, string $campo): void
@@ -242,8 +267,8 @@ class Ficha extends Component
             $this->addError(
                 'observaciones_ia',
                 $this->campo === 'recomendaciones'
-                    ? 'Captura primero algún campo formativo o escribe observaciones para generar recomendaciones.'
-                    : 'Escribe algunas observaciones para generar la descripción.'
+                ? 'Captura primero algún campo formativo o escribe observaciones para generar recomendaciones.'
+                : 'Escribe algunas observaciones para generar la descripción.'
             );
 
             return;
@@ -338,6 +363,7 @@ class Ficha extends Component
             ]
         );
 
+        $this->limpiarInformeGrupoIa();
         $this->cerrarModal();
 
         $this->dispatch('swal', [
@@ -345,6 +371,318 @@ class Ficha extends Component
             'title' => 'Ficha guardada',
             'position' => 'top',
         ]);
+    }
+
+    public function generarInformeGrupoIa(GroqFichaGrupoService $groq): void
+    {
+        $this->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+            'periodo' => ['required', 'integer', 'in:1,2,3'],
+            'tipo_informe_grupo_ia' => ['required', 'in:pedagogico,direccion,consejo_tecnico,familias'],
+        ], [
+            'grado_id.required' => 'Selecciona un grado para generar el informe grupal.',
+            'grupo_id.required' => 'Selecciona un grupo específico para generar el informe.',
+            'tipo_informe_grupo_ia.in' => 'El tipo de informe seleccionado no es válido.',
+        ]);
+
+        $grupoValido = Grupo::query()
+            ->whereKey($this->grupo_id)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->exists();
+
+        if (!$grupoValido) {
+            $this->addError('grupo_id', 'El grupo seleccionado no pertenece al grado indicado.');
+
+            return;
+        }
+
+        try {
+            $datos = $this->construirDatosAnonimosGrupoParaIa();
+            $cobertura = $datos['cobertura'] ?? [];
+
+            if ((int) ($cobertura['total_alumnos'] ?? 0) === 0) {
+                throw new \RuntimeException('No hay alumnos activos en el grado y grupo seleccionados.');
+            }
+
+            if ((int) ($cobertura['fichas_capturadas'] ?? 0) === 0) {
+                throw new \RuntimeException(
+                    'Todavía no hay descripciones capturadas para este grupo y periodo.'
+                );
+            }
+
+            $this->informe_grupo_ia = $groq->generarInforme(
+                $datos,
+                $this->tipo_informe_grupo_ia
+            );
+
+            $this->resumen_informe_grupo_ia = [
+                'grado' => (string) data_get($datos, 'contexto.grado', 'Sin grado'),
+                'grupo' => (string) data_get($datos, 'contexto.grupo', 'Sin grupo'),
+                'periodo' => (string) data_get($datos, 'contexto.periodo', $this->periodoNombre()),
+                'total_alumnos' => (int) ($cobertura['total_alumnos'] ?? 0),
+                'fichas_capturadas' => (int) ($cobertura['fichas_capturadas'] ?? 0),
+                'fichas_esperadas' => (int) ($cobertura['fichas_esperadas'] ?? 0),
+                'porcentaje_cobertura' => (int) ($cobertura['porcentaje_cobertura'] ?? 0),
+                'estado_captura' => (string) ($cobertura['estado_captura'] ?? 'parcial'),
+                'modelo' => $groq->model(),
+            ];
+
+            $this->informe_grupo_ia_generado_en = Carbon::now()->format('d/m/Y H:i');
+
+            $this->dispatch('swal', [
+                'icon' => 'success',
+                'title' => 'Informe descriptivo grupal generado',
+                'text' => 'Revisa el contenido antes de utilizarlo en planeaciones o reuniones.',
+                'position' => 'top',
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('No se pudo generar el informe grupal de fichas con GroqCloud.', [
+                'nivel_id' => $this->nivel_id,
+                'grado_id' => $this->grado_id,
+                'grupo_id' => $this->grupo_id,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'periodo' => $this->periodo,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->limpiarInformeGrupoIa();
+
+            $this->dispatch('swal', [
+                'icon' => 'error',
+                'title' => 'No se pudo generar el informe grupal',
+                'text' => $exception->getMessage(),
+                'position' => 'top',
+            ]);
+        }
+    }
+
+    public function limpiarInformeGrupoIa(): void
+    {
+        $this->informe_grupo_ia = [];
+        $this->resumen_informe_grupo_ia = [];
+        $this->informe_grupo_ia_generado_en = null;
+    }
+
+    public function clasePrioridadInformeGrupoIa(?string $prioridad): string
+    {
+        return match (mb_strtolower((string) $prioridad)) {
+            'alta' => 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300',
+            'baja' => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300',
+            default => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300',
+        };
+    }
+
+    /**
+     * Construye el contexto del grupo sin nombres, matrículas, CURP ni identificadores individuales.
+     *
+     * @return array<string, mixed>
+     */
+    private function construirDatosAnonimosGrupoParaIa(): array
+    {
+        $alumnos = Inscripcion::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->where('grado_id', $this->grado_id)
+            ->where('grupo_id', $this->grupo_id)
+            ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
+            ->where('activo', true)
+            ->orderBy('id')
+            ->get([
+                'id',
+                'nombre',
+                'apellido_paterno',
+                'apellido_materno',
+                'curp',
+                'matricula',
+            ]);
+
+        $ids = $alumnos->pluck('id');
+
+        $fichas = FichaDescriptiva::query()
+            ->whereIn('inscripcion_id', $ids)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->whereNotNull('descripcion')
+            ->get(['inscripcion_id', 'campo', 'descripcion'])
+            ->filter(fn(FichaDescriptiva $ficha) => filled(trim(strip_tags((string) $ficha->descripcion))));
+
+        $identificadores = $alumnos->mapWithKeys(function (Inscripcion $alumno) {
+            return [
+                $alumno->id => array_values(array_filter([
+                    trim($alumno->nombre . ' ' . $alumno->apellido_paterno . ' ' . $alumno->apellido_materno),
+                    $alumno->nombre,
+                    $alumno->apellido_paterno,
+                    $alumno->apellido_materno,
+                    $alumno->curp,
+                    $alumno->matricula,
+                ])),
+            ];
+        })->all();
+
+        $maxFragmentosPorCampo = max(5, (int) config('groq.fichas_grupo.max_fragmentos_por_campo', 24));
+        $maxCaracteresFragmento = max(200, (int) config('groq.fichas_grupo.max_caracteres_fragmento', 650));
+        $presupuestoCaracteres = max(5000, (int) config('groq.fichas_grupo.max_caracteres_totales', 28000));
+
+        $campos = [];
+        $recomendacionesRegistradas = [];
+
+        foreach ($this->campos as $clave => $campoInfo) {
+            $fichasCampo = $fichas
+                ->where('campo', $clave)
+                ->values();
+
+            $fragmentos = [];
+            $vistos = [];
+
+            foreach ($fichasCampo as $ficha) {
+                if (count($fragmentos) >= $maxFragmentosPorCampo || $presupuestoCaracteres <= 0) {
+                    break;
+                }
+
+                $texto = $this->anonimizarDescripcionGrupo(
+                    (string) $ficha->descripcion,
+                    $identificadores[$ficha->inscripcion_id] ?? [],
+                    $maxCaracteresFragmento
+                );
+
+                if ($texto === '') {
+                    continue;
+                }
+
+                $huella = mb_strtolower($texto);
+
+                if (isset($vistos[$huella])) {
+                    continue;
+                }
+
+                $texto = mb_substr($texto, 0, $presupuestoCaracteres);
+                $presupuestoCaracteres -= mb_strlen($texto);
+                $vistos[$huella] = true;
+                $fragmentos[] = $texto;
+            }
+
+            $capturados = $fichasCampo
+                ->pluck('inscripcion_id')
+                ->unique()
+                ->count();
+
+            $totalAlumnos = $alumnos->count();
+
+            if ($clave === 'recomendaciones') {
+                $recomendacionesRegistradas = $fragmentos;
+
+                continue;
+            }
+
+            $campos[] = [
+                'clave' => $clave,
+                'campo' => (string) ($campoInfo['label'] ?? $clave),
+                'estudiantes_con_captura' => $capturados,
+                'total_estudiantes' => $totalAlumnos,
+                'porcentaje_cobertura' => $totalAlumnos > 0
+                    ? (int) round(($capturados / $totalAlumnos) * 100)
+                    : 0,
+                'fragmentos_anonimos' => $fragmentos,
+            ];
+        }
+
+        $totalAlumnos = $alumnos->count();
+        $fichasEsperadas = $totalAlumnos * count($this->campos);
+        $fichasCapturadas = $fichas
+            ->map(fn(FichaDescriptiva $ficha) => $ficha->inscripcion_id . ':' . $ficha->campo)
+            ->unique()
+            ->count();
+        $porcentajeCobertura = $fichasEsperadas > 0
+            ? (int) round(($fichasCapturadas / $fichasEsperadas) * 100)
+            : 0;
+
+        $grado = Grado::query()->whereKey($this->grado_id)->value('nombre') ?? 'Sin grado';
+
+        $grupo = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
+            ->find($this->grupo_id);
+
+        $grupoNombre = $grupo?->asignacionGrupo?->nombre
+            ?? ($grupo?->nombre ?? 'Sin grupo');
+
+        $generacion = $this->generacion_id
+            ? Generacion::query()->whereKey($this->generacion_id)->first()
+            : null;
+
+        $ciclo = cicloEscolar::query()->whereKey($this->ciclo_escolar_id)->first();
+
+        return [
+            'contexto' => [
+                'nivel' => 'Preescolar',
+                'grado' => (string) $grado,
+                'grupo' => (string) $grupoNombre,
+                'generacion' => $generacion
+                    ? trim($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso)
+                    : 'No especificada',
+                'ciclo_escolar' => $ciclo
+                    ? trim($ciclo->inicio_anio . ' - ' . $ciclo->fin_anio)
+                    : 'No especificado',
+                'periodo' => $this->periodoNombre(),
+            ],
+            'cobertura' => [
+                'total_alumnos' => $totalAlumnos,
+                'total_campos_por_alumno' => count($this->campos),
+                'fichas_esperadas' => $fichasEsperadas,
+                'fichas_capturadas' => $fichasCapturadas,
+                'porcentaje_cobertura' => $porcentajeCobertura,
+                'estado_captura' => match (true) {
+                    $porcentajeCobertura >= 90 => 'completa',
+                    $porcentajeCobertura >= 60 => 'parcial',
+                    default => 'insuficiente',
+                },
+            ],
+            'campos_formativos' => $campos,
+            'recomendaciones_individuales_anonimizadas' => $recomendacionesRegistradas,
+            'restricciones' => [
+                'usar_solo_tendencias_grupales' => true,
+                'no_individualizar_casos' => true,
+                'no_emitir_diagnosticos' => true,
+                'marcar_como_preliminar_si_cobertura_menor_a_90' => true,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, string> $identificadores
+     */
+    private function anonimizarDescripcionGrupo(
+        string $descripcion,
+        array $identificadores,
+        int $limite
+    ): string {
+        $texto = html_entity_decode(strip_tags($descripcion), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $texto = preg_replace('/\s+/u', ' ', trim($texto)) ?? '';
+
+        usort($identificadores, fn($a, $b) => mb_strlen((string) $b) <=> mb_strlen((string) $a));
+
+        foreach ($identificadores as $identificador) {
+            $identificador = trim((string) $identificador);
+
+            if (mb_strlen($identificador) < 3) {
+                continue;
+            }
+
+            $patron = '/(?<![\p{L}\p{N}])' . preg_quote($identificador, '/') . '(?![\p{L}\p{N}])/iu';
+            $texto = preg_replace($patron, 'la persona estudiante', $texto) ?? $texto;
+        }
+
+        $patrones = [
+            '/\b[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d\b/iu',
+            '/\b[\w.%+\-]+@[\w.\-]+\.[A-Z]{2,}\b/iu',
+            '/\b(?:\+?52\s*)?(?:\d[\s\-()]*){10}\b/u',
+            '/\b(?:matr[ií]cula|curp|folio)\s*[:#-]?\s*[A-Z0-9-]{4,}\b/iu',
+        ];
+
+        $texto = preg_replace($patrones, '[DATO OMITIDO]', $texto) ?? $texto;
+
+        return mb_substr(trim($texto), 0, $limite);
     }
 
     public function getGeneracionesProperty()

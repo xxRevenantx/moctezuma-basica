@@ -19,6 +19,7 @@ use App\Models\Parcial;
 use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
+use App\Services\GroqCalificacionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -69,6 +70,10 @@ class Calificacion extends Component
 
     public $archivo_calificaciones = null;
     public array $resumenImportacion = [];
+
+    public string $tipoDiagnosticoIa = 'pedagogico';
+    public array $diagnosticoIa = [];
+    public ?string $diagnosticoIaGeneradoEn = null;
 
     public $boleta_inscripcion_id = '';
     public $reconocimiento_inscripcion_id = '';
@@ -271,6 +276,8 @@ class Calificacion extends Component
 
     public function updatedCalificaciones($value = null, $key = null): void
     {
+        $this->limpiarDiagnosticoIa();
+
         /*
          * Solo se recalculan promedios cuando Livewire recibe el cambio.
          * Con wire:model.blur ya no se ejecuta en cada tecla.
@@ -308,6 +315,8 @@ class Calificacion extends Component
             'motivo_guardado',
             'archivo_calificaciones',
             'resumenImportacion',
+            'diagnosticoIa',
+            'diagnosticoIaGeneradoEn',
         ]);
 
         $this->reset($campos);
@@ -414,6 +423,8 @@ class Calificacion extends Component
             'motivo_guardado',
             'archivo_calificaciones',
             'resumenImportacion',
+            'diagnosticoIa',
+            'diagnosticoIaGeneradoEn',
             'boleta_inscripcion_id',
             'reconocimiento_inscripcion_id',
         ]);
@@ -443,6 +454,8 @@ class Calificacion extends Component
             'motivo_guardado',
             'archivo_calificaciones',
             'resumenImportacion',
+            'diagnosticoIa',
+            'diagnosticoIaGeneradoEn',
         ]);
 
         if (!$this->puedeCargarDatos()) {
@@ -1977,6 +1990,190 @@ class Calificacion extends Component
             'materia_mas_alta' => $materiaMasAlta,
             'recomendaciones' => $recomendaciones,
         ];
+    }
+
+
+    public function generarDiagnosticoIa(GroqCalificacionService $groq): void
+    {
+        $this->validate([
+            'tipoDiagnosticoIa' => ['required', 'in:pedagogico,direccion,consejo_tecnico,familias'],
+        ], [
+            'tipoDiagnosticoIa.required' => 'Selecciona el tipo de informe.',
+            'tipoDiagnosticoIa.in' => 'El tipo de informe seleccionado no es válido.',
+        ]);
+
+        $diagnosticoBase = $this->diagnosticoCalificaciones;
+
+        if (!($diagnosticoBase['hay_datos'] ?? false)) {
+            $this->dispatch('swal', [
+                'title' => 'Selecciona generación, grado, grupo y periodo antes de generar el informe.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->diagnosticoIa = $groq->generarDiagnostico(
+                $this->construirEstadisticasAnonimasParaIa(),
+                $this->tipoDiagnosticoIa
+            );
+
+            $this->diagnosticoIaGeneradoEn = Carbon::now()->format('d/m/Y H:i');
+
+            $this->dispatch('swal', [
+                'title' => 'Diagnóstico con IA generado correctamente.',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $this->diagnosticoIa = [];
+            $this->diagnosticoIaGeneradoEn = null;
+
+            $this->dispatch('swal', [
+                'title' => $exception->getMessage(),
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
+    public function limpiarDiagnosticoIa(): void
+    {
+        $this->diagnosticoIa = [];
+        $this->diagnosticoIaGeneradoEn = null;
+    }
+
+    /**
+     * Construye un resumen grupal sin nombres, matrículas ni calificaciones individuales.
+     *
+     * @return array<string, mixed>
+     */
+    private function construirEstadisticasAnonimasParaIa(): array
+    {
+        $diagnostico = $this->diagnosticoCalificaciones;
+        $estadisticas = $this->estadisticasCalificaciones;
+
+        $nivel = $this->niveles
+            ->firstWhere('id', (int) $this->nivel_id)?->nombre
+            ?? Nivel::query()->whereKey($this->nivel_id)->value('nombre')
+            ?? $this->slug_nivel;
+
+        $grado = $this->grados
+            ->firstWhere('id', (int) $this->grado_id)?->nombre
+            ?? Grado::query()->whereKey($this->grado_id)->value('nombre')
+            ?? 'Sin grado';
+
+        $grupo = $this->textoGrupo($this->grupoSeleccionado());
+
+        $generacionSeleccionada = $this->generaciones
+            ->firstWhere('id', (int) $this->generacion_id);
+
+        $generacion = $generacionSeleccionada
+            ? trim($generacionSeleccionada->anio_ingreso . ' - ' . $generacionSeleccionada->anio_egreso)
+            : 'Sin generación';
+
+        $semestre = null;
+
+        if ($this->esBachillerato && filled($this->semestre_id)) {
+            $semestreSeleccionado = $this->semestres
+                ->firstWhere('id', (int) $this->semestre_id);
+
+            $semestre = $semestreSeleccionado?->numero;
+        }
+
+        $materias = collect($diagnostico['materias_resumen'] ?? [])
+            ->map(fn($materia) => [
+                'materia' => (string) ($materia['materia'] ?? 'Sin materia'),
+                'es_extra' => (bool) ($materia['extra'] ?? false),
+                'promedio' => isset($materia['promedio']) && is_numeric($materia['promedio'])
+                    ? (float) $materia['promedio']
+                    : null,
+                'calificaciones_reprobatorias' => (int) ($materia['reprobadas'] ?? 0),
+                'capturas_pendientes' => (int) ($materia['pendientes'] ?? 0),
+                'valores_especiales' => (int) ($materia['especiales'] ?? 0),
+                'estado' => (string) ($materia['estado'] ?? 'Sin datos'),
+            ])
+            ->take(30)
+            ->values()
+            ->all();
+
+        $materiaMasBaja = $diagnostico['materia_mas_baja'] ?? null;
+        $materiaMasAlta = $diagnostico['materia_mas_alta'] ?? null;
+
+        return [
+            'contexto' => [
+                'nivel' => (string) $nivel,
+                'generacion' => $generacion,
+                'grado' => (string) $grado,
+                'grupo' => $grupo,
+                'semestre' => $semestre,
+                'periodo' => $this->nombrePeriodo,
+                'estado_periodo' => $this->estadoPeriodo,
+            ],
+            'captura' => [
+                'total_alumnos' => count($this->inscripciones),
+                'total_materias' => count($this->materias),
+                'total_celdas' => (int) $this->totalCeldas,
+                'celdas_capturadas' => (int) $this->celdasCapturadas,
+                'porcentaje_captura' => (int) ($estadisticas['porcentaje_captura'] ?? 0),
+                'calificaciones_pendientes' => (int) ($estadisticas['pendientes'] ?? 0),
+                'alumnos_con_captura_incompleta' => collect(
+                    $diagnostico['alumnos_captura_incompleta'] ?? []
+                )->count(),
+            ],
+            'rendimiento' => [
+                'promedio_global' => is_numeric($estadisticas['promedio_global'] ?? null)
+                    ? (float) $estadisticas['promedio_global']
+                    : null,
+                'porcentaje_aprobacion' => (int) ($estadisticas['porcentaje_aprobacion'] ?? 0),
+                'alumnos_en_riesgo' => collect($diagnostico['alumnos_riesgo'] ?? [])->count(),
+                'candidatos_reconocimiento' => collect(
+                    $diagnostico['candidatos_reconocimiento'] ?? []
+                )->count(),
+                'valores_especiales' => (int) ($estadisticas['especiales'] ?? 0),
+                'salud_academica_calculada' => (int) ($diagnostico['salud'] ?? 0),
+            ],
+            'materia_menor_rendimiento' => $materiaMasBaja ? [
+                'materia' => (string) ($materiaMasBaja['materia'] ?? 'Sin materia'),
+                'promedio' => isset($materiaMasBaja['promedio']) && is_numeric($materiaMasBaja['promedio'])
+                    ? (float) $materiaMasBaja['promedio']
+                    : null,
+                'calificaciones_reprobatorias' => (int) ($materiaMasBaja['reprobadas'] ?? 0),
+                'capturas_pendientes' => (int) ($materiaMasBaja['pendientes'] ?? 0),
+            ] : null,
+            'materia_mayor_rendimiento' => $materiaMasAlta ? [
+                'materia' => (string) ($materiaMasAlta['materia'] ?? 'Sin materia'),
+                'promedio' => isset($materiaMasAlta['promedio']) && is_numeric($materiaMasAlta['promedio'])
+                    ? (float) $materiaMasAlta['promedio']
+                    : null,
+            ] : null,
+            'materias' => $materias,
+            'observaciones_del_sistema' => collect($diagnostico['recomendaciones'] ?? [])
+                ->map(fn($recomendacion) => (string) $recomendacion)
+                ->take(8)
+                ->values()
+                ->all(),
+            'advertencias' => [
+                'datos_anonimos' => true,
+                'sin_nombres' => true,
+                'sin_matriculas' => true,
+                'sin_calificaciones_individuales' => true,
+                'hay_cambios_sin_guardar' => $this->hayCambios,
+            ],
+        ];
+    }
+
+    public function clasePrioridadDiagnosticoIa(string $prioridad): string
+    {
+        return match ($prioridad) {
+            'alta' => 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+            'baja' => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+            default => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+        };
     }
 
 

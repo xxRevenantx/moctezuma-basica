@@ -628,6 +628,64 @@
                         </flux:field>
                     </div>
 
+                    <div
+                        class="mt-5 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+                        <div class="flex flex-col gap-4">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="inline-flex rounded-full bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white">
+                                        GroqCloud
+                                    </span>
+
+                                    <p class="text-sm font-semibold text-violet-950 dark:text-violet-100">
+                                        Asistente de redacción institucional
+                                    </p>
+                                </div>
+
+                                <p class="mt-1 text-xs text-violet-700 dark:text-violet-300">
+                                    Genera una propuesta o mejora el contenido actual. La IA no guarda la plantilla
+                                    automáticamente.
+                                </p>
+                            </div>
+
+                            <flux:field>
+                                <flux:label>Instrucción para la IA</flux:label>
+                                <flux:textarea wire:model.live.debounce.400ms="instruccion_ia" rows="3"
+                                    placeholder="Ejemplo: Redacta una constancia de estudios formal para un trámite de beca. Usa @nombre, @grado, @nivel, @ciclo y @fecha." />
+                                <flux:description>
+                                    No escribas nombres reales, CURP, matrículas, teléfonos ni otros datos personales.
+                                </flux:description>
+                                <flux:error name="instruccion_ia" />
+                            </flux:field>
+
+                            <div class="flex flex-wrap gap-2">
+                                <flux:button type="button" size="sm" variant="primary"
+                                    x-on:click="window.redactarPlantillaIA?.('generar')" wire:loading.attr="disabled"
+                                    wire:target="redactarPlantillaConIA">
+                                    <span wire:loading.remove wire:target="redactarPlantillaConIA">
+                                        Generar propuesta
+                                    </span>
+                                    <span wire:loading wire:target="redactarPlantillaConIA">
+                                        Procesando...
+                                    </span>
+                                </flux:button>
+
+                                <flux:button type="button" size="sm" variant="filled"
+                                    x-on:click="window.redactarPlantillaIA?.('mejorar')" wire:loading.attr="disabled"
+                                    wire:target="redactarPlantillaConIA">
+                                    Mejorar redacción
+                                </flux:button>
+
+                                <flux:button type="button" size="sm" variant="ghost"
+                                    x-on:click="window.redactarPlantillaIA?.('corregir')" wire:loading.attr="disabled"
+                                    wire:target="redactarPlantillaConIA">
+                                    Corregir ortografía
+                                </flux:button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mt-5">
                         <flux:field>
                             <flux:label>Contenido de la plantilla</flux:label>
@@ -825,7 +883,7 @@
                             clearInterval(intervalo);
                             console.error(
                                 'TinyMCE no se pudo cargar. Revisa la API Key o la conexión a Tiny Cloud.'
-                                );
+                            );
                         }
                     }, 250);
                 };
@@ -885,10 +943,10 @@
                                     });
 
                                     editor.on('change undo redo input keyup',
-                                function() {
-                                        enviarPlantillaConDebounce(editor
-                                            .getContent());
-                                    });
+                                        function() {
+                                            enviarPlantillaConDebounce(editor
+                                                .getContent());
+                                        });
 
                                     editor.on('blur', function() {
                                         @this.set('nuevo_contenido_html', editor
@@ -921,11 +979,11 @@
                                     });
 
                                     editor.on('change undo redo input keyup',
-                                function() {
-                                        @this.set(
-                                            'editar_contenido_generado_html',
-                                            editor.getContent(), false);
-                                    });
+                                        function() {
+                                            @this.set(
+                                                'editar_contenido_generado_html',
+                                                editor.getContent(), false);
+                                        });
 
                                     editor.on('blur', function() {
                                         @this.set(
@@ -944,12 +1002,34 @@
                     }
                 };
 
+                window.redactarPlantillaIA = async (accion) => {
+                    const editor = window.tinymce ? tinymce.get('editor_plantilla') : null;
+
+                    if (editor) {
+                        await @this.set('nuevo_contenido_html', editor.getContent(), false);
+                    }
+
+                    await @this.call('redactarPlantillaConIA', accion);
+                };
+
                 window.sincronizarEditorConstanciaEdicion = () => {
                     if (window.tinymce && tinymce.get('editor_constancia_edicion')) {
                         @this.set('editar_contenido_generado_html', tinymce.get('editor_constancia_edicion')
                             .getContent(), false);
                     }
                 };
+
+                window.addEventListener('actualizar-editor-plantilla', (event) => {
+                    const contenido = event.detail.contenido ?? '';
+                    const editor = window.tinymce ? tinymce.get('editor_plantilla') : null;
+
+                    if (editor) {
+                        editor.setContent(contenido);
+                        return;
+                    }
+
+                    iniciarEditorPlantilla(contenido);
+                });
 
                 window.addEventListener('abrir-modal-plantilla', (event) => {
                     iniciarEditorPlantilla(event.detail.contenido ?? '');

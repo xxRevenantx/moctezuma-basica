@@ -16,7 +16,7 @@ class GroqFichaService
     public function __construct()
     {
         $this->baseUrl = rtrim((string) config('groq.base_url', 'https://api.groq.com/openai/v1'), '/');
-        $this->model = (string) config('groq.model', 'llama-3.1-8b-instant');
+        $this->model = (string) config('groq.model', 'openai/gpt-oss-20b');
         $this->apiKey = config('groq.api_key');
     }
 
@@ -163,7 +163,7 @@ PROMPT;
                 ->post($this->baseUrl . '/chat/completions', [
                     'model' => $this->model,
                     'temperature' => (float) config('groq.temperature', 0.35),
-                    'max_tokens' => (int) config('groq.max_tokens', 450),
+                    'max_completion_tokens' => (int) config('groq.max_tokens', 450),
                     'messages' => [
                         [
                             'role' => 'system',
@@ -258,8 +258,8 @@ PROMPT;
             429 => 'Se alcanzó temporalmente el límite gratuito de GroqCloud. Espera un momento y vuelve a intentarlo.',
             500, 502, 503, 504 => 'GroqCloud presenta una interrupción temporal. Vuelve a intentarlo más tarde.',
             default => $detalle !== ''
-                ? $predeterminado . ' ' . $detalle
-                : $predeterminado . ' Código HTTP: ' . $response->status() . '.',
+            ? $predeterminado . ' ' . $detalle
+            : $predeterminado . ' Código HTTP: ' . $response->status() . '.',
         };
     }
 

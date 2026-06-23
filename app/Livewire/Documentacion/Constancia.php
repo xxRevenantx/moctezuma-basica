@@ -8,10 +8,13 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Services\GroqDocumentoService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 class Constancia extends Component
 {
@@ -74,6 +77,8 @@ class Constancia extends Component
     public string $nuevas_variables = '';
 
     public bool $nuevo_activo = true;
+
+    public string $instruccion_ia = '';
 
     public string $buscar_constancia = '';
 
@@ -225,6 +230,7 @@ class Constancia extends Component
         $this->nuevo_contenido_html = '';
         $this->nuevas_variables = implode("\n", $this->variablesBase());
         $this->nuevo_activo = true;
+        $this->instruccion_ia = '';
 
         $this->resetValidation([
             'nueva_clave',
@@ -250,6 +256,7 @@ class Constancia extends Component
         $this->nuevo_contenido_html = $plantilla->contenido_html;
         $this->nuevas_variables = implode("\n", $plantilla->variables ?? []);
         $this->nuevo_activo = (bool) $plantilla->activo;
+        $this->instruccion_ia = '';
 
         $this->resetValidation([
             'nueva_clave',
@@ -267,6 +274,7 @@ class Constancia extends Component
         $this->mostrar_modal_plantilla = false;
         $this->editando_plantilla = false;
         $this->plantilla_editando_id = null;
+        $this->instruccion_ia = '';
 
         $this->resetValidation([
             'nueva_clave',
@@ -294,7 +302,90 @@ class Constancia extends Component
             'nuevo_contenido_html.string' => 'El contenido HTML debe ser una cadena de texto.',
             'nuevas_variables.string' => 'Las variables deben ser una cadena de texto.',
             'editar_contenido_generado_html.required' => 'El contenido de la constancia es obligatorio.',
+            'instruccion_ia.max' => 'La instrucción para GroqCloud no puede superar los 2500 caracteres.',
         ];
+    }
+
+    public function redactarPlantillaConIA(string $accion): void
+    {
+        $accion = mb_strtolower(trim($accion));
+
+        if (!in_array($accion, ['generar', 'mejorar', 'corregir'], true)) {
+            $this->dispatch('notificar', tipo: 'error', mensaje: 'La acción de GroqCloud no es válida.');
+
+            return;
+        }
+
+        $this->validate([
+            'nuevo_titulo' => ['nullable', 'string', 'max:255'],
+            'nuevo_contenido_html' => ['nullable', 'string', 'max:20000'],
+            'nuevas_variables' => ['nullable', 'string', 'max:5000'],
+            'instruccion_ia' => ['nullable', 'string', 'max:2500'],
+        ]);
+
+        if ($accion === 'generar' && blank(strip_tags($this->instruccion_ia))) {
+            $this->addError(
+                'instruccion_ia',
+                'Describe qué constancia deseas generar. Por ejemplo: constancia de estudios para trámite de beca.'
+            );
+
+            return;
+        }
+
+        if (
+            in_array($accion, ['mejorar', 'corregir'], true)
+            && blank(strip_tags($this->nuevo_contenido_html))
+        ) {
+            $this->addError('nuevo_contenido_html', 'Primero escribe o genera contenido para poder procesarlo.');
+
+            return;
+        }
+
+        $variables = collect(preg_split('/\r\n|\r|\n/', $this->nuevas_variables))
+            ->map(fn($variable) => trim((string) $variable))
+            ->filter()
+            ->merge($this->variablesBase())
+            ->unique()
+            ->values()
+            ->all();
+
+        try {
+            $html = app(GroqDocumentoService::class)->redactar(
+                tipoDocumento: 'constancia escolar',
+                accion: $accion,
+                titulo: $this->nuevo_titulo,
+                instruccion: $this->instruccion_ia,
+                contenidoActual: $this->nuevo_contenido_html,
+                variablesPermitidas: $variables,
+            );
+
+            $this->nuevo_contenido_html = $html;
+            $this->resetValidation(['nuevo_contenido_html', 'instruccion_ia']);
+
+            $this->dispatch('actualizar-editor-plantilla', contenido: $html);
+            $this->dispatch(
+                'notificar',
+                tipo: 'success',
+                mensaje: match ($accion) {
+                    'generar' => 'GroqCloud generó una propuesta. Revísala antes de guardar.',
+                    'mejorar' => 'GroqCloud mejoró la redacción. Revísala antes de guardar.',
+                    'corregir' => 'GroqCloud corrigió el contenido. Revísalo antes de guardar.',
+                }
+            );
+        } catch (Throwable $exception) {
+            Log::warning('No se pudo procesar la plantilla de constancia con GroqCloud.', [
+                'accion' => $accion,
+                'plantilla_id' => $this->plantilla_editando_id,
+                'modelo' => config('groq.model'),
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->dispatch(
+                'notificar',
+                tipo: 'error',
+                mensaje: $exception->getMessage()
+            );
+        }
     }
 
     public function guardarPlantillaSistema(): void

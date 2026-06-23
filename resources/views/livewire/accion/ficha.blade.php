@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" x-data="{ copiadoInformeGrupo: false }">
     <div
         class="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div
@@ -176,6 +176,333 @@
                     @endif
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div
+        class="overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/40 dark:bg-neutral-900">
+        <div class="h-1.5 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500"></div>
+
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div class="flex items-start gap-4">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:ring-violet-900/50">
+                        <flux:icon.sparkles class="h-6 w-6" />
+                    </div>
+
+                    <div>
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40">
+                            <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                            GroqCloud · Informe por periodo
+                        </div>
+
+                        <h3 class="mt-2 text-xl font-black text-neutral-900 dark:text-white">
+                            Descripción general del grado y grupo
+                        </h3>
+
+                        <p class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                            Analiza las fichas capturadas del periodo y redacta tendencias grupales, fortalezas,
+                            aspectos por acompañar y estrategias docentes. No envía nombres, matrículas, CURP ni
+                            identificadores individuales.
+                        </p>
+
+                        <p class="mt-2 text-xs font-bold text-neutral-500 dark:text-neutral-400">
+                            La búsqueda de alumno no afecta este informe: se toma el grupo completo seleccionado.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="w-full xl:w-[460px]">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                        <flux:select label="Tipo de informe" wire:model="tipo_informe_grupo_ia">
+                            <flux:select.option value="pedagogico">Pedagógico para docente</flux:select.option>
+                            <flux:select.option value="direccion">Resumen para dirección</flux:select.option>
+                            <flux:select.option value="consejo_tecnico">Consejo técnico escolar</flux:select.option>
+                            <flux:select.option value="familias">Descripción para familias</flux:select.option>
+                        </flux:select>
+
+                        <div class="flex items-end">
+                            <button type="button" wire:click="generarInformeGrupoIa" wire:loading.attr="disabled"
+                                wire:target="generarInformeGrupoIa"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+                                <span wire:loading.remove wire:target="generarInformeGrupoIa"
+                                    class="inline-flex items-center gap-2">
+                                    <flux:icon.sparkles class="h-4 w-4" />
+                                    Generar informe
+                                </span>
+
+                                <span wire:loading.flex wire:target="generarInformeGrupoIa"
+                                    class="items-center gap-2">
+                                    <span
+                                        class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    Analizando…
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    @error('tipo_informe_grupo_ia')
+                        <p class="mt-2 text-xs font-bold text-rose-600 dark:text-rose-300">{{ $message }}</p>
+                    @enderror
+
+                    @if (!$grado_id || !$grupo_id)
+                        <div
+                            class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-relaxed text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                            Selecciona un grado y un grupo específico antes de generar la descripción general.
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            @if (!empty($informe_grupo_ia))
+                @php($prioridadGrupo = $informe_grupo_ia['prioridad_seguimiento'] ?? 'media')
+                @php($coberturaGrupo = (int) ($resumen_informe_grupo_ia['porcentaje_cobertura'] ?? 0))
+
+                <div class="mt-6 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+                    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span
+                                class="inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase {{ $this->clasePrioridadInformeGrupoIa($prioridadGrupo) }}">
+                                Seguimiento {{ $prioridadGrupo }}
+                            </span>
+
+                            <span
+                                class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-black text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                {{ $resumen_informe_grupo_ia['grado'] ?? '' }} · Grupo
+                                {{ $resumen_informe_grupo_ia['grupo'] ?? '' }}
+                            </span>
+
+                            <span
+                                class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-black text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                {{ $resumen_informe_grupo_ia['periodo'] ?? '' }}
+                            </span>
+
+                            <span
+                                class="rounded-full px-3 py-1 text-xs font-black {{ $coberturaGrupo >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : ($coberturaGrupo >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300') }}">
+                                Cobertura {{ $coberturaGrupo }}%
+                            </span>
+
+                            @if ($informe_grupo_ia_generado_en)
+                                <span
+                                    class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">
+                                    Generado {{ $informe_grupo_ia_generado_en }}
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button"
+                                x-on:click="navigator.clipboard.writeText($refs.informeFichaGrupo.innerText).then(() => { copiadoInformeGrupo = true; setTimeout(() => copiadoInformeGrupo = false, 1800) })"
+                                class="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 transition hover:border-violet-200 hover:text-violet-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:border-violet-800 dark:hover:text-violet-300">
+                                <flux:icon.clipboard-document class="h-4 w-4" />
+                                <span x-text="copiadoInformeGrupo ? 'Copiado' : 'Copiar informe'"></span>
+                            </button>
+
+                            <button type="button" wire:click="limpiarInformeGrupoIa"
+                                class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                <flux:icon.trash class="h-4 w-4" />
+                                Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-5 grid gap-3 sm:grid-cols-3">
+                        <div
+                            class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                            <p class="text-xs font-black uppercase tracking-wide text-neutral-500">Alumnos del grupo
+                            </p>
+                            <p class="mt-1 text-2xl font-black text-neutral-900 dark:text-white">
+                                {{ $resumen_informe_grupo_ia['total_alumnos'] ?? 0 }}
+                            </p>
+                        </div>
+
+                        <div
+                            class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                            <p class="text-xs font-black uppercase tracking-wide text-neutral-500">Apartados capturados
+                            </p>
+                            <p class="mt-1 text-2xl font-black text-neutral-900 dark:text-white">
+                                {{ $resumen_informe_grupo_ia['fichas_capturadas'] ?? 0 }} /
+                                {{ $resumen_informe_grupo_ia['fichas_esperadas'] ?? 0 }}
+                            </p>
+                        </div>
+
+                        <div
+                            class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                            <p class="text-xs font-black uppercase tracking-wide text-neutral-500">Estado de captura
+                            </p>
+                            <p class="mt-1 text-lg font-black capitalize text-neutral-900 dark:text-white">
+                                {{ $resumen_informe_grupo_ia['estado_captura'] ?? 'Parcial' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    @if ($coberturaGrupo < 90)
+                        <div
+                            class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-relaxed text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                            El informe es preliminar porque no están capturados todos los apartados del grupo. Al
+                            completar
+                            las fichas, genera nuevamente el informe para obtener una descripción más representativa.
+                        </div>
+                    @endif
+
+                    <div x-ref="informeFichaGrupo" class="space-y-5">
+                        <div
+                            class="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-pink-50 p-5 dark:border-violet-900/40 dark:from-violet-950/20 dark:via-neutral-950 dark:to-pink-950/20">
+                            <h4 class="text-xl font-black text-neutral-900 dark:text-white">
+                                {{ $informe_grupo_ia['titulo'] ?? 'Informe descriptivo grupal de preescolar' }}
+                            </h4>
+
+                            <p
+                                class="mt-3 whitespace-pre-line text-sm font-semibold leading-7 text-neutral-700 dark:text-neutral-300">
+                                {{ $informe_grupo_ia['descripcion_general'] ?? '' }}
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                            <div
+                                class="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                                <h5
+                                    class="flex items-center gap-2 text-sm font-black text-emerald-800 dark:text-emerald-300">
+                                    <flux:icon.check-circle class="h-5 w-5" />
+                                    Fortalezas grupales
+                                </h5>
+
+                                <div class="mt-3 space-y-2">
+                                    @forelse ($informe_grupo_ia['fortalezas_grupales'] ?? [] as $fortaleza)
+                                        <div
+                                            class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                            {{ $fortaleza }}
+                                        </div>
+                                    @empty
+                                        <p class="text-xs text-neutral-500">No se señalaron fortalezas específicas.</p>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                                <h5
+                                    class="flex items-center gap-2 text-sm font-black text-amber-800 dark:text-amber-300">
+                                    <flux:icon.exclamation-triangle class="h-5 w-5" />
+                                    Áreas de acompañamiento
+                                </h5>
+
+                                <div class="mt-3 space-y-2">
+                                    @forelse ($informe_grupo_ia['areas_acompanamiento'] ?? [] as $area)
+                                        <div
+                                            class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                            {{ $area }}
+                                        </div>
+                                    @empty
+                                        <p class="text-xs text-neutral-500">No se señalaron áreas específicas.</p>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-3xl border border-sky-200 bg-sky-50/70 p-5 dark:border-sky-900/40 dark:bg-sky-950/20">
+                                <h5 class="flex items-center gap-2 text-sm font-black text-sky-800 dark:text-sky-300">
+                                    <flux:icon.sparkles class="h-5 w-5" />
+                                    Recomendaciones grupales
+                                </h5>
+
+                                <div class="mt-3 space-y-2">
+                                    @forelse ($informe_grupo_ia['recomendaciones_grupales'] ?? [] as $recomendacion)
+                                        <div
+                                            class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                            {{ $recomendacion }}
+                                        </div>
+                                    @empty
+                                        <p class="text-xs text-neutral-500">No se generaron recomendaciones.</p>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-3xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-950/60">
+                            <h5 class="text-sm font-black text-neutral-900 dark:text-white">
+                                Síntesis por campo formativo
+                            </h5>
+
+                            <div class="mt-4 grid gap-4 xl:grid-cols-2">
+                                @forelse ($informe_grupo_ia['sintesis_campos'] ?? [] as $campoGrupo)
+                                    <article
+                                        class="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                        <h6 class="text-sm font-black text-violet-700 dark:text-violet-300">
+                                            {{ $campoGrupo['campo'] ?? 'Campo formativo' }}
+                                        </h6>
+
+                                        <p
+                                            class="mt-2 text-sm font-semibold leading-7 text-neutral-700 dark:text-neutral-300">
+                                            {{ $campoGrupo['sintesis'] ?? '' }}
+                                        </p>
+
+                                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <p
+                                                    class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                                                    Fortalezas
+                                                </p>
+                                                <ul
+                                                    class="mt-2 space-y-1.5 text-xs font-semibold leading-relaxed text-neutral-600 dark:text-neutral-400">
+                                                    @forelse ($campoGrupo['fortalezas'] ?? [] as $fortalezaCampo)
+                                                        <li>• {{ $fortalezaCampo }}</li>
+                                                    @empty
+                                                        <li>Sin fortalezas específicas registradas.</li>
+                                                    @endforelse
+                                                </ul>
+                                            </div>
+
+                                            <div>
+                                                <p
+                                                    class="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                                    Por fortalecer
+                                                </p>
+                                                <ul
+                                                    class="mt-2 space-y-1.5 text-xs font-semibold leading-relaxed text-neutral-600 dark:text-neutral-400">
+                                                    @forelse ($campoGrupo['aspectos_por_fortalecer'] ?? [] as $aspectoCampo)
+                                                        <li>• {{ $aspectoCampo }}</li>
+                                                    @empty
+                                                        <li>Sin aspectos específicos registrados.</li>
+                                                    @endforelse
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </article>
+                                @empty
+                                    <p class="text-sm text-neutral-500">No se generó síntesis por campo formativo.</p>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-3xl border border-indigo-200 bg-indigo-50/70 p-5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                            <h5 class="text-sm font-black text-indigo-800 dark:text-indigo-300">
+                                Estrategias sugeridas para el trabajo docente
+                            </h5>
+
+                            <div class="mt-3 grid gap-2 md:grid-cols-2">
+                                @forelse ($informe_grupo_ia['estrategias_docentes'] ?? [] as $estrategia)
+                                    <div
+                                        class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                        {{ $estrategia }}
+                                    </div>
+                                @empty
+                                    <p class="text-xs text-neutral-500">No se generaron estrategias específicas.</p>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <p
+                            class="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+                            {{ $informe_grupo_ia['aviso'] ?? 'Revisa el informe antes de utilizarlo.' }}
+                        </p>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 

@@ -1033,6 +1033,204 @@
         </div>
     @endif
 
+    {{-- INFORME PEDAGÓGICO REDACTADO CON GROQCLOUD --}}
+    @if ($this->diagnosticoCalificaciones['hay_datos'])
+        <div x-data="{ copiado: false }"
+            class="mt-6 overflow-hidden rounded-[28px] border border-violet-200 bg-white shadow-xl shadow-violet-100/60 dark:border-violet-900/40 dark:bg-neutral-900 dark:shadow-black/20">
+            <div class="h-1.5 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-sky-500"></div>
+
+            <div class="p-5 sm:p-6">
+                <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                    <div class="flex items-start gap-4">
+                        <div
+                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:ring-violet-900/50">
+                            <flux:icon.sparkles class="h-6 w-6" />
+                        </div>
+
+                        <div>
+                            <div
+                                class="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40">
+                                <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                GroqCloud
+                            </div>
+
+                            <h3 class="mt-2 text-xl font-black text-neutral-900 dark:text-white">
+                                Informe académico redactado con IA
+                            </h3>
+
+                            <p class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                                Convierte el diagnóstico automático del sistema en un informe profesional. Solo se envían
+                                estadísticas grupales; no se comparten nombres, matrículas ni calificaciones individuales.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="w-full xl:w-[430px]">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                            <flux:select label="Tipo de informe" wire:model="tipoDiagnosticoIa">
+                                <flux:select.option value="pedagogico">Pedagógico para docentes</flux:select.option>
+                                <flux:select.option value="direccion">Resumen para dirección</flux:select.option>
+                                <flux:select.option value="consejo_tecnico">Consejo técnico escolar</flux:select.option>
+                                <flux:select.option value="familias">Resumen para familias</flux:select.option>
+                            </flux:select>
+
+                            <div class="flex items-end">
+                                <button type="button" wire:click="generarDiagnosticoIa"
+                                    wire:loading.attr="disabled" wire:target="generarDiagnosticoIa"
+                                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+                                    <span wire:loading.remove wire:target="generarDiagnosticoIa"
+                                        class="inline-flex items-center gap-2">
+                                        <flux:icon.sparkles class="h-4 w-4" />
+                                        Generar informe
+                                    </span>
+
+                                    <span wire:loading.flex wire:target="generarDiagnosticoIa"
+                                        class="items-center gap-2">
+                                        <span
+                                            class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                        Generando…
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        @error('tipoDiagnosticoIa')
+                            <p class="mt-2 text-xs font-bold text-rose-600 dark:text-rose-300">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                @if (!empty($diagnosticoIa))
+                    @php($prioridadIa = $diagnosticoIa['prioridad'] ?? 'media')
+
+                    <div class="mt-6 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+                        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                    class="inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase {{ $this->clasePrioridadDiagnosticoIa($prioridadIa) }}">
+                                    Prioridad {{ $prioridadIa }}
+                                </span>
+
+                                @if ($diagnosticoIaGeneradoEn)
+                                    <span
+                                        class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">
+                                        Generado {{ $diagnosticoIaGeneradoEn }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button"
+                                    x-on:click="navigator.clipboard.writeText($refs.informeGroq.innerText).then(() => { copiado = true; setTimeout(() => copiado = false, 1800) })"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 transition hover:border-violet-200 hover:text-violet-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:border-violet-800 dark:hover:text-violet-300">
+                                    <flux:icon.clipboard-document class="h-4 w-4" />
+                                    <span x-text="copiado ? 'Copiado' : 'Copiar informe'"></span>
+                                </button>
+
+                                <button type="button" wire:click="limpiarDiagnosticoIa"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    <flux:icon.trash class="h-4 w-4" />
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div x-ref="informeGroq" class="space-y-5">
+                            <div
+                                class="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-5 dark:border-violet-900/40 dark:from-violet-950/20 dark:via-neutral-950 dark:to-sky-950/20">
+                                <h4 class="text-xl font-black text-neutral-900 dark:text-white">
+                                    {{ $diagnosticoIa['titulo'] ?? 'Diagnóstico académico grupal' }}
+                                </h4>
+
+                                <p class="mt-3 whitespace-pre-line text-sm font-semibold leading-7 text-neutral-700 dark:text-neutral-300">
+                                    {{ $diagnosticoIa['resumen_ejecutivo'] ?? '' }}
+                                </p>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                                <div
+                                    class="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                                    <h5 class="flex items-center gap-2 text-sm font-black text-emerald-800 dark:text-emerald-300">
+                                        <flux:icon.check-circle class="h-5 w-5" />
+                                        Fortalezas
+                                    </h5>
+
+                                    <div class="mt-3 space-y-2">
+                                        @forelse ($diagnosticoIa['fortalezas'] ?? [] as $fortaleza)
+                                            <div
+                                                class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                                {{ $fortaleza }}
+                                            </div>
+                                        @empty
+                                            <p class="text-xs text-neutral-500">No se señalaron fortalezas específicas.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                                    <h5 class="flex items-center gap-2 text-sm font-black text-amber-800 dark:text-amber-300">
+                                        <flux:icon.exclamation-triangle class="h-5 w-5" />
+                                        Áreas de atención
+                                    </h5>
+
+                                    <div class="mt-3 space-y-2">
+                                        @forelse ($diagnosticoIa['areas_atencion'] ?? [] as $area)
+                                            <div
+                                                class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                                {{ $area }}
+                                            </div>
+                                        @empty
+                                            <p class="text-xs text-neutral-500">No se señalaron áreas críticas.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="rounded-3xl border border-sky-200 bg-sky-50/70 p-5 dark:border-sky-900/40 dark:bg-sky-950/20">
+                                    <h5 class="flex items-center gap-2 text-sm font-black text-sky-800 dark:text-sky-300">
+                                        <flux:icon.light-bulb class="h-5 w-5" />
+                                        Recomendaciones
+                                    </h5>
+
+                                    <div class="mt-3 space-y-2">
+                                        @forelse ($diagnosticoIa['recomendaciones'] ?? [] as $recomendacionIa)
+                                            <div
+                                                class="rounded-2xl bg-white/80 px-4 py-3 text-xs font-semibold leading-relaxed text-neutral-700 shadow-sm dark:bg-neutral-950/60 dark:text-neutral-300">
+                                                {{ $recomendacionIa }}
+                                            </div>
+                                        @empty
+                                            <p class="text-xs text-neutral-500">No se generaron recomendaciones.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-3xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-950/60">
+                                <h5 class="text-sm font-black text-neutral-900 dark:text-white">Diagnóstico pedagógico</h5>
+                                <p class="mt-3 whitespace-pre-line text-sm leading-7 text-neutral-600 dark:text-neutral-300">
+                                    {{ $diagnosticoIa['diagnostico_pedagogico'] ?? '' }}
+                                </p>
+                            </div>
+
+                            <div
+                                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+                                {{ $diagnosticoIa['aviso'] ?? 'Este informe es orientativo y debe revisarse antes de utilizarse.' }}
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div
+                        class="mt-5 rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 px-4 py-4 text-sm font-semibold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-300">
+                        Selecciona el tipo de informe y pulsa <strong>Generar informe</strong>. El contenido no se guarda
+                        automáticamente en la base de datos.
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- Tabla --}}
     <div
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
