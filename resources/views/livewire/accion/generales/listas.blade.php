@@ -1,10 +1,4 @@
-<div x-data="{
-    abierto: 'listas',
-
-    cambiar(seccion) {
-        this.abierto = this.abierto === seccion ? null : seccion
-    }
-}" class="space-y-6">
+<div class="space-y-6">
     @php
         $esSecundaria = $this->esSecundaria();
 
@@ -23,52 +17,7 @@
         <article
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 dark:border-neutral-800 dark:bg-neutral-900">
 
-            <button type="button" x-on:click="cambiar('listas')"
-                class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
-
-                <div class="flex items-center gap-4">
-                    <span
-                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/20 transition group-hover:scale-105">
-                        <flux:icon.document-arrow-down class="h-5 w-5" />
-                    </span>
-
-                    <span>
-                        <span class="block text-base font-black text-slate-900 dark:text-white">
-                            Descargar listas y formatos
-                        </span>
-
-                        <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                            Filtra por generación, grado, {{ $this->esBachillerato() ? 'semestre,' : '' }} grupo y tipo
-                            de documento. También puedes descargar todas las listas del nivel.
-                        </span>
-                    </span>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <span
-                        class="hidden rounded-full px-3 py-1 text-xs font-bold ring-1 sm:inline-flex
-                            {{ $esWord
-                                ? 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/60'
-                                : 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/60' }}">
-                        {{ $this->extensionDescarga }}
-                    </span>
-
-                    <span
-                        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
-                        x-bind:class="abierto === 'listas'
-                            ?
-                            'rotate-180 border-sky-200 text-sky-600 dark:border-sky-900 dark:text-sky-300' :
-                            ''">
-                        <flux:icon.chevron-down class="h-5 w-5" />
-                    </span>
-                </div>
-            </button>
-
-            <div x-cloak x-show="abierto === 'listas'" x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
-                class="border-t border-slate-200 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-950/30 sm:p-6">
+            <div class="bg-slate-50/70 p-4 dark:bg-neutral-950/30 sm:p-6">
 
                 <div
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -308,12 +257,12 @@
                                 <flux:select id="grupo_id" wire:model.live="grupo_id"
                                     wire:key="lista-grupo-select-{{ $slug_nivel }}-{{ $modo_descarga }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                                     :disabled="$modo_descarga === 'nivel'
-                                                                            ? true
-                                                                            : (
-                                                                                $this->esBachillerato()
-                                                                                    ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                    : (!$generacion_id || !$grado_id || $grupos->isEmpty())
-                                                                            )">
+                                                                                                                                                    ? true
+                                                                                                                                                    : (
+                                                                                                                                                        $this->esBachillerato()
+                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())
+                                                                                                                                                    )">
 
                                     <flux:select.option value="">
                                         Selecciona un grupo

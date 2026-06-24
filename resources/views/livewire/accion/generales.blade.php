@@ -3,6 +3,7 @@
         estadistica: false,
         promocion: false,
         listas: false,
+        horarios: false,
         promedios: false,
         lugares_preescolar: false,
         credenciales: false,
@@ -35,6 +36,7 @@
                 estadistica: guardados.estadistica === true,
                 promocion: guardados.promocion === true,
                 listas: guardados.listas === true,
+                horarios: guardados.horarios === true,
                 promedios: guardados.promedios === true,
                 credenciales: guardados.credenciales === true,
                 lugares_preescolar: guardados.lugares_preescolar === true,
@@ -529,6 +531,52 @@
             <livewire:accion.generales.listas :slug_nivel="$slug_nivel" :key="'listas-generales-' . $slug_nivel" />
         </div>
     </section>
+
+    {{-- COLLAPSE: HORARIOS GENERALES --}}
+    <section
+        class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <button type="button" x-on:click="alternarCollapse('horarios')"
+            class="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/70 sm:px-6">
+            <div class="flex min-w-0 items-center gap-4">
+                <div
+                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20">
+                    <flux:icon.calendar-days class="h-6 w-6" />
+                </div>
+
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">
+                        Horarios
+                    </p>
+                    <h2 class="truncate text-lg font-black text-slate-900 dark:text-white">
+                        Horarios generales
+                    </h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Consulta y descarga un horario concentrado con todos los grados y grupos del nivel seleccionado.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2">
+                <span class="hidden rounded-full border px-3 py-1 text-xs font-black sm:inline-flex"
+                    :class="colapsos.horarios ?
+                        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300' :
+                        'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300'"
+                    x-text="colapsos.horarios ? 'Abierto' : 'Cerrado'"></span>
+
+                <span
+                    class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition duration-300 group-hover:border-blue-200 group-hover:text-blue-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
+                    :class="colapsos.horarios ? 'rotate-180' : 'rotate-0'">
+                    <flux:icon.chevron-down class="h-5 w-5" />
+                </span>
+            </div>
+        </button>
+
+        <div x-cloak x-show="colapsos.horarios" x-transition.opacity.duration.200ms
+            class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+            <livewire:accion.generales.horarios-generales :slug_nivel="$slug_nivel" :key="'horarios-generales-' . $slug_nivel" />
+        </div>
+    </section>
+
     {{-- COLLAPSE: PROMEDIOS GENERALES --}}
     @if ($esPreescolar)
         {{-- COLLAPSE: LUGARES PREESCOLAR --}}
