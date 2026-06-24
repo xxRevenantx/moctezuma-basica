@@ -2,7 +2,7 @@
 
 namespace App\Policies;
 
-use App\Models\PeriodosBachillerato;
+use App\Models\Periodos as PeriodosBachillerato;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 

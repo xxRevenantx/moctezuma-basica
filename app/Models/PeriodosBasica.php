@@ -16,8 +16,6 @@ class PeriodosBasica extends Model
     // RELACIONES CON PERIODOS
     public function periodos()
     {
-        return $this->hasMany(Periodos::class, 'parcial_id');
+        return $this->hasMany(Periodos::class, 'periodo_basica_id');
     }
-
-
 }

@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Periodo;
 
+use App\Exceptions\PeriodoImportException;
+use App\Exports\Periodos\PlantillaPeriodosExport;
+use App\Imports\PeriodosImport;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\MesesBachillerato;
@@ -11,10 +14,17 @@ use App\Models\Parcial;
 use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Livewire\WithFileUploads;
+use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class CrearPeriodo extends Component
 {
+    use WithFileUploads;
+
     public $nivel_id = null;
     public $generacion_id = null;
     public $semestre_id = null;
@@ -28,6 +38,14 @@ class CrearPeriodo extends Component
 
     public $fecha_inicio = null;
     public $fecha_fin = null;
+
+    public $archivo_periodos = null;
+
+    /** @var array<int, string> */
+    public array $errores_importacion = [];
+
+    public ?string $mensaje_importacion = null;
+    public ?string $error_importacion = null;
 
     /**
      * Se limpian los campos cuando cambia el nivel.
@@ -58,7 +76,14 @@ class CrearPeriodo extends Component
      */
     public function getEsBachilleratoProperty(): bool
     {
-        return (int) $this->nivel_id === 4;
+        if (empty($this->nivel_id)) {
+            return false;
+        }
+
+        return Nivel::query()
+            ->whereKey($this->nivel_id)
+            ->where('slug', 'bachillerato')
+            ->exists();
     }
 
     /**
@@ -66,7 +91,7 @@ class CrearPeriodo extends Component
      */
     public function getEsBasicaProperty(): bool
     {
-        return !empty($this->nivel_id) && (int) $this->nivel_id !== 4;
+        return !empty($this->nivel_id) && !$this->esBachillerato;
     }
 
     protected function rules(): array
@@ -74,8 +99,8 @@ class CrearPeriodo extends Component
         $rules = [
             'nivel_id' => 'required|exists:niveles,id',
             'ciclo_escolar_id' => 'required|exists:ciclo_escolares,id',
-            'fecha_inicio' => 'nullable|date',
-            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            'fecha_inicio' => 'nullable|required_with:fecha_fin|date',
+            'fecha_fin' => 'nullable|required_with:fecha_inicio|date|after_or_equal:fecha_inicio',
         ];
 
         if ($this->esBachillerato) {
@@ -128,6 +153,8 @@ class CrearPeriodo extends Component
             'periodo_basica_id.required' => 'El periodo de básica es obligatorio.',
             'periodo_basica_id.exists' => 'El periodo de básica seleccionado no es válido.',
 
+            'fecha_inicio.required_with' => 'Captura también la fecha de inicio.',
+            'fecha_fin.required_with' => 'Captura también la fecha de fin.',
             'fecha_inicio.date' => 'La fecha de inicio no es válida.',
             'fecha_fin.date' => 'La fecha de fin no es válida.',
             'fecha_fin.after_or_equal' => 'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
@@ -137,6 +164,10 @@ class CrearPeriodo extends Component
     public function guardarPeriodo(): void
     {
         $this->validate();
+
+        if (!$this->validarFechasDelCiclo()) {
+            return;
+        }
 
         if ($this->esBachillerato) {
             $generacionValida = Generacion::query()
@@ -165,6 +196,16 @@ class CrearPeriodo extends Component
         }
 
         if ($this->esBasica) {
+            $ordenMes = MesesBasica::query()->orderBy('id')->pluck('id')->values();
+            $ordenPeriodo = PeriodosBasica::query()->orderBy('periodo')->pluck('id')->values();
+            $posicionMes = $ordenMes->search((int) $this->mes_basica_id, true);
+            $posicionPeriodo = $ordenPeriodo->search((int) $this->periodo_basica_id, true);
+
+            if ($posicionMes === false || $posicionPeriodo === false || $posicionMes !== $posicionPeriodo) {
+                $this->addError('periodo_basica_id', 'El mes de básica no corresponde al periodo seleccionado.');
+                return;
+            }
+
             $existe = Periodos::query()
                 ->where('nivel_id', $this->nivel_id)
                 ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
@@ -216,10 +257,124 @@ class CrearPeriodo extends Component
         $this->dispatch('refreshPeriodos');
     }
 
+    private function validarFechasDelCiclo(): bool
+    {
+        if (!$this->fecha_inicio && !$this->fecha_fin) {
+            return true;
+        }
+
+        $ciclo = CicloEscolar::find($this->ciclo_escolar_id);
+
+        if (!$ciclo) {
+            return false;
+        }
+
+        foreach (['fecha_inicio', 'fecha_fin'] as $campo) {
+            if (!$this->{$campo}) {
+                continue;
+            }
+
+            $anio = (int) Carbon::parse($this->{$campo})->format('Y');
+
+            if ($anio < (int) $ciclo->inicio_anio || $anio > (int) $ciclo->fin_anio) {
+                $this->addError(
+                    $campo,
+                    "La fecha debe pertenecer al ciclo escolar {$ciclo->inicio_anio}-{$ciclo->fin_anio}."
+                );
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function descargarPlantillaPeriodos()
+    {
+        return Excel::download(
+            new PlantillaPeriodosExport(),
+            'plantilla_importacion_periodos_' . now()->format('Y-m-d') . '.xlsx'
+        );
+    }
+
+    public function importarPeriodos(): void
+    {
+        $this->resetValidation('archivo_periodos');
+        $this->errores_importacion = [];
+        $this->mensaje_importacion = null;
+        $this->error_importacion = null;
+
+        $this->validate([
+            'archivo_periodos' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'archivo_periodos.required' => 'Selecciona un archivo para importar.',
+            'archivo_periodos.file' => 'Selecciona un archivo válido.',
+            'archivo_periodos.mimes' => 'El archivo debe ser de Excel con formato XLSX o XLS.',
+            'archivo_periodos.max' => 'El archivo no debe superar 10 MB.',
+        ]);
+
+        $importacion = new PeriodosImport();
+
+        try {
+            Excel::import($importacion, $this->archivo_periodos);
+
+            $this->mensaje_importacion = sprintf(
+                'Importación completada: %d creado(s), %d actualizado(s) y %d sin cambios.',
+                $importacion->creados(),
+                $importacion->actualizados(),
+                $importacion->sinCambios()
+            );
+
+            $this->reset('archivo_periodos');
+            $this->dispatch('refreshPeriodos');
+            $this->dispatch('swal', [
+                'title' => '¡Periodos importados correctamente!',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (PeriodoImportException $exception) {
+            $this->errores_importacion = array_slice($exception->errores(), 0, 100);
+            $this->error_importacion = 'No se importó ninguna fila. Corrige los errores indicados y vuelve a intentarlo.';
+
+            $this->dispatch('swal', [
+                'title' => 'La plantilla contiene errores.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Error al importar periodos', [
+                'mensaje' => $exception->getMessage(),
+                'archivo' => $exception->getFile(),
+                'linea' => $exception->getLine(),
+            ]);
+
+            $this->errores_importacion = $importacion->errores();
+            $this->error_importacion = 'No fue posible importar el archivo. Verifica que sea la plantilla descargada desde este módulo.';
+
+            $this->dispatch('swal', [
+                'title' => 'No se pudo importar la plantilla.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+        }
+    }
+
+    public function limpiarArchivoPeriodos(): void
+    {
+        $this->reset([
+            'archivo_periodos',
+            'errores_importacion',
+            'mensaje_importacion',
+            'error_importacion',
+        ]);
+
+        $this->resetValidation('archivo_periodos');
+    }
+
     public function render()
     {
         $generaciones = Generacion::query()
-            ->when((int) $this->nivel_id === 4, function ($query) {
+            ->when($this->esBachillerato, function ($query) {
                 $query->where('nivel_id', $this->nivel_id);
             }, function ($query) {
                 $query->whereRaw('1 = 0');

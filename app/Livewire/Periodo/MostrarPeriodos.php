@@ -34,6 +34,16 @@ class MostrarPeriodos extends Component
             return;
         }
 
+        if ($periodo->calificaciones()->exists() || $periodo->bitacoraCalificaciones()->exists()) {
+            $this->dispatch('swal', [
+                'title' => 'No se puede eliminar el periodo porque tiene calificaciones o historial de cambios asociado.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+
+            return;
+        }
+
         $periodo->delete();
 
         $this->dispatch('swal', [
@@ -125,7 +135,7 @@ class MostrarPeriodos extends Component
 
             // Orden general
             ->orderBy('nivel_id')
-            ->orderBy('ciclo_escolar_id')
+            ->orderByDesc('ciclo_escolar_id')
 
             // Orden para bachillerato
             ->orderBy('generacion_id')
