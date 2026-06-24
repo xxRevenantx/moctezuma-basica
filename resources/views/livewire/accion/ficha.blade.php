@@ -542,7 +542,11 @@
                                 @else
                                     <div
                                         class="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-xl shadow-sm dark:bg-indigo-500/15">
-                                        👦
+                                        @if ($alumno->genero == 'M')
+                                            👧
+                                        @else
+                                            👦
+                                        @endif
                                     </div>
                                 @endif
                             </td>
