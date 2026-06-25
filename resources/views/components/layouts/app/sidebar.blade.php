@@ -99,19 +99,26 @@
                         Inicio
                     </flux:navlist.item>
 
-                    {{-- Documentación --}}
-                    <flux:sidebar.group expandable :expanded="false" heading="DOCUMENTACIÓN"
-                        class="grid gap-1 text-xs text-zinc-300">
-                        <flux:navlist.item icon="file-check" :href="route('misrutas.constancias')"
-                            :current="request()->routeIs('misrutas.constancias')" wire:navigate>
-                            Constancias
-                        </flux:navlist.item>
+                    {{-- Documentación: acceso exclusivo para administración --}}
+                    @if (auth()->user()?->is_admin)
+                        <flux:sidebar.group expandable :expanded="request()->routeIs('misrutas.expedientes*', 'misrutas.constancias', 'misrutas.oficios')" heading="DOCUMENTACIÓN"
+                            class="grid gap-1 text-xs text-zinc-300">
+                            <flux:navlist.item icon="folder-open" :href="route('misrutas.expedientes')"
+                                :current="request()->routeIs('misrutas.expedientes*')" wire:navigate>
+                                Expedientes digitales
+                            </flux:navlist.item>
 
-                        <flux:navlist.item icon="scroll-text" :href="route('misrutas.oficios')"
-                            :current="request()->routeIs('misrutas.oficios')" wire:navigate>
-                            Oficios
-                        </flux:navlist.item>
-                    </flux:sidebar.group>
+                            <flux:navlist.item icon="file-check" :href="route('misrutas.constancias')"
+                                :current="request()->routeIs('misrutas.constancias')" wire:navigate>
+                                Constancias
+                            </flux:navlist.item>
+
+                            <flux:navlist.item icon="scroll-text" :href="route('misrutas.oficios')"
+                                :current="request()->routeIs('misrutas.oficios')" wire:navigate>
+                                Oficios
+                            </flux:navlist.item>
+                        </flux:sidebar.group>
+                    @endif
 
                     {{-- Académica --}}
                     <flux:sidebar.group expandable :expanded="false" heading="ACADÉMICA"
@@ -148,8 +155,9 @@
                     </flux:sidebar.group>
 
                     {{-- Personal --}}
-                    <flux:sidebar.group expandable :expanded="false" heading="PERSONAL"
-                        class="grid gap-1 text-xs text-zinc-300">
+                    <flux:sidebar.group expandable
+                        :expanded="request()->routeIs('misrutas.personal', 'misrutas.role-persona', 'misrutas.plantilla', 'misrutas.profesores', 'misrutas.expedientes-personal*')"
+                        heading="PERSONAL" class="grid gap-1 text-xs text-zinc-300">
                         <flux:navlist.item icon="user-plus" :href="route('misrutas.personal')"
                             :current="request()->routeIs('misrutas.personal')" wire:navigate>
                             Crear Persona
@@ -169,6 +177,13 @@
                             :current="request()->routeIs('misrutas.profesores')" wire:navigate>
                             Profesores
                         </flux:navlist.item>
+
+                        @if (auth()->user()?->is_admin)
+                            <flux:navlist.item icon="briefcase" :href="route('misrutas.expedientes-personal')"
+                                :current="request()->routeIs('misrutas.expedientes-personal*')" wire:navigate>
+                                Expedientes del personal
+                            </flux:navlist.item>
+                        @endif
                     </flux:sidebar.group>
 
                     {{-- Estructura --}}

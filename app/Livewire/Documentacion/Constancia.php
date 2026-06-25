@@ -164,6 +164,7 @@ class Constancia extends Component
     {
         $plantilla = ConstanciaPlantilla::query()
             ->where('activo', true)
+            ->where('clave', '!=', 'baja-traslado')
             ->orderBy('titulo')
             ->first();
 
@@ -293,7 +294,7 @@ class Constancia extends Component
             'nueva_clave.required' => 'La clave es obligatoria.',
             'nueva_clave.string' => 'La clave debe ser una cadena de texto.',
             'nueva_clave.max' => 'La clave no puede tener más de 100 caracteres.',
-            'nueva_clave.regex' => 'La clave solo puede llevar minúsculas, números y guion bajo.',
+            'nueva_clave.regex' => 'La clave solo puede llevar minúsculas, números, guion medio y guion bajo.',
             'nueva_clave.unique' => 'Ya existe una plantilla con esa clave. Por favor elige otra.',
             'nuevo_titulo.required' => 'El título es obligatorio.',
             'nuevo_titulo.string' => 'El título debe ser una cadena de texto.',
@@ -397,7 +398,7 @@ class Constancia extends Component
                 'required',
                 'string',
                 'max:100',
-                'regex:/^[a-z0-9_]+$/',
+                'regex:/^[a-z0-9_-]+$/',
                 'unique:constancia_plantillas,clave,' . $plantillaId,
             ],
             'nuevo_titulo' => ['required', 'string', 'max:255'],
@@ -800,6 +801,7 @@ class Constancia extends Component
     public function abrirEditarConstancia(int $constanciaId): void
     {
         $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
+        abort_if(($constancia->estado_documento ?? 'emitida') === 'cancelada', 422, 'Una constancia cancelada no puede editarse.');
         $periodos = $constancia->periodos_calificaciones ?? [];
 
         $this->constancia_editando_id = $constancia->id;
@@ -851,9 +853,18 @@ class Constancia extends Component
             'editar_contenido_generado_html' => ['required', 'string'],
         ]);
 
-        $constancia = ConstanciaModelo::query()->findOrFail($this->constancia_editando_id);
+        $constancia = ConstanciaModelo::query()->with('documentoAlumno')->findOrFail($this->constancia_editando_id);
+        abort_if(($constancia->estado_documento ?? 'emitida') === 'cancelada', 422, 'Una constancia cancelada no puede editarse.');
+
+        if ($constancia->documentoAlumno) {
+            $constancia->documentoAlumno->update([
+                'es_actual' => false,
+                'estado' => 'reemplazado',
+            ]);
+        }
 
         $constancia->update([
+            'documento_alumno_id' => null,
             'fecha_expedicion' => $this->editar_fecha_expedicion ?: now()->format('Y-m-d'),
             'dirigido_a' => $this->editar_dirigido_a,
             'periodos_calificaciones' => [
@@ -870,11 +881,26 @@ class Constancia extends Component
 
     public function eliminarConstanciaGenerada(int $constanciaId): void
     {
-        $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
-        $constancia->delete();
+        $constancia = ConstanciaModelo::query()
+            ->with('documentoAlumno')
+            ->findOrFail($constanciaId);
+
+        $constancia->update([
+            'estado_documento' => 'cancelada',
+            'cancelada_at' => now(),
+            'cancelada_por' => auth()->id(),
+        ]);
+
+        if ($constancia->documentoAlumno) {
+            $constancia->documentoAlumno->update([
+                'estado' => 'cancelada',
+                'validado_por' => auth()->id(),
+                'validado_at' => now(),
+            ]);
+        }
 
         $this->resetPage('constanciasPage');
-        $this->dispatch('notificar', tipo: 'success', mensaje: 'Constancia eliminada correctamente.');
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'Constancia cancelada. Se conservó en el historial y continúa disponible para administración.');
     }
 
     public function abrirPdfConstancia(int $constanciaId): void
@@ -895,6 +921,7 @@ class Constancia extends Component
 
             'plantillasActivas' => ConstanciaPlantilla::query()
                 ->where('activo', true)
+                ->where('clave', '!=', 'baja-traslado')
                 ->orderBy('titulo')
                 ->get(),
 

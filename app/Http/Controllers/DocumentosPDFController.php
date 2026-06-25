@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use ZipArchive;
 use App\Models\Oficio;
+use App\Services\ExpedienteArchivoService;
 
 
 class DocumentosPDFController extends Controller
@@ -45,12 +46,76 @@ class DocumentosPDFController extends Controller
         ])->setPaper('letter', 'portrait');
 
         $nombreArchivo = Str::slug($constancia->folio, '_') . '.pdf';
+        $contenidoPdf = $pdf->output();
 
-        return $pdf->stream($nombreArchivo);
+        $this->archivarConstanciaEnExpediente($constancia, $contenidoPdf);
+
+        return response($contenidoPdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $nombreArchivo . '"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function archivarConstanciaEnExpediente(Constancia $constancia, string $contenidoPdf): void
+    {
+        if ($constancia->documento_alumno_id || !$constancia->alumno || !$constancia->plantilla) {
+            return;
+        }
+
+        $identificador = Str::lower(trim(
+            ($constancia->plantilla->clave ?? '') . ' ' .
+                ($constancia->plantilla->titulo ?? '')
+        ));
+
+        $tipoSlug = match (true) {
+            Str::contains($identificador, ['baja', 'traslado']) => 'constancia-baja-traslado',
+            Str::contains($identificador, 'estudio') => 'constancia-estudios',
+            default => null,
+        };
+
+        if (!$tipoSlug) {
+            return;
+        }
+
+        $alumno = $constancia->alumno;
+        $trayectoria = $alumno->trayectoriasAcademicas()->latest('id')->first();
+        $movimiento = $tipoSlug === 'constancia-baja-traslado'
+            ? $alumno->movimientos()
+            ->whereIn('tipo', ['baja_definitiva', 'baja_temporal', 'traslado'])
+            ->latest('fecha')
+            ->latest('id')
+            ->first()
+            : null;
+
+        $documento = app(ExpedienteArchivoService::class)->guardarPdfGenerado(
+            $alumno,
+            $tipoSlug,
+            $contenidoPdf,
+            [
+                'nivel_id' => $trayectoria?->nivel_id ?? $alumno->nivel_id,
+                'grado_id' => $trayectoria?->grado_id ?? $alumno->grado_id,
+                'grupo_id' => $trayectoria?->grupo_id ?? $alumno->grupo_id,
+                'ciclo_escolar_id' => $trayectoria?->ciclo_escolar_id,
+                'trayectoria_academica_id' => $trayectoria?->id,
+                'fecha_documento' => $constancia->fecha_expedicion?->format('Y-m-d'),
+                'folio' => $constancia->folio,
+                'estado' => $constancia->estado_documento === 'cancelada' ? 'cancelada' : 'emitida',
+                'tipo_movimiento' => $movimiento?->tipo,
+                'motivo' => $movimiento?->motivo ?? ($tipoSlug === 'constancia-baja-traslado' ? $alumno->motivo_baja : null),
+            ]
+        );
+
+        $constancia->update(['documento_alumno_id' => $documento->id]);
+
+        if ($movimiento) {
+            $movimiento->update(['documento_alumno_id' => $documento->id]);
+        }
     }
 
     /**
-     * Genera constancias masivas sin guardarlas en la base de datos.
+     * Genera constancias masivas. Las constancias de estudios se guardan
+     * individualmente y también se archivan en el expediente de cada alumno.
      */
     public function constanciasZip()
     {
@@ -99,6 +164,8 @@ class DocumentosPDFController extends Controller
             File::makeDirectory($carpetaTemporal, 0755, true);
         }
 
+        $esConstanciaEstudios = $this->esPlantillaConstanciaEstudios($plantilla);
+
         foreach ($alumnos as $alumno) {
             $alumnoArray = $this->formatearAlumno($alumno);
 
@@ -108,42 +175,66 @@ class DocumentosPDFController extends Controller
                 $payload
             );
 
-            $folioTemporal = $this->generarFolioTemporal($alumno->id);
+            if ($esConstanciaEstudios) {
+                $constancia = Constancia::query()->create([
+                    'inscripcion_id' => $alumno->id,
+                    'constancia_plantilla_id' => $plantilla->id,
+                    'folio' => $this->generarFolioPersistente(),
+                    'fecha_expedicion' => $payload['fecha_expedicion'] ?? now()->toDateString(),
+                    'dirigido_a' => $payload['dirigido_a'] ?? null,
+                    'modo_descarga' => $payload['modo_descarga'] ?? 'masivo',
+                    'periodos_calificaciones' => $payload['periodos_calificaciones'] ?? [],
+                    'contenido_generado_html' => $contenidoGenerado,
+                    'estado_documento' => 'emitida',
+                ]);
 
-            // Objeto temporal. No se guarda en la base de datos.
-            $constanciaTemporal = (object) [
-                'id' => null,
-                'folio' => $folioTemporal,
-                'fecha_expedicion' => Carbon::parse($payload['fecha_expedicion']),
-                'dirigido_a' => $payload['dirigido_a'] ?? null,
-                'modo_descarga' => $payload['modo_descarga'] ?? 'masivo',
-                'periodos_calificaciones' => $payload['periodos_calificaciones'] ?? [],
-                'contenido_generado_html' => $contenidoGenerado,
-                'plantilla' => $plantilla,
-            ];
+                $constancia->setRelation('alumno', $alumno);
+                $constancia->setRelation('plantilla', $plantilla);
+                $constanciaParaPdf = $constancia;
+            } else {
+                $folioTemporal = $this->generarFolioTemporal($alumno->id);
+
+                // Las constancias distintas a estudios conservan el comportamiento masivo previo.
+                $constanciaParaPdf = (object) [
+                    'id' => null,
+                    'folio' => $folioTemporal,
+                    'fecha_expedicion' => Carbon::parse($payload['fecha_expedicion']),
+                    'dirigido_a' => $payload['dirigido_a'] ?? null,
+                    'modo_descarga' => $payload['modo_descarga'] ?? 'masivo',
+                    'periodos_calificaciones' => $payload['periodos_calificaciones'] ?? [],
+                    'contenido_generado_html' => $contenidoGenerado,
+                    'plantilla' => $plantilla,
+                ];
+            }
 
             $calificacionesConstancia = $this->obtenerCalificacionesConstancia(
                 $alumno,
-                $constanciaTemporal,
+                $constanciaParaPdf,
                 $plantilla
             );
 
             $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
-                'constancia' => $constanciaTemporal,
+                'constancia' => $constanciaParaPdf,
                 'alumno' => $alumno,
                 'plantilla' => $plantilla,
                 'calificacionesConstancia' => $calificacionesConstancia,
             ])->setPaper('letter', 'portrait');
 
+            $contenidoPdf = $pdf->output();
+
+            if ($esConstanciaEstudios && $constanciaParaPdf instanceof Constancia) {
+                $this->archivarConstanciaEnExpediente($constanciaParaPdf, $contenidoPdf);
+            }
+
             $nombreAlumno = trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
             );
 
-            $nombreArchivo = Str::slug($folioTemporal . '_' . $nombreAlumno, '_') . '.pdf';
+            $nombreArchivo = Str::slug($constanciaParaPdf->folio . '_' . $nombreAlumno, '_') . '.pdf';
 
-            file_put_contents($carpetaTemporal . '/' . $nombreArchivo, $pdf->output());
+            file_put_contents($carpetaTemporal . '/' . $nombreArchivo, $contenidoPdf);
         }
 
         $nombreZip = 'CONSTANCIAS_' . Str::upper($payload['modo_descarga'] ?? 'MASIVO') . '_' . now()->format('Ymd_His') . '.zip';
@@ -170,6 +261,21 @@ class DocumentosPDFController extends Controller
             ->deleteFileAfterSend(true);
     }
 
+    private function esPlantillaConstanciaEstudios(ConstanciaPlantilla $plantilla): bool
+    {
+        $identificador = Str::lower(trim(($plantilla->clave ?? '') . ' ' . ($plantilla->titulo ?? '')));
+
+        return Str::contains($identificador, 'estudio')
+            && !Str::contains($identificador, ['baja', 'traslado']);
+    }
+
+    private function generarFolioPersistente(): string
+    {
+        $siguiente = (Constancia::query()->max('id') ?? 0) + 1;
+
+        return 'CONST-' . now()->format('Y') . '-' . Str::padLeft((string) $siguiente, 5, '0');
+    }
+
     /**
      * Da formato a los datos del alumno para reemplazar variables.
      */
@@ -180,8 +286,8 @@ class DocumentosPDFController extends Controller
         if ($alumno->generacion) {
             $generacion = trim(
                 ($alumno->generacion->anio_ingreso ?? '') .
-                '-' .
-                ($alumno->generacion->anio_egreso ?? '')
+                    '-' .
+                    ($alumno->generacion->anio_egreso ?? '')
             );
         }
 
@@ -189,8 +295,8 @@ class DocumentosPDFController extends Controller
             'id' => $alumno->id,
             'nombre_completo' => trim(
                 ($alumno->nombre ?? '') . ' ' .
-                ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '')
+                    ($alumno->apellido_paterno ?? '') . ' ' .
+                    ($alumno->apellido_materno ?? '')
             ),
             'curp' => $alumno->curp,
             'matricula' => $alumno->matricula,

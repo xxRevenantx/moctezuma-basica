@@ -22,13 +22,13 @@
     eliminar(id, nombre) {
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `La persona ${nombre} se eliminará de forma permanente`,
+            text: `La persona ${nombre} se marcará como baja. Su expediente y datos se conservarán.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#2563EB',
             cancelButtonColor: '#EF4444',
             cancelButtonText: 'Cancelar',
-            confirmButtonText: 'Sí, eliminar'
+            confirmButtonText: 'Sí, dar de baja'
         }).then((r) => r.isConfirmed && @this.call('eliminarPersonal', id))
     }
 }" @keydown.escape.window="closePhoto()" class="space-y-5">
@@ -264,7 +264,9 @@
                                                 </td>
 
                                                 <td class="px-4 py-3 text-center">
-                                                    @php($g = $persona->genero ?? null)
+                                                    @php
+                                                        $g = $persona->genero ?? null;
+                                                    @endphp
 
                                                     @if ($g === 'H')
                                                         <span

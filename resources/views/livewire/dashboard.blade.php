@@ -106,6 +106,71 @@
 
     </section>
 
+    @if (auth()->user()?->is_admin)
+        <section
+            class="overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-sm dark:border-amber-900/40 dark:bg-neutral-900">
+            <div
+                class="flex flex-col gap-4 border-b border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-orange-950/20 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
+                        {{-- <flux:icon name="folder-open" class="size-5" /> --}}
+                    </div>
+                    <div>
+                        <h3 class="font-black text-neutral-900 dark:text-white">Control documental</h3>
+                        <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                            Expedientes activos con documentos pendientes de carga o validación.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span
+                        class="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                        {{ count($alumnosDocumentosPendientes) }} pendientes
+                    </span>
+                    <a href="{{ route('misrutas.expedientes') }}"
+                        class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white transition hover:bg-amber-600"
+                        wire:navigate>
+                        Abrir expedientes
+                        <flux:icon name="arrow-right" class="size-4" />
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 p-5 md:grid-cols-2 xl:grid-cols-5">
+                @forelse (array_slice($alumnosDocumentosPendientes, 0, 5) as $alumnoPendiente)
+                    <a href="{{ route('misrutas.expedientes.show', $alumnoPendiente['id']) }}"
+                        class="group rounded-2xl border border-neutral-200 bg-neutral-50 p-4 transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-amber-900/60 dark:hover:bg-amber-950/10"
+                        wire:navigate>
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-black text-neutral-900 dark:text-white">
+                                    {{ $alumnoPendiente['nombre'] }}
+                                </p>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    {{ $alumnoPendiente['nivel'] }} · Grupo {{ $alumnoPendiente['grupo'] }}
+                                </p>
+                            </div>
+                            <span
+                                class="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                                {{ $alumnoPendiente['completados'] }}/{{ $alumnoPendiente['total'] }}
+                            </span>
+                        </div>
+                        <p class="mt-3 text-xs font-bold text-amber-700 dark:text-amber-300">
+                            {{ $alumnoPendiente['pendientes'] }} documento(s) pendiente(s)
+                        </p>
+                    </a>
+                @empty
+                    <div
+                        class="col-span-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 p-6 text-center dark:border-emerald-900/50 dark:bg-emerald-950/10">
+                        <p class="font-black text-emerald-700 dark:text-emerald-300">Todos los expedientes están
+                            completos.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+    @endif
 
 
     {{-- Resumen por nivel --}}

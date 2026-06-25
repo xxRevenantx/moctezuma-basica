@@ -15,11 +15,16 @@ class Constancia extends Model
         'modo_descarga',
         'periodos_calificaciones',
         'contenido_generado_html',
+        'estado_documento',
+        'cancelada_at',
+        'cancelada_por',
+        'documento_alumno_id',
     ];
 
     protected $casts = [
         'fecha_expedicion' => 'date',
         'periodos_calificaciones' => 'array',
+        'cancelada_at' => 'datetime',
     ];
 
     public function alumno()
@@ -30,6 +35,16 @@ class Constancia extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id');
+    }
+
+    public function documentoAlumno()
+    {
+        return $this->belongsTo(DocumentoAlumno::class, 'documento_alumno_id');
+    }
+
+    public function usuarioQueCancelo()
+    {
+        return $this->belongsTo(User::class, 'cancelada_por');
     }
 
     public function plantilla()

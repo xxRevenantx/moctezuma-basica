@@ -510,8 +510,13 @@
                                                         {{ $constanciaGenerada->plantilla?->titulo ?? 'Sin plantilla' }}
                                                     </div>
 
-                                                    <div class="mt-0.5 text-xs text-zinc-500">
-                                                        {{ $constanciaGenerada->modo_descarga }}
+                                                    <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                                                        <span>{{ $constanciaGenerada->modo_descarga }}</span>
+                                                        @if (($constanciaGenerada->estado_documento ?? 'emitida') === 'cancelada')
+                                                            <span class="rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Cancelada</span>
+                                                        @else
+                                                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Emitida</span>
+                                                        @endif
                                                     </div>
                                                 </td>
 
@@ -526,16 +531,18 @@
                                                             PDF
                                                         </flux:button>
 
-                                                        <flux:button type="button" size="xs" variant="filled"
-                                                            wire:click="abrirEditarConstancia({{ $constanciaGenerada->id }})">
-                                                            Editar
-                                                        </flux:button>
+                                                        @if (($constanciaGenerada->estado_documento ?? 'emitida') !== 'cancelada')
+                                                            <flux:button type="button" size="xs" variant="filled"
+                                                                wire:click="abrirEditarConstancia({{ $constanciaGenerada->id }})">
+                                                                Editar
+                                                            </flux:button>
 
-                                                        <flux:button type="button" size="xs" variant="danger"
-                                                            wire:click="eliminarConstanciaGenerada({{ $constanciaGenerada->id }})"
-                                                            wire:confirm="¿Seguro que deseas eliminar esta constancia?">
-                                                            Eliminar
-                                                        </flux:button>
+                                                            <flux:button type="button" size="xs" variant="danger"
+                                                                wire:click="eliminarConstanciaGenerada({{ $constanciaGenerada->id }})"
+                                                                wire:confirm="¿Seguro que deseas cancelar esta constancia? El PDF se conservará en el historial.">
+                                                                Cancelar
+                                                            </flux:button>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>

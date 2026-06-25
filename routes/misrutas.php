@@ -5,6 +5,8 @@ use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
+use App\Http\Controllers\ExpedienteDigitalController;
+use App\Http\Controllers\ExpedientePersonalController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\NivelController;
@@ -69,9 +71,46 @@ Route::get('/plantilla', [PersonaNivelController::class, 'plantilla'])->name('mi
 // Ruta profesores
 Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');
 
-//Documentación
-Route::get('/constancias', [DocumentosController::class, 'constancias'])->name('misrutas.constancias');
-Route::get('/oficios', [DocumentosController::class, 'oficios'])->name('misrutas.oficios');
+// Documentación
+Route::middleware('admin')->group(function () {
+    Route::get('/expedientes-digitales', [ExpedienteDigitalController::class, 'index'])
+        ->name('misrutas.expedientes');
+
+    Route::get('/expedientes-digitales/alumno/{inscripcion}', [ExpedienteDigitalController::class, 'show'])
+        ->withTrashed()
+        ->name('misrutas.expedientes.show');
+
+    Route::get('/expedientes-digitales/documento/{documento}/ver', [ExpedienteDigitalController::class, 'preview'])
+        ->name('misrutas.expedientes.preview');
+
+    Route::get('/expedientes-digitales/documento/{documento}/descargar', [ExpedienteDigitalController::class, 'download'])
+        ->name('misrutas.expedientes.download');
+
+    Route::get('/expedientes-digitales/alumno/{inscripcion}/zip', [ExpedienteDigitalController::class, 'zip'])
+        ->withTrashed()
+        ->name('misrutas.expedientes.zip');
+});
+
+// Expedientes del personal
+Route::middleware('admin')->group(function () {
+    Route::get('/expedientes-personal', [ExpedientePersonalController::class, 'index'])
+        ->name('misrutas.expedientes-personal');
+
+    Route::get('/expedientes-personal/persona/{persona}', [ExpedientePersonalController::class, 'show'])
+        ->name('misrutas.expedientes-personal.show');
+
+    Route::get('/expedientes-personal/documento/{documento}/ver', [ExpedientePersonalController::class, 'preview'])
+        ->name('misrutas.expedientes-personal.preview');
+
+    Route::get('/expedientes-personal/documento/{documento}/descargar', [ExpedientePersonalController::class, 'download'])
+        ->name('misrutas.expedientes-personal.download');
+
+    Route::get('/expedientes-personal/persona/{persona}/zip', [ExpedientePersonalController::class, 'zip'])
+        ->name('misrutas.expedientes-personal.zip');
+});
+
+Route::get('/constancias', [DocumentosController::class, 'constancias'])->middleware('admin')->name('misrutas.constancias');
+Route::get('/oficios', [DocumentosController::class, 'oficios'])->middleware('admin')->name('misrutas.oficios');
 
 
 // RUTAS DE GRADOS
@@ -174,13 +213,16 @@ Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'c
     ->name('generales.credenciales.pdf');
 
 Route::get('/constancias/descargar/zip', [DocumentosPDFController::class, 'constanciasZip'])
+    ->middleware('admin')
     ->name('misrutas.constancias.zip');
 
 Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'constanciaPdf'])
+    ->middleware('admin')
     ->name('misrutas.constancias.pdf');
 
 
 Route::get('/oficios/{oficio}/pdf', [DocumentosPDFController::class, 'oficioPdf'])
+    ->middleware('admin')
     ->name('misrutas.oficios.pdf');
 
 

@@ -27,6 +27,7 @@ class Persona extends Model
         'grado_estudios',
         'especialidad',
         'status',
+        'estado_laboral',
         'calle',
         'numero_exterior',
         'numero_interior',
@@ -34,6 +35,11 @@ class Persona extends Model
         'municipio',
         'estado',
         'codigo_postal',
+    ];
+
+
+    protected $casts = [
+        'status' => 'boolean',
     ];
 
     public function rolesPersona()
@@ -71,6 +77,16 @@ class Persona extends Model
         return $this->belongsToMany(Grupo::class, 'docente_grupo', 'persona_id', 'grupo_id')
             ->withPivot(['ciclo_escolar_id', 'es_tutor'])
             ->withTimestamps();
+    }
+
+    public function documentosPersonal()
+    {
+        return $this->hasMany(DocumentoPersonal::class, 'persona_id');
+    }
+
+    public function movimientosLaborales()
+    {
+        return $this->hasMany(MovimientoPersonal::class, 'persona_id');
     }
 
     public function ciclosEscolares()

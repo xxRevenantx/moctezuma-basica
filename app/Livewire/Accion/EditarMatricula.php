@@ -13,6 +13,7 @@ use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Models\TrayectoriaAcademica;
 use App\Services\CurpService;
+use App\Services\ExpedienteDigitalService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -1198,6 +1199,22 @@ class EditarMatricula extends Component
 
     public function render()
     {
+        $resumenDocumental = null;
+
+        if ($this->InscripcionId && auth()->user()?->is_admin) {
+            $alumnoDocumental = Inscripcion::query()
+                ->with([
+                    'nivel:id,nombre,slug,color',
+                    'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+                    'documentos.nivel:id,nombre,slug,color',
+                ])
+                ->find($this->InscripcionId);
+
+            if ($alumnoDocumental) {
+                $resumenDocumental = app(ExpedienteDigitalService::class)->resumen($alumnoDocumental);
+            }
+        }
+
         return view('livewire.accion.editar-matricula', [
             'niveles' => $this->niveles,
             'grados' => $this->gradosOptions,
@@ -1208,6 +1225,7 @@ class EditarMatricula extends Component
             'ciclos' => $this->ciclosOptions,
             'cicloEscolares' => $this->cicloEscolaresOptions,
             'tutores' => $this->tutores,
+            'resumenDocumental' => $resumenDocumental,
         ]);
     }
 }

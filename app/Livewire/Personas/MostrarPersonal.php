@@ -4,7 +4,9 @@ namespace App\Livewire\Personas;
 
 use App\Exports\PersonasExport;
 use App\Imports\PersonasImport;
+use App\Models\MovimientoPersonal;
 use App\Models\Persona;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -77,15 +79,33 @@ class MostrarPersonal extends Component
     {
         $personal = Persona::find($id);
 
-        if ($personal) {
-            $personal->delete();
-
-            $this->dispatch('swal', [
-                'title' => '¡Personal eliminado correctamente!',
-                'icon' => 'success',
-                'position' => 'top-end',
-            ]);
+        if (!$personal) {
+            return;
         }
+
+        DB::transaction(function () use ($personal) {
+            if ($personal->estado_laboral !== 'baja' || $personal->status) {
+                $personal->update([
+                    'status' => false,
+                    'estado_laboral' => 'baja',
+                ]);
+
+                MovimientoPersonal::query()->create([
+                    'persona_id' => $personal->id,
+                    'tipo' => 'baja',
+                    'fecha' => now()->toDateString(),
+                    'motivo' => 'Baja registrada desde el listado general de personal.',
+                    'observaciones' => 'El registro y su expediente digital se conservaron.',
+                    'registrado_por' => auth()->id(),
+                ]);
+            }
+        });
+
+        $this->dispatch('swal', [
+            'title' => 'Personal marcado como baja. Su expediente se conservó.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
     }
 
     #[On('refreshPersonal')]

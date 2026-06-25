@@ -48,6 +48,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'is_admin' => 'boolean',
             'password' => 'hashed',
         ];
     }
@@ -68,6 +69,31 @@ class User extends Authenticatable implements MustVerifyEmail
     public function bitacoraCalificaciones()
     {
         return $this->hasMany(BitacoraCalificacion::class);
+    }
+
+    public function documentosSubidos()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'subido_por');
+    }
+
+    public function documentosValidados()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'validado_por');
+    }
+
+    public function documentosPersonalSubidos()
+    {
+        return $this->hasMany(DocumentoPersonal::class, 'subido_por');
+    }
+
+    public function documentosPersonalValidados()
+    {
+        return $this->hasMany(DocumentoPersonal::class, 'validado_por');
+    }
+
+    public function movimientosPersonalRegistrados()
+    {
+        return $this->hasMany(MovimientoPersonal::class, 'registrado_por');
     }
 
     // Otros métodos relacionados con el usuario pueden ir aquí

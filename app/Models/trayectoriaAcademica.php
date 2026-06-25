@@ -86,4 +86,9 @@ class TrayectoriaAcademica extends Model
     {
         return $this->hasMany(TrayectoriaAcademica::class, 'trayectoria_origen_id');
     }
+
+    public function documentos()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'trayectoria_academica_id');
+    }
 }

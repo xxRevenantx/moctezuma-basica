@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\ExpedienteDigitalService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -315,7 +316,7 @@ class AlumnosGenerales extends Component
             ]);
 
         if ($conRelaciones) {
-            $consulta->with([
+            $relaciones = [
                 'nivel:id,nombre,slug,color',
                 'grado:id,nombre,slug,orden',
                 'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
@@ -331,7 +332,14 @@ class AlumnosGenerales extends Component
                         'semestre_id',
                     ])->with('asignacionGrupo:id,nombre');
                 },
-            ]);
+            ];
+
+            if (auth()->user()?->is_admin) {
+                $relaciones[] = 'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden';
+                $relaciones[] = 'documentos.nivel:id,nombre,slug,color';
+            }
+
+            $consulta->with($relaciones);
         }
 
         if ($this->nivel_id) {
@@ -481,6 +489,16 @@ class AlumnosGenerales extends Component
     {
         $alumnos = $this->consultaBase()
             ->paginate($this->perPage);
+
+        if (auth()->user()?->is_admin) {
+            $servicio = app(ExpedienteDigitalService::class);
+
+            $alumnos->getCollection()->transform(function (Inscripcion $alumno) use ($servicio) {
+                $alumno->setAttribute('resumen_documental', $servicio->resumen($alumno));
+
+                return $alumno;
+            });
+        }
 
         return view('livewire.alumnos-generales', [
             'alumnos' => $alumnos,

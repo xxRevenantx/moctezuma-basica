@@ -19,7 +19,7 @@
         confirmarReactivacion(id) {
             Swal.fire({
                 title: '¿Reactivar alumno?',
-                text: 'El alumno volverá a estar activo y se limpiarán los datos de baja.',
+                text: 'El alumno volverá a estar activo como reingreso. La baja anterior se conservará en su historial.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#059669',
@@ -284,18 +284,25 @@
                         </div>
 
                         <div>
-                            <flux:label>Motivo de baja</flux:label>
-                            <flux:select wire:model.live="motivo_baja">
-                                <flux:select.option value="">Selecciona un motivo</flux:select.option>
-                                <flux:select.option value="Cambio de escuela">Cambio de escuela</flux:select.option>
-                                <flux:select.option value="Baja voluntaria">Baja voluntaria</flux:select.option>
-                                <flux:select.option value="Problemas económicos">Problemas económicos
-                                </flux:select.option>
-                                <flux:select.option value="Cambio de domicilio">Cambio de domicilio
-                                </flux:select.option>
-                                <flux:select.option value="Inasistencia">Inasistencia</flux:select.option>
-                                <flux:select.option value="Otro">Otro</flux:select.option>
+                            <flux:label>Tipo de movimiento</flux:label>
+                            <flux:select wire:model.live="tipo_movimiento">
+                                <flux:select.option value="baja_definitiva">Baja definitiva</flux:select.option>
+                                <flux:select.option value="baja_temporal">Baja temporal</flux:select.option>
+                                <flux:select.option value="traslado">Traslado</flux:select.option>
                             </flux:select>
+
+                            @error('tipo_movimiento')
+                                <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                Motivo de la baja o traslado
+                            </label>
+                            <textarea wire:model.live.debounce.400ms="motivo_baja" rows="3" maxlength="1000"
+                                placeholder="Escribe libremente el motivo..."
+                                class="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-rose-900/40"></textarea>
 
                             @error('motivo_baja')
                                 <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
@@ -690,7 +697,12 @@
                                         </td>
 
                                         <td class="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
-                                            {{ $row->motivo_baja ?: '—' }}
+                                            @if ($row->ultimoMovimiento)
+                                                <span class="mb-1 inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                                                    {{ str_replace('_', ' ', $row->ultimoMovimiento->tipo) }}
+                                                </span>
+                                            @endif
+                                            <p>{{ $row->motivo_baja ?: '—' }}</p>
                                         </td>
 
                                         <td class="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
@@ -698,21 +710,22 @@
                                         </td>
 
                                         <td class="px-4 py-4 text-right">
-                                            <button type="button"
-                                                x-on:click="confirmarReactivacion({{ $row->id }})"
-                                                wire:loading.attr="disabled" wire:target="reactivarAlumno"
-                                                class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60">
+                                            <div class="flex flex-wrap justify-end gap-2">
+                                                <button type="button" wire:click="generarConstanciaBaja({{ $row->id }})"
+                                                    wire:loading.attr="disabled" wire:target="generarConstanciaBaja"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-300">
+                                                    <flux:icon.document-text class="h-4 w-4" />
+                                                    Constancia
+                                                </button>
 
-                                                <span wire:loading.remove wire:target="reactivarAlumno"
-                                                    class="inline-flex items-center gap-2">
+                                                <button type="button"
+                                                    x-on:click="confirmarReactivacion({{ $row->id }})"
+                                                    wire:loading.attr="disabled" wire:target="reactivarAlumno"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60">
                                                     <flux:icon.arrow-path class="h-4 w-4" />
                                                     Reactivar
-                                                </span>
-
-                                                <span wire:loading wire:target="reactivarAlumno">
-                                                    Reactivando...
-                                                </span>
-                                            </button>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
@@ -764,6 +777,11 @@
                                 </div>
 
                                 <div>
+                                    <span class="font-semibold">Movimiento:</span>
+                                    {{ $row->ultimoMovimiento ? str_replace('_', ' ', ucfirst($row->ultimoMovimiento->tipo)) : 'Baja' }}
+                                </div>
+
+                                <div>
                                     <span class="font-semibold">Motivo:</span>
                                     {{ $row->motivo_baja ?: '—' }}
                                 </div>
@@ -774,9 +792,16 @@
                                 </div>
                             </div>
 
+                            <button type="button" wire:click="generarConstanciaBaja({{ $row->id }})"
+                                wire:loading.attr="disabled" wire:target="generarConstanciaBaja"
+                                class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-300">
+                                <flux:icon.document-text class="h-4 w-4" />
+                                Generar constancia
+                            </button>
+
                             <button type="button" x-on:click="confirmarReactivacion({{ $row->id }})"
                                 wire:loading.attr="disabled" wire:target="reactivarAlumno"
-                                class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                                class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
 
                                 <span wire:loading.remove wire:target="reactivarAlumno">
                                     Reactivar alumno
@@ -802,4 +827,13 @@
             </div>
         </div>
     </section>
+
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('abrir-constancia-baja', (event) => {
+                const detail = Array.isArray(event) ? event[0] : event;
+                if (detail?.url) window.open(detail.url, '_blank', 'noopener');
+            });
+        });
+    </script>
 </div>

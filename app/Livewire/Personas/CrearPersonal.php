@@ -397,6 +397,7 @@ class CrearPersonal extends Component
             'fecha_nacimiento' => $this->fecha_nacimiento,
             'genero' => $this->genero,
             'status' => $this->status,
+            'estado_laboral' => $this->status ? 'activo' : 'baja',
 
             'calle' => $this->calle,
             'numero_exterior' => $this->numero_exterior,

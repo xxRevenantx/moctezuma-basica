@@ -110,4 +110,9 @@ class Nivel extends Model
     {
         return $this->hasMany(Calificacion::class);
     }
+
+    public function documentosAlumnos()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'nivel_id');
+    }
 }

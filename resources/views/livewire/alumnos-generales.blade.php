@@ -469,39 +469,36 @@
                                                     </a>
                                                 @endif
 
-                                                <a href="{{ route('misrutas.constancias') }}"
-                                                    class="inline-flex items-center rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-xs font-black text-white transition hover:from-sky-600 hover:to-indigo-700">
-                                                    Documentación
-                                                </a>
+                                                @if (auth()->user()?->is_admin)
+                                                    <a href="{{ route('misrutas.expedientes.show', $alumno) }}"
+                                                        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-xs font-black text-white transition hover:from-emerald-600 hover:to-teal-700"
+                                                        wire:navigate>
+                                                        <flux:icon name="folder-lock" class="size-4" />
+                                                        Expediente digital
+                                                    </a>
+                                                @endif
                                             </div>
 
-                                            <div
-                                                class="mt-4 rounded-2xl border border-slate-200 p-3 dark:border-neutral-800">
-                                                <div class="flex flex-wrap items-center gap-2 text-xs">
-                                                    <span
-                                                        class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 font-bold text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
-                                                        <flux:icon.x-mark class="h-3.5 w-3.5" />
-                                                        CURP
-                                                    </span>
+                                            @if (auth()->user()?->is_admin)
+                                                @php($resumenDocumental = $alumno->resumen_documental ?? ['items' => [], 'completados' => 0, 'total' => 0, 'completo' => false])
+                                                <div
+                                                    class="mt-4 rounded-2xl border border-slate-200 p-3 dark:border-neutral-800">
+                                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                                        @foreach ($resumenDocumental['items'] as $documentoEsperado)
+                                                            <span
+                                                                class="inline-flex items-center gap-1 rounded-full px-2 py-1 font-bold {{ $documentoEsperado['presente'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300' }}">
+                                                                <flux:icon :name="$documentoEsperado['presente'] ? 'check' : 'x'" class="size-3.5" />
+                                                                {{ $documentoEsperado['etiqueta'] }}
+                                                            </span>
+                                                        @endforeach
 
-                                                    <span
-                                                        class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 font-bold text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
-                                                        <flux:icon.x-mark class="h-3.5 w-3.5" />
-                                                        Acta
-                                                    </span>
-
-                                                    <span
-                                                        class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 font-bold text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
-                                                        <flux:icon.x-mark class="h-3.5 w-3.5" />
-                                                        Certificado
-                                                    </span>
-
-                                                    <span
-                                                        class="ml-auto rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                                                        0/3
-                                                    </span>
+                                                        <span
+                                                            class="ml-auto rounded-full px-2.5 py-1 text-xs font-black {{ $resumenDocumental['completo'] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' }}">
+                                                            {{ $resumenDocumental['completados'] }}/{{ $resumenDocumental['total'] }}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            @endif
                                         </div>
 
                                         {{-- Datos escolares --}}

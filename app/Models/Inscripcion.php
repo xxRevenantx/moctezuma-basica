@@ -142,6 +142,27 @@ class Inscripcion extends Model
         return $this->hasMany(\App\Models\Oficio::class, 'inscripcion_id');
     }
 
+    public function documentos()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'inscripcion_id');
+    }
+
+    public function documentosActuales()
+    {
+        return $this->hasMany(DocumentoAlumno::class, 'inscripcion_id')
+            ->where('es_actual', true);
+    }
+
+    public function movimientos()
+    {
+        return $this->hasMany(MovimientoAlumno::class, 'inscripcion_id');
+    }
+
+    public function ultimoMovimiento()
+    {
+        return $this->hasOne(MovimientoAlumno::class, 'inscripcion_id')->latestOfMany();
+    }
+
     // Relación con ficha descriptiva
     public function fichasDescriptivas()
     {

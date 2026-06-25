@@ -165,6 +165,9 @@ class EditarPersonal extends Component
             'estado' => $this->estado,
             'codigo_postal' => $this->codigo_postal,
             'status' => $this->status ? 1 : 0,
+            'estado_laboral' => $this->status
+                ? ($personal->estado_laboral === 'baja' ? 'reingreso' : ($personal->estado_laboral ?: 'activo'))
+                : 'baja',
         ]);
 
 

@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Models\Inscripcion;
+use App\Services\ExpedienteDigitalService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -38,10 +40,12 @@ class Dashboard extends Component
         $this->niveles = $this->obtenerNiveles();
         $this->resumen = $this->obtenerResumenGeneral();
         $this->resumenNiveles = $this->obtenerResumenPorNivel();
-        $this->alertas = $this->obtenerAlertas();
         $this->periodosProximos = $this->obtenerPeriodosProximos();
-        $this->alumnosDocumentosPendientes = $this->obtenerAlumnosConDocumentosPendientes();
+        $this->alumnosDocumentosPendientes = auth()->user()?->is_admin
+            ? $this->obtenerAlumnosConDocumentosPendientes()
+            : [];
         $this->gruposSinHorario = $this->obtenerGruposSinHorario();
+        $this->alertas = $this->obtenerAlertas();
         $this->graficaAlumnosNivel = $this->obtenerDatosGraficaAlumnosNivel();
     }
 
@@ -349,67 +353,58 @@ class Dashboard extends Component
 
     private function obtenerAlumnosConDocumentosPendientes(): array
     {
-        if (!$this->tablaExiste('inscripciones')) {
+        if (!auth()->user()?->is_admin) {
             return [];
         }
 
-        $columnasDocumentos = [
-            'acta_nacimiento',
-            'curp_documento',
-            'certificado_estudios',
-            'comprobante_domicilio',
-            'certificado_medico',
-            'fotos_infantiles',
-            'foto',
-            'foto_path',
-        ];
-
-        $columnasExistentes = collect($columnasDocumentos)
-            ->filter(fn($columna) => $this->columnaExiste('inscripciones', $columna))
-            ->values();
-
-        if ($columnasExistentes->isEmpty()) {
+        if (
+            !$this->tablaExiste('inscripciones') ||
+            !$this->tablaExiste('tipos_documentos') ||
+            !$this->tablaExiste('documentos_alumnos')
+        ) {
             return [];
         }
 
-        $query = DB::table('inscripciones')
-            ->leftJoin('niveles', 'niveles.id', '=', 'inscripciones.nivel_id')
-            ->leftJoin('grupos', 'grupos.id', '=', 'inscripciones.grupo_id')
-            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->select(
-                'inscripciones.id',
-                'inscripciones.nombre',
-                'inscripciones.apellido_paterno',
-                'inscripciones.apellido_materno',
-                'niveles.nombre as nivel',
-                'asignacion_grupos.nombre as grupo'
-            )
-            ->where(function ($query) use ($columnasExistentes) {
-                foreach ($columnasExistentes as $columna) {
-                    $query->orWhere(function ($q) use ($columna) {
-                        $q->whereNull('inscripciones.' . $columna)
-                            ->orWhere('inscripciones.' . $columna, '')
-                            ->orWhere('inscripciones.' . $columna, 0);
-                    });
-                }
-            });
+        $servicio = app(ExpedienteDigitalService::class);
 
-        $this->aplicarFiltroNivel($query, 'inscripciones');
-        $this->aplicarActivo($query, 'inscripciones');
-
-        return $query
-            ->orderBy('inscripciones.apellido_paterno')
-            ->orderBy('inscripciones.apellido_materno')
-            ->orderBy('inscripciones.nombre')
-            ->limit(5)
-            ->get()
-            ->map(fn($alumno) => [
-                'id' => $alumno->id,
-                'nombre' => trim($alumno->nombre . ' ' . $alumno->apellido_paterno . ' ' . $alumno->apellido_materno),
-                'nivel' => $alumno->nivel ?? 'Sin nivel',
-                'grupo' => $alumno->grupo ?? 'Sin grupo',
+        $query = Inscripcion::query()
+            ->with([
+                'nivel:id,nombre,slug,color',
+                'grupo:id,asignacion_grupo_id',
+                'grupo.asignacionGrupo:id,nombre',
+                'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+                'documentos.nivel:id,nombre,slug,color',
             ])
-            ->toArray();
+            ->where('activo', true)
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre');
+
+        if ($this->nivel_id) {
+            $query->where('nivel_id', $this->nivel_id);
+        }
+
+        return $query->get()
+            ->map(function (Inscripcion $alumno) use ($servicio) {
+                $resumen = $servicio->resumen($alumno);
+
+                if ($resumen['completo']) {
+                    return null;
+                }
+
+                return [
+                    'id' => $alumno->id,
+                    'nombre' => trim($alumno->nombre . ' ' . $alumno->apellido_paterno . ' ' . $alumno->apellido_materno),
+                    'nivel' => $alumno->nivel?->nombre ?? 'Sin nivel',
+                    'grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo',
+                    'pendientes' => $resumen['pendientes'],
+                    'completados' => $resumen['completados'],
+                    'total' => $resumen['total'],
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function obtenerGruposSinHorario(): array

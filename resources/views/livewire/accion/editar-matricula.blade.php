@@ -171,6 +171,15 @@
 
                             {{-- ACCIONES --}}
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+                                @if (auth()->user()?->is_admin && $InscripcionId)
+                                    <a href="{{ route('misrutas.expedientes.show', $InscripcionId) }}"
+                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-700 hover:shadow-lg"
+                                        wire:navigate>
+                                        <flux:icon name="folder-lock" class="size-4" />
+                                        Expediente digital
+                                    </a>
+                                @endif
+
                                 <span
                                     class="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-bold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
                                     Matrícula protegida
@@ -199,6 +208,51 @@
                         </div>
                     </div>
                 </div>
+
+                @if (auth()->user()?->is_admin && !empty($resumenDocumental))
+                    <section
+                        class="mb-6 rounded-[26px] border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-sky-50 p-5 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/10 dark:via-neutral-900 dark:to-sky-950/10">
+                        <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm">
+                                        <flux:icon name="folder-lock" class="size-5" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-black text-slate-900 dark:text-white">Expediente digital del alumno</h3>
+                                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                                            {{ $resumenDocumental['completados'] }}/{{ $resumenDocumental['total'] }} documentos recibidos ·
+                                            {{ $resumenDocumental['pendientes'] }} pendientes
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-sky-500"
+                                        style="width: {{ $resumenDocumental['porcentaje'] }}%"></div>
+                                </div>
+
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach ($resumenDocumental['items'] as $itemDocumento)
+                                        <span
+                                            class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black {{ $itemDocumento['presente'] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' }}">
+                                            <flux:icon :name="$itemDocumento['presente'] ? 'check' : 'clock-3'" class="size-3.5" />
+                                            {{ $itemDocumento['etiqueta'] }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <a href="{{ route('misrutas.expedientes.show', $InscripcionId) }}"
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
+                                wire:navigate>
+                                Administrar documentos
+                                <flux:icon name="arrow-right" class="size-4" />
+                            </a>
+                        </div>
+                    </section>
+                @endif
 
                 @if (!empty($curpSuccess ?? null))
                     <div x-data="{ mostrar: true }" x-init="setTimeout(() => {
