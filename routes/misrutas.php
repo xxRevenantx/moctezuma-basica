@@ -9,6 +9,7 @@ use App\Http\Controllers\ExpedienteDigitalController;
 use App\Http\Controllers\ExpedientePersonalController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
+use App\Http\Controllers\MatriculaHistorialPdfController;
 use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\FichaController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
+use App\Http\Controllers\RespaldoAcademicoController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
@@ -54,6 +56,12 @@ Route::get('/escuela', [EscuelaController::class, 'index'])->name('misrutas.escu
 
 // RUTA ALUMNOS
 Route::get('/alumnos', [InscripcionController::class, 'alumnos'])->name('misrutas.alumnos');
+
+
+// RESPALDOS ACADÉMICOS
+Route::get('/respaldos-academicos', [RespaldoAcademicoController::class, 'index'])
+    ->middleware('admin')
+    ->name('misrutas.respaldos-academicos');
 
 // RUTA DIRECTIVOS
 Route::get('/autoridades', [DirectorController::class, 'index'])->name('misrutas.autoridades');
@@ -135,6 +143,12 @@ Route::get('/materias', [MateriaController::class, 'index'])->name('misrutas.mat
 
 Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaController::class, 'editar'])
     ->name('misrutas.matricula.editar');
+
+
+
+Route::get('/nivel/{slug_nivel}/matricula-historica/pdf', MatriculaHistorialPdfController::class)
+    ->middleware('admin')
+    ->name('misrutas.matricula.historial.pdf');
 
 
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])

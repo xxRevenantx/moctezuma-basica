@@ -3,6 +3,7 @@
 namespace App\Livewire\CicloEscolar;
 
 use App\Models\CicloEscolar;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -14,9 +15,12 @@ class MostrarCicloEscolar extends Component
     public string $search = '';
     public int $perPage = 10;
 
-    protected $queryString = [
-        'search' => ['except' => ''],
-    ];
+    protected $queryString = ['search' => ['except' => '']];
+
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+    }
 
     public function updatingSearch(): void
     {
@@ -27,12 +31,77 @@ class MostrarCicloEscolar extends Component
     public function refreshCiclos(): void
     {
         $this->resetPage();
-        $this->dispatch('$refresh');
+    }
+
+    public function marcarActual(int $cicloId): void
+    {
+        DB::transaction(function () use ($cicloId) {
+            $nuevo = CicloEscolar::query()->lockForUpdate()->findOrFail($cicloId);
+            $anteriores = CicloEscolar::query()->where('es_actual', true)->where('id', '!=', $nuevo->id)->lockForUpdate()->get();
+
+            foreach ($anteriores as $anterior) {
+                $anterior->update([
+                    'es_actual' => false,
+                    'cerrado_at' => $anterior->cerrado_at ?: now(),
+                    'cerrado_por' => auth()->id(),
+                ]);
+            }
+
+            $nuevo->update([
+                'es_actual' => true,
+                'cerrado_at' => null,
+                'cerrado_por' => null,
+            ]);
+        });
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Ciclo actual actualizado',
+            'text' => 'El ciclo anterior se conservó y quedó cerrado.',
+            'position' => 'top-end',
+        ]);
+        $this->dispatch('refreshHeader');
+    }
+
+    public function alternarCierre(int $cicloId): void
+    {
+        $ciclo = CicloEscolar::query()->findOrFail($cicloId);
+
+        if ($ciclo->es_actual && !$ciclo->cerrado_at) {
+            $this->dispatch('swal', [
+                'icon' => 'warning',
+                'title' => 'No se puede cerrar el ciclo actual',
+                'text' => 'Marca primero otro ciclo como actual.',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $ciclo->update($ciclo->cerrado_at
+            ? ['cerrado_at' => null, 'cerrado_por' => null]
+            : ['cerrado_at' => now(), 'cerrado_por' => auth()->id()]);
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => $ciclo->fresh()->cerrado_at ? 'Ciclo cerrado' : 'Ciclo reabierto para correcciones',
+            'position' => 'top-end',
+        ]);
     }
 
     public function eliminar(int $cicloId): void
     {
-        $ciclo = CicloEscolar::findOrFail($cicloId);
+        $ciclo = CicloEscolar::query()->withCount(['trayectorias', 'calificaciones', 'periodos'])->findOrFail($cicloId);
+
+        if ($ciclo->es_actual) {
+            $this->addError('eliminar', 'El ciclo actual no puede eliminarse.');
+            return;
+        }
+
+        if ($ciclo->trayectorias_count > 0 || $ciclo->calificaciones_count > 0 || $ciclo->periodos_count > 0) {
+            $this->addError('eliminar', 'Este ciclo ya contiene historial académico, periodos o calificaciones. Puedes cerrarlo, pero no eliminarlo.');
+            return;
+        }
+
         $ciclo->delete();
 
         $this->dispatch('swal', [
@@ -40,45 +109,22 @@ class MostrarCicloEscolar extends Component
             'title' => 'Ciclo escolar eliminado',
             'position' => 'top-end',
         ]);
-
         $this->refreshCiclos();
-
         $this->dispatch('refreshHeader');
     }
 
     public function render()
     {
-        $query = CicloEscolar::query()
-            ->when($this->search !== '', function ($q) {
-                $s = trim($this->search);
-
-                // Permite buscar por: "2025", "2026", "2025-2026", "2025 2026"
-                $nums = preg_split('/\D+/', $s, -1, PREG_SPLIT_NO_EMPTY);
-
-                $q->where(function ($qq) use ($s, $nums) {
-                    if (count($nums) >= 1) {
-                        $qq->orWhere('inicio_anio', (int) $nums[0])
-                            ->orWhere('fin_anio', (int) $nums[0]);
-                    }
-
-                    if (count($nums) >= 2) {
-                        $qq->orWhere(function ($qq2) use ($nums) {
-                            $qq2->where('inicio_anio', (int) $nums[0])
-                                ->where('fin_anio', (int) $nums[1]);
-                        });
-                    }
-
-                    // fallback por si escriben raro
-                    $qq->orWhereRaw("CONCAT(inicio_anio,'-',fin_anio) LIKE ?", ["%{$s}%"]);
-                });
+        $ciclos = CicloEscolar::query()
+            ->withCount('trayectorias')
+            ->when(trim($this->search) !== '', function ($query) {
+                $search = trim($this->search);
+                $query->whereRaw("CONCAT(inicio_anio, '-', fin_anio) LIKE ?", ["%{$search}%"]);
             })
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
-            ->orderByDesc('fin_anio');
+            ->paginate($this->perPage);
 
-        $ciclos = $query->paginate($this->perPage);
-
-        return view('livewire.ciclo-escolar.mostrar-ciclo-escolar', [
-            'ciclos' => $ciclos,
-        ]);
+        return view('livewire.ciclo-escolar.mostrar-ciclo-escolar', compact('ciclos'));
     }
 }

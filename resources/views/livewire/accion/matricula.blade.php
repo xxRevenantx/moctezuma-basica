@@ -1,1108 +1,553 @@
-<div x-data="{
-    openRow: null,
-    filaResaltada: null,
-    filtrosRestaurados: false,
-    editandoAlumno: false,
-
-    init() {
-        this.$nextTick(() => {
-            this.restaurarFiltros();
-            this.resaltarFilaEditada();
-        });
-
-        document.addEventListener('livewire:navigated', () => {
-            this.$nextTick(() => {
-                this.restaurarFiltros();
-                this.resaltarFilaEditada();
-            });
-        });
-    },
-
-    llaveFiltros() {
-        return 'matricula_filtros_' + @js($slug_nivel);
-    },
-
-    guardarFiltros() {
-        const filtros = {
-            slug_nivel: @js($slug_nivel),
-            ciclo_escolar_id: this.$wire.get('ciclo_escolar_id'),
-            generacion_id: this.$wire.get('generacion_id'),
-            grado_id: this.$wire.get('grado_id'),
-            semestre_id: this.$wire.get('semestre_id'),
-            grupo_id: this.$wire.get('grupo_id'),
-            search: this.$wire.get('search'),
-        };
-
-        localStorage.setItem(this.llaveFiltros(), JSON.stringify(filtros));
-    },
-
-    restaurarFiltros() {
-        if (this.filtrosRestaurados) {
-            return;
+<div
+    x-data="{
+        editando: false,
+        llave() { return 'matricula_historial_' + @js($slug_nivel); },
+        guardarFiltros() {
+            localStorage.setItem(this.llave(), JSON.stringify({
+                ciclo_escolar_id: this.$wire.get('ciclo_escolar_id'),
+                ciclo_id: this.$wire.get('ciclo_id'),
+                generacion_id: this.$wire.get('generacion_id'),
+                grado_id: this.$wire.get('grado_id'),
+                semestre_id: this.$wire.get('semestre_id'),
+                grupo_id: this.$wire.get('grupo_id'),
+                estatus: this.$wire.get('estatus'),
+                search: this.$wire.get('search'),
+                mostrar_archivados: this.$wire.get('mostrar_archivados'),
+            }));
+        },
+        abrirEdicion(id, url) {
+            this.guardarFiltros();
+            localStorage.setItem('matricula_highlight_id', id);
+            this.editando = true;
+            setTimeout(() => window.location.href = url, 300);
+        },
+        archivar(id, nombre) {
+            Swal.fire({
+                title: 'Archivar alumno',
+                html: `El expediente de <b>${nombre}</b> dejará de aparecer en la vista normal, pero toda su trayectoria se conservará.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, archivar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#006492'
+            }).then((result) => result.isConfirmed && this.$wire.archivar(id));
         }
-
-        const idResaltado = localStorage.getItem('matricula_highlight_id');
-
-        if (!idResaltado) {
-            return;
-        }
-
-        const raw = localStorage.getItem(this.llaveFiltros());
-
-        if (!raw) {
-            return;
-        }
-
-        let filtros = null;
-
-        try {
-            filtros = JSON.parse(raw);
-        } catch (e) {
-            localStorage.removeItem(this.llaveFiltros());
-            return;
-        }
-
-        if (!filtros || filtros.slug_nivel !== @js($slug_nivel)) {
-            return;
-        }
-
-        this.filtrosRestaurados = true;
-
-        @this.call('restaurarFiltrosMatricula', filtros).then(() => {
-            this.$nextTick(() => {
-                this.resaltarFilaEditada();
-            });
-        });
-    },
-
-    prepararEdicion(id, url) {
-        this.editandoAlumno = true;
-
-        this.guardarFiltros();
-
-        localStorage.setItem('matricula_return_url', window.location.href);
-        localStorage.setItem('matricula_highlight_id', id);
-
-        setTimeout(() => {
-            window.location.href = url;
-        }, 300);
-    },
-
-    resaltarFilaEditada() {
-        const id = localStorage.getItem('matricula_highlight_id');
-
-        if (!id) {
-            return;
-        }
-
-        this.filaResaltada = id;
-
-        setTimeout(() => {
-            const fila = document.getElementById('alumno-fila-' + id) ||
-                document.getElementById('alumno-card-' + id);
-
-            if (fila) {
-                fila.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',
-                });
-            }
-        }, 900);
-
-        setTimeout(() => {
-            this.filaResaltada = null;
-            localStorage.removeItem('matricula_highlight_id');
-        }, 4500);
-    },
-
-    limpiarFiltrosGuardados() {
-        localStorage.removeItem(this.llaveFiltros());
-        localStorage.removeItem('matricula_return_url');
-        localStorage.removeItem('matricula_highlight_id');
-    },
-
-    eliminar(id, nombre) {
-        Swal.fire({
-            title: '¿Estás seguro?',
-            text: `Esta inscripción se eliminará de forma permanente`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#2563EB',
-            cancelButtonColor: '#EF4444',
-            cancelButtonText: 'Cancelar',
-            confirmButtonText: 'Sí, eliminar'
-        }).then((r) => r.isConfirmed && @this.call('eliminar', id))
-    }
-}" class="space-y-5">
-
-    {{-- LOADER AL DAR CLIC EN EDITAR --}}
-    <div x-cloak x-show="editandoAlumno" x-transition.opacity
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-md dark:bg-neutral-950/80">
-        <div
-            class="mx-4 w-full max-w-sm rounded-[28px] border border-sky-100 bg-white/95 p-7 text-center shadow-2xl shadow-sky-500/20 dark:border-sky-900/40 dark:bg-neutral-900/95">
-            <div class="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center">
-                <div class="absolute inset-0 rounded-full border-4 border-sky-100 dark:border-sky-900/40"></div>
-                <div
-                    class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-sky-500 border-r-indigo-500">
-                </div>
-                <div
-                    class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/30">
-                    <flux:icon.square-pen class="h-5 w-5" />
-                </div>
-            </div>
-
-            <h3 class="text-lg font-bold text-slate-800 dark:text-white">
-                Abriendo edición
-            </h3>
-
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Preparando los datos del alumno...
-            </p>
-
-            <div class="mt-5 flex items-center justify-center gap-1.5">
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500 [animation-delay:-0.3s]"></span>
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500"></span>
-            </div>
+    }"
+    class="space-y-5"
+>
+    <div x-cloak x-show="editando" x-transition.opacity
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+        <div class="w-full max-w-sm rounded-3xl bg-white p-7 text-center shadow-2xl dark:bg-neutral-900">
+            <div class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-sky-100 border-t-sky-600"></div>
+            <h3 class="font-bold text-slate-900 dark:text-white">Abriendo expediente</h3>
+            <p class="mt-1 text-sm text-slate-500">Preparando la información del alumno…</p>
         </div>
     </div>
 
-    {{-- AQUÍ DEJAS TODO EL RESTO DE TU CÓDIGO ACTUAL DE MATRÍCULA --}}
-
-    {{-- ITERA NIVELES --}}
-    <div class="overflow-hidden">
-        <div>
-            <div class="-mx-1 overflow-x-auto pb-1">
-                <div class="flex min-w-max items-center gap-2 px-1 justify-center">
-                    @foreach ($niveles as $item)
-                        @php
-                            $activo = $slug_nivel === $item->slug;
-                        @endphp
-
-                        <a href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'matricula']) }}"
-                            wire:navigate aria-current="{{ $activo ? 'page' : 'false' }}"
-                            class="group relative inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5
+    {{-- Navegación por nivel --}}
+    <div class="overflow-x-auto pb-1">
+        <div class="flex min-w-max justify-center gap-2">
+            @foreach ($niveles as $item)
+                @php($activo = $slug_nivel === $item->slug)
+                <a wire:navigate
+                    href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'matricula']) }}"
+                    class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition
                         {{ $activo
-                            ? 'border-sky-200 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 dark:border-sky-700/50'
-                            : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-neutral-800 dark:hover:text-sky-300' }}">
-
-                            <span
-                                class="flex h-8 w-8 items-center justify-center rounded-xl
-                            {{ $activo
-                                ? 'bg-white/15 text-white'
-                                : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 dark:bg-neutral-700 dark:text-slate-300 dark:group-hover:bg-sky-950/40 dark:group-hover:text-sky-300' }}">
-                                <flux:icon.rectangle-stack class="h-4 w-4" />
-                            </span>
-
-                            <span>{{ $item->nombre }}</span>
-
-                            @if ($activo)
-                                <span class="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold text-white">
-                                    Activo
-                                </span>
-                                <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-white/80"></span>
-                            @endif
-                        </a>
-                    @endforeach
-                </div>
-            </div>
+                            ? 'border-sky-600 bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200' }}">
+                    <flux:icon.users class="h-4 w-4" />
+                    {{ $item->nombre }}
+                </a>
+            @endforeach
         </div>
     </div>
 
-    {{-- Encabezado --}}
-    <div>
-        <div class="p-5 sm:p-6">
+    {{-- Encabezado y estado del ciclo --}}
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+        <div class="bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-700 p-5 text-white sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">
-                        Matrícula
-                    </h1>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Consulta de alumnos y personal por generación, grado y grupo.
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1 class="text-2xl font-black tracking-tight">Historial de matrícula</h1>
+                        @if ($cicloSeleccionado)
+                            @if ($cicloSeleccionado->es_actual)
+                                <span class="rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-bold ring-1 ring-emerald-200/40">Ciclo actual</span>
+                            @elseif ($cicloSeleccionado->cerrado_at)
+                                <span class="rounded-full bg-amber-400/20 px-3 py-1 text-xs font-bold ring-1 ring-amber-200/40">Ciclo cerrado</span>
+                            @else
+                                <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/25">Ciclo histórico</span>
+                            @endif
+                        @endif
+                    </div>
+                    <p class="mt-1 text-sm text-blue-100">
+                        Consulta activos, bajas, traslados, reingresos y cambios de grupo sin sobrescribir ciclos anteriores.
                     </p>
                 </div>
 
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div
-                        class="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/30">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                            Total
-                        </p>
-                        <p class="mt-1 text-2xl font-bold text-sky-900 dark:text-sky-100">
-                            {{ $total }}
-                        </p>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                            Hombres
-                        </p>
-                        <p class="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-100">
-                            {{ $hombres }}
-                        </p>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-pink-100 bg-pink-50 px-4 py-3 dark:border-pink-900/40 dark:bg-pink-950/30">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-pink-700 dark:text-pink-300">
-                            Mujeres
-                        </p>
-                        <p class="mt-1 text-2xl font-bold text-pink-900 dark:text-pink-100">
-                            {{ $mujeres }}
-                        </p>
-                    </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
+                        class="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 transition hover:bg-white/25 disabled:opacity-60">
+                        <flux:icon.table-cells class="h-4 w-4" /> Excel
+                    </button>
+                    <button type="button" wire:click="exportarPdf" wire:loading.attr="disabled"
+                        class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-sky-800 transition hover:bg-blue-50 disabled:opacity-60">
+                        <flux:icon.document-arrow-down class="h-4 w-4" /> PDF
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
+
+        <div class="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-4 dark:bg-neutral-700">
+            @foreach ([
+                ['label' => 'Alumnos', 'value' => $total, 'icon' => 'users'],
+                ['label' => 'Hombres', 'value' => $hombres, 'icon' => 'user'],
+                ['label' => 'Mujeres', 'value' => $mujeres, 'icon' => 'user'],
+                ['label' => 'Bajas / traslados', 'value' => $bajas, 'icon' => 'user-minus'],
+            ] as $dato)
+                <div class="bg-white p-4 dark:bg-neutral-900">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                            @if ($dato['icon'] === 'user-minus')
+                                <flux:icon.user-minus class="h-5 w-5" />
+                            @elseif ($dato['icon'] === 'users')
+                                <flux:icon.users class="h-5 w-5" />
+                            @else
+                                <flux:icon.user class="h-5 w-5" />
+                            @endif
+                        </span>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $dato['label'] }}</p>
+                            <p class="text-xl font-black text-slate-900 dark:text-white">{{ number_format($dato['value']) }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </section>
 
     {{-- Filtros --}}
-    <div
-        class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-        <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
-
-        <div class="p-5 sm:p-6">
-            <div
-                class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $esBachillerato ? 'xl:grid-cols-7' : 'xl:grid-cols-6' }}">
-                <div>
-                    <flux:label>Nivel</flux:label>
-                    <flux:input readonly variant="filled" value="{{ $nivel?->nombre ?? '—' }}" disabled />
-                </div>
-
-                <div>
-                    <flux:label>Ciclo escolar</flux:label>
-                    <flux:select id="ciclo_escolar_id" wire:model.live="ciclo_escolar_id">
-                        <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
-
-                        @foreach ($cicloEscolares as $cicloEscolar)
-                            <flux:select.option value="{{ $cicloEscolar->id }}">
-                                {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-
-                <div>
-                    <flux:label>Generación</flux:label>
-                    <flux:select id="generacion_id" wire:model.live="generacion_id">
-                        <flux:select.option value="">Selecciona una generación</flux:select.option>
-                        @foreach ($generaciones as $generacion)
-                            <flux:select.option value="{{ $generacion->id }}">
-                                {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-
-                <div>
-                    <flux:label>Grado</flux:label>
-                    <flux:select id="grado_id" wire:model.live="grado_id">
-                        <flux:select.option value="">Selecciona un grado</flux:select.option>
-                        @foreach ($grados as $grado)
-                            <flux:select.option value="{{ $grado->id }}">
-                                {{ $grado->nombre }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-
-                @if ($esBachillerato)
-                    <div>
-                        <flux:label>Semestre</flux:label>
-                        <flux:select id="semestre_id" wire:model.live="semestre_id"
-                            :disabled="!$grado_id || $semestres->isEmpty()">
-                            <flux:select.option value="">Selecciona un semestre</flux:select.option>
-                            @foreach ($semestres as $semestre)
-                                <flux:select.option value="{{ $semestre->id }}">
-                                    Semestre {{ $semestre->numero }}
-                                </flux:select.option>
-                            @endforeach
-                        </flux:select>
-                    </div>
-                @endif
-
-                <div>
-                    <flux:label>Grupo</flux:label>
-                    <flux:select id="grupo_id" wire:model.live="grupo_id"
-                        wire:key="grupo-select-{{ $slug_nivel }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
-                        :disabled="$esBachillerato
-                                                                                                                                                                                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                                                                                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())">
-                        <flux:select.option value="">Selecciona un grupo</flux:select.option>
-                        @foreach ($grupos as $grupo)
-                            <flux:select.option value="{{ (string) $grupo->id }}">
-                                {{ $this->textoGrupo($grupo) }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                </div>
-
-                <div>
-                    <flux:label>Buscar</flux:label>
-                    <x-input wire:model.live.debounce.400ms="search" placeholder="Matrícula, CURP o nombre..." />
-                </div>
+    <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="font-black text-slate-900 dark:text-white">Contexto académico</h2>
+                <p class="text-sm text-slate-500">El ciclo y el corte determinan qué etapa histórica se consulta.</p>
             </div>
-
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex flex-wrap items-center gap-2">
-                    @if ($ciclo_escolar_id)
-                        @php
-                            $cicloEscolarSeleccionado = $cicloEscolares->firstWhere('id', $ciclo_escolar_id);
-                        @endphp
-
-                        @if ($cicloEscolarSeleccionado)
-                            <span
-                                class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                Ciclo escolar: {{ $cicloEscolarSeleccionado->inicio_anio }} -
-                                {{ $cicloEscolarSeleccionado->fin_anio }}
-                            </span>
-                        @endif
-                    @endif
-
-                    @if ($generacionGrupoLabel)
-                        <span
-                            class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
-                            Generación: {{ $generacionGrupoLabel }}
-                        </span>
-                    @endif
-
-                    @if (
-                        (!$esBachillerato && $generacion_id && $grado_id && $grupo_id) ||
-                            ($esBachillerato && $generacion_id && $grado_id && $semestre_id && $grupo_id))
-                        <span
-                            class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-                            Filtros aplicados
-                        </span>
-                    @endif
-                </div>
-
-                <button type="button" x-on:click="limpiarFiltrosGuardados(); @this.call('clearFilters')"
-                    class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200 dark:hover:bg-neutral-700">
-                    Limpiar filtros
-                </button>
-            </div>
+            <button type="button" wire:click="clearFilters"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-neutral-800">
+                <flux:icon.arrow-path class="h-4 w-4" /> Limpiar filtros
+            </button>
         </div>
-    </div>
 
-    @if (
-        (!$esBachillerato && (!$generacion_id || !$grado_id || !$grupo_id)) ||
-            ($esBachillerato && (!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id)))
-        <div
-            class="rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-10 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/60">
-            <div class="mx-auto max-w-2xl">
-                <h2 class="text-xl font-bold text-slate-800 dark:text-white">
-                    @if ($esBachillerato)
-                        Selecciona una generación, un grado, un semestre y un grupo
-                    @else
-                        Selecciona una generación, un grado y un grupo
-                    @endif
-                </h2>
-                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    @if ($esBachillerato)
-                        Primero elige esos cuatro filtros para mostrar la matrícula y el personal relacionado.
-                    @else
-                        Primero elige esos tres filtros para mostrar la matrícula y el personal relacionado.
-                    @endif
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Ciclo escolar</span>
+                <select wire:model.live="ciclo_escolar_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    @foreach ($cicloEscolares as $item)
+                        <option value="{{ $item->id }}">
+                            {{ $item->inicio_anio }}-{{ $item->fin_anio }}
+                            {{ $item->es_actual ? ' · Actual' : ($item->cerrado_at ? ' · Cerrado' : '') }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Corte</span>
+                <select wire:model.live="ciclo_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    @foreach ($ciclos as $item)
+                        <option value="{{ $item->id }}">{{ $item->ciclo }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Generación</span>
+                <select wire:model.live="generacion_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    <option value="">Todas</option>
+                    @foreach ($generaciones as $item)
+                        <option value="{{ $item->id }}">{{ $item->anio_ingreso }}-{{ $item->anio_egreso }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Grado</span>
+                <select wire:model.live="grado_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    <option value="">Todos</option>
+                    @foreach ($grados as $item)
+                        <option value="{{ $item->id }}">{{ $item->nombre }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            @if ($esBachillerato)
+                <label class="space-y-1.5">
+                    <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Semestre</span>
+                    <select wire:model.live="semestre_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800" @disabled($semestres->isEmpty())>
+                        <option value="">Todos</option>
+                        @foreach ($semestres as $item)
+                            <option value="{{ $item->id }}">Semestre {{ $item->numero }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            @endif
+
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Grupo</span>
+                <select wire:model.live="grupo_id" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800" @disabled($grupos->isEmpty())>
+                    <option value="">Todos</option>
+                    @foreach ($grupos as $item)
+                        <option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Estatus</span>
+                <select wire:model.live="estatus" class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    <option value="todos">Todos</option>
+                    @foreach (\App\Models\TrayectoriaAcademica::ESTATUS as $estado)
+                        <option value="{{ $estado }}">{{ $this->etiquetaEstatus($estado) }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="space-y-1.5 {{ $esBachillerato ? '' : 'xl:col-span-2' }}">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Buscar</span>
+                <div class="relative">
+                    <flux:icon.magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input wire:model.live.debounce.350ms="search" type="search"
+                        placeholder="Nombre, matrícula actual o anterior, folio o CURP"
+                        class="w-full rounded-xl border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm dark:border-neutral-700 dark:bg-neutral-800" />
+                </div>
+            </label>
+        </div>
+
+        <label class="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <input type="checkbox" wire:model.live="mostrar_archivados" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+            Incluir expedientes archivados
+        </label>
+    </section>
+
+    {{-- Corrección histórica masiva --}}
+    <section class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        <flux:icon.pencil-square class="h-5 w-5" />
+                    </span>
+                    <div>
+                        <h2 class="font-black text-amber-950 dark:text-amber-100">Corregir historial seleccionado</h2>
+                        <p class="text-sm text-amber-800/80 dark:text-amber-200/70">
+                            Crea una nueva estancia en este ciclo y corte; no sobrescribe la etapa anterior.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <span class="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">
+                {{ $this->selectedCount }} seleccionado(s)
+            </span>
+        </div>
+
+        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <select wire:model.live="nueva_generacion_id" class="rounded-xl border-amber-300 bg-white text-sm dark:border-amber-800 dark:bg-neutral-900">
+                <option value="">Nueva generación</option>
+                @foreach ($generaciones as $item)
+                    <option value="{{ $item->id }}">{{ $item->anio_ingreso }}-{{ $item->anio_egreso }}</option>
+                @endforeach
+            </select>
+
+            <select wire:model.live="nuevo_grado_id" class="rounded-xl border-amber-300 bg-white text-sm dark:border-amber-800 dark:bg-neutral-900">
+                <option value="">Nuevo grado</option>
+                @foreach ($grados as $item)
+                    <option value="{{ $item->id }}">{{ $item->nombre }}</option>
+                @endforeach
+            </select>
+
+            @if ($esBachillerato)
+                <select wire:model.live="nuevo_semestre_id" class="rounded-xl border-amber-300 bg-white text-sm dark:border-amber-800 dark:bg-neutral-900" @disabled($nuevosSemestres->isEmpty())>
+                    <option value="">Nuevo semestre</option>
+                    @foreach ($nuevosSemestres as $item)
+                        <option value="{{ $item->id }}">Semestre {{ $item->numero }}</option>
+                    @endforeach
+                </select>
+            @endif
+
+            <select wire:model="nuevo_grupo_id" class="rounded-xl border-amber-300 bg-white text-sm dark:border-amber-800 dark:bg-neutral-900" @disabled($nuevosGrupos->isEmpty())>
+                <option value="">Nuevo grupo</option>
+                @foreach ($nuevosGrupos as $item)
+                    <option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}</option>
+                @endforeach
+            </select>
+
+            <input wire:model="motivo_correccion" type="text" placeholder="Motivo de la corrección (opcional)"
+                class="rounded-xl border-amber-300 bg-white text-sm dark:border-amber-800 dark:bg-neutral-900 xl:col-span-3" />
+
+            <button type="button" wire:click="aplicarCorreccion" wire:loading.attr="disabled"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 disabled:opacity-50">
+                <flux:icon.check class="h-4 w-4" /> Aplicar corrección
+            </button>
+        </div>
+
+        @error('selected') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+        @error('nuevo_grupo_id') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+    </section>
+
+    {{-- Tabla --}}
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+        <div class="flex flex-col gap-2 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-700">
+            <div>
+                <h2 class="font-black text-slate-900 dark:text-white">Alumnos del contexto seleccionado</h2>
+                <p class="text-sm text-slate-500">
+                    {{ $cicloSeleccionado?->nombre ?? 'Sin ciclo' }} · {{ $corteSeleccionado?->ciclo ?? 'Sin corte' }} · {{ $nivel?->nombre }}
                 </p>
             </div>
+            <div wire:loading.delay class="text-sm font-semibold text-sky-600">
+                Actualizando información…
+            </div>
         </div>
-    @else
-        <div
-            class="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-            <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-emerald-500 to-fuchsia-500"></div>
 
-            <div class="p-5 sm:p-6">
-                {{-- Sección personal asignado --}}
-                <section class="mb-3">
-                    <div class="relative">
-                        <div class="transition-opacity duration-300" wire:loading.class="opacity-50"
-                            wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
-                            @if ($personal->isEmpty())
-                                <div
-                                    class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
-                                    No hay personal asignado para este grupo.
-                                </div>
-                            @else
-                                <div class="space-y-3">
-                                    @foreach ($personal as $p)
-                                        @php
-                                            $per = $p->persona;
-                                            $detalle = $p->detalles->first();
-
-                                            $nombre = trim(
-                                                ($per?->titulo ? $per->titulo . ' ' : '') .
-                                                    ($per?->nombre ?? '') .
-                                                    ' ' .
-                                                    ($per?->apellido_paterno ?? '') .
-                                                    ' ' .
-                                                    ($per?->apellido_materno ?? ''),
-                                            );
-
-                                            $gen = $per?->genero;
-                                        @endphp
-
-                                        <div
-                                            class="w-full rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900">
-                                            <div
-                                                class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                                                <div class="min-w-0 flex-1">
-                                                    <div
-                                                        class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-                                                        <h3
-                                                            class="truncate text-base font-bold text-slate-800 dark:text-white">
-                                                            {{ $nombre !== '' ? $nombre : 'Sin nombre' }}
-                                                        </h3>
-
-                                                        <div class="flex flex-wrap items-center gap-2">
-                                                            @if ($gen)
-                                                                <span
-                                                                    class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $gen === 'H'
-                                                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-                                                                        : 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300' }}">
-                                                                    {{ $gen === 'H' ? 'Hombre' : 'Mujer' }}
-                                                                </span>
-                                                            @endif
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div
-                                                    class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300 xl:flex-row xl:items-center xl:gap-6">
-                                                    <p><span class="font-semibold">Nivel:</span>
-                                                        {{ $p->nivel?->nombre ?? '—' }}</p>
-                                                    <p><span class="font-semibold">Grado:</span>
-                                                        {{ $detalle?->grado?->nombre ?? '—' }}</p>
-                                                    @if ($esBachillerato)
-                                                        <p><span class="font-semibold">Semestre:</span>
-                                                            {{ $semestres->firstWhere('id', $semestre_id)?->numero ?? '—' }}
-                                                        </p>
-                                                    @endif
-                                                    <p><span class="font-semibold">Grupo:</span>
-                                                        {{ $this->textoGrupo($detalle?->grupo) }}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </section>
-
-                {{-- Sección lista de alumnos --}}
-                <section>
-                    <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <label
-                                class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
-                                <input type="checkbox" wire:model.live="selectPage"
-                                    class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                                Seleccionar página
-                            </label>
-
-                            <div
-                                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
-                                Seleccionados: <span class="font-bold">{{ $this->selectedCount }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        class="mb-5 overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
-                        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
-
-                        <div class="p-5 sm:p-6">
-                            <div class="mb-5 flex flex-col gap-4">
-                                <div class="flex flex-col gap-1">
-                                    <h3 class="text-sm font-bold text-slate-800 dark:text-white">
-                                        {{ $esBachillerato ? 'Corrección administrativa de grado, semestre y grupo' : 'Corrección administrativa de grado y grupo' }}
-                                    </h3>
-
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $esBachillerato
-                                            ? 'Este cambio corrige la asignación actual del alumno dentro del ciclo escolar seleccionado. No crea una promoción oficial.'
-                                            : 'Este cambio corrige la asignación actual del alumno dentro del ciclo escolar seleccionado. No crea una promoción oficial.' }}
-                                    </p>
-                                </div>
-
-                                <div
-                                    class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-                                    Este apartado sirve para corregir errores de asignación dentro del mismo ciclo
-                                    escolar.
-                                    Para pasar alumnos a otro ciclo escolar, usa el módulo de Promoción de alumnos.
-                                </div>
-
-
-                            </div>
-
-                            <div
-                                class="grid grid-cols-1 gap-3 {{ $esBachillerato ? 'xl:grid-cols-[1fr_1fr_1fr_auto_auto]' : 'xl:grid-cols-[1fr_1fr_auto_auto]' }} xl:items-end">
-                                <div>
-                                    <label for="nuevo_grado_id"
-                                        class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                        Grado destino
-                                    </label>
-
-                                    <select id="nuevo_grado_id" wire:model.live="nuevo_grado_id"
-                                        @disabled($this->selectedCount === 0 || !$ciclo_escolar_id || !$generacion_id)
-                                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
-                                        <option value="">Selecciona un grado</option>
-
-                                        @foreach ($grados as $grado)
-                                            <option value="{{ $grado->id }}">
-                                                {{ $grado->nombre }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-
-                                    @error('nuevo_grado_id')
-                                        <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                @if ($esBachillerato)
-                                    <div>
-                                        <label for="nuevo_semestre_id"
-                                            class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                            Semestre destino
-                                        </label>
-
-                                        <select id="nuevo_semestre_id" wire:model.live="nuevo_semestre_id"
-                                            @disabled(
-                                                $this->selectedCount === 0 ||
-                                                    !$ciclo_escolar_id ||
-                                                    !$generacion_id ||
-                                                    !$nuevo_grado_id ||
-                                                    $nuevosSemestres->isEmpty())
-                                            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-violet-900/40">
-                                            <option value="">Selecciona un semestre</option>
-
-                                            @foreach ($nuevosSemestres as $semestreDestino)
-                                                <option value="{{ $semestreDestino->id }}">
-                                                    Semestre {{ $semestreDestino->numero }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-
-                                        @error('nuevo_semestre_id')
-                                            <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
-                                        @enderror
-
-                                        @if ($nuevo_grado_id && $nuevosSemestres->isEmpty())
-                                            <p class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                                No hay semestres registrados para ese grado.
-                                            </p>
-                                        @endif
-                                    </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-[1350px] w-full text-left text-sm">
+                <thead class="bg-slate-900 text-xs uppercase tracking-wide text-white dark:bg-black">
+                    <tr>
+                        <th class="px-4 py-3 text-center">
+                            <input type="checkbox" wire:model.live="selectPage" class="rounded border-white/30 text-sky-600" />
+                        </th>
+                        <th class="px-4 py-3">Matrícula / CURP</th>
+                        <th class="px-4 py-3">Alumno</th>
+                        <th class="px-4 py-3">Generación</th>
+                        <th class="px-4 py-3">Ubicación</th>
+                        <th class="px-4 py-3">Ciclo y corte</th>
+                        <th class="px-4 py-3">Estatus</th>
+                        <th class="px-4 py-3">Fechas / motivo</th>
+                        <th class="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                    @forelse ($rows as $row)
+                        @php
+                            $trayectoria = $row->getRelation('trayectoriaContexto');
+                            $nombreCompleto = trim("{$row->apellido_paterno} {$row->apellido_materno} {$row->nombre}");
+                            $estado = $row->estatus_historial ?? 'activo';
+                            $estadoClass = match ($estado) {
+                                'baja_temporal' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+                                'baja_definitiva', 'traslado' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+                                'reingreso' => 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200',
+                                'egresado', 'promovido' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
+                                'no_promovido' => 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200',
+                                default => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200',
+                            };
+                        @endphp
+                        <tr wire:key="matricula-historica-{{ $row->id }}-{{ $row->trayectoria_id }}"
+                            class="align-top transition hover:bg-sky-50/50 dark:hover:bg-sky-950/10 {{ $row->deleted_at ? 'opacity-65' : '' }}">
+                            <td class="px-4 py-4 text-center">
+                                <input type="checkbox" wire:model.live="selected" value="{{ $row->id }}" class="rounded border-slate-300 text-sky-600" />
+                            </td>
+                            <td class="px-4 py-4">
+                                <p class="font-black text-slate-900 dark:text-white">{{ $row->matricula_contexto ?: '—' }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $row->curp ?: 'Sin CURP' }}</p>
+                                @if ($row->matricula_contexto !== $row->matricula)
+                                    <span class="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">Matrícula histórica</span>
                                 @endif
-
-                                <div>
-                                    <label for="nuevo_grupo_id"
-                                        class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                        Grupo destino
-                                    </label>
-
-                                    <select id="nuevo_grupo_id" wire:model.live="nuevo_grupo_id"
-                                        @disabled(
-                                            $this->selectedCount === 0 ||
-                                                !$ciclo_escolar_id ||
-                                                !$generacion_id ||
-                                                !$nuevo_grado_id ||
-                                                ($esBachillerato && !$nuevo_semestre_id) ||
-                                                $nuevosGrupos->isEmpty())
-                                        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-100 dark:focus:ring-sky-900/40">
-                                        <option value="">Selecciona un grupo</option>
-
-                                        @foreach ($nuevosGrupos as $grupoDestino)
-                                            <option value="{{ $grupoDestino->id }}">
-                                                Grupo {{ $this->textoGrupo($grupoDestino) }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-
-                                    @error('nuevo_grupo_id')
-                                        <p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
-                                    @enderror
-
-                                    @if ($generacion_id && $nuevo_grado_id && (!$esBachillerato || $nuevo_semestre_id) && $nuevosGrupos->isEmpty())
-                                        <p class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                            No hay grupos registrados para el destino seleccionado.
-                                        </p>
+                            </td>
+                            <td class="px-4 py-4">
+                                <p class="font-bold text-slate-900 dark:text-white">{{ $nombreCompleto }}</p>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">{{ $row->genero === 'H' ? 'Hombre' : ($row->genero === 'M' ? 'Mujer' : 'Sin género') }}</span>
+                                    @if ($row->datos_reconstruidos)
+                                        <span class="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-bold text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-200">Reconstruido</span>
+                                    @endif
+                                    @if ($row->deleted_at)
+                                        <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-neutral-700 dark:text-slate-200">Archivado</span>
                                     @endif
                                 </div>
-
-                                <button type="button" wire:click="exportarMatricula" wire:loading.attr="disabled"
-                                    wire:target="exportarMatricula"
-                                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-green-500 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
-                                    <span wire:loading.remove wire:target="exportarMatricula">
-                                        <div class="flex justify-between gap-2">
-                                            <flux:icon.download class="h-4 w-4" />
-                                            Exportar Excel
-                                        </div>
-                                    </span>
-
-                                    <span wire:loading wire:target="exportarMatricula">
-                                        Descargando...
-                                    </span>
-                                </button>
-
-                                <button type="button" wire:click="aplicarCambiarGrado" wire:loading.attr="disabled"
-                                    wire:target="aplicarCambiarGrado" @disabled(
-                                        $this->selectedCount === 0 ||
-                                            !$ciclo_escolar_id ||
-                                            !$generacion_id ||
-                                            !$nuevo_grado_id ||
-                                            ($esBachillerato && !$nuevo_semestre_id) ||
-                                            !$nuevo_grupo_id)
-                                    class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
-                                    <span wire:loading.remove wire:target="aplicarCambiarGrado">
-                                        Aplicar cambio
-                                    </span>
-
-                                    <span wire:loading wire:target="aplicarCambiarGrado">
-                                        Aplicando...
-                                    </span>
-                                </button>
-                            </div>
-
-                            @if (!$ciclo_escolar_id)
-                                <p class="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                    Selecciona un ciclo escolar para actualizar también la trayectoria académica.
+                            </td>
+                            <td class="px-4 py-4">
+                                <p class="font-semibold text-slate-700 dark:text-slate-200">
+                                    {{ $row->generacion ? $row->generacion->anio_ingreso . '-' . $row->generacion->anio_egreso : '—' }}
                                 </p>
-                            @elseif (!$generacion_id)
-                                <p class="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                    Selecciona una generación para poder cargar los destinos disponibles.
+                            </td>
+                            <td class="px-4 py-4">
+                                <p class="font-bold text-slate-800 dark:text-slate-100">
+                                    {{ $row->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($row->grupo) }}
                                 </p>
-                            @endif
-                        </div>
+                                @if ($esBachillerato)
+                                    <p class="mt-1 text-xs text-slate-500">Semestre {{ $row->semestre?->numero ?? '—' }}</p>
+                                @endif
+                                @if (($trayectoria?->numero_estancia ?? 1) > 1)
+                                    <p class="mt-1 text-xs font-semibold text-violet-600">Estancia {{ $trayectoria->numero_estancia }} en este corte</p>
+                                @endif
+                            </td>
+                            <td class="px-4 py-4">
+                                <p class="font-semibold text-slate-700 dark:text-slate-200">{{ $trayectoria?->cicloEscolar?->nombre ?? '—' }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $trayectoria?->ciclo?->ciclo ?? '—' }}</p>
+                            </td>
+                            <td class="px-4 py-4">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-black {{ $estadoClass }}">
+                                    {{ $this->etiquetaEstatus($estado) }}
+                                </span>
+                                @if ($trayectoria?->es_actual)
+                                    <p class="mt-2 text-[11px] font-bold text-sky-600">Ubicación actual</p>
+                                @endif
+                            </td>
+                            <td class="max-w-xs px-4 py-4">
+                                <p class="text-xs text-slate-500">Inscripción: <b class="text-slate-700 dark:text-slate-200">{{ optional($trayectoria?->fecha_inscripcion ?? $trayectoria?->fecha_inicio)->format('d/m/Y') ?: '—' }}</b></p>
+                                @if ($trayectoria?->fecha_baja)
+                                    <p class="mt-1 text-xs text-red-600">Baja: <b>{{ $trayectoria->fecha_baja->format('d/m/Y') }}</b></p>
+                                @endif
+                                @if ($trayectoria?->motivo_baja)
+                                    <p class="mt-1 line-clamp-2 text-xs text-slate-500" title="{{ $trayectoria->motivo_baja }}">{{ $trayectoria->motivo_baja }}</p>
+                                @endif
+                            </td>
+                            <td class="px-4 py-4">
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" wire:click="abrirHistorial({{ $row->id }})"
+                                        title="Ver historial completo"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-300">
+                                        <flux:icon.clock class="h-4 w-4" />
+                                    </button>
+                                    <button type="button"
+                                        x-on:click="abrirEdicion({{ $row->id }}, @js(route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id])))"
+                                        title="Editar alumno"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
+                                        <flux:icon.pencil-square class="h-4 w-4" />
+                                    </button>
+                                    @if ($row->deleted_at)
+                                        <button type="button" wire:click="restaurar({{ $row->id }})" title="Restaurar"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                            <flux:icon.arrow-uturn-left class="h-4 w-4" />
+                                        </button>
+                                    @else
+                                        <button type="button" x-on:click="archivar({{ $row->id }}, @js($nombreCompleto))" title="Archivar"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300">
+                                            <flux:icon.archive-box class="h-4 w-4" />
+                                        </button>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9" class="px-6 py-16 text-center">
+                                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">
+                                    <flux:icon.magnifying-glass class="h-7 w-7" />
+                                </div>
+                                <h3 class="mt-4 font-black text-slate-800 dark:text-white">No hay alumnos en este contexto</h3>
+                                <p class="mt-1 text-sm text-slate-500">Cambia el ciclo, el corte o los filtros de búsqueda.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if ($rows->hasPages())
+            <div class="border-t border-slate-200 p-4 dark:border-neutral-700">
+                {{ $rows->onEachSide(1)->links(data: ['scrollTo' => false]) }}
+            </div>
+        @endif
+    </section>
+
+    {{-- Modal historial individual --}}
+    @if ($modalHistorial && $historialAlumno)
+        <div class="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+            wire:key="modal-historial-{{ $historialAlumno->id }}">
+            <div class="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-4 bg-gradient-to-r from-violet-700 to-indigo-700 p-5 text-white">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[.2em] text-violet-200">Historial académico completo</p>
+                        <h2 class="mt-1 text-xl font-black">
+                            {{ trim("{$historialAlumno->apellido_paterno} {$historialAlumno->apellido_materno} {$historialAlumno->nombre}") }}
+                        </h2>
+                        <p class="mt-1 text-sm text-violet-100">Matrícula vigente: {{ $historialAlumno->matricula }} · CURP: {{ $historialAlumno->curp ?: '—' }}</p>
                     </div>
+                    <button type="button" wire:click="cerrarHistorial" class="rounded-xl bg-white/15 p-2 transition hover:bg-white/25">
+                        <flux:icon.x-mark class="h-5 w-5" />
+                    </button>
+                </div>
 
-                    {{-- BADGES DE ESTADÍSTICA SEGÚN FILTRO DE MATRÍCULA --}}
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 my-4">
-                        {{-- Total --}}
-                        <div
-                            class="group relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-800">
-
-                            <div
-                                class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-slate-300/20 blur-2xl dark:bg-slate-500/10">
-                            </div>
-
-                            <div class="relative flex items-center justify-between gap-3">
-                                <div>
-                                    <p
-                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                        Total filtrado
-                                    </p>
-
-                                    <p class="mt-1 text-3xl font-black tracking-tight text-slate-800 dark:text-white">
-                                        {{ $total }}
-                                    </p>
-
-                                    <p class="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                        Alumnos encontrados
-                                    </p>
-                                </div>
-
-                                <div
-                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-neutral-900">
-                                    <flux:icon.users class="h-6 w-6" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Hombres --}}
-                        <div
-                            class="group relative overflow-hidden rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-blue-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/30 dark:via-neutral-900 dark:to-blue-950/30">
-
-                            <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-400/20 blur-2xl">
-                            </div>
-
-                            <div class="relative flex items-center justify-between gap-3">
-                                <div>
-                                    <p
-                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-                                        Hombres
-                                    </p>
-
-                                    <div class="mt-1 flex items-end gap-2">
-                                        <p class="text-3xl font-black tracking-tight text-sky-900 dark:text-sky-100">
-                                            {{ $hombres }}
-                                        </p>
-
-                                        @if ($total > 0)
-                                            <span
-                                                class="mb-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">
-                                                {{ number_format(($hombres / $total) * 100, 1) }}%
-                                            </span>
-                                        @endif
-                                    </div>
-
-                                    <p class="mt-1 text-xs font-medium text-sky-700/70 dark:text-sky-300/70">
-                                        Según matrícula filtrada
-                                    </p>
-                                </div>
-
-                                <div
-                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25">
-                                    <flux:icon.user class="h-6 w-6" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Mujeres --}}
-                        <div
-                            class="group relative overflow-hidden rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 via-white to-fuchsia-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-pink-500/10 dark:border-pink-900/40 dark:from-pink-950/30 dark:via-neutral-900 dark:to-fuchsia-950/30">
-
-                            <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-pink-400/20 blur-2xl">
-                            </div>
-
-                            <div class="relative flex items-center justify-between gap-3">
-                                <div>
-                                    <p
-                                        class="text-[11px] font-black uppercase tracking-[0.18em] text-pink-700 dark:text-pink-300">
-                                        Mujeres
-                                    </p>
-
-                                    <div class="mt-1 flex items-end gap-2">
-                                        <p class="text-3xl font-black tracking-tight text-pink-900 dark:text-pink-100">
-                                            {{ $mujeres }}
-                                        </p>
-
-                                        @if ($total > 0)
-                                            <span
-                                                class="mb-1 rounded-full bg-pink-100 px-2 py-0.5 text-[11px] font-bold text-pink-700 dark:bg-pink-950/60 dark:text-pink-300">
-                                                {{ number_format(($mujeres / $total) * 100, 1) }}%
-                                            </span>
-                                        @endif
-                                    </div>
-
-                                    <p class="mt-1 text-xs font-medium text-pink-700/70 dark:text-pink-300/70">
-                                        Según matrícula filtrada
-                                    </p>
-                                </div>
-
-                                <div
-                                    class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/25">
-                                    <flux:icon.user-round class="h-6 w-6" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="relative transition-opacity duration-300" wire:loading.class="opacity-60"
-                        wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado">
-                        <div wire:loading.flex
-                            wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,nuevo_grado_id,nuevo_semestre_id,nuevo_grupo_id,aplicarCambiarGrado"
-                            class="absolute inset-0 z-30 hidden items-center justify-center rounded-3xl border border-white/60 bg-white/75 backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/75">
-                            <div
-                                class="flex min-w-[260px] flex-col items-center rounded-3xl border border-sky-100 bg-white/90 px-8 py-7 shadow-2xl shadow-sky-500/10 dark:border-sky-900/40 dark:bg-neutral-950/90">
-                                <div class="relative mb-4 flex h-16 w-16 items-center justify-center">
-                                    <div
-                                        class="absolute inset-0 rounded-full border-4 border-sky-200 dark:border-sky-900/40">
-                                    </div>
-                                    <div
-                                        class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-sky-500 border-r-indigo-500">
-                                    </div>
-                                    <div
-                                        class="h-8 w-8 rounded-full bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 shadow-lg shadow-sky-500/30">
-                                    </div>
-                                </div>
-
-                                <h3 class="text-base font-bold text-slate-800 dark:text-white">
-                                    Cargando registros
-                                </h3>
-
-                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    Actualizando alumnos y personal...
-                                </p>
-
-                                <div class="mt-4 flex items-center gap-1.5">
-                                    <span
-                                        class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500 [animation-delay:-0.3s]"></span>
-                                    <span
-                                        class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
-                                    <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500"></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- TABLA ESCRITORIO --}}
-                        <div
-                            class="hidden overflow-hidden rounded-3xl border border-slate-200 dark:border-neutral-800 xl:block">
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-slate-200 dark:divide-neutral-800">
-                                    <thead class="bg-slate-50/90 dark:bg-neutral-800/80">
+                <div class="max-h-[calc(92vh-110px)] space-y-6 overflow-y-auto p-5 sm:p-6">
+                    <section>
+                        <h3 class="mb-3 flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                            <flux:icon.academic-cap class="h-5 w-5 text-violet-600" /> Trayectoria por ciclo y corte
+                        </h3>
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-neutral-700">
+                            <table class="min-w-[1050px] w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-xs uppercase text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
+                                    <tr>
+                                        <th class="px-4 py-3">Ciclo / corte</th>
+                                        <th class="px-4 py-3">Nivel</th>
+                                        <th class="px-4 py-3">Generación</th>
+                                        <th class="px-4 py-3">Grado / grupo</th>
+                                        <th class="px-4 py-3">Estancia</th>
+                                        <th class="px-4 py-3">Estatus</th>
+                                        <th class="px-4 py-3">Periodo</th>
+                                        <th class="px-4 py-3">Origen</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                    @forelse ($historialAlumno->trayectoriasAcademicas as $item)
                                         <tr>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Sel.
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                #
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Foto
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Matrícula
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Folio
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Apellido Paterno
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Apellido Materno
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Nombre(s)
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                CURP
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Género
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Generación
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Grado
-                                            </th>
-                                            @if ($esBachillerato)
-                                                <th
-                                                    class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                    Semestre
-                                                </th>
-                                            @endif
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Grupo
-                                            </th>
-                                            <th
-                                                class="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                                Acciones
-                                            </th>
+                                            <td class="px-4 py-3 font-semibold">{{ $item->cicloEscolar?->nombre ?? '—' }}<br><span class="text-xs font-normal text-slate-500">{{ $item->ciclo?->ciclo ?? '—' }}</span></td>
+                                            <td class="px-4 py-3">{{ $item->nivel?->nombre ?? '—' }}</td>
+                                            <td class="px-4 py-3">{{ $item->generacion ? $item->generacion->anio_ingreso . '-' . $item->generacion->anio_egreso : '—' }}</td>
+                                            <td class="px-4 py-3">{{ $item->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($item->grupo) }} @if($item->semestre)<br><span class="text-xs text-slate-500">Semestre {{ $item->semestre->numero }}</span>@endif</td>
+                                            <td class="px-4 py-3">#{{ $item->numero_estancia }}</td>
+                                            <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold dark:bg-neutral-800">{{ $item->etiqueta_estatus }}</span></td>
+                                            <td class="px-4 py-3 text-xs">{{ optional($item->fecha_inicio ?? $item->fecha_inscripcion)->format('d/m/Y') ?: '—' }}<br>a {{ optional($item->fecha_fin ?? $item->fecha_baja)->format('d/m/Y') ?: 'actual' }}</td>
+                                            <td class="px-4 py-3 text-xs">{{ str($item->origen)->replace('_', ' ')->title() }} @if($item->datos_reconstruidos)<br><b class="text-fuchsia-600">Reconstruido</b>@endif</td>
                                         </tr>
-                                    </thead>
-
-                                    <tbody
-                                        class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
-                                        @forelse ($rows as $row)
-                                            <tr id="alumno-fila-{{ $row->id }}"
-                                                class="transition-all duration-500"
-                                                :class="filaResaltada == '{{ $row->id }}' ?
-                                                    'bg-emerald-100 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 dark:bg-emerald-950/40 dark:ring-emerald-500' :
-                                                    'hover:bg-slate-50 dark:hover:bg-neutral-800/60'">
-                                                <td class="px-4 py-4 align-top">
-                                                    <input type="checkbox" wire:model.live="selected"
-                                                        value="{{ $row->id }}"
-                                                        class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $loop->iteration + ($rows->currentPage() - 1) * $rows->perPage() }}
-                                                </td>
-
-                                                <td class="px-4 py-4 align-top">
-                                                    @if ($row->foto_path)
-                                                        <img src="{{ asset('storage/' . $row->foto_path) }}"
-                                                            alt="Foto de {{ $row->nombre }}"
-                                                            class="h-10 w-10 rounded-full object-cover">
-                                                    @else
-                                                        <div
-                                                            class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-medium text-slate-500 dark:bg-neutral-700 dark:text-slate-400">
-                                                        </div>
-                                                    @endif
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top font-semibold text-slate-800 dark:text-slate-100">
-                                                    {{ $row->matricula ?: '—' }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->folio ?: '—' }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->apellido_paterno ?: '—' }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->apellido_materno ?: '—' }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ trim($row->nombre) }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->curp ?: '—' }}
-                                                </td>
-
-                                                <td class="px-4 py-4 align-top">
-                                                    <span
-                                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
-                                                        {{ $row->genero === 'H'
-                                                            ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-                                                            : 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300' }}">
-                                                        {{ $row->genero ?: '—' }}
-                                                    </span>
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->generacion ? $row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso : '—' }}
-                                                </td>
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $row->grado?->nombre ?? '—' }}
-                                                </td>
-
-                                                @if ($esBachillerato)
-                                                    <td
-                                                        class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                        {{ $row->semestre?->numero ?? '—' }}
-                                                    </td>
-                                                @endif
-
-                                                <td
-                                                    class="px-4 py-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                                                    {{ $this->textoGrupo($row->grupo) }}
-                                                </td>
-
-                                                <td class="px-4 py-4 align-top">
-                                                    <div class="flex items-center gap-2">
-                                                        <flux:button variant="primary"
-                                                            class="cursor-pointer bg-amber-500 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-amber-600 hover:shadow-md"
-                                                            x-on:click="prepararEdicion(
-                                                                '{{ $row->id }}',
-                                                                '{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}'
-                                                            )">
-                                                            <flux:icon.square-pen class="h-3.5 w-3.5" />
-                                                        </flux:button>
-
-                                                        <flux:button variant="danger"
-                                                            class="cursor-pointer bg-rose-600 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-rose-700 hover:shadow-md"
-                                                            @click="eliminar({{ $row->id }}, '{{ $row->nombre }}')">
-                                                            <flux:icon.trash-2 class="h-3.5 w-3.5" />
-                                                        </flux:button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="{{ $esBachillerato ? 15 : 14 }}"
-                                                    class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                                                    No se encontraron alumnos con los filtros actuales.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
+                                    @empty
+                                        <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">Sin trayectorias registradas.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
+                    </section>
 
-                        {{-- TARJETAS MÓVIL --}}
-                        <div class="space-y-4 xl:hidden">
-                            @forelse ($rows as $row)
-                                <div id="alumno-card-{{ $row->id }}"
-                                    class="rounded-3xl border p-4 shadow-sm transition-all duration-500"
-                                    :class="filaResaltada == '{{ $row->id }}' ?
-                                        'border-emerald-300 bg-emerald-100 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/20 dark:border-emerald-700 dark:bg-emerald-950/40 dark:ring-emerald-500' :
-                                        'border-slate-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'">
-                                    <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <section>
+                            <h3 class="mb-3 flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <flux:icon.identification class="h-5 w-5 text-sky-600" /> Matrículas por nivel
+                            </h3>
+                            <div class="space-y-2">
+                                @forelse ($historialAlumno->matriculasAlumno as $matricula)
+                                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 p-3 dark:border-neutral-700">
                                         <div>
-                                            <p class="text-base font-bold text-slate-800 dark:text-white">
-                                                {{ trim($row->nombre . ' ' . $row->apellido_paterno . ' ' . $row->apellido_materno) }}
-                                            </p>
-                                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                                Matrícula: {{ $row->matricula ?: '—' }}
-                                            </p>
+                                            <p class="font-black text-slate-900 dark:text-white">{{ $matricula->matricula }}</p>
+                                            <p class="text-xs text-slate-500">{{ $matricula->nivel?->nombre ?? '—' }} · Desde {{ optional($matricula->fecha_asignacion)->format('d/m/Y') }}</p>
                                         </div>
-
-                                        <input type="checkbox" wire:model.live="selected"
-                                            value="{{ $row->id }}"
-                                            class="mt-1 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                        <span class="rounded-full px-2 py-1 text-xs font-bold {{ $matricula->vigente ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">{{ $matricula->vigente ? 'Vigente' : 'Anterior' }}</span>
                                     </div>
+                                @empty
+                                    <p class="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Sin historial de matrículas.</p>
+                                @endforelse
+                            </div>
+                        </section>
 
-                                    <div
-                                        class="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-                                        <div><span class="font-semibold">CURP:</span> {{ $row->curp ?: '—' }}</div>
-                                        <div><span class="font-semibold">Género:</span> {{ $row->genero ?: '—' }}
+                        <section>
+                            <h3 class="mb-3 flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <flux:icon.clock class="h-5 w-5 text-amber-600" /> Línea de tiempo
+                            </h3>
+                            <div class="max-h-80 space-y-3 overflow-y-auto pr-1">
+                                @forelse ($historialAlumno->movimientos as $movimiento)
+                                    <div class="relative border-l-2 border-violet-200 pl-4 dark:border-violet-900">
+                                        <span class="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-violet-600"></span>
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="font-bold text-slate-800 dark:text-slate-100">{{ str($movimiento->tipo)->replace('_', ' ')->title() }}</p>
+                                            <span class="text-xs text-slate-500">{{ optional($movimiento->fecha)->format('d/m/Y') }}</span>
                                         </div>
-                                        <div><span class="font-semibold">Generación:</span>
-                                            {{ $row->generacion ? $row->generacion->anio_ingreso . ' - ' . $row->generacion->anio_egreso : '—' }}
-                                        </div>
-                                        <div><span class="font-semibold">Grado:</span>
-                                            {{ $row->grado?->nombre ?? '—' }}</div>
-                                        @if ($esBachillerato)
-                                            <div><span class="font-semibold">Semestre:</span>
-                                                {{ $row->semestre?->numero ?? '—' }}</div>
-                                        @endif
-                                        <div><span class="font-semibold">Grupo:</span>
-                                            {{ $this->textoGrupo($row->grupo) }}</div>
-                                        <div><span class="font-semibold">Folio:</span> {{ $row->folio ?: '—' }}</div>
+                                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $movimiento->motivo ?: 'Sin motivo registrado' }}</p>
+                                        <p class="mt-1 text-xs text-slate-400">{{ $movimiento->cicloEscolar?->nombre }} · {{ $movimiento->ciclo?->ciclo }} @if($movimiento->usuario) · {{ $movimiento->usuario->name }} @endif</p>
                                     </div>
-
-                                    <div class="mt-4 flex justify-end gap-2">
-                                        <flux:button variant="primary"
-                                            class="cursor-pointer bg-amber-500 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-amber-600 hover:shadow-md"
-                                            x-on:click="prepararEdicion(
-                                                '{{ $row->id }}',
-                                                '{{ route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id]) }}'
-                                            )">
-                                            <flux:icon.square-pen class="h-3.5 w-3.5" />
-                                            Editar
-                                        </flux:button>
-
-                                        <flux:button variant="danger"
-                                            class="cursor-pointer bg-rose-600 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-rose-700 hover:shadow-md"
-                                            @click="eliminar({{ $row->id }}, '{{ $row->nombre }}')">
-                                            <flux:icon.trash-2 class="h-3.5 w-3.5" />
-                                            Eliminar
-                                        </flux:button>
-                                    </div>
-                                </div>
-                            @empty
-                                <div
-                                    class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
-                                    No se encontraron alumnos con los filtros actuales.
-                                </div>
-                            @endforelse
-                        </div>
+                                @empty
+                                    <p class="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Sin movimientos registrados.</p>
+                                @endforelse
+                            </div>
+                        </section>
                     </div>
-
-                    <div class="mt-5">
-                        {{ $rows->links() }}
-                    </div>
-                </section>
-
-                <div
-                    class="my-8 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
                 </div>
             </div>
         </div>

@@ -3,97 +3,99 @@
 namespace App\Livewire\CicloEscolar;
 
 use App\Models\CicloEscolar;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class CrearCicloEscolar extends Component
 {
     public ?int $inicio_anio = null;
     public ?int $fin_anio = null;
+    public bool $marcar_como_actual = true;
+    public bool $cerrar_anterior = true;
+
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+    }
 
     public function rules(): array
     {
-        $min = 2000;
         $max = (int) now()->addYears(5)->format('Y');
 
         return [
-            'inicio_anio' => [
-                'required',
-                'integer',
-                "min:$min",
-                "max:$max",
-                'digits:4',
-            ],
+            'inicio_anio' => ['required', 'integer', 'digits:4', 'min:2000', "max:{$max}"],
             'fin_anio' => [
                 'required',
                 'integer',
-                "min:$min",
-                "max:$max",
                 'digits:4',
+                'min:2000',
+                "max:{$max}",
                 function ($attribute, $value, $fail) {
-                    if ($this->inicio_anio !== null && (int) $value < (int) $this->inicio_anio) {
-                        $fail('El año final debe ser mayor o igual al año de inicio.');
-                    }
-
-                    // Regla sugerida (no obligatoria en muchos casos, pero útil)
-                    if ($this->inicio_anio !== null && ((int) $value - (int) $this->inicio_anio) > 1) {
-                        $fail('El ciclo escolar normalmente abarca 1 año (por ejemplo 2025–2026).');
+                    if ($this->inicio_anio !== null && (int) $value !== (int) $this->inicio_anio + 1) {
+                        $fail('El ciclo debe abarcar un año, por ejemplo 2026-2027.');
                     }
                 },
             ],
+            'marcar_como_actual' => ['boolean'],
+            'cerrar_anterior' => ['boolean'],
         ];
     }
 
-    public function messages(): array
+    public function updatedInicioAnio($value): void
     {
-        return [
-            'inicio_anio.required' => 'El año de inicio es obligatorio.',
-            'inicio_anio.integer' => 'El año de inicio debe ser numérico.',
-            'inicio_anio.digits' => 'El año de inicio debe tener 4 dígitos.',
-            'inicio_anio.min' => 'El año de inicio es demasiado antiguo.',
-            'inicio_anio.max' => 'El año de inicio es demasiado grande.',
-
-            'fin_anio.required' => 'El año de fin es obligatorio.',
-            'fin_anio.integer' => 'El año de fin debe ser numérico.',
-            'fin_anio.digits' => 'El año de fin debe tener 4 dígitos.',
-            'fin_anio.min' => 'El año de fin es demasiado antiguo.',
-            'fin_anio.max' => 'El año de fin es demasiado grande.',
-        ];
-    }
-
-    public function updated($property): void
-    {
-        $this->validateOnly($property);
+        if (filled($value) && is_numeric($value)) {
+            $this->fin_anio = (int) $value + 1;
+        }
     }
 
     public function guardar(): void
     {
         $data = $this->validate();
 
-        $existe = CicloEscolar::query()
+        if (CicloEscolar::query()
             ->where('inicio_anio', $data['inicio_anio'])
             ->where('fin_anio', $data['fin_anio'])
-            ->exists();
-
-        if ($existe) {
+            ->exists()) {
             $this->addError('inicio_anio', 'Este ciclo escolar ya existe.');
-            $this->addError('fin_anio', 'Este ciclo escolar ya existe.');
             return;
         }
 
-        CicloEscolar::create([
-            'inicio_anio' => (int) $data['inicio_anio'],
-            'fin_anio' => (int) $data['fin_anio'],
-        ]);
+        $nuevo = DB::transaction(function () use ($data) {
+            $marcarActual = (bool) $data['marcar_como_actual'] || !CicloEscolar::query()->exists();
+
+            if ($marcarActual) {
+                $actuales = CicloEscolar::query()->where('es_actual', true)->lockForUpdate()->get();
+
+                foreach ($actuales as $actual) {
+                    $actual->update([
+                        'es_actual' => false,
+                        'cerrado_at' => $data['cerrar_anterior'] ? now() : $actual->cerrado_at,
+                        'cerrado_por' => $data['cerrar_anterior'] ? auth()->id() : $actual->cerrado_por,
+                    ]);
+                }
+            }
+
+            return CicloEscolar::query()->create([
+                'inicio_anio' => (int) $data['inicio_anio'],
+                'fin_anio' => (int) $data['fin_anio'],
+                'es_actual' => $marcarActual,
+                'cerrado_at' => null,
+                'cerrado_por' => null,
+            ]);
+        });
 
         $this->reset(['inicio_anio', 'fin_anio']);
+        $this->marcar_como_actual = true;
+        $this->cerrar_anterior = true;
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Ciclo escolar creado',
+            'title' => "Ciclo {$nuevo->nombre} creado",
+            'text' => $nuevo->es_actual
+                ? 'Quedó marcado como ciclo actual.'
+                : 'Quedó registrado como ciclo histórico.',
             'position' => 'top-end',
         ]);
-
-
         $this->dispatch('refreshHeader');
         $this->dispatch('refreshCiclos');
     }

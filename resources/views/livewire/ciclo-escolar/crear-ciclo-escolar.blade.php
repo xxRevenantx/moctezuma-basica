@@ -1,132 +1,51 @@
-<div class="w-full mx-auto p-4 sm:p-6">
-    {{-- Header --}}
-    <div class="mb-6">
-        <h1 class="text-xl sm:text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Crear ciclo escolar
-        </h1>
-        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-            Captura manualmente los años (ej. 2025 – 2026).
-        </p>
+<div class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+    <div class="border-b border-slate-200 p-5 dark:border-neutral-700">
+        <h2 class="text-xl font-black text-slate-900 dark:text-white">Crear ciclo escolar</h2>
+        <p class="mt-1 text-sm text-slate-500">Al marcarlo como actual, el ciclo anterior puede cerrarse automáticamente sin perder su historial.</p>
     </div>
 
-    {{-- Card --}}
-    <div
-        class="relative overflow-hidden rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
-        <div class="h-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
-
-        {{-- Loader overlay --}}
-        <div wire:loading.flex wire:target="guardar"
-            class="absolute inset-0 z-10 items-center justify-center bg-white/60 dark:bg-zinc-950/60 backdrop-blur-sm">
-            <div
-                class="flex items-center gap-3 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/60 px-4 py-3 shadow-sm">
-                <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                <span class="text-sm text-zinc-700 dark:text-zinc-200">Guardando…</span>
-            </div>
+    <form wire:submit="guardar" class="space-y-5 p-5">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Año de inicio</span>
+                <input wire:model.live.blur="inicio_anio" type="number" min="2000" max="{{ now()->addYears(5)->year }}" placeholder="2026"
+                    class="w-full rounded-xl border-slate-300 bg-white dark:border-neutral-700 dark:bg-neutral-800" />
+                @error('inicio_anio') <p class="text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+            </label>
+            <label class="space-y-1.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Año final</span>
+                <input wire:model="fin_anio" type="number" min="2001" max="{{ now()->addYears(6)->year }}" placeholder="2027"
+                    class="w-full rounded-xl border-slate-300 bg-white dark:border-neutral-700 dark:bg-neutral-800" />
+                @error('fin_anio') <p class="text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+            </label>
         </div>
 
-        <div class="p-5 sm:p-7">
-            {{-- Preview --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-500/15 via-blue-600/15 to-indigo-600/15 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-center">
-                        <svg class="h-5 w-5 text-zinc-800 dark:text-zinc-100" viewBox="0 0 24 24" fill="none">
-                            <path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" />
-                            <path d="M6 7h12a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V9a2 2 0 012-2Z"
-                                stroke="currentColor" stroke-width="2" />
-                            <path d="M8 11h8M8 15h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                        </svg>
-                    </div>
-
-                    <div>
-                        <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                            Vista previa del ciclo
-                        </div>
-                        <div class="text-xs text-zinc-600 dark:text-zinc-300">
-                            {{ $inicio_anio ?: '----' }} — {{ $fin_anio ?: '----' }}
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs
-                            border border-zinc-200/70 dark:border-zinc-800
-                            bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">
-                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    Formato recomendado: 4 dígitos
-                </div>
-            </div>
-
-            <form wire:submit.prevent="guardar" class="space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {{-- Inicio --}}
-                    <div>
-                        <flux:field>
-                            <flux:label>Año de inicio</flux:label>
-
-                            <div class="mt-2">
-                                <flux:input type="number" inputmode="numeric" min="2000"
-                                    max="{{ now()->addYears(5)->format('Y') }}" step="1" placeholder="Ej. 2025"
-                                    wire:model="inicio_anio" />
-                            </div>
-
-                            <div class="mt-2 text-xs text-zinc-600 dark:text-zinc-300">
-                                Escribe el año con 4 dígitos.
-                            </div>
-
-                            <flux:error name="inicio_anio" />
-                        </flux:field>
-                    </div>
-
-                    {{-- Fin --}}
-                    <div>
-                        <flux:field>
-                            <flux:label>Año de fin</flux:label>
-
-                            <div class="mt-2">
-                                <flux:input type="number" inputmode="numeric" min="2000"
-                                    max="{{ now()->addYears(5)->format('Y') }}" step="1" placeholder="Ej. 2026"
-                                    wire:model="fin_anio" />
-                            </div>
-
-                            <div class="mt-2 text-xs text-zinc-600 dark:text-zinc-300">
-                                Debe ser igual o mayor al año de inicio.
-                            </div>
-
-                            <flux:error name="fin_anio" />
-                        </flux:field>
-                    </div>
-                </div>
-
-                {{-- Tip box --}}
-                <div
-                    class="rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-4">
-                    <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        Reglas rápidas
-                    </div>
-                    <ul class="mt-2 text-sm text-zinc-700 dark:text-zinc-200 list-disc pl-5 space-y-1">
-                        <li>Ambos años deben tener 4 dígitos.</li>
-                        <li>El año final debe ser mayor o igual al año de inicio.</li>
-                        <li>Evita guardar ciclos duplicados.</li>
-                    </ul>
-                </div>
-
-                {{-- Actions --}}
-                <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
-
-                    <button type="submit"
-                        class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white
-                               bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600
-                               hover:opacity-95 transition shadow-sm">
-                        Guardar ciclo
-                    </button>
-                </div>
-            </form>
+        <div class="rounded-2xl bg-sky-50 p-4 text-center dark:bg-sky-950/20">
+            <p class="text-xs font-bold uppercase tracking-wide text-sky-600">Vista previa</p>
+            <p class="mt-1 text-2xl font-black text-sky-900 dark:text-sky-100">{{ $inicio_anio ?: '----' }}-{{ $fin_anio ?: '----' }}</p>
         </div>
-    </div>
+
+        <div class="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
+            <label class="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" wire:model.live="marcar_como_actual" class="mt-1 rounded border-slate-300 text-sky-600" />
+                <span>
+                    <b class="block text-sm text-slate-900 dark:text-white">Marcar como ciclo actual</b>
+                    <span class="text-xs text-slate-500">Será el ciclo seleccionado de forma predeterminada en matrícula, bajas y reportes.</span>
+                </span>
+            </label>
+            <label class="flex cursor-pointer items-start gap-3 {{ !$marcar_como_actual ? 'opacity-50' : '' }}">
+                <input type="checkbox" wire:model="cerrar_anterior" @disabled(!$marcar_como_actual) class="mt-1 rounded border-slate-300 text-amber-600" />
+                <span>
+                    <b class="block text-sm text-slate-900 dark:text-white">Cerrar automáticamente el ciclo anterior</b>
+                    <span class="text-xs text-slate-500">El historial seguirá disponible y el administrador podrá reabrirlo para correcciones.</span>
+                </span>
+            </label>
+        </div>
+
+        <button type="submit" wire:loading.attr="disabled"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-600/20 disabled:opacity-50">
+            <span wire:loading.remove wire:target="guardar" class="inline-flex items-center gap-2"><flux:icon.plus class="h-4 w-4" /> Crear ciclo escolar</span>
+            <span wire:loading wire:target="guardar">Guardando…</span>
+        </button>
+    </form>
 </div>

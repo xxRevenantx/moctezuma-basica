@@ -121,12 +121,19 @@
                     @endif
 
                     {{-- Académica --}}
-                    <flux:sidebar.group expandable :expanded="false" heading="ACADÉMICA"
+                    <flux:sidebar.group expandable :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos')" heading="ACADÉMICA"
                         class="grid gap-1 text-xs text-zinc-300">
                         <flux:navlist.item icon="graduation-cap" :href="route('misrutas.alumnos')"
                             :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
                             Alumnos
                         </flux:navlist.item>
+
+                        @if (auth()->user()?->is_admin)
+                            <flux:navlist.item icon="database-backup" :href="route('misrutas.respaldos-academicos')"
+                                :current="request()->routeIs('misrutas.respaldos-academicos')" wire:navigate>
+                                Respaldos académicos
+                            </flux:navlist.item>
+                        @endif
 
                         <flux:navlist.item icon="school" :href="route('misrutas.escuela')"
                             :current="request()->routeIs('misrutas.escuela')" wire:navigate>

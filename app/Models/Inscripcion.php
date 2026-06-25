@@ -130,6 +130,21 @@ class Inscripcion extends Model
     public function trayectoriaActual()
     {
         return $this->hasOne(TrayectoriaAcademica::class, 'inscripcion_id')
+            ->where('es_actual', true)
+            ->latestOfMany();
+    }
+
+    public function matriculasAlumno()
+    {
+        return $this->hasMany(MatriculaAlumno::class, 'inscripcion_id')
+            ->orderByDesc('vigente')
+            ->orderByDesc('fecha_asignacion');
+    }
+
+    public function matriculaVigente()
+    {
+        return $this->hasOne(MatriculaAlumno::class, 'inscripcion_id')
+            ->where('vigente', true)
             ->latestOfMany();
     }
 
@@ -173,4 +188,21 @@ class Inscripcion extends Model
     {
         return $this->hasOne(LugarPreescolar::class, 'inscripcion_id');
     }
+
+    protected static function booted(): void
+    {
+        static::forceDeleting(function (Inscripcion $inscripcion) {
+            $tieneHistorial = $inscripcion->trayectoriasAcademicas()->exists()
+                || $inscripcion->movimientos()->exists()
+                || $inscripcion->calificaciones()->exists()
+                || $inscripcion->documentos()->exists();
+
+            if ($tieneHistorial) {
+                throw new \RuntimeException(
+                    'El alumno tiene historial académico y no puede eliminarse definitivamente. Usa archivar o dar de baja.'
+                );
+            }
+        });
+    }
+
 }

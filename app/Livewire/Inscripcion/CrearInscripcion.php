@@ -15,6 +15,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Models\TrayectoriaAcademica;
+use App\Services\TrayectoriaAcademicaService;
 use App\Services\CurpService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1316,21 +1317,22 @@ class CrearInscripcion extends Component
                 'activo' => true,
             ]);
 
-            TrayectoriaAcademica::query()->create([
-                'inscripcion_id' => $inscripcion->id,
-                'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
-                'ciclo_id' => (int) $data['ciclo_id'],
-                'nivel_id' => (int) $data['nivel_id'],
-                'grado_id' => (int) $data['grado_id'],
-                'generacion_id' => (int) $data['generacion_id'],
-                'grupo_id' => (int) $data['grupo_id'],
-                'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
-                'activo' => true,
-                'fecha_baja' => null,
-                'motivo_baja' => null,
-                'observaciones_baja' => null,
-                'fecha_inscripcion' => $data['fecha_inscripcion'],
-            ]);
+            app(TrayectoriaAcademicaService::class)->registrarInscripcionEnContexto(
+                $inscripcion,
+                [
+                    'matricula' => $data['matricula'],
+                    'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
+                    'ciclo_id' => (int) $data['ciclo_id'],
+                    'nivel_id' => (int) $data['nivel_id'],
+                    'grado_id' => (int) $data['grado_id'],
+                    'generacion_id' => (int) $data['generacion_id'],
+                    'grupo_id' => (int) $data['grupo_id'],
+                    'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                    'fecha_inscripcion' => $data['fecha_inscripcion'],
+                ],
+                auth()->id(),
+                'inscripcion'
+            );
         });
 
         $this->dispatch('swal', [

@@ -739,14 +739,34 @@ class ExpedientesDigitales extends Component
                     'generacion:id,anio_ingreso,anio_egreso',
                     'semestre:id,numero',
                     'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
-                    'trayectoriasAcademicas.nivel:id,nombre,slug,color',
-                    'trayectoriasAcademicas.grado:id,nombre,orden',
-                    'trayectoriasAcademicas.grupo:id,asignacion_grupo_id',
-                    'trayectoriasAcademicas.grupo.asignacionGrupo:id,nombre',
-                    'trayectoriasAcademicas.cicloEscolar:id,inicio_anio,fin_anio',
-                    'movimientos.usuario:id,name',
-                    'movimientos.trayectoriaAcademica.nivel:id,nombre,slug',
-                    'movimientos.trayectoriaAcademica.grado:id,nombre,orden',
+                    'trayectoriasAcademicas' => fn (Builder $query) => $query
+                        ->with([
+                            'nivel:id,nombre,slug,color',
+                            'grado:id,nombre,orden',
+                            'grupo:id,asignacion_grupo_id',
+                            'grupo.asignacionGrupo:id,nombre',
+                            'generacion:id,anio_ingreso,anio_egreso',
+                            'semestre:id,numero',
+                            'cicloEscolar:id,inicio_anio,fin_anio,es_actual,cerrado_at',
+                            'ciclo:id,ciclo',
+                        ])
+                        ->orderByDesc('ciclo_escolar_id')
+                        ->orderByDesc('ciclo_id')
+                        ->orderByDesc('numero_estancia')
+                        ->orderByDesc('id'),
+                    'matriculasAlumno.nivel:id,nombre,slug',
+                    'movimientos' => fn (Builder $query) => $query
+                        ->with([
+                            'usuario:id,name',
+                            'cicloEscolar:id,inicio_anio,fin_anio',
+                            'ciclo:id,ciclo',
+                            'trayectoriaAcademica.nivel:id,nombre,slug',
+                            'trayectoriaAcademica.grado:id,nombre,orden',
+                            'trayectoriaAcademica.grupo:id,asignacion_grupo_id',
+                            'trayectoriaAcademica.grupo.asignacionGrupo:id,nombre',
+                        ])
+                        ->orderByDesc('fecha')
+                        ->orderByDesc('id'),
                     'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
                     'documentos.nivel:id,nombre,slug,color',
                     'documentos.grado:id,nombre,orden',

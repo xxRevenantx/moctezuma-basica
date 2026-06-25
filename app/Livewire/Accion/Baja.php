@@ -2,19 +2,17 @@
 
 namespace App\Livewire\Accion;
 
+use App\Models\Ciclo;
+use App\Models\CicloEscolar;
 use App\Models\Constancia as ConstanciaModelo;
 use App\Models\ConstanciaPlantilla;
-use App\Models\Inscripcion;
-use App\Models\MovimientoAlumno;
 use App\Models\Nivel;
 use App\Models\TrayectoriaAcademica;
+use App\Services\TrayectoriaAcademicaService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -22,12 +20,14 @@ class Baja extends Component
 {
     use WithPagination;
 
-    public string $slug_nivel;
-
-    public Collection $niveles;
+    public string $slug_nivel = '';
     public ?Nivel $nivel = null;
-    public ?int $nivel_id = null;
+    public Collection $niveles;
+    public Collection $cicloEscolares;
+    public Collection $ciclos;
 
+    public ?int $ciclo_escolar_id = null;
+    public ?int $ciclo_id = null;
     public string $search = '';
 
     public array $selected = [];
@@ -38,32 +38,39 @@ class Baja extends Component
     public ?string $fecha_baja = null;
     public ?string $observaciones_baja = null;
 
-    public bool $esBachillerato = false;
+    public ?string $fecha_reingreso = null;
+    public ?string $motivo_reingreso = null;
+
+    protected $paginationTheme = 'tailwind';
 
     public function mount(string $slug_nivel): void
     {
+        abort_unless(auth()->user()?->is_admin, 403);
+
         $this->slug_nivel = $slug_nivel;
+        $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
+        $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
+        $this->cicloEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
+        $this->ciclos = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
 
-        $this->niveles = Nivel::query()
-            ->orderBy('id')
-            ->get();
-
-        $this->nivel = Nivel::query()
-            ->where('slug', $this->slug_nivel)
-            ->firstOrFail();
-
-        $this->nivel_id = $this->nivel->id;
-        $this->esBachillerato = (int) $this->nivel_id === 4
-            || $this->slug_nivel === 'bachillerato';
-
-        $this->fecha_baja = now()->format('Y-m-d');
+        $this->ciclo_escolar_id = $this->cicloEscolares->firstWhere('es_actual', true)?->id
+            ?: $this->cicloEscolares->first()?->id;
+        $this->ciclo_id = $this->ciclos->first()?->id;
+        $this->fecha_baja = now()->toDateString();
+        $this->fecha_reingreso = now()->toDateString();
     }
 
     protected function rules(): array
     {
         return [
+            'ciclo_escolar_id' => ['required', 'exists:ciclo_escolares,id'],
+            'ciclo_id' => ['required', 'exists:ciclos,id'],
             'selected' => ['required', 'array', 'min:1'],
-            'selected.*' => ['integer', 'exists:inscripciones,id'],
+            'selected.*' => ['integer', 'exists:trayectorias_academicas,id'],
             'tipo_movimiento' => ['required', 'in:baja_definitiva,baja_temporal,traslado'],
             'motivo_baja' => ['required', 'string', 'max:1000'],
             'fecha_baja' => ['required', 'date'],
@@ -74,77 +81,33 @@ class Baja extends Component
     protected function messages(): array
     {
         return [
-            'selected.required' => 'Selecciona al menos un alumno para aplicar la baja.',
-            'selected.min' => 'Selecciona al menos un alumno para aplicar la baja.',
-            'tipo_movimiento.required' => 'Selecciona el tipo de movimiento.',
-            'tipo_movimiento.in' => 'El tipo de movimiento no es válido.',
+            'selected.required' => 'Selecciona al menos un alumno.',
+            'selected.min' => 'Selecciona al menos un alumno.',
             'motivo_baja.required' => 'Escribe el motivo de la baja o traslado.',
-            'motivo_baja.max' => 'El motivo no debe superar los 1000 caracteres.',
-            'fecha_baja.required' => 'Selecciona la fecha de baja.',
-            'fecha_baja.date' => 'La fecha de baja no es válida.',
-            'observaciones_baja.max' => 'Las observaciones no deben superar los 1000 caracteres.',
+            'fecha_baja.required' => 'Selecciona la fecha del movimiento.',
         ];
     }
 
-    public function updatedSearch(): void
+    public function updated($property): void
     {
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-
-        $this->selected = [];
-        $this->selectPage = false;
+        if (in_array($property, ['ciclo_escolar_id', 'ciclo_id', 'search'], true)) {
+            $this->selected = [];
+            $this->selectPage = false;
+            $this->resetPage();
+            $this->resetPage('bajasPage');
+        }
     }
 
     public function updatedSelectPage(bool $value): void
     {
-        if (!$value) {
-            $this->selected = [];
-            return;
-        }
-
-        $this->selected = $this->rows()
-            ->pluck('id')
-            ->map(fn($id) => (string) $id)
-            ->toArray();
+        $this->selected = $value
+            ? $this->rows()->getCollection()->pluck('id')->map(fn($id) => (string) $id)->all()
+            : [];
     }
 
-    #[Computed]
-    public function selectedCount(): int
+    public function getSelectedCountProperty(): int
     {
         return count($this->selected);
-    }
-
-    public function textoGrupo($grupo): string
-    {
-        if (!$grupo) {
-            return '—';
-        }
-
-        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
-    }
-
-    public function getTotalProperty(): int
-    {
-        return $this->baseQuery()->count();
-    }
-
-    public function getTotalBajasProperty(): int
-    {
-        return $this->bajasQuery()->count();
-    }
-
-    public function getHombresProperty(): int
-    {
-        return $this->baseQuery()
-            ->where('genero', 'H')
-            ->count();
-    }
-
-    public function getMujeresProperty(): int
-    {
-        return $this->baseQuery()
-            ->where('genero', 'M')
-            ->count();
     }
 
     public function clearSearch(): void
@@ -152,7 +115,6 @@ class Baja extends Component
         $this->search = '';
         $this->selected = [];
         $this->selectPage = false;
-
         $this->resetPage();
         $this->resetPage('bajasPage');
     }
@@ -161,184 +123,114 @@ class Baja extends Component
     {
         $this->validate();
 
-        $ids = collect($this->selected)
-            ->filter()
-            ->map(fn($id) => (int) $id)
-            ->unique()
-            ->values();
+        $trayectorias = $this->activosQuery()
+            ->whereIn('trayectorias_academicas.id', collect($this->selected)->map(fn($id) => (int) $id))
+            ->get();
 
-        if ($ids->isEmpty()) {
-            $this->addError('selected', 'Selecciona al menos un alumno.');
+        if ($trayectorias->isEmpty()) {
+            $this->addError('selected', 'Los alumnos seleccionados ya no están disponibles en este ciclo y corte.');
             return;
         }
 
-        DB::transaction(function () use ($ids) {
-            $alumnos = $this->baseQuery()
-                ->whereIn('id', $ids)
-                ->lockForUpdate()
-                ->get();
+        $service = app(TrayectoriaAcademicaService::class);
+        $aplicadas = 0;
 
-            foreach ($alumnos as $alumno) {
-                $datos = [
-                    'activo' => false,
-                    'fecha_baja' => $this->fecha_baja,
-                    'motivo_baja' => $this->motivo_baja,
-                    'observaciones_baja' => $this->observaciones_baja,
-                ];
-
-                if (Schema::hasColumn('inscripciones', 'status')) {
-                    $datos['status'] = 'Baja';
-                }
-
-                $alumno->update($datos);
-
-                $trayectoria = TrayectoriaAcademica::query()
-                    ->where('inscripcion_id', $alumno->id)
-                    ->latest('id')
-                    ->first();
-
-                if ($trayectoria) {
-                    $trayectoria->update([
-                        'activo' => false,
-                        'fecha_baja' => $this->fecha_baja,
-                        'motivo_baja' => $this->motivo_baja,
-                        'observaciones_baja' => $this->observaciones_baja,
-                    ]);
-                }
-
-                MovimientoAlumno::query()->create([
-                    'inscripcion_id' => $alumno->id,
-                    'trayectoria_academica_id' => $trayectoria?->id,
-                    'tipo' => $this->tipo_movimiento,
-                    'fecha' => $this->fecha_baja,
-                    'motivo' => trim((string) $this->motivo_baja),
-                    'observaciones' => trim((string) $this->observaciones_baja) ?: null,
-                    'registrado_por' => auth()->id(),
-                ]);
-            }
-        });
-
-        $totalBajas = $ids->count();
+        foreach ($trayectorias as $trayectoria) {
+            $service->aplicarBaja(
+                $trayectoria->inscripcion,
+                (int) $this->ciclo_escolar_id,
+                (int) $this->ciclo_id,
+                $this->tipo_movimiento,
+                (string) $this->fecha_baja,
+                trim((string) $this->motivo_baja),
+                filled($this->observaciones_baja) ? trim((string) $this->observaciones_baja) : null,
+                auth()->id()
+            );
+            $aplicadas++;
+        }
 
         $this->selected = [];
         $this->selectPage = false;
         $this->tipo_movimiento = 'baja_definitiva';
         $this->motivo_baja = null;
         $this->observaciones_baja = null;
-        $this->fecha_baja = now()->format('Y-m-d');
+        $this->fecha_baja = now()->toDateString();
+        $this->resetPage();
+        $this->resetPage('bajasPage');
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Baja aplicada correctamente',
-            'text' => $totalBajas === 1
-                ? 'Se dio de baja 1 alumno.'
-                : "Se dieron de baja {$totalBajas} alumnos.",
+            'title' => $aplicadas === 1 ? 'Baja registrada' : "{$aplicadas} bajas registradas",
+            'text' => 'La ubicación anterior y la línea de tiempo quedaron conservadas.',
             'position' => 'top-end',
         ]);
-
-        $this->resetPage();
-        $this->resetPage('bajasPage');
     }
 
-    public function reactivarAlumno(int $inscripcionId): void
+    public function reactivarAlumno(int $trayectoriaId): void
     {
-        DB::transaction(function () use ($inscripcionId) {
-            $alumno = $this->bajasQuery()
-                ->where('id', $inscripcionId)
-                ->lockForUpdate()
-                ->firstOrFail();
+        $this->validate([
+            'fecha_reingreso' => ['required', 'date'],
+            'motivo_reingreso' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-            $trayectoriaAnterior = TrayectoriaAcademica::query()
-                ->where('inscripcion_id', $alumno->id)
-                ->latest('id')
-                ->lockForUpdate()
-                ->first();
+        $trayectoria = $this->bajasQuery()->whereKey($trayectoriaId)->firstOrFail();
 
-            if ($trayectoriaAnterior) {
-                // La BD permite una sola trayectoria por alumno y ciclo escolar.
-                // Se reactiva la misma etapa y el historial de baja queda en movimientos_alumnos.
-                $trayectoriaAnterior->update([
-                    'activo' => true,
-                    'fecha_inscripcion' => now(),
-                ]);
-            }
+        app(TrayectoriaAcademicaService::class)->reingresar(
+            $trayectoria->inscripcion,
+            (int) $this->ciclo_escolar_id,
+            (int) $this->ciclo_id,
+            (string) $this->fecha_reingreso,
+            $this->motivo_reingreso ?: 'Reingreso del alumno.',
+            'Se creó una nueva estancia y se conservó la baja anterior.',
+            auth()->id()
+        );
 
-            $datos = [
-                'activo' => true,
-                'fecha_baja' => null,
-                'motivo_baja' => null,
-                'observaciones_baja' => null,
-            ];
-
-            if (Schema::hasColumn('inscripciones', 'status')) {
-                $datos['status'] = 'Reingreso';
-            }
-
-            $alumno->update($datos);
-
-            MovimientoAlumno::query()->create([
-                'inscripcion_id' => $alumno->id,
-                'trayectoria_academica_id' => $trayectoriaAnterior?->id,
-                'tipo' => 'reingreso',
-                'fecha' => now()->toDateString(),
-                'motivo' => 'Reingreso del alumno',
-                'observaciones' => 'Se reactivó la inscripción sin eliminar el historial de baja.',
-                'registrado_por' => auth()->id(),
-            ]);
-        });
+        $this->motivo_reingreso = null;
+        $this->fecha_reingreso = now()->toDateString();
+        $this->resetPage();
+        $this->resetPage('bajasPage');
 
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => 'Reingreso registrado',
-            'text' => 'El alumno volvió a quedar activo y la baja anterior se conservó en su historial.',
+            'text' => 'Se creó una nueva estancia sin borrar la baja anterior.',
             'position' => 'top-end',
         ]);
-
-        $this->resetPage();
-        $this->resetPage('bajasPage');
     }
 
-    public function generarConstanciaBaja(int $inscripcionId): void
+    public function generarConstanciaBaja(int $trayectoriaId): void
     {
-        $alumno = $this->bajasQuery()
-            ->where('id', $inscripcionId)
-            ->firstOrFail();
-
+        $trayectoria = $this->bajasQuery()->whereKey($trayectoriaId)->firstOrFail();
+        $alumno = $trayectoria->inscripcion;
         $plantilla = ConstanciaPlantilla::query()
             ->where('clave', 'baja-traslado')
             ->where('activo', true)
             ->firstOrFail();
 
-        $movimiento = MovimientoAlumno::query()
-            ->where('inscripcion_id', $alumno->id)
-            ->whereIn('tipo', ['baja_definitiva', 'baja_temporal', 'traslado'])
-            ->latest('fecha')
-            ->latest('id')
-            ->first();
-
-        $tipoMovimiento = match ($movimiento?->tipo) {
+        $folio = $this->generarFolioConstancia();
+        $tipo = match ($trayectoria->estatus) {
             'baja_temporal' => 'baja temporal',
             'traslado' => 'traslado',
             default => 'baja definitiva',
         };
 
-        $folio = $this->generarFolioConstancia();
+        $grupo = $trayectoria->grupo?->asignacionGrupo?->nombre
+            ?? $trayectoria->grupo?->grupo
+            ?? $trayectoria->grupo?->nombre
+            ?? '';
 
         $variables = [
-            '@nombre_completo' => trim(($alumno->nombre ?? '') . ' ' . ($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? '')),
-            '@matricula' => $alumno->matricula ?? '',
+            '@nombre_completo' => trim("{$alumno->nombre} {$alumno->apellido_paterno} {$alumno->apellido_materno}"),
+            '@matricula' => $alumno->matriculasAlumno->firstWhere('nivel_id', $trayectoria->nivel_id)?->matricula ?: $alumno->matricula,
             '@curp' => $alumno->curp ?? '',
-            '@nivel' => $alumno->nivel?->nombre ?? '',
-            '@grado' => $alumno->grado?->nombre ?? '',
-            '@grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? '',
-            '@fecha_baja' => $movimiento?->fecha?->format('d/m/Y')
-                ?? ($alumno->fecha_baja ? \Carbon\Carbon::parse($alumno->fecha_baja)->format('d/m/Y') : ''),
-            '@tipo_movimiento' => $tipoMovimiento,
-            '@motivo_baja' => $movimiento?->motivo ?? $alumno->motivo_baja ?? '',
+            '@nivel' => $trayectoria->nivel?->nombre ?? '',
+            '@grado' => $trayectoria->grado?->nombre ?? '',
+            '@grupo' => $grupo,
+            '@fecha_baja' => optional($trayectoria->fecha_baja)->format('d/m/Y') ?: '',
+            '@tipo_movimiento' => $tipo,
+            '@motivo_baja' => $trayectoria->motivo_baja ?? '',
             '@folio' => $folio,
         ];
-
-        $contenido = str_replace(array_keys($variables), array_values($variables), $plantilla->contenido_html);
 
         $constancia = ConstanciaModelo::query()->create([
             'inscripcion_id' => $alumno->id,
@@ -348,7 +240,7 @@ class Baja extends Component
             'dirigido_a' => null,
             'modo_descarga' => 'alumno',
             'periodos_calificaciones' => null,
-            'contenido_generado_html' => $contenido,
+            'contenido_generado_html' => str_replace(array_keys($variables), array_values($variables), $plantilla->contenido_html),
             'estado_documento' => 'emitida',
         ]);
 
@@ -357,137 +249,111 @@ class Baja extends Component
 
     private function generarFolioConstancia(): string
     {
-        $siguiente = (ConstanciaModelo::query()->max('id') ?? 0) + 1;
-
-        return 'CONST-' . now()->format('Y') . '-' . Str::padLeft((string) $siguiente, 5, '0');
+        return 'CONST-' . now()->format('Y') . '-' . Str::padLeft((string) ((ConstanciaModelo::max('id') ?? 0) + 1), 5, '0');
     }
 
     public function rows(): LengthAwarePaginator
     {
-        return $this->baseQuery()
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->paginate(10);
+        return $this->activosQuery()->paginate(10);
     }
 
     public function bajasRows(): LengthAwarePaginator
     {
-        return $this->bajasQuery()
-            ->orderByDesc('fecha_baja')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->paginate(10, ['*'], 'bajasPage');
+        return $this->bajasQuery()->orderByDesc('fecha_baja')->paginate(10, ['trayectorias_academicas.*'], 'bajasPage');
     }
 
-    private function baseQuery(): Builder
+    private function baseContextQuery(): Builder
     {
-        $query = Inscripcion::query()
+        $query = TrayectoriaAcademica::query()
             ->with([
-                'generacion',
-                'grado',
-                'grupo.asignacionGrupo',
-                'semestre',
-                'nivel',
-                'ultimoMovimiento',
+                'inscripcion' => fn($q) => $q->withTrashed()->with('matriculasAlumno'),
+                'nivel:id,nombre,slug',
+                'grado:id,nombre,orden',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id,numero',
+                'cicloEscolar:id,inicio_anio,fin_anio,es_actual,cerrado_at',
+                'ciclo:id,ciclo',
             ])
-            ->where('nivel_id', $this->nivel_id)
-            ->where('activo', true)
-            ->whereNull('fecha_baja')
-            ->whereNull('motivo_baja')
-            ->whereNull('observaciones_baja')
-            ->when(Schema::hasColumn('inscripciones', 'status'), function (Builder $query) {
-                $query->where(function (Builder $subquery) {
-                    $subquery->whereNull('status')
-                        ->orWhereNotIn('status', [
-                            'Baja',
-                            'BAJA',
-                            'baja',
-                            'Inactivo',
-                            'INACTIVO',
-                            'inactivo',
-                        ]);
+            ->where('trayectorias_academicas.ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('trayectorias_academicas.ciclo_id', $this->ciclo_id)
+            ->where('trayectorias_academicas.nivel_id', $this->nivel?->id)
+            ->where('trayectorias_academicas.vigente_en_corte', true)
+            ->whereHas('inscripcion', fn(Builder $q) => $q->whereNull('deleted_at'));
+
+        $termino = preg_replace('/\s+/', ' ', trim($this->search));
+        if ($termino !== '') {
+            $like = "%{$termino}%";
+            $query->whereHas('inscripcion', function (Builder $q) use ($like) {
+                $q->where(function (Builder $buscar) use ($like) {
+                    $buscar->where('matricula', 'like', $like)
+                        ->orWhere('folio', 'like', $like)
+                        ->orWhere('curp', 'like', $like)
+                        ->orWhere('nombre', 'like', $like)
+                        ->orWhere('apellido_paterno', 'like', $like)
+                        ->orWhere('apellido_materno', 'like', $like)
+                        ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$like])
+                        ->orWhereHas('matriculasAlumno', fn(Builder $m) => $m->where('matricula', 'like', $like));
                 });
             });
+        }
 
-        return $this->applySearch($query);
+        return $query
+            ->join('inscripciones', 'inscripciones.id', '=', 'trayectorias_academicas.inscripcion_id')
+            ->orderBy('inscripciones.apellido_paterno')
+            ->orderBy('inscripciones.apellido_materno')
+            ->orderBy('inscripciones.nombre')
+            ->select('trayectorias_academicas.*');
+    }
+
+    private function activosQuery(): Builder
+    {
+        return $this->baseContextQuery()
+            ->where('trayectorias_academicas.activo', true)
+            ->whereNotIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado']);
     }
 
     private function bajasQuery(): Builder
     {
-        $query = Inscripcion::query()
-            ->with([
-                'generacion',
-                'grado',
-                'grupo.asignacionGrupo',
-                'semestre',
-                'nivel',
-                'ultimoMovimiento',
-            ])
-            ->where('nivel_id', $this->nivel_id)
-            ->where(function (Builder $query) {
-                $query->where('activo', false)
-                    ->orWhereNotNull('fecha_baja')
-                    ->orWhereNotNull('motivo_baja')
-                    ->orWhereNotNull('observaciones_baja');
-            });
-
-        return $this->applySearch($query);
+        return $this->baseContextQuery()
+            ->whereIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado']);
     }
 
-    private function applySearch(Builder $query): Builder
+    public function textoGrupo($grupo): string
     {
-        $termino = preg_replace('/\s+/', ' ', trim($this->search));
+        return $grupo?->asignacionGrupo?->nombre
+            ?? $grupo?->grupo
+            ?? $grupo?->nombre
+            ?? '—';
+    }
 
-        if (blank($termino)) {
-            return $query;
-        }
-
-        $buscar = "%{$termino}%";
-
-        return $query->where(function (Builder $subquery) use ($buscar) {
-            $subquery
-                ->where('matricula', 'like', $buscar)
-                ->orWhere('folio', 'like', $buscar)
-                ->orWhere('curp', 'like', $buscar)
-                ->orWhere('nombre', 'like', $buscar)
-                ->orWhere('apellido_paterno', 'like', $buscar)
-                ->orWhere('apellido_materno', 'like', $buscar)
-                ->orWhereRaw(
-                    "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
-                    [$buscar]
-                )
-                ->orWhereRaw(
-                    "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
-                    [$buscar]
-                )
-                ->orWhereHas('generacion', function (Builder $query) use ($buscar) {
-                    $query->where('anio_ingreso', 'like', $buscar)
-                        ->orWhere('anio_egreso', 'like', $buscar)
-                        ->orWhereRaw(
-                            "CONCAT(anio_ingreso, ' - ', anio_egreso) LIKE ?",
-                            [$buscar]
-                        );
-                })
-                ->orWhereHas('grado', fn(Builder $query) => $query->where('nombre', 'like', $buscar))
-                ->orWhereHas(
-                    'grupo.asignacionGrupo',
-                    fn(Builder $query) => $query->where('nombre', 'like', $buscar)
-                )
-                ->orWhereHas('semestre', fn(Builder $query) => $query->where('numero', 'like', $buscar));
-        });
+    public function etiquetaEstatus(string $estatus): string
+    {
+        return match ($estatus) {
+            'baja_temporal' => 'Baja temporal',
+            'baja_definitiva' => 'Baja definitiva',
+            'traslado' => 'Traslado',
+            'reingreso' => 'Reingreso',
+            'no_promovido' => 'No promovido',
+            default => 'Activo',
+        };
     }
 
     public function render()
     {
+        $rows = $this->rows();
+        $bajasRows = $this->bajasRows();
+        $activos = $this->activosQuery();
+
         return view('livewire.accion.baja', [
-            'rows' => $this->rows(),
-            'bajasRows' => $this->bajasRows(),
-            'total' => $this->total,
-            'totalBajas' => $this->totalBajas,
-            'hombres' => $this->hombres,
-            'mujeres' => $this->mujeres,
+            'rows' => $rows,
+            'bajasRows' => $bajasRows,
+            'total' => (clone $activos)->count(),
+            'hombres' => (clone $activos)->where('inscripciones.genero', 'H')->count(),
+            'mujeres' => (clone $activos)->where('inscripciones.genero', 'M')->count(),
+            'totalBajas' => $this->bajasQuery()->count(),
+            'cicloSeleccionado' => $this->cicloEscolares->firstWhere('id', $this->ciclo_escolar_id),
+            'corteSeleccionado' => $this->ciclos->firstWhere('id', $this->ciclo_id),
         ]);
     }
 }

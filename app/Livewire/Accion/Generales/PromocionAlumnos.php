@@ -11,23 +11,22 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\TrayectoriaAcademica;
+use App\Services\TrayectoriaAcademicaService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class PromocionAlumnos extends Component
 {
     public ?string $slug_nivel = null;
-
     public ?Nivel $nivel = null;
-
     public Collection $niveles;
     public Collection $cicloEscolares;
     public Collection $ciclos;
 
     public ?int $ciclo_escolar_origen_id = null;
+    public ?int $ciclo_id_origen = null;
     public ?int $nivel_origen_id = null;
     public ?int $grado_origen_id = null;
     public ?int $generacion_origen_id = null;
@@ -42,71 +41,62 @@ class PromocionAlumnos extends Component
     public ?int $semestre_destino_id = null;
     public ?int $grupo_destino_id = null;
 
+    public string $resultado_promocion = 'promovido';
+    public ?string $fecha_promocion = null;
     public string $search = '';
     public bool $seleccionarTodos = false;
     public bool $ocultarPromovidos = true;
     public bool $confirmarPromocion = false;
-
     public array $seleccionados = [];
 
     public function mount(?string $slug_nivel = null): void
     {
+        abort_unless(auth()->user()?->is_admin, 403);
+
         $this->slug_nivel = $slug_nivel;
-
-        $this->nivel = Nivel::query()
-            ->where('slug', $slug_nivel)
-            ->first();
-
-        $this->niveles = Nivel::query()
-            ->orderBy('id')
-            ->get(['id', 'nombre', 'slug']);
-
+        $this->nivel = Nivel::query()->where('slug', $slug_nivel)->first();
+        $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
         $this->cicloEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
-            ->orderByDesc('id')
-            ->get(['id', 'inicio_anio', 'fin_anio']);
+            ->orderByDesc('fin_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
+        $this->ciclos = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
 
-        $this->ciclos = Ciclo::query()
-            ->orderBy('id')
-            ->get(['id', 'ciclo']);
+        $actual = $this->cicloEscolares->firstWhere('es_actual', true) ?: $this->cicloEscolares->first();
+        $anterior = $this->cicloEscolares->first(fn($item) => $actual && $item->id !== $actual->id) ?: $actual;
 
-        $cicloActual = $this->cicloEscolares->first();
-        $cicloDestino = $this->cicloEscolares->skip(1)->first() ?: $cicloActual;
-
-        $this->ciclo_escolar_origen_id = $cicloDestino?->id;
-        $this->ciclo_escolar_destino_id = $cicloActual?->id;
-
+        $this->ciclo_escolar_origen_id = $anterior?->id;
+        $this->ciclo_escolar_destino_id = $actual?->id;
+        $this->ciclo_id_origen = $this->ciclos->last()?->id;
+        $this->ciclo_id_destino = $this->ciclos->first()?->id;
         $this->nivel_origen_id = $this->nivel?->id;
         $this->nivel_destino_id = $this->nivel?->id;
-
-        $this->ciclo_id_destino = $this->obtenerCicloInicioId();
+        $this->fecha_promocion = now()->toDateString();
     }
 
-    public function updatedCicloEscolarOrigenId(): void
+    public function updated($property): void
     {
-        $this->limpiarSeleccion();
+        if (str_starts_with($property, 'ciclo_escolar_origen') || $property === 'ciclo_id_origen') {
+            $this->limpiarSeleccion();
+        }
     }
 
     public function updatedNivelOrigenId(): void
     {
-        $this->grado_origen_id = null;
-        $this->generacion_origen_id = null;
-        $this->semestre_origen_id = null;
-        $this->grupo_origen_id = null;
+        $this->grado_origen_id = $this->generacion_origen_id = $this->semestre_origen_id = $this->grupo_origen_id = null;
         $this->limpiarSeleccion();
     }
 
     public function updatedGradoOrigenId(): void
     {
-        $this->semestre_origen_id = null;
-        $this->grupo_origen_id = null;
+        $this->semestre_origen_id = $this->grupo_origen_id = null;
         $this->limpiarSeleccion();
     }
 
     public function updatedGeneracionOrigenId(): void
     {
-        $this->semestre_origen_id = null;
-        $this->grupo_origen_id = null;
+        $this->semestre_origen_id = $this->grupo_origen_id = null;
         $this->limpiarSeleccion();
     }
 
@@ -121,29 +111,19 @@ class PromocionAlumnos extends Component
         $this->limpiarSeleccion();
     }
 
-    public function updatedCicloEscolarDestinoId(): void
-    {
-        $this->limpiarSeleccion();
-    }
-
     public function updatedNivelDestinoId(): void
     {
-        $this->grado_destino_id = null;
-        $this->generacion_destino_id = null;
-        $this->semestre_destino_id = null;
-        $this->grupo_destino_id = null;
+        $this->grado_destino_id = $this->generacion_destino_id = $this->semestre_destino_id = $this->grupo_destino_id = null;
     }
 
     public function updatedGradoDestinoId(): void
     {
-        $this->semestre_destino_id = null;
-        $this->grupo_destino_id = null;
+        $this->semestre_destino_id = $this->grupo_destino_id = null;
     }
 
     public function updatedGeneracionDestinoId(): void
     {
-        $this->semestre_destino_id = null;
-        $this->grupo_destino_id = null;
+        $this->semestre_destino_id = $this->grupo_destino_id = null;
     }
 
     public function updatedSemestreDestinoId(): void
@@ -163,16 +143,9 @@ class PromocionAlumnos extends Component
 
     public function updatedSeleccionarTodos(bool $valor): void
     {
-        if (!$valor) {
-            $this->seleccionados = [];
-            return;
-        }
-
-        $this->seleccionados = $this->alumnosDisponibles
-            ->pluck('id')
-            ->map(fn($id) => (string) $id)
-            ->values()
-            ->all();
+        $this->seleccionados = $valor
+            ? $this->alumnosDisponibles->pluck('id')->map(fn($id) => (string) $id)->values()->all()
+            : [];
     }
 
     public function getEsBachilleratoOrigenProperty(): bool
@@ -207,20 +180,12 @@ class PromocionAlumnos extends Component
 
     public function getSemestresOrigenProperty(): Collection
     {
-        return $this->consultarSemestres(
-            $this->nivel_origen_id,
-            $this->grado_origen_id,
-            $this->generacion_origen_id
-        );
+        return $this->consultarSemestres($this->nivel_origen_id, $this->grado_origen_id);
     }
 
     public function getSemestresDestinoProperty(): Collection
     {
-        return $this->consultarSemestres(
-            $this->nivel_destino_id,
-            $this->grado_destino_id,
-            $this->generacion_destino_id
-        );
+        return $this->consultarSemestres($this->nivel_destino_id, $this->grado_destino_id);
     }
 
     public function getGruposOrigenProperty(): Collection
@@ -253,50 +218,43 @@ class PromocionAlumnos extends Component
 
         return TrayectoriaAcademica::query()
             ->with([
-                'inscripcion:id,matricula,folio,curp,nombre,apellido_paterno,apellido_materno,genero,foto_path,activo',
+                'inscripcion' => fn($q) => $q->with('matriculasAlumno'),
                 'nivel:id,nombre,slug',
-                'grado:id,nombre',
+                'grado:id,nombre,orden',
                 'generacion:id,anio_ingreso,anio_egreso',
-                'grupo:id,nombre,grupo',
+                'grupo.asignacionGrupo:id,nombre',
                 'semestre:id,numero',
                 'cicloEscolar:id,inicio_anio,fin_anio',
                 'ciclo:id,ciclo',
             ])
             ->where('ciclo_escolar_id', $this->ciclo_escolar_origen_id)
+            ->where('ciclo_id', $this->ciclo_id_origen)
             ->where('nivel_id', $this->nivel_origen_id)
             ->where('grado_id', $this->grado_origen_id)
             ->where('generacion_id', $this->generacion_origen_id)
             ->where('grupo_id', $this->grupo_origen_id)
-            ->when($this->es_bachillerato_origen, function (Builder $query) {
-                $query->where('semestre_id', $this->semestre_origen_id);
-            })
-            ->when(!$this->es_bachillerato_origen, function (Builder $query) {
-                $query->whereNull('semestre_id');
-            })
+            ->where('vigente_en_corte', true)
             ->where('activo', true)
-            ->whereNull('fecha_baja')
-            ->when($this->ocultarPromovidos, function (Builder $query) {
-                $query->where(function (Builder $subconsulta) {
-                    $subconsulta->whereNull('promovido')
-                        ->orWhere('promovido', false);
-                });
-            })
-            ->whereHas('inscripcion', function (Builder $query) {
-                $query->whereNull('deleted_at')
-                    ->when($this->search !== '', function (Builder $subconsulta) {
-                        $busqueda = '%' . trim($this->search) . '%';
-
-                        $subconsulta->where(function (Builder $buscador) use ($busqueda) {
-                            $buscador->where('matricula', 'like', $busqueda)
-                                ->orWhere('folio', 'like', $busqueda)
-                                ->orWhere('curp', 'like', $busqueda)
-                                ->orWhere('nombre', 'like', $busqueda)
-                                ->orWhere('apellido_paterno', 'like', $busqueda)
-                                ->orWhere('apellido_materno', 'like', $busqueda)
-                                ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", [$busqueda])
-                                ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$busqueda]);
-                        });
+            ->whereNotIn('estatus', ['baja_temporal', 'baja_definitiva', 'traslado', 'egresado'])
+            ->when($this->es_bachillerato_origen, fn(Builder $q) => $q->where('semestre_id', $this->semestre_origen_id))
+            ->when(!$this->es_bachillerato_origen, fn(Builder $q) => $q->whereNull('semestre_id'))
+            ->when($this->ocultarPromovidos, fn(Builder $q) => $q->whereNull('fecha_promocion'))
+            ->whereHas('inscripcion', function (Builder $q) {
+                $q->whereNull('deleted_at');
+                $termino = preg_replace('/\s+/', ' ', trim($this->search));
+                if ($termino !== '') {
+                    $like = "%{$termino}%";
+                    $q->where(function (Builder $buscar) use ($like) {
+                        $buscar->where('matricula', 'like', $like)
+                            ->orWhere('folio', 'like', $like)
+                            ->orWhere('curp', 'like', $like)
+                            ->orWhere('nombre', 'like', $like)
+                            ->orWhere('apellido_paterno', 'like', $like)
+                            ->orWhere('apellido_materno', 'like', $like)
+                            ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$like])
+                            ->orWhereHas('matriculasAlumno', fn(Builder $m) => $m->where('matricula', 'like', $like));
                     });
+                }
             })
             ->join('inscripciones', 'inscripciones.id', '=', 'trayectorias_academicas.inscripcion_id')
             ->orderBy('inscripciones.apellido_paterno')
@@ -317,9 +275,9 @@ class PromocionAlumnos extends Component
 
         return [
             'total' => $alumnos->count(),
-            'hombres' => $alumnos->filter(fn($trayectoria) => $trayectoria->inscripcion?->genero === 'H')->count(),
-            'mujeres' => $alumnos->filter(fn($trayectoria) => $trayectoria->inscripcion?->genero === 'M')->count(),
-            'promovidos' => $alumnos->filter(fn($trayectoria) => (bool) $trayectoria->promovido)->count(),
+            'hombres' => $alumnos->filter(fn($t) => $t->inscripcion?->genero === 'H')->count(),
+            'mujeres' => $alumnos->filter(fn($t) => $t->inscripcion?->genero === 'M')->count(),
+            'procesados' => $alumnos->filter(fn($t) => filled($t->fecha_promocion))->count(),
         ];
     }
 
@@ -328,126 +286,67 @@ class PromocionAlumnos extends Component
         $this->validate($this->reglas(), [], $this->atributos());
 
         if (!$this->confirmarPromocion) {
-            $this->dispatch('swal', [
-                'title' => 'Confirma la promoción antes de continuar.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-
+            $this->addError('confirmarPromocion', 'Confirma la operación antes de continuar.');
             return;
         }
 
-        if ((int) $this->ciclo_escolar_origen_id === (int) $this->ciclo_escolar_destino_id) {
-            $this->dispatch('swal', [
-                'title' => 'El ciclo escolar destino debe ser diferente al origen.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
+        $grupoDestino = Grupo::query()
+            ->whereKey($this->grupo_destino_id)
+            ->where('nivel_id', $this->nivel_destino_id)
+            ->where('grado_id', $this->grado_destino_id)
+            ->where('generacion_id', $this->generacion_destino_id)
+            ->when($this->es_bachillerato_destino, fn(Builder $q) => $q->where('semestre_id', $this->semestre_destino_id))
+            ->when(!$this->es_bachillerato_destino, fn(Builder $q) => $q->whereNull('semestre_id'))
+            ->exists();
 
+        if (!$grupoDestino) {
+            $this->addError('grupo_destino_id', 'El grupo no corresponde al nivel, generación, grado y semestre de destino.');
             return;
         }
 
-        $idsSeleccionados = collect($this->seleccionados)
-            ->filter()
-            ->map(fn($id) => (int) $id)
-            ->unique()
-            ->values();
+        $trayectorias = $this->alumnosDisponibles
+            ->whereIn('id', collect($this->seleccionados)->map(fn($id) => (int) $id));
 
-        if ($idsSeleccionados->isEmpty()) {
-            $this->dispatch('swal', [
-                'title' => 'Selecciona al menos un alumno.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-
+        if ($trayectorias->isEmpty()) {
+            $this->addError('seleccionados', 'Selecciona al menos un alumno disponible.');
             return;
         }
 
-        $trayectoriasOrigen = TrayectoriaAcademica::query()
-            ->with('inscripcion')
-            ->whereIn('id', $idsSeleccionados)
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_origen_id)
-            ->where('nivel_id', $this->nivel_origen_id)
-            ->where('grado_id', $this->grado_origen_id)
-            ->where('generacion_id', $this->generacion_origen_id)
-            ->where('grupo_id', $this->grupo_origen_id)
-            ->where('activo', true)
-            ->whereNull('fecha_baja')
-            ->get();
-
-        if ($trayectoriasOrigen->isEmpty()) {
-            $this->dispatch('swal', [
-                'title' => 'No se encontraron alumnos válidos para promover.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-
-            return;
-        }
-
+        $service = app(TrayectoriaAcademicaService::class);
         $creados = 0;
         $omitidos = 0;
+        $errores = [];
 
-        DB::transaction(function () use ($trayectoriasOrigen, &$creados, &$omitidos) {
-            foreach ($trayectoriasOrigen as $trayectoriaOrigen) {
-                $yaExisteDestino = TrayectoriaAcademica::query()
-                    ->where('inscripcion_id', $trayectoriaOrigen->inscripcion_id)
-                    ->where('ciclo_escolar_id', $this->ciclo_escolar_destino_id)
-                    ->exists();
-
-                if ($yaExisteDestino) {
-                    $omitidos++;
-                    continue;
-                }
-
-                $trayectoriaDestino = TrayectoriaAcademica::create([
-                    'inscripcion_id' => $trayectoriaOrigen->inscripcion_id,
-                    'ciclo_escolar_id' => $this->ciclo_escolar_destino_id,
-                    'ciclo_id' => $this->ciclo_id_destino,
-                    'nivel_id' => $this->nivel_destino_id,
-                    'grado_id' => $this->grado_destino_id,
-                    'generacion_id' => $this->generacion_destino_id,
-                    'grupo_id' => $this->grupo_destino_id,
-                    'semestre_id' => $this->es_bachillerato_destino ? $this->semestre_destino_id : null,
-                    'activo' => true,
-                    'promovido' => null,
-                    'fecha_promocion' => null,
-                    'trayectoria_origen_id' => $trayectoriaOrigen->id,
-                    'fecha_baja' => null,
-                    'motivo_baja' => null,
-                    'observaciones_baja' => null,
-                    'fecha_inscripcion' => now(),
-                ]);
-
-                $trayectoriaOrigen->update([
-                    'promovido' => true,
-                    'fecha_promocion' => now(),
-                ]);
-
-                Inscripcion::query()
-                    ->where('id', $trayectoriaOrigen->inscripcion_id)
-                    ->update([
-                        'nivel_id' => $trayectoriaDestino->nivel_id,
-                        'grado_id' => $trayectoriaDestino->grado_id,
-                        'generacion_id' => $trayectoriaDestino->generacion_id,
-                        'grupo_id' => $trayectoriaDestino->grupo_id,
-                        'semestre_id' => $trayectoriaDestino->semestre_id,
-                        'ciclo_id' => $trayectoriaDestino->ciclo_id,
-                        'activo' => true,
-                        'fecha_baja' => null,
-                        'motivo_baja' => null,
-                        'observaciones_baja' => null,
-                    ]);
-
+        foreach ($trayectorias as $origen) {
+            try {
+                $service->promover(
+                    $origen,
+                    [
+                        'ciclo_escolar_id' => (int) $this->ciclo_escolar_destino_id,
+                        'ciclo_id' => (int) $this->ciclo_id_destino,
+                        'nivel_id' => (int) $this->nivel_destino_id,
+                        'grado_id' => (int) $this->grado_destino_id,
+                        'generacion_id' => (int) $this->generacion_destino_id,
+                        'grupo_id' => (int) $this->grupo_destino_id,
+                        'semestre_id' => $this->es_bachillerato_destino ? (int) $this->semestre_destino_id : null,
+                    ],
+                    $this->resultado_promocion,
+                    $this->fecha_promocion,
+                    auth()->id()
+                );
                 $creados++;
+            } catch (ValidationException $exception) {
+                $omitidos++;
+                $errores[] = collect($exception->errors())->flatten()->first();
             }
-        });
+        }
 
         $this->limpiarSeleccion();
         $this->confirmarPromocion = false;
 
         $this->dispatch('swal', [
-            'title' => "Promoción aplicada. Creados: {$creados}. Omitidos: {$omitidos}.",
+            'title' => "Proceso terminado: {$creados} creado(s), {$omitidos} omitido(s).",
+            'text' => collect($errores)->filter()->unique()->take(3)->implode(' '),
             'icon' => $creados > 0 ? 'success' : 'info',
             'position' => 'top-end',
         ]);
@@ -455,17 +354,10 @@ class PromocionAlumnos extends Component
 
     public function limpiarFormulario(): void
     {
-        $this->grado_origen_id = null;
-        $this->generacion_origen_id = null;
-        $this->semestre_origen_id = null;
-        $this->grupo_origen_id = null;
-
-        $this->grado_destino_id = null;
-        $this->generacion_destino_id = null;
-        $this->semestre_destino_id = null;
-        $this->grupo_destino_id = null;
-
+        $this->grado_origen_id = $this->generacion_origen_id = $this->semestre_origen_id = $this->grupo_origen_id = null;
+        $this->grado_destino_id = $this->generacion_destino_id = $this->semestre_destino_id = $this->grupo_destino_id = null;
         $this->search = '';
+        $this->resultado_promocion = 'promovido';
         $this->confirmarPromocion = false;
         $this->limpiarSeleccion();
     }
@@ -478,31 +370,18 @@ class PromocionAlumnos extends Component
 
     public function textoGrupo($grupo): string
     {
-        if (!$grupo) {
-            return '—';
-        }
-
-        return $grupo->grupo
-            ?? $grupo->nombre
-            ?? ('Grupo ' . $grupo->id);
+        return $grupo?->asignacionGrupo?->nombre ?? $grupo?->grupo ?? $grupo?->nombre ?? '—';
     }
 
     public function nombreAlumno(?Inscripcion $alumno): string
     {
-        if (!$alumno) {
-            return 'Alumno sin datos';
-        }
-
-        return trim(
-            ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
-        ) ?: 'Alumno sin nombre';
+        return trim(($alumno?->apellido_paterno ?? '') . ' ' . ($alumno?->apellido_materno ?? '') . ' ' . ($alumno?->nombre ?? '')) ?: 'Alumno sin nombre';
     }
 
     private function filtrosOrigenCompletos(): bool
     {
         return filled($this->ciclo_escolar_origen_id)
+            && filled($this->ciclo_id_origen)
             && filled($this->nivel_origen_id)
             && filled($this->grado_origen_id)
             && filled($this->generacion_origen_id)
@@ -512,120 +391,70 @@ class PromocionAlumnos extends Component
 
     private function esBachillerato(?int $nivelId): bool
     {
-        if (!$nivelId) {
-            return false;
-        }
-
-        $nivel = $this->niveles->firstWhere('id', $nivelId) ?: Nivel::find($nivelId);
-
-        if (!$nivel) {
-            return false;
-        }
-
-        return str_contains(strtolower($nivel->slug ?? ''), 'bachillerato')
-            || str_contains(strtolower($nivel->nombre ?? ''), 'bachillerato');
+        $nivel = $this->niveles->firstWhere('id', $nivelId);
+        return str_contains(mb_strtolower(($nivel?->slug ?? '') . ' ' . ($nivel?->nombre ?? '')), 'bachillerato');
     }
 
     private function consultarGrados(?int $nivelId): Collection
     {
-        if (!$nivelId) {
-            return collect();
-        }
-
-        return Grado::query()
-            ->where('nivel_id', $nivelId)
-            ->when(Schema::hasColumn('grados', 'orden'), fn($query) => $query->orderBy('orden'))
-            ->orderBy('id')
-            ->get(['id', 'nivel_id', 'nombre']);
+        return $nivelId
+            ? Grado::query()->where('nivel_id', $nivelId)->orderBy('orden')->orderBy('nombre')->get(['id', 'nivel_id', 'nombre', 'orden'])
+            : collect();
     }
 
     private function consultarGeneraciones(?int $nivelId): Collection
     {
-        if (!$nivelId) {
-            return collect();
-        }
-
-        return Generacion::query()
-            ->when(Schema::hasColumn('generaciones', 'nivel_id'), fn($query) => $query->where('nivel_id', $nivelId))
-            ->orderByDesc('anio_ingreso')
-            ->orderByDesc('id')
-            ->get(['id', 'anio_ingreso', 'anio_egreso']);
+        return $nivelId
+            ? Generacion::query()->where('nivel_id', $nivelId)->orderByDesc('anio_ingreso')->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso'])
+            : collect();
     }
 
-    private function consultarSemestres(?int $nivelId, ?int $gradoId, ?int $generacionId): Collection
+    private function consultarSemestres(?int $nivelId, ?int $gradoId): Collection
     {
-        if (!$nivelId || !$gradoId) {
+        if (!$this->esBachillerato($nivelId) || !$gradoId) {
             return collect();
         }
 
-        if (!$this->esBachillerato($nivelId)) {
-            return collect();
-        }
-
-        $semestresDesdeGrupos = Grupo::query()
-            ->where('nivel_id', $nivelId)
-            ->where('grado_id', $gradoId)
-            ->when($generacionId, fn($query) => $query->where('generacion_id', $generacionId))
-            ->whereNotNull('semestre_id')
-            ->pluck('semestre_id')
-            ->unique()
-            ->values();
-
-        return Semestre::query()
-            ->when($semestresDesdeGrupos->isNotEmpty(), fn($query) => $query->whereIn('id', $semestresDesdeGrupos))
-            ->when($semestresDesdeGrupos->isEmpty() && Schema::hasColumn('semestres', 'grado_id'), fn($query) => $query->where('grado_id', $gradoId))
-            ->orderBy('numero')
-            ->orderBy('id')
-            ->get(['id', 'numero']);
+        return Semestre::query()->where('grado_id', $gradoId)->orderBy('numero')->get(['id', 'grado_id', 'numero']);
     }
 
-    private function consultarGrupos(?int $nivelId, ?int $gradoId, ?int $generacionId, ?int $semestreId, bool $esBachillerato): Collection
+    private function consultarGrupos(?int $nivelId, ?int $gradoId, ?int $generacionId, ?int $semestreId, bool $bachillerato): Collection
     {
-        if (!$nivelId || !$gradoId || !$generacionId) {
-            return collect();
-        }
-
-        if ($esBachillerato && !$semestreId) {
+        if (!$nivelId || !$gradoId || !$generacionId || ($bachillerato && !$semestreId)) {
             return collect();
         }
 
         return Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
             ->where('nivel_id', $nivelId)
             ->where('grado_id', $gradoId)
             ->where('generacion_id', $generacionId)
-            ->when($esBachillerato, fn($query) => $query->where('semestre_id', $semestreId))
-            ->when(!$esBachillerato && Schema::hasColumn('grupos', 'semestre_id'), fn($query) => $query->whereNull('semestre_id'))
-            ->when(Schema::hasColumn('grupos', 'orden'), fn($query) => $query->orderBy('orden'))
+            ->when($bachillerato, fn(Builder $q) => $q->where('semestre_id', $semestreId))
+            ->when(!$bachillerato, fn(Builder $q) => $q->whereNull('semestre_id'))
+            ->orderBy('asignacion_grupo_id')
             ->orderBy('id')
             ->get();
-    }
-
-    private function obtenerCicloInicioId(): ?int
-    {
-        return Ciclo::query()
-            ->where('ciclo', 'like', '%inicio%')
-            ->value('id')
-            ?: Ciclo::query()->orderBy('id')->value('id');
     }
 
     private function reglas(): array
     {
         return [
             'ciclo_escolar_origen_id' => ['required', 'exists:ciclo_escolares,id'],
+            'ciclo_id_origen' => ['required', 'exists:ciclos,id'],
             'nivel_origen_id' => ['required', 'exists:niveles,id'],
             'grado_origen_id' => ['required', 'exists:grados,id'],
             'generacion_origen_id' => ['required', 'exists:generaciones,id'],
+            'semestre_origen_id' => [$this->es_bachillerato_origen ? 'required' : 'nullable', 'exists:semestres,id'],
             'grupo_origen_id' => ['required', 'exists:grupos,id'],
-            'semestre_origen_id' => [$this->es_bachillerato_origen ? 'required' : 'nullable', 'nullable', 'exists:semestres,id'],
-
             'ciclo_escolar_destino_id' => ['required', 'exists:ciclo_escolares,id'],
             'ciclo_id_destino' => ['required', 'exists:ciclos,id'],
             'nivel_destino_id' => ['required', 'exists:niveles,id'],
             'grado_destino_id' => ['required', 'exists:grados,id'],
             'generacion_destino_id' => ['required', 'exists:generaciones,id'],
+            'semestre_destino_id' => [$this->es_bachillerato_destino ? 'required' : 'nullable', 'exists:semestres,id'],
             'grupo_destino_id' => ['required', 'exists:grupos,id'],
-            'semestre_destino_id' => [$this->es_bachillerato_destino ? 'required' : 'nullable', 'nullable', 'exists:semestres,id'],
-
+            'resultado_promocion' => ['required', 'in:promovido,no_promovido'],
+            'fecha_promocion' => ['required', 'date'],
             'seleccionados' => ['required', 'array', 'min:1'],
             'seleccionados.*' => ['integer', 'exists:trayectorias_academicas,id'],
         ];
@@ -634,19 +463,12 @@ class PromocionAlumnos extends Component
     private function atributos(): array
     {
         return [
-            'ciclo_escolar_origen_id' => 'ciclo escolar origen',
-            'nivel_origen_id' => 'nivel origen',
-            'grado_origen_id' => 'grado origen',
-            'generacion_origen_id' => 'generación origen',
-            'grupo_origen_id' => 'grupo origen',
-            'semestre_origen_id' => 'semestre origen',
-            'ciclo_escolar_destino_id' => 'ciclo escolar destino',
-            'ciclo_id_destino' => 'periodo de inscripción destino',
-            'nivel_destino_id' => 'nivel destino',
-            'grado_destino_id' => 'grado destino',
-            'generacion_destino_id' => 'generación destino',
-            'grupo_destino_id' => 'grupo destino',
-            'semestre_destino_id' => 'semestre destino',
+            'ciclo_escolar_origen_id' => 'ciclo escolar de origen',
+            'ciclo_id_origen' => 'corte de origen',
+            'grupo_origen_id' => 'grupo de origen',
+            'ciclo_escolar_destino_id' => 'ciclo escolar de destino',
+            'ciclo_id_destino' => 'corte de destino',
+            'grupo_destino_id' => 'grupo de destino',
             'seleccionados' => 'alumnos seleccionados',
         ];
     }
