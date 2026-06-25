@@ -2,12 +2,8 @@
 
 namespace App\Livewire\Accion;
 
-use App\Models\Generacion;
-use App\Models\Grado;
-use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
-use App\Models\Semestre;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -25,12 +21,7 @@ class Baja extends Component
 
     public Collection $niveles;
     public ?Nivel $nivel = null;
-
     public ?int $nivel_id = null;
-    public ?int $generacion_id = null;
-    public ?int $grado_id = null;
-    public ?int $semestre_id = null;
-    public ?int $grupo_id = null;
 
     public string $search = '';
 
@@ -56,8 +47,8 @@ class Baja extends Component
             ->firstOrFail();
 
         $this->nivel_id = $this->nivel->id;
-
-        $this->esBachillerato = (int) $this->nivel_id === 4 || $this->slug_nivel === 'bachillerato';
+        $this->esBachillerato = (int) $this->nivel_id === 4
+            || $this->slug_nivel === 'bachillerato';
 
         $this->fecha_baja = now()->format('Y-m-d');
     }
@@ -84,48 +75,6 @@ class Baja extends Component
             'fecha_baja.date' => 'La fecha de baja no es válida.',
             'observaciones_baja.max' => 'Las observaciones no deben superar los 1000 caracteres.',
         ];
-    }
-
-    public function updatedGeneracionId(): void
-    {
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-
-        $this->grado_id = null;
-        $this->semestre_id = null;
-        $this->grupo_id = null;
-        $this->selected = [];
-        $this->selectPage = false;
-    }
-
-    public function updatedGradoId(): void
-    {
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-
-        $this->semestre_id = null;
-        $this->grupo_id = null;
-        $this->selected = [];
-        $this->selectPage = false;
-    }
-
-    public function updatedSemestreId(): void
-    {
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-
-        $this->grupo_id = null;
-        $this->selected = [];
-        $this->selectPage = false;
-    }
-
-    public function updatedGrupoId(): void
-    {
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-
-        $this->selected = [];
-        $this->selectPage = false;
     }
 
     public function updatedSearch(): void
@@ -156,94 +105,6 @@ class Baja extends Component
         return count($this->selected);
     }
 
-    #[Computed]
-    public function filtrosListos(): bool
-    {
-        if ($this->esBachillerato) {
-            return filled($this->generacion_id)
-                && filled($this->grado_id)
-                && filled($this->semestre_id)
-                && filled($this->grupo_id);
-        }
-
-        return filled($this->generacion_id)
-            && filled($this->grado_id)
-            && filled($this->grupo_id);
-    }
-
-    public function getGeneracionesProperty(): Collection
-    {
-        return Generacion::query()
-            ->whereIn('id', function ($query) {
-                $query->select('generacion_id')
-                    ->from('grupos')
-                    ->where('nivel_id', $this->nivel_id)
-                    ->whereNotNull('generacion_id');
-            })
-            ->orderByDesc('anio_ingreso')
-            ->get();
-    }
-
-    public function getGradosProperty(): Collection
-    {
-        return Grado::query()
-            ->whereIn('id', function ($query) {
-                $query->select('grado_id')
-                    ->from('grupos')
-                    ->where('nivel_id', $this->nivel_id)
-                    ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
-                    ->whereNotNull('grado_id');
-            })
-            ->orderBy('id')
-            ->get();
-    }
-
-    public function getSemestresProperty(): Collection
-    {
-        if (!$this->esBachillerato || !$this->generacion_id || !$this->grado_id) {
-            return collect();
-        }
-
-        return Semestre::query()
-            ->whereIn('id', function ($query) {
-                $query->select('semestre_id')
-                    ->from('grupos')
-                    ->where('nivel_id', $this->nivel_id)
-                    ->where('generacion_id', $this->generacion_id)
-                    ->where('grado_id', $this->grado_id)
-                    ->whereNotNull('semestre_id');
-            })
-            ->orderBy('numero')
-            ->get();
-    }
-
-    public function getGruposProperty(): Collection
-    {
-        if (!$this->generacion_id || !$this->grado_id) {
-            return collect();
-        }
-
-        if ($this->esBachillerato && !$this->semestre_id) {
-            return collect();
-        }
-
-        return Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->select('grupos.*')
-            ->where('grupos.nivel_id', $this->nivel_id)
-            ->where('grupos.generacion_id', $this->generacion_id)
-            ->where('grupos.grado_id', $this->grado_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('grupos.semestre_id')
-            )
-            ->orderBy('asignacion_grupos.nombre')
-            ->orderBy('grupos.id')
-            ->get();
-    }
-
     public function textoGrupo($grupo): string
     {
         if (!$grupo) {
@@ -253,45 +114,18 @@ class Baja extends Component
         return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
     }
 
-    public function getGeneracionGrupoLabelProperty(): ?string
-    {
-        if (!$this->generacion_id) {
-            return null;
-        }
-
-        $generacion = $this->generaciones->firstWhere('id', $this->generacion_id);
-
-        if (!$generacion) {
-            return null;
-        }
-
-        return $generacion->anio_ingreso . ' - ' . $generacion->anio_egreso;
-    }
-
     public function getTotalProperty(): int
     {
-        if (!$this->filtrosListos) {
-            return 0;
-        }
-
         return $this->baseQuery()->count();
     }
 
     public function getTotalBajasProperty(): int
     {
-        if (!$this->filtrosListos) {
-            return 0;
-        }
-
         return $this->bajasQuery()->count();
     }
 
     public function getHombresProperty(): int
     {
-        if (!$this->filtrosListos) {
-            return 0;
-        }
-
         return $this->baseQuery()
             ->where('genero', 'H')
             ->count();
@@ -299,46 +133,16 @@ class Baja extends Component
 
     public function getMujeresProperty(): int
     {
-        if (!$this->filtrosListos) {
-            return 0;
-        }
-
         return $this->baseQuery()
             ->where('genero', 'M')
             ->count();
     }
 
-    public function clearFilters(): void
+    public function clearSearch(): void
     {
-        $this->reset([
-            'generacion_id',
-            'grado_id',
-            'semestre_id',
-            'grupo_id',
-            'search',
-            'selected',
-            'selectPage',
-            'motivo_baja',
-            'observaciones_baja',
-        ]);
-
-        $this->fecha_baja = now()->format('Y-m-d');
-
-        $this->resetPage();
-        $this->resetPage('bajasPage');
-    }
-
-    public function restaurarFiltrosBajas(array $filtros): void
-    {
-        if (($filtros['slug_nivel'] ?? null) !== $this->slug_nivel) {
-            return;
-        }
-
-        $this->generacion_id = filled($filtros['generacion_id'] ?? null) ? (int) $filtros['generacion_id'] : null;
-        $this->grado_id = filled($filtros['grado_id'] ?? null) ? (int) $filtros['grado_id'] : null;
-        $this->semestre_id = filled($filtros['semestre_id'] ?? null) ? (int) $filtros['semestre_id'] : null;
-        $this->grupo_id = filled($filtros['grupo_id'] ?? null) ? (int) $filtros['grupo_id'] : null;
-        $this->search = (string) ($filtros['search'] ?? '');
+        $this->search = '';
+        $this->selected = [];
+        $this->selectPage = false;
 
         $this->resetPage();
         $this->resetPage('bajasPage');
@@ -347,16 +151,6 @@ class Baja extends Component
     public function aplicarBaja(): void
     {
         $this->validate();
-
-        if (!$this->filtrosListos) {
-            $this->dispatch('swal', [
-                'icon' => 'warning',
-                'title' => 'Completa los filtros antes de aplicar la baja.',
-                'position' => 'top-end',
-            ]);
-
-            return;
-        }
 
         $ids = collect($this->selected)
             ->filter()
@@ -413,16 +207,6 @@ class Baja extends Component
 
     public function reactivarAlumno(int $inscripcionId): void
     {
-        if (!$this->filtrosListos) {
-            $this->dispatch('swal', [
-                'icon' => 'warning',
-                'title' => 'Completa los filtros antes de reactivar.',
-                'position' => 'top-end',
-            ]);
-
-            return;
-        }
-
         DB::transaction(function () use ($inscripcionId) {
             $datos = [
                 'activo' => true,
@@ -457,12 +241,6 @@ class Baja extends Component
 
     public function rows(): LengthAwarePaginator
     {
-        if (!$this->filtrosListos) {
-            return Inscripcion::query()
-                ->whereRaw('1 = 0')
-                ->paginate(10);
-        }
-
         return $this->baseQuery()
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
@@ -472,12 +250,6 @@ class Baja extends Component
 
     public function bajasRows(): LengthAwarePaginator
     {
-        if (!$this->filtrosListos) {
-            return Inscripcion::query()
-                ->whereRaw('1 = 0')
-                ->paginate(10, ['*'], 'bajasPage');
-        }
-
         return $this->bajasQuery()
             ->orderByDesc('fecha_baja')
             ->orderBy('apellido_paterno')
@@ -488,7 +260,7 @@ class Baja extends Component
 
     private function baseQuery(): Builder
     {
-        return Inscripcion::query()
+        $query = Inscripcion::query()
             ->with([
                 'generacion',
                 'grado',
@@ -496,44 +268,30 @@ class Baja extends Component
                 'semestre',
             ])
             ->where('nivel_id', $this->nivel_id)
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->grado_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('semestre_id')
-            )
-            ->where('grupo_id', $this->grupo_id)
             ->where('activo', true)
             ->whereNull('fecha_baja')
             ->whereNull('motivo_baja')
             ->whereNull('observaciones_baja')
-            ->when(Schema::hasColumn('inscripciones', 'status'), function ($query) {
-                $query->where(function ($subquery) {
+            ->when(Schema::hasColumn('inscripciones', 'status'), function (Builder $query) {
+                $query->where(function (Builder $subquery) {
                     $subquery->whereNull('status')
-                        ->orWhereNotIn('status', ['Baja', 'BAJA', 'baja', 'Inactivo', 'INACTIVO', 'inactivo']);
-                });
-            })
-            ->when(filled($this->search), function ($query) {
-                $buscar = '%' . trim($this->search) . '%';
-
-                $query->where(function ($subquery) use ($buscar) {
-                    $subquery
-                        ->where('matricula', 'like', $buscar)
-                        ->orWhere('folio', 'like', $buscar)
-                        ->orWhere('curp', 'like', $buscar)
-                        ->orWhere('nombre', 'like', $buscar)
-                        ->orWhere('apellido_paterno', 'like', $buscar)
-                        ->orWhere('apellido_materno', 'like', $buscar)
-                        ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", [$buscar])
-                        ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$buscar]);
+                        ->orWhereNotIn('status', [
+                            'Baja',
+                            'BAJA',
+                            'baja',
+                            'Inactivo',
+                            'INACTIVO',
+                            'inactivo',
+                        ]);
                 });
             });
+
+        return $this->applySearch($query);
     }
 
     private function bajasQuery(): Builder
     {
-        return Inscripcion::query()
+        $query = Inscripcion::query()
             ->with([
                 'generacion',
                 'grado',
@@ -541,35 +299,57 @@ class Baja extends Component
                 'semestre',
             ])
             ->where('nivel_id', $this->nivel_id)
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->grado_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('semestre_id')
-            )
-            ->where('grupo_id', $this->grupo_id)
-            ->where(function ($query) {
+            ->where(function (Builder $query) {
                 $query->where('activo', false)
                     ->orWhereNotNull('fecha_baja')
                     ->orWhereNotNull('motivo_baja')
                     ->orWhereNotNull('observaciones_baja');
-            })
-            ->when(filled($this->search), function ($query) {
-                $buscar = '%' . trim($this->search) . '%';
-
-                $query->where(function ($subquery) use ($buscar) {
-                    $subquery
-                        ->where('matricula', 'like', $buscar)
-                        ->orWhere('folio', 'like', $buscar)
-                        ->orWhere('curp', 'like', $buscar)
-                        ->orWhere('nombre', 'like', $buscar)
-                        ->orWhere('apellido_paterno', 'like', $buscar)
-                        ->orWhere('apellido_materno', 'like', $buscar)
-                        ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", [$buscar])
-                        ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$buscar]);
-                });
             });
+
+        return $this->applySearch($query);
+    }
+
+    private function applySearch(Builder $query): Builder
+    {
+        $termino = preg_replace('/\s+/', ' ', trim($this->search));
+
+        if (blank($termino)) {
+            return $query;
+        }
+
+        $buscar = "%{$termino}%";
+
+        return $query->where(function (Builder $subquery) use ($buscar) {
+            $subquery
+                ->where('matricula', 'like', $buscar)
+                ->orWhere('folio', 'like', $buscar)
+                ->orWhere('curp', 'like', $buscar)
+                ->orWhere('nombre', 'like', $buscar)
+                ->orWhere('apellido_paterno', 'like', $buscar)
+                ->orWhere('apellido_materno', 'like', $buscar)
+                ->orWhereRaw(
+                    "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                    [$buscar]
+                )
+                ->orWhereRaw(
+                    "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
+                    [$buscar]
+                )
+                ->orWhereHas('generacion', function (Builder $query) use ($buscar) {
+                    $query->where('anio_ingreso', 'like', $buscar)
+                        ->orWhere('anio_egreso', 'like', $buscar)
+                        ->orWhereRaw(
+                            "CONCAT(anio_ingreso, ' - ', anio_egreso) LIKE ?",
+                            [$buscar]
+                        );
+                })
+                ->orWhereHas('grado', fn(Builder $query) => $query->where('nombre', 'like', $buscar))
+                ->orWhereHas(
+                    'grupo.asignacionGrupo',
+                    fn(Builder $query) => $query->where('nombre', 'like', $buscar)
+                )
+                ->orWhereHas('semestre', fn(Builder $query) => $query->where('numero', 'like', $buscar));
+        });
     }
 
     public function render()
@@ -577,11 +357,6 @@ class Baja extends Component
         return view('livewire.accion.baja', [
             'rows' => $this->rows(),
             'bajasRows' => $this->bajasRows(),
-            'generaciones' => $this->generaciones,
-            'grados' => $this->grados,
-            'semestres' => $this->semestres,
-            'grupos' => $this->grupos,
-            'generacionGrupoLabel' => $this->generacionGrupoLabel,
             'total' => $this->total,
             'totalBajas' => $this->totalBajas,
             'hombres' => $this->hombres,

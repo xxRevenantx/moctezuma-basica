@@ -10,15 +10,27 @@
             margin: 7mm 7mm 8mm 7mm;
         }
 
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ARIAL';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
-            margin: 0;
-            font-family: DejaVu Sans, Arial, sans-serif;
+
+            font-family: 'ARIAL', sans-serif;
             color: #172033;
-            font-size: 8px;
         }
 
         .page {
@@ -31,7 +43,7 @@
             right: -18mm;
             bottom: -17mm;
             width: 86mm;
-            opacity: .045;
+            opacity: .08;
             z-index: -1;
         }
 
@@ -43,16 +55,15 @@
 
         .header-table td {
             vertical-align: middle;
+            line-height: 1;
         }
 
         .logo-left {
-            width: 30mm;
-            max-height: 19mm;
+            width: 80px;
         }
 
         .logo-right {
-            width: 18mm;
-            max-height: 18mm;
+            width: 80px;
         }
 
         .school-name {
@@ -74,20 +85,20 @@
         .cycle {
             margin: .7mm 0 0;
             color: #006492;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
         }
 
         .meta {
             width: 100%;
-            margin: 0 0 3mm;
-            padding: 2mm 2.5mm;
+            padding: 5px;
             border: .35mm solid #d8e2ee;
             border-radius: 2.5mm;
             background: #f7fafc;
             color: #475569;
-            font-size: 7px;
+            font-size: 12px;
+            text-align: center;
         }
 
         .meta strong {
@@ -111,7 +122,7 @@
             padding: 2.2mm 1mm;
             border-radius: 4mm;
             color: #fff;
-            font-size: 9px;
+            font-size: 11px;
             font-weight: bold;
             text-align: center;
         }
@@ -147,21 +158,14 @@
             border-radius: 4mm;
             background: #dcefc8;
             color: #172033;
-            font-size: 8px;
+            font-size: 12px;
             font-weight: bold;
             text-align: center;
         }
 
-        .time-cell small {
-            display: block;
-            margin-top: .4mm;
-            color: #536270;
-            font-size: 6px;
-            font-weight: normal;
-        }
 
         .activity-cell {
-            min-height: 14mm;
+
             padding: 1.5mm 1.4mm;
             border-radius: 4mm;
             background: #d9eef8;
@@ -171,7 +175,7 @@
         .activity-cell.empty {
             background: #f3f6f8;
             color: #9aa5b1;
-            font-size: 6.5px;
+            font-size: 11px;
             text-align: center;
         }
 
@@ -179,8 +183,8 @@
             margin: 0 0 1mm;
             padding-bottom: .8mm;
             border-bottom: .22mm solid rgba(0, 100, 146, .16);
-            font-size: 6.3px;
-            line-height: 1.22;
+            font-size: 11px;
+            line-height: 1;
         }
 
         .activity:last-child {
@@ -222,7 +226,7 @@
             border-radius: 4mm;
             background: #ffad00;
             color: #111827;
-            font-size: 17px;
+            font-size: 25px;
             font-weight: bold;
             letter-spacing: 4mm;
             text-align: center;
@@ -231,19 +235,10 @@
         .legend {
             margin-top: 2.5mm;
             color: #64748b;
-            font-size: 6.5px;
+            font-size: 15px;
             text-align: center;
         }
 
-        .footer {
-            position: fixed;
-            right: 0;
-            bottom: -4mm;
-            left: 0;
-            color: #7b8794;
-            font-size: 6px;
-            text-align: center;
-        }
 
         .page-break {
             page-break-before: always;
@@ -262,7 +257,7 @@
         .teachers {
             width: 100%;
             border-collapse: collapse;
-            font-size: 7px;
+            font-size: 12px;
         }
 
         .teachers th {
@@ -291,8 +286,21 @@
         .groups-summary {
             margin: 0 0 3mm;
             color: #475569;
-            font-size: 7px;
+            font-size: 12px;
             line-height: 1.5;
+        }
+
+        footer {
+            position: fixed;
+            right: 0;
+            bottom: -15px;
+            left: 0;
+            padding-top: 4px;
+            border-top: 1px solid #cbd5e1;
+            color: #475569;
+            font-size: 11px;
+            line-height: 1;
+            text-align: center;
         }
     </style>
 </head>
@@ -356,8 +364,6 @@
         <div class="meta">
             <strong>Nivel:</strong> {{ $nivel->nombre }} &nbsp;&nbsp;|&nbsp;&nbsp;
             <strong>C.C.T.:</strong> {{ $nivel->cct ?? '—' }} &nbsp;&nbsp;|&nbsp;&nbsp;
-            <strong>Grupos incluidos:</strong> {{ $tabla['total_grupos'] }} &nbsp;&nbsp;|&nbsp;&nbsp;
-            <strong>Actividades:</strong> {{ $tabla['total_actividades'] }}
         </div>
 
         <table class="schedule">
@@ -379,8 +385,7 @@
                     @if ($fila['es_receso'])
                         <tr>
                             <td class="time-cell">
-                                {{ $formatoHora($hora->hora_inicio) }}
-                                <small>{{ $formatoHora($hora->hora_fin) }}</small>
+                                {{ $formatoHora($hora->hora_inicio) }} - {{ $formatoHora($hora->hora_fin) }}
                             </td>
                             <td class="recess-cell" colspan="{{ max(1, count($tabla['dias'])) }}">
                                 {{ $fila['receso_label'] }}
@@ -389,23 +394,49 @@
                     @else
                         <tr>
                             <td class="time-cell">
-                                {{ $formatoHora($hora->hora_inicio) }}
-                                <small>{{ $formatoHora($hora->hora_fin) }}</small>
+                                {{ $formatoHora($hora->hora_inicio) }} - {{ $formatoHora($hora->hora_fin) }}
                             </td>
 
                             @foreach ($tabla['dias'] as $dia)
                                 @php
                                     $actividades = $fila['celdas']->get((int) $dia->id, collect());
+
+                                    /*
+                                     * Las materias normales se muestran individualmente.
+                                     * Los talleres se agrupan por grado y grupo para evitar
+                                     * imprimir el nombre de cada taller. En su lugar se muestra
+                                     * una sola entrada con el texto "Talleres".
+                                     */
+                                    $materias = $actividades
+                                        ->filter(fn($actividad) => ($actividad['tipo'] ?? 'materia') !== 'taller')
+                                        ->values();
+
+                                    $talleres = $actividades
+                                        ->filter(fn($actividad) => ($actividad['tipo'] ?? null) === 'taller')
+                                        ->groupBy(fn($actividad) => trim((string) ($actividad['grado_grupo'] ?? '')))
+                                        ->map(function ($actividadesDelGrupo, $gradoGrupo) {
+                                            return [
+                                                'tipo' => 'taller',
+                                                'grado_grupo' => $gradoGrupo,
+                                                'nombre' => 'Talleres',
+                                            ];
+                                        })
+                                        ->values();
+
+                                    $actividadesMostrar = $materias
+                                        ->concat($talleres)
+                                        ->sortBy(fn($actividad) => (string) ($actividad['grado_grupo'] ?? ''))
+                                        ->values();
                                 @endphp
 
-                                <td class="activity-cell {{ $actividades->isEmpty() ? 'empty' : '' }}">
-                                    @forelse ($actividades as $actividad)
-                                        <div class="activity {{ $actividad['tipo'] === 'taller' ? 'taller' : '' }}">
+                                <td class="activity-cell {{ $actividadesMostrar->isEmpty() ? 'empty' : '' }}">
+                                    @forelse ($actividadesMostrar as $actividad)
+                                        <div
+                                            class="activity {{ ($actividad['tipo'] ?? '') === 'taller' ? 'taller' : '' }}">
                                             <span>{{ $actividad['grado_grupo'] }}</span>
-                                            <span class="subject">{{ $actividad['nombre'] }}</span>
-                                            @if ($actividad['tipo'] === 'taller')
-                                                <span class="type"> · TALLER</span>
-                                            @endif
+                                            <span class="subject">
+                                                {{ ($actividad['tipo'] ?? '') === 'taller' ? 'Taller' : $actividad['nombre'] }}
+                                            </span>
                                         </div>
                                     @empty
                                         Sin actividad
@@ -418,10 +449,7 @@
             </tbody>
         </table>
 
-        <p class="legend">
-            Cada registro muestra grado, grupo y materia. Los bloques de receso, colación o comida se toman de las
-            materias marcadas como receso en la base de datos del nivel.
-        </p>
+
     </div>
 
     @if (($tabla['docentes'] ?? collect())->isNotEmpty())
@@ -462,10 +490,33 @@
         </div>
     @endif
 
-    <div class="footer">
-        {{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }} · Horario general de {{ $nivel->nombre }} ·
-        {{ $ciclo_escolar->inicio_anio }}-{{ $ciclo_escolar->fin_anio }}
-    </div>
+    <footer>
+        <strong>
+            {{ $escuela->nombre ?? 'Centro Universitario Moctezuma' }}
+        </strong>
+
+        @if (!empty($nivel->cct))
+            - C.C.T. {{ $nivel->cct }}
+        @endif
+
+        <br>
+
+        C. {{ $escuela->calle ?? '' }}
+        No. {{ $escuela->no_exterior ?? '' }},
+        Col. {{ $escuela->colonia ?? '' }},
+        C.P. {{ $escuela->codigo_postal ?? '' }},
+        {{ $escuela->ciudad ?? '' }},
+        {{ $escuela->estado ?? '' }}
+
+        @if (!empty($escuela->telefono))
+            · Tel. {{ $escuela->telefono }}
+        @endif
+
+        <br>
+
+        <strong>Fecha de expedición:</strong>
+        {{ \Carbon\Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
+    </footer>
 </body>
 
 </html>
