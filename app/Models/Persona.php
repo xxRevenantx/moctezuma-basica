@@ -67,6 +67,11 @@ class Persona extends Model
         return $this->hasMany(AsignacionMateria::class, 'profesor_id');
     }
 
+    public function tallerSesiones()
+    {
+        return $this->hasMany(TallerSesion::class, 'profesor_id');
+    }
+
     public function docenteGrupos()
     {
         return $this->hasMany(DocenteGrupo::class, 'persona_id');

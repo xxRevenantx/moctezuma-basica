@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\cicloEscolar;
+use App\Models\AsignacionMateria;
+use App\Models\TallerSesion;
 use App\Models\Escuela;
 use App\Models\Horario;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -17,6 +19,7 @@ class TodosHorariosProfesoresPdfController extends Controller
     {
         $cicloEscolar = cicloEscolar::query()
             ->when($request->filled('ciclo_escolar_id'), fn($query) => $query->where('id', $request->integer('ciclo_escolar_id')))
+            ->when(!$request->filled('ciclo_escolar_id'), fn($query) => $query->orderByDesc('es_actual'))
             ->orderByDesc('id')
             ->first();
 
@@ -40,8 +43,12 @@ class TodosHorariosProfesoresPdfController extends Controller
                 'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
             ->where(function ($query) {
-                $query->whereHas('asignacionMateria', fn($subQuery) => $subQuery->whereNotNull('profesor_id'))
-                    ->orWhereHas('tallerSesion', fn($subQuery) => $subQuery->whereNotNull('profesor_id'));
+                $query->whereHas('asignacionMateria', fn($subQuery) => $subQuery
+                        ->whereNotNull('profesor_id')
+                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                    ->orWhereHas('tallerSesion', fn($subQuery) => $subQuery
+                        ->whereNotNull('profesor_id')
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
             })
             ->when($cicloEscolar, fn($query) => $query->where('ciclo_escolar_id', $cicloEscolar->id))
             ->when($request->filled('nivel_id'), function ($query) use ($request) {

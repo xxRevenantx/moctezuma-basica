@@ -3,121 +3,119 @@
 namespace App\Livewire\Accion;
 
 use App\Models\AsignacionMateria as AsignacionMateriaModel;
+use App\Models\cicloEscolar;
 use App\Models\Grupo;
+use App\Models\Horario;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
+use App\Models\TrayectoriaAcademica;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class AsignacionMateria extends Component
 {
     public string $slug_nivel = '';
-
     public $nivel = null;
 
+    public ?int $ciclo_escolar_id = null;
+    public ?int $ciclo_origen_id = null;
+    public bool $copiar_profesores = true;
+    public bool $copiar_horarios = false;
+
     public string $buscar = '';
-
-    public $editandoId = null;
-
+    public ?int $editandoId = null;
     public $grupo_id = '';
-
     public $materia_id = '';
-
     public $profesor_id = '';
-
     public string $buscarProfesor = '';
-
-    public $ultimoRegistroId = null;
-
+    public ?int $ultimoRegistroId = null;
     public string $ultimoMovimiento = '';
 
-    public function mount($slug_nivel)
+    public function mount($slug_nivel): void
     {
         $this->slug_nivel = $slug_nivel;
+        $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
-        $this->nivel = Nivel::query()
-            ->where('slug', $this->slug_nivel)
-            ->firstOrFail();
+        $actual = cicloEscolar::query()->where('es_actual', true)->first()
+            ?? cicloEscolar::query()->orderByDesc('inicio_anio')->first();
+
+        $this->ciclo_escolar_id = $actual?->id;
+        $this->ciclo_origen_id = cicloEscolar::query()
+            ->when($actual, fn ($q) => $q->where('id', '!=', $actual->id)->where('inicio_anio', '<=', $actual->inicio_anio))
+            ->orderByDesc('inicio_anio')
+            ->value('id');
     }
 
-    public function getEsBachilleratoProperty()
+    public function getEsBachilleratoProperty(): bool
     {
         return (int) $this->nivel?->id === 4;
     }
 
-    public function getNivelesProperty()
+    public function getCiclosEscolaresProperty(): Collection
     {
-        return Nivel::query()
-            ->orderBy('id')
+        return cicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
             ->get();
     }
 
-    public function getGruposProperty()
+    public function getCicloSeleccionadoProperty(): ?cicloEscolar
     {
-        if (blank($this->nivel?->id)) {
+        return $this->ciclo_escolar_id
+            ? cicloEscolar::query()->find($this->ciclo_escolar_id)
+            : null;
+    }
+
+    public function getGruposProperty(): Collection
+    {
+        if (!$this->nivel?->id) {
             return collect();
         }
+
+        $gruposConTrayectoria = TrayectoriaAcademica::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->pluck('grupo_id')
+            ->filter()
+            ->unique();
 
         return Grupo::query()
             ->with([
                 'asignacionGrupo:id,nombre',
-                'grado:id,nombre,nivel_id',
+                'grado:id,nombre,nivel_id,orden',
                 'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
-                'semestre:id,numero',
+                'semestre:id,numero,orden_global',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->whereHas('generacion', function ($query) {
-                $query->where('status', 1);
-            })
+            ->when($gruposConTrayectoria->isNotEmpty(), fn ($q) => $q->whereIn('id', $gruposConTrayectoria))
             ->get()
-            ->sortBy([
-                fn($a, $b) => ($a->grado_id ?? 0) <=> ($b->grado_id ?? 0),
-                fn($a, $b) => ($a->semestre_id ?? 0) <=> ($b->semestre_id ?? 0),
-                fn($a, $b) => strcmp(
-                    $a->asignacionGrupo?->nombre ?? '',
-                    $b->asignacionGrupo?->nombre ?? ''
-                ),
-            ])
-            ->map(function ($grupo) {
-                $nombreGrupo = $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
-
-                $generacion = $grupo->generacion
-                    ? $grupo->generacion->anio_ingreso . ' - ' . $grupo->generacion->anio_egreso
-                    : 'Sin generación';
-
-                $grado = $grupo->grado?->nombre ?? 'Sin grado';
-
-                $semestre = $grupo->semestre
-                    ? ' | ' . $grupo->semestre->numero . '° semestre'
-                    : '';
-
-                return [
-                    'id' => $grupo->id,
-                    'nombre' => $grado . ' | Grupo ' . $nombreGrupo . ' | Gen. ' . $generacion . $semestre,
-                ];
-            })
+            ->sortBy(fn ($grupo) => sprintf(
+                '%03d|%03d|%s|%04d',
+                (int) ($grupo->grado?->orden ?? 999),
+                (int) ($grupo->semestre?->orden_global ?? $grupo->semestre?->numero ?? 999),
+                mb_strtolower((string) ($grupo->asignacionGrupo?->nombre ?? '')),
+                (int) ($grupo->generacion?->anio_ingreso ?? 0),
+            ))
             ->values();
     }
 
-    public function getGrupoSeleccionadoProperty()
+    public function getGrupoSeleccionadoProperty(): ?Grupo
     {
         if (blank($this->grupo_id)) {
             return null;
         }
 
         return Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-                'grado:id,nombre,nivel_id',
-                'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
-                'semestre:id,numero',
-            ])
-            ->where('id', $this->grupo_id)
+            ->with(['asignacionGrupo', 'grado', 'generacion', 'semestre'])
+            ->whereKey($this->grupo_id)
             ->where('nivel_id', $this->nivel->id)
             ->first();
     }
 
-    public function getMateriasDisponiblesProperty()
+    public function getMateriasDisponiblesProperty(): Collection
     {
         $grupo = $this->grupoSeleccionado;
 
@@ -128,398 +126,441 @@ class AsignacionMateria extends Component
         return Materia::query()
             ->where('nivel_id', $grupo->nivel_id)
             ->where('grado_id', $grupo->grado_id)
-            ->when($this->esBachillerato, function ($query) use ($grupo) {
-                $query->where('semestre_id', $grupo->semestre_id);
-            })
-            ->when(!$this->esBachillerato, function ($query) {
-                $query->whereNull('semestre_id');
-            })
-            ->when($this->nivel?->slug === 'secundaria', function ($query) {
-                $query->where(function ($subQuery) {
-                    $subQuery->where('slug', '!=', 'taller')
-                        ->orWhere('extra', '!=', 1)
-                        ->orWhere('receso', '!=', 1);
-                });
-            })
+            ->when(
+                $this->esBachillerato,
+                fn ($q) => $q->where('semestre_id', $grupo->semestre_id),
+                fn ($q) => $q->whereNull('semestre_id')
+            )
+            // Receso nunca genera carga. Los talleres conjuntos de secundaria
+            // se administran en su módulo específico y no se duplican aquí.
+            ->where('receso', false)
+            ->when($this->nivel?->slug === 'secundaria', fn ($q) => $q->where('slug', '!=', 'taller'))
             ->orderBy('orden')
             ->orderBy('materia')
             ->get();
     }
 
-    public function getProfesoresProperty()
+    public function getProfesoresProperty(): Collection
     {
-        if (blank($this->nivel?->id)) {
-            return collect();
-        }
-
         return PersonaNivel::query()
             ->with('persona')
             ->where('nivel_id', $this->nivel->id)
-            ->whereHas('persona')
+            ->whereHas('persona', fn ($q) => $q->where('status', true))
             ->get()
             ->map(function ($registro) {
                 $persona = $registro->persona;
-
-                $nombreCompleto = trim(
-                    ($persona->titulo ?? '') . ' ' .
-                    ($persona->nombre ?? '') . ' ' .
-                    ($persona->apellido_paterno ?? '') . ' ' .
-                    ($persona->apellido_materno ?? '')
-                );
+                $nombre = trim(($persona->titulo ?? '') . ' ' . ($persona->nombre ?? '') . ' '
+                    . ($persona->apellido_paterno ?? '') . ' ' . ($persona->apellido_materno ?? ''));
 
                 return [
-                    'id' => $persona->id,
-                    'nombre' => $nombreCompleto,
-                    'buscar' => mb_strtolower($nombreCompleto),
+                    'id' => (int) $persona->id,
+                    'nombre' => $nombre,
+                    'buscar' => mb_strtolower($nombre),
                 ];
             })
-            ->filter(fn($item) => filled($item['nombre']))
+            ->filter(fn ($item) => filled($item['nombre']))
             ->unique('id')
             ->sortBy('nombre')
             ->values();
     }
 
-    public function getProfesoresFiltradosProperty()
+    public function getProfesoresFiltradosProperty(): Collection
     {
         $buscar = mb_strtolower(trim($this->buscarProfesor));
 
-        if ($buscar === '') {
-            return $this->profesores;
-        }
-
-        return $this->profesores
-            ->filter(function ($item) use ($buscar) {
-                return str_contains($item['buscar'], $buscar);
-            })
-            ->values();
+        return $buscar === ''
+            ? $this->profesores
+            : $this->profesores->filter(fn ($item) => str_contains($item['buscar'], $buscar))->values();
     }
 
-    public function getAsignacionesFiltradasProperty()
+    public function getAsignacionesFiltradasProperty(): Collection
     {
+        if (!$this->ciclo_escolar_id) {
+            return collect();
+        }
+
         return AsignacionMateriaModel::query()
             ->with([
                 'materia',
                 'profesor',
+                'cicloEscolar',
                 'grupo.nivel',
                 'grupo.grado',
                 'grupo.generacion',
                 'grupo.semestre',
                 'grupo.asignacionGrupo',
+                'horarios' => fn ($q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id),
             ])
-            ->whereHas('grupo', function ($query) {
-                $query->where('nivel_id', $this->nivel?->id);
-            })
-            ->when($this->nivel?->slug === 'secundaria', function ($query) {
-                $query->whereHas('materia', function ($materiaQuery) {
-                    $materiaQuery->where(function ($subQuery) {
-                        $subQuery->where('slug', '!=', 'taller')
-                            ->orWhere('extra', '!=', 1)
-                            ->orWhere('receso', '!=', 1);
-                    });
-                });
-            })
-            ->when($this->buscar, function ($query) {
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->when($this->buscar !== '', function ($q) {
                 $buscar = '%' . trim($this->buscar) . '%';
-
-                $query->where(function ($subquery) use ($buscar) {
-                    $subquery
-                        ->whereHas('materia', function ($q) use ($buscar) {
-                            $q->where('materia', 'like', $buscar)
-                                ->orWhere('clave', 'like', $buscar);
-                        })
-                        ->orWhereHas('profesor', function ($q) use ($buscar) {
-                            $q->where('nombre', 'like', $buscar)
-                                ->orWhere('apellido_paterno', 'like', $buscar)
-                                ->orWhere('apellido_materno', 'like', $buscar)
-                                ->orWhere('titulo', 'like', $buscar);
-                        })
-                        ->orWhereHas('grupo.grado', function ($q) use ($buscar) {
-                            $q->where('nombre', 'like', $buscar);
-                        })
-                        ->orWhereHas('grupo.asignacionGrupo', function ($q) use ($buscar) {
-                            $q->where('nombre', 'like', $buscar);
-                        })
-                        ->orWhereHas('grupo.generacion', function ($q) use ($buscar) {
-                            $q->where('anio_ingreso', 'like', $buscar)
-                                ->orWhere('anio_egreso', 'like', $buscar);
-                        })
-                        ->orWhereHas('grupo.semestre', function ($q) use ($buscar) {
-                            $q->where('numero', 'like', $buscar);
-                        });
+                $q->where(function ($sub) use ($buscar) {
+                    $sub->whereHas('materia', fn ($m) => $m->where('materia', 'like', $buscar)->orWhere('clave', 'like', $buscar))
+                        ->orWhereHas('profesor', fn ($p) => $p->where('nombre', 'like', $buscar)
+                            ->orWhere('apellido_paterno', 'like', $buscar)
+                            ->orWhere('apellido_materno', 'like', $buscar))
+                        ->orWhereHas('grupo.asignacionGrupo', fn ($g) => $g->where('nombre', 'like', $buscar));
                 });
             })
             ->get()
-            ->sortBy([
-                // Se muestra primero la generación más reciente.
-                fn($a, $b) => ($b->grupo?->generacion?->anio_ingreso ?? 0) <=> ($a->grupo?->generacion?->anio_ingreso ?? 0),
-
-                // Después se acomoda por grado.
-                fn($a, $b) => ($a->grupo?->grado_id ?? 0) <=> ($b->grupo?->grado_id ?? 0),
-
-                // Después se acomoda por grupo.
-                fn($a, $b) => strcmp(
-                    $a->grupo?->asignacionGrupo?->nombre ?? '',
-                    $b->grupo?->asignacionGrupo?->nombre ?? ''
-                ),
-
-                // En bachillerato se separa por semestre.
-                fn($a, $b) => ($a->grupo?->semestre_id ?? 0) <=> ($b->grupo?->semestre_id ?? 0),
-
-                // Finalmente se respeta el orden manual.
-                fn($a, $b) => ($a->orden ?? 0) <=> ($b->orden ?? 0),
-
-                // Respaldo por orden de la materia.
-                fn($a, $b) => ($a->materia?->orden ?? 0) <=> ($b->materia?->orden ?? 0),
-            ])
+            ->sortBy(fn ($a) => sprintf(
+                '%03d|%03d|%s|%03d|%s',
+                (int) ($a->grupo?->grado?->orden ?? 999),
+                (int) ($a->grupo?->semestre?->orden_global ?? $a->grupo?->semestre?->numero ?? 999),
+                mb_strtolower((string) ($a->grupo?->asignacionGrupo?->nombre ?? '')),
+                (int) ($a->orden ?? 999),
+                mb_strtolower((string) ($a->materia?->materia ?? '')),
+            ))
             ->values();
     }
 
-    protected function rules()
+    protected function rules(): array
     {
         return [
-            'grupo_id' => [
-                'required',
-                'integer',
-                'exists:grupos,id',
-            ],
-            'materia_id' => [
-                'required',
-                'integer',
-                'exists:materias,id',
-            ],
-            'profesor_id' => [
-                'nullable',
-                'integer',
-                'exists:personas,id',
-            ],
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+            'materia_id' => ['required', 'integer', 'exists:materias,id'],
+            'profesor_id' => ['nullable', 'integer', 'exists:personas,id'],
         ];
     }
 
-    protected function messages()
+    public function updatedCicloEscolarId(): void
     {
-        return [
-            'grupo_id.required' => 'Selecciona un grupo.',
-            'materia_id.required' => 'Selecciona una materia.',
-            'materia_id.exists' => 'La materia seleccionada no existe.',
-            'profesor_id.exists' => 'El profesor seleccionado no existe.',
-        ];
+        $this->limpiarFormulario();
     }
 
-    public function updatedGrupoId()
+    public function updatedGrupoId(): void
     {
-        $this->reset([
-            'materia_id',
-        ]);
-
-        $this->resetValidation([
-            'grupo_id',
-            'materia_id',
-        ]);
+        $this->reset(['materia_id']);
+        $this->resetValidation(['grupo_id', 'materia_id']);
     }
 
-    public function updatedBuscarProfesor()
+    public function updatedBuscarProfesor(): void
     {
         if (blank($this->buscarProfesor)) {
-            $this->profesor_id = null;
+            $this->profesor_id = '';
         }
     }
 
-    public function guardarMateria()
+    public function seleccionarProfesor(int $profesorId): void
+    {
+        $profesor = $this->profesores->firstWhere('id', $profesorId);
+        $this->profesor_id = $profesorId;
+        $this->buscarProfesor = $profesor['nombre'] ?? '';
+    }
+
+    public function guardarMateria(): void
     {
         $this->validate();
 
-        $grupo = Grupo::query()
-            ->where('id', $this->grupo_id)
-            ->where('nivel_id', $this->nivel->id)
-            ->first();
+        $grupo = Grupo::query()->whereKey($this->grupo_id)->where('nivel_id', $this->nivel->id)->first();
+        $materia = Materia::query()->find($this->materia_id);
 
-        if (!$grupo) {
-            $this->addError('grupo_id', 'El grupo seleccionado no pertenece al nivel actual.');
+        if (!$grupo || !$materia) {
+            $this->addError('grupo_id', 'El grupo o la materia ya no están disponibles.');
             return;
         }
 
-        $materia = Materia::query()
-            ->where('id', $this->materia_id)
-            ->first();
-
-        if (!$materia) {
-            $this->addError('materia_id', 'La materia seleccionada no existe.');
+        if ((int) $materia->nivel_id !== (int) $grupo->nivel_id
+            || (int) $materia->grado_id !== (int) $grupo->grado_id
+            || ($this->esBachillerato && (int) $materia->semestre_id !== (int) $grupo->semestre_id)) {
+            $this->addError('materia_id', 'La materia no corresponde al contexto académico del grupo.');
             return;
         }
 
-        if ((int) $materia->nivel_id !== (int) $grupo->nivel_id) {
-            $this->addError('materia_id', 'La materia no pertenece al nivel del grupo.');
-            return;
-        }
-
-        if ((int) $materia->grado_id !== (int) $grupo->grado_id) {
-            $this->addError('materia_id', 'La materia no pertenece al grado del grupo.');
-            return;
-        }
-
-        if ($this->esBachillerato && (int) $materia->semestre_id !== (int) $grupo->semestre_id) {
-            $this->addError('materia_id', 'La materia no pertenece al semestre del grupo.');
-            return;
-        }
-
-        if (!$this->esBachillerato && filled($materia->semestre_id)) {
-            $this->addError('materia_id', 'La materia no corresponde a básica.');
-            return;
-        }
-
-        $yaExiste = AsignacionMateriaModel::query()
-            ->where('grupo_id', $this->grupo_id)
-            ->where('materia_id', $this->materia_id)
-            ->when($this->editandoId, function ($query) {
-                $query->where('id', '!=', $this->editandoId);
-            })
+        $duplicada = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('grupo_id', $grupo->id)
+            ->where('materia_id', $materia->id)
+            ->when($this->editandoId, fn ($q) => $q->where('id', '!=', $this->editandoId))
             ->exists();
 
-        if ($yaExiste) {
-            $this->addError('materia_id', 'Esta materia ya está asignada a este grupo.');
+        if ($duplicada) {
+            $this->addError('materia_id', 'Esta materia ya tiene una carga en el grupo y ciclo seleccionados.');
             return;
         }
 
-        $profesorId = (bool) $materia->receso ? null : $this->profesor_id;
+        $profesorId = $materia->receso ? null : (filled($this->profesor_id) ? (int) $this->profesor_id : null);
 
-        if (!$materia->receso && blank($profesorId)) {
-            $this->addError('profesor_id', 'Selecciona un profesor para esta materia.');
-            return;
-        }
+        DB::transaction(function () use ($grupo, $materia, $profesorId) {
+            if ($this->editandoId) {
+                $asignacion = AsignacionMateriaModel::query()->findOrFail($this->editandoId);
+                abort_unless((int) $asignacion->ciclo_escolar_id === (int) $this->ciclo_escolar_id, 422);
 
-        if (!$materia->receso) {
-            $profesorRelacionado = PersonaNivel::query()
-                ->where('persona_id', $profesorId)
-                ->where('nivel_id', $this->nivel->id)
-                ->exists();
-
-            if (!$profesorRelacionado) {
-                $this->addError('profesor_id', 'El profesor seleccionado no pertenece al nivel actual.');
-                return;
+                $asignacion->update([
+                    'materia_id' => $materia->id,
+                    'grupo_id' => $grupo->id,
+                    'profesor_id' => $profesorId,
+                    'nivel_id' => $grupo->nivel_id,
+                    'grado_id' => $grupo->grado_id,
+                    'generacion_id' => $grupo->generacion_id,
+                    'semestre_id' => $grupo->semestre_id,
+                ]);
+                $this->ultimoMovimiento = 'actualizada';
+            } else {
+                $asignacion = AsignacionMateriaModel::query()->create([
+                    'materia_id' => $materia->id,
+                    'grupo_id' => $grupo->id,
+                    'profesor_id' => $profesorId,
+                    'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                    'nivel_id' => $grupo->nivel_id,
+                    'grado_id' => $grupo->grado_id,
+                    'generacion_id' => $grupo->generacion_id,
+                    'semestre_id' => $grupo->semestre_id,
+                    'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
+                ]);
+                $this->ultimoMovimiento = 'registrada';
             }
-        }
 
-        if ($this->editandoId) {
-            $asignacion = AsignacionMateriaModel::findOrFail($this->editandoId);
+            $this->ultimoRegistroId = $asignacion->id;
+        });
 
-            $asignacion->update([
-                'materia_id' => $this->materia_id,
-                'grupo_id' => $this->grupo_id,
-                'profesor_id' => $profesorId,
-            ]);
-
-            $this->ultimoMovimiento = 'actualizado';
-        } else {
-            $siguienteOrden = AsignacionMateriaModel::query()
-                ->where('grupo_id', $this->grupo_id)
-                ->max('orden');
-
-            $asignacion = AsignacionMateriaModel::create([
-                'materia_id' => $this->materia_id,
-                'grupo_id' => $this->grupo_id,
-                'profesor_id' => $profesorId,
-                'orden' => ((int) $siguienteOrden) + 1,
-            ]);
-
-            $this->ultimoMovimiento = 'registrado';
-        }
-
-        $this->ultimoRegistroId = $asignacion->id;
-
-        /*
-         * Se limpia solo lo necesario para capturar otra materia.
-         * El grupo se conserva para seguir asignando materias al mismo grupo.
-         */
         $this->limpiarFormularioDespuesDeGuardar();
-
-        /*
-         * Se mantiene abierto el collapse de nueva asignación.
-         */
-        $this->dispatch('abrir-formulario-materia');
-
         $this->dispatch('swal', [
-            'title' => 'Asignación guardada correctamente',
+            'title' => 'Carga académica ' . $this->ultimoMovimiento,
+            'text' => 'Se guardó dentro del ciclo seleccionado sin modificar ciclos anteriores.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
     }
 
-    public function limpiarFormularioDespuesDeGuardar()
-    {
-        /*
-         * Se conserva el grupo seleccionado para no obligar a elegirlo otra vez.
-         */
-        $grupoSeleccionado = $this->grupo_id;
-
-        $this->reset([
-            'editandoId',
-            'materia_id',
-            'profesor_id',
-            'buscarProfesor',
-        ]);
-
-        $this->grupo_id = $grupoSeleccionado;
-
-        $this->resetValidation();
-    }
-
-    public function editar($id)
+    public function editar(int $id): void
     {
         $asignacion = AsignacionMateriaModel::query()
-            ->with([
-                'materia',
-                'grupo',
-                'profesor',
-            ])
+            ->with(['profesor'])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->findOrFail($id);
 
         $this->editandoId = $asignacion->id;
         $this->grupo_id = $asignacion->grupo_id;
         $this->materia_id = $asignacion->materia_id;
-        $this->profesor_id = $asignacion->profesor_id;
+        $this->profesor_id = $asignacion->profesor_id ?: '';
+        $this->buscarProfesor = $asignacion->profesor
+            ? trim(($asignacion->profesor->titulo ?? '') . ' ' . ($asignacion->profesor->nombre ?? '') . ' '
+                . ($asignacion->profesor->apellido_paterno ?? '') . ' ' . ($asignacion->profesor->apellido_materno ?? ''))
+            : '';
 
-        $this->buscarProfesor = trim(
-            ($asignacion->profesor?->titulo ?? '') . ' ' .
-            ($asignacion->profesor?->nombre ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_paterno ?? '') . ' ' .
-            ($asignacion->profesor?->apellido_materno ?? '')
-        );
-
-        $this->dispatch('abrir-formulario-materia');
         $this->dispatch('scroll-editar-materia');
     }
 
-    public function eliminar($id)
+    public function confirmar(int $id): void
     {
-        $asignacion = AsignacionMateriaModel::find($id);
+        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ACTIVA);
+    }
 
-        if (!$asignacion) {
-            return;
+    public function cerrar(int $id): void
+    {
+        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_CERRADA);
+    }
+
+    public function archivar(int $id): void
+    {
+        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ARCHIVADA);
+    }
+
+    public function reactivar(int $id): void
+    {
+        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ACTIVA);
+    }
+
+    public function confirmarTodas(): void
+    {
+        $this->autorizarAdministracion();
+
+        AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
+            ->update([
+                'estado' => AsignacionMateriaModel::ESTADO_ACTIVA,
+                'confirmada_at' => now(),
+                'confirmada_por' => auth()->id(),
+                'fecha_inicio' => DB::raw('COALESCE(fecha_inicio, CURRENT_DATE)'),
+            ]);
+
+        $this->dispatch('swal', ['title' => 'Cargas confirmadas', 'icon' => 'success', 'position' => 'top-end']);
+    }
+
+    private function cambiarEstado(int $id, string $estado): void
+    {
+        $this->autorizarAdministracion();
+
+        $asignacion = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->findOrFail($id);
+
+        $datos = ['estado' => $estado];
+
+        if ($estado === AsignacionMateriaModel::ESTADO_ACTIVA) {
+            $datos['confirmada_at'] = now();
+            $datos['confirmada_por'] = auth()->id();
+            $datos['fecha_inicio'] = $asignacion->fecha_inicio ?: now()->toDateString();
+            $datos['fecha_fin'] = null;
         }
 
-        $asignacion->delete();
+        if (in_array($estado, [AsignacionMateriaModel::ESTADO_CERRADA, AsignacionMateriaModel::ESTADO_ARCHIVADA], true)) {
+            $datos['fecha_fin'] = now()->toDateString();
+        }
+
+        $asignacion->update($datos);
 
         $this->dispatch('swal', [
-            'title' => 'Asignación eliminada correctamente',
+            'title' => 'Estado actualizado',
+            'text' => 'No se eliminó ningún horario, calificación o lista histórica.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
     }
 
-    public function limpiarFormulario()
+    /**
+     * Copia por nivel las cargas del ciclo origen. Siempre crea IDs nuevos.
+     * Los horarios se copian únicamente cuando el administrador lo solicita.
+     */
+    public function copiarDesdeCiclo(): void
     {
-        $this->reset([
-            'editandoId',
-            'grupo_id',
-            'materia_id',
-            'profesor_id',
-            'buscarProfesor',
+        $this->autorizarAdministracion();
+
+        $this->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'ciclo_origen_id' => ['required', 'integer', 'exists:ciclo_escolares,id', Rule::notIn([(int) $this->ciclo_escolar_id])],
         ]);
 
+        $creadas = 0;
+        $omitidas = 0;
+        $horariosCopiados = 0;
+
+        DB::transaction(function () use (&$creadas, &$omitidas, &$horariosCopiados) {
+            $origenes = AsignacionMateriaModel::query()
+                ->with(['grupo', 'horarios' => fn ($q) => $q->where('ciclo_escolar_id', $this->ciclo_origen_id)])
+                ->where('ciclo_escolar_id', $this->ciclo_origen_id)
+                ->where('nivel_id', $this->nivel->id)
+                ->where('estado', '!=', AsignacionMateriaModel::ESTADO_ARCHIVADA)
+                ->get();
+
+            foreach ($origenes as $origen) {
+                $grupoDestino = $this->resolverGrupoDestino($origen);
+
+                if (!$grupoDestino) {
+                    $omitidas++;
+                    continue;
+                }
+
+                $existe = AsignacionMateriaModel::query()
+                    ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                    ->where('grupo_id', $grupoDestino->id)
+                    ->where('materia_id', $origen->materia_id)
+                    ->first();
+
+                if ($existe) {
+                    $omitidas++;
+                    continue;
+                }
+
+                $nueva = AsignacionMateriaModel::query()->create([
+                    'materia_id' => $origen->materia_id,
+                    'grupo_id' => $grupoDestino->id,
+                    'profesor_id' => $this->copiar_profesores ? $origen->profesor_id : null,
+                    'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                    'nivel_id' => $grupoDestino->nivel_id,
+                    'grado_id' => $grupoDestino->grado_id,
+                    'generacion_id' => $grupoDestino->generacion_id,
+                    'semestre_id' => $grupoDestino->semestre_id,
+                    'orden' => $origen->orden,
+                    'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
+                    'asignacion_origen_id' => $origen->id,
+                ]);
+                $creadas++;
+
+                if (!$this->copiar_horarios) {
+                    continue;
+                }
+
+                foreach ($origen->horarios as $horarioOrigen) {
+                    $ocupada = Horario::query()
+                        ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                        ->where('grupo_id', $grupoDestino->id)
+                        ->where('dia_id', $horarioOrigen->dia_id)
+                        ->where('hora_id', $horarioOrigen->hora_id)
+                        ->exists();
+
+                    if ($ocupada) {
+                        continue;
+                    }
+
+                    Horario::query()->create([
+                        'nivel_id' => $grupoDestino->nivel_id,
+                        'grado_id' => $grupoDestino->grado_id,
+                        'generacion_id' => $grupoDestino->generacion_id,
+                        'semestre_id' => $grupoDestino->semestre_id,
+                        'grupo_id' => $grupoDestino->id,
+                        'hora_id' => $horarioOrigen->hora_id,
+                        'dia_id' => $horarioOrigen->dia_id,
+                        'asignacion_materia_id' => $nueva->id,
+                        'taller_sesion_id' => null,
+                        'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                    ]);
+                    $horariosCopiados++;
+                }
+            }
+        });
+
+        $this->dispatch('swal', [
+            'title' => 'Preparación del ciclo terminada',
+            'text' => "Nuevas: {$creadas}. Omitidas: {$omitidas}. Horarios copiados: {$horariosCopiados}. Revisa y confirma las cargas.",
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    private function resolverGrupoDestino(AsignacionMateriaModel $origen): ?Grupo
+    {
+        $origen->loadMissing('grupo');
+        $grupoOrigen = $origen->grupo;
+
+        if (!$grupoOrigen) {
+            return null;
+        }
+
+        $idsVigentes = TrayectoriaAcademica::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $grupoOrigen->grado_id)
+            ->whereNotNull('grupo_id')
+            ->when($grupoOrigen->semestre_id, fn ($q) => $q->where('semestre_id', $grupoOrigen->semestre_id))
+            ->pluck('grupo_id')
+            ->unique();
+
+        return Grupo::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('grado_id', $grupoOrigen->grado_id)
+            ->where('asignacion_grupo_id', $grupoOrigen->asignacion_grupo_id)
+            ->when(
+                $grupoOrigen->semestre_id,
+                fn ($q) => $q->where('semestre_id', $grupoOrigen->semestre_id),
+                fn ($q) => $q->whereNull('semestre_id')
+            )
+            ->when($idsVigentes->isNotEmpty(), fn ($q) => $q->whereIn('id', $idsVigentes))
+            ->orderByDesc('generacion_id')
+            ->first()
+            ?? Grupo::query()->find($grupoOrigen->id);
+    }
+
+    public function limpiarFormularioDespuesDeGuardar(): void
+    {
+        $grupo = $this->grupo_id;
+        $this->reset(['editandoId', 'materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->grupo_id = $grupo;
         $this->resetValidation();
     }
 
-    public function ordenarMateriasPorGrupoJs($grupoId, $ids)
+    public function limpiarFormulario(): void
+    {
+        $this->reset(['editandoId', 'grupo_id', 'materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->resetValidation();
+    }
+
+    public function ordenarMateriasPorGrupoJs($grupoId, $ids): void
     {
         if (!is_array($ids)) {
             return;
@@ -527,26 +568,20 @@ class AsignacionMateria extends Component
 
         foreach ($ids as $index => $id) {
             AsignacionMateriaModel::query()
-                ->where('id', $id)
+                ->whereKey($id)
                 ->where('grupo_id', $grupoId)
-                ->update([
-                    'orden' => $index + 1,
-                ]);
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->update(['orden' => $index + 1]);
         }
+    }
 
-        $this->dispatch('swal', [
-            'title' => 'Orden actualizado',
-            'icon' => 'success',
-            'position' => 'top-end',
-        ]);
+    private function autorizarAdministracion(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede confirmar, cerrar, archivar o copiar cargas.');
     }
 
     public function render()
     {
-        return view('livewire.accion.asignacion-materia', [
-            'niveles' => $this->niveles,
-            'grupos' => $this->grupos,
-            'profesores' => $this->profesores,
-        ]);
+        return view('livewire.accion.asignacion-materia');
     }
 }

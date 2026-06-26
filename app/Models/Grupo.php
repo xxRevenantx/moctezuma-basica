@@ -77,6 +77,11 @@ class Grupo extends Model
 
 
 
+    public function trayectoriasAcademicas()
+    {
+        return $this->hasMany(TrayectoriaAcademica::class, 'grupo_id');
+    }
+
     // RELACION CON HORARIOS
     public function horarios()
     {

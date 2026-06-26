@@ -68,6 +68,24 @@ class Dashboard extends Component
         return $query;
     }
 
+    private function aplicarCicloActual(Builder $query, string $tabla): Builder
+    {
+        if (!$this->columnaExiste($tabla, 'ciclo_escolar_id') || !$this->tablaExiste('ciclo_escolares')) {
+            return $query;
+        }
+
+        $cicloActualId = DB::table('ciclo_escolares')
+            ->where('es_actual', 1)
+            ->value('id')
+            ?? DB::table('ciclo_escolares')->orderByDesc('inicio_anio')->value('id');
+
+        if ($cicloActualId) {
+            $query->where($tabla . '.ciclo_escolar_id', $cicloActualId);
+        }
+
+        return $query;
+    }
+
     private function aplicarActivo(Builder $query, string $tabla): Builder
     {
         if ($this->columnaExiste($tabla, 'activo')) {
@@ -216,6 +234,11 @@ class Dashboard extends Component
         }
 
         $query = DB::table('asignacion_materias');
+        $this->aplicarCicloActual($query, 'asignacion_materias');
+
+        if (Schema::hasColumn('asignacion_materias', 'estado')) {
+            $query->where('asignacion_materias.estado', '!=', 'archivada');
+        }
 
         if ($this->nivel_id && $this->tablaExiste('grupos') && $this->columnaExiste('grupos', 'nivel_id')) {
             $query->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
@@ -231,10 +254,17 @@ class Dashboard extends Component
             return 0;
         }
 
-        return DB::table('asignacion_materias')
+        $query = DB::table('asignacion_materias')
             ->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
-            ->where('grupos.nivel_id', $nivelId)
-            ->count();
+            ->where('grupos.nivel_id', $nivelId);
+
+        $this->aplicarCicloActual($query, 'asignacion_materias');
+
+        if (Schema::hasColumn('asignacion_materias', 'estado')) {
+            $query->where('asignacion_materias.estado', '!=', 'archivada');
+        }
+
+        return $query->count();
     }
 
     private function obtenerAlertas(): array
@@ -287,6 +317,12 @@ class Dashboard extends Component
 
         $query = DB::table('asignacion_materias')
             ->whereNull('asignacion_materias.profesor_id');
+
+        $this->aplicarCicloActual($query, 'asignacion_materias');
+
+        if (Schema::hasColumn('asignacion_materias', 'estado')) {
+            $query->where('asignacion_materias.estado', '!=', 'archivada');
+        }
 
         if ($this->nivel_id && $this->tablaExiste('grupos')) {
             $query->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')

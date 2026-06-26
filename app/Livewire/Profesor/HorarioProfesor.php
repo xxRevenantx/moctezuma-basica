@@ -5,6 +5,8 @@ namespace App\Livewire\Profesor;
 use App\Models\Horario;
 use App\Models\cicloEscolar;
 use App\Models\Persona;
+use App\Models\AsignacionMateria;
+use App\Models\TallerSesion;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +27,9 @@ class HorarioProfesor extends Component
 
     public function mount(): void
     {
-        $this->cicloEscolarId = cicloEscolar::query()->orderByDesc('id')->value('id');
+        $this->cicloEscolarId = cicloEscolar::query()
+            ->where('es_actual', true)
+            ->value('id') ?: cicloEscolar::query()->orderByDesc('id')->value('id');
 
         $this->profesorId = Persona::query()
             ->select('personas.id')
@@ -34,12 +38,14 @@ class HorarioProfesor extends Component
                     $query->select(DB::raw(1))
                         ->from('asignacion_materias')
                         ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
-                        ->whereNotNull('asignacion_materias.profesor_id');
+                        ->whereNotNull('asignacion_materias.profesor_id')
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
                 })->orWhereExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('taller_sesiones')
                         ->whereColumn('taller_sesiones.profesor_id', 'personas.id')
-                        ->whereNotNull('taller_sesiones.profesor_id');
+                        ->whereNotNull('taller_sesiones.profesor_id')
+                        ->where('taller_sesiones.estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                 });
             })
             ->where('personas.status', true)
@@ -136,12 +142,14 @@ class HorarioProfesor extends Component
                     $query->select(DB::raw(1))
                         ->from('asignacion_materias')
                         ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
-                        ->whereNotNull('asignacion_materias.profesor_id');
+                        ->whereNotNull('asignacion_materias.profesor_id')
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
                 })->orWhereExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('taller_sesiones')
                         ->whereColumn('taller_sesiones.profesor_id', 'personas.id')
-                        ->whereNotNull('taller_sesiones.profesor_id');
+                        ->whereNotNull('taller_sesiones.profesor_id')
+                        ->where('taller_sesiones.estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                 });
             })
             ->where('personas.status', true)
@@ -187,9 +195,11 @@ class HorarioProfesor extends Component
             ])
             ->where(function ($query) {
                 $query->whereHas('asignacionMateria', function ($subQuery) {
-                    $subQuery->where('profesor_id', $this->profesorId);
+                    $subQuery->where('profesor_id', $this->profesorId)
+                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
                 })->orWhereHas('tallerSesion', function ($subQuery) {
-                    $subQuery->where('profesor_id', $this->profesorId);
+                    $subQuery->where('profesor_id', $this->profesorId)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                 });
             })
             ->when($this->cicloEscolarId, fn($query) => $query->where('ciclo_escolar_id', $this->cicloEscolarId))

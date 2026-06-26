@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AsignacionMateria;
 use App\Models\Dia;
 use App\Models\Grupo;
 use App\Models\Hora;
@@ -55,7 +56,7 @@ class HorarioTallerService
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id',
                 'asignacionMateria.materia:id,materia',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
-                'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,dia_id,hora_id',
+                'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,estado,dia_id,hora_id',
                 'tallerSesion.taller:id,nombre',
                 'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
                 'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
@@ -68,6 +69,14 @@ class HorarioTallerService
                     ->where('hora_fin', '>', $hora->hora_inicio);
             })
             ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where(function ($query) {
+                $query->where(function ($normal) {
+                    $normal->whereNull('taller_sesion_id')
+                        ->whereHas('asignacionMateria', fn($subQuery) => $subQuery
+                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA));
+                })->orWhereHas('tallerSesion', fn($subQuery) => $subQuery
+                    ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
+            })
             ->when($sesionActualId, function ($query) use ($sesionActualId) {
                 $query->where(function ($subQuery) use ($sesionActualId) {
                     $subQuery->whereNull('taller_sesion_id')
@@ -77,10 +86,12 @@ class HorarioTallerService
             ->where(function ($query) use ($grupoIds, $profesorId) {
                 $query->whereIn('grupo_id', $grupoIds)
                     ->orWhereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
-                        $subQuery->where('profesor_id', $profesorId);
+                        $subQuery->where('profesor_id', $profesorId)
+                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
                     })
                     ->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
-                        $subQuery->where('profesor_id', $profesorId);
+                        $subQuery->where('profesor_id', $profesorId)
+                            ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                     });
             })
             ->get();

@@ -310,13 +310,14 @@
             $parcial = $bloque['parcial'] ?? null;
             $esBachillerato = $bloque['es_bachillerato'] ?? false;
 
+            $profesorBloque = $bloque['profesor_historico'] ?? $profesor;
             $nombreProfesor = trim(
-                ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-                    ($profesor->nombre ?? '') .
+                ($profesorBloque->titulo ? $profesorBloque->titulo . ' ' : '') .
+                    ($profesorBloque->nombre ?? '') .
                     ' ' .
-                    ($profesor->apellido_paterno ?? '') .
+                    ($profesorBloque->apellido_paterno ?? '') .
                     ' ' .
-                    ($profesor->apellido_materno ?? ''),
+                    ($profesorBloque->apellido_materno ?? ''),
             );
 
             $ciclo =
@@ -351,7 +352,7 @@
             */
             $horaInicio = $horario->hora?->hora_inicio ?? null;
             $horaFin = $horario->hora?->hora_fin ?? null;
-            $diaHorario = $horario->dia?->nombre ?? null;
+            $diaHorario = $horario->dia?->dia ?? null;
 
             $horarioTexto =
                 $horaInicio && $horaFin
@@ -400,6 +401,10 @@
                     <td class="label">MATERIA</td>
                     <td class="valor" colspan="3">
                         {{ mb_strtoupper($materia?->materia ?? 'No especificada', 'UTF-8') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">CORTE</td>
+                    <td class="valor" colspan="3">{{ $fechaCorte ?? optional($bloque['fecha_corte'] ?? null)->locale('es')->translatedFormat('d \d\e F \d\e Y') }}</td>
                 </tr>
             </table>
 

@@ -68,6 +68,21 @@ class cicloEscolar extends Model
         return $this->hasMany(TrayectoriaAcademica::class, 'ciclo_escolar_id');
     }
 
+    public function asignacionMaterias()
+    {
+        return $this->hasMany(AsignacionMateria::class, 'ciclo_escolar_id');
+    }
+
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class, 'ciclo_escolar_id');
+    }
+
+    public function tallerSesiones()
+    {
+        return $this->hasMany(TallerSesion::class, 'ciclo_escolar_id');
+    }
+
     public function usuarioQueCerro()
     {
         return $this->belongsTo(User::class, 'cerrado_por');

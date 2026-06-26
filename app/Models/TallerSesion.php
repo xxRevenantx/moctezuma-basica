@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -9,12 +10,22 @@ class TallerSesion extends Model
 {
     use HasFactory;
 
+    public const ESTADO_BORRADOR = 'borrador';
+    public const ESTADO_ACTIVA = 'activa';
+    public const ESTADO_CERRADA = 'cerrada';
+    public const ESTADO_ARCHIVADA = 'archivada';
+
     protected $table = 'taller_sesiones';
 
     protected $fillable = [
         'taller_id',
         'profesor_id',
         'ciclo_escolar_id',
+        'estado',
+        'fecha_inicio',
+        'fecha_fin',
+        'confirmada_at',
+        'confirmada_por',
         'dia_id',
         'hora_id',
         'ubicacion',
@@ -27,6 +38,10 @@ class TallerSesion extends Model
         'taller_id' => 'integer',
         'profesor_id' => 'integer',
         'ciclo_escolar_id' => 'integer',
+        'fecha_inicio' => 'date',
+        'fecha_fin' => 'date',
+        'confirmada_at' => 'datetime',
+        'confirmada_por' => 'integer',
         'dia_id' => 'integer',
         'hora_id' => 'integer',
         'conflicto_forzado' => 'boolean',
@@ -76,5 +91,20 @@ class TallerSesion extends Model
     public function usuarioForzado()
     {
         return $this->belongsTo(User::class, 'forzado_por');
+    }
+
+    public function usuarioConfirmacion()
+    {
+        return $this->belongsTo(User::class, 'confirmada_por');
+    }
+
+    public function scopeDelCiclo(Builder $query, int|string|null $cicloEscolarId): Builder
+    {
+        return $query->when(filled($cicloEscolarId), fn (Builder $q) => $q->where('ciclo_escolar_id', $cicloEscolarId));
+    }
+
+    public function scopeVisibles(Builder $query): Builder
+    {
+        return $query->where('estado', '!=', self::ESTADO_ARCHIVADA);
     }
 }

@@ -20,6 +20,7 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
+use App\Services\ListaAcademicaService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -599,44 +600,43 @@ class Calificacion extends Component
     {
         $grupoIds = $this->obtenerGrupoIdsParaAlumnos();
 
-        $query = Inscripcion::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->where('generacion_id', $this->generacion_id)
-            ->where('grado_id', $this->grado_id)
-            ->where(function ($q) {
-                $q->where('activo', 1)
-                    ->orWhere('activo', true)
-                    ->orWhere('activo', '1')
-                    ->orWhere('activo', 'true');
-            });
-
-        /*
-         * No se filtra por semestre_id.
-         * En bachillerato tampoco se usa solo el grupo_id seleccionado,
-         * porque el mismo grupo A puede existir en varios semestres con ids diferentes.
-         */
-        if (!empty($grupoIds)) {
-            $query->whereIn('grupo_id', $grupoIds);
+        if (empty($grupoIds) || blank($this->ciclo_escolar_id)) {
+            $this->inscripciones = [];
+            $this->inscripcionesTabla = [];
+            return;
         }
+
+        $fechaCorte = $this->periodoSeleccionado['fecha_fin']
+            ?? $this->periodoSeleccionado['fecha_inicio']
+            ?? now()->toDateString();
+
+        $alumnos = app(ListaAcademicaService::class)->alumnosPorContexto(
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            grupoIds: $grupoIds,
+            fechaCorte: $fechaCorte,
+            nivelId: (int) $this->nivel_id,
+            gradoId: (int) $this->grado_id,
+            generacionId: (int) $this->generacion_id,
+            semestreId: $this->esBachillerato && filled($this->semestre_id)
+                ? (int) $this->semestre_id
+                : null,
+        );
 
         if (filled($this->busqueda)) {
-            $busqueda = '%' . trim($this->busqueda) . '%';
+            $buscar = mb_strtolower(trim($this->busqueda));
+            $alumnos = $alumnos->filter(function ($alumno) use ($buscar) {
+                $texto = mb_strtolower(trim(
+                    ($alumno->matricula ?? '') . ' ' .
+                    ($alumno->nombre ?? '') . ' ' .
+                    ($alumno->apellido_paterno ?? '') . ' ' .
+                    ($alumno->apellido_materno ?? '')
+                ));
 
-            $query->where(function ($q) use ($busqueda) {
-                $q->where('matricula', 'like', $busqueda)
-                    ->orWhere('nombre', 'like', $busqueda)
-                    ->orWhere('apellido_paterno', 'like', $busqueda)
-                    ->orWhere('apellido_materno', 'like', $busqueda)
-                    ->orWhereRaw("CONCAT(nombre, ' ', apellido_paterno, ' ', IFNULL(apellido_materno, '')) LIKE ?", [$busqueda])
-                    ->orWhereRaw("CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, ''), ' ', nombre) LIKE ?", [$busqueda]);
-            });
+                return str_contains($texto, $buscar);
+            })->values();
         }
 
-        $this->inscripciones = $query
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get()
+        $this->inscripciones = $alumnos
             ->map(function ($inscripcion) {
                 return [
                     'inscripcion_id' => (int) $inscripcion->id,
@@ -646,6 +646,7 @@ class Calificacion extends Component
                         ($inscripcion->apellido_materno ?? '') . ' ' .
                         ($inscripcion->nombre ?? '')
                     ),
+                    'estatus_historico' => $inscripcion->getAttribute('estatus_historico') ?? 'activo',
                 ];
             })
             ->values()
@@ -667,6 +668,8 @@ class Calificacion extends Component
                 'materia:id,nivel_id,grado_id,semestre_id,materia,clave,slug,calificable,extra,orden',
             ])
             ->where('grupo_id', $this->grupo_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel_id)
                     ->where('grado_id', $this->grado_id)
@@ -1168,6 +1171,13 @@ class Calificacion extends Component
 
         if (blank($this->ciclo_escolar_id)) {
             $this->addError('calificaciones', 'No se pudo determinar el ciclo escolar para guardar las calificaciones.');
+            return;
+        }
+
+        $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
+
+        if ($ciclo?->cerrado_at && !auth()->user()?->is_admin) {
+            $this->addError('calificaciones', 'El ciclo está cerrado. Solo administración puede realizar correcciones históricas.');
             return;
         }
 

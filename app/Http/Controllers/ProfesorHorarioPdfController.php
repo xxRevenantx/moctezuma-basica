@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\cicloEscolar;
+use App\Models\AsignacionMateria;
+use App\Models\TallerSesion;
 use App\Models\Escuela;
 use App\Models\Horario;
 use App\Models\Persona;
@@ -24,6 +26,7 @@ class ProfesorHorarioPdfController extends Controller
 
         $cicloEscolar = cicloEscolar::query()
             ->when($request->filled('ciclo_escolar_id'), fn($query) => $query->where('id', $request->integer('ciclo_escolar_id')))
+            ->when(!$request->filled('ciclo_escolar_id'), fn($query) => $query->orderByDesc('es_actual'))
             ->orderBy('id', 'desc')
             ->first();
 
@@ -50,9 +53,11 @@ class ProfesorHorarioPdfController extends Controller
             ])
             ->where(function ($query) use ($profesorId) {
                 $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
-                    $subQuery->where('profesor_id', $profesorId);
+                    $subQuery->where('profesor_id', $profesorId)
+                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
                 })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
-                    $subQuery->where('profesor_id', $profesorId);
+                    $subQuery->where('profesor_id', $profesorId)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                 });
             })
             ->when($cicloEscolar, fn($query) => $query->where('ciclo_escolar_id', $cicloEscolar->id))

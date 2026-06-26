@@ -42,7 +42,7 @@
                 </div>
             </div>
 
-            <div wire:loading.flex wire:target="guardarSesion,crearTaller,editar,eliminar"
+            <div wire:loading.flex wire:target="guardarSesion,crearTaller,editar,cerrarSesion,archivarSesion,reactivarSesion"
                 class="absolute inset-0 z-40 items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-black/60">
                 <div
                     class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
@@ -338,22 +338,54 @@
                                                     Autorizado con conflicto
                                                 </span>
                                             @endif
+                                            <span
+                                                class="rounded-full px-2 py-0.5 text-[10px] font-black
+                                                    {{ $sesion->estado === \App\Models\TallerSesion::ESTADO_ACTIVA
+                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                                        : ($sesion->estado === \App\Models\TallerSesion::ESTADO_CERRADA
+                                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                                            : 'bg-slate-200 text-slate-700 dark:bg-neutral-800 dark:text-slate-300') }}">
+                                                {{ ucfirst($sesion->estado ?? 'activa') }}
+                                            </span>
                                         </div>
                                         <p class="mt-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
                                             {{ $this->nombreProfesor($sesion->profesor) }}
                                         </p>
                                     </div>
 
-                                    <div class="flex shrink-0 gap-1">
-                                        <button type="button" wire:click="editar({{ $sesion->id }})"
-                                            class="grid h-8 w-8 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
-                                            <flux:icon.pencil-square class="h-4 w-4" />
-                                        </button>
-                                        <button type="button" wire:click="eliminar({{ $sesion->id }})"
-                                            wire:confirm="¿Eliminar esta sesión compartida de todos los grupos?"
-                                            class="grid h-8 w-8 place-items-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-                                            <flux:icon.trash class="h-4 w-4" />
-                                        </button>
+                                    <div class="flex shrink-0 flex-wrap justify-end gap-1">
+                                        @if ($sesion->estado !== \App\Models\TallerSesion::ESTADO_ARCHIVADA)
+                                            <button type="button" wire:click="editar({{ $sesion->id }})"
+                                                title="Editar"
+                                                class="grid h-8 w-8 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
+                                                <flux:icon.pencil-square class="h-4 w-4" />
+                                            </button>
+                                        @endif
+
+                                        @if ($sesion->estado === \App\Models\TallerSesion::ESTADO_ACTIVA)
+                                            <button type="button" wire:click="cerrarSesion({{ $sesion->id }})"
+                                                wire:confirm="¿Cerrar este taller? Seguirá disponible como historial."
+                                                title="Cerrar"
+                                                class="grid h-8 w-8 place-items-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                                                <flux:icon.lock-closed class="h-4 w-4" />
+                                            </button>
+                                        @endif
+
+                                        @if ($sesion->estado !== \App\Models\TallerSesion::ESTADO_ARCHIVADA)
+                                            <button type="button" wire:click="archivarSesion({{ $sesion->id }})"
+                                                wire:confirm="¿Archivar este taller? No se eliminarán sus horarios ni sus datos históricos."
+                                                title="Archivar"
+                                                class="grid h-8 w-8 place-items-center rounded-xl border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
+                                                <flux:icon.archive-box class="h-4 w-4" />
+                                            </button>
+                                        @else
+                                            <button type="button" wire:click="reactivarSesion({{ $sesion->id }})"
+                                                wire:confirm="¿Reactivar este taller conjunto?"
+                                                title="Reactivar"
+                                                class="grid h-8 w-8 place-items-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                <flux:icon.arrow-path class="h-4 w-4" />
+                                            </button>
+                                        @endif
                                     </div>
                                 </div>
 

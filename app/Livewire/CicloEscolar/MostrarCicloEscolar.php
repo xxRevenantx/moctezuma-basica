@@ -61,7 +61,7 @@ class MostrarCicloEscolar extends Component
             return [$nuevo->fresh(), $anterior?->fresh()];
         });
 
-        $texto = 'El ciclo anterior se conservó y quedó cerrado.';
+        $texto = 'El ciclo anterior se conservó y quedó cerrado. Las cargas y horarios no se eliminaron; revísalos por nivel en Asignación de materias.';
 
         if ($prepararTrayectorias && $anterior) {
             $resumen = app(\App\Services\PrepararCicloEscolarService::class)
@@ -80,6 +80,8 @@ class MostrarCicloEscolar extends Component
                 $texto .= ' Revisa Promoción masiva: ' . implode(' ', array_slice($resumen['errores'], 0, 2));
             }
         }
+
+        $texto .= ' En cada nivel abre Asignación de materias, decide si copiar materias, profesores y horarios, y confirma las nuevas cargas.';
 
         $this->dispatch('swal', [
             'icon' => 'success',
@@ -118,15 +120,24 @@ class MostrarCicloEscolar extends Component
 
     public function eliminar(int $cicloId): void
     {
-        $ciclo = CicloEscolar::query()->withCount(['trayectorias', 'calificaciones', 'periodos'])->findOrFail($cicloId);
+        $ciclo = CicloEscolar::query()
+            ->withCount(['trayectorias', 'calificaciones', 'periodos', 'asignacionMaterias', 'horarios', 'tallerSesiones'])
+            ->findOrFail($cicloId);
 
         if ($ciclo->es_actual) {
             $this->addError('eliminar', 'El ciclo actual no puede eliminarse.');
             return;
         }
 
-        if ($ciclo->trayectorias_count > 0 || $ciclo->calificaciones_count > 0 || $ciclo->periodos_count > 0) {
-            $this->addError('eliminar', 'Este ciclo ya contiene historial académico, periodos o calificaciones. Puedes cerrarlo, pero no eliminarlo.');
+        if (
+            $ciclo->trayectorias_count > 0
+            || $ciclo->calificaciones_count > 0
+            || $ciclo->periodos_count > 0
+            || $ciclo->asignacion_materias_count > 0
+            || $ciclo->horarios_count > 0
+            || $ciclo->taller_sesiones_count > 0
+        ) {
+            $this->addError('eliminar', 'Este ciclo contiene historial, periodos, cargas, talleres, horarios o calificaciones. Puedes cerrarlo, pero no eliminarlo.');
             return;
         }
 

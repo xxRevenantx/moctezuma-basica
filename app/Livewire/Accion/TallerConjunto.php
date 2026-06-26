@@ -48,7 +48,9 @@ class TallerConjunto extends Component
     {
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
-        $this->ciclo_escolar_id = cicloEscolar::query()->max('id');
+        $this->ciclo_escolar_id = cicloEscolar::query()
+            ->where('es_actual', true)
+            ->value('id') ?: cicloEscolar::query()->max('id');
     }
 
     public function getEsSecundariaProperty(): bool
@@ -392,6 +394,18 @@ class TallerConjunto extends Component
                 'motivo_conflicto' => count($conflictos) > 0
                     ? trim($this->motivo_conflicto)
                     : null,
+                'estado' => $sesion->exists
+                    ? ($sesion->estado ?: TallerSesion::ESTADO_ACTIVA)
+                    : TallerSesion::ESTADO_ACTIVA,
+                'fecha_inicio' => $sesion->exists
+                    ? $sesion->fecha_inicio
+                    : now()->toDateString(),
+                'confirmada_at' => $sesion->exists
+                    ? ($sesion->confirmada_at ?: now())
+                    : now(),
+                'confirmada_por' => $sesion->exists
+                    ? ($sesion->confirmada_por ?: auth()->id())
+                    : auth()->id(),
             ]);
             $sesion->save();
 
@@ -421,6 +435,16 @@ class TallerConjunto extends Component
             ->whereHas('taller', fn($query) => $query->where('nivel_id', $this->nivel?->id))
             ->findOrFail($sesionId);
 
+        if ($sesion->estado === TallerSesion::ESTADO_ARCHIVADA) {
+            $this->dispatch('swal', [
+                'title' => 'La sesión está archivada',
+                'text' => 'Reactívala antes de modificarla.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
         $this->mostrarPanel = true;
         $this->editandoSesionId = $sesion->id;
         $this->taller_id = $sesion->taller_id;
@@ -437,17 +461,70 @@ class TallerConjunto extends Component
         $this->resetValidation();
     }
 
+    public function cerrarSesion(int $sesionId): void
+    {
+        $this->cambiarEstadoSesion(
+            sesionId: $sesionId,
+            estado: TallerSesion::ESTADO_CERRADA,
+            titulo: 'Taller conjunto cerrado'
+        );
+    }
+
+    public function archivarSesion(int $sesionId): void
+    {
+        $this->cambiarEstadoSesion(
+            sesionId: $sesionId,
+            estado: TallerSesion::ESTADO_ARCHIVADA,
+            titulo: 'Taller conjunto archivado'
+        );
+    }
+
+    public function reactivarSesion(int $sesionId): void
+    {
+        $this->cambiarEstadoSesion(
+            sesionId: $sesionId,
+            estado: TallerSesion::ESTADO_ACTIVA,
+            titulo: 'Taller conjunto reactivado'
+        );
+    }
+
+    /**
+     * Compatibilidad con vistas antiguas: una solicitud de eliminación se
+     * convierte en archivado. No se borran horarios ni relaciones históricas.
+     */
     public function eliminar(int $sesionId): void
     {
+        $this->archivarSesion($sesionId);
+    }
+
+    private function cambiarEstadoSesion(int $sesionId, string $estado, string $titulo): void
+    {
+        $this->autorizarAdministracion();
+
+        $estadosPermitidos = [
+            TallerSesion::ESTADO_ACTIVA,
+            TallerSesion::ESTADO_CERRADA,
+            TallerSesion::ESTADO_ARCHIVADA,
+        ];
+
+        abort_unless(in_array($estado, $estadosPermitidos, true), 422);
+
         $sesion = TallerSesion::query()
             ->whereHas('taller', fn($query) => $query->where('nivel_id', $this->nivel?->id))
-            ->find($sesionId);
+            ->findOrFail($sesionId);
 
-        if (!$sesion) {
-            return;
-        }
-
-        $sesion->delete();
+        $sesion->forceFill([
+            'estado' => $estado,
+            'fecha_fin' => $estado === TallerSesion::ESTADO_ACTIVA
+                ? null
+                : now()->toDateString(),
+            'confirmada_at' => $estado === TallerSesion::ESTADO_ACTIVA
+                ? now()
+                : $sesion->confirmada_at,
+            'confirmada_por' => $estado === TallerSesion::ESTADO_ACTIVA
+                ? auth()->id()
+                : $sesion->confirmada_por,
+        ])->save();
 
         if ($this->editandoSesionId === $sesionId) {
             $this->limpiarFormulario(false);
@@ -455,10 +532,20 @@ class TallerConjunto extends Component
 
         $this->dispatch('taller-conjunto-actualizado');
         $this->dispatch('swal', [
-            'title' => 'Taller conjunto eliminado',
+            'title' => $titulo,
+            'text' => 'La información histórica y sus horarios permanecen guardados.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
+    }
+
+    private function autorizarAdministracion(): void
+    {
+        abort_unless(
+            auth()->user()?->is_admin,
+            403,
+            'Solo administración puede cerrar, archivar o reactivar talleres.'
+        );
     }
 
     public function cancelarAutorizacion(): void

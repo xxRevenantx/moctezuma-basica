@@ -12,6 +12,7 @@ use App\Models\MateriaPromediar;
 use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
+use App\Services\ListaAcademicaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -39,6 +40,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected ?int $periodo_id;
     protected ?int $semestre_id;
     protected ?int $generacion_id;
+    protected ?int $ciclo_escolar_id = null;
+    protected ?string $fecha_corte = null;
     protected bool $esBachillerato;
     protected string $busqueda;
 
@@ -1003,6 +1006,9 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->first();
 
         if ($periodo) {
+            $this->ciclo_escolar_id = $periodo->ciclo_escolar_id ? (int) $periodo->ciclo_escolar_id : null;
+            $this->fecha_corte = $periodo->fecha_fin ?: $periodo->fecha_inicio;
+
             $inicio = $periodo->fecha_inicio ? date('d/m/Y', strtotime($periodo->fecha_inicio)) : 'Sin inicio';
             $fin = $periodo->fecha_fin ? date('d/m/Y', strtotime($periodo->fecha_fin)) : 'Sin fin';
             $descripcion = 'Periodo seleccionado';
@@ -1049,6 +1055,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->where('materias.nivel_id', $this->nivel_id)
             ->where('materias.grado_id', $this->grado_id)
             ->where('asignacion_materias.grupo_id', $this->grupo_id)
+            ->when($this->ciclo_escolar_id, fn ($q) => $q->where('asignacion_materias.ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         if (Schema::hasColumn('materias', 'semestre_id')) {
@@ -1088,56 +1096,55 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             return [];
         }
 
-        $query = Inscripcion::query()
-            ->with([
-                'grado:id,nombre',
-                'grupo' => function ($query) {
-                    $query->select('id', 'asignacion_grupo_id')
-                        ->with('asignacionGrupo:id,nombre');
-                },
-                'semestre:id,numero',
-            ])
-            ->where('nivel_id', $this->nivel_id)
-            ->where('grado_id', $this->grado_id)
-            ->where('grupo_id', $this->grupo_id);
-
-        if ($this->generacion_id) {
-            $query->where('generacion_id', $this->generacion_id);
-        }
-
-        if ($this->esBachillerato) {
-            $query->where('semestre_id', $this->semestre_id);
+        if ($this->ciclo_escolar_id) {
+            $alumnos = app(ListaAcademicaService::class)->alumnosPorContexto(
+                cicloEscolarId: $this->ciclo_escolar_id,
+                grupoIds: [(int) $this->grupo_id],
+                fechaCorte: $this->fecha_corte,
+                nivelId: $this->nivel_id,
+                gradoId: $this->grado_id,
+                generacionId: $this->generacion_id,
+                semestreId: $this->esBachillerato ? $this->semestre_id : null,
+            );
         } else {
-            if (Schema::hasColumn('inscripciones', 'semestre_id')) {
-                $query->whereNull('semestre_id');
-            }
-        }
-
-        if (Schema::hasColumn('inscripciones', 'activo')) {
-            $query->where('activo', 1);
+            // Compatibilidad con exportaciones antiguas sin periodo relacionado.
+            $alumnos = Inscripcion::query()
+                ->where('nivel_id', $this->nivel_id)
+                ->where('grado_id', $this->grado_id)
+                ->where('grupo_id', $this->grupo_id)
+                ->when($this->generacion_id, fn ($q) => $q->where('generacion_id', $this->generacion_id))
+                ->when($this->esBachillerato, fn ($q) => $q->where('semestre_id', $this->semestre_id))
+                ->when(!$this->esBachillerato && Schema::hasColumn('inscripciones', 'semestre_id'), fn ($q) => $q->whereNull('semestre_id'))
+                ->where('activo', 1)
+                ->get();
         }
 
         if ($this->busqueda !== '') {
-            $buscar = $this->busqueda;
+            $buscar = mb_strtolower($this->busqueda);
+            $alumnos = $alumnos->filter(function ($alumno) use ($buscar) {
+                $texto = mb_strtolower(trim(
+                    ($alumno->matricula ?? '') . ' ' .
+                    ($alumno->nombre ?? '') . ' ' .
+                    ($alumno->apellido_paterno ?? '') . ' ' .
+                    ($alumno->apellido_materno ?? '')
+                ));
 
-            $query->where(function ($q) use ($buscar) {
-                $q->where('matricula', 'like', "%{$buscar}%")
-                    ->orWhere('nombre', 'like', "%{$buscar}%")
-                    ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
-                    ->orWhere('apellido_materno', 'like', "%{$buscar}%")
-                    ->orWhere(
-                        DB::raw("TRIM(CONCAT(nombre,' ',IFNULL(apellido_paterno,''),' ',IFNULL(apellido_materno,'')))"),
-                        'like',
-                        "%{$buscar}%"
-                    );
-            });
+                return str_contains($texto, $buscar);
+            })->values();
         }
 
-        return $query
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get()
+        $alumnos->each(fn ($alumno) => $alumno->loadMissing([
+            'grado:id,nombre',
+            'grupo.asignacionGrupo:id,nombre',
+            'semestre:id,numero',
+        ]));
+
+        return $alumnos
+            ->sortBy(fn ($item) => mb_strtolower(trim(
+                ($item->apellido_paterno ?? '') . '|' .
+                ($item->apellido_materno ?? '') . '|' .
+                ($item->nombre ?? '')
+            )))
             ->map(function ($item) {
                 return [
                     'inscripcion_id' => (int) $item->id,
@@ -1168,7 +1175,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $query = Calificacion::query()
             ->whereIn('inscripcion_id', $idsInscripciones)
             ->whereIn('asignacion_materia_id', $idsMaterias)
-            ->where('periodo_id', $this->periodo_id);
+            ->where('periodo_id', $this->periodo_id)
+            ->when($this->ciclo_escolar_id, fn ($q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id));
 
         if (Schema::hasColumn('calificaciones', 'nivel_id')) {
             $query->where('nivel_id', $this->nivel_id);

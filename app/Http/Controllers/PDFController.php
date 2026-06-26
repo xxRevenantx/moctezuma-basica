@@ -18,6 +18,7 @@ use App\Models\Parcial;
 use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
+use App\Services\ListaAcademicaService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -272,6 +273,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolar->id)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
@@ -2031,6 +2034,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
@@ -2798,6 +2803,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
@@ -3473,6 +3480,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
@@ -4214,6 +4223,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
@@ -4858,6 +4869,18 @@ class PDFController extends Controller
     // LISTAS PDF
     public function lista_pdf(Request $request, string $slug_nivel)
     {
+        $cicloEscolar = cicloEscolar::query()
+            ->when($request->integer('ciclo_escolar_id'), fn ($q) => $q->whereKey($request->integer('ciclo_escolar_id')))
+            ->when(!$request->integer('ciclo_escolar_id'), fn ($q) => $q->where('es_actual', true))
+            ->first()
+            ?? cicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->firstOrFail();
+
+        if (!$cicloEscolar->es_actual) {
+            abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede consultar listas históricas.');
+        }
+
+        $request->merge(['ciclo_escolar_id' => $cicloEscolar->id]);
+
         $modoDescarga = $request->input('modo_descarga', 'grupo');
 
         $generacionId = $request->integer('generacion_id');
@@ -5013,7 +5036,8 @@ class PDFController extends Controller
         $grupos = $this->obtenerGruposListaNivelPdf(
             nivel: $nivel,
             generacionId: $generacionId,
-            esBachillerato: $esBachillerato
+            esBachillerato: $esBachillerato,
+            cicloEscolarId: (int) $cicloEscolar->id,
         );
 
         if ($grupos->isEmpty()) {
@@ -5115,7 +5139,8 @@ class PDFController extends Controller
     private function obtenerGruposListaNivelPdf(
         Nivel $nivel,
         ?int $generacionId,
-        bool $esBachillerato
+        bool $esBachillerato,
+        ?int $cicloEscolarId = null,
     ) {
         $consulta = Grupo::query()
             ->with([
@@ -5134,6 +5159,19 @@ class PDFController extends Controller
 
         if (!$esBachillerato && Schema::hasColumn('grupos', 'semestre_id')) {
             $consulta->whereNull('semestre_id');
+        }
+
+        if ($cicloEscolarId) {
+            $grupoIds = \App\Models\TrayectoriaAcademica::query()
+                ->where('ciclo_escolar_id', $cicloEscolarId)
+                ->where('nivel_id', $nivel->id)
+                ->pluck('grupo_id')
+                ->filter()
+                ->unique();
+
+            if ($grupoIds->isNotEmpty()) {
+                $consulta->whereIn('id', $grupoIds);
+            }
         }
 
         return $consulta
@@ -5157,6 +5195,7 @@ class PDFController extends Controller
         $esSecundaria = $this->esSecundaria($nivel);
         $esPreescolar = (int) $nivel->id === 1 || $nivel->slug === 'preescolar';
         $esPrimaria = (int) $nivel->id === 2 || $nivel->slug === 'primaria';
+        $cicloEscolarId = $request->integer('ciclo_escolar_id');
 
         /*
     |--------------------------------------------------------------------------
@@ -5213,19 +5252,8 @@ class PDFController extends Controller
     |--------------------------------------------------------------------------
     */
 
-        $alumnosQuery = $this->queryInscripcionesPorContextoPdf(
-            nivel: $nivel,
-            generacion: $generacion,
-            grado: $grado,
-            grupo: $grupo,
-            esBachillerato: $esBachillerato
-        );
-
-        $alumnos = $alumnosQuery
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+        // La lista se resuelve después de conocer el periodo y su fecha de corte.
+        $alumnos = collect();
 
         /*
     |--------------------------------------------------------------------------
@@ -5247,6 +5275,8 @@ class PDFController extends Controller
             ->where('materias.nivel_id', $nivel->id)
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
+            ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId)
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', 1);
 
         $this->aplicarFiltroSemestreAsignacion($materiasQuery, $esBachillerato, $semestre?->id);
@@ -5352,7 +5382,7 @@ class PDFController extends Controller
         }
 
         $cicloEscolar = cicloEscolar::query()
-            ->orderByDesc('id')
+            ->whereKey($cicloEscolarId)
             ->first();
 
         if (!$cicloEscolar) {
@@ -5420,6 +5450,23 @@ class PDFController extends Controller
 
             $tipoPeriodo = $datosPeriodo['tipoPeriodo'];
         }
+
+        $fechaCorte = $periodo?->fecha_fin
+            ?? $periodo?->fecha_inicio
+            ?? $request->input('fecha_fin')
+            ?? ($cicloEscolar->es_actual
+                ? now()->toDateString()
+                : sprintf('%04d-07-31', (int) $cicloEscolar->fin_anio));
+
+        $alumnos = app(ListaAcademicaService::class)->alumnosPorContexto(
+            cicloEscolarId: (int) $cicloEscolarId,
+            grupoIds: [(int) $grupo->id],
+            fechaCorte: $fechaCorte,
+            nivelId: (int) $nivel->id,
+            gradoId: (int) $grado->id,
+            generacionId: (int) $generacion->id,
+            semestreId: $esBachillerato ? (int) $semestre?->id : null,
+        );
 
         /*
     |--------------------------------------------------------------------------
@@ -5820,6 +5867,7 @@ class PDFController extends Controller
         $periodoBasicaId = $request->integer('periodo_basica_id') ?: null;
         $parcialBachilleratoId = $request->integer('parcial_bachillerato_id') ?: null;
         $opcionDescarga = $request->input('opcion_descarga');
+        $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: null;
 
         /*
          * Si llega periodo_id directo, se respeta.
@@ -5836,6 +5884,7 @@ class PDFController extends Controller
                 ])
                 ->where('id', $periodoId)
                 ->where('nivel_id', $nivel->id)
+                ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
                 ->first();
 
             if (!$periodo) {
@@ -5880,6 +5929,7 @@ class PDFController extends Controller
                     'mesesBachillerato',
                 ])
                 ->where('nivel_id', $nivel->id)
+                ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
                 ->where('generacion_id', $generacion->id)
                 ->where('semestre_id', $semestre->id)
                 ->where('parcial_bachillerato_id', $parcialBachilleratoId)
@@ -5911,6 +5961,7 @@ class PDFController extends Controller
                 'mesesBasica',
             ])
             ->where('nivel_id', $nivel->id)
+            ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
             ->where('periodo_basica_id', $periodoBasicaId)
             ->whereNull('parcial_bachillerato_id')
             ->first();

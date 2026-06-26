@@ -112,6 +112,10 @@ class CrearCicloEscolar extends Component
             }
         }
 
+        if ($nuevo->es_actual) {
+            $texto .= ' En cada nivel abre Asignación de materias, decide si copiar materias, profesores y horarios, y confirma las nuevas cargas.';
+        }
+
         $this->reset(['inicio_anio', 'fin_anio']);
         $this->marcar_como_actual = true;
         $this->cerrar_anterior = true;

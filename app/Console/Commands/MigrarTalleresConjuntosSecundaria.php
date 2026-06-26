@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 
 class MigrarTalleresConjuntosSecundaria extends Command
 {
-    protected $signature = 'talleres:migrar-secundaria {--eliminar-legado : Elimina las materias y asignaciones antiguas llamadas Taller}';
+    protected $signature = 'talleres:migrar-secundaria {--eliminar-legado : Archiva las asignaciones antiguas llamadas Taller sin borrar su historial}';
 
     protected $description = 'Convierte los registros antiguos de Taller de secundaria en una sesión compartida para varios grupos.';
 
@@ -59,11 +59,14 @@ class MigrarTalleresConjuntosSecundaria extends Command
             $this->warn('Las materias antiguas existen, pero no tienen bloques de horario para convertir.');
 
             if ($this->option('eliminar-legado')) {
-                DB::transaction(function () use ($asignaciones, $materias) {
-                    AsignacionMateria::query()->whereIn('id', $asignaciones->pluck('id'))->delete();
-                    Materia::query()->whereIn('id', $materias->pluck('id'))->delete();
-                });
-                $this->info('Se eliminaron las materias y asignaciones antiguas sin horario.');
+                AsignacionMateria::query()
+                    ->whereIn('id', $asignaciones->pluck('id'))
+                    ->update([
+                        'estado' => AsignacionMateria::ESTADO_ARCHIVADA,
+                        'fecha_fin' => now()->toDateString(),
+                        'updated_at' => now(),
+                    ]);
+                $this->info('Las asignaciones antiguas sin horario se archivaron; no se eliminó información.');
             }
 
             return self::SUCCESS;
@@ -139,8 +142,13 @@ class MigrarTalleresConjuntosSecundaria extends Command
                 });
 
             if ($this->option('eliminar-legado')) {
-                AsignacionMateria::query()->whereIn('id', $asignaciones->pluck('id'))->delete();
-                Materia::query()->whereIn('id', $materias->pluck('id'))->delete();
+                AsignacionMateria::query()
+                    ->whereIn('id', $asignaciones->pluck('id'))
+                    ->update([
+                        'estado' => AsignacionMateria::ESTADO_ARCHIVADA,
+                        'fecha_fin' => now()->toDateString(),
+                        'updated_at' => now(),
+                    ]);
             }
         });
 
@@ -148,7 +156,7 @@ class MigrarTalleresConjuntosSecundaria extends Command
         $this->info('Cada sesión compartida cuenta como un solo bloque semanal para el profesor.');
 
         if (!$this->option('eliminar-legado')) {
-            $this->warn('Las materias antiguas quedaron ocultas, pero no se eliminaron. Usa --eliminar-legado después de verificar la conversión.');
+            $this->warn('Las materias antiguas permanecen disponibles. Usa --eliminar-legado únicamente para archivar sus asignaciones después de verificar la conversión.');
         }
 
         return self::SUCCESS;
