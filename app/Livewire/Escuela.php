@@ -10,6 +10,7 @@ class Escuela extends Component
 
 
     public $nombre;
+    public $regional;
 
     public $calle;
     public $no_exterior;
@@ -27,6 +28,7 @@ class Escuela extends Component
 
   protected $rules = [
         'nombre'         => 'required|string|min:3|max:180',
+        'regional'       => 'nullable|string|min:3|max:120',
         'calle'          => 'required|string|min:3|max:180',
         'no_exterior'    => 'nullable|string|max:20',
         'no_interior'    => 'nullable|string|max:20',
@@ -65,6 +67,7 @@ class Escuela extends Component
 
         if ($escuela) {
             $this->nombre        = $escuela->nombre;
+            $this->regional      = $escuela->regional;
             $this->calle         = $escuela->calle;
             $this->no_exterior   = $escuela->no_exterior;
             $this->no_interior   = $escuela->no_interior;

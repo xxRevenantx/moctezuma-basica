@@ -34,7 +34,7 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-black">Bajas, traslados y reingresos</h1>
+                        <h1 class="text-2xl font-black">Estados, bajas, traslados y reingresos</h1>
                         @if ($cicloSeleccionado?->es_actual)
                             <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/25">Ciclo actual</span>
                         @elseif ($cicloSeleccionado?->cerrado_at)
@@ -53,7 +53,7 @@
         </div>
 
         <div class="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-4 dark:bg-neutral-700">
-            @foreach ([['Activos', $total], ['Hombres', $hombres], ['Mujeres', $mujeres], ['Bajas / traslados', $totalBajas]] as [$label, $value])
+            @foreach ([['Activos', $total], ['Hombres', $hombres], ['Mujeres', $mujeres], ['No activos', $totalBajas]] as [$label, $value])
                 <div class="bg-white p-4 dark:bg-neutral-900">
                     <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $label }}</p>
                     <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">{{ number_format($value) }}</p>
@@ -102,7 +102,7 @@
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h2 class="text-lg font-black text-red-950 dark:text-red-100">Aplicar movimiento a alumnos activos</h2>
-                <p class="text-sm text-red-800/80 dark:text-red-200/70">Se generará una nueva estancia de baja en el ciclo y corte seleccionados.</p>
+                <p class="text-sm text-red-800/80 dark:text-red-200/70">Se generará una nueva estancia no activa en el ciclo y corte seleccionados.</p>
             </div>
             <span class="rounded-full bg-red-200 px-3 py-1 text-xs font-black text-red-900 dark:bg-red-900/50 dark:text-red-100">{{ $this->selectedCount }} seleccionado(s)</span>
         </div>
@@ -113,7 +113,9 @@
                 <select wire:model="tipo_movimiento" class="w-full rounded-xl border-red-300 bg-white text-sm dark:border-red-800 dark:bg-neutral-900">
                     <option value="baja_definitiva">Baja definitiva</option>
                     <option value="baja_temporal">Baja temporal</option>
-                    <option value="traslado">Traslado</option>
+                    <option value="traslado">Traslado / cambio de escuela</option>
+                    <option value="inactivo">Inactivo</option>
+                    <option value="suspendido">Suspendido</option>
                 </select>
             </label>
             <label class="space-y-1.5">
@@ -121,8 +123,8 @@
                 <input wire:model="fecha_baja" type="date" class="w-full rounded-xl border-red-300 bg-white text-sm dark:border-red-800 dark:bg-neutral-900" />
             </label>
             <label class="space-y-1.5 md:col-span-2">
-                <span class="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Motivo</span>
-                <input wire:model="motivo_baja" type="text" placeholder="Motivo obligatorio"
+                <span class="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Motivo <span class="normal-case font-medium">(opcional)</span></span>
+                <input wire:model="motivo_baja" type="text" placeholder="Escribe el motivo cuando corresponda"
                     class="w-full rounded-xl border-red-300 bg-white text-sm dark:border-red-800 dark:bg-neutral-900" />
             </label>
             <label class="space-y-1.5 md:col-span-2 xl:col-span-3">
@@ -144,7 +146,7 @@
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="border-b border-slate-200 p-4 dark:border-neutral-700">
             <h2 class="font-black text-slate-900 dark:text-white">Alumnos activos disponibles</h2>
-            <p class="text-sm text-slate-500">Marca los alumnos a los que se aplicará la baja o traslado.</p>
+            <p class="text-sm text-slate-500">Marca los alumnos a los que se aplicará el estado no activo.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-[1050px] w-full text-left text-sm">
@@ -205,8 +207,8 @@
 
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="border-b border-slate-200 p-4 dark:border-neutral-700">
-            <h2 class="font-black text-slate-900 dark:text-white">Bajas y traslados del contexto</h2>
-            <p class="text-sm text-slate-500">El reingreso crea una estancia nueva y conserva esta fila como antecedente.</p>
+            <h2 class="font-black text-slate-900 dark:text-white">Estados no activos del contexto</h2>
+            <p class="text-sm text-slate-500">El reingreso crea una estancia nueva y conserva el estado anterior como antecedente.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-[1250px] w-full text-left text-sm">

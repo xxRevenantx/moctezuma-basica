@@ -33,16 +33,21 @@ class MostrarCicloEscolar extends Component
         $this->resetPage();
     }
 
-    public function marcarActual(int $cicloId): void
+    public function marcarActual(int $cicloId, bool $prepararTrayectorias = true): void
     {
-        DB::transaction(function () use ($cicloId) {
+        [$nuevo, $anterior] = DB::transaction(function () use ($cicloId) {
             $nuevo = CicloEscolar::query()->lockForUpdate()->findOrFail($cicloId);
-            $anteriores = CicloEscolar::query()->where('es_actual', true)->where('id', '!=', $nuevo->id)->lockForUpdate()->get();
+            $anteriores = CicloEscolar::query()
+                ->where('es_actual', true)
+                ->where('id', '!=', $nuevo->id)
+                ->lockForUpdate()
+                ->get();
+            $anterior = $anteriores->first();
 
-            foreach ($anteriores as $anterior) {
-                $anterior->update([
+            foreach ($anteriores as $cicloAnterior) {
+                $cicloAnterior->update([
                     'es_actual' => false,
-                    'cerrado_at' => $anterior->cerrado_at ?: now(),
+                    'cerrado_at' => $cicloAnterior->cerrado_at ?: now(),
                     'cerrado_por' => auth()->id(),
                 ]);
             }
@@ -52,15 +57,38 @@ class MostrarCicloEscolar extends Component
                 'cerrado_at' => null,
                 'cerrado_por' => null,
             ]);
+
+            return [$nuevo->fresh(), $anterior?->fresh()];
         });
+
+        $texto = 'El ciclo anterior se conservó y quedó cerrado.';
+
+        if ($prepararTrayectorias && $anterior) {
+            $resumen = app(\App\Services\PrepararCicloEscolarService::class)
+                ->ejecutar($anterior, $nuevo, auth()->id());
+
+            $texto = sprintf(
+                'Trayectorias preparadas: %d promovidos, %d no promovidos, %d egresados, %d existentes y %d omitidos.',
+                $resumen['promovidos'],
+                $resumen['no_promovidos'],
+                $resumen['egresados'],
+                $resumen['existentes'],
+                $resumen['omitidos'],
+            );
+
+            if ($resumen['errores'] !== []) {
+                $texto .= ' Revisa Promoción masiva: ' . implode(' ', array_slice($resumen['errores'], 0, 2));
+            }
+        }
 
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => 'Ciclo actual actualizado',
-            'text' => 'El ciclo anterior se conservó y quedó cerrado.',
+            'text' => $texto,
             'position' => 'top-end',
         ]);
         $this->dispatch('refreshHeader');
+        $this->dispatch('refreshCiclos');
     }
 
     public function alternarCierre(int $cicloId): void

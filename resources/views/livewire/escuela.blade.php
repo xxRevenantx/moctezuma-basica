@@ -89,6 +89,10 @@
                                 placeholder="Nombre de la escuela" autofocus autocomplete="organization"
                                 class="sm:col-span-2 lg:col-span-2" />
 
+                            <flux:input wire:model="regional" badge="Opcional" :label="__('Regional educativa')"
+                                type="text" placeholder="Ej. Tierra Caliente"
+                                autocomplete="organization-title" class="sm:col-span-2 lg:col-span-2" />
+
 
                             <!-- Calle (más ancho) -->
                             <flux:input wire:model="calle" :label="__('Calle')" type="text" placeholder="Calle"

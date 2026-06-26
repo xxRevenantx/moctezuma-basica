@@ -40,6 +40,13 @@
                     <span class="text-xs text-slate-500">El historial seguirá disponible y el administrador podrá reabrirlo para correcciones.</span>
                 </span>
             </label>
+            <label class="flex cursor-pointer items-start gap-3 {{ !$marcar_como_actual ? 'opacity-50' : '' }}">
+                <input type="checkbox" wire:model="preparar_trayectorias" @disabled(!$marcar_como_actual) class="mt-1 rounded border-slate-300 text-emerald-600" />
+                <span>
+                    <b class="block text-sm text-slate-900 dark:text-white">Preparar trayectorias del nuevo ciclo</b>
+                    <span class="text-xs text-slate-500">Promueve automáticamente conservando generación y grupo; los casos sin grupo destino quedarán para revisión manual.</span>
+                </span>
+            </label>
         </div>
 
         <button type="submit" wire:loading.attr="disabled"

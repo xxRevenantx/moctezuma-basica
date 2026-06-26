@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\DirectorController;
+use App\Http\Controllers\DistribucionEscolarController;
 use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
@@ -178,6 +179,17 @@ Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrut
 
 Route::get('/generales/horarios/pdf', HorariosGeneralesPdfController::class)
     ->name('generales.horarios.pdf');
+
+Route::middleware('admin')->prefix('generales/{slug_nivel}/distribucion')->group(function () {
+    Route::get('/pdf', [DistribucionEscolarController::class, 'pdf'])
+        ->name('generales.distribucion.pdf');
+
+    Route::get('/excel', [DistribucionEscolarController::class, 'excel'])
+        ->name('generales.distribucion.excel');
+
+    Route::get('/zip', [DistribucionEscolarController::class, 'zip'])
+        ->name('generales.distribucion.zip');
+});
 
 Route::get('/profesores/horario-profesor/pdf', ProfesorHorarioPdfController::class)
     ->name('profesor.horario.pdf');

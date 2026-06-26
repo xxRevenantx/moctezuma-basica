@@ -13,13 +13,19 @@
     actual(id, nombre) {
         Swal.fire({
             title: 'Marcar ' + nombre + ' como ciclo actual',
-            text: 'El ciclo actual anterior quedará cerrado, pero su historial no se modificará.',
+            text: 'Puedes preparar automáticamente las trayectorias iniciales conservando generación y grupo. Los alumnos sin grupo destino se omitirán para revisión manual.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Sí, marcar actual',
+            showDenyButton: true,
+            confirmButtonText: 'Marcar y preparar',
+            denyButtonText: 'Solo marcar actual',
             cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#006492'
-        }).then((r) => r.isConfirmed && this.$wire.marcarActual(id));
+            confirmButtonColor: '#006492',
+            denyButtonColor: '#64748b'
+        }).then((r) => {
+            if (r.isConfirmed) this.$wire.marcarActual(id, true);
+            if (r.isDenied) this.$wire.marcarActual(id, false);
+        });
     }
 }" class="space-y-4">
     <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">

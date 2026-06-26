@@ -304,15 +304,16 @@
         @php
             $documentosActuales = $documentosSeleccionados->where('es_actual', true);
             $documentosHistoricos = $documentosSeleccionados->where('es_actual', false);
+            $slugsCertificados = ['certificado-estudios', 'certificado-terminacion'];
             $certificados = $documentosActuales->filter(
-                fn($documento) => $documento->tipoDocumento?->slug === 'certificado-estudios',
+                fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsCertificados, true),
             );
             $slugsAcademicos = ['boleta-final-grado', 'constancia-estudios', 'constancia-baja-traslado'];
             $academicos = $documentosActuales->filter(
                 fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsAcademicos, true),
             );
             $generales = $documentosActuales->reject(
-                fn($documento) => $documento->tipoDocumento?->slug === 'certificado-estudios' ||
+                fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsCertificados, true) ||
                     in_array($documento->tipoDocumento?->slug, $slugsAcademicos, true),
             );
             $soloHistorico = $alumnoSeleccionado->trashed() || !$alumnoSeleccionado->activo;
@@ -772,9 +773,9 @@
                                 <flux:icon name="academic-cap" class="size-5" />
                             </div>
                             <div>
-                                <h3 class="font-black text-slate-900 dark:text-white">Certificados por nivel</h3>
-                                <p class="text-xs text-slate-500">Cada certificado permanece ligado al nivel que
-                                    acredita.</p>
+                                <h3 class="font-black text-slate-900 dark:text-white">Certificados</h3>
+                                <p class="text-xs text-slate-500">Certificados de estudios por nivel y certificado
+                                    de terminación del alumno.</p>
                             </div>
                         </div>
 
@@ -784,8 +785,13 @@
                                     class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div>
-                                            <p class="font-black text-slate-900 dark:text-white">Certificado de
-                                                {{ $documento->nivel?->nombre ?? 'nivel no especificado' }}</p>
+                                            <p class="font-black text-slate-900 dark:text-white">
+                                                @if ($documento->tipoDocumento?->slug === 'certificado-estudios')
+                                                    Certificado de {{ $documento->nivel?->nombre ?? 'nivel no especificado' }}
+                                                @else
+                                                    {{ $documento->tipoDocumento?->nombre ?? 'Certificado de terminación' }}
+                                                @endif
+                                            </p>
                                             <p class="mt-1 text-xs text-slate-500">
                                                 Versión {{ $documento->version }} · {{ $documento->tamano_legible }} ·
                                                 {{ $documento->created_at?->format('d/m/Y H:i') }}

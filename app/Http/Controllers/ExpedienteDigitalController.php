@@ -282,7 +282,7 @@ class ExpedienteDigitalController extends Controller
             return '01_Documentos_personales/' . $nombre;
         }
 
-        if ($slug === 'certificado-estudios') {
+        if (in_array($slug, ['certificado-estudios', 'certificado-terminacion'], true)) {
             return '02_Certificados/' . $nombre;
         }
 

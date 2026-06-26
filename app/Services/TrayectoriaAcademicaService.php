@@ -247,13 +247,13 @@ class TrayectoriaAcademicaService
         int $cicloId,
         string $tipo,
         CarbonInterface|string $fecha,
-        string $motivo,
+        ?string $motivo,
         ?string $observaciones = null,
         ?int $usuarioId = null
     ): TrayectoriaAcademica {
-        if (!in_array($tipo, ['baja_temporal', 'baja_definitiva', 'traslado'], true)) {
+        if (!in_array($tipo, ['baja_temporal', 'baja_definitiva', 'traslado', 'inactivo', 'suspendido'], true)) {
             throw ValidationException::withMessages([
-                'tipo_movimiento' => 'El tipo de baja o traslado no es válido.',
+                'tipo_movimiento' => 'El tipo de movimiento no es válido.',
             ]);
         }
 
@@ -269,6 +269,7 @@ class TrayectoriaAcademicaService
         ) {
             $usuarioId = $this->resolverUsuario($usuarioId);
             $fecha = $this->fecha($fecha);
+            $motivoNormalizado = filled($motivo) ? trim((string) $motivo) : null;
 
             $origen = $this->trayectoriaVigente($alumno->id, $cicloEscolarId, $cicloId, true);
             $estadoAnterior = $this->snapshot($origen);
@@ -284,7 +285,7 @@ class TrayectoriaAcademicaService
                 'activo' => false,
                 'estatus' => $tipo,
                 'fecha_baja' => $fecha,
-                'motivo_baja' => trim($motivo),
+                'motivo_baja' => $motivoNormalizado,
                 'observaciones_baja' => filled($observaciones) ? trim($observaciones) : null,
                 'fecha_inicio' => $fecha,
                 'fecha_fin' => null,
@@ -300,7 +301,7 @@ class TrayectoriaAcademicaService
                 $alumno->update([
                     'activo' => false,
                     'fecha_baja' => $fecha,
-                    'motivo_baja' => trim($motivo),
+                    'motivo_baja' => $motivoNormalizado,
                     'observaciones_baja' => filled($observaciones) ? trim($observaciones) : null,
                 ]);
             }
@@ -309,7 +310,7 @@ class TrayectoriaAcademicaService
                 $baja,
                 $tipo,
                 $fecha,
-                trim($motivo),
+                $motivoNormalizado,
                 $observaciones,
                 $estadoAnterior,
                 $this->snapshot($baja),
@@ -344,9 +345,9 @@ class TrayectoriaAcademicaService
 
             $origen = $this->trayectoriaVigente($alumno->id, $cicloEscolarId, $cicloId, true);
 
-            if (!in_array($origen->estatus, ['baja_temporal', 'baja_definitiva', 'traslado'], true)) {
+            if (!in_array($origen->estatus, ['baja_temporal', 'baja_definitiva', 'traslado', 'inactivo', 'suspendido'], true)) {
                 throw ValidationException::withMessages([
-                    'reingreso' => 'El alumno seleccionado no tiene una baja vigente en este ciclo y corte.',
+                    'reingreso' => 'El alumno seleccionado no tiene un estado no activo vigente en este ciclo y corte.',
                 ]);
             }
 
@@ -526,6 +527,62 @@ class TrayectoriaAcademicaService
             );
 
             return $trayectoriaDestino;
+        });
+    }
+
+    public function egresar(
+        TrayectoriaAcademica $origen,
+        CarbonInterface|string|null $fecha = null,
+        ?string $observaciones = null,
+        ?int $usuarioId = null
+    ): TrayectoriaAcademica {
+        return DB::transaction(function () use ($origen, $fecha, $observaciones, $usuarioId) {
+            $usuarioId = $this->resolverUsuario($usuarioId);
+            $fecha = $this->fecha($fecha ?? now());
+            $origen = TrayectoriaAcademica::query()->lockForUpdate()->findOrFail($origen->id);
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($origen->inscripcion_id);
+            $estadoAnterior = $this->snapshot($origen);
+
+            TrayectoriaAcademica::query()
+                ->where('inscripcion_id', $alumno->id)
+                ->where('es_actual', true)
+                ->where('id', '!=', $origen->id)
+                ->update(['es_actual' => false]);
+
+            $origen->update([
+                'activo' => false,
+                'estatus' => 'egresado',
+                'fecha_fin' => $fecha,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => filled($observaciones) ? trim($observaciones) : null,
+                'vigente_en_corte' => true,
+                'es_actual' => true,
+                'promovido' => true,
+                'fecha_promocion' => $fecha,
+            ]);
+
+            $alumno->restore();
+            $alumno->update([
+                'activo' => false,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => filled($observaciones) ? trim($observaciones) : null,
+            ]);
+
+            $this->registrarMovimiento(
+                $origen,
+                'egresado',
+                $fecha,
+                'Conclusión del último grado o semestre del nivel educativo.',
+                $observaciones,
+                $estadoAnterior,
+                $this->snapshot($origen),
+                $usuarioId,
+                $origen->trayectoria_origen_id
+            );
+
+            return $origen->refresh();
         });
     }
 

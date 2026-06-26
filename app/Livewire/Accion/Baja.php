@@ -71,8 +71,8 @@ class Baja extends Component
             'ciclo_id' => ['required', 'exists:ciclos,id'],
             'selected' => ['required', 'array', 'min:1'],
             'selected.*' => ['integer', 'exists:trayectorias_academicas,id'],
-            'tipo_movimiento' => ['required', 'in:baja_definitiva,baja_temporal,traslado'],
-            'motivo_baja' => ['required', 'string', 'max:1000'],
+            'tipo_movimiento' => ['required', 'in:baja_definitiva,baja_temporal,traslado,inactivo,suspendido'],
+            'motivo_baja' => ['nullable', 'string', 'max:1000'],
             'fecha_baja' => ['required', 'date'],
             'observaciones_baja' => ['nullable', 'string', 'max:1000'],
         ];
@@ -83,7 +83,6 @@ class Baja extends Component
         return [
             'selected.required' => 'Selecciona al menos un alumno.',
             'selected.min' => 'Selecciona al menos un alumno.',
-            'motivo_baja.required' => 'Escribe el motivo de la baja o traslado.',
             'fecha_baja.required' => 'Selecciona la fecha del movimiento.',
         ];
     }
@@ -142,7 +141,7 @@ class Baja extends Component
                 (int) $this->ciclo_id,
                 $this->tipo_movimiento,
                 (string) $this->fecha_baja,
-                trim((string) $this->motivo_baja),
+                filled($this->motivo_baja) ? trim((string) $this->motivo_baja) : null,
                 filled($this->observaciones_baja) ? trim((string) $this->observaciones_baja) : null,
                 auth()->id()
             );
@@ -160,7 +159,7 @@ class Baja extends Component
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => $aplicadas === 1 ? 'Baja registrada' : "{$aplicadas} bajas registradas",
+            'title' => $aplicadas === 1 ? 'Movimiento registrado' : "{$aplicadas} movimientos registrados",
             'text' => 'La ubicación anterior y la línea de tiempo quedaron conservadas.',
             'position' => 'top-end',
         ]);
@@ -181,7 +180,7 @@ class Baja extends Component
             (int) $this->ciclo_id,
             (string) $this->fecha_reingreso,
             $this->motivo_reingreso ?: 'Reingreso del alumno.',
-            'Se creó una nueva estancia y se conservó la baja anterior.',
+            'Se creó una nueva estancia y se conservó el estado anterior.',
             auth()->id()
         );
 
@@ -211,6 +210,8 @@ class Baja extends Component
         $tipo = match ($trayectoria->estatus) {
             'baja_temporal' => 'baja temporal',
             'traslado' => 'traslado',
+            'inactivo' => 'inactividad',
+            'suspendido' => 'suspensión',
             default => 'baja definitiva',
         };
 
@@ -310,13 +311,13 @@ class Baja extends Component
     {
         return $this->baseContextQuery()
             ->where('trayectorias_academicas.activo', true)
-            ->whereNotIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado']);
+            ->whereNotIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado', 'inactivo', 'suspendido', 'egresado', 'archivado']);
     }
 
     private function bajasQuery(): Builder
     {
         return $this->baseContextQuery()
-            ->whereIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado']);
+            ->whereIn('trayectorias_academicas.estatus', ['baja_temporal', 'baja_definitiva', 'traslado', 'inactivo', 'suspendido']);
     }
 
     public function textoGrupo($grupo): string
@@ -333,6 +334,8 @@ class Baja extends Component
             'baja_temporal' => 'Baja temporal',
             'baja_definitiva' => 'Baja definitiva',
             'traslado' => 'Traslado',
+            'inactivo' => 'Inactivo',
+            'suspendido' => 'Suspendido',
             'reingreso' => 'Reingreso',
             'no_promovido' => 'No promovido',
             default => 'Activo',

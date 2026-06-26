@@ -14,6 +14,7 @@ class Escuela extends Model
 
     protected $fillable = [
         'nombre',
+        'regional',
         'calle',
         'no_exterior',
         'no_interior',

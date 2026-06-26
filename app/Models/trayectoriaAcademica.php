@@ -12,6 +12,8 @@ class TrayectoriaAcademica extends Model
 
     public const ESTATUS = [
         'activo',
+        'inactivo',
+        'suspendido',
         'baja_temporal',
         'baja_definitiva',
         'traslado',
@@ -153,6 +155,8 @@ class TrayectoriaAcademica extends Model
             'no_promovido' => 'No promovido',
             'promovido' => 'Promovido',
             'archivado' => 'Archivado',
+            'inactivo' => 'Inactivo',
+            'suspendido' => 'Suspendido',
             default => 'Activo',
         };
     }

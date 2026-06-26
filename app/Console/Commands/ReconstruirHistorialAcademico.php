@@ -300,6 +300,7 @@ class ReconstruirHistorialAcademico extends Command
             ->whereIn('td.slug', [
                 'boleta-final-grado',
                 'certificado-estudios',
+                'certificado-terminacion',
                 'constancia-estudios',
                 'constancia-baja-traslado',
             ]);
@@ -307,7 +308,7 @@ class ReconstruirHistorialAcademico extends Command
         $this->aplicarFiltros($query, 'd');
 
         return $query->get()->map(function ($fila): array {
-            $esFinal = in_array($fila->slug, ['boleta-final-grado', 'certificado-estudios'], true);
+            $esFinal = in_array($fila->slug, ['boleta-final-grado', 'certificado-estudios', 'certificado-terminacion'], true);
 
             return [
                 'inscripcion_id' => (int) $fila->inscripcion_id,

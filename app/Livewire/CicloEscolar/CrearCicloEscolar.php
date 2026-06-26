@@ -12,6 +12,7 @@ class CrearCicloEscolar extends Component
     public ?int $fin_anio = null;
     public bool $marcar_como_actual = true;
     public bool $cerrar_anterior = true;
+    public bool $preparar_trayectorias = true;
 
     public function mount(): void
     {
@@ -38,6 +39,7 @@ class CrearCicloEscolar extends Component
             ],
             'marcar_como_actual' => ['boolean'],
             'cerrar_anterior' => ['boolean'],
+            'preparar_trayectorias' => ['boolean'],
         ];
     }
 
@@ -60,11 +62,13 @@ class CrearCicloEscolar extends Component
             return;
         }
 
-        $nuevo = DB::transaction(function () use ($data) {
+        [$nuevo, $anterior] = DB::transaction(function () use ($data) {
             $marcarActual = (bool) $data['marcar_como_actual'] || !CicloEscolar::query()->exists();
+            $anterior = null;
 
             if ($marcarActual) {
                 $actuales = CicloEscolar::query()->where('es_actual', true)->lockForUpdate()->get();
+                $anterior = $actuales->first();
 
                 foreach ($actuales as $actual) {
                     $actual->update([
@@ -75,25 +79,48 @@ class CrearCicloEscolar extends Component
                 }
             }
 
-            return CicloEscolar::query()->create([
+            $nuevo = CicloEscolar::query()->create([
                 'inicio_anio' => (int) $data['inicio_anio'],
                 'fin_anio' => (int) $data['fin_anio'],
                 'es_actual' => $marcarActual,
                 'cerrado_at' => null,
                 'cerrado_por' => null,
             ]);
+
+            return [$nuevo, $anterior?->fresh()];
         });
+
+        $texto = $nuevo->es_actual
+            ? 'Quedó marcado como ciclo actual.'
+            : 'Quedó registrado como ciclo histórico.';
+
+        if ($nuevo->es_actual && $data['preparar_trayectorias'] && $anterior) {
+            $resumen = app(\App\Services\PrepararCicloEscolarService::class)
+                ->ejecutar($anterior, $nuevo, auth()->id());
+
+            $texto = sprintf(
+                'Trayectorias preparadas: %d promovidos, %d no promovidos, %d egresados, %d existentes y %d omitidos.',
+                $resumen['promovidos'],
+                $resumen['no_promovidos'],
+                $resumen['egresados'],
+                $resumen['existentes'],
+                $resumen['omitidos'],
+            );
+
+            if ($resumen['errores'] !== []) {
+                $texto .= ' Revisa Promoción masiva: ' . implode(' ', array_slice($resumen['errores'], 0, 2));
+            }
+        }
 
         $this->reset(['inicio_anio', 'fin_anio']);
         $this->marcar_como_actual = true;
         $this->cerrar_anterior = true;
+        $this->preparar_trayectorias = true;
 
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => "Ciclo {$nuevo->nombre} creado",
-            'text' => $nuevo->es_actual
-                ? 'Quedó marcado como ciclo actual.'
-                : 'Quedó registrado como ciclo histórico.',
+            'text' => $texto,
             'position' => 'top-end',
         ]);
         $this->dispatch('refreshHeader');
