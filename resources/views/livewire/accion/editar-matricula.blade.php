@@ -1,4 +1,54 @@
-<div x-data="{ cargandoPagina: true }" x-init="setTimeout(() => cargandoPagina = false, 700)" class="space-y-6">
+<div x-data="{
+    cargandoPagina: true,
+    regresandoMatricula: false,
+
+    llaveRetorno() {
+        return 'matricula_return_context_' + @js($slug_nivel);
+    },
+
+    regresarMatricula() {
+        if (this.regresandoMatricula) {
+            return;
+        }
+
+        let url = @js(
+    route('submodulos.accion', [
+        'slug_nivel' => $slug_nivel,
+        'accion' => 'matricula',
+    ]),
+);
+
+        const raw = localStorage.getItem(this.llaveRetorno());
+
+        if (raw) {
+            try {
+                const contexto = JSON.parse(raw);
+
+                if (
+                    contexto.url &&
+                    contexto.expires_at &&
+                    Date.now() <= Number(contexto.expires_at)
+                ) {
+                    url = contexto.url;
+                    localStorage.setItem(
+                        'matricula_return_pending',
+                        '1'
+                    );
+                } else {
+                    localStorage.removeItem(this.llaveRetorno());
+                }
+            } catch (error) {
+                localStorage.removeItem(this.llaveRetorno());
+            }
+        }
+
+        this.regresandoMatricula = true;
+
+        setTimeout(() => {
+            window.location.href = url;
+        }, 300);
+    }
+}" x-init="setTimeout(() => cargandoPagina = false, 700)" class="space-y-6">
 
     {{-- LOADER AL ENTRAR A EDITAR MATRÍCULA --}}
     <div x-cloak x-show="cargandoPagina" x-transition.opacity
@@ -31,6 +81,24 @@
                 <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
                 <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500"></span>
             </div>
+        </div>
+    </div>
+
+    <div x-cloak x-show="regresandoMatricula" x-transition.opacity
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-md">
+        <div
+            class="mx-4 w-full max-w-sm rounded-[28px] border border-emerald-100 bg-white/95 p-7 text-center shadow-2xl shadow-emerald-500/20 dark:border-emerald-900/40 dark:bg-neutral-900/95">
+            <div
+                class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600">
+            </div>
+
+            <h3 class="font-bold text-slate-900 dark:text-white">
+                Regresando a matrícula
+            </h3>
+
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Recuperando el alumno, los filtros y la posición anterior…
+            </p>
         </div>
     </div>
 
@@ -185,16 +253,7 @@
                                     Matrícula protegida
                                 </span>
 
-                                <flux:button type="button" variant="ghost" x-data
-                                    x-on:click="
-                                        const url = localStorage.getItem('matricula_return_url');
-
-                                        if (url) {
-                                            window.location.href = url;
-                                        } else {
-                                            window.history.back();
-                                        }
-                                    "
+                                <flux:button type="button" variant="ghost" x-data x-on:click="regresarMatricula()"
                                     class="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 hover:shadow-lg hover:shadow-sky-500/10 dark:border-neutral-700 dark:bg-neutral-800/90 dark:text-slate-200 dark:hover:border-sky-800 dark:hover:bg-sky-950/30 dark:hover:text-sky-300">
 
                                     <span
@@ -220,9 +279,11 @@
                                         <flux:icon name="folder-lock" class="size-5" />
                                     </div>
                                     <div>
-                                        <h3 class="font-black text-slate-900 dark:text-white">Expediente digital del alumno</h3>
+                                        <h3 class="font-black text-slate-900 dark:text-white">Expediente digital del
+                                            alumno</h3>
                                         <p class="text-sm text-slate-500 dark:text-slate-400">
-                                            {{ $resumenDocumental['completados'] }}/{{ $resumenDocumental['total'] }} documentos recibidos ·
+                                            {{ $resumenDocumental['completados'] }}/{{ $resumenDocumental['total'] }}
+                                            documentos recibidos ·
                                             {{ $resumenDocumental['pendientes'] }} pendientes
                                         </p>
                                     </div>
@@ -237,7 +298,8 @@
                                     @foreach ($resumenDocumental['items'] as $itemDocumento)
                                         <span
                                             class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black {{ $itemDocumento['presente'] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' }}">
-                                            <flux:icon :name="$itemDocumento['presente'] ? 'check' : 'clock-3'" class="size-3.5" />
+                                            <flux:icon :name="$itemDocumento['presente'] ? 'check' : 'clock-3'"
+                                                class="size-3.5" />
                                             {{ $itemDocumento['etiqueta'] }}
                                         </span>
                                     @endforeach
@@ -1223,16 +1285,7 @@
                 <div
                     class="mt-8 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 dark:border-neutral-800 sm:flex-row sm:justify-end">
 
-                    <flux:button type="button" variant="ghost" x-data
-                        x-on:click="
-                            const url = localStorage.getItem('matricula_return_url');
-
-                            if (url) {
-                                window.location.href = url;
-                            } else {
-                                window.history.back();
-                            }
-                        "
+                    <flux:button type="button" variant="ghost" x-data x-on:click="regresarMatricula()"
                         class="cursor-pointer rounded-2xl">
                         Cancelar
                     </flux:button>

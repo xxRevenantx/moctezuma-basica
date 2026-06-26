@@ -368,18 +368,7 @@ class ExpedientesDigitales extends Component
         $reemplazaAnterior = !in_array($tipo->slug, ['constancia-estudios', 'constancia-baja-traslado'], true);
 
         try {
-            DB::transaction(function () use (
-                $tipo,
-                $nivelId,
-                $gradoId,
-                $grupoId,
-                $cicloEscolarId,
-                $nombreOriginal,
-                $tamanoBytes,
-                $hashSha256,
-                $reemplazaAnterior,
-                &$rutaGuardada
-            ) {
+            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $reemplazaAnterior, &$rutaGuardada) {
                 $consultaVersiones = DocumentoAlumno::query()
                     ->where('inscripcion_id', $this->alumnoSeleccionadoId)
                     ->where('tipo_documento_id', $tipo->id)
@@ -538,8 +527,8 @@ class ExpedientesDigitales extends Component
     {
         return trim(
             ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+            ($alumno->apellido_materno ?? '') . ' ' .
+            ($alumno->nombre ?? '')
         );
     }
 
@@ -739,7 +728,7 @@ class ExpedientesDigitales extends Component
                     'generacion:id,anio_ingreso,anio_egreso',
                     'semestre:id,numero',
                     'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
-                    'trayectoriasAcademicas' => fn (Builder $query) => $query
+                    'trayectoriasAcademicas' => fn($query) => $query
                         ->with([
                             'nivel:id,nombre,slug,color',
                             'grado:id,nombre,orden',
@@ -755,7 +744,7 @@ class ExpedientesDigitales extends Component
                         ->orderByDesc('numero_estancia')
                         ->orderByDesc('id'),
                     'matriculasAlumno.nivel:id,nombre,slug',
-                    'movimientos' => fn (Builder $query) => $query
+                    'movimientos' => fn($query) => $query
                         ->with([
                             'usuario:id,name',
                             'cicloEscolar:id,inicio_anio,fin_anio',

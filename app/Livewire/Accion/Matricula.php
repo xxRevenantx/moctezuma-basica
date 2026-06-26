@@ -389,8 +389,8 @@ class Matricula extends Component
                 generacionNombre: $this->nombreGeneracion($this->generacion_id),
                 gradoNombre: $this->grados->firstWhere('id', $this->grado_id)?->nombre ?? 'Todos',
                 semestreNombre: $this->semestres->firstWhere('id', $this->semestre_id)
-                    ? 'Semestre ' . $this->semestres->firstWhere('id', $this->semestre_id)->numero
-                    : 'Todos',
+                ? 'Semestre ' . $this->semestres->firstWhere('id', $this->semestre_id)->numero
+                : 'Todos',
                 grupoNombre: $this->textoGrupo($this->grupos->firstWhere('id', $this->grupo_id)),
                 search: $this->search,
                 esBachillerato: $this->esBachillerato(),
@@ -420,17 +420,98 @@ class Matricula extends Component
 
     public function restaurarFiltrosMatricula(array $filtros): void
     {
+        $pagina = max(1, (int) ($filtros['page'] ?? 1));
+
         foreach (['ciclo_escolar_id', 'ciclo_id', 'generacion_id', 'grado_id', 'semestre_id', 'grupo_id'] as $campo) {
-            $this->{$campo} = filled($filtros[$campo] ?? null) ? (int) $filtros[$campo] : null;
+            $this->{$campo} = filled($filtros[$campo] ?? null)
+                ? (int) $filtros[$campo]
+                : null;
         }
 
         $this->estatus = (string) ($filtros['estatus'] ?? 'todos');
         $this->search = trim((string) ($filtros['search'] ?? ''));
-        $this->mostrar_archivados = (bool) ($filtros['mostrar_archivados'] ?? false);
+        $this->mostrar_archivados = filter_var(
+            $filtros['mostrar_archivados'] ?? false,
+            FILTER_VALIDATE_BOOL
+        );
+
+        /*
+         * Primero se reconstruyen los catálogos dependientes y al final
+         * se restablece grupo_id. Esto evita que Flux UI pierda la opción.
+         */
+        $grupoSeleccionado = $this->grupo_id;
+
         $this->semestres = $this->cargarSemestres($this->grado_id);
-        $this->grupos = $this->cargarGrupos($this->generacion_id, $this->grado_id, $this->semestre_id);
+        $this->grupos = $this->cargarGrupos(
+            $this->generacion_id,
+            $this->grado_id,
+            $this->semestre_id
+        );
+
+        $this->grupo_id = $grupoSeleccionado
+            && $this->grupos->contains(
+                fn($grupo) => (int) $grupo->id === (int) $grupoSeleccionado
+            )
+            ? (int) $grupoSeleccionado
+            : null;
+
         $this->limpiarSeleccion();
-        $this->resetPage();
+        $this->setPage($pagina);
+        $this->recalcularResumen();
+    }
+
+    public function localizarAlumnoEnMatricula(int $inscripcionId): void
+    {
+        $alumno = Inscripcion::withTrashed()->findOrFail($inscripcionId);
+
+        $trayectoria = TrayectoriaAcademica::query()
+            ->where('inscripcion_id', $alumno->id)
+            ->where('nivel_id', $this->nivel->id)
+            ->orderByDesc('es_actual')
+            ->orderByDesc('vigente_en_corte')
+            ->orderByDesc('ciclo_escolar_id')
+            ->orderByDesc('ciclo_id')
+            ->orderByDesc('numero_estancia')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($trayectoria) {
+            $this->ciclo_escolar_id = $trayectoria->ciclo_escolar_id;
+            $this->ciclo_id = $trayectoria->ciclo_id;
+            $this->generacion_id = $trayectoria->generacion_id;
+            $this->grado_id = $trayectoria->grado_id;
+            $this->semestre_id = $trayectoria->semestre_id;
+
+            $this->semestres = $this->cargarSemestres($this->grado_id);
+            $this->grupos = $this->cargarGrupos(
+                $this->generacion_id,
+                $this->grado_id,
+                $this->semestre_id
+            );
+
+            $this->grupo_id = $trayectoria->grupo_id
+                && $this->grupos->contains(
+                    fn($grupo) => (int) $grupo->id === (int) $trayectoria->grupo_id
+                )
+                ? (int) $trayectoria->grupo_id
+                : null;
+        } else {
+            $this->generacion_id = null;
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+            $this->semestres = collect();
+            $this->grupos = collect();
+        }
+
+        $this->estatus = 'todos';
+        $this->mostrar_archivados = $alumno->trashed();
+        $this->search = $alumno->matricula
+            ?: $alumno->curp
+            ?: trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}");
+
+        $this->limpiarSeleccion();
+        $this->setPage(1);
         $this->recalcularResumen();
     }
 
@@ -476,7 +557,7 @@ class Matricula extends Component
             : Inscripcion::query();
 
         $query->with([
-            'trayectoriasAcademicas' => function (Builder $trayectorias) {
+            'trayectoriasAcademicas' => function ($trayectorias) {
                 $this->aplicarFiltrosTrayectoria($trayectorias)
                     ->with([
                         'nivel:id,nombre,slug',
@@ -519,7 +600,14 @@ class Matricula extends Component
             ->orderBy('nombre');
     }
 
-    private function aplicarFiltrosTrayectoria(Builder $query): Builder
+    /**
+     * Aplica los mismos filtros tanto a la relación usada por with()
+     * como al Builder recibido por whereHas().
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $query
+     * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation
+     */
+    private function aplicarFiltrosTrayectoria($query)
     {
         return $query
             ->when($this->ciclo_escolar_id, fn(Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
@@ -647,8 +735,8 @@ class Matricula extends Component
     {
         return TrayectoriaAcademica::query()
             ->where('inscripcion_id', $inscripcionId)
-            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->when($this->ciclo_id, fn (Builder $query) => $query->where('ciclo_id', $this->ciclo_id))
+            ->when($this->ciclo_escolar_id, fn(Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->when($this->ciclo_id, fn(Builder $query) => $query->where('ciclo_id', $this->ciclo_id))
             ->where('nivel_id', $this->nivel->id)
             ->where('vigente_en_corte', true)
             ->latest('numero_estancia')
