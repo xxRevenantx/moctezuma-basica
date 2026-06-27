@@ -8,6 +8,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -315,9 +316,9 @@ class PromediosGenerales extends Component
 
                     $totalNumericas = $valoresNumericos->count();
 
-                    $periodos[$periodo] = $totalNumericas > 0
-                        ? $this->redondearPromedio($valoresNumericos->sum() / $totalNumericas)
-                        : null;
+                    // Se conserva toda la precisión. El truncamiento se aplica
+                    // únicamente cuando el valor se presenta en pantalla, PDF o Excel.
+                    $periodos[$periodo] = PromedioExcel::calcular($valoresNumericos);
 
                     $materiasCapturadas += $totalNumericas;
                 }
@@ -333,20 +334,13 @@ class PromediosGenerales extends Component
                 $totalEsperado = count($limitePeriodos);
 
                 /*
-                 * Para primaria y secundaria el promedio final se divide entre los 3 periodos,
-                 * aunque un periodo todavía no tenga promedio capturado.
-                 * Si no existe ninguna captura numérica, se mantiene como pendiente.
-                 * En bachillerato se conserva el promedio semestral con los parciales capturados.
+                 * Regla equivalente a PROMEDIO de Excel:
+                 * - promedia únicamente evaluaciones numéricas disponibles;
+                 * - no cuenta vacíos ni textos como cero;
+                 * - si falta una evaluación, el resultado es provisional;
+                 * - no se truncan resultados intermedios.
                  */
-                if (!$this->esBachillerato) {
-                    $promedioFinal = $periodosCapturados > 0
-                        ? $this->redondearPromedio($sumaPeriodos / $totalEsperado)
-                        : null;
-                } else {
-                    $promedioFinal = $periodosCapturados > 0
-                        ? $this->redondearPromedio($sumaPeriodos / $periodosCapturados)
-                        : null;
-                }
+                $promedioFinal = PromedioExcel::calcular($periodos);
 
                 return [
                     'inscripcion_id' => (int) $primero->inscripcion_id,
@@ -361,7 +355,7 @@ class PromediosGenerales extends Component
                     'semestre_id' => $primero->semestre_id ? (int) $primero->semestre_id : null,
                     'semestre' => $primero->semestre_numero ? (int) $primero->semestre_numero : null,
                     'periodos' => $periodos,
-                    'suma_periodos' => $this->redondearPromedio($sumaPeriodos),
+                    'suma_periodos' => (float) $sumaPeriodos,
                     'promedio_final' => $promedioFinal,
                     'periodos_capturados' => $periodosCapturados,
                     'periodos_faltantes' => max($totalEsperado - $periodosCapturados, 0),
@@ -388,24 +382,24 @@ class PromediosGenerales extends Component
             ->groupBy(fn(array $alumno) => $this->claveGrupoAlumno($alumno))
             ->flatMap(function (Collection $items) {
                 $promediosUnicosDesc = $items
-                    ->filter(fn(array $alumno) => ($alumno['promedio_final'] ?? null) !== null && (float) $alumno['promedio_final'] > 0)
+                    ->filter(fn(array $alumno) => ($alumno['promedio_final'] ?? null) !== null)
                     ->sortByDesc('promedio_final')
                     ->pluck('promedio_final')
-                    ->map(fn($promedio) => number_format((float) $promedio, 2, '.', ''))
+                    ->map(fn($promedio) => PromedioExcel::claveComparacion($promedio))
                     ->unique()
                     ->values();
 
                 return $items->map(function (array $alumno) use ($promediosUnicosDesc) {
                     $promedio = $alumno['promedio_final'] ?? null;
 
-                    if ($promedio === null || !is_numeric($promedio) || (float) $promedio <= 0) {
+                    if ($promedio === null || !is_numeric($promedio)) {
                         $alumno['lugar'] = null;
                         $alumno['texto_lugar'] = 'Pendiente';
 
                         return $alumno;
                     }
 
-                    $clavePromedio = number_format((float) $promedio, 2, '.', '');
+                    $clavePromedio = PromedioExcel::claveComparacion($promedio);
                     $indiceLugar = $promediosUnicosDesc->search($clavePromedio);
 
                     $lugar = $indiceLugar !== false
@@ -496,11 +490,11 @@ class PromediosGenerales extends Component
                     'total' => $items->count(),
 
                     'promedio' => $this->formatearDecimal(
-                        $items
-                            ->filter(
-                                fn(array $item) => ($item['promedio_final'] ?? null) !== null
-                            )
-                            ->avg('promedio_final')
+                        PromedioExcel::calcular(
+                            $items
+                                ->pluck('promedio_final')
+                                ->filter(fn($valor) => $valor !== null)
+                        )
                     ),
 
                     'aprobados' => $items
@@ -511,7 +505,7 @@ class PromediosGenerales extends Component
 
                     'riesgo' => $items
                         ->filter(
-                            fn(array $item) => ($item['promedio_final'] ?? 0) > 0
+                            fn(array $item) => ($item['promedio_final'] ?? null) !== null
                                 && ($item['promedio_final'] ?? 0) < 6
                         )
                         ->count(),
@@ -599,7 +593,7 @@ class PromediosGenerales extends Component
 
         return [
             'total_alumnos' => $alumnos->count(),
-            'promedio_general' => $this->formatearDecimal($conPromedio->avg('promedio_final')),
+            'promedio_general' => $this->formatearDecimal(PromedioExcel::calcular($conPromedio->pluck('promedio_final'))),
             'aprobados' => $conPromedio->filter(fn($alumno) => $alumno['promedio_final'] >= 6)->count(),
             'riesgo' => $conPromedio->filter(fn($alumno) => $alumno['promedio_final'] < 6)->count(),
             'incompletos' => $alumnos->filter(fn($alumno) => $alumno['periodos_faltantes'] > 0)->count(),
@@ -642,24 +636,9 @@ class PromediosGenerales extends Component
         return 'Aprobado';
     }
 
-    private function redondearPromedio(float $valor): float
-    {
-        /*
-         * promedio-numerico-pro:
-         * Se toma solo el primer decimal sin redondear.
-         * El pequeño ajuste evita cortes incorrectos por precisión decimal.
-         * Ejemplo: 8.777777777777778 se muestra como 8.7.
-         */
-        return floor(($valor + 0.000000001) * 10) / 10;
-    }
-
     public function formatearDecimal(null|int|float|string $valor): string
     {
-        if ($valor === null || $valor === '') {
-            return '0.0';
-        }
-
-        return number_format($this->redondearPromedio((float) $valor), 1, '.', '');
+        return PromedioExcel::formatear($valor, 1, '0.0');
     }
 
     public function exportarExcel(): BinaryFileResponse

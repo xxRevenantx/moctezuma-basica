@@ -18,6 +18,7 @@ class TrayectoriaAcademica extends Model
         'baja_definitiva',
         'traslado',
         'reingreso',
+        'reincorporacion',
         'egresado',
         'no_promovido',
         'promovido',
@@ -47,6 +48,14 @@ class TrayectoriaAcademica extends Model
         'vigente_en_corte',
         'es_actual',
         'origen',
+        'tipo_ingreso',
+        'continuidad',
+        'escuela_procedencia',
+        'cct_procedencia',
+        'ciclo_procedencia',
+        'ultimo_grado_procedencia',
+        'observaciones_procedencia',
+        'documentacion_pendiente',
         'datos_reconstruidos',
         'promovido',
         'fecha_promocion',
@@ -62,6 +71,7 @@ class TrayectoriaAcademica extends Model
         'numero_estancia' => 'integer',
         'vigente_en_corte' => 'boolean',
         'es_actual' => 'boolean',
+        'documentacion_pendiente' => 'boolean',
         'datos_reconstruidos' => 'boolean',
         'promovido' => 'boolean',
         'fecha_promocion' => 'datetime',
@@ -144,6 +154,11 @@ class TrayectoriaAcademica extends Model
         return $this->hasMany(MovimientoAlumno::class, 'trayectoria_academica_id');
     }
 
+    public function constanciasTraslado()
+    {
+        return $this->hasMany(ConstanciaTraslado::class, 'trayectoria_academica_id');
+    }
+
     public function getEtiquetaEstatusAttribute(): string
     {
         return match ($this->estatus) {
@@ -151,6 +166,7 @@ class TrayectoriaAcademica extends Model
             'baja_definitiva' => 'Baja definitiva',
             'traslado' => 'Traslado',
             'reingreso' => 'Reingreso',
+            'reincorporacion' => 'Reincorporación',
             'egresado' => 'Egresado',
             'no_promovido' => 'No promovido',
             'promovido' => 'Promovido',

@@ -7,12 +7,16 @@ use App\Models\CicloEscolar;
 use App\Models\Constancia as ConstanciaModelo;
 use App\Models\ConstanciaPlantilla;
 use App\Models\Nivel;
+use App\Models\Periodos;
 use App\Models\TrayectoriaAcademica;
 use App\Services\TrayectoriaAcademicaService;
+use App\Services\ConstanciaTrasladoService;
+use App\Services\CierreNivelReingresoService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -40,6 +44,9 @@ class Baja extends Component
 
     public ?string $fecha_reingreso = null;
     public ?string $motivo_reingreso = null;
+
+    public ?int $trayectoria_constancia_id = null;
+    public array $periodos_constancia = [];
 
     protected $paginationTheme = 'tailwind';
 
@@ -174,15 +181,37 @@ class Baja extends Component
 
         $trayectoria = $this->bajasQuery()->whereKey($trayectoriaId)->firstOrFail();
 
-        app(TrayectoriaAcademicaService::class)->reingresar(
-            $trayectoria->inscripcion,
-            (int) $this->ciclo_escolar_id,
-            (int) $this->ciclo_id,
-            (string) $this->fecha_reingreso,
-            $this->motivo_reingreso ?: 'Reingreso del alumno.',
-            'Se creó una nueva estancia y se conservó el estado anterior.',
-            auth()->id()
-        );
+        try {
+            app(CierreNivelReingresoService::class)->reingresarExalumno(
+                $trayectoria->inscripcion,
+                'reincorporacion',
+                [
+                    'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
+                    'ciclo_id' => (int) $this->ciclo_id,
+                    'nivel_id' => (int) $trayectoria->nivel_id,
+                    'grado_id' => (int) $trayectoria->grado_id,
+                    'generacion_id' => (int) $trayectoria->generacion_id,
+                    'semestre_id' => $trayectoria->semestre_id,
+                    'grupo_id' => (int) $trayectoria->grupo_id,
+                    'fecha_ingreso' => (string) $this->fecha_reingreso,
+                    'justificacion' => $this->motivo_reingreso ?: 'Reincorporación al mismo nivel.',
+                    'usuario_acceso_activo' => null,
+                ],
+                [
+                    'observaciones_procedencia' => 'Reincorporación rápida desde el módulo de bajas y traslados.',
+                    'documentacion_pendiente' => false,
+                ],
+                auth()->id()
+            );
+        } catch (ValidationException $e) {
+            $this->dispatch('swal', [
+                'icon' => 'warning',
+                'title' => 'No fue posible reincorporar',
+                'text' => collect($e->errors())->flatten()->first(),
+                'position' => 'top-end',
+            ]);
+            return;
+        }
 
         $this->motivo_reingreso = null;
         $this->fecha_reingreso = now()->toDateString();
@@ -191,10 +220,108 @@ class Baja extends Component
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Reingreso registrado',
-            'text' => 'Se creó una nueva estancia sin borrar la baja anterior.',
+            'title' => 'Reincorporación registrada',
+            'text' => 'Se creó una nueva trayectoria activa sin modificar la etapa anterior.',
             'position' => 'top-end',
         ]);
+    }
+
+    public function prepararConstanciaTraslado(int $trayectoriaId): void
+    {
+        $trayectoria = $this->bajasQuery()
+            ->whereKey($trayectoriaId)
+            ->where('trayectorias_academicas.estatus', 'traslado')
+            ->firstOrFail();
+
+        $this->trayectoria_constancia_id = $trayectoria->id;
+        $this->periodos_constancia = $this->consultarPeriodosConstancia($trayectoria)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+        $this->resetValidation('periodos_constancia');
+    }
+
+    public function cancelarConstanciaTraslado(): void
+    {
+        $this->trayectoria_constancia_id = null;
+        $this->periodos_constancia = [];
+        $this->resetValidation('periodos_constancia');
+    }
+
+    public function getPeriodosConstanciaDisponiblesProperty(): Collection
+    {
+        if (!$this->trayectoria_constancia_id) {
+            return collect();
+        }
+
+        $trayectoria = $this->bajasQuery()
+            ->whereKey($this->trayectoria_constancia_id)
+            ->where('trayectorias_academicas.estatus', 'traslado')
+            ->first();
+
+        return $trayectoria ? $this->consultarPeriodosConstancia($trayectoria) : collect();
+    }
+
+    public function generarConstanciaTraslado()
+    {
+        $this->validate([
+            'trayectoria_constancia_id' => ['required', 'integer', 'exists:trayectorias_academicas,id'],
+            'periodos_constancia' => ['required', 'array', 'min:1'],
+            'periodos_constancia.*' => ['integer', 'exists:periodos,id'],
+        ], [
+            'periodos_constancia.required' => 'Selecciona al menos un periodo o parcial.',
+            'periodos_constancia.min' => 'Selecciona al menos un periodo o parcial.',
+        ]);
+
+        $trayectoria = $this->bajasQuery()
+            ->whereKey($this->trayectoria_constancia_id)
+            ->where('trayectorias_academicas.estatus', 'traslado')
+            ->firstOrFail();
+
+        $constancia = app(ConstanciaTrasladoService::class)->crearGenerada(
+            $trayectoria,
+            $this->periodos_constancia,
+            'Constancia generada desde el módulo de bajas y traslados.',
+            auth()->id()
+        );
+
+        $this->cancelarConstanciaTraslado();
+
+        return redirect()->route('misrutas.constancias-traslado.pdf', $constancia);
+    }
+
+    public function etiquetaPeriodoConstancia(Periodos $periodo): string
+    {
+        $nombre = $periodo->periodoBasica?->periodo
+            ?: $periodo->parcialBachillerato?->parcial
+            ?: 'Periodo ' . $periodo->id;
+        $ciclo = $periodo->cicloEscolar
+            ? $periodo->cicloEscolar->inicio_anio . '-' . $periodo->cicloEscolar->fin_anio
+            : 'Sin ciclo';
+
+        return $nombre . ' · ' . $ciclo;
+    }
+
+    private function consultarPeriodosConstancia(TrayectoriaAcademica $trayectoria): Collection
+    {
+        return Periodos::query()
+            ->with([
+                'periodoBasica:id,periodo',
+                'parcialBachillerato:id,parcial',
+                'cicloEscolar:id,inicio_anio,fin_anio',
+            ])
+            ->where('ciclo_escolar_id', $trayectoria->ciclo_escolar_id)
+            ->where('nivel_id', $trayectoria->nivel_id)
+            ->where('generacion_id', $trayectoria->generacion_id)
+            ->when(
+                $trayectoria->semestre_id,
+                fn ($query) => $query->where('semestre_id', $trayectoria->semestre_id),
+                fn ($query) => $query->whereNull('semestre_id')
+            )
+            ->whereHas('calificaciones', fn ($query) => $query->where('inscripcion_id', $trayectoria->inscripcion_id))
+            ->orderBy('fecha_inicio')
+            ->orderBy('id')
+            ->get();
     }
 
     public function generarConstanciaBaja(int $trayectoriaId): void

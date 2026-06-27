@@ -406,6 +406,10 @@ class EditarPeriodo extends Component
     public function render()
     {
         $generaciones = Generacion::query()
+            ->where(function ($query) {
+                $query->where('status', true)
+                    ->when($this->generacion_id, fn ($sub) => $sub->orWhereKey($this->generacion_id));
+            })
             ->when($this->esBachillerato, function ($query) {
                 $query->where('nivel_id', $this->nivel_id);
             }, function ($query) {

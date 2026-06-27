@@ -57,6 +57,11 @@ class Inscripcion extends Model
 
         // Control
         'activo',
+        'indicador_reingreso',
+        'tipo_ultimo_ingreso',
+        'fecha_ultimo_ingreso',
+        'documentacion_reingreso_pendiente',
+        'usuario_acceso_activo',
 
         'fecha_baja',
         'motivo_baja',
@@ -67,6 +72,10 @@ class Inscripcion extends Model
     protected $casts = [
         'fecha_nacimiento' => 'date',
         'activo' => 'boolean',
+        'indicador_reingreso' => 'boolean',
+        'fecha_ultimo_ingreso' => 'date',
+        'documentacion_reingreso_pendiente' => 'boolean',
+        'usuario_acceso_activo' => 'boolean',
     ];
 
     /* =========================
@@ -176,6 +185,11 @@ class Inscripcion extends Model
     public function ultimoMovimiento()
     {
         return $this->hasOne(MovimientoAlumno::class, 'inscripcion_id')->latestOfMany();
+    }
+
+    public function constanciasTraslado()
+    {
+        return $this->hasMany(ConstanciaTraslado::class, 'inscripcion_id');
     }
 
     // Relación con ficha descriptiva

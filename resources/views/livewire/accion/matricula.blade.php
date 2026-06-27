@@ -223,6 +223,29 @@
         </div>
     </div>
 
+
+    {{-- REINGRESO / REINCORPORACIÓN --}}
+    <section id="reingreso-alumno" class="scroll-mt-24 rounded-3xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-900/50 dark:bg-violet-950/10">
+        <details class="group" @if(request()->integer('reingreso') > 0) open @endif>
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-sky-600 text-white shadow-lg shadow-violet-500/20">
+                        <flux:icon.arrow-path class="h-5 w-5" />
+                    </span>
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[.18em] text-violet-600 dark:text-violet-300">Retorno</p>
+                        <h2 class="font-black text-slate-900 dark:text-white">Reingresar exalumno o reincorporar alumno</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Conserva el mismo ID y abre una nueva trayectoria.</p>
+                    </div>
+                </div>
+                <flux:icon.chevron-down class="h-5 w-5 text-slate-500 transition group-open:rotate-180" />
+            </summary>
+            <div class="mt-5 border-t border-violet-200 pt-5 dark:border-violet-900/50">
+                <livewire:accion.reingreso-alumno :slug_nivel="$slug_nivel" :key="'reingreso-alumno-' . $slug_nivel" />
+            </div>
+        </details>
+    </section>
+
     {{-- Encabezado y estado del ciclo --}}
     <section
         class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">

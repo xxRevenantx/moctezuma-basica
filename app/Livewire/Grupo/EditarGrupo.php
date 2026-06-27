@@ -115,6 +115,10 @@ class EditarGrupo extends Component
         $this->generaciones = Generacion::query()
             ->with('nivel')
             ->where('nivel_id', $this->nivel_id)
+            ->where(function ($query) {
+                $query->where('status', true)
+                    ->when($this->generacion_id, fn ($sub) => $sub->orWhereKey($this->generacion_id));
+            })
             ->orderByDesc('anio_ingreso')
             ->get();
 

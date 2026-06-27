@@ -2,6 +2,7 @@
     colapsos: {
         estadistica: false,
         promocion: false,
+        cierre_nivel: false,
         listas: false,
         horarios: false,
         promedios: false,
@@ -35,6 +36,7 @@
             this.colapsos = {
                 estadistica: guardados.estadistica === true,
                 promocion: guardados.promocion === true,
+                cierre_nivel: guardados.cierre_nivel === true,
                 listas: guardados.listas === true,
                 horarios: guardados.horarios === true,
                 promedios: guardados.promedios === true,
@@ -411,6 +413,31 @@
         </div>
     </section>
 
+
+    {{-- COLLAPSE: CIERRE DE NIVEL Y CONTINUIDAD --}}
+    <section class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <button type="button" x-on:click="alternarCollapse('cierre_nivel')"
+            class="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/70 sm:px-6">
+            <div class="flex min-w-0 items-center gap-4">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-sky-600 to-emerald-600 text-white shadow-lg shadow-violet-500/20">
+                    <flux:icon.academic-cap class="h-6 w-6" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-300">Fin de etapa</p>
+                    <h2 class="truncate text-lg font-black text-slate-900 dark:text-white">Cierre de nivel y continuidad</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Egreso, continuidad interna, traslado, baja y repetición sin eliminar el historial.</p>
+                </div>
+            </div>
+            <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition duration-300 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
+                :class="colapsos.cierre_nivel ? 'rotate-180' : 'rotate-0'">
+                <flux:icon.chevron-down class="h-5 w-5" />
+            </span>
+        </button>
+        <div x-cloak x-show="colapsos.cierre_nivel" x-transition.opacity.duration.200ms class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+            <livewire:accion.generales.cierre-nivel-continuidad :slug_nivel="$slug_nivel" :key="'cierre-nivel-' . $slug_nivel" />
+        </div>
+    </section>
+
     {{-- COLLAPSE: LISTAS GENERALES --}}
     <section
         class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -568,8 +595,7 @@
                         </h2>
 
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            Consulta el concentrado de promedios por periodos en básica y parciales por semestre en
-                            bachillerato.
+                            Consulta promedios generales y el concentrado por materia para primaria, secundaria y bachillerato, adaptado a periodos o parciales.
                         </p>
                     </div>
                 </div>
@@ -593,6 +619,13 @@
             <div x-cloak x-show="colapsos.promedios" x-transition.opacity.duration.200ms
                 class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
                 <livewire:accion.generales.promedios-generales :slug_nivel="$slug_nivel" :key="'promedios-generales-' . $slug_nivel" />
+
+                @if (in_array($slug_nivel, ['primaria', 'secundaria', 'bachillerato'], true))
+                    <div class="my-8 border-t border-slate-200 dark:border-neutral-800"></div>
+
+                    <livewire:accion.generales.promedios-materias :slug_nivel="$slug_nivel"
+                        :key="'promedios-materias-' . $slug_nivel" />
+                @endif
             </div>
         </section>
     @endif

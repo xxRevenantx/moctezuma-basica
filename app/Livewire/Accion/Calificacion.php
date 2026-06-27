@@ -21,6 +21,7 @@ use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
 use App\Services\ListaAcademicaService;
+use App\Support\PromedioExcel;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -62,6 +63,7 @@ class Calificacion extends Component
     public array $observaciones = [];
     public array $observacionesOriginales = [];
     public array $promedios = [];
+    public array $promediosPrecisos = [];
 
     public bool $mostrarModalBitacora = false;
     public bool $mostrarModalRevision = false;
@@ -911,28 +913,18 @@ class Calificacion extends Component
             ->values();
     }
 
-    private function redondearPromedio(float $valor): float
-    {
-        /*
-         * Se toma solo el primer decimal sin redondear.
-         * Ejemplo: 8.777777777777778 se muestra como 8.7.
-         */
-        return floor($valor * 10) / 10;
-    }
-
-    private function calcularPromedioAlumno(
+    private function calcularPromedioAlumnoPreciso(
         int $inscripcionId,
         ?int $numeroMateriasPromediar = null,
         ?Collection $materiasOrdenadas = null
-    ): string {
+    ): ?float {
         $materiasOrdenadas ??= $this->obtenerMateriasOrdenadasParaPromedio();
 
         if ($inscripcionId <= 0 || $materiasOrdenadas->isEmpty()) {
-            return '0.0';
+            return null;
         }
 
-        $suma = 0;
-        $totalNumericas = 0;
+        $valores = [];
 
         foreach ($materiasOrdenadas as $materia) {
             $asignacionMateriaId = (int) ($materia['id'] ?? 0);
@@ -941,29 +933,34 @@ class Calificacion extends Component
                 continue;
             }
 
-            $valor = $this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null;
-            $valor = $this->normalizarCalificacion($valor);
+            $valor = $this->normalizarCalificacion(
+                $this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null
+            );
 
-            /*
-             * Solo se suman valores numéricos.
-             * AC, NP, SD, ED, RA, textos y vacíos no se suman
-             * y tampoco cuentan como divisor.
-             */
-            if (!$this->esCalificacionNumerica($valor)) {
+            // Igual que PROMEDIO de Excel: textos, claves especiales y vacíos
+            // no suman ni cuentan como divisor.
+            if (! $this->esCalificacionNumerica($valor)) {
                 continue;
             }
 
-            $suma += (float) $valor;
-            $totalNumericas++;
+            $valores[] = (float) $valor;
         }
 
-        if ($totalNumericas === 0) {
-            return '0.0';
-        }
+        return PromedioExcel::calcular($valores);
+    }
 
-        $promedio = $this->redondearPromedio($suma / $totalNumericas);
+    private function calcularPromedioAlumno(
+        int $inscripcionId,
+        ?int $numeroMateriasPromediar = null,
+        ?Collection $materiasOrdenadas = null
+    ): string {
+        $promedioPreciso = $this->calcularPromedioAlumnoPreciso(
+            inscripcionId: $inscripcionId,
+            numeroMateriasPromediar: $numeroMateriasPromediar,
+            materiasOrdenadas: $materiasOrdenadas,
+        );
 
-        return number_format($promedio, 1, '.', '');
+        return PromedioExcel::formatear($promedioPreciso, 1, '0.0');
     }
 
     public function promedioAlumnoTabla(int $inscripcionId): string
@@ -981,6 +978,7 @@ class Calificacion extends Component
     public function calcularPromedios(): void
     {
         $this->promedios = [];
+        $this->promediosPrecisos = [];
 
         $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
 
@@ -991,10 +989,13 @@ class Calificacion extends Component
                 continue;
             }
 
-            $this->promedios[$inscripcionId] = $this->calcularPromedioAlumno(
+            $promedioPreciso = $this->calcularPromedioAlumnoPreciso(
                 inscripcionId: $inscripcionId,
-                materiasOrdenadas: $materiasOrdenadas
+                materiasOrdenadas: $materiasOrdenadas,
             );
+
+            $this->promediosPrecisos[$inscripcionId] = $promedioPreciso;
+            $this->promedios[$inscripcionId] = PromedioExcel::formatear($promedioPreciso, 1, '0.0');
         }
     }
 
@@ -1061,7 +1062,7 @@ class Calificacion extends Component
 
     private function obtenerPromedioOrdenable(int $inscripcionId): float
     {
-        $promedio = $this->promedios[$inscripcionId] ?? null;
+        $promedio = $this->promediosPrecisos[$inscripcionId] ?? null;
 
         if (!is_numeric($promedio)) {
             return -1;
@@ -1548,7 +1549,7 @@ class Calificacion extends Component
         $pendientes = max(0, $this->totalCeldas - $this->celdasCapturadas);
         $hayMateriasPromediables = $this->tieneMateriasPromediables();
 
-        $promediosAlumnos = collect($this->promedios)
+        $promediosAlumnos = collect($this->promediosPrecisos)
             ->filter(function ($valor, $inscripcionId) use ($hayMateriasPromediables) {
                 return $hayMateriasPromediables
                     && is_numeric($valor)
@@ -1557,9 +1558,7 @@ class Calificacion extends Component
             ->map(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioGlobal = $promediosAlumnos->isNotEmpty()
-            ? $this->redondearPromedio($promediosAlumnos->sum() / $promediosAlumnos->count())
-            : 0;
+        $promedioGlobal = PromedioExcel::calcular($promediosAlumnos) ?? 0.0;
 
         $aprobados = $promediosAlumnos
             ->filter(fn($valor) => $valor >= 6)
@@ -1570,7 +1569,7 @@ class Calificacion extends Component
             ->count();
 
         return [
-            'promedio_global' => number_format($promedioGlobal, 1, '.', ''),
+            'promedio_global' => PromedioExcel::formatear($promedioGlobal, 1, '0.0'),
             'porcentaje_aprobacion' => $promediosAlumnos->isNotEmpty()
                 ? (int) round(($aprobados / $promediosAlumnos->count()) * 100)
                 : 0,
@@ -1588,7 +1587,7 @@ class Calificacion extends Component
         $alumnos = collect($this->inscripciones)
             ->map(function ($fila) use ($hayMateriasPromediables) {
                 $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
-                $promedio = $this->promedios[$inscripcionId] ?? null;
+                $promedio = $this->promediosPrecisos[$inscripcionId] ?? null;
 
                 if (
                     !$hayMateriasPromediables ||
@@ -1624,18 +1623,18 @@ class Calificacion extends Component
                     return null;
                 }
 
-                $promedioMateria = $this->redondearPromedio($valores->avg());
+                $promedioMateria = PromedioExcel::calcular($valores);
 
                 return [
                     'materia' => $this->recortarTexto($materia['materia'] ?? 'Materia', 18),
-                    'promedio' => (float) number_format($promedioMateria, 1, '.', ''),
+                    'promedio' => PromedioExcel::truncar($promedioMateria) ?? 0.0,
                 ];
             })
             ->filter()
             ->when($numeroMateriasPromediar, fn($coleccion) => $coleccion->take((int) $numeroMateriasPromediar))
             ->values();
 
-        $promediosAlumnos = collect($this->promedios)
+        $promediosAlumnos = collect($this->promediosPrecisos)
             ->filter(function ($valor, $inscripcionId) use ($hayMateriasPromediables) {
                 return $hayMateriasPromediables
                     && is_numeric($valor)
@@ -1644,9 +1643,7 @@ class Calificacion extends Component
             ->map(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioGlobal = $promediosAlumnos->isNotEmpty()
-            ? $this->redondearPromedio($promediosAlumnos->sum() / $promediosAlumnos->count())
-            : 0;
+        $promedioGlobal = PromedioExcel::calcular($promediosAlumnos) ?? 0.0;
 
         $aprobadas = $promediosAlumnos
             ->filter(fn($valor) => $valor >= 6)
@@ -1666,7 +1663,7 @@ class Calificacion extends Component
                 'series' => $materias->pluck('promedio')->toArray(),
             ],
             'global' => [
-                'promedio' => (float) number_format($promedioGlobal, 1, '.', ''),
+                'promedio' => PromedioExcel::truncar($promedioGlobal) ?? 0.0,
                 'porcentaje' => min(100, round(($promedioGlobal / 10) * 100)),
                 'total_numericas' => $promediosAlumnos->count(),
                 'aprobadas' => $aprobadas,
@@ -1744,7 +1741,7 @@ class Calificacion extends Component
                 $especiales = $valores->pluck('valor')->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
                 $pendientesAlumno = $valores->filter(fn($item) => blank($item['valor']))->count();
 
-                $promedio = $this->promedios[$inscripcionId] ?? null;
+                $promedio = $this->promediosPrecisos[$inscripcionId] ?? null;
 
                 $tieneNumericas = $this->alumnoTieneCalificacionesNumericas($inscripcionId);
 
@@ -1757,7 +1754,7 @@ class Calificacion extends Component
                     'matricula' => $fila['matricula'] ?? 'Sin matrícula',
                     'alumno' => $fila['alumno'] ?? 'Sin alumno',
                     'promedio' => $promedioNumerico,
-                    'promedio_texto' => $promedioNumerico !== null ? number_format($promedioNumerico, 1, '.', '') : '—',
+                    'promedio_texto' => PromedioExcel::formatear($promedioNumerico, 1, '—'),
                     'reprobadas' => $reprobadas,
                     'especiales' => $especiales,
                     'pendientes' => $pendientesAlumno,
@@ -1805,7 +1802,7 @@ class Calificacion extends Component
                 $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
                 $pendientesMateria = $valores->filter(fn($valor) => blank($valor))->count();
                 $especiales = $valores->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
-                $promedio = $numericas->isEmpty() ? null : $this->redondearPromedio($numericas->avg());
+                $promedio = PromedioExcel::calcular($numericas);
 
                 return [
                     'id' => $asignacionMateriaId,
@@ -1813,7 +1810,7 @@ class Calificacion extends Component
                     'profesor' => $materia['profesor'] ?? 'Sin profesor asignado',
                     'extra' => (bool) ($materia['extra'] ?? false),
                     'promedio' => $promedio,
-                    'promedio_texto' => $promedio !== null ? number_format($promedio, 1, '.', '') : '—',
+                    'promedio_texto' => PromedioExcel::formatear($promedio, 1, '—'),
                     'aprobadas' => $aprobadas,
                     'reprobadas' => $reprobadas,
                     'pendientes' => $pendientesMateria,
@@ -2206,8 +2203,8 @@ class Calificacion extends Component
             return collect();
         }
 
-        return collect($this->promedios)
-            ->filter(fn($valor) => is_numeric($valor) && (float) $valor > 0)
+        return collect($this->promediosPrecisos)
+            ->filter(fn($valor) => is_numeric($valor))
             ->map(fn($valor) => (float) $valor)
             ->values();
     }
@@ -2230,9 +2227,9 @@ class Calificacion extends Component
         $alumnosBase = collect($this->inscripciones)
             ->map(function ($fila) {
                 $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
-                $promedio = $this->promedios[$inscripcionId] ?? null;
+                $promedio = $this->promediosPrecisos[$inscripcionId] ?? null;
 
-                if ($inscripcionId <= 0 || !is_numeric($promedio) || (float) $promedio <= 0) {
+                if ($inscripcionId <= 0 || !is_numeric($promedio)) {
                     return null;
                 }
 
@@ -2243,8 +2240,8 @@ class Calificacion extends Component
                     'matricula' => $fila['matricula'] ?? 'SIN MATRÍCULA',
                     'alumno' => $fila['alumno'] ?? 'Alumno',
                     'promedio' => $promedioNumerico,
-                    'promedio_texto' => number_format($promedioNumerico, 1, '.', ''),
-                    'promedio_clave' => number_format($promedioNumerico, 2, '.', ''),
+                    'promedio_texto' => PromedioExcel::formatear($promedioNumerico, 1, '—'),
+                    'promedio_clave' => PromedioExcel::claveComparacion($promedioNumerico),
                 ];
             })
             ->filter()

@@ -2,10 +2,12 @@
 
 namespace App\Imports;
 
+use App\Models\CampoFormativo;
 use App\Models\Grado;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Support\CampoFormativoClassifier;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -30,6 +32,7 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 'nivel_id' => $row['nivel_id'] ?? null,
                 'grado_id' => $row['grado_id'] ?? null,
                 'semestre_id' => $row['semestre_id'] ?? null,
+                'campo_formativo_id' => $row['campo_formativo_id'] ?? null,
                 'materia' => trim((string) ($row['materia'] ?? '')),
                 'clave' => trim((string) ($row['clave'] ?? '')),
                 'slug' => trim((string) ($row['slug'] ?? '')),
@@ -57,6 +60,11 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'nullable',
                     'integer',
                     Rule::exists('semestres', 'id'),
+                ],
+                'campo_formativo_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('campos_formativos', 'id'),
                 ],
                 'materia' => [
                     'required',
@@ -134,6 +142,12 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 $datos['extra'] = false;
             }
 
+            if (blank($datos['campo_formativo_id'])) {
+                $datos['campo_formativo_id'] = CampoFormativo::query()
+                    ->where('slug', $this->sugerirCampoSlug($datos['materia']))
+                    ->value('id');
+            }
+
             $materia = Materia::updateOrCreate(
                 [
                     'nivel_id' => $datos['nivel_id'],
@@ -142,6 +156,7 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'slug' => $datos['slug'],
                 ],
                 [
+                    'campo_formativo_id' => $datos['campo_formativo_id'],
                     'materia' => $datos['materia'],
                     'clave' => $datos['clave'] !== '' ? Str::upper($datos['clave']) : null,
                     'calificable' => $datos['calificable'],
@@ -156,6 +171,11 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 $this->actualizadas++;
             }
         }
+    }
+
+    private function sugerirCampoSlug(string $nombre): string
+    {
+        return CampoFormativoClassifier::sugerir($nombre);
     }
 
     private function convertirBooleano($valor): bool

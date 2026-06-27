@@ -17,6 +17,11 @@ class MovimientoAlumno extends Model
         'ciclo_escolar_id',
         'ciclo_id',
         'trayectoria_origen_id',
+        'trayectoria_destino_id',
+        'nivel_anterior_id',
+        'nivel_nuevo_id',
+        'resultado_continuidad',
+        'usuario_acceso_activo',
         'documento_alumno_id',
         'tipo',
         'fecha',
@@ -31,6 +36,7 @@ class MovimientoAlumno extends Model
         'fecha' => 'date',
         'estado_anterior' => 'array',
         'estado_nuevo' => 'array',
+        'usuario_acceso_activo' => 'boolean',
     ];
 
     public function inscripcion()
@@ -46,6 +52,21 @@ class MovimientoAlumno extends Model
     public function trayectoriaOrigen()
     {
         return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_origen_id');
+    }
+
+    public function trayectoriaDestino()
+    {
+        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_destino_id');
+    }
+
+    public function nivelAnterior()
+    {
+        return $this->belongsTo(Nivel::class, 'nivel_anterior_id');
+    }
+
+    public function nivelNuevo()
+    {
+        return $this->belongsTo(Nivel::class, 'nivel_nuevo_id');
     }
 
     public function cicloEscolar()

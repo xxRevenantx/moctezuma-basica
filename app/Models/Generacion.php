@@ -18,7 +18,14 @@ class Generacion extends Model
         'anio_ingreso',
         'anio_egreso',
         'status',
+        'cerrada_at',
+        'cerrada_por',
         'observaciones',
+    ];
+
+    protected $casts = [
+        'status' => 'boolean',
+        'cerrada_at' => 'datetime',
     ];
 
     // Relaciones y métodos adicionales pueden ser añadidos aquí
@@ -61,5 +68,15 @@ class Generacion extends Model
     public function bitacoraCalificaciones()
     {
         return $this->hasMany(BitacoraCalificacion::class, 'generacion_id');
+    }
+
+    public function trayectoriasAcademicas()
+    {
+        return $this->hasMany(TrayectoriaAcademica::class, 'generacion_id');
+    }
+
+    public function usuarioQueCerro()
+    {
+        return $this->belongsTo(User::class, 'cerrada_por');
     }
 }

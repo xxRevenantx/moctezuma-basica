@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -292,10 +293,6 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
 
     protected function formatearDecimal(null|int|float|string $valor): string
     {
-        if ($valor === null || $valor === '') {
-            return '0.0';
-        }
-
-        return number_format((float) $valor, 1, '.', '');
+        return PromedioExcel::formatear($valor, 1, '0.0');
     }
 }

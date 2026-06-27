@@ -1,12 +1,12 @@
 <div
     x-data="{
-        confirmarReingreso(id, nombre) {
+        confirmarReincorporacion(id, nombre) {
             Swal.fire({
-                title: 'Registrar reingreso',
-                html: `Se creará una nueva estancia para <b>${nombre}</b> y la baja anterior permanecerá en el historial.`,
+                title: 'Registrar reincorporación',
+                html: `Se creará una nueva trayectoria activa en el mismo nivel para <b>${nombre}</b> y la baja anterior permanecerá en el historial.`,
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: 'Registrar reingreso',
+                confirmButtonText: 'Reincorporar',
                 cancelButtonText: 'Cancelar',
                 confirmButtonColor: '#7c3aed'
             }).then((r) => r.isConfirmed && this.$wire.reactivarAlumno(id));
@@ -34,7 +34,7 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-black">Estados, bajas, traslados y reingresos</h1>
+                        <h1 class="text-2xl font-black">Estados, bajas, traslados y reincorporaciones</h1>
                         @if ($cicloSeleccionado?->es_actual)
                             <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/25">Ciclo actual</span>
                         @elseif ($cicloSeleccionado?->cerrado_at)
@@ -191,11 +191,11 @@
     <section class="rounded-3xl border border-violet-200 bg-violet-50/50 p-5 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/15">
         <div class="grid gap-3 md:grid-cols-3">
             <div>
-                <h2 class="font-black text-violet-950 dark:text-violet-100">Configuración de reingreso</h2>
-                <p class="mt-1 text-sm text-violet-800/75 dark:text-violet-200/70">Estos datos se usarán al pulsar “Reingresar”.</p>
+                <h2 class="font-black text-violet-950 dark:text-violet-100">Configuración de reincorporación rápida</h2>
+                <p class="mt-1 text-sm text-violet-800/75 dark:text-violet-200/70">Estos datos se usarán al pulsar “Reincorporar”. Para cambiar de nivel utiliza el módulo de Matrícula.</p>
             </div>
             <label class="space-y-1.5">
-                <span class="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Fecha de reingreso</span>
+                <span class="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Fecha de reincorporación</span>
                 <input wire:model="fecha_reingreso" type="date" class="w-full rounded-xl border-violet-300 bg-white text-sm dark:border-violet-800 dark:bg-neutral-900" />
             </label>
             <label class="space-y-1.5">
@@ -208,7 +208,7 @@
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="border-b border-slate-200 p-4 dark:border-neutral-700">
             <h2 class="font-black text-slate-900 dark:text-white">Estados no activos del contexto</h2>
-            <p class="text-sm text-slate-500">El reingreso crea una estancia nueva y conserva el estado anterior como antecedente.</p>
+            <p class="text-sm text-slate-500">La reincorporación crea una trayectoria nueva en el mismo nivel y conserva el estado anterior como antecedente.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-[1250px] w-full text-left text-sm">
@@ -243,9 +243,15 @@
                                         class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
                                         <flux:icon.document-text class="h-4 w-4" />
                                     </button>
-                                    <button type="button" x-on:click="confirmarReingreso({{ $row->id }}, @js($nombre))"
+                                    @if ($row->estatus === 'traslado')
+                                        <button type="button" wire:click="prepararConstanciaTraslado({{ $row->id }})" title="Constancia de traslado con calificaciones"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                            <flux:icon.document-text class="h-4 w-4" />
+                                        </button>
+                                    @endif
+                                    <button type="button" x-on:click="confirmarReincorporacion({{ $row->id }}, @js($nombre))"
                                         class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">
-                                        <flux:icon.arrow-path class="h-4 w-4" /> Reingresar
+                                        <flux:icon.arrow-path class="h-4 w-4" /> Reincorporar
                                     </button>
                                 </div>
                             </td>
@@ -256,6 +262,40 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($trayectoria_constancia_id)
+            <div class="border-t border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/15">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[.18em] text-emerald-700 dark:text-emerald-300">Constancia de traslado</p>
+                        <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-white">Selecciona los periodos o parciales que se incluirán</h4>
+                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Solo aparecen periodos que ya tienen calificaciones capturadas para el alumno.</p>
+                    </div>
+                    <flux:button type="button" wire:click="cancelarConstanciaTraslado" variant="ghost" icon="x-mark">Cancelar</flux:button>
+                </div>
+
+                <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    @forelse ($this->periodosConstanciaDisponibles as $periodoConstancia)
+                        <label wire:key="periodo-constancia-{{ $periodoConstancia->id }}" class="flex cursor-pointer items-center gap-3 rounded-2xl border border-emerald-200 bg-white p-3 text-sm font-bold text-slate-700 dark:border-emerald-900/50 dark:bg-neutral-900 dark:text-slate-100">
+                            <input type="checkbox" wire:model="periodos_constancia" value="{{ $periodoConstancia->id }}" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span>{{ $this->etiquetaPeriodoConstancia($periodoConstancia) }}</span>
+                        </label>
+                    @empty
+                        <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                            No hay calificaciones capturadas que puedan incluirse en la constancia.
+                        </div>
+                    @endforelse
+                </div>
+                @error('periodos_constancia') <p class="mt-2 text-sm font-bold text-red-600">{{ $message }}</p> @enderror
+
+                <div class="mt-4 flex justify-end">
+                    <flux:button type="button" wire:click="generarConstanciaTraslado" variant="primary" icon="document-text" wire:loading.attr="disabled" wire:target="generarConstanciaTraslado">
+                        Generar PDF con periodos seleccionados
+                    </flux:button>
+                </div>
+            </div>
+        @endif
+
         @if ($bajasRows->hasPages())
             <div class="border-t border-slate-200 p-4 dark:border-neutral-700">{{ $bajasRows->links(data: ['scrollTo' => false]) }}</div>
         @endif

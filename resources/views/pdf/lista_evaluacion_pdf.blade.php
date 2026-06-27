@@ -257,6 +257,16 @@
             font-size: 10.3px;
         }
 
+
+        .alta-posterior {
+            display: block;
+            margin-top: 2px;
+            color: #9a3412;
+            font-size: 6.5px;
+            font-weight: bold;
+            line-height: 1.1;
+        }
+
         .resumen {
             margin-top: 9px;
             width: 100%;
@@ -407,6 +417,9 @@
                     : 'No especificado';
 
             $nombreMes = $periodo?->meses ?? ($parcial?->meses ?? '—');
+            $inicioPeriodo = $periodo?->fecha_inicio
+                ? \Illuminate\Support\Carbon::parse($periodo->fecha_inicio)->startOfDay()
+                : null;
 
             $folio =
                 'LE-' .
@@ -611,6 +624,14 @@
                                 {{ $alumno->apellido_paterno }}
                                 {{ $alumno->apellido_materno }}
                                 {{ $alumno->nombre }}
+                                @php
+                                    $fechaAltaLista = $alumno->fecha_inicio_historica
+                                        ? \Illuminate\Support\Carbon::parse($alumno->fecha_inicio_historica)->startOfDay()
+                                        : null;
+                                @endphp
+                                @if ($inicioPeriodo && $fechaAltaLista && $fechaAltaLista->gt($inicioPeriodo))
+                                    <span class="alta-posterior">Aún no inscrito antes del {{ $fechaAltaLista->format('d/m/Y') }}</span>
+                                @endif
                             </td>
 
                             <td class="campo">%</td>

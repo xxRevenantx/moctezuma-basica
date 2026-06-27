@@ -77,6 +77,14 @@ class ListaAcademicaService
             ->when($gradoId, fn ($q) => $q->where('grado_id', $gradoId))
             ->when($generacionId, fn ($q) => $q->where('generacion_id', $generacionId))
             ->when($semestreId, fn ($q) => $q->where('semestre_id', $semestreId))
+            ->whereNotIn('estatus', [
+                'baja_temporal',
+                'baja_definitiva',
+                'traslado',
+                'inactivo',
+                'suspendido',
+                'archivado',
+            ])
             ->where(function ($q) use ($fecha) {
                 $q->whereNull('fecha_inicio')
                     ->orWhereDate('fecha_inicio', '<=', $fecha);

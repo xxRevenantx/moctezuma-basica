@@ -374,6 +374,7 @@ class CrearPeriodo extends Component
     public function render()
     {
         $generaciones = Generacion::query()
+            ->where('status', true)
             ->when($this->esBachillerato, function ($query) {
                 $query->where('nivel_id', $this->nivel_id);
             }, function ($query) {

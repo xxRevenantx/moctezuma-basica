@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Materia;
 
+use App\Models\CampoFormativo;
 use App\Models\Grado;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Support\CampoFormativoClassifier;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -33,6 +35,7 @@ class CrearMateria extends Component
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
     public ?int $semestre_id = null;
+    public ?int $campo_formativo_id = null;
 
     public string $materia = '';
     public ?string $clave = null;
@@ -48,6 +51,7 @@ class CrearMateria extends Component
 
     public $gradosFiltro;
     public $semestresFiltro;
+    public $camposFormativos;
 
     public function mount(): void
     {
@@ -57,6 +61,7 @@ class CrearMateria extends Component
 
         $this->gradosFiltro = collect();
         $this->semestresFiltro = collect();
+        $this->camposFormativos = collect();
 
         $this->cargarCatalogos();
     }
@@ -65,6 +70,12 @@ class CrearMateria extends Component
     {
         $this->niveles = Nivel::query()
             ->orderBy('id')
+            ->get();
+
+        $this->camposFormativos = CampoFormativo::query()
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->orderBy('nombre')
             ->get();
 
         $this->cargarGradosFormulario();
@@ -140,6 +151,10 @@ class CrearMateria extends Component
     {
         if (!$this->editandoId || blank($this->slug)) {
             $this->slug = Str::slug($value);
+        }
+
+        if (!$this->editandoId && !$this->campo_formativo_id) {
+            $this->campo_formativo_id = $this->sugerirCampoFormativoId((string) $value);
         }
     }
 
@@ -252,6 +267,12 @@ class CrearMateria extends Component
                 Rule::exists('semestres', 'id')->where('grado_id', $this->grado_id),
             ],
 
+            'campo_formativo_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('campos_formativos', 'id')->where('activo', true),
+            ],
+
             'materia' => [
                 'required',
                 'string',
@@ -309,6 +330,7 @@ class CrearMateria extends Component
 
             'semestre_id.required' => 'Selecciona un semestre para bachillerato.',
             'semestre_id.exists' => 'El semestre no pertenece al grado seleccionado.',
+            'campo_formativo_id.exists' => 'El campo formativo seleccionado no es válido.',
 
             'materia.required' => 'Escribe el nombre de la materia.',
             'materia.min' => 'El nombre de la materia debe tener al menos 1 carácter.',
@@ -404,6 +426,7 @@ class CrearMateria extends Component
             'nivel_id' => $this->nivel_id,
             'grado_id' => $this->grado_id,
             'semestre_id' => $this->esBachilleratoFormulario ? $this->semestre_id : null,
+            'campo_formativo_id' => $this->campo_formativo_id,
             'materia' => $this->materia,
             'clave' => $this->esBachilleratoFormulario ? $this->clave : null,
             'slug' => $this->slug,
@@ -503,6 +526,7 @@ class CrearMateria extends Component
 
         // Ya con los semestres cargados, se asigna el semestre.
         $this->semestre_id = $materia->semestre_id ? (int) $materia->semestre_id : null;
+        $this->campo_formativo_id = $materia->campo_formativo_id ? (int) $materia->campo_formativo_id : null;
 
         $this->materia = $materia->materia;
         $this->clave = $materia->clave;
@@ -576,6 +600,7 @@ class CrearMateria extends Component
         $this->nivel_id = null;
         $this->grado_id = null;
         $this->semestre_id = null;
+        $this->campo_formativo_id = null;
 
         $this->materia = '';
         $this->clave = null;
@@ -614,7 +639,7 @@ class CrearMateria extends Component
     private function consultaMaterias()
     {
         return Materia::query()
-            ->with(['nivel', 'grado', 'semestre'])
+            ->with(['nivel', 'grado', 'semestre', 'campoFormativo'])
             ->withCount('asignaciones')
             ->when(trim($this->buscar) !== '', function ($query) {
                 $buscar = '%' . trim($this->buscar) . '%';
@@ -647,6 +672,13 @@ class CrearMateria extends Component
             ->orderBy('semestre_id')
             ->orderBy('orden')
             ->orderBy('materia');
+    }
+
+    private function sugerirCampoFormativoId(string $nombre): ?int
+    {
+        $slug = CampoFormativoClassifier::sugerir($nombre);
+
+        return $this->camposFormativos?->firstWhere('slug', $slug)?->id;
     }
 
     public function render()

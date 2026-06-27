@@ -23,6 +23,12 @@ class Calificacion extends Model
         'es_numerica',
         'clave_especial',
         'observacion',
+        'fuente',
+        'escuela_procedencia',
+        'documento_respaldo_id',
+        'equivalencia_autorizada',
+        'fecha_validacion',
+        'validado_por',
         'capturado_por',
         'fecha_captura',
         'ip_captura',
@@ -32,6 +38,8 @@ class Calificacion extends Model
         'valor_numerico' => 'decimal:2',
         'es_numerica' => 'boolean',
         'fecha_captura' => 'datetime',
+        'equivalencia_autorizada' => 'boolean',
+        'fecha_validacion' => 'datetime',
     ];
 
     public function inscripcion()
@@ -82,6 +90,16 @@ class Calificacion extends Model
     public function capturador()
     {
         return $this->belongsTo(User::class, 'capturado_por');
+    }
+
+    public function validador()
+    {
+        return $this->belongsTo(User::class, 'validado_por');
+    }
+
+    public function documentoRespaldo()
+    {
+        return $this->belongsTo(DocumentoAlumno::class, 'documento_respaldo_id');
     }
 
     public function getMateriaAttribute()

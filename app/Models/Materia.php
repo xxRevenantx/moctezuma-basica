@@ -17,6 +17,7 @@ class Materia extends Model
         'nivel_id',
         'grado_id',
         'semestre_id',
+        'campo_formativo_id',
         'materia',
         'clave',
         'slug',
@@ -41,6 +42,11 @@ class Materia extends Model
     public function semestre()
     {
         return $this->belongsTo(Semestre::class, 'semestre_id');
+    }
+
+    public function campoFormativo()
+    {
+        return $this->belongsTo(CampoFormativo::class, 'campo_formativo_id');
     }
 
     public function asignaciones()

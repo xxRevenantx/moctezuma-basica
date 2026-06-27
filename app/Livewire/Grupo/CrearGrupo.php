@@ -54,6 +54,7 @@ class CrearGrupo extends Component
 
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel_id)
+            ->where('status', true)
             ->orderByDesc('anio_ingreso')
             ->get();
 

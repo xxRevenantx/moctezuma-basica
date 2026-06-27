@@ -19,6 +19,7 @@ use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Support\PromedioExcel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -379,7 +380,7 @@ class PDFController extends Controller
          * Ejemplo: 8.777777777777778 se muestra como 8.7.
          */
         $truncarPromedio = function (float $valor): float {
-            return floor(($valor + 0.000000001) * 10) / 10;
+            return PromedioExcel::truncar($valor) ?? 0.0;
         };
 
         $formatearPromedio = function (?float $valor) use ($truncarPromedio): string {
@@ -483,8 +484,8 @@ class PDFController extends Controller
             $estadoMateria = 'Sin datos';
 
             if ($capturadasMateria > 0) {
-                $promedioMateriaNumero = $truncarPromedio($sumaMateria / $capturadasMateria);
-                $promedioMateria = number_format($promedioMateriaNumero, 1, '.', '');
+                $promedioMateriaNumero = (float) ($sumaMateria / $capturadasMateria);
+                $promedioMateria = $formatearPromedio($promedioMateriaNumero);
 
                 if ($promedioMateriaNumero < 6) {
                     $estadoMateria = 'En riesgo';
@@ -517,53 +518,39 @@ class PDFController extends Controller
         */
 
         $promediosPeriodos = [];
-        $sumaPromediosPeriodos = 0;
-        $periodosCapturados = 0;
+        $promediosPeriodosPrecisos = [];
 
         foreach ($numerosPeriodos as $numeroPeriodo) {
-            $promedioPeriodo = null;
+            $promedioPeriodoPreciso = null;
 
             if ($capturadasPorPeriodo[$numeroPeriodo] > 0) {
                 /*
-                 * promedio-numerico-pro:
-                 * Se divide únicamente entre las calificaciones numéricas encontradas.
-                 * AC, NP, SD, ED, RA, textos y vacíos no suman ni dividen.
+                 * Regla PROMEDIO de Excel: solo participan valores numéricos;
+                 * textos, claves especiales y vacíos no suman ni cuentan como divisor.
+                 * No se trunca este resultado intermedio.
                  */
-                $promedioPeriodo = $truncarPromedio(
+                $promedioPeriodoPreciso = (float) (
                     $sumasPorPeriodo[$numeroPeriodo] / $capturadasPorPeriodo[$numeroPeriodo]
                 );
             }
 
-            $promediosPeriodos[$numeroPeriodo] = $formatearPromedio($promedioPeriodo);
-
-            if ($promedioPeriodo !== null) {
-                $sumaPromediosPeriodos += $promedioPeriodo;
-                $periodosCapturados++;
-            }
+            $promediosPeriodosPrecisos[$numeroPeriodo] = $promedioPeriodoPreciso;
+            $promediosPeriodos[$numeroPeriodo] = $formatearPromedio($promedioPeriodoPreciso);
         }
 
         $promedio = '—';
-        $promedioNumero = null;
+        $promedioNumero = PromedioExcel::calcular($promediosPeriodosPrecisos);
         $porcentajePromedio = 0;
         $estadoPromedio = 'Sin datos';
 
-        if ($periodosCapturados > 0) {
-            /*
-             * En básica el promedio final se divide siempre entre los 3 periodos.
-             * Si falta un periodo, no se cambia el divisor porque así se conserva la lógica de Promedios Generales.
-             * En bachillerato se divide entre los parciales numéricos encontrados.
-             */
-            $divisorPromedioFinal = $esBachillerato ? $periodosCapturados : count($numerosPeriodos);
+        if ($promedioNumero !== null) {
+            // El truncamiento se aplica únicamente al mostrar el promedio final.
+            $promedio = PromedioExcel::formatear($promedioNumero);
+            $porcentajePromedio = min(100, $promedioNumero * 10);
 
-            $promedioTruncado = $truncarPromedio($sumaPromediosPeriodos / max(1, $divisorPromedioFinal));
-
-            $promedioNumero = $promedioTruncado;
-            $promedio = number_format($promedioTruncado, 1, '.', '');
-            $porcentajePromedio = min(100, $promedioTruncado * 10);
-
-            if ($promedioTruncado < 6) {
+            if ($promedioNumero < 6) {
                 $estadoPromedio = 'Reprobado';
-            } elseif ($promedioTruncado < 8) {
+            } elseif ($promedioNumero < 8) {
                 $estadoPromedio = 'Regular';
             } else {
                 $estadoPromedio = 'Aprobado';
@@ -657,70 +644,42 @@ class PDFController extends Controller
                 });
         }
 
-        $calcularPromedioFinalAlumno = function (int $inscripcionAlumnoId) use ($calificacionesGrupoPorAlumno, $materias, $periodos, $numerosPeriodos, $esBachillerato, $truncarPromedio): ?float {
+        $calcularPromedioFinalAlumno = function (int $inscripcionAlumnoId) use ($calificacionesGrupoPorAlumno, $materias, $periodos, $numerosPeriodos): ?float {
             $mapaAlumno = $calificacionesGrupoPorAlumno->get($inscripcionAlumnoId, collect());
-
-            $sumasPeriodoAlumno = [];
-            $capturadasPeriodoAlumno = [];
+            $promediosPeriodoAlumno = [];
 
             foreach ($numerosPeriodos as $numeroPeriodo) {
-                $sumasPeriodoAlumno[$numeroPeriodo] = 0;
-                $capturadasPeriodoAlumno[$numeroPeriodo] = 0;
-            }
+                $periodo = $periodos->get($numeroPeriodo);
 
-            foreach ($materias as $materia) {
-                if ((int) ($materia->extra ?? 0) === 1 || (int) ($materia->receso ?? 0) === 1) {
+                if (! $periodo) {
                     continue;
                 }
 
-                foreach ($numerosPeriodos as $numeroPeriodo) {
-                    $periodo = $periodos->get($numeroPeriodo);
+                $valoresPeriodo = [];
 
-                    if (!$periodo) {
+                foreach ($materias as $materia) {
+                    if ((int) ($materia->extra ?? 0) === 1 || (int) ($materia->receso ?? 0) === 1) {
                         continue;
                     }
 
                     $registro = $mapaAlumno->get($materia->id)?->get($periodo->id);
-                    $valor = $registro ? trim((string) $registro->calificacion) : '';
+                    $valor = $registro ? trim((string) $registro->calificacion) : null;
+                    $numero = PromedioExcel::valoresNumericos([$valor])->first();
 
-                    if (!is_numeric($valor)) {
-                        continue;
+                    if ($numero !== null) {
+                        $valoresPeriodo[] = $numero;
                     }
+                }
 
-                    $numero = (float) $valor;
+                $promedioPeriodo = PromedioExcel::calcular($valoresPeriodo);
 
-                    if ($numero < 0 || $numero > 10) {
-                        continue;
-                    }
-
-                    $sumasPeriodoAlumno[$numeroPeriodo] += $numero;
-                    $capturadasPeriodoAlumno[$numeroPeriodo]++;
+                if ($promedioPeriodo !== null) {
+                    $promediosPeriodoAlumno[] = $promedioPeriodo;
                 }
             }
 
-            $sumaPromediosAlumno = 0;
-            $periodosCapturadosAlumno = 0;
-
-            foreach ($numerosPeriodos as $numeroPeriodo) {
-                if ($capturadasPeriodoAlumno[$numeroPeriodo] <= 0) {
-                    continue;
-                }
-
-                $promedioPeriodoAlumno = $truncarPromedio(
-                    $sumasPeriodoAlumno[$numeroPeriodo] / $capturadasPeriodoAlumno[$numeroPeriodo]
-                );
-
-                $sumaPromediosAlumno += $promedioPeriodoAlumno;
-                $periodosCapturadosAlumno++;
-            }
-
-            if ($periodosCapturadosAlumno <= 0) {
-                return null;
-            }
-
-            $divisorAlumno = $esBachillerato ? $periodosCapturadosAlumno : count($numerosPeriodos);
-
-            return $truncarPromedio($sumaPromediosAlumno / max(1, $divisorAlumno));
+            // Precisión completa para orden, lugares y estadísticas.
+            return PromedioExcel::calcular($promediosPeriodoAlumno);
         };
 
         $promediosAlumnosGrupo = $inscripcionesGrupo
@@ -732,16 +691,15 @@ class PDFController extends Controller
             });
 
         $promediosUnicosDesc = $promediosAlumnosGrupo
-            ->filter(fn(array $alumnoGrupo) => ($alumnoGrupo['promedio_final'] ?? null) !== null && (float) $alumnoGrupo['promedio_final'] > 0)
+            ->filter(fn(array $alumnoGrupo) => ($alumnoGrupo['promedio_final'] ?? null) !== null)
             ->pluck('promedio_final')
-            ->map(fn($valor) => number_format((float) $valor, 1, '.', ''))
+            ->sortDesc()
+            ->map(fn($valor) => PromedioExcel::claveComparacion($valor))
+            ->filter()
             ->unique()
-            ->sortByDesc(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioClaveAlumno = $promedioNumero !== null
-            ? number_format((float) $promedioNumero, 1, '.', '')
-            : null;
+        $promedioClaveAlumno = PromedioExcel::claveComparacion($promedioNumero);
 
         $indiceLugarAlumno = $promedioClaveAlumno !== null
             ? $promediosUnicosDesc->search($promedioClaveAlumno)
@@ -808,16 +766,15 @@ class PDFController extends Controller
             'grupo' => $this->nombreGrupo($grupo),
             'semestre' => $semestre?->numero,
             'periodos' => $promediosPeriodos,
-            'suma_periodos' => collect($promediosPeriodos)
-                ->filter(fn($valor) => is_numeric($valor))
-                ->map(fn($valor) => (float) $valor)
+            'suma_periodos' => collect($promediosPeriodosPrecisos)
+                ->filter(fn($valor) => $valor !== null)
                 ->sum(),
             'promedio_final' => $promedioNumero,
-            'periodos_capturados' => collect($promediosPeriodos)
-                ->filter(fn($valor) => is_numeric($valor))
+            'periodos_capturados' => collect($promediosPeriodosPrecisos)
+                ->filter(fn($valor) => $valor !== null)
                 ->count(),
-            'periodos_faltantes' => count($numerosPeriodos) - collect($promediosPeriodos)
-                ->filter(fn($valor) => is_numeric($valor))
+            'periodos_faltantes' => count($numerosPeriodos) - collect($promediosPeriodosPrecisos)
+                ->filter(fn($valor) => $valor !== null)
                 ->count(),
             'materias_capturadas' => $totalMaterias - $pendientes,
             'lugar' => $lugarAlumno,
@@ -2175,7 +2132,7 @@ class PDFController extends Controller
              * Se toma solo el primer decimal sin redondear.
              * Ejemplo: 8.777777777777778 se muestra como 8.7.
              */
-            return floor(($valor + 0.000000001) * 10) / 10;
+            return PromedioExcel::truncar($valor) ?? 0.0;
         };
 
         /*
@@ -2245,24 +2202,23 @@ class PDFController extends Controller
 
         $promedio = '0.0';
         $promedioNumero = 0.0;
+        $promedioPreciso = null;
         $porcentajePromedio = 0;
         $estadoPromedio = 'Pendiente';
 
         if ($hayMateriasPromediables && $capturadasNumericasPromedio > 0) {
             /*
-             * promedio-numerico-pro:
-             * Se divide únicamente entre calificaciones numéricas encontradas.
+             * Se conserva el promedio con precisión completa. El truncamiento
+             * se utiliza únicamente para presentar el valor final.
              */
-            $promedioCalculado = $suma / $capturadasNumericasPromedio;
-            $promedioTruncado = $truncarPromedio($promedioCalculado);
+            $promedioPreciso = (float) ($suma / $capturadasNumericasPromedio);
+            $promedioNumero = PromedioExcel::truncar($promedioPreciso) ?? 0.0;
+            $promedio = PromedioExcel::formatear($promedioPreciso, 1, '0.0');
+            $porcentajePromedio = min(100, $promedioPreciso * 10);
 
-            $promedioNumero = $promedioTruncado;
-            $promedio = number_format($promedioTruncado, 1, '.', '');
-            $porcentajePromedio = min(100, $promedioTruncado * 10);
-
-            if ($promedioTruncado < 6) {
+            if ($promedioPreciso < 6) {
                 $estadoPromedio = 'Reprobado';
-            } elseif ($promedioTruncado < 8) {
+            } elseif ($promedioPreciso < 8) {
                 $estadoPromedio = 'Regular';
             } else {
                 $estadoPromedio = 'Aprobado';
@@ -2383,12 +2339,14 @@ class PDFController extends Controller
         }
 
         $promediosLugar = [];
+        $promediosLugarPrecisos = [];
 
         foreach ($inscripcionesLugar as $filaLugar) {
             $inscripcionLugarId = (int) $filaLugar['inscripcion_id'];
 
             if (!$hayMateriasPromediables) {
                 $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                $promediosLugarPrecisos[$inscripcionLugarId] = null;
                 continue;
             }
 
@@ -2409,18 +2367,18 @@ class PDFController extends Controller
 
             if ($totalNumericasLugar === 0) {
                 $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                $promediosLugarPrecisos[$inscripcionLugarId] = null;
                 continue;
             }
 
-            $promedioLugarCalculado = $sumaLugar / $totalNumericasLugar;
-            $promedioLugarTruncado = $truncarPromedio($promedioLugarCalculado);
-
-            $promediosLugar[$inscripcionLugarId] = number_format($promedioLugarTruncado, 1, '.', '');
+            $promedioLugarPreciso = (float) ($sumaLugar / $totalNumericasLugar);
+            $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
+            $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso, 1, 'Pendiente');
         }
 
         $inscripcionesOrdenadasLugar = collect($inscripcionesLugar)
-            ->sortByDesc(function ($filaLugar) use ($promediosLugar) {
-                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+            ->sortByDesc(function ($filaLugar) use ($promediosLugarPrecisos) {
+                $promedioAlumnoLugar = $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? null;
 
                 return is_numeric($promedioAlumnoLugar) ? (float) $promedioAlumnoLugar : -1;
             })
@@ -2428,14 +2386,14 @@ class PDFController extends Controller
 
         $promediosUnicosLugar = $hayMateriasPromediables
             ? $inscripcionesOrdenadasLugar
-                ->map(function ($filaLugar) use ($promediosLugar, $truncarPromedio) {
-                    $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+                ->map(function ($filaLugar) use ($promediosLugarPrecisos) {
+                    $promedioAlumnoLugar = $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? null;
 
-                    if (!is_numeric($promedioAlumnoLugar) || (float) $promedioAlumnoLugar <= 0) {
+                    if (!is_numeric($promedioAlumnoLugar)) {
                         return null;
                     }
 
-                    return number_format($truncarPromedio((float) $promedioAlumnoLugar), 1, '.', '');
+                    return PromedioExcel::claveComparacion((float) $promedioAlumnoLugar);
                 })
                 ->filter()
                 ->unique()
@@ -2449,8 +2407,8 @@ class PDFController extends Controller
             $lugaresPorPromedio[$promedioUnicoLugar] = $index + 1;
         }
 
-        $promedioClaveAlumno = $hayMateriasPromediables && is_numeric($promedio) && (float) $promedio > 0
-            ? number_format($truncarPromedio((float) $promedio), 1, '.', '')
+        $promedioClaveAlumno = $hayMateriasPromediables && is_numeric($promedioPreciso)
+            ? PromedioExcel::claveComparacion($promedioPreciso)
             : null;
 
         $lugarAlumno = $promedioClaveAlumno && isset($lugaresPorPromedio[$promedioClaveAlumno])
@@ -3013,7 +2971,7 @@ class PDFController extends Controller
              * Se toma solo el primer decimal sin redondear.
              * Ejemplo: 8.777777777777778 se muestra como 8.7.
              */
-            return floor(($valor + 0.000000001) * 10) / 10;
+            return PromedioExcel::truncar($valor) ?? 0.0;
         };
 
         /*
@@ -3023,6 +2981,7 @@ class PDFController extends Controller
         */
 
         $promedios = [];
+        $promediosPrecisos = [];
         $totalNumericasPorAlumno = [];
 
         foreach ($inscripciones as $fila) {
@@ -3030,6 +2989,7 @@ class PDFController extends Controller
 
             if ($numeroMateriasPromediar <= 0 || empty($idsMateriasPromediables)) {
                 $promedios[$inscripcionId] = 'Pendiente';
+                $promediosPrecisos[$inscripcionId] = null;
                 $totalNumericasPorAlumno[$inscripcionId] = 0;
                 continue;
             }
@@ -3057,15 +3017,17 @@ class PDFController extends Controller
              */
             if ($totalNumericas === 0) {
                 $promedios[$inscripcionId] = 'Pendiente';
+                $promediosPrecisos[$inscripcionId] = null;
                 continue;
             }
 
             /*
-             * Se divide solo entre calificaciones numéricas capturadas.
+             * Se conserva la precisión completa para cálculos posteriores.
+             * Solo el valor mostrado se trunca a un decimal.
              */
-            $promedio = $truncarPromedio($suma / $totalNumericas);
-
-            $promedios[$inscripcionId] = number_format($promedio, 1, '.', '');
+            $promedioPreciso = (float) ($suma / $totalNumericas);
+            $promediosPrecisos[$inscripcionId] = $promedioPreciso;
+            $promedios[$inscripcionId] = PromedioExcel::formatear($promedioPreciso, 1, 'Pendiente');
         }
 
         /*
@@ -3123,9 +3085,9 @@ class PDFController extends Controller
             }
 
             if ($totalNumericasMateria > 0) {
-                $promedioMateria = $truncarPromedio($sumaMateria / $totalNumericasMateria);
+                $promedioMateria = (float) ($sumaMateria / $totalNumericasMateria);
 
-                $promedioTexto = number_format($promedioMateria, 1, '.', '');
+                $promedioTexto = PromedioExcel::formatear($promedioMateria);
                 $porcentaje = min(100, max(0, $promedioMateria * 10));
 
                 if ($promedioMateria < 6) {
@@ -3160,16 +3122,14 @@ class PDFController extends Controller
     |--------------------------------------------------------------------------
     */
 
-        $promediosNumericosGrupo = collect($promedios)
+        $promediosNumericosGrupo = collect($promediosPrecisos)
             ->filter(fn($valor) => is_numeric($valor))
             ->map(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioGeneralGrupo = $promediosNumericosGrupo->isNotEmpty()
-            ? $truncarPromedio($promediosNumericosGrupo->avg())
-            : 0;
+        $promedioGeneralGrupo = PromedioExcel::calcular($promediosNumericosGrupo) ?? 0.0;
 
-        $promedioGeneralGrupoTexto = number_format($promedioGeneralGrupo, 1, '.', '');
+        $promedioGeneralGrupoTexto = PromedioExcel::formatear($promedioGeneralGrupo, 1, '0.0');
 
         $porcentajePromedioGeneral = min(100, $promedioGeneralGrupo * 10);
 
@@ -3183,11 +3143,11 @@ class PDFController extends Controller
 
         $totalConPromedio = $promediosNumericosGrupo->count();
 
-        $totalAprobados = collect($promedios)
+        $totalAprobados = collect($promediosPrecisos)
             ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 6)
             ->count();
 
-        $totalReprobados = collect($promedios)
+        $totalReprobados = collect($promediosPrecisos)
             ->filter(fn($valor) => is_numeric($valor) && (float) $valor < 6)
             ->count();
 
@@ -3620,7 +3580,7 @@ class PDFController extends Controller
              * Se toma solo el primer decimal sin truncar.
              * Ejemplo: 8.777777777777778 se muestra como 8.7.
              */
-            return floor(($valor + 0.000000001) * 10) / 10;
+            return PromedioExcel::truncar($valor) ?? 0.0;
         };
 
         /*
@@ -3690,21 +3650,24 @@ class PDFController extends Controller
 
         $promedio = '0.0';
         $promedioNumero = 0.0;
+        $promedioPreciso = null;
         $porcentajePromedio = 0;
         $estadoPromedio = 'Pendiente';
 
         if ($hayMateriasPromediables && $capturadasNumericasPromedio > 0) {
             /*
              * Se divide únicamente entre las calificaciones numéricas encontradas.
-             * AC, NP, SD, ED, RA, textos y vacíos no suman ni dividen.
+             * El resultado preciso se conserva para comparaciones y lugares;
+             * solo la presentación se trunca a un decimal.
              */
-            $promedioNumero = $truncarPromedio($sumaPromedio / $capturadasNumericasPromedio);
-            $promedio = number_format($promedioNumero, 1, '.', '');
-            $porcentajePromedio = min(100, $promedioNumero * 10);
+            $promedioPreciso = (float) ($sumaPromedio / $capturadasNumericasPromedio);
+            $promedioNumero = PromedioExcel::truncar($promedioPreciso) ?? 0.0;
+            $promedio = PromedioExcel::formatear($promedioPreciso, 1, '0.0');
+            $porcentajePromedio = min(100, $promedioPreciso * 10);
 
-            if ($promedioNumero < 6) {
+            if ($promedioPreciso < 6) {
                 $estadoPromedio = 'Reprobado';
-            } elseif ($promedioNumero < 8) {
+            } elseif ($promedioPreciso < 8) {
                 $estadoPromedio = 'Regular';
             } else {
                 $estadoPromedio = 'Aprobado';
@@ -3839,12 +3802,14 @@ class PDFController extends Controller
         }
 
         $promediosLugar = [];
+        $promediosLugarPrecisos = [];
 
         foreach ($inscripcionesLugar as $filaLugar) {
             $inscripcionLugarId = (int) $filaLugar['inscripcion_id'];
 
             if (!$hayMateriasPromediables) {
                 $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                $promediosLugarPrecisos[$inscripcionLugarId] = null;
                 continue;
             }
 
@@ -3865,31 +3830,32 @@ class PDFController extends Controller
 
             if ($totalNumericasLugar === 0) {
                 $promediosLugar[$inscripcionLugarId] = 'Pendiente';
+                $promediosLugarPrecisos[$inscripcionLugarId] = null;
                 continue;
             }
 
-            $promedioLugar = $truncarPromedio($sumaLugar / $totalNumericasLugar);
-
-            $promediosLugar[$inscripcionLugarId] = number_format($promedioLugar, 1, '.', '');
+            $promedioLugarPreciso = (float) ($sumaLugar / $totalNumericasLugar);
+            $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
+            $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso, 1, 'Pendiente');
         }
 
         $inscripcionesOrdenadasLugar = collect($inscripcionesLugar)
-            ->sortByDesc(function ($filaLugar) use ($promediosLugar) {
-                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+            ->sortByDesc(function ($filaLugar) use ($promediosLugarPrecisos) {
+                $promedioAlumnoLugar = $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? null;
 
                 return is_numeric($promedioAlumnoLugar) ? (float) $promedioAlumnoLugar : -1;
             })
             ->values();
 
         $promediosUnicosLugar = $inscripcionesOrdenadasLugar
-            ->map(function ($filaLugar) use ($promediosLugar) {
-                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
+            ->map(function ($filaLugar) use ($promediosLugarPrecisos) {
+                $promedioAlumnoLugar = $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? null;
 
-                if (!is_numeric($promedioAlumnoLugar) || (float) $promedioAlumnoLugar <= 0) {
+                if (!is_numeric($promedioAlumnoLugar)) {
                     return null;
                 }
 
-                return number_format((float) $promedioAlumnoLugar, 1, '.', '');
+                return PromedioExcel::claveComparacion((float) $promedioAlumnoLugar);
             })
             ->filter()
             ->unique()
@@ -3902,8 +3868,8 @@ class PDFController extends Controller
             $lugaresPorPromedio[$promedioUnicoLugar] = $index + 1;
         }
 
-        $promedioClaveAlumno = is_numeric($promedio)
-            ? number_format((float) $promedio, 1, '.', '')
+        $promedioClaveAlumno = is_numeric($promedioPreciso)
+            ? PromedioExcel::claveComparacion($promedioPreciso)
             : null;
 
         $lugarAlumno = $promedioClaveAlumno && isset($lugaresPorPromedio[$promedioClaveAlumno])
@@ -4321,7 +4287,7 @@ class PDFController extends Controller
 
         $filasMaterias = [];
 
-        $suma = 0;
+        $valoresPromediables = [];
         $capturadasNumericas = 0;
         $especiales = 0;
         $reprobadas = 0;
@@ -4338,28 +4304,26 @@ class PDFController extends Controller
 
             $estado = 'Sin captura';
             $porcentaje = 0;
+            $numero = PromedioExcel::valoresNumericos([$valor])->first();
 
-            if (is_numeric($valor)) {
-                $numero = (float) $valor;
+            if ($numero !== null) {
+                $porcentaje = min(100, $numero * 10);
+                $capturadasNumericas++;
 
-                if ($numero >= 0 && $numero <= 10) {
-                    $porcentaje = min(100, $numero * 10);
-                    $capturadasNumericas++;
+                if ((int) ($materia->extra ?? 0) === 0) {
+                    // Igual que PROMEDIO de Excel: solo cuentan celdas numéricas.
+                    $valoresPromediables[] = $numero;
+                }
 
-                    if ((int) ($materia->extra ?? 0) === 0) {
-                        $suma += $numero;
-                    }
-
-                    if ($numero < 6) {
-                        $estado = 'En riesgo';
-                        $reprobadas++;
-                    } elseif ($numero < 8) {
-                        $estado = 'Regular';
-                        $aprobadas++;
-                    } else {
-                        $estado = 'Aprobado';
-                        $aprobadas++;
-                    }
+                if ($numero < 6) {
+                    $estado = 'En riesgo';
+                    $reprobadas++;
+                } elseif ($numero < 8) {
+                    $estado = 'Regular';
+                    $aprobadas++;
+                } else {
+                    $estado = 'Aprobado';
+                    $aprobadas++;
                 }
             } elseif ($valor !== '') {
                 $estado = 'Especial';
@@ -4379,20 +4343,19 @@ class PDFController extends Controller
 
         $promedio = '—';
         $promedioNumero = null;
+        $promedioPreciso = PromedioExcel::calcular($valoresPromediables);
         $porcentajePromedio = 0;
         $estadoPromedio = 'Sin datos';
 
-        if ($numeroMateriasPromediar > 0) {
-            $promedioCalculado = $suma / $numeroMateriasPromediar;
-            $promedioTruncado = floor($promedioCalculado * 10) / 10;
+        if ($promedioPreciso !== null) {
+            // No se truncan parciales ni materias intermedias. Solo la salida final.
+            $promedioNumero = PromedioExcel::truncar($promedioPreciso);
+            $promedio = PromedioExcel::formatear($promedioPreciso);
+            $porcentajePromedio = min(100, $promedioPreciso * 10);
 
-            $promedioNumero = $promedioTruncado;
-            $promedio = number_format($promedioTruncado, 1);
-            $porcentajePromedio = min(100, $promedioTruncado * 10);
-
-            if ($promedioTruncado < 6) {
+            if ($promedioPreciso < 6) {
                 $estadoPromedio = 'Reprobado';
-            } elseif ($promedioTruncado < 8) {
+            } elseif ($promedioPreciso < 8) {
                 $estadoPromedio = 'Regular';
             } else {
                 $estadoPromedio = 'Aprobado';
@@ -4513,16 +4476,11 @@ class PDFController extends Controller
         }
 
         $promediosLugar = [];
+        $promediosLugarPrecisos = [];
 
         foreach ($inscripcionesLugar as $filaLugar) {
             $inscripcionLugarId = (int) $filaLugar['inscripcion_id'];
-
-            if ($numeroMateriasPromediar <= 0) {
-                $promediosLugar[$inscripcionLugarId] = '—';
-                continue;
-            }
-
-            $sumaLugar = 0;
+            $valoresLugar = [];
 
             foreach ($materias as $materia) {
                 if ((int) ($materia->extra ?? 0) !== 0) {
@@ -4531,45 +4489,29 @@ class PDFController extends Controller
 
                 $claveLugar = $inscripcionLugarId . '-' . $materia->id;
                 $valorLugar = $calificacionesLugar[$claveLugar] ?? null;
+                $numeroLugar = PromedioExcel::valoresNumericos([$valorLugar])->first();
 
-                if ($valorLugar === null || $valorLugar === '') {
-                    continue;
-                }
-
-                $valorLugar = strtoupper(trim((string) $valorLugar));
-
-                if (!is_numeric($valorLugar)) {
-                    continue;
-                }
-
-                $numeroLugar = (float) $valorLugar;
-
-                if ($numeroLugar >= 0 && $numeroLugar <= 10) {
-                    $sumaLugar += $numeroLugar;
+                if ($numeroLugar !== null) {
+                    $valoresLugar[] = $numeroLugar;
                 }
             }
 
-            $promedioLugarCalculado = $sumaLugar / $numeroMateriasPromediar;
-            $promedioLugarTruncado = floor($promedioLugarCalculado * 10) / 10;
-
-            $promediosLugar[$inscripcionLugarId] = number_format($promedioLugarTruncado, 1);
+            $promedioLugarPreciso = PromedioExcel::calcular($valoresLugar);
+            $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
+            $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso);
         }
 
         $inscripcionesOrdenadasLugar = collect($inscripcionesLugar)
-            ->sortByDesc(function ($filaLugar) use ($promediosLugar) {
-                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
-
-                return is_numeric($promedioAlumnoLugar) ? (float) $promedioAlumnoLugar : -1;
+            ->sortByDesc(function ($filaLugar) use ($promediosLugarPrecisos) {
+                return $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? -1;
             })
             ->values();
 
         $promediosUnicosLugar = $inscripcionesOrdenadasLugar
-            ->map(function ($filaLugar) use ($promediosLugar) {
-                $promedioAlumnoLugar = $promediosLugar[$filaLugar['inscripcion_id']] ?? null;
-
-                return is_numeric($promedioAlumnoLugar)
-                    ? number_format((float) $promedioAlumnoLugar, 1, '.', '')
-                    : null;
+            ->map(function ($filaLugar) use ($promediosLugarPrecisos) {
+                return PromedioExcel::claveComparacion(
+                    $promediosLugarPrecisos[$filaLugar['inscripcion_id']] ?? null
+                );
             })
             ->filter()
             ->unique()
@@ -4582,9 +4524,7 @@ class PDFController extends Controller
             $lugaresPorPromedio[$promedioUnicoLugar] = $index + 1;
         }
 
-        $promedioClaveAlumno = is_numeric($promedio)
-            ? number_format((float) $promedio, 1, '.', '')
-            : null;
+        $promedioClaveAlumno = PromedioExcel::claveComparacion($promedioPreciso);
 
         $lugarAlumno = $promedioClaveAlumno && isset($lugaresPorPromedio[$promedioClaveAlumno])
             ? $lugaresPorPromedio[$promedioClaveAlumno]

@@ -99,13 +99,17 @@ class CrearCicloEscolar extends Component
                 ->ejecutar($anterior, $nuevo, auth()->id());
 
             $texto = sprintf(
-                'Trayectorias preparadas: %d promovidos, %d no promovidos, %d egresados, %d existentes y %d omitidos.',
+                'Trayectorias preparadas: %d promovidos, %d no promovidos, %d pendientes de cierre de nivel, %d existentes y %d omitidos.',
                 $resumen['promovidos'],
                 $resumen['no_promovidos'],
-                $resumen['egresados'],
+                $resumen['pendientes_cierre'],
                 $resumen['existentes'],
                 $resumen['omitidos'],
             );
+
+            if (($resumen['pendientes_cierre'] ?? 0) > 0) {
+                $texto .= ' Resuelve esos alumnos desde Generales > Cierre de nivel y continuidad; no fueron egresados automáticamente.';
+            }
 
             if ($resumen['errores'] !== []) {
                 $texto .= ' Revisa Promoción masiva: ' . implode(' ', array_slice($resumen['errores'], 0, 2));

@@ -308,7 +308,7 @@
             $certificados = $documentosActuales->filter(
                 fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsCertificados, true),
             );
-            $slugsAcademicos = ['boleta-final-grado', 'constancia-estudios', 'constancia-baja-traslado'];
+            $slugsAcademicos = ['boleta-final-grado', 'constancia-estudios', 'constancia-baja-traslado', 'constancia-traslado-calificaciones'];
             $academicos = $documentosActuales->filter(
                 fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsAcademicos, true),
             );
@@ -324,6 +324,10 @@
             $nivelContextoId = $trayectoriaContexto?->nivel_id ?? $alumnoSeleccionado->nivel_id;
             $gradoContextoId = $trayectoriaContexto?->grado_id ?? $alumnoSeleccionado->grado_id;
             $cicloContextoId = $trayectoriaContexto?->ciclo_escolar_id ?? data_get($ciclosEscolares, '0.id');
+            $slugReingreso = $trayectoriaContexto?->nivel?->slug ?? $alumnoSeleccionado->nivel?->slug;
+            $estatusRetornable = in_array($trayectoriaContexto?->estatus, [
+                'egresado', 'traslado', 'baja_temporal', 'baja_definitiva', 'inactivo', 'suspendido',
+            ], true);
         @endphp
 
         <section id="expediente-seleccionado"
@@ -354,6 +358,14 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
+                        @if ($soloHistorico && $estatusRetornable && $slugReingreso)
+                            <a href="{{ route('submodulos.accion', ['slug_nivel' => $slugReingreso, 'accion' => 'matricula', 'reingreso' => $alumnoSeleccionado->id]) }}#reingreso-alumno"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-400 hover:shadow-lg">
+                                <flux:icon name="arrow-path" class="size-4" />
+                                Reingresar o reincorporar
+                            </a>
+                        @endif
+
                         @if ($documentosSeleccionados->isNotEmpty() || $alumnoSeleccionado->trayectoriasAcademicas->isNotEmpty() || $alumnoSeleccionado->movimientos->isNotEmpty())
                             <a href="{{ route('misrutas.expedientes.zip', $alumnoSeleccionado) }}"
                                 class="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">

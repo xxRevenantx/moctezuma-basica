@@ -13,6 +13,7 @@ use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Support\PromedioExcel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -57,6 +58,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected array $inscripciones = [];
     protected array $calificaciones = [];
     protected array $promedios = [];
+    protected array $promediosPrecisos = [];
     protected array $promediosPorMateria = [];
     protected array $periodosPorMateria = [];
     protected array $filas = [];
@@ -142,7 +144,10 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->materias = $this->obtenerMaterias();
         $this->inscripciones = $this->obtenerInscripciones();
         $this->calificaciones = $this->obtenerCalificaciones($this->inscripciones, $this->materias);
-        $this->promedios = $this->calcularPromediosAlumnos($this->inscripciones, $this->materias, $this->calificaciones);
+        $this->promediosPrecisos = $this->calcularPromediosAlumnosPrecisos($this->inscripciones, $this->materias, $this->calificaciones);
+        $this->promedios = collect($this->promediosPrecisos)
+            ->map(fn ($valor) => is_numeric($valor) ? PromedioExcel::formatear($valor, 1, 'Pendiente') : $valor)
+            ->all();
         $this->promediosPorMateria = $this->calcularPromediosPorMateria($this->inscripciones, $this->materias, $this->calificaciones);
         $this->periodosPorMateria = $this->obtenerPeriodosPorMateria($this->materias);
         $this->filas = $this->construirFilas();
@@ -153,14 +158,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     {
         $filas = [];
 
-        $promediosNumericos = collect($this->promedios)
+        $promediosNumericos = collect($this->promediosPrecisos)
             ->filter(fn($valor) => is_numeric($valor))
             ->map(fn($valor) => (float) $valor)
             ->values();
 
-        $promedioGlobal = $promediosNumericos->isNotEmpty()
-            ? $this->truncarPromedio((float) $promediosNumericos->avg())
-            : 0;
+        $promedioGlobal = PromedioExcel::calcular($promediosNumericos) ?? 0.0;
 
         $totalAlumnos = count($this->inscripciones);
 
@@ -200,7 +203,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         ];
 
         $filas[] = [
-            number_format($promedioGlobal, 1, '.', ''),
+            PromedioExcel::formatear($promedioGlobal, 1, '0.0'),
             $porcentajeAprobacion . '%',
             $totalAlumnos,
             $totalAprobados,
@@ -228,13 +231,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
          * Se valida si existen promedios reales mayores a 0.
          * Si no existen, la columna LUGAR mostrará Pendiente.
          */
-        $hayPromediosParaLugar = collect($this->promedios)
-            ->filter(fn($valor) => is_numeric($valor) && (float) $valor > 0)
+        $hayPromediosParaLugar = collect($this->promediosPrecisos)
+            ->filter(fn($valor) => is_numeric($valor))
             ->isNotEmpty();
 
         $inscripcionesOrdenadas = collect($this->inscripciones)
             ->sortByDesc(function ($inscripcion) {
-                $promedio = $this->promedios[$inscripcion['inscripcion_id']] ?? null;
+                $promedio = $this->promediosPrecisos[$inscripcion['inscripcion_id']] ?? null;
 
                 return is_numeric($promedio) ? (float) $promedio : -1;
             })
@@ -243,13 +246,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $promediosUnicos = $hayPromediosParaLugar
             ? $inscripcionesOrdenadas
                 ->map(function ($inscripcion) {
-                    $promedio = $this->promedios[$inscripcion['inscripcion_id']] ?? null;
+                    $promedio = $this->promediosPrecisos[$inscripcion['inscripcion_id']] ?? null;
 
-                    if (!is_numeric($promedio) || (float) $promedio <= 0) {
+                    if (!is_numeric($promedio)) {
                         return null;
                     }
 
-                    return number_format($this->truncarPromedio((float) $promedio), 1, '.', '');
+                    return PromedioExcel::claveComparacion((float) $promedio);
                 })
                 ->filter()
                 ->unique()
@@ -291,11 +294,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         foreach ($inscripcionesOrdenadas as $inscripcion) {
             $inscripcionId = (int) $inscripcion['inscripcion_id'];
             $promedio = $this->promedios[$inscripcionId] ?? 'Pendiente';
+            $promedioPreciso = $this->promediosPrecisos[$inscripcionId] ?? null;
 
             $promedioClave = null;
 
-            if ($hayPromediosParaLugar && is_numeric($promedio) && (float) $promedio > 0) {
-                $promedioClave = number_format($this->truncarPromedio((float) $promedio), 1, '.', '');
+            if ($hayPromediosParaLugar && is_numeric($promedioPreciso)) {
+                $promedioClave = PromedioExcel::claveComparacion((float) $promedioPreciso);
             }
 
             $lugar = $promedioClave && isset($lugaresPorPromedio[$promedioClave])
@@ -1213,7 +1217,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->toArray();
     }
 
-    protected function calcularPromediosAlumnos(array $inscripciones, array $materias, array $calificaciones): array
+    protected function calcularPromediosAlumnosPrecisos(array $inscripciones, array $materias, array $calificaciones): array
     {
         $numeroMaterias = $this->obtenerNumeroMateriasAPromediar($materias);
 
@@ -1255,9 +1259,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 continue;
             }
 
-            $promedio = $this->truncarPromedio($suma / $totalNumericas);
-
-            $promedios[$inscripcionId] = number_format($promedio, 1, '.', '');
+            $promedios[$inscripcionId] = (float) ($suma / $totalNumericas);
         }
 
         return $promedios;
@@ -1285,16 +1287,16 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 $total++;
             }
 
-            $promedio = $total > 0
-                ? $this->truncarPromedio($suma / $total)
-                : 0;
+            $promedioCalculo = $total > 0 ? (float) ($suma / $total) : null;
+            $promedio = PromedioExcel::truncar($promedioCalculo) ?? 0.0;
 
             $promedios[] = [
                 'materia' => $materia['materia'],
-                'promedio' => number_format($promedio, 1, '.', ''),
-                'promedio_numero' => (float) number_format($promedio, 1, '.', ''),
+                'promedio_calculo' => $promedioCalculo,
+                'promedio' => PromedioExcel::formatear($promedioCalculo, 1, '0.0'),
+                'promedio_numero' => $promedio,
                 'total_capturadas' => $total,
-                'estado' => $this->estadoPromedio($promedio),
+                'estado' => $this->estadoPromedio($promedioCalculo),
             ];
         }
 
@@ -1406,18 +1408,6 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $numero = (float) $valor;
 
         return $numero >= 0 && $numero <= 10;
-    }
-
-    protected function truncarPromedio(float $valor, int $decimales = 1): float
-    {
-        /*
-         * promedio-numerico-pro:
-         * Se toma solo el primer decimal sin redondear.
-         * Ejemplo: 8.777777777777778 se muestra como 8.7.
-         */
-        $factor = pow(10, $decimales);
-
-        return floor(($valor + 0.000000001) * $factor) / $factor;
     }
 
     protected function estadoPromedio($promedio): string

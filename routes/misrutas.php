@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CicloEscolarController;
+use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\DistribucionEscolarController;
 use App\Http\Controllers\DocumentosController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
+use App\Http\Controllers\PromediosMateriasPdfController;
 use App\Http\Controllers\RespaldoAcademicoController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
@@ -180,6 +182,11 @@ Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrut
 Route::get('/generales/horarios/pdf', HorariosGeneralesPdfController::class)
     ->name('generales.horarios.pdf');
 
+
+Route::get('/generales/{slug_nivel}/promedios-materias/pdf', PromediosMateriasPdfController::class)
+    ->middleware('admin')
+    ->name('generales.promedios-materias.pdf');
+
 Route::middleware('admin')->prefix('generales/{slug_nivel}/distribucion')->group(function () {
     Route::get('/pdf', [DistribucionEscolarController::class, 'pdf'])
         ->name('generales.distribucion.pdf');
@@ -241,6 +248,10 @@ Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'c
 Route::get('/constancias/descargar/zip', [DocumentosPDFController::class, 'constanciasZip'])
     ->middleware('admin')
     ->name('misrutas.constancias.zip');
+
+Route::get('/constancias-traslado/{constancia}/pdf', [ConstanciaTrasladoController::class, 'show'])
+    ->middleware('admin')
+    ->name('misrutas.constancias-traslado.pdf');
 
 Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'constanciaPdf'])
     ->middleware('admin')

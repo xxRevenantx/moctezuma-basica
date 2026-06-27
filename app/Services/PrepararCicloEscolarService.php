@@ -109,13 +109,11 @@ class PrepararCicloEscolarService
                 $destino = $this->resolverDestino($origen, $resultado);
 
                 if ($destino['egresado']) {
-                    $this->trayectorias->egresar(
-                        $origen,
-                        now(),
-                        'Egreso automático al marcar el nuevo ciclo escolar como actual.',
-                        $usuarioId
-                    );
-                    $resumen['egresados']++;
+                    // El último grado o semestre requiere una decisión administrativa:
+                    // continuidad interna, egreso a otra escuela, traslado, baja o repetición.
+                    // No se modifica la trayectoria hasta que el administrador la confirme
+                    // desde Generales > Cierre de nivel y continuidad.
+                    $resumen['pendientes_cierre']++;
                     continue;
                 }
 
@@ -165,8 +163,7 @@ class PrepararCicloEscolarService
         }
 
         $resumen['procesados'] = $resumen['promovidos']
-            + $resumen['no_promovidos']
-            + $resumen['egresados'];
+            + $resumen['no_promovidos'];
         $resumen['errores'] = collect($resumen['errores'])
             ->filter()
             ->unique()
@@ -284,6 +281,7 @@ class PrepararCicloEscolarService
             'promovidos' => 0,
             'no_promovidos' => 0,
             'egresados' => 0,
+            'pendientes_cierre' => 0,
             'existentes' => 0,
             'omitidos' => 0,
             'errores' => [],

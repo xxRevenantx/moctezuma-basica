@@ -689,6 +689,7 @@ class Ficha extends Component
     {
         return Generacion::query()
             ->where('nivel_id', $this->nivel_id)
+            ->where('status', true)
             ->orderByDesc('anio_ingreso')
             ->orderByDesc('anio_egreso')
             ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);

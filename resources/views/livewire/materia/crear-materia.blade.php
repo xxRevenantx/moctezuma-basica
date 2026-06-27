@@ -220,7 +220,7 @@
                     </div>
 
                     <div
-                        class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachilleratoFormulario ? 'xl:grid-cols-4' : 'xl:grid-cols-3' }}">
+                        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
                         <flux:field class="{{ $this->esBachilleratoFormulario ? 'xl:col-span-2' : 'xl:col-span-2' }}">
                             <flux:label badge="Requerido">Materia</flux:label>
                             <flux:input wire:model.live.debounce.400ms="materia" placeholder="Nombre de la materia" />
@@ -242,6 +242,13 @@
                                 placeholder="slug-de-la-materia" />
                             <flux:error name="slug" />
                         </flux:field>
+
+                        <flux:select wire:model.live="campo_formativo_id" label="Campo formativo">
+                            <option value="">Sin clasificar</option>
+                            @foreach ($camposFormativos as $campo)
+                                <option value="{{ $campo->id }}">{{ $campo->nombre }}</option>
+                            @endforeach
+                        </flux:select>
                     </div>
 
                     <div

@@ -1,23 +1,22 @@
 <div x-data="{
     openRow: null,
-    eliminar(id, nombre) {
+    cerrar(id, nombre) {
         Swal.fire({
-            title: '¿Estás seguro?',
-            text: `La generación ${nombre} se eliminará de forma permanente`,
-            icon: 'warning',
+            title: '¿Cerrar generación?',
+            text: `La generación ${nombre} dejará de aparecer en módulos operativos. Su historial no se elimina.`,
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#2563EB',
-            cancelButtonColor: '#EF4444',
+            confirmButtonColor: '#006492',
             cancelButtonText: 'Cancelar',
-            confirmButtonText: 'Sí, eliminar'
-        }).then((r) => r.isConfirmed && @this.call('eliminar', id))
+            confirmButtonText: 'Sí, cerrar'
+        }).then((r) => r.isConfirmed && @this.call('cerrar', id))
     }
 }" class="space-y-5">
     <!-- Encabezado -->
     <div class="flex flex-col gap-1">
         <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Generaciones</h1>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Busca, edita o elimina generaciones.
+            Busca, edita, cierra o reactiva generaciones.
         </p>
     </div>
 
@@ -57,7 +56,7 @@
             <div class="relative">
 
                 <!-- Loader -->
-                <div wire:loading.delay wire:target="search, eliminar"
+                <div wire:loading.delay wire:target="search,cerrar,reactivar"
                     class="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 dark:bg-neutral-900/70 backdrop-blur"
                     aria-live="polite" aria-busy="true">
                     <div
@@ -75,7 +74,7 @@
 
 
                 <!-- Contenido -->
-                <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,eliminar">
+                <div class="transition filter duration-200" wire:loading.class="blur-sm" wire:target="search,cerrar,reactivar">
 
                     @if ($groupedByNivel->isEmpty())
                         <!-- Estado vacío -->
@@ -175,9 +174,8 @@
                                                                 {{ $generacion->anio_ingreso }} -
                                                                 {{ $generacion->anio_egreso }}
                                                             </span>
-                                                            <span
-                                                                class="text-[11px] text-slate-500 dark:text-slate-400">
-                                                                Generación académica
+                                                            <span class="text-[11px] text-slate-500 dark:text-slate-400">
+                                                                {{ $generacion->alumnos_activos_count }} alumno(s) activo(s)
                                                             </span>
                                                         </div>
                                                     </td>
@@ -213,11 +211,18 @@
 
 
 
-                                                            <flux:button variant="danger"
-                                                                class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white p-1"
-                                                                @click="eliminar({{ $generacion->id }}, '{{ addslashes($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso) }}')">
-                                                                <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                                            </flux:button>
+                                                            @if ((int) $generacion->status === 1)
+                                                                <flux:button variant="danger"
+                                                                    class="cursor-pointer bg-violet-600 hover:bg-violet-700 text-white !px-3 !py-1.5 text-xs"
+                                                                    @click="cerrar({{ $generacion->id }}, '{{ addslashes($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso) }}')">
+                                                                    <flux:icon.archive-box class="w-3.5 h-3.5 mr-1" /> Cerrar
+                                                                </flux:button>
+                                                            @else
+                                                                <flux:button variant="primary" wire:click="reactivar({{ $generacion->id }})"
+                                                                    class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white !px-3 !py-1.5 text-xs">
+                                                                    <flux:icon.arrow-path class="w-3.5 h-3.5 mr-1" /> Reactivar
+                                                                </flux:button>
+                                                            @endif
 
                                                             <flux:button variant="primary"
                                                                 class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white !px-3 !py-1.5 text-xs"

@@ -170,12 +170,12 @@ class PromocionAlumnos extends Component
 
     public function getGeneracionesOrigenProperty(): Collection
     {
-        return $this->consultarGeneraciones($this->nivel_origen_id);
+        return $this->consultarGeneraciones($this->nivel_origen_id, true);
     }
 
     public function getGeneracionesDestinoProperty(): Collection
     {
-        return $this->consultarGeneraciones($this->nivel_destino_id);
+        return $this->consultarGeneraciones($this->nivel_destino_id, false);
     }
 
     public function getSemestresOrigenProperty(): Collection
@@ -402,10 +402,14 @@ class PromocionAlumnos extends Component
             : collect();
     }
 
-    private function consultarGeneraciones(?int $nivelId): Collection
+    private function consultarGeneraciones(?int $nivelId, bool $incluirCerradas = false): Collection
     {
         return $nivelId
-            ? Generacion::query()->where('nivel_id', $nivelId)->orderByDesc('anio_ingreso')->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso'])
+            ? Generacion::query()
+                ->where('nivel_id', $nivelId)
+                ->when(!$incluirCerradas, fn ($query) => $query->where('status', true))
+                ->orderByDesc('anio_ingreso')
+                ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'status'])
             : collect();
     }
 

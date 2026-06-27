@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use ZipArchive;
 use App\Models\Oficio;
 use App\Services\ExpedienteArchivoService;
+use App\Support\PromedioExcel;
 
 
 class DocumentosPDFController extends Controller
@@ -467,14 +468,13 @@ class DocumentosPDFController extends Controller
                 }
             }
 
-            $promedio = count($numericas) > 0
-                ? floor((array_sum($numericas) / count($numericas)) * 10) / 10
-                : 0;
+            $promedio = PromedioExcel::calcular($numericas);
 
             $filas[] = [
                 'periodo' => $nombrePeriodo,
                 'valores' => $valores,
-                'promedio' => number_format($promedio, 1, '.', ''),
+                'promedio' => PromedioExcel::formatear($promedio, 1, '0.0'),
+                'promedio_calculo' => $promedio,
             ];
         }
 
@@ -662,14 +662,13 @@ class DocumentosPDFController extends Controller
                 }
             }
 
-            $promedio = count($numericas) > 0
-                ? floor((array_sum($numericas) / count($numericas)) * 10) / 10
-                : 0;
+            $promedio = PromedioExcel::calcular($numericas);
 
             $filas[] = [
                 'periodo' => $nombrePeriodo,
                 'valores' => $valores,
-                'promedio' => number_format($promedio, 1, '.', ''),
+                'promedio' => PromedioExcel::formatear($promedio, 1, '0.0'),
+                'promedio_calculo' => $promedio,
             ];
         }
 
