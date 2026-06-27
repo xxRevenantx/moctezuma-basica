@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\PromedioExcel;
+use App\Services\CalificacionOficialPrimariaService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -219,6 +220,10 @@ class PromediosGenerales extends Component
             return collect();
         }
 
+        if (($this->nivel?->slug ?? null) === 'primaria') {
+            return $this->obtenerAlumnosOficialesPrimaria();
+        }
+
         $campoPeriodo = $this->esBachillerato
             ? 'periodos.parcial_bachillerato_id'
             : 'periodos.periodo_basica_id';
@@ -248,6 +253,9 @@ class PromediosGenerales extends Component
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)
+            ->when(! $this->esBachillerato, fn ($query) =>
+                $query->where('materias.participa_en_calificacion_oficial', true)
+            )
             ->whereIn(DB::raw($campoPeriodo), $limitePeriodos)
             ->when($this->generacion_id !== '', fn($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($query) => $query->where('calificaciones.grado_id', $this->grado_id))
@@ -364,6 +372,55 @@ class PromediosGenerales extends Component
                 ];
             })
             ->values();
+
+        $alumnos = $this->asignarLugaresPorGrupo($alumnos);
+
+        return $this->ordenarAlumnos($alumnos);
+    }
+
+
+    private function obtenerAlumnosOficialesPrimaria(): Collection
+    {
+        $reporte = app(CalificacionOficialPrimariaService::class)->reporteAnual(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id !== '' ? (int) $this->generacion_id : null,
+            gradoId: $this->grado_id !== '' ? (int) $this->grado_id : null,
+            grupoId: $this->grupo_id !== '' ? (int) $this->grupo_id : null,
+        );
+
+        $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
+            $periodos = $fila['promedios_periodo_precisos'];
+            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+
+            return [
+                'inscripcion_id' => $fila['inscripcion_id'],
+                'generacion_id' => $fila['generacion_id'],
+                'matricula' => $fila['matricula'],
+                'alumno' => $fila['alumno'],
+                'grado_id' => $fila['grado_id'],
+                'grado' => $fila['grado'],
+                'grado_orden' => $fila['grado_orden'],
+                'grupo_id' => $fila['grupo_id'],
+                'grupo' => $fila['grupo'],
+                'semestre_id' => null,
+                'semestre' => null,
+                'periodos' => $periodos,
+                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                'promedio_final' => $fila['promedio_general_preciso'],
+                'periodos_capturados' => $capturados,
+                'periodos_faltantes' => max(3 - $capturados, 0),
+                'materias_capturadas' => collect($fila['campos'])->sum('capturados'),
+                'estatus' => $this->obtenerEstatusPromedio(
+                    $fila['promedio_general_preciso'],
+                    $fila['completo'] ? 3 : $capturados,
+                    3
+                ),
+                'fuente_oficial' => true,
+                'promocion_sugerida' => $fila['promocion_sugerida'],
+                'promocion_confirmada' => $fila['promocion_confirmada'],
+            ];
+        })->values();
 
         $alumnos = $this->asignarLugaresPorGrupo($alumnos);
 

@@ -625,6 +625,15 @@
 
                     <livewire:accion.generales.promedios-materias :slug_nivel="$slug_nivel"
                         :key="'promedios-materias-' . $slug_nivel" />
+
+
+                    @if ($slug_nivel === 'primaria')
+                        <div class="my-8 border-t border-slate-200 dark:border-neutral-800"></div>
+                        <livewire:accion.generales.promedios-oficiales-primaria
+                            :slug_nivel="$slug_nivel"
+                            :key="'promedios-oficiales-primaria-' . $slug_nivel"
+                        />
+                    @endif
                 @endif
             </div>
         </section>

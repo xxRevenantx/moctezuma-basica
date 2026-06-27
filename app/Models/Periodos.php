@@ -78,6 +78,11 @@ class Periodos extends Model
         return $this->hasMany(Calificacion::class, 'periodo_id');
     }
 
+    public function calificacionesCamposFormativos()
+    {
+        return $this->hasMany(CalificacionCampoFormativo::class, 'periodo_id');
+    }
+
     // RELACION CON BITACORA DE CALIFICACIONES
     public function bitacoraCalificaciones()
     {

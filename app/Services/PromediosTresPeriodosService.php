@@ -225,6 +225,7 @@ class PromediosTresPeriodosService
                     'materia_id' => (int) $primero->materia_id,
                     'materia' => $primero->materia_nombre ?: 'Sin materia',
                     'materia_orden' => (int) ($primero->materia_orden ?? 999),
+                    'participa_en_calificacion_oficial' => (bool) ($primero->participa_en_calificacion_oficial ?? true),
                     'campo_formativo_id' => $primero->campo_formativo_id ? (int) $primero->campo_formativo_id : null,
                     'campo_formativo' => $primero->campo_formativo_nombre,
                     'campo_slug' => $primero->campo_formativo_slug,
@@ -273,7 +274,11 @@ class PromediosTresPeriodosService
                     ])
                     ->values();
 
-                $promedios = $materias
+                $materiasParticipantes = $materias
+                    ->filter(fn (array $materia) => (bool) ($materia['participa_en_calificacion_oficial'] ?? true))
+                    ->values();
+
+                $promedios = $materiasParticipantes
                     ->pluck('promedio_calculo')
                     ->filter(fn ($valor) => $valor !== null)
                     ->map(fn ($valor) => (float) $valor)
@@ -283,9 +288,9 @@ class PromediosTresPeriodosService
 
                 $claveConfig = $primero['grado_id'] . '|' . ($esBachillerato ? ($primero['semestre_id'] ?: 0) : 0);
                 $numeroConfigurado = (int) ($configuraciones->get($claveConfig)?->numero_materias ?? 0);
-                $numeroEsperado = $numeroConfigurado > 0 ? $numeroConfigurado : $materias->count();
-                $completo = $materias->isNotEmpty()
-                    && $materias->every(fn (array $materia) => $materia['completo'] === true)
+                $numeroEsperado = $numeroConfigurado > 0 ? $numeroConfigurado : $materiasParticipantes->count();
+                $completo = $materiasParticipantes->isNotEmpty()
+                    && $materiasParticipantes->every(fn (array $materia) => $materia['completo'] === true)
                     && $promedios->count() >= $numeroEsperado;
 
                 return [

@@ -667,7 +667,7 @@ class Calificacion extends Component
         $asignaciones = AsignacionMateria::query()
             ->with([
                 'profesor:id,nombre,apellido_paterno,apellido_materno',
-                'materia:id,nivel_id,grado_id,semestre_id,materia,clave,slug,calificable,extra,orden',
+                'materia:id,nivel_id,grado_id,semestre_id,materia,clave,slug,calificable,extra,receso,participa_en_calificacion_oficial,orden',
             ])
             ->where('grupo_id', $this->grupo_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
@@ -705,6 +705,7 @@ class Calificacion extends Component
                     'slug' => $asignacion->materia?->slug,
                     'extra' => (bool) ($asignacion->materia?->extra ?? false),
                     'calificable' => (bool) ($asignacion->materia?->calificable ?? false),
+                    'participa_en_calificacion_oficial' => (bool) ($asignacion->materia?->participa_en_calificacion_oficial ?? true),
 
                     'profesor' => $profesor
                         ? trim(
@@ -904,7 +905,17 @@ class Calificacion extends Component
          * y meter materias con AC dentro de las primeras posiciones.
          */
         return collect($this->materias)
-            ->filter(fn($materia) => empty($materia['extra']))
+            ->filter(function ($materia): bool {
+                if (! empty($materia['extra'])) {
+                    return false;
+                }
+
+                if (in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
+                    return (bool) ($materia['participa_en_calificacion_oficial'] ?? true);
+                }
+
+                return true;
+            })
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,
                 fn($materia) => $materia['orden'] ?? 999,
@@ -1271,6 +1282,8 @@ class Calificacion extends Component
 
         $this->calcularPromedios();
         $this->aplicarFiltroEstado();
+
+        $this->dispatch('calificaciones-internas-guardadas');
 
         $this->dispatch('swal', [
             'title' => '¡Calificaciones guardadas correctamente!',

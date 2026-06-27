@@ -125,6 +125,16 @@ class Inscripcion extends Model
         return $this->hasMany(Calificacion::class);
     }
 
+    public function calificacionesCamposFormativos()
+    {
+        return $this->hasMany(CalificacionCampoFormativo::class, 'inscripcion_id');
+    }
+
+    public function decisionesPromocionOficial()
+    {
+        return $this->hasMany(DecisionPromocionOficial::class, 'inscripcion_id');
+    }
+
     // Relación con bitácora de calificaciones
     public function bitacoraCalificaciones()
     {

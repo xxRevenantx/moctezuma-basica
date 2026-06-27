@@ -24,10 +24,17 @@ class Materia extends Model
         'calificable',
         'extra',
         'receso',
+        'participa_en_calificacion_oficial',
         'orden',
     ];
 
-
+    protected $casts = [
+        'calificable' => 'boolean',
+        'extra' => 'boolean',
+        'receso' => 'boolean',
+        'participa_en_calificacion_oficial' => 'boolean',
+        'orden' => 'integer',
+    ];
 
     public function nivel()
     {

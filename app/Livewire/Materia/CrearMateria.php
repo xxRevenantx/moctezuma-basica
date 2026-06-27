@@ -44,6 +44,7 @@ class CrearMateria extends Component
     public bool $calificable = true;
     public bool $extra = false;
     public bool $receso = false;
+    public bool $participa_en_calificacion_oficial = true;
 
     public $niveles;
     public $gradosFormulario;
@@ -174,6 +175,7 @@ class CrearMateria extends Component
 
         if ($this->receso) {
             $this->calificable = false;
+            $this->participa_en_calificacion_oficial = false;
 
             if (blank($this->materia)) {
                 $this->materia = 'Receso';
@@ -188,6 +190,17 @@ class CrearMateria extends Component
 
         if ($this->calificable) {
             $this->receso = false;
+        } else {
+            $this->participa_en_calificacion_oficial = false;
+        }
+    }
+
+    public function updatedExtra($value): void
+    {
+        $this->extra = (bool) $value;
+
+        if ($this->extra) {
+            $this->participa_en_calificacion_oficial = false;
         }
     }
 
@@ -304,6 +317,10 @@ class CrearMateria extends Component
             'receso' => [
                 'boolean',
             ],
+
+            'participa_en_calificacion_oficial' => [
+                'boolean',
+            ],
         ];
     }
 
@@ -345,6 +362,7 @@ class CrearMateria extends Component
             'calificable.boolean' => 'El valor de calificable no es válido.',
             'extra.boolean' => 'El valor de extra no es válido.',
             'receso.boolean' => 'El valor de receso no es válido.',
+            'participa_en_calificacion_oficial.boolean' => 'La participación oficial no es válida.',
 
             'archivo_materias.required' => 'Selecciona un archivo de Excel.',
             'archivo_materias.file' => 'El archivo no es válido.',
@@ -395,6 +413,11 @@ class CrearMateria extends Component
         $this->calificable = (bool) $this->calificable;
         $this->extra = (bool) $this->extra;
         $this->receso = (bool) $this->receso;
+        $this->participa_en_calificacion_oficial = (bool) $this->participa_en_calificacion_oficial;
+
+        if ($this->receso || $this->extra || ! $this->calificable) {
+            $this->participa_en_calificacion_oficial = false;
+        }
 
         if ($this->receso) {
             $this->calificable = false;
@@ -433,6 +456,7 @@ class CrearMateria extends Component
             'calificable' => $this->calificable ? 1 : 0,
             'extra' => $this->extra ? 1 : 0,
             'receso' => $this->receso ? 1 : 0,
+            'participa_en_calificacion_oficial' => $this->participa_en_calificacion_oficial ? 1 : 0,
         ];
 
         if ($this->editandoId) {
@@ -534,6 +558,7 @@ class CrearMateria extends Component
         $this->calificable = (bool) $materia->calificable;
         $this->extra = (bool) $materia->extra;
         $this->receso = (bool) $materia->receso;
+        $this->participa_en_calificacion_oficial = (bool) $materia->participa_en_calificacion_oficial;
 
         $this->dispatch('abrir-formulario-materia');
 
@@ -609,6 +634,7 @@ class CrearMateria extends Component
         $this->calificable = true;
         $this->extra = false;
         $this->receso = false;
+        $this->participa_en_calificacion_oficial = true;
 
         $this->gradosFormulario = collect();
         $this->semestresFormulario = collect();

@@ -39,6 +39,7 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 'calificable' => $this->convertirBooleano($row['calificable'] ?? 0),
                 'extra' => $this->convertirBooleano($row['extra'] ?? 0),
                 'receso' => $this->convertirBooleano($row['receso'] ?? 0),
+                'participa_en_calificacion_oficial' => $this->convertirBooleano($row['participa_en_calificacion_oficial'] ?? 1),
             ];
 
             if ($datos['slug'] === '' && $datos['materia'] !== '') {
@@ -93,6 +94,10 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'required',
                     'boolean',
                 ],
+                'participa_en_calificacion_oficial' => [
+                    'required',
+                    'boolean',
+                ],
             ], [
                 'nivel_id.required' => 'El nivel es obligatorio.',
                 'nivel_id.exists' => 'El nivel no existe.',
@@ -140,6 +145,11 @@ class MateriasImport implements ToCollection, WithHeadingRow
             if ((bool) $datos['receso']) {
                 $datos['calificable'] = false;
                 $datos['extra'] = false;
+                $datos['participa_en_calificacion_oficial'] = false;
+            }
+
+            if (! (bool) $datos['calificable'] || (bool) $datos['extra']) {
+                $datos['participa_en_calificacion_oficial'] = false;
             }
 
             if (blank($datos['campo_formativo_id'])) {
@@ -162,6 +172,7 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'calificable' => $datos['calificable'],
                     'extra' => $datos['extra'],
                     'receso' => $datos['receso'],
+                    'participa_en_calificacion_oficial' => $datos['participa_en_calificacion_oficial'],
                 ]
             );
 

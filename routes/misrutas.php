@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\BoletaOficialPrimariaController;
+use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
@@ -212,6 +214,15 @@ Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])-
 
 Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificaciones_pdf'])
     ->name('misrutas.boleta.calificaciones.pdf');
+
+
+Route::middleware('admin')->group(function () {
+    Route::get('/calificaciones/boleta-oficial-primaria/{inscripcion}', BoletaOficialPrimariaController::class)
+        ->name('calificaciones.boleta-oficial-primaria');
+
+    Route::get('/generales/promedios-oficiales-primaria/pdf', PromediosOficialesPrimariaPdfController::class)
+        ->name('generales.promedios-oficiales-primaria.pdf');
+});
 
 Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_pdf'])
     ->name('misrutas.diploma.pdf');

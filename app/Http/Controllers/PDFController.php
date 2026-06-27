@@ -268,6 +268,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -366,9 +367,10 @@ class PDFController extends Controller
 
         if ($numeroMateriasPromediar <= 0) {
             $numeroMateriasPromediar = $materias
-                ->filter(function ($materia) {
+                ->filter(function ($materia) use ($esBachillerato) {
                     return (int) ($materia->extra ?? 0) === 0
-                        && (int) ($materia->receso ?? 0) === 0;
+                        && (int) ($materia->receso ?? 0) === 0
+                        && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
                 })
                 ->count();
         }
@@ -1985,6 +1987,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -2090,9 +2093,10 @@ class PDFController extends Controller
          */
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? $materias
-                ->filter(function ($materia) {
+                ->filter(function ($materia) use ($esBachillerato) {
                     return (int) ($materia->extra ?? 0) === 0
-                        && (int) ($materia->receso ?? 0) === 0;
+                        && (int) ($materia->receso ?? 0) === 0
+                        && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
                 })
                 ->sortBy([
                     fn($materia) => $materia->orden === null ? 1 : 0,
@@ -2755,6 +2759,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -2928,7 +2933,8 @@ class PDFController extends Controller
             */
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? collect($materias)
-                ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0)
+                ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0
+                    && ($esBachillerato || (int) ($materia['participa_en_calificacion_oficial'] ?? 1) === 1))
                 ->sortBy([
                     fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,
                     fn($materia) => $materia['orden'] ?? 999,
@@ -3434,6 +3440,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -3538,9 +3545,10 @@ class PDFController extends Controller
          */
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? $materias
-                ->filter(function ($materia) {
+                ->filter(function ($materia) use ($esBachillerato) {
                     return (int) ($materia->extra ?? 0) === 0
-                        && (int) ($materia->receso ?? 0) === 0;
+                        && (int) ($materia->receso ?? 0) === 0
+                        && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
                 })
                 ->sortBy([
                     fn($materia) => $materia->orden === null ? 1 : 0,
@@ -4183,6 +4191,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -4275,7 +4284,8 @@ class PDFController extends Controller
 
         if ($numeroMateriasPromediar <= 0) {
             $numeroMateriasPromediar = $materias
-                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0)
+                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0
+                    && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1))
                 ->count();
         }
 
@@ -4310,8 +4320,12 @@ class PDFController extends Controller
                 $porcentaje = min(100, $numero * 10);
                 $capturadasNumericas++;
 
-                if ((int) ($materia->extra ?? 0) === 0) {
-                    // Igual que PROMEDIO de Excel: solo cuentan celdas numéricas.
+                if (
+                    (int) ($materia->extra ?? 0) === 0
+                    && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1)
+                ) {
+                    // Igual que PROMEDIO de Excel: solo cuentan celdas numéricas
+                    // de disciplinas que participan en la calificación oficial.
                     $valoresPromediables[] = $numero;
                 }
 
@@ -5209,6 +5223,7 @@ class PDFController extends Controller
                 'materias.clave as clave',
                 'materias.slug as slug',
                 'materias.calificable as calificable',
+                'materias.participa_en_calificacion_oficial as participa_en_calificacion_oficial',
                 'materias.extra as extra',
                 'materias.receso as receso',
             ])
@@ -5251,7 +5266,8 @@ class PDFController extends Controller
             $materiasPromediables = $materias
                 ->filter(function ($materia) use ($slugsMateriasCualitativas) {
                     return !in_array($materia->slug, $slugsMateriasCualitativas, true)
-                        && (int) ($materia->calificable ?? 0) === 1;
+                        && (int) ($materia->calificable ?? 0) === 1
+                        && (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1;
                 })
                 ->values();
         }

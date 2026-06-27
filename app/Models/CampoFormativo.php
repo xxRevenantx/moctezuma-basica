@@ -26,4 +26,9 @@ class CampoFormativo extends Model
     {
         return $this->hasMany(Materia::class, 'campo_formativo_id');
     }
+
+    public function calificacionesOficiales()
+    {
+        return $this->hasMany(CalificacionCampoFormativo::class, 'campo_formativo_id');
+    }
 }

@@ -262,7 +262,7 @@
                             </p>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <label
                                 class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-neutral-900">
                                 <input type="checkbox" wire:model.live="calificable"
@@ -304,12 +304,28 @@
                                     </span>
                                 </span>
                             </label>
+
+
+                            <label
+                                class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-neutral-900">
+                                <input type="checkbox" wire:model.live="participa_en_calificacion_oficial"
+                                    class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-neutral-700">
+                                <span>
+                                    <span class="block text-sm font-bold text-slate-800 dark:text-white">
+                                        Participa en calificación oficial
+                                    </span>
+                                    <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                                        En primaria participa en la sugerencia del campo formativo; en secundaria participa en el promedio acreditable.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
 
-                        <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                        <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
                             <flux:error name="calificable" />
                             <flux:error name="extra" />
                             <flux:error name="receso" />
+                            <flux:error name="participa_en_calificacion_oficial" />
                         </div>
                     </div>
                 </div>
