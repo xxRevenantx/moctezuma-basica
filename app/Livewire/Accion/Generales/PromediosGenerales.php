@@ -9,7 +9,6 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\PromedioExcel;
-use App\Services\CalificacionOficialPrimariaService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -220,9 +219,12 @@ class PromediosGenerales extends Component
             return collect();
         }
 
-        if (($this->nivel?->slug ?? null) === 'primaria') {
-            return $this->obtenerAlumnosOficialesPrimaria();
-        }
+        /*
+         * Primaria y secundaria vuelven a utilizar las calificaciones internas
+         * capturadas por materia. La sección de calificaciones oficiales por
+         * campo formativo fue retirada, por lo que este concentrado no debe
+         * depender de calificaciones_campos_formativos.
+         */
 
         $campoPeriodo = $this->esBachillerato
             ? 'periodos.parcial_bachillerato_id'
@@ -379,53 +381,6 @@ class PromediosGenerales extends Component
     }
 
 
-    private function obtenerAlumnosOficialesPrimaria(): Collection
-    {
-        $reporte = app(CalificacionOficialPrimariaService::class)->reporteAnual(
-            nivelId: (int) $this->nivel->id,
-            cicloEscolarId: (int) $this->ciclo_escolar_id,
-            generacionId: $this->generacion_id !== '' ? (int) $this->generacion_id : null,
-            gradoId: $this->grado_id !== '' ? (int) $this->grado_id : null,
-            grupoId: $this->grupo_id !== '' ? (int) $this->grupo_id : null,
-        );
-
-        $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
-            $periodos = $fila['promedios_periodo_precisos'];
-            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
-
-            return [
-                'inscripcion_id' => $fila['inscripcion_id'],
-                'generacion_id' => $fila['generacion_id'],
-                'matricula' => $fila['matricula'],
-                'alumno' => $fila['alumno'],
-                'grado_id' => $fila['grado_id'],
-                'grado' => $fila['grado'],
-                'grado_orden' => $fila['grado_orden'],
-                'grupo_id' => $fila['grupo_id'],
-                'grupo' => $fila['grupo'],
-                'semestre_id' => null,
-                'semestre' => null,
-                'periodos' => $periodos,
-                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
-                'promedio_final' => $fila['promedio_general_preciso'],
-                'periodos_capturados' => $capturados,
-                'periodos_faltantes' => max(3 - $capturados, 0),
-                'materias_capturadas' => collect($fila['campos'])->sum('capturados'),
-                'estatus' => $this->obtenerEstatusPromedio(
-                    $fila['promedio_general_preciso'],
-                    $fila['completo'] ? 3 : $capturados,
-                    3
-                ),
-                'fuente_oficial' => true,
-                'promocion_sugerida' => $fila['promocion_sugerida'],
-                'promocion_confirmada' => $fila['promocion_confirmada'],
-            ];
-        })->values();
-
-        $alumnos = $this->asignarLugaresPorGrupo($alumnos);
-
-        return $this->ordenarAlumnos($alumnos);
-    }
 
     private function asignarLugaresPorGrupo(Collection $alumnos): Collection
     {
@@ -439,7 +394,10 @@ class PromediosGenerales extends Component
             ->groupBy(fn(array $alumno) => $this->claveGrupoAlumno($alumno))
             ->flatMap(function (Collection $items) {
                 $promediosUnicosDesc = $items
-                    ->filter(fn(array $alumno) => ($alumno['promedio_final'] ?? null) !== null)
+                    ->filter(fn(array $alumno) =>
+                        ($alumno['promedio_final'] ?? null) !== null
+                        && (int) ($alumno['periodos_faltantes'] ?? 0) === 0
+                    )
                     ->sortByDesc('promedio_final')
                     ->pluck('promedio_final')
                     ->map(fn($promedio) => PromedioExcel::claveComparacion($promedio))
@@ -449,7 +407,11 @@ class PromediosGenerales extends Component
                 return $items->map(function (array $alumno) use ($promediosUnicosDesc) {
                     $promedio = $alumno['promedio_final'] ?? null;
 
-                    if ($promedio === null || !is_numeric($promedio)) {
+                    if (
+                        $promedio === null
+                        || ! is_numeric($promedio)
+                        || (int) ($alumno['periodos_faltantes'] ?? 0) > 0
+                    ) {
                         $alumno['lugar'] = null;
                         $alumno['texto_lugar'] = 'Pendiente';
 
@@ -556,13 +518,18 @@ class PromediosGenerales extends Component
 
                     'aprobados' => $items
                         ->filter(
-                            fn(array $item) => ($item['promedio_final'] ?? 0) >= 6
+                            fn(array $item) =>
+                                (int) ($item['periodos_faltantes'] ?? 0) === 0
+                                && ($item['promedio_final'] ?? null) !== null
+                                && ($item['promedio_final'] ?? 0) >= 6
                         )
                         ->count(),
 
                     'riesgo' => $items
                         ->filter(
-                            fn(array $item) => ($item['promedio_final'] ?? null) !== null
+                            fn(array $item) =>
+                                (int) ($item['periodos_faltantes'] ?? 0) === 0
+                                && ($item['promedio_final'] ?? null) !== null
                                 && ($item['promedio_final'] ?? 0) < 6
                         )
                         ->count(),
@@ -645,7 +612,11 @@ class PromediosGenerales extends Component
 
     private function construirResumen(Collection $alumnos): array
     {
-        $conPromedio = $alumnos->filter(fn($alumno) => $alumno['promedio_final'] !== null);
+        $conPromedio = $alumnos->filter(
+            fn(array $alumno) =>
+                ($alumno['promedio_final'] ?? null) !== null
+                && (int) ($alumno['periodos_faltantes'] ?? 0) === 0
+        );
         $mejor = $conPromedio->sortByDesc('promedio_final')->first();
 
         return [
