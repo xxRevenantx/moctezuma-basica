@@ -117,8 +117,8 @@ class PromediosOficialesPrimaria extends Component
             return;
         }
 
-        if ($fila['promedio_general_preciso'] === null && (int) $fila['grado_orden'] !== 1) {
-            $this->addError('promocion', 'No se puede confirmar la promoción mientras falten campos o periodos oficiales.');
+        if (! ($fila['completo'] ?? false) || $fila['promedio_general_preciso'] === null) {
+            $this->addError('promocion', 'No se puede confirmar la promoción mientras falten campos, materias o periodos.');
             return;
         }
 

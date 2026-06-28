@@ -62,7 +62,7 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
                 'Total de alumnos',
                 $grupoPromedio['total'] ?? 0,
                 'Promedio',
-                $this->formatearDecimal($grupoPromedio['promedio'] ?? 0),
+                $grupoPromedio['promedio'] ?? '—',
                 'Aprobados',
                 $grupoPromedio['aprobados'] ?? 0,
                 'En riesgo',
@@ -102,8 +102,13 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
                         : 'Pendiente';
                 }
 
-                $fila[] = $this->formatearDecimal($alumno['suma_periodos'] ?? 0);
-                $fila[] = $this->formatearDecimal($alumno['promedio_final'] ?? 0);
+                $fila[] = collect($alumno['periodos'] ?? [])->contains(fn ($valor) => $valor !== null)
+                    ? $this->formatearDecimal($alumno['suma_periodos'] ?? null)
+                    : 'Pendiente';
+                $promedioMostrar = $alumno['promedio_final'] ?? $alumno['promedio_provisional'] ?? null;
+                $fila[] = $promedioMostrar !== null
+                    ? $this->formatearDecimal($promedioMostrar) . (($alumno['completo'] ?? false) ? '' : ' PROV.')
+                    : 'Pendiente';
                 $fila[] = $alumno['estatus'] ?? 'Sin captura';
 
                 $this->filas[] = $fila;

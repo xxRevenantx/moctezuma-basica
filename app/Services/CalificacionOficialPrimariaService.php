@@ -6,6 +6,7 @@ use App\Models\CalificacionCampoFormativo;
 use App\Models\CampoFormativo;
 use App\Models\DecisionPromocionOficial;
 use App\Models\Grado;
+use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Periodos;
@@ -13,6 +14,7 @@ use App\Models\TrayectoriaAcademica;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CalificacionOficialPrimariaService
 {
@@ -24,7 +26,12 @@ class CalificacionOficialPrimariaService
     {
         return CampoFormativo::query()
             ->where('activo', true)
-            ->where('slug', '!=', 'sin-campo-formativo')
+            ->whereIn('slug', [
+                'lenguajes',
+                'saberes-pensamiento-cientifico',
+                'etica-naturaleza-sociedades',
+                'humano-comunitario',
+            ])
             ->orderBy('orden')
             ->get(['id', 'nombre', 'slug', 'color_fondo', 'color_texto', 'orden']);
     }
@@ -38,8 +45,8 @@ class CalificacionOficialPrimariaService
     }
 
     /**
-     * Devuelve los alumnos del periodo y la sugerencia calculada con las
-     * materias internas que participan en la calificación oficial.
+     * Vista de captura heredada. Se conserva por compatibilidad, aunque el
+     * concentrado anual ya puede calcularse automáticamente desde las materias.
      */
     public function capturaPeriodo(
         int $nivelId,
@@ -90,20 +97,30 @@ class CalificacionOficialPrimariaService
             ->where('materias.participa_en_calificacion_oficial', true)
             ->whereNotNull('materias.campo_formativo_id')
             ->select([
+                'calificaciones.id as calificacion_id',
                 'calificaciones.inscripcion_id',
                 'materias.campo_formativo_id',
                 'materias.id as materia_id',
                 'materias.materia',
                 'calificaciones.valor_numerico',
             ])
+            ->orderBy('calificaciones.id')
             ->get()
-            ->groupBy(fn ($fila) => $fila->inscripcion_id . '|' . $fila->campo_formativo_id);
+            ->groupBy(fn ($fila) => $fila->inscripcion_id . '|' . $fila->campo_formativo_id)
+            ->map(function (Collection $items): Collection {
+                return $items
+                    ->groupBy('materia_id')
+                    ->map(fn (Collection $materia) => $materia->last())
+                    ->values();
+            });
 
-        $oficiales = CalificacionCampoFormativo::query()
-            ->where('periodo_id', $periodoId)
-            ->whereIn('inscripcion_id', $alumnos->pluck('id')->all())
-            ->get()
-            ->keyBy(fn (CalificacionCampoFormativo $item) => $item->inscripcion_id . '|' . $item->campo_formativo_id);
+        $oficiales = Schema::hasTable('calificaciones_campos_formativos')
+            ? CalificacionCampoFormativo::query()
+                ->where('periodo_id', $periodoId)
+                ->whereIn('inscripcion_id', $alumnos->pluck('id')->all())
+                ->get()
+                ->keyBy(fn (CalificacionCampoFormativo $item) => $item->inscripcion_id . '|' . $item->campo_formativo_id)
+            : collect();
 
         $filasAlumnos = $alumnos->map(function (Inscripcion $alumno) use ($campos, $filasInternas, $oficiales): array {
             $celdas = [];
@@ -113,7 +130,7 @@ class CalificacionOficialPrimariaService
                 $materias = $filasInternas->get($clave, collect());
                 $promedioPreciso = PromedioExcel::calcular($materias->pluck('valor_numerico'));
                 $sugerenciaEntera = $promedioPreciso !== null
-                    ? max(0, min(10, (int) floor($promedioPreciso + 0.000000001)))
+                    ? (int) max(0, min(10, floor($promedioPreciso + 0.000000001)))
                     : null;
                 $registro = $oficiales->get($clave);
 
@@ -159,9 +176,16 @@ class CalificacionOficialPrimariaService
     }
 
     /**
-     * Reporte anual oficial de primaria. Los cuatro campos tienen el mismo peso.
-     * El promedio final oficial solo existe cuando están completos los 3 periodos
-     * de los cuatro campos. Los cálculos conservan toda la precisión.
+     * Reporte anual SEP para primaria.
+     *
+     * Reglas aplicadas:
+     * - Cada periodo de un campo se obtiene promediando sus materias participantes.
+     * - La propuesta del periodo se trunca a entero, sin redondear.
+     * - Una calificación oficial confirmada, si existe, tiene prioridad.
+     * - El promedio final del campo conserva la precisión de sus tres periodos.
+     * - El promedio final de grado es la suma de los cuatro promedios precisos
+     *   de campo dividida entre cuatro.
+     * - El truncamiento a un decimal se aplica únicamente al presentar.
      */
     public function reporteAnual(
         int $nivelId,
@@ -171,11 +195,16 @@ class CalificacionOficialPrimariaService
         ?int $grupoId = null,
         ?int $inscripcionId = null,
     ): array {
-        if (! $this->esPrimaria($nivelId)) {
+        if ($cicloEscolarId <= 0 || ! $this->esPrimaria($nivelId)) {
             return $this->reporteVacio();
         }
 
         $campos = $this->campos();
+
+        if ($campos->count() !== 4) {
+            return $this->reporteVacio();
+        }
+
         $grados = Grado::query()
             ->where('nivel_id', $nivelId)
             ->when($gradoId, fn ($query) => $query->whereKey($gradoId))
@@ -198,59 +227,39 @@ class CalificacionOficialPrimariaService
             ->orderByDesc('id')
             ->get()
             ->filter(fn (TrayectoriaAcademica $trayectoria) => $trayectoria->inscripcion !== null)
-            ->unique(fn (TrayectoriaAcademica $trayectoria) => implode('|', [
-                $trayectoria->inscripcion_id,
-                $trayectoria->grado_id,
-                $trayectoria->grupo_id,
-            ]))
+            ->unique('inscripcion_id')
             ->values();
 
-        $idsAlumnos = $trayectorias->pluck('inscripcion_id')->unique()->values();
-
-        if ($idsAlumnos->isEmpty()) {
-            $idsAlumnos = CalificacionCampoFormativo::query()
-                ->where('ciclo_escolar_id', $cicloEscolarId)
-                ->where('nivel_id', $nivelId)
-                ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
-                ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
-                ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-                ->when($inscripcionId, fn ($query) => $query->where('inscripcion_id', $inscripcionId))
-                ->pluck('inscripcion_id')
-                ->unique()
-                ->values();
-        }
-
-        $registrosConsulta = CalificacionCampoFormativo::query()
-            ->join('periodos', 'periodos.id', '=', 'calificaciones_campos_formativos.periodo_id')
-            ->where('calificaciones_campos_formativos.ciclo_escolar_id', $cicloEscolarId)
-            ->where('calificaciones_campos_formativos.nivel_id', $nivelId)
-            ->when($generacionId, fn ($query) => $query->where('calificaciones_campos_formativos.generacion_id', $generacionId))
-            ->when($gradoId, fn ($query) => $query->where('calificaciones_campos_formativos.grado_id', $gradoId))
-            ->when($grupoId, fn ($query) => $query->where('calificaciones_campos_formativos.grupo_id', $grupoId))
-            ->when($inscripcionId, fn ($query) => $query->where('calificaciones_campos_formativos.inscripcion_id', $inscripcionId))
-            ->whereIn('calificaciones_campos_formativos.inscripcion_id', $idsAlumnos->all())
-            ->whereIn('periodos.periodo_basica_id', [1, 2, 3])
+        $contextosCalificacion = DB::table('calificaciones')
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('nivel_id', $nivelId)
+            ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
+            ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
+            ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
+            ->when($inscripcionId, fn ($query) => $query->where('inscripcion_id', $inscripcionId))
             ->select([
-                'calificaciones_campos_formativos.*',
-                'periodos.periodo_basica_id as numero_periodo',
+                'id',
+                'inscripcion_id',
+                'generacion_id',
+                'grado_id',
+                'grupo_id',
             ])
-            ->get();
-
-        $registros = $registrosConsulta
-            ->groupBy(fn ($fila) => $fila->inscripcion_id . '|' . $fila->campo_formativo_id);
-
-        // Cuando no exista trayectoria reconstruida, el propio registro oficial
-        // conserva el grado, grupo y generación históricos del ciclo consultado.
-        $contextosOficiales = $registrosConsulta
-            ->sortByDesc('id')
+            ->orderByDesc('id')
+            ->get()
             ->unique('inscripcion_id')
             ->keyBy('inscripcion_id');
 
-        $decisiones = DecisionPromocionOficial::query()
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->whereIn('inscripcion_id', $idsAlumnos->all())
-            ->get()
-            ->keyBy(fn (DecisionPromocionOficial $item) => $item->inscripcion_id . '|' . $item->grado_id);
+        $idsAlumnos = $trayectorias->pluck('inscripcion_id')
+            ->merge($contextosCalificacion->keys())
+            ->when($inscripcionId, fn (Collection $ids) => $ids->push($inscripcionId))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($idsAlumnos->isEmpty()) {
+            return $this->reporteVacio($campos);
+        }
 
         $alumnosPorId = Inscripcion::withTrashed()
             ->whereIn('id', $idsAlumnos->all())
@@ -259,14 +268,139 @@ class CalificacionOficialPrimariaService
 
         $trayectoriasPorAlumno = $trayectorias->keyBy('inscripcion_id');
 
-        $filas = $idsAlumnos->map(function ($alumnoId) use (
+        $grupoIds = $trayectorias->pluck('grupo_id')
+            ->merge($contextosCalificacion->pluck('grupo_id'))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $grupos = Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
+            ->whereIn('id', $grupoIds->all())
+            ->get(['id', 'asignacion_grupo_id'])
+            ->keyBy('id');
+
+        $materiasCatalogo = DB::table('materias')
+            ->where('nivel_id', $nivelId)
+            ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
+            ->where('calificable', true)
+            ->where('extra', false)
+            ->where('receso', false)
+            ->whereNotNull('campo_formativo_id')
+            ->select([
+                'id',
+                'grado_id',
+                'campo_formativo_id',
+                'materia',
+                'orden',
+                'participa_en_calificacion_oficial',
+            ])
+            ->orderBy('grado_id')
+            ->orderBy('orden')
+            ->orderBy('materia')
+            ->get();
+
+        $materiasPorGradoCampo = $materiasCatalogo
+            ->groupBy(fn ($materia) => $materia->grado_id . '|' . $materia->campo_formativo_id);
+
+        $calificacionesInternas = DB::table('calificaciones')
+            ->join('periodos', 'periodos.id', '=', 'calificaciones.periodo_id')
+            ->join('asignacion_materias', 'asignacion_materias.id', '=', 'calificaciones.asignacion_materia_id')
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->where('calificaciones.ciclo_escolar_id', $cicloEscolarId)
+            ->where('calificaciones.nivel_id', $nivelId)
+            ->whereIn('calificaciones.inscripcion_id', $idsAlumnos->all())
+            ->whereIn('periodos.periodo_basica_id', [1, 2, 3])
+            ->where('materias.calificable', true)
+            ->where('materias.extra', false)
+            ->where('materias.receso', false)
+            ->whereNotNull('materias.campo_formativo_id')
+            ->select([
+                'calificaciones.id as calificacion_id',
+                'calificaciones.inscripcion_id',
+                'calificaciones.grado_id',
+                'calificaciones.grupo_id',
+                'calificaciones.generacion_id',
+                'calificaciones.valor_numerico',
+                'calificaciones.es_numerica',
+                'calificaciones.calificacion',
+                'calificaciones.clave_especial',
+                'materias.id as materia_id',
+                'materias.materia as materia_nombre',
+                'materias.campo_formativo_id',
+                'materias.participa_en_calificacion_oficial',
+                'periodos.periodo_basica_id as numero_periodo',
+            ])
+            ->orderBy('calificaciones.id')
+            ->get();
+
+        $ultimaCalificacionPorMateriaPeriodo = $calificacionesInternas
+            ->groupBy(fn ($fila) => implode('|', [
+                $fila->inscripcion_id,
+                $fila->materia_id,
+                $fila->numero_periodo,
+            ]))
+            ->map(fn (Collection $items) => $items->last());
+
+        $internasPorAlumnoCampoPeriodo = $ultimaCalificacionPorMateriaPeriodo
+            ->values()
+            ->groupBy(fn ($fila) => implode('|', [
+                $fila->inscripcion_id,
+                $fila->campo_formativo_id,
+                $fila->numero_periodo,
+            ]));
+
+        $internasPorAlumnoMateriaPeriodo = $ultimaCalificacionPorMateriaPeriodo;
+
+        $oficialesConfirmadas = collect();
+
+        if (Schema::hasTable('calificaciones_campos_formativos')) {
+            $oficialesConfirmadas = CalificacionCampoFormativo::query()
+                ->join('periodos', 'periodos.id', '=', 'calificaciones_campos_formativos.periodo_id')
+                ->where('calificaciones_campos_formativos.ciclo_escolar_id', $cicloEscolarId)
+                ->where('calificaciones_campos_formativos.nivel_id', $nivelId)
+                ->whereIn('calificaciones_campos_formativos.inscripcion_id', $idsAlumnos->all())
+                ->where('calificaciones_campos_formativos.confirmada', true)
+                ->whereIn('periodos.periodo_basica_id', [1, 2, 3])
+                ->select([
+                    'calificaciones_campos_formativos.id',
+                    'calificaciones_campos_formativos.inscripcion_id',
+                    'calificaciones_campos_formativos.campo_formativo_id',
+                    'calificaciones_campos_formativos.calificacion_oficial',
+                    'periodos.periodo_basica_id as numero_periodo',
+                ])
+                ->orderBy('calificaciones_campos_formativos.id')
+                ->get()
+                ->groupBy(fn ($fila) => implode('|', [
+                    $fila->inscripcion_id,
+                    $fila->campo_formativo_id,
+                    $fila->numero_periodo,
+                ]))
+                ->map(fn (Collection $items) => $items->last());
+        }
+
+        $decisiones = Schema::hasTable('decisiones_promocion_oficial')
+            ? DecisionPromocionOficial::query()
+                ->where('ciclo_escolar_id', $cicloEscolarId)
+                ->where('nivel_id', $nivelId)
+                ->whereIn('inscripcion_id', $idsAlumnos->all())
+                ->get()
+                ->keyBy(fn (DecisionPromocionOficial $item) => $item->inscripcion_id . '|' . $item->grado_id)
+            : collect();
+
+        $filas = $idsAlumnos->map(function (int $alumnoId) use (
             $alumnosPorId,
             $trayectoriasPorAlumno,
-            $campos,
-            $registros,
+            $contextosCalificacion,
             $grados,
+            $grupos,
+            $campos,
+            $materiasPorGradoCampo,
+            $internasPorAlumnoCampoPeriodo,
+            $internasPorAlumnoMateriaPeriodo,
+            $oficialesConfirmadas,
             $decisiones,
-            $contextosOficiales,
             $gradoId,
             $grupoId,
             $generacionId,
@@ -278,83 +412,178 @@ class CalificacionOficialPrimariaService
             }
 
             $trayectoria = $trayectoriasPorAlumno->get($alumnoId);
-            $contextoOficial = $contextosOficiales->get($alumnoId);
+            $contexto = $contextosCalificacion->get($alumnoId);
+
             $gradoActualId = (int) ($trayectoria?->grado_id
-                ?? $contextoOficial?->grado_id
+                ?? $contexto?->grado_id
                 ?? $gradoId
                 ?? $alumno->grado_id);
             $grupoActualId = (int) ($trayectoria?->grupo_id
-                ?? $contextoOficial?->grupo_id
+                ?? $contexto?->grupo_id
                 ?? $grupoId
                 ?? $alumno->grupo_id);
             $generacionActualId = (int) ($trayectoria?->generacion_id
-                ?? $contextoOficial?->generacion_id
+                ?? $contexto?->generacion_id
                 ?? $generacionId
                 ?? $alumno->generacion_id);
+
+            if ($gradoActualId <= 0 || $grupoActualId <= 0) {
+                return null;
+            }
+
             $grado = $grados->get($gradoActualId) ?: Grado::query()->find($gradoActualId);
+            $grupo = $grupos->get($grupoActualId);
             $grupoNombre = $trayectoria?->grupo?->asignacionGrupo?->nombre
-                ?? $alumno->grupo?->asignacionGrupo?->nombre
+                ?? $grupo?->asignacionGrupo?->nombre
                 ?? 'Sin grupo';
 
             $camposAlumno = [];
-            $finalesCompletos = [];
+            $finalesPrecisos = [];
             $promediosPorPeriodo = [1 => [], 2 => [], 3 => []];
-            $tienePendientes = false;
+            $periodosCompletos = [1 => true, 2 => true, 3 => true];
+            $materiasDetalle = [];
 
             foreach ($campos as $campo) {
-                $items = $registros->get($alumnoId . '|' . $campo->id, collect());
+                $catalogoCampo = $materiasPorGradoCampo->get(
+                    $gradoActualId . '|' . $campo->id,
+                    collect()
+                );
+
+                $materiasParticipantes = $catalogoCampo
+                    ->filter(fn ($materia) => (bool) $materia->participa_en_calificacion_oficial)
+                    ->values();
+
                 $periodos = [];
+                $estadosPeriodo = [];
+                $fuentesPeriodo = [];
+                $capturasPeriodo = [];
 
-                foreach ([1, 2, 3] as $numero) {
-                    $registro = $items
-                        ->where('numero_periodo', $numero)
-                        ->sortByDesc('id')
-                        ->first();
-                    $valor = $registro?->calificacion_oficial;
-                    $periodos[$numero] = is_numeric($valor) ? (float) $valor : null;
+                foreach ([1, 2, 3] as $numeroPeriodo) {
+                    $clave = implode('|', [$alumnoId, $campo->id, $numeroPeriodo]);
+                    $registroOficial = $oficialesConfirmadas->get($clave);
+                    $filasCampo = $internasPorAlumnoCampoPeriodo->get($clave, collect())
+                        ->filter(fn ($fila) => (bool) $fila->participa_en_calificacion_oficial)
+                        ->values();
 
-                    if ($periodos[$numero] !== null) {
-                        $promediosPorPeriodo[$numero][] = $periodos[$numero];
+                    $valores = $filasCampo
+                        ->filter(fn ($fila) => (bool) $fila->es_numerica && is_numeric($fila->valor_numerico))
+                        ->pluck('valor_numerico')
+                        ->map(fn ($valor) => (float) $valor)
+                        ->values();
+
+                    $promedioInternoPreciso = PromedioExcel::calcular($valores);
+                    $propuestaEntera = $promedioInternoPreciso !== null
+                        ? (float) floor($promedioInternoPreciso + 0.000000001)
+                        : null;
+
+                    $valorOficial = $registroOficial && is_numeric($registroOficial->calificacion_oficial)
+                        ? (float) $registroOficial->calificacion_oficial
+                        : null;
+
+                    $periodos[$numeroPeriodo] = $valorOficial ?? $propuestaEntera;
+
+                    $idsCapturados = $filasCampo
+                        ->filter(fn ($fila) => (bool) $fila->es_numerica && is_numeric($fila->valor_numerico))
+                        ->pluck('materia_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->unique();
+
+                    $esperadas = $materiasParticipantes->count();
+                    $capturadas = $idsCapturados->count();
+                    $capturasPeriodo[$numeroPeriodo] = [
+                        'esperadas' => $esperadas,
+                        'capturadas' => $capturadas,
+                        'promedio_interno_preciso' => $promedioInternoPreciso,
+                    ];
+
+                    $estadosPeriodo[$numeroPeriodo] = $valorOficial !== null
+                        || ($esperadas > 0 && $capturadas >= $esperadas);
+                    $fuentesPeriodo[$numeroPeriodo] = $valorOficial !== null ? 'confirmada' : 'automatica';
+
+                    if ($periodos[$numeroPeriodo] !== null) {
+                        $promediosPorPeriodo[$numeroPeriodo][] = $periodos[$numeroPeriodo];
+                    }
+
+                    if (! $estadosPeriodo[$numeroPeriodo]) {
+                        $periodosCompletos[$numeroPeriodo] = false;
                     }
                 }
 
                 $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
-                $provisionalCalculo = PromedioExcel::calcular($periodos);
-                $provisionalOficial = PromedioExcel::truncar($provisionalCalculo, 1);
-                $finalCalculo = $capturados === 3 ? $provisionalCalculo : null;
-                $finalOficial = $capturados === 3 ? PromedioExcel::truncar($finalCalculo, 1) : null;
+                $provisionalPreciso = PromedioExcel::calcular($periodos);
+                $campoCompleto = $capturados === 3
+                    && collect($estadosPeriodo)->every(fn ($completo) => $completo === true);
+                $finalPreciso = $campoCompleto ? $provisionalPreciso : null;
 
-                /*
-                 * En la boleta SEP el promedio final de cada campo se expresa
-                 * oficialmente con un decimal. El promedio final de grado se
-                 * obtiene promediando esos cuatro valores oficiales mostrados.
-                 * Así, 9.6 + 9.0 + 9.3 + 9.6 produce 9.3 al truncar el resultado.
-                 */
-                if ($finalOficial !== null) {
-                    $finalesCompletos[] = $finalOficial;
-                } else {
-                    $tienePendientes = true;
+                if ($finalPreciso !== null) {
+                    $finalesPrecisos[] = $finalPreciso;
                 }
+
+                $materiasCampoDetalle = $catalogoCampo->map(function ($materia) use (
+                    $alumnoId,
+                    $internasPorAlumnoMateriaPeriodo
+                ): array {
+                    $evaluaciones = [];
+
+                    foreach ([1, 2, 3] as $numeroPeriodo) {
+                        $registro = $internasPorAlumnoMateriaPeriodo->get(
+                            implode('|', [$alumnoId, $materia->id, $numeroPeriodo])
+                        );
+
+                        $evaluaciones[$numeroPeriodo] = $registro
+                            && (bool) $registro->es_numerica
+                            && is_numeric($registro->valor_numerico)
+                            ? (float) $registro->valor_numerico
+                            : null;
+                    }
+
+                    $promedioProvisional = PromedioExcel::calcular($evaluaciones);
+                    $completa = collect($evaluaciones)->filter(fn ($valor) => $valor !== null)->count() === 3;
+
+                    return [
+                        'materia_id' => (int) $materia->id,
+                        'materia' => $materia->materia,
+                        'orden' => (int) ($materia->orden ?? 999),
+                        'participa' => (bool) $materia->participa_en_calificacion_oficial,
+                        'evaluaciones' => $evaluaciones,
+                        'promedio_provisional_preciso' => $promedioProvisional,
+                        'promedio_final_preciso' => $completa ? $promedioProvisional : null,
+                        'promedio' => PromedioExcel::formatear(
+                            $completa ? $promedioProvisional : null,
+                            1,
+                            '—'
+                        ),
+                        'completo' => $completa,
+                    ];
+                })->values();
+
+                $materiasDetalle = array_merge($materiasDetalle, $materiasCampoDetalle->all());
 
                 $camposAlumno[$campo->id] = [
                     'campo_id' => (int) $campo->id,
                     'campo' => $campo->nombre,
                     'slug' => $campo->slug,
+                    'color_fondo' => $campo->color_fondo,
+                    'color_texto' => $campo->color_texto,
                     'periodos' => $periodos,
+                    'periodos_completos' => $estadosPeriodo,
+                    'fuentes_periodo' => $fuentesPeriodo,
+                    'capturas_periodo' => $capturasPeriodo,
                     'capturados' => $capturados,
-                    'provisional_calculo_preciso' => $provisionalCalculo,
-                    'provisional_preciso' => $provisionalOficial,
-                    'provisional' => PromedioExcel::formatear($provisionalOficial, 1, '—'),
-                    'final_calculo_preciso' => $finalCalculo,
-                    'final_preciso' => $finalOficial,
-                    'final' => PromedioExcel::formatear($finalOficial, 1, '—'),
-                    'completo' => $capturados === 3,
+                    'provisional_calculo_preciso' => $provisionalPreciso,
+                    'provisional_preciso' => $provisionalPreciso,
+                    'provisional' => PromedioExcel::formatear($provisionalPreciso, 1, '—'),
+                    'final_calculo_preciso' => $finalPreciso,
+                    'final_preciso' => $finalPreciso,
+                    'final' => PromedioExcel::formatear($finalPreciso, 1, '—'),
+                    'completo' => $campoCompleto,
+                    'materias' => $materiasCampoDetalle->all(),
                 ];
             }
 
-            $todosLosCamposCompletos = count($finalesCompletos) === $campos->count() && $campos->isNotEmpty();
+            $todosLosCamposCompletos = count($finalesPrecisos) === 4;
             $promedioGeneralPreciso = $todosLosCamposCompletos
-                ? PromedioExcel::calcular($finalesCompletos)
+                ? PromedioExcel::calcular($finalesPrecisos)
                 : null;
             $promedioProvisionalPreciso = PromedioExcel::calcular(
                 collect($camposAlumno)->pluck('provisional_preciso')
@@ -363,8 +592,21 @@ class CalificacionOficialPrimariaService
             $esPrimerGrado = (int) ($grado?->orden ?? 0) === 1;
             $promocionSugerida = $esPrimerGrado
                 ? true
-                : ($promedioGeneralPreciso !== null ? $promedioGeneralPreciso >= 6.0 : null);
+                : ($todosLosCamposCompletos
+                    ? collect($finalesPrecisos)->every(fn ($promedio) => (float) $promedio >= 6.0)
+                    : null);
+
             $decision = $decisiones->get($alumnoId . '|' . $gradoActualId);
+
+            $periodosPromedio = [];
+            foreach ([1, 2, 3] as $numeroPeriodo) {
+                $periodosPromedio[$numeroPeriodo] = PromedioExcel::calcular($promediosPorPeriodo[$numeroPeriodo]);
+                $periodosCompletos[$numeroPeriodo] = $periodosCompletos[$numeroPeriodo]
+                    && count($promediosPorPeriodo[$numeroPeriodo]) === 4;
+            }
+
+            $totalCapturasMaterias = collect($materiasDetalle)
+                ->sum(fn (array $materia) => collect($materia['evaluaciones'])->filter(fn ($valor) => $valor !== null)->count());
 
             return [
                 'inscripcion_id' => (int) $alumnoId,
@@ -378,20 +620,27 @@ class CalificacionOficialPrimariaService
                 'grupo' => $grupoNombre,
                 'generacion_id' => $generacionActualId,
                 'campos' => $camposAlumno,
-                'promedios_periodo_precisos' => [
-                    1 => PromedioExcel::calcular($promediosPorPeriodo[1]),
-                    2 => PromedioExcel::calcular($promediosPorPeriodo[2]),
-                    3 => PromedioExcel::calcular($promediosPorPeriodo[3]),
-                ],
+                'materias' => collect($materiasDetalle)
+                    ->sortBy([['orden', 'asc'], ['materia', 'asc']])
+                    ->values()
+                    ->all(),
+                'promedios_periodo_precisos' => $periodosPromedio,
+                'periodos_completos' => $periodosCompletos,
                 'promedio_general_preciso' => $promedioGeneralPreciso,
                 'promedio_general' => PromedioExcel::formatear($promedioGeneralPreciso, 1, '—'),
                 'promedio_provisional_preciso' => $promedioProvisionalPreciso,
                 'promedio_provisional' => PromedioExcel::formatear($promedioProvisionalPreciso, 1, '—'),
-                'completo' => $todosLosCamposCompletos && ! $tienePendientes,
+                'completo' => $todosLosCamposCompletos,
+                'materias_capturadas' => $totalCapturasMaterias,
                 'promocion_sugerida' => $promocionSugerida,
                 'promocion_confirmada' => $decision?->promocion_confirmada,
                 'promocion_confirmada_at' => optional($decision?->confirmada_at)->format('d/m/Y H:i'),
                 'motivo_promocion' => $decision?->motivo,
+                'campos_reprobados' => collect($camposAlumno)
+                    ->filter(fn (array $campo) => $campo['final_preciso'] !== null && $campo['final_preciso'] < 6)
+                    ->pluck('campo')
+                    ->values()
+                    ->all(),
             ];
         })->filter()->sortBy([
             ['grado_orden', 'asc'],
@@ -399,11 +648,14 @@ class CalificacionOficialPrimariaService
             ['alumno', 'asc'],
         ])->values();
 
-        $grupos = $filas
+        $gruposReporte = $filas
             ->groupBy(fn (array $fila) => $fila['grado_id'] . '|' . $fila['grupo_id'])
             ->map(function (Collection $items): array {
                 $primero = $items->first();
-                $conPromedio = $items->pluck('promedio_general_preciso')->filter(fn ($valor) => $valor !== null);
+                $conPromedio = $items
+                    ->where('completo', true)
+                    ->pluck('promedio_general_preciso')
+                    ->filter(fn ($valor) => $valor !== null);
 
                 return [
                     'grado_id' => $primero['grado_id'],
@@ -425,12 +677,15 @@ class CalificacionOficialPrimariaService
             ])
             ->values();
 
-        $promediosCompletos = $filas->pluck('promedio_general_preciso')->filter(fn ($valor) => $valor !== null);
+        $promediosCompletos = $filas
+            ->where('completo', true)
+            ->pluck('promedio_general_preciso')
+            ->filter(fn ($valor) => $valor !== null);
 
         return [
             'campos' => $campos,
             'alumnos' => $filas,
-            'grupos' => $grupos,
+            'grupos' => $gruposReporte,
             'resumen' => [
                 'total_alumnos' => $filas->count(),
                 'completos' => $filas->where('completo', true)->count(),
@@ -443,10 +698,10 @@ class CalificacionOficialPrimariaService
         ];
     }
 
-    private function reporteVacio(): array
+    private function reporteVacio(?Collection $campos = null): array
     {
         return [
-            'campos' => collect(),
+            'campos' => $campos ?? collect(),
             'alumnos' => collect(),
             'grupos' => collect(),
             'resumen' => [

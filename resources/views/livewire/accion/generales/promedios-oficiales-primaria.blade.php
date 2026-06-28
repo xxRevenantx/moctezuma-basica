@@ -7,7 +7,7 @@
                 <p class="text-xs font-black uppercase tracking-[.18em] text-[#006492] dark:text-sky-300">Fuente oficial de primaria</p>
                 <h3 class="mt-1 text-xl font-black text-slate-950 dark:text-white">Promedios por campos formativos</h3>
                 <p class="mt-2 max-w-4xl text-sm text-slate-600 dark:text-slate-300">
-                    El promedio final de cada campo se obtiene de sus tres periodos. El promedio final de grado otorga el mismo peso a los cuatro campos y solo se publica cuando la captura está completa.
+                    Cada periodo del campo usa la calificación oficial confirmada cuando existe; de lo contrario, se calcula automáticamente desde sus materias participantes. El promedio final de grado es la suma de los cuatro promedios precisos de campo dividida entre cuatro y solo es definitivo cuando todo está completo.
                 </p>
             </div>
 
@@ -171,7 +171,7 @@
             </section>
         @empty
             <div class="rounded-3xl border border-dashed border-slate-300 p-10 text-center text-sm font-semibold text-slate-500 dark:border-neutral-700">
-                No hay calificaciones oficiales confirmadas para los filtros seleccionados.
+                No hay calificaciones ni datos académicos suficientes para los filtros seleccionados.
             </div>
         @endforelse
     </div>

@@ -12,25 +12,25 @@ class PromediosGeneralesExport implements WithMultipleSheets
 
     public function __construct(
         protected string $nivelNombre,
+        protected string $nivelSlug,
         protected bool $esBachillerato,
         protected array $encabezadosPeriodos,
         protected array $resumen,
         protected Collection $gruposPromedios,
         protected array $filtros = [],
     ) {
-        //
     }
 
     public function sheets(): array
     {
-        return [
+        $hojas = [
             new PromediosGeneralesResumenSheet(
                 nivelNombre: $this->nivelNombre,
+                nivelSlug: $this->nivelSlug,
                 esBachillerato: $this->esBachillerato,
                 resumen: $this->resumen,
                 filtros: $this->filtros,
             ),
-
             new PromediosGeneralesDetalleSheet(
                 nivelNombre: $this->nivelNombre,
                 esBachillerato: $this->esBachillerato,
@@ -38,5 +38,15 @@ class PromediosGeneralesExport implements WithMultipleSheets
                 gruposPromedios: $this->gruposPromedios,
             ),
         ];
+
+        if (in_array($this->nivelSlug, ['primaria', 'secundaria'], true)) {
+            $hojas[] = new PromediosGeneralesAcademicoSheet(
+                nivelNombre: $this->nivelNombre,
+                nivelSlug: $this->nivelSlug,
+                gruposPromedios: $this->gruposPromedios,
+            );
+        }
+
+        return $hojas;
     }
 }

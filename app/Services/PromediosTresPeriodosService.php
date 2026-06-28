@@ -288,7 +288,12 @@ class PromediosTresPeriodosService
 
                 $claveConfig = $primero['grado_id'] . '|' . ($esBachillerato ? ($primero['semestre_id'] ?: 0) : 0);
                 $numeroConfigurado = (int) ($configuraciones->get($claveConfig)?->numero_materias ?? 0);
-                $numeroEsperado = $numeroConfigurado > 0 ? $numeroConfigurado : $materiasParticipantes->count();
+                // En primaria y secundaria el catálogo oficial es dinámico por grado.
+                // MateriaPromediar se conserva únicamente para bachillerato, donde
+                // la configuración histórica por semestre sí sigue siendo útil.
+                $numeroEsperado = $esBachillerato && $numeroConfigurado > 0
+                    ? $numeroConfigurado
+                    : $materiasParticipantes->count();
                 $completo = $materiasParticipantes->isNotEmpty()
                     && $materiasParticipantes->every(fn (array $materia) => $materia['completo'] === true)
                     && $promedios->count() >= $numeroEsperado;

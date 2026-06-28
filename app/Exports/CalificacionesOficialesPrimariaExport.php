@@ -11,6 +11,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Maatwebsite\Excel\Events\AfterSheet;
 
 class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize, WithEvents, WithTitle
@@ -69,14 +70,11 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
                 $fila[] = $datos['periodos'][1];
                 $fila[] = $datos['periodos'][2];
                 $fila[] = $datos['periodos'][3];
-                $fila[] = $datos['final_preciso'] !== null
-                    ? PromedioExcel::truncar($datos['final_preciso'], 1)
-                    : null;
+                // Se conserva la precisión en el archivo; Excel solo presenta un decimal.
+                $fila[] = $datos['final_preciso'];
             }
 
-            $fila[] = $alumno['promedio_general_preciso'] !== null
-                ? PromedioExcel::truncar($alumno['promedio_general_preciso'], 1)
-                : null;
+            $fila[] = $alumno['promedio_general_preciso'];
             $fila[] = $alumno['promocion_sugerida'] === null
                 ? 'PENDIENTE'
                 : ($alumno['promocion_sugerida'] ? 'PROMOVIDA(O)' : 'NO PROMOVIDA(O)');
@@ -89,7 +87,7 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
 
         $filas[] = [];
         $filas[] = [
-            'NOTA: La boleta oficial de primaria utiliza los cuatro campos formativos. El promedio final de cada campo se obtiene de los tres periodos y el promedio final de grado otorga el mismo peso a cada campo.',
+            'NOTA: El promedio final de cada campo se obtiene de sus tres periodos. El promedio final de grado es la suma de los cuatro promedios precisos de campo dividida entre cuatro; el truncamiento se aplica únicamente al presentar.',
         ];
 
         return $filas;
@@ -131,6 +129,23 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
                         ->getColor()->setRGB(ltrim((string) $campo->color_texto, '#'));
                     $indiceInicialCampo += 4;
                 }
+
+                // Los promedios finales conservan el valor preciso y se muestran con un decimal.
+                $primeraFilaDatos = 4;
+                $ultimaFilaDatos = max($primeraFilaDatos, $highestRow - 2);
+                $indiceCampo = 5;
+                foreach ($this->reporte['campos'] as $campo) {
+                    $columnaFinal = Coordinate::stringFromColumnIndex($indiceCampo + 3);
+                    $sheet->getStyle("{$columnaFinal}{$primeraFilaDatos}:{$columnaFinal}{$ultimaFilaDatos}")
+                        ->getNumberFormat()
+                        ->setFormatCode('0.0');
+                    $indiceCampo += 4;
+                }
+
+                $columnaPromedioGeneral = Coordinate::stringFromColumnIndex($indiceInicialCampo);
+                $sheet->getStyle("{$columnaPromedioGeneral}{$primeraFilaDatos}:{$columnaPromedioGeneral}{$ultimaFilaDatos}")
+                    ->getNumberFormat()
+                    ->setFormatCode('0.0');
 
                 // Promedio y promoción ocupan dos filas de encabezado.
                 for ($indice = $indiceInicialCampo; $indice <= $indiceInicialCampo + 2; $indice++) {

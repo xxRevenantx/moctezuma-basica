@@ -19,6 +19,8 @@ use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Services\CalificacionOficialPrimariaService;
+use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -712,6 +714,103 @@ class PDFController extends Controller
             $textoLugarAlumno = $lugarAlumno . '° lugar';
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Fuente académica oficial de primaria y secundaria
+        |--------------------------------------------------------------------------
+        |
+        | El bloque anterior se conserva para bachillerato y para construir el
+        | detalle institucional por materia. En primaria y secundaria se reemplaza
+        | el resumen anual por la misma fuente usada en Promedios Generales:
+        |
+        | - Primaria: promedio de los cuatro campos formativos.
+        | - Secundaria: promedio de los promedios anuales precisos de materias.
+        | - Sin truncamientos intermedios; se trunca únicamente al presentar.
+        */
+        $reporteAcademico = null;
+        $filaAcademica = null;
+
+        if ($nivel->slug === 'primaria') {
+            $reporteAcademico = app(CalificacionOficialPrimariaService::class)->reporteAnual(
+                nivelId: (int) $nivel->id,
+                cicloEscolarId: (int) $cicloEscolar->id,
+                generacionId: (int) $generacion->id,
+                gradoId: (int) $grado->id,
+                grupoId: (int) $grupo->id,
+            );
+        } elseif ($nivel->slug === 'secundaria') {
+            $reporteAcademico = app(PromedioSecundariaService::class)->reporteAnual(
+                nivelId: (int) $nivel->id,
+                cicloEscolarId: (int) $cicloEscolar->id,
+                generacionId: (int) $generacion->id,
+                gradoId: (int) $grado->id,
+                grupoId: (int) $grupo->id,
+            );
+        }
+
+        if (is_array($reporteAcademico)) {
+            $filasAcademicas = collect($reporteAcademico['alumnos'] ?? []);
+            $filaAcademica = $filasAcademicas->firstWhere('inscripcion_id', (int) $inscripcion->id);
+
+            if ($filaAcademica) {
+                $promediosPeriodosPrecisos = $filaAcademica['promedios_periodo_precisos'] ?? [];
+                $promediosPeriodos = collect($numerosPeriodos)
+                    ->mapWithKeys(fn (int $numero) => [
+                        $numero => PromedioExcel::formatear(
+                            $promediosPeriodosPrecisos[$numero] ?? null,
+                            1,
+                            '—'
+                        ),
+                    ])
+                    ->all();
+
+                $promedioNumero = $filaAcademica['promedio_general_preciso']
+                    ?? $filaAcademica['promedio_provisional_preciso']
+                    ?? null;
+                $promedio = PromedioExcel::formatear($promedioNumero, 1, '—');
+                $porcentajePromedio = $promedioNumero !== null
+                    ? min(100, ((float) $promedioNumero) * 10)
+                    : 0;
+
+                if (! ($filaAcademica['completo'] ?? false)) {
+                    $estadoPromedio = $promedioNumero === null ? 'Sin datos' : 'Incompleto';
+                } elseif ($nivel->slug === 'primaria') {
+                    $estadoPromedio = empty($filaAcademica['campos_reprobados'] ?? [])
+                        ? (((float) $promedioNumero >= 8) ? 'Aprobado' : 'Regular')
+                        : 'Reprobado';
+                } else {
+                    $estadoPromedio = empty($filaAcademica['materias_reprobadas'] ?? [])
+                        ? (((float) $promedioNumero >= 8) ? 'Aprobado' : 'Regular')
+                        : 'Reprobado';
+                }
+
+                $lugarAlumno = null;
+                $textoLugarAlumno = 'Pendiente';
+
+                if (($filaAcademica['completo'] ?? false) && $promedioNumero !== null) {
+                    $promediosUnicosAcademicos = $filasAcademicas
+                        ->filter(fn (array $fila) => ($fila['completo'] ?? false)
+                            && is_numeric($fila['promedio_general_preciso'] ?? null))
+                        ->pluck('promedio_general_preciso')
+                        ->sortDesc()
+                        ->map(fn ($valor) => PromedioExcel::claveComparacion($valor))
+                        ->filter()
+                        ->unique()
+                        ->values();
+
+                    $claveAlumno = PromedioExcel::claveComparacion($promedioNumero);
+                    $indice = $claveAlumno !== null
+                        ? $promediosUnicosAcademicos->search($claveAlumno)
+                        : false;
+
+                    if ($indice !== false) {
+                        $lugarAlumno = ((int) $indice) + 1;
+                        $textoLugarAlumno = $lugarAlumno . '° lugar';
+                    }
+                }
+            }
+        }
+
         $totalMaterias = count($filasMaterias);
 
         $porcentajeCaptura = $totalCeldas > 0
@@ -820,6 +919,8 @@ class PDFController extends Controller
             'nombreAlumno' => $nombreAlumno,
 
             'alumno' => $alumno,
+            'reporteAcademico' => $reporteAcademico,
+            'filaAcademica' => $filaAcademica,
 
             'periodosResumen' => $periodosResumen,
             'promediosPeriodos' => $promediosPeriodos,

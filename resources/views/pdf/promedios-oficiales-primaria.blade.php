@@ -55,6 +55,6 @@
         </table>
     @endforeach
 
-    <p class="nota">NOTA: Se consideran los tres periodos de los cuatro campos formativos. Los resultados se expresan con un decimal y el truncamiento se aplica únicamente al resultado mostrado.</p>
+    <p class="nota">NOTA: El promedio final de grado es la suma de los cuatro promedios finales precisos de campo dividida entre cuatro. El truncamiento se aplica únicamente al resultado mostrado.</p>
 </body>
 </html>

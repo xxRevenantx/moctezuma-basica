@@ -14,13 +14,22 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
+    private array $filas = [];
+
+    /** @var array<int, int> */
+    private array $filasTitulo = [];
+
+    /** @var array<int, int> */
+    private array $filasEncabezado = [];
+
     public function __construct(
         protected string $nivelNombre,
+        protected string $nivelSlug,
         protected bool $esBachillerato,
         protected array $resumen,
         protected array $filtros = [],
     ) {
-        //
+        $this->prepararFilas();
     }
 
     public function title(): string
@@ -30,72 +39,83 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
 
     public function array(): array
     {
-        $filas = [];
+        return $this->filas;
+    }
 
-        $filas[] = ['CONCENTRADO FINAL DE ' . mb_strtoupper($this->nivelNombre)];
-        $filas[] = ['Exportación generada el ' . now()->format('d/m/Y H:i')];
-        $filas[] = [];
+    private function prepararFilas(): void
+    {
+        $this->filas[] = ['CONCENTRADO FINAL DE ' . mb_strtoupper($this->nivelNombre)];
+        $this->filas[] = ['Exportación generada el ' . now()->format('d/m/Y H:i')];
+        $this->filas[] = [];
 
-        $filas[] = ['FILTROS APLICADOS'];
-        $filas[] = ['Filtro', 'Valor'];
+        $this->filasTitulo[] = count($this->filas) + 1;
+        $this->filas[] = ['FILTROS APLICADOS'];
+        $this->filasEncabezado[] = count($this->filas) + 1;
+        $this->filas[] = ['Filtro', 'Valor'];
 
         foreach ($this->filtros as $nombre => $valor) {
-            $filas[] = [$nombre, $valor ?: 'Todos'];
+            $this->filas[] = [$nombre, $valor ?: 'Todos'];
         }
 
-        $filas[] = [];
-        $filas[] = ['RESUMEN GENERAL'];
-        $filas[] = ['Indicador', 'Valor'];
+        $this->filas[] = [];
+        $this->filasTitulo[] = count($this->filas) + 1;
+        $this->filas[] = ['RESUMEN GENERAL'];
+        $this->filasEncabezado[] = count($this->filas) + 1;
+        $this->filas[] = ['Indicador', 'Valor'];
 
-        $filas[] = ['Total de alumnos', $this->resumen['total_alumnos'] ?? 0];
-        $filas[] = ['Promedio general', $this->formatearDecimal($this->resumen['promedio_general'] ?? 0)];
-        $filas[] = ['Aprobados', $this->resumen['aprobados'] ?? 0];
-        $filas[] = ['En riesgo', $this->resumen['riesgo'] ?? 0];
-        $filas[] = ['Incompletos', $this->resumen['incompletos'] ?? 0];
-        $filas[] = ['Mejor promedio', $this->formatearDecimal($this->resumen['mejor_promedio'] ?? 0)];
-        $filas[] = ['Mejor alumno', $this->resumen['mejor_alumno'] ?? 'Sin datos'];
+        $this->filas[] = ['Total de alumnos', $this->resumen['total_alumnos'] ?? 0];
+        $this->filas[] = ['Promedio general', $this->valor($this->resumen['promedio_general'] ?? null)];
+        $this->filas[] = ['Acreditados', $this->resumen['aprobados'] ?? 0];
+        $this->filas[] = ['En riesgo', $this->resumen['riesgo'] ?? 0];
+        $this->filas[] = ['Incompletos', $this->resumen['incompletos'] ?? 0];
+        $this->filas[] = ['Decisiones pendientes', $this->resumen['pendientes_decision'] ?? 0];
+        $this->filas[] = ['Mejor promedio', $this->valor($this->resumen['mejor_promedio'] ?? null)];
+        $this->filas[] = ['Mejor alumno', $this->resumen['mejor_alumno'] ?? 'Sin datos'];
 
-        $filas[] = [];
-        $filas[] = ['FÓRMULA APLICADA'];
+        $this->filas[] = [];
+        $this->filasTitulo[] = count($this->filas) + 1;
+        $this->filas[] = ['FÓRMULA APLICADA'];
 
-        if ($this->esBachillerato) {
-            $filas[] = ['Promedio semestral', '(Parcial 1 + Parcial 2) / parciales capturados'];
+        if ($this->nivelSlug === 'primaria') {
+            $this->filas[] = ['Promedio final de campo', 'PROMEDIO(P1, P2, P3) del campo con precisión completa'];
+            $this->filas[] = ['Promedio general', 'Suma de los cuatro promedios finales precisos de campo / 4'];
+            $this->filas[] = ['Promoción sugerida', '1.º por conclusión del grado; 2.º a 6.º requieren los cuatro campos con mínimo 6.0'];
+        } elseif ($this->nivelSlug === 'secundaria') {
+            $this->filas[] = ['Promedio anual por materia', 'PROMEDIO(P1, P2, P3) con precisión completa'];
+            $this->filas[] = ['Promedio general', 'PROMEDIO de los promedios anuales precisos de las materias participantes'];
+            $this->filas[] = ['Tutoría', 'Se muestra, pero no participa en promedio, lugares ni promoción'];
+        } elseif ($this->esBachillerato) {
+            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los parciales numéricos del semestre'];
         } else {
-            $filas[] = ['Promedio anual', '(Periodo 1 + Periodo 2 + Periodo 3) / periodos capturados'];
+            $this->filas[] = ['Promedio anual', 'PROMEDIO de las evaluaciones numéricas configuradas'];
         }
 
-        $filas[] = ['Nota', 'Solo se toman calificaciones numéricas. Se ignoran textos como AC, NP, SD, ED, RA y pendientes.'];
-
-        return $filas;
+        $this->filas[] = [
+            'Nota',
+            'Los vacíos y claves especiales no se convierten en cero. Los cálculos intermedios no se truncan; el truncamiento a un decimal se aplica únicamente al presentar.',
+        ];
     }
 
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function (AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event): void {
                 $hoja = $event->sheet->getDelegate();
+                $ultimaFila = $hoja->getHighestRow();
 
                 $hoja->mergeCells('A1:D1');
                 $hoja->mergeCells('A2:D2');
-
                 $hoja->getRowDimension(1)->setRowHeight(30);
                 $hoja->getRowDimension(2)->setRowHeight(22);
 
-                $hoja->getColumnDimension('A')->setWidth(28);
-                $hoja->getColumnDimension('B')->setWidth(45);
-                $hoja->getColumnDimension('C')->setWidth(20);
-                $hoja->getColumnDimension('D')->setWidth(20);
+                $hoja->getColumnDimension('A')->setWidth(30);
+                $hoja->getColumnDimension('B')->setWidth(80);
+                $hoja->getColumnDimension('C')->setWidth(18);
+                $hoja->getColumnDimension('D')->setWidth(18);
 
                 $hoja->getStyle('A1:D1')->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                        'size' => 16,
-                        'color' => ['rgb' => 'FFFFFF'],
-                    ],
-                    'fill' => [
-                        'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '006492'],
-                    ],
+                    'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '006492']],
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
                         'vertical' => Alignment::VERTICAL_CENTER,
@@ -103,44 +123,24 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
                 ]);
 
                 $hoja->getStyle('A2:D2')->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                        'color' => ['rgb' => '475569'],
-                    ],
-                    'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    ],
+                    'font' => ['bold' => true, 'color' => ['rgb' => '475569']],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                 ]);
 
-                foreach ([4, 12, 21] as $filaTitulo) {
-                    $hoja->mergeCells("A{$filaTitulo}:D{$filaTitulo}");
-
-                    $hoja->getStyle("A{$filaTitulo}:D{$filaTitulo}")->applyFromArray([
-                        'font' => [
-                            'bold' => true,
-                            'color' => ['rgb' => 'FFFFFF'],
-                        ],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => '88AC2E'],
-                        ],
+                foreach ($this->filasTitulo as $fila) {
+                    $hoja->mergeCells("A{$fila}:D{$fila}");
+                    $hoja->getStyle("A{$fila}:D{$fila}")->applyFromArray([
+                        'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '88AC2E']],
                     ]);
                 }
 
-                foreach ([5, 13] as $filaEncabezado) {
-                    $hoja->getStyle("A{$filaEncabezado}:B{$filaEncabezado}")->applyFromArray([
-                        'font' => [
-                            'bold' => true,
-                            'color' => ['rgb' => 'FFFFFF'],
-                        ],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => '334155'],
-                        ],
+                foreach ($this->filasEncabezado as $fila) {
+                    $hoja->getStyle("A{$fila}:B{$fila}")->applyFromArray([
+                        'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '334155']],
                     ]);
                 }
-
-                $ultimaFila = $hoja->getHighestRow();
 
                 $hoja->getStyle("A1:D{$ultimaFila}")->applyFromArray([
                     'borders' => [
@@ -155,13 +155,18 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
                     ],
                 ]);
 
-                $hoja->getStyle("B14:B19")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $hoja->freezePane('A4');
+                $hoja->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
             },
         ];
     }
 
-    protected function formatearDecimal(null|int|float|string $valor): string
+    private function valor(mixed $valor): string
     {
-        return PromedioExcel::formatear($valor, 1, '0.0');
+        if ($valor === null || $valor === '' || ! is_numeric($valor)) {
+            return '—';
+        }
+
+        return PromedioExcel::formatear($valor, 1, '—');
     }
 }
