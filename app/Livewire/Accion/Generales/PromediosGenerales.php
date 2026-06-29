@@ -11,6 +11,7 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\CalificacionOficialPrimariaService;
+use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
@@ -219,6 +220,10 @@ class PromediosGenerales extends Component
             return $this->agregarDisponibilidadDiploma($this->obtenerAlumnosSecundaria());
         }
 
+        if ($this->esBachillerato) {
+            return $this->obtenerAlumnosBachillerato();
+        }
+
         return $this->agregarDisponibilidadDiploma($this->obtenerAlumnosGenericos());
     }
 
@@ -373,6 +378,70 @@ class PromediosGenerales extends Component
         })->values();
 
         return $this->ordenarAlumnos($this->asignarLugaresPorGrupo($alumnos));
+    }
+
+    private function obtenerAlumnosBachillerato(): Collection
+    {
+        $reporte = app(PromedioBachilleratoService::class)->reporteSemestral(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id !== '' ? (int) $this->generacion_id : null,
+            gradoId: $this->grado_id !== '' ? (int) $this->grado_id : null,
+            grupoId: $this->grupo_id !== '' ? (int) $this->grupo_id : null,
+            semestreId: $this->semestre_id !== '' ? (int) $this->semestre_id : null,
+        );
+
+        $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
+            $periodos = $fila['promedios_periodo_precisos'] ?? [1 => null, 2 => null];
+            $periodosCompletos = $fila['periodos_completos'] ?? [1 => false, 2 => false];
+            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+
+            $filaNormalizada = [
+                'inscripcion_id' => $fila['inscripcion_id'],
+                'trayectoria_academica_id' => $fila['trayectoria_academica_id'] ?? null,
+                'generacion_id' => $fila['generacion_id'],
+                'matricula' => $fila['matricula'],
+                'alumno' => $fila['alumno'],
+                'grado_id' => $fila['grado_id'],
+                'grado' => $fila['grado'],
+                'grado_orden' => $fila['grado_orden'],
+                'grupo_id' => $fila['grupo_id'],
+                'grupo' => $fila['grupo'],
+                'semestre_id' => $fila['semestre_id'],
+                'semestre' => $fila['semestre'],
+                'periodos' => $periodos,
+                'periodos_completos' => $periodosCompletos,
+                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                'promedio_final' => $fila['promedio_general_preciso'],
+                'promedio_provisional' => $fila['promedio_provisional_preciso'],
+                'promedio_mostrado' => $fila['promedio_general_preciso'] ?? $fila['promedio_provisional_preciso'],
+                'periodos_capturados' => $capturados,
+                'periodos_faltantes' => collect($periodosCompletos)->filter(fn ($valor) => ! $valor)->count(),
+                'materias_capturadas' => $fila['materias_completas'] ?? 0,
+                'materias_esperadas' => $fila['materias_esperadas'] ?? 0,
+                'completo' => (bool) ($fila['completo'] ?? false),
+                'campos' => [],
+                'materias' => $fila['materias'] ?? [],
+                'campos_reprobados' => [],
+                'materias_reprobadas' => $fila['materias_reprobadas'] ?? [],
+                'claves_especiales' => $fila['claves_especiales'] ?? [],
+                'promocion_sugerida' => $fila['aprobado_general'] ?? false,
+                'promocion_confirmada' => null,
+                'lugar' => $fila['lugar'] ?? null,
+                'texto_lugar' => $fila['texto_lugar'] ?? 'Pendiente',
+                'reconocimiento_disponible' => (bool) ($fila['reconocimiento_disponible'] ?? false),
+                'diploma_disponible' => (bool) ($fila['diploma_disponible'] ?? false),
+                'es_grado_terminal' => (int) ($fila['semestre'] ?? 0) === 6,
+                'es_semestre_terminal' => (int) ($fila['semestre'] ?? 0) === 6,
+                'fuente_calculo' => 'materias_bachillerato',
+            ];
+
+            $filaNormalizada['estatus'] = $this->obtenerEstatusAlumno($filaNormalizada);
+
+            return $filaNormalizada;
+        })->values();
+
+        return $this->ordenarAlumnos($alumnos);
     }
 
     private function obtenerAlumnosGenericos(): Collection

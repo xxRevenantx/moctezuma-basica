@@ -8,6 +8,7 @@ use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\PromedioBachilleratoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -31,6 +32,7 @@ class DocumentosAcademicosZipController extends Controller
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'grado_id' => ['required', 'integer', 'exists:grados,id'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
+            'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
         ]);
 
         $nivel = Nivel::query()
@@ -50,36 +52,43 @@ class DocumentosAcademicosZipController extends Controller
 
         $esBachillerato = $nivel->slug === 'bachillerato' || (int) $nivel->id === 4;
 
-        if ($tipo === 'reconocimientos') {
-            abort_if(
-                $esBachillerato,
-                403,
-                'Los reconocimientos anuales no están habilitados para bachillerato en este módulo.'
-            );
-
+        if ($tipo === 'reconocimientos' && ! $esBachillerato) {
             abort_unless(
                 in_array($nivel->slug, ['primaria', 'secundaria'], true),
                 403,
-                'La descarga masiva de reconocimientos solo está habilitada para primaria y secundaria.'
+                'La descarga masiva de reconocimientos solo está habilitada para primaria, secundaria y bachillerato.'
             );
         }
 
-        $semestreTerminal = null;
+        $semestreSeleccionado = null;
+
+        if ($esBachillerato) {
+            abort_unless(
+                ! empty($datos['semestre_id']),
+                422,
+                'Debes seleccionar el semestre de bachillerato.'
+            );
+
+            $semestreSeleccionado = Semestre::query()
+                ->whereKey((int) $datos['semestre_id'])
+                ->where('grado_id', $grado->id)
+                ->first();
+
+            abort_unless(
+                $semestreSeleccionado,
+                404,
+                'El semestre seleccionado no pertenece al grado indicado.'
+            );
+        }
 
         if ($tipo === 'diplomas') {
             $this->validarGradoTerminal($nivel, $grado);
 
             if ($esBachillerato) {
-                $semestreTerminal = Semestre::query()
-                    ->where('grado_id', $grado->id)
-                    ->orderByDesc('numero')
-                    ->orderByDesc('id')
-                    ->first();
-
                 abort_unless(
-                    $semestreTerminal,
-                    404,
-                    'No se encontró el semestre terminal de bachillerato.'
+                    (int) $semestreSeleccionado?->numero === 6,
+                    403,
+                    'Los diplomas de bachillerato solo están disponibles para sexto semestre.'
                 );
             }
         }
@@ -97,8 +106,8 @@ class DocumentosAcademicosZipController extends Controller
                 fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
             )
             ->when(
-                $esBachillerato && $tipo === 'diplomas' && $semestreTerminal,
-                fn ($query) => $query->where('semestre_id', $semestreTerminal->id)
+                $esBachillerato && $semestreSeleccionado,
+                fn ($query) => $query->where('semestre_id', $semestreSeleccionado->id)
             )
             ->get([
                 'id',
@@ -111,26 +120,113 @@ class DocumentosAcademicosZipController extends Controller
 
         abort_if($grupos->isEmpty(), 404, 'No se encontraron grupos para el grado seleccionado.');
 
-        $alumnos = Inscripcion::query()
-            ->with([
-                'grupo.asignacionGrupo:id,nombre',
-                'grupo.semestre:id,grado_id,numero',
-            ])
-            ->where('nivel_id', $nivel->id)
-            ->where('grado_id', $grado->id)
-            ->where('activo', true)
-            ->whereIn('grupo_id', $grupos->pluck('id'))
-            ->when(
-                !empty($datos['generacion_id']),
-                fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
-            )
-            ->orderBy('grupo_id')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+        $filasBachilleratoElegibles = collect();
 
-        abort_if($alumnos->isEmpty(), 404, 'No se encontraron alumnos activos para el grado seleccionado.');
+        if ($esBachillerato) {
+            $reporteBachillerato = app(PromedioBachilleratoService::class)->reporteSemestral(
+                nivelId: (int) $nivel->id,
+                cicloEscolarId: (int) $datos['ciclo_escolar_id'],
+                generacionId: ! empty($datos['generacion_id']) ? (int) $datos['generacion_id'] : null,
+                gradoId: (int) $grado->id,
+                grupoId: null,
+                semestreId: (int) $semestreSeleccionado->id,
+            );
+
+            $filasBachilleratoElegibles = collect($reporteBachillerato['alumnos'] ?? [])
+                ->filter(fn (array $fila) => $tipo === 'reconocimientos'
+                    ? ($fila['reconocimiento_disponible'] ?? false) === true
+                    : ($fila['diploma_disponible'] ?? false) === true)
+                ->values();
+        }
+
+        if ($esBachillerato) {
+            /*
+             * El contexto del documento se toma del reporte semestral, no de
+             * los campos actuales de la inscripción. Así también se generan
+             * reconocimientos de un semestre ya concluido aunque el alumno
+             * actualmente esté registrado en el semestre siguiente.
+             */
+            $alumnosPorId = Inscripcion::withTrashed()
+                ->where('nivel_id', $nivel->id)
+                ->whereIn(
+                    'id',
+                    $filasBachilleratoElegibles
+                        ->pluck('inscripcion_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->unique()
+                        ->all()
+                )
+                ->get()
+                ->keyBy('id');
+
+            $gruposPorId = $grupos->keyBy('id');
+
+            $documentos = $filasBachilleratoElegibles
+                ->map(function (array $fila) use ($alumnosPorId, $gruposPorId): ?array {
+                    $alumno = $alumnosPorId->get((int) $fila['inscripcion_id']);
+                    $grupo = $gruposPorId->get((int) $fila['grupo_id']);
+
+                    if (! $alumno || ! $grupo) {
+                        return null;
+                    }
+
+                    return [
+                        'alumno' => $alumno,
+                        'grupo' => $grupo,
+                        'generacion_id' => (int) $fila['generacion_id'],
+                        'grado_id' => (int) $fila['grado_id'],
+                        'grupo_id' => (int) $fila['grupo_id'],
+                        'semestre_id' => (int) $fila['semestre_id'],
+                    ];
+                })
+                ->filter()
+                ->values();
+        } else {
+            $alumnos = Inscripcion::query()
+                ->with([
+                    'grupo.asignacionGrupo:id,nombre',
+                    'grupo.semestre:id,grado_id,numero',
+                ])
+                ->where('nivel_id', $nivel->id)
+                ->where('grado_id', $grado->id)
+                ->whereIn('grupo_id', $grupos->pluck('id'))
+                ->where('activo', true)
+                ->when(
+                    ! empty($datos['generacion_id']),
+                    fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
+                )
+                ->orderBy('grupo_id')
+                ->orderBy('apellido_paterno')
+                ->orderBy('apellido_materno')
+                ->orderBy('nombre')
+                ->get();
+
+            $documentos = $alumnos
+                ->map(function (Inscripcion $alumno): ?array {
+                    if (! $alumno->grupo || ! $alumno->generacion_id) {
+                        return null;
+                    }
+
+                    return [
+                        'alumno' => $alumno,
+                        'grupo' => $alumno->grupo,
+                        'generacion_id' => (int) $alumno->generacion_id,
+                        'grado_id' => (int) $alumno->grado_id,
+                        'grupo_id' => (int) $alumno->grupo_id,
+                        'semestre_id' => null,
+                    ];
+                })
+                ->filter()
+                ->values();
+        }
+
+        abort_if(
+            $documentos->isEmpty(),
+            404,
+            $esBachillerato
+                ? 'No hay alumnos con el documento académico habilitado en el semestre seleccionado.'
+                : 'No se encontraron alumnos activos para el grado seleccionado.'
+        );
 
         $zipPath = $this->crearRutaTemporalZip();
         $zip = new ZipArchive();
@@ -144,23 +240,22 @@ class DocumentosAcademicosZipController extends Controller
         $documentosAgregados = 0;
 
         try {
-            foreach ($alumnos as $alumno) {
-                $grupo = $alumno->grupo;
-
-                if (!$grupo || !$alumno->generacion_id) {
-                    continue;
-                }
+            foreach ($documentos as $documento) {
+                /** @var Inscripcion $alumno */
+                $alumno = $documento['alumno'];
+                /** @var Grupo $grupo */
+                $grupo = $documento['grupo'];
 
                 $parametros = [
-                    'generacion_id' => (int) $alumno->generacion_id,
-                    'grado_id' => (int) $alumno->grado_id,
-                    'grupo_id' => (int) $alumno->grupo_id,
+                    'generacion_id' => (int) $documento['generacion_id'],
+                    'grado_id' => (int) $documento['grado_id'],
+                    'grupo_id' => (int) $documento['grupo_id'],
                     'inscripcion_id' => (int) $alumno->id,
                     'ciclo_escolar_id' => (int) $datos['ciclo_escolar_id'],
                 ];
 
                 if ($esBachillerato) {
-                    $semestreId = (int) ($grupo->semestre_id ?: $semestreTerminal?->id);
+                    $semestreId = (int) $documento['semestre_id'];
 
                     if ($semestreId <= 0) {
                         continue;
@@ -193,7 +288,7 @@ class DocumentosAcademicosZipController extends Controller
                 }
 
                 if ($zip->addFromString(
-                    $this->rutaDocumentoZip($alumno, $tipo),
+                    $this->rutaDocumentoZip($alumno, $tipo, $grupo),
                     $contenido
                 )) {
                     $documentosAgregados++;
@@ -213,12 +308,22 @@ class DocumentosAcademicosZipController extends Controller
             abort(
                 404,
                 $tipo === 'reconocimientos'
-                    ? 'No hay alumnos con reconocimiento habilitado en el grado seleccionado.'
-                    : 'No hay alumnos con diploma habilitado en el grado seleccionado.'
+                    ? ($esBachillerato
+                        ? 'No hay alumnos con reconocimiento habilitado en el semestre seleccionado.'
+                        : 'No hay alumnos con reconocimiento habilitado en el grado seleccionado.')
+                    : ($esBachillerato
+                        ? 'No hay alumnos con diploma habilitado en sexto semestre.'
+                        : 'No hay alumnos con diploma habilitado en el grado seleccionado.')
             );
         }
 
-        $nombreZip = $this->nombreZip($nivel, $grado, $tipo, (int) $datos['ciclo_escolar_id']);
+        $nombreZip = $this->nombreZip(
+            $nivel,
+            $grado,
+            $tipo,
+            (int) $datos['ciclo_escolar_id'],
+            $semestreSeleccionado
+        );
 
         return response()
             ->download($zipPath, $nombreZip)
@@ -415,9 +520,13 @@ class DocumentosAcademicosZipController extends Controller
         return $directorio . DIRECTORY_SEPARATOR . 'documentos_academicos_' . Str::uuid() . '.zip';
     }
 
-    private function rutaDocumentoZip(Inscripcion $alumno, string $tipo): string
-    {
-        $grupoNombre = trim((string) ($alumno->grupo?->asignacionGrupo?->nombre ?? 'SIN_GRUPO'));
+    private function rutaDocumentoZip(
+        Inscripcion $alumno,
+        string $tipo,
+        ?Grupo $grupoContexto = null,
+    ): string {
+        $grupo = $grupoContexto ?: $alumno->grupo;
+        $grupoNombre = trim((string) ($grupo?->asignacionGrupo?->nombre ?? 'SIN_GRUPO'));
         $grupoNombre = preg_replace('/^grupo\s+/iu', '', $grupoNombre) ?: $grupoNombre;
         $carpeta = 'Grupo_' . $this->segmentoArchivo($grupoNombre);
         $prefijo = $tipo === 'reconocimientos' ? 'RECONOCIMIENTO' : 'DIPLOMA';
@@ -427,10 +536,16 @@ class DocumentosAcademicosZipController extends Controller
         return $carpeta . '/' . $prefijo . '_' . $matricula . '_' . $nombre . '_' . $alumno->id . '.pdf';
     }
 
-    private function nombreZip(Nivel $nivel, Grado $grado, string $tipo, int $cicloEscolarId): string
-    {
+    private function nombreZip(
+        Nivel $nivel,
+        Grado $grado,
+        string $tipo,
+        int $cicloEscolarId,
+        ?Semestre $semestre = null,
+    ): string {
         return mb_strtoupper($tipo)
             . '_' . $this->segmentoArchivo($grado->nombre)
+            . ($semestre ? '_SEMESTRE_' . $semestre->numero : '')
             . '_' . $this->segmentoArchivo($nivel->nombre)
             . '_CICLO_' . $cicloEscolarId
             . '.zip';

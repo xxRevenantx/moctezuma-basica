@@ -8,10 +8,21 @@
     $esBachillerato = $this->esBachillerato;
     $esBasicaConDetalle = $esPrimaria || $esSecundaria;
     $gradoTerminal = $grados->sortByDesc('orden')->first();
+    $semestreTerminal = $semestres->sortByDesc('numero')->first();
     $puedeDescargarPorGrado = $ciclo_escolar_id !== '' && $grado_id !== '';
+    $puedeDescargarReconocimientos = $puedeDescargarPorGrado
+        && (! $esBachillerato || $semestre_id !== '');
     $esGradoTerminalSeleccionado = $puedeDescargarPorGrado
         && $gradoTerminal
         && (int) $grado_id === (int) $gradoTerminal->id;
+    $esSemestreTerminalSeleccionado = ! $esBachillerato
+        || (
+            $semestre_id !== ''
+            && $semestreTerminal
+            && (int) $semestre_id === (int) $semestreTerminal->id
+            && (int) $semestreTerminal->numero === 6
+        );
+    $puedeDescargarDiplomas = $esGradoTerminalSeleccionado && $esSemestreTerminalSeleccionado;
     $parametrosDescargaMasiva = [
         'ciclo_escolar_id' => $ciclo_escolar_id,
         'grado_id' => $grado_id,
@@ -19,6 +30,10 @@
 
     if ($generacion_id !== '') {
         $parametrosDescargaMasiva['generacion_id'] = $generacion_id;
+    }
+
+    if ($esBachillerato && $semestre_id !== '') {
+        $parametrosDescargaMasiva['semestre_id'] = $semestre_id;
     }
 @endphp
 
@@ -45,7 +60,7 @@
                         @elseif ($esSecundaria)
                             El promedio de cada materia se obtiene con sus tres periodos. El promedio general se calcula con los promedios anuales de las materias oficiales configuradas en la base de datos. Materias extra, recesos, talleres y materias informativas no se muestran ni participan.
                         @elseif ($esBachillerato)
-                            El promedio se calcula con los parciales numéricos del semestre, conservando la precisión hasta el resultado final.
+                            El promedio de cada materia se obtiene con el primer y segundo parcial. El promedio semestral se calcula con los promedios finales de todas las materias oficiales asignadas. El resultado solo es definitivo cuando todas tienen ambos parciales numéricos.
                         @else
                             El promedio se calcula con las evaluaciones numéricas configuradas para el nivel.
                         @endif
@@ -164,18 +179,18 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
-                    Descargas masivas por grado
+                    {{ $esBachillerato ? 'Descargas masivas por semestre' : 'Descargas masivas por grado' }}
                 </p>
                 <h3 class="mt-1 text-lg font-black text-slate-950 dark:text-white">
                     Reconocimientos y diplomas en archivos ZIP
                 </h3>
                 <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    Selecciona un grado. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.
+                    {{ $esBachillerato ? 'Selecciona grado y semestre. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.' : 'Selecciona un grado. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.' }}
                 </p>
             </div>
 
             <div class="flex flex-wrap gap-2">
-                @if (! $esBachillerato && $puedeDescargarPorGrado)
+                @if ($puedeDescargarReconocimientos)
                     <a href="{{ route('generales.documentos-academicos.zip', array_merge([
                         'slug_nivel' => $slug_nivel,
                         'tipo' => 'reconocimientos',
@@ -184,14 +199,15 @@
                         <flux:icon.trophy class="h-4 w-4" />
                         Reconocimientos ZIP
                     </a>
-                @elseif (! $esBachillerato)
-                    <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
+                @else
+                    <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                        title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
                         <flux:icon.trophy class="h-4 w-4" />
                         Reconocimientos ZIP
                     </span>
                 @endif
 
-                @if ($esGradoTerminalSeleccionado)
+                @if ($puedeDescargarDiplomas)
                     <a href="{{ route('generales.documentos-academicos.zip', array_merge([
                         'slug_nivel' => $slug_nivel,
                         'tipo' => 'diplomas',
@@ -202,7 +218,7 @@
                     </a>
                 @else
                     <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                        title="Selecciona el último grado del nivel">
+                        title="{{ $esBachillerato ? 'Selecciona sexto semestre y su grado correspondiente' : 'Selecciona el último grado del nivel' }}">
                         <flux:icon.academic-cap class="h-4 w-4" />
                         Diplomas ZIP
                     </span>
@@ -233,13 +249,17 @@
         <div class="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
             <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Acreditados</p>
             <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ $resumen['aprobados'] }}</p>
-            <p class="mt-1 text-xs font-bold text-emerald-700">Con todos los requisitos completos</p>
+            <p class="mt-1 text-xs font-bold text-emerald-700">
+                {{ $esBachillerato ? 'Semestre completo y promedio general mínimo de 6' : 'Con todos los requisitos completos' }}
+            </p>
         </div>
 
         <div class="rounded-[1.4rem] border border-rose-200 bg-rose-50 p-4 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/20">
             <p class="text-xs font-black uppercase tracking-wide text-rose-700">En riesgo</p>
             <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ $resumen['riesgo'] }}</p>
-            <p class="mt-1 text-xs font-bold text-rose-700">Campos o materias por debajo de 6</p>
+            <p class="mt-1 text-xs font-bold text-rose-700">
+                {{ $esBachillerato ? 'Promedio semestral general menor de 6' : 'Campos o materias por debajo de 6' }}
+            </p>
         </div>
 
         <div class="rounded-[1.4rem] border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
@@ -425,7 +445,10 @@
                                                     <flux:icon.document-arrow-down class="h-4 w-4" /> Boleta
                                                 </a>
 
-                                                @if (! $esBachillerato && $definitivo && ($alumno['lugar'] ?? null))
+                                                @if ($definitivo && (
+                                                    ($esBachillerato && ($alumno['reconocimiento_disponible'] ?? false))
+                                                    || (! $esBachillerato && ($alumno['lugar'] ?? null))
+                                                ))
                                                     <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                         'slug_nivel' => $slug_nivel,
                                                         'tipo' => 'reconocimiento',
@@ -434,6 +457,7 @@
                                                         'generacion_id' => $alumnoGeneracionId,
                                                         'grado_id' => $alumnoGradoId,
                                                         'grupo_id' => $alumnoGrupoId,
+                                                        'semestre_id' => $alumnoSemestreId,
                                                     ]) }}" target="_blank"
                                                         class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">
                                                         <flux:icon.trophy class="h-4 w-4" /> Reconocimiento

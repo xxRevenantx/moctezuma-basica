@@ -317,6 +317,14 @@
             color: #071846;
         }
 
+        .firmas.solo-director {
+            width: 45%;
+        }
+
+        .firmas.solo-director td {
+            width: 100% !important;
+        }
+
         .cargo {
             margin-top: 2px;
             font-size: 10px;
@@ -399,6 +407,7 @@
         }
 
         $textoLugarReconocimiento = mb_strtoupper((string) $textoLugarReconocimiento, 'UTF-8');
+        $soloDirector = !empty($mostrarSoloDirector) || !empty($esBachillerato);
     @endphp
 
     <div class="diploma">
@@ -504,9 +513,9 @@
             </div>
         </div> --}}
 
-        <table class="firmas">
+        <table class="firmas {{ $soloDirector ? 'solo-director' : '' }}">
             <tr>
-                <td style="width: 50%; padding-top: 0px; text-align: center;">
+                <td style="width: {{ $soloDirector ? '100%' : '50%' }}; padding-top: 0px; text-align: center;">
                     <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
 
                     @if (optional($director->director)->genero === 'F')
@@ -515,17 +524,19 @@
                         Firma del director de la escuela
                     @endif
                 </td>
-                <td style="width: 50%; padding-top: 0px; text-align: center;">
-                    <u>{{ mb_strtoupper(trim((optional($director->supervisor)->titulo ?? '') . ' ' . (optional($director->supervisor)->nombre ?? '') . ' ' . (optional($director->supervisor)->apellido_paterno ?? '') . ' ' . (optional($director->supervisor)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
+                @unless ($soloDirector)
+                    <td style="width: 50%; padding-top: 0px; text-align: center;">
+                        <u>{{ mb_strtoupper(trim((optional($director->supervisor)->titulo ?? '') . ' ' . (optional($director->supervisor)->nombre ?? '') . ' ' . (optional($director->supervisor)->apellido_paterno ?? '') . ' ' . (optional($director->supervisor)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
 
-                    @if (optional($director->supervisor)->genero === 'F')
-                        Firma de la supervisora escolar<br>
-                        Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
-                    @else
-                        Firma del supervisor escolar <br>
-                        Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
-                    @endif
-                </td>
+                        @if (optional($director->supervisor)->genero === 'F')
+                            Firma de la supervisora escolar<br>
+                            Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
+                        @else
+                            Firma del supervisor escolar <br>
+                            Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
+                        @endif
+                    </td>
+                @endunless
             </tr>
         </table>
     </div>

@@ -20,6 +20,7 @@ use App\Models\Persona;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
 use App\Services\CalificacionOficialPrimariaService;
+use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -74,7 +75,7 @@ class PDFController extends Controller
         $esBachillerato = $this->esBachillerato($nivel);
         $esSecundaria = $this->esSecundaria($nivel);
 
-        abort_if($esBachillerato && !in_array($tipo, ['semestral', 'diploma'], true), 404);
+        abort_if($esBachillerato && !in_array($tipo, ['semestral', 'reconocimiento', 'diploma'], true), 404);
         abort_if(!$esBachillerato && !in_array($tipo, ['boleta', 'reconocimiento', 'diploma'], true), 404);
 
         $generacion = Generacion::query()
@@ -171,6 +172,19 @@ class PDFController extends Controller
             grupo: $grupo,
             esBachillerato: $esBachillerato
         );
+
+        /*
+         * En bachillerato el alumno puede estar actualmente en el semestre
+         * siguiente. Se permite recuperar su inscripción histórica y el
+         * servicio semestral valida más adelante que sí pertenezca al ciclo,
+         * generación, grado, grupo y semestre solicitados.
+         */
+        if (! $inscripcion && $esBachillerato) {
+            $inscripcion = Inscripcion::withTrashed()
+                ->whereKey($inscripcionId)
+                ->where('nivel_id', $nivel->id)
+                ->first();
+        }
 
         if (!$inscripcion) {
             abort(404, 'Inscripción no encontrada para el contexto seleccionado.');
@@ -729,15 +743,16 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Fuente académica oficial de primaria y secundaria
+        | Fuente académica oficial por nivel
         |--------------------------------------------------------------------------
         |
-        | El bloque anterior se conserva para bachillerato y para construir el
-        | detalle institucional por materia. En primaria y secundaria se reemplaza
-        | el resumen anual por la misma fuente usada en Promedios Generales:
+        | El bloque anterior construye la estructura institucional del PDF.
+        | Después se reemplazan promedios, lugares y detalle por la misma fuente
+        | utilizada en Promedios Generales:
         |
         | - Primaria: promedio de los cuatro campos formativos.
         | - Secundaria: promedio de los promedios anuales precisos de materias.
+        | - Bachillerato: promedio semestral de los promedios finales por materia.
         | - Sin truncamientos intermedios; se trunca únicamente al presentar.
         */
         $reporteAcademico = null;
@@ -758,6 +773,15 @@ class PDFController extends Controller
                 generacionId: (int) $generacion->id,
                 gradoId: (int) $grado->id,
                 grupoId: (int) $grupo->id,
+            );
+        } elseif ($esBachillerato) {
+            $reporteAcademico = app(PromedioBachilleratoService::class)->reporteSemestral(
+                nivelId: (int) $nivel->id,
+                cicloEscolarId: (int) $cicloEscolar->id,
+                generacionId: (int) $generacion->id,
+                gradoId: (int) $grado->id,
+                grupoId: (int) $grupo->id,
+                semestreId: (int) $semestre->id,
             );
         }
 
@@ -880,6 +904,92 @@ class PDFController extends Controller
                         ->filter(fn(array $materia) => in_array($materia['estado'], ['Regular', 'Aprobado'], true))
                         ->count();
                     $numeroMateriasPromediar = count($filasMaterias);
+                } elseif ($esBachillerato) {
+                    $filasMaterias = collect($filaAcademica['materias'] ?? [])
+                        ->map(function (array $materia) use ($numerosPeriodos): array {
+                            $calificacionesPeriodo = [];
+
+                            foreach ($numerosPeriodos as $numeroPeriodo) {
+                                $valor = $materia['evaluaciones'][$numeroPeriodo] ?? null;
+                                $especial = $materia['especiales'][$numeroPeriodo] ?? null;
+
+                                if (is_numeric($valor)) {
+                                    $numero = (float) $valor;
+                                    $estadoPeriodo = match (true) {
+                                        $numero < 6.0 => 'En riesgo',
+                                        $numero < 8.0 => 'Regular',
+                                        default => 'Aprobado',
+                                    };
+
+                                    $calificacionesPeriodo[$numeroPeriodo] = [
+                                        'calificacion' => PromedioExcel::formatear($numero, 1, '—'),
+                                        'estado' => $estadoPeriodo,
+                                        'porcentaje' => min(100, $numero * 10),
+                                    ];
+
+                                    continue;
+                                }
+
+                                if (filled($especial)) {
+                                    $calificacionesPeriodo[$numeroPeriodo] = [
+                                        'calificacion' => mb_strtoupper(trim((string) $especial)),
+                                        'estado' => 'Especial',
+                                        'porcentaje' => 0,
+                                    ];
+
+                                    continue;
+                                }
+
+                                $calificacionesPeriodo[$numeroPeriodo] = [
+                                    'calificacion' => '—',
+                                    'estado' => 'Sin captura',
+                                    'porcentaje' => 0,
+                                ];
+                            }
+
+                            $completa = (bool) ($materia['completo'] ?? false);
+                            $promedioMateriaPreciso = $completa
+                                ? ($materia['promedio_final_preciso'] ?? null)
+                                : null;
+
+                            $estadoMateria = match (true) {
+                                ! $completa || ! is_numeric($promedioMateriaPreciso) => 'Provisional',
+                                (float) $promedioMateriaPreciso < 6.0 => 'En riesgo',
+                                (float) $promedioMateriaPreciso < 8.0 => 'Regular',
+                                default => 'Aprobado',
+                            };
+
+                            return [
+                                'materia' => $materia['materia'] ?? 'Materia',
+                                'clave' => $materia['clave'] ?? '—',
+                                'extra' => 0,
+                                'receso' => 0,
+                                'calificaciones' => $calificacionesPeriodo,
+                                'promedio' => PromedioExcel::formatear($promedioMateriaPreciso, 1, '—'),
+                                'promedio_numero' => $promedioMateriaPreciso,
+                                'promedio_numero_preciso' => $promedioMateriaPreciso,
+                                'promedio_truncado' => PromedioExcel::truncar($promedioMateriaPreciso, 1),
+                                'estado' => $estadoMateria,
+                                'completo' => $completa,
+                            ];
+                        })
+                        ->values()
+                        ->all();
+
+                    $totalCeldas = count($filasMaterias) * count($numerosPeriodos);
+                    $pendientes = collect($filasMaterias)
+                        ->flatMap(fn (array $materia) => $materia['calificaciones'] ?? [])
+                        ->where('estado', 'Sin captura')
+                        ->count();
+                    $especiales = collect($filasMaterias)
+                        ->flatMap(fn (array $materia) => $materia['calificaciones'] ?? [])
+                        ->where('estado', 'Especial')
+                        ->count();
+                    $reprobadas = collect($filasMaterias)->where('estado', 'En riesgo')->count();
+                    $aprobadas = collect($filasMaterias)
+                        ->filter(fn (array $materia) => in_array($materia['estado'], ['Regular', 'Aprobado'], true))
+                        ->count();
+                    $numeroMateriasPromediar = count($filasMaterias);
                 }
 
                 if (!($filaAcademica['completo'] ?? false)) {
@@ -889,6 +999,13 @@ class PDFController extends Controller
                     $estadoPromedio = empty($filaAcademica['campos_reprobados'] ?? [])
                         ? (((float) $promedioNumero >= 8) ? 'Aprobado' : 'Regular')
                         : 'Reprobado';
+                } elseif ($esBachillerato) {
+                    $estadoPromedio = match (true) {
+                        ! is_numeric($promedioNumero) => 'Sin datos',
+                        (float) $promedioNumero < 6.0 => 'Reprobado',
+                        (float) $promedioNumero < 8.0 => 'Regular',
+                        default => 'Aprobado',
+                    };
                 } else {
                     $estadoPromedio = empty($filaAcademica['materias_reprobadas'] ?? [])
                         ? (((float) $promedioNumero >= 8) ? 'Aprobado' : 'Regular')
@@ -898,7 +1015,10 @@ class PDFController extends Controller
                 $lugarAlumno = null;
                 $textoLugarAlumno = 'Pendiente';
 
-                if (($filaAcademica['completo'] ?? false) && $promedioNumero !== null) {
+                if ($esBachillerato) {
+                    $lugarAlumno = $filaAcademica['lugar'] ?? null;
+                    $textoLugarAlumno = $filaAcademica['texto_lugar'] ?? 'Pendiente';
+                } elseif (($filaAcademica['completo'] ?? false) && $promedioNumero !== null) {
                     $promediosUnicosAcademicos = $filasAcademicas
                         ->filter(function (array $fila) use ($nivel): bool {
                             if (
@@ -938,11 +1058,18 @@ class PDFController extends Controller
             }
         }
 
+        if ($esBachillerato && ! is_array($filaAcademica)) {
+            abort(
+                404,
+                'No se encontró información académica completa para el alumno, grupo y semestre seleccionados.'
+            );
+        }
+
         if ($tipo === 'reconocimiento') {
             abort_unless(
-                in_array($nivel->slug, ['primaria', 'secundaria'], true),
+                in_array($nivel->slug, ['primaria', 'secundaria'], true) || $esBachillerato,
                 403,
-                'El reconocimiento anual solo está disponible para primaria y secundaria.'
+                'El reconocimiento no está habilitado para este nivel.'
             );
 
             abort_unless(
@@ -950,7 +1077,9 @@ class PDFController extends Controller
                 && ($filaAcademica['completo'] ?? false) === true
                 && $lugarAlumno !== null,
                 422,
-                'El alumno aún no tiene un reconocimiento anual habilitado.'
+                $esBachillerato
+                    ? 'El alumno aún no tiene un reconocimiento semestral habilitado.'
+                    : 'El alumno aún no tiene un reconocimiento anual habilitado.'
             );
 
             if ($nivel->slug === 'primaria') {
@@ -966,6 +1095,16 @@ class PDFController extends Controller
                     empty($filaAcademica['materias_reprobadas'] ?? []),
                     403,
                     'El alumno tiene materias no acreditadas y no puede generar reconocimiento anual.'
+                );
+            }
+
+            if ($esBachillerato) {
+                abort_unless(
+                    ($filaAcademica['reconocimiento_disponible'] ?? false) === true
+                    && (int) ($filaAcademica['lugar'] ?? 0) >= 1
+                    && (int) ($filaAcademica['lugar'] ?? 0) <= 3,
+                    403,
+                    'El reconocimiento semestral solo está disponible para los tres primeros lugares con promedio aprobatorio.'
                 );
             }
         }
@@ -994,8 +1133,8 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $mostrarSoloDirector = $tipo === 'diploma'
-            && ($esSecundaria || $esBachillerato);
+        $mostrarSoloDirector = ($tipo === 'diploma' && ($esSecundaria || $esBachillerato))
+            || ($esBachillerato && $tipo === 'reconocimiento');
 
         $docente = null;
 
@@ -6023,32 +6162,31 @@ class PDFController extends Controller
         );
 
         if ($this->esBachillerato($nivel)) {
-            $semestreTerminalNumero = Semestre::query()
-                ->whereHas('grado', fn($query) => $query->where('nivel_id', $nivel->id))
-                ->max('numero');
-
             abort_unless(
-                $semestre !== null
-                && $semestreTerminalNumero !== null
-                && (int) $semestre->numero === (int) $semestreTerminalNumero,
+                $semestre !== null && (int) $semestre->numero === 6,
                 403,
-                'El diploma anual de bachillerato solo está disponible para el último semestre.'
+                'El diploma de bachillerato solo está disponible para sexto semestre.'
             );
 
-            $periodosCapturados = collect($promediosPeriodosPrecisos)
-                ->filter(fn($valor) => $valor !== null)
-                ->count();
-
             abort_unless(
-                $periodosCapturados === count($numerosPeriodos),
+                is_array($filaAcademica) && ($filaAcademica['completo'] ?? false) === true,
                 422,
-                'El alumno aún tiene evaluaciones pendientes.'
+                'El alumno aún tiene materias sin ambos parciales numéricos.'
             );
 
             abort_unless(
-                $promedioNumero !== null && $promedioNumero >= 6.0,
+                ($filaAcademica['todas_materias_acreditadas'] ?? false) === true
+                && empty($filaAcademica['materias_reprobadas'] ?? []),
                 403,
-                'El alumno no cumple con el promedio mínimo para generar el diploma.'
+                'El alumno tiene materias no acreditadas y no puede generar el diploma.'
+            );
+
+            abort_unless(
+                ($filaAcademica['diploma_disponible'] ?? false) === true
+                && $promedioNumero !== null
+                && $promedioNumero >= 6.0,
+                403,
+                'El alumno no cumple las condiciones académicas para generar el diploma.'
             );
 
             return;
