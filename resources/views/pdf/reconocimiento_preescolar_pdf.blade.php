@@ -337,8 +337,8 @@
 
         $tipoTexto =
             $reconocimiento->tipo_reconocimiento === 'anual'
-                ? 'Fin de curso'
-                : 'Reconocimiento del ' . $reconocimiento->periodo . '° periodo';
+                ? 'ciclo escolar ' . ($cicloEscolar->inicio_anio ?? '') . '-' . ($cicloEscolar->fin_anio ?? '')
+                : $reconocimiento->periodo . '° periodo';
 
         $lugarTexto = $reconocimiento->texto_lugar ?: 'Reconocimiento especial';
 
@@ -410,10 +410,10 @@
         <div class="descripcion">
             Por haber obtenido el
             <strong>{{ $lugarTexto }}</strong>
-            durante el
+            en aprovechamiento durante el
             <strong>{{ mb_strtoupper($tipoTexto, 'UTF-8') }}</strong>,
             correspondiente al
-            <strong>{{ $gradoTexto }}</strong>,
+            <strong>{{ $gradoTexto }}° grado</strong>,
             grupo "<strong>{{ $grupoTexto }}</strong>",
             del nivel <strong>PREESCOLAR</strong>.
         </div>
