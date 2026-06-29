@@ -8,8 +8,12 @@ use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
+use App\Services\PromedioSecundariaService;
+use App\Support\PromedioExcel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -177,11 +181,24 @@ class DocumentosAcademicosZipController extends Controller
                         'grado_id' => (int) $fila['grado_id'],
                         'grupo_id' => (int) $fila['grupo_id'],
                         'semestre_id' => (int) $fila['semestre_id'],
+                        'lugar' => isset($fila['lugar']) ? (int) $fila['lugar'] : null,
                     ];
                 })
                 ->filter()
                 ->values();
         } else {
+            $lugaresPorAlumno = $tipo === 'reconocimientos'
+                ? $this->lugaresReconocimientoBasica(
+                    nivel: $nivel,
+                    grupos: $grupos,
+                    cicloEscolarId: (int) $datos['ciclo_escolar_id'],
+                    generacionId: ! empty($datos['generacion_id'])
+                        ? (int) $datos['generacion_id']
+                        : null,
+                    gradoId: (int) $grado->id,
+                )
+                : collect();
+
             $alumnos = Inscripcion::query()
                 ->with([
                     'grupo.asignacionGrupo:id,nombre',
@@ -202,7 +219,7 @@ class DocumentosAcademicosZipController extends Controller
                 ->get();
 
             $documentos = $alumnos
-                ->map(function (Inscripcion $alumno): ?array {
+                ->map(function (Inscripcion $alumno) use ($lugaresPorAlumno): ?array {
                     if (! $alumno->grupo || ! $alumno->generacion_id) {
                         return null;
                     }
@@ -214,6 +231,7 @@ class DocumentosAcademicosZipController extends Controller
                         'grado_id' => (int) $alumno->grado_id,
                         'grupo_id' => (int) $alumno->grupo_id,
                         'semestre_id' => null,
+                        'lugar' => $lugaresPorAlumno->get((int) $alumno->id),
                     ];
                 })
                 ->filter()
@@ -288,7 +306,12 @@ class DocumentosAcademicosZipController extends Controller
                 }
 
                 if ($zip->addFromString(
-                    $this->rutaDocumentoZip($alumno, $tipo, $grupo),
+                    $this->rutaDocumentoZip(
+                        $alumno,
+                        $tipo,
+                        $grupo,
+                        isset($documento['lugar']) ? (int) $documento['lugar'] : null,
+                    ),
                     $contenido
                 )) {
                     $documentosAgregados++;
@@ -421,7 +444,12 @@ class DocumentosAcademicosZipController extends Controller
                     }
 
                     if ($zip->addFromString(
-                        $this->rutaDocumentoZip($alumno, $tipo),
+                        $this->rutaDocumentoZip(
+                            $alumno,
+                            $tipo,
+                            null,
+                            $registro->lugar !== null ? (int) $registro->lugar : null,
+                        ),
                         $contenido
                     )) {
                         $documentosAgregados++;
@@ -497,6 +525,85 @@ class DocumentosAcademicosZipController extends Controller
             ->deleteFileAfterSend(true);
     }
 
+    /**
+     * @param  Collection<int, Grupo>  $grupos
+     * @return Collection<int, int>
+     */
+    private function lugaresReconocimientoBasica(
+        Nivel $nivel,
+        Collection $grupos,
+        int $cicloEscolarId,
+        ?int $generacionId,
+        int $gradoId,
+    ): Collection {
+        $lugaresPorAlumno = collect();
+
+        foreach ($grupos as $grupo) {
+            $reporte = match ($nivel->slug) {
+                'primaria' => app(CalificacionOficialPrimariaService::class)->reporteAnual(
+                    nivelId: (int) $nivel->id,
+                    cicloEscolarId: $cicloEscolarId,
+                    generacionId: $generacionId,
+                    gradoId: $gradoId,
+                    grupoId: (int) $grupo->id,
+                ),
+                'secundaria' => app(PromedioSecundariaService::class)->reporteAnual(
+                    nivelId: (int) $nivel->id,
+                    cicloEscolarId: $cicloEscolarId,
+                    generacionId: $generacionId,
+                    gradoId: $gradoId,
+                    grupoId: (int) $grupo->id,
+                ),
+                default => ['alumnos' => collect()],
+            };
+
+            $filasElegibles = collect($reporte['alumnos'] ?? [])
+                ->filter(function (array $fila) use ($nivel): bool {
+                    if (
+                        ! ($fila['completo'] ?? false)
+                        || ! is_numeric($fila['promedio_general_preciso'] ?? null)
+                    ) {
+                        return false;
+                    }
+
+                    if ($nivel->slug === 'primaria') {
+                        return ($fila['promocion_sugerida'] ?? false) === true;
+                    }
+
+                    if ($nivel->slug === 'secundaria') {
+                        return empty($fila['materias_reprobadas'] ?? []);
+                    }
+
+                    return false;
+                })
+                ->values();
+
+            $promediosUnicos = $filasElegibles
+                ->pluck('promedio_general_preciso')
+                ->sortDesc()
+                ->map(fn ($promedio) => PromedioExcel::claveComparacion($promedio))
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($filasElegibles as $fila) {
+                $clavePromedio = PromedioExcel::claveComparacion($fila['promedio_general_preciso']);
+                $indice = $clavePromedio !== null
+                    ? $promediosUnicos->search($clavePromedio)
+                    : false;
+
+                if ($indice !== false) {
+                    $lugaresPorAlumno->put(
+                        (int) $fila['inscripcion_id'],
+                        ((int) $indice) + 1,
+                    );
+                }
+            }
+        }
+
+        return $lugaresPorAlumno;
+    }
+
     private function validarGradoTerminal(Nivel $nivel, Grado $grado): void
     {
         $gradoTerminalId = Grado::query()
@@ -524,16 +631,20 @@ class DocumentosAcademicosZipController extends Controller
         Inscripcion $alumno,
         string $tipo,
         ?Grupo $grupoContexto = null,
+        ?int $lugar = null,
     ): string {
         $grupo = $grupoContexto ?: $alumno->grupo;
         $grupoNombre = trim((string) ($grupo?->asignacionGrupo?->nombre ?? 'SIN_GRUPO'));
         $grupoNombre = preg_replace('/^grupo\s+/iu', '', $grupoNombre) ?: $grupoNombre;
         $carpeta = 'Grupo_' . $this->segmentoArchivo($grupoNombre);
         $prefijo = $tipo === 'reconocimientos' ? 'RECONOCIMIENTO' : 'DIPLOMA';
+        $segmentoLugar = $tipo === 'reconocimientos' && $lugar !== null && $lugar > 0
+            ? '_' . $lugar . '_LUGAR'
+            : '';
         $matricula = $this->segmentoArchivo((string) ($alumno->matricula ?: 'SIN_MATRICULA'));
         $nombre = $this->segmentoArchivo($this->nombreAlumno($alumno));
 
-        return $carpeta . '/' . $prefijo . '_' . $matricula . '_' . $nombre . '_' . $alumno->id . '.pdf';
+        return $carpeta . '/' . $prefijo . $segmentoLugar . '_' . $matricula . '_' . $nombre . '_' . $alumno->id . '.pdf';
     }
 
     private function nombreZip(
