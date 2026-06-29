@@ -55,6 +55,6 @@
         </table>
     @endforeach
 
-    <p class="nota">NOTA: El promedio final de grado es la suma de los cuatro promedios finales precisos de campo dividida entre cuatro. El truncamiento se aplica únicamente al resultado mostrado.</p>
+    <p class="nota">NOTA: Cada promedio final de campo se establece con un decimal truncado. El promedio final de grado es la suma de esos cuatro valores oficiales dividida entre cuatro; el resultado se presenta con un decimal truncado.</p>
 </body>
 </html>

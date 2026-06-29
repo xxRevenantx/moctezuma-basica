@@ -7,6 +7,7 @@ use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\DistribucionEscolarController;
 use App\Http\Controllers\DocumentosController;
+use App\Http\Controllers\DocumentosAcademicosZipController;
 use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\ExpedienteDigitalController;
@@ -159,6 +160,10 @@ Route::get('/nivel/{slug_nivel}/matricula-historica/pdf', MatriculaHistorialPdfC
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])
     ->name('misrutas.promedios.boleta.pdf');
 
+Route::get('/generales/{slug_nivel}/documentos-academicos/{tipo}/zip', [DocumentosAcademicosZipController::class, 'descargar'])
+    ->middleware('admin')
+    ->name('generales.documentos-academicos.zip');
+
 
 // FICHAS DESCRIPTIVAS PREESCOLAR
 Route::get('/fichas/preescolar/excel', [FichaController::class, 'excel'])
@@ -173,8 +178,12 @@ Route::get('/fichas/preescolar/alumno/{inscripcion}/pdf', [FichaController::clas
 Route::get('/lugares-preescolar/{lugarPreescolar}/pdf', [LugarPreescolarPDFController::class, 'show'])
     ->name('misrutas.lugares-preescolar.pdf');
 
-Route::get('/lugares-preescolar/{lugarPreescolar}/diploma', [LugarPreescolarPDFController::class, 'diploma'])
+Route::get('/lugares-preescolar/alumno/{inscripcion}/diploma', [LugarPreescolarPDFController::class, 'diploma'])
     ->name('misrutas.lugares-preescolar.diploma');
+
+Route::get('/lugares-preescolar/documentos/{tipo}/zip', [DocumentosAcademicosZipController::class, 'descargarPreescolar'])
+    ->middleware('admin')
+    ->name('misrutas.lugares-preescolar.documentos.zip');
 
 // PDF
 Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
@@ -224,7 +233,7 @@ Route::middleware('admin')->group(function () {
         ->name('generales.promedios-oficiales-primaria.pdf');
 });
 
-Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_pdf'])
+Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_calificaciones_pdf'])
     ->name('misrutas.diploma.pdf');
 
 

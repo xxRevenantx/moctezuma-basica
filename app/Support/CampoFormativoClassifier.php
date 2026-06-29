@@ -24,6 +24,18 @@ final class CampoFormativoClassifier
             return self::SIN_CAMPO;
         }
 
+        // Coincidencias directas de los nombres oficiales. Este clasificador
+        // únicamente propone un campo al crear/importar materias; la relación
+        // persistida en materias.campo_formativo_id sigue siendo la fuente de
+        // verdad para calificaciones, reportes y documentos.
+        if (self::contiene($texto, [
+            'saberes y pensamiento cientifico',
+            'saberes y pensamientos',
+            'pensamiento cientifico',
+        ])) {
+            return self::SABERES;
+        }
+
         // Frases específicas primero. Evita que "Educación Física" sea
         // clasificada como Física en Saberes y pensamiento científico.
         if (self::contiene($texto, [

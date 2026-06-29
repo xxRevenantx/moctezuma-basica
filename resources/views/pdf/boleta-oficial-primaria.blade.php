@@ -91,7 +91,7 @@
     </table>
 
     <p class="nota">
-        Los promedios se calculan con precisión completa y se expresan con un decimal truncado únicamente al presentarse. El promedio final de grado es la suma de los cuatro promedios finales precisos de campo dividida entre cuatro.
+        El promedio final de cada campo se establece con un decimal truncado. El promedio final de grado es la suma de los cuatro promedios oficiales de campo dividida entre cuatro y se presenta con un decimal truncado.
     </p>
 </body>
 </html>

@@ -7,6 +7,19 @@
     $esSecundaria = $this->esSecundaria;
     $esBachillerato = $this->esBachillerato;
     $esBasicaConDetalle = $esPrimaria || $esSecundaria;
+    $gradoTerminal = $grados->sortByDesc('orden')->first();
+    $puedeDescargarPorGrado = $ciclo_escolar_id !== '' && $grado_id !== '';
+    $esGradoTerminalSeleccionado = $puedeDescargarPorGrado
+        && $gradoTerminal
+        && (int) $grado_id === (int) $gradoTerminal->id;
+    $parametrosDescargaMasiva = [
+        'ciclo_escolar_id' => $ciclo_escolar_id,
+        'grado_id' => $grado_id,
+    ];
+
+    if ($generacion_id !== '') {
+        $parametrosDescargaMasiva['generacion_id'] = $generacion_id;
+    }
 @endphp
 
 <div class="space-y-6">
@@ -30,7 +43,7 @@
                         @if ($esPrimaria)
                             El promedio oficial se obtiene sumando los promedios precisos de los cuatro campos formativos y dividiendo entre cuatro. Cada campo se calcula con sus tres periodos y el truncamiento se aplica únicamente al mostrar el resultado.
                         @elseif ($esSecundaria)
-                            El promedio general se obtiene promediando los resultados anuales precisos de las materias participantes. Tutoría y Educación Socioemocional pueden mostrarse, pero no participan en el promedio ni en la promoción.
+                            El promedio de cada materia se obtiene con sus tres periodos. El promedio general se calcula con los promedios anuales de las materias oficiales configuradas en la base de datos. Materias extra, recesos, talleres y materias informativas no se muestran ni participan.
                         @elseif ($esBachillerato)
                             El promedio se calcula con los parciales numéricos del semestre, conservando la precisión hasta el resultado final.
                         @else
@@ -147,6 +160,57 @@
         </div>
     </section>
 
+    <section class="rounded-[1.6rem] border border-indigo-200 bg-gradient-to-r from-indigo-50 via-sky-50 to-violet-50 p-5 shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/20 dark:via-sky-950/20 dark:to-violet-950/20">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
+                    Descargas masivas por grado
+                </p>
+                <h3 class="mt-1 text-lg font-black text-slate-950 dark:text-white">
+                    Reconocimientos y diplomas en archivos ZIP
+                </h3>
+                <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    Selecciona un grado. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                @if (! $esBachillerato && $puedeDescargarPorGrado)
+                    <a href="{{ route('generales.documentos-academicos.zip', array_merge([
+                        'slug_nivel' => $slug_nivel,
+                        'tipo' => 'reconocimientos',
+                    ], $parametrosDescargaMasiva)) }}" target="_blank" rel="noopener"
+                        class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
+                        <flux:icon.trophy class="h-4 w-4" />
+                        Reconocimientos ZIP
+                    </a>
+                @elseif (! $esBachillerato)
+                    <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
+                        <flux:icon.trophy class="h-4 w-4" />
+                        Reconocimientos ZIP
+                    </span>
+                @endif
+
+                @if ($esGradoTerminalSeleccionado)
+                    <a href="{{ route('generales.documentos-academicos.zip', array_merge([
+                        'slug_nivel' => $slug_nivel,
+                        'tipo' => 'diplomas',
+                    ], $parametrosDescargaMasiva)) }}" target="_blank" rel="noopener"
+                        class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">
+                        <flux:icon.academic-cap class="h-4 w-4" />
+                        Diplomas ZIP
+                    </a>
+                @else
+                    <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                        title="Selecciona el último grado del nivel">
+                        <flux:icon.academic-cap class="h-4 w-4" />
+                        Diplomas ZIP
+                    </span>
+                @endif
+            </div>
+        </div>
+    </section>
+
     @error('promocion')
         <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
             {{ $message }}
@@ -227,11 +291,13 @@
                                 :class="tab === 'materias' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700'">
                                 Detalle por materia
                             </button>
-                            <button type="button" x-on:click="tab = 'campos'"
-                                class="rounded-xl px-4 py-2 text-xs font-black transition"
-                                :class="tab === 'campos' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700'">
-                                Campos formativos
-                            </button>
+                            @if ($esPrimaria)
+                                <button type="button" x-on:click="tab = 'campos'"
+                                    class="rounded-xl px-4 py-2 text-xs font-black transition"
+                                    :class="tab === 'campos' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700'">
+                                    Campos formativos
+                                </button>
+                            @endif
                         </div>
                     @endif
 
@@ -246,7 +312,6 @@
                                     @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
                                         <th class="px-3 py-3 text-center text-xs font-black uppercase text-slate-500">{{ $etiqueta }}</th>
                                     @endforeach
-                                    <th class="px-3 py-3 text-center text-xs font-black uppercase text-slate-500">Promedio general</th>
                                     <th class="min-w-[180px] px-3 py-3 text-center text-xs font-black uppercase text-slate-500">Situación</th>
                                     @if ($esBasicaConDetalle)
                                         <th class="min-w-[190px] px-3 py-3 text-center text-xs font-black uppercase text-slate-500">Promoción</th>
@@ -257,7 +322,6 @@
                             <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
                                 @foreach ($grupoPromedio['alumnos'] as $index => $alumno)
                                     @php
-                                        $promedioVisible = $alumno['promedio_final'] ?? $alumno['promedio_provisional'] ?? null;
                                         $definitivo = (bool) ($alumno['completo'] ?? false);
                                         $alumnoInscripcionId = $alumno['inscripcion_id'] ?? null;
                                         $alumnoGeneracionId = $alumno['generacion_id'] ?? ($generacion_id ?: null);
@@ -296,19 +360,6 @@
                                                 @endif
                                             </td>
                                         @endforeach
-
-                                        <td class="px-3 py-3 text-center">
-                                            @if ($promedioVisible !== null)
-                                                <span class="inline-flex min-w-16 flex-col items-center rounded-xl bg-sky-50 px-3 py-1 text-sm font-black text-sky-700 ring-1 ring-sky-100">
-                                                    {{ $this->formatearDecimal($promedioVisible) }}
-                                                    @if (! $definitivo)
-                                                        <small class="text-[9px] uppercase text-amber-600">Provisional</small>
-                                                    @endif
-                                                </span>
-                                            @else
-                                                <span class="text-xs font-black text-amber-600">Pendiente</span>
-                                            @endif
-                                        </td>
 
                                         <td class="px-3 py-3 text-center">
                                             <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-800 dark:text-slate-200 dark:ring-neutral-700">
@@ -374,7 +425,7 @@
                                                     <flux:icon.document-arrow-down class="h-4 w-4" /> Boleta
                                                 </a>
 
-                                                @if (! $esBachillerato && $definitivo && ($alumno['lugar_grupo'] ?? null))
+                                                @if (! $esBachillerato && $definitivo && ($alumno['lugar'] ?? null))
                                                     <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                         'slug_nivel' => $slug_nivel,
                                                         'tipo' => 'reconocimiento',
@@ -386,6 +437,22 @@
                                                     ]) }}" target="_blank"
                                                         class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">
                                                         <flux:icon.trophy class="h-4 w-4" /> Reconocimiento
+                                                    </a>
+                                                @endif
+
+                                                @if ($alumno['diploma_disponible'] ?? false)
+                                                    <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                        'slug_nivel' => $slug_nivel,
+                                                        'tipo' => 'diploma',
+                                                        'inscripcion_id' => $alumnoInscripcionId,
+                                                        'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                        'generacion_id' => $alumnoGeneracionId,
+                                                        'grado_id' => $alumnoGradoId,
+                                                        'grupo_id' => $alumnoGrupoId,
+                                                        'semestre_id' => $alumnoSemestreId,
+                                                    ]) }}" target="_blank"
+                                                        class="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">
+                                                        <flux:icon.academic-cap class="h-4 w-4" /> Diploma
                                                     </a>
                                                 @endif
                                             </div>
@@ -415,7 +482,9 @@
                                             <thead>
                                                 <tr class="bg-white dark:bg-neutral-900">
                                                     <th class="px-3 py-2 text-left font-black uppercase text-slate-500">Materia</th>
-                                                    <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Participa</th>
+                                                    @if ($esPrimaria)
+                                                        <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Participa</th>
+                                                    @endif
                                                     @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
                                                         <th class="px-3 py-2 text-center font-black uppercase text-slate-500">{{ $etiqueta }}</th>
                                                     @endforeach
@@ -427,7 +496,9 @@
                                                 @foreach ($alumno['materias'] ?? [] as $materia)
                                                     <tr>
                                                         <td class="px-3 py-2 font-bold text-slate-800 dark:text-slate-200">{{ $materia['materia'] }}</td>
-                                                        <td class="px-3 py-2 text-center">{{ ($materia['participa'] ?? true) ? 'Sí' : 'No' }}</td>
+                                                        @if ($esPrimaria)
+                                                            <td class="px-3 py-2 text-center">{{ ($materia['participa'] ?? true) ? 'Sí' : 'No' }}</td>
+                                                        @endif
                                                         @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
                                                             <td class="px-3 py-2 text-center">
                                                                 @if (($materia['evaluaciones'][$periodo] ?? null) !== null)
@@ -440,7 +511,11 @@
                                                             </td>
                                                         @endforeach
                                                         <td class="px-3 py-2 text-center font-black">
-                                                            {{ $this->formatearDecimal($materia['promedio_final_preciso'] ?? $materia['promedio_provisional_preciso'] ?? null) }}
+                                                            @if ($esSecundaria)
+                                                                {{ $materia['promedio'] ?? '—' }}
+                                                            @else
+                                                                {{ $this->formatearDecimal($materia['promedio_final_preciso'] ?? $materia['promedio_provisional_preciso'] ?? null) }}
+                                                            @endif
                                                         </td>
                                                         <td class="px-3 py-2 text-center">
                                                             <span class="rounded-full px-2 py-1 font-black {{ ($materia['completo'] ?? false) ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">
@@ -456,7 +531,8 @@
                             @endforeach
                         </div>
 
-                        <div x-cloak x-show="tab === 'campos'" class="space-y-5 p-4">
+                        @if ($esPrimaria)
+                            <div x-cloak x-show="tab === 'campos'" class="space-y-5 p-4">
                             @foreach ($grupoPromedio['alumnos'] as $alumno)
                                 <article class="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-800">
                                     <div class="bg-slate-50 px-4 py-3 dark:bg-neutral-950/40">
@@ -502,7 +578,7 @@
                                                     <tr class="bg-yellow-50 font-black dark:bg-yellow-950/20">
                                                         <td class="px-3 py-3">PROMEDIO GENERAL = suma de los 4 campos ÷ 4</td>
                                                         <td colspan="{{ count($encabezadosPeriodos) }}" class="px-3 py-3 text-center text-slate-500">
-                                                            Los cálculos intermedios conservan toda la precisión
+                                                            Se promedian los cuatro valores finales mostrados
                                                         </td>
                                                         <td class="px-3 py-3 text-center text-lg">
                                                             {{ $this->formatearDecimal($alumno['promedio_final'] ?? $alumno['promedio_provisional'] ?? null) }}
@@ -538,7 +614,8 @@
                                     @endif
                                 </article>
                             @endforeach
-                        </div>
+                            </div>
+                        @endif
                     @endif
                 </div>
             </section>

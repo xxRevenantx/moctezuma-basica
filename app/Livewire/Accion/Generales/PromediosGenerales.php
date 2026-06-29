@@ -212,14 +212,56 @@ class PromediosGenerales extends Component
         }
 
         if ($this->esPrimaria) {
-            return $this->obtenerAlumnosPrimaria();
+            return $this->agregarDisponibilidadDiploma($this->obtenerAlumnosPrimaria());
         }
 
         if ($this->esSecundaria) {
-            return $this->obtenerAlumnosSecundaria();
+            return $this->agregarDisponibilidadDiploma($this->obtenerAlumnosSecundaria());
         }
 
-        return $this->obtenerAlumnosGenericos();
+        return $this->agregarDisponibilidadDiploma($this->obtenerAlumnosGenericos());
+    }
+
+    private function agregarDisponibilidadDiploma(Collection $alumnos): Collection
+    {
+        $gradoTerminalId = Grado::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->orderByDesc('orden')
+            ->orderByDesc('id')
+            ->value('id');
+
+        $semestreTerminalNumero = $this->esBachillerato
+            ? Semestre::query()
+                ->whereHas('grado', fn ($query) => $query->where('nivel_id', $this->nivel->id))
+                ->max('numero')
+            : null;
+
+        return $alumnos->map(function (array $alumno) use ($gradoTerminalId, $semestreTerminalNumero): array {
+            $esGradoTerminal = $gradoTerminalId !== null
+                && (int) ($alumno['grado_id'] ?? 0) === (int) $gradoTerminalId;
+
+            $esSemestreTerminal = ! $this->esBachillerato
+                || (
+                    $semestreTerminalNumero !== null
+                    && (int) ($alumno['semestre'] ?? 0) === (int) $semestreTerminalNumero
+                );
+
+            $diplomaDisponible = false;
+
+            if ($esGradoTerminal && $esSemestreTerminal && ($alumno['completo'] ?? false)) {
+                if (in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
+                    $diplomaDisponible = ($alumno['promocion_confirmada'] ?? null) === true;
+                } elseif ($this->esBachillerato) {
+                    $diplomaDisponible = $this->estaAprobadoAcademicamente($alumno);
+                }
+            }
+
+            $alumno['es_grado_terminal'] = $esGradoTerminal;
+            $alumno['es_semestre_terminal'] = $esSemestreTerminal;
+            $alumno['diploma_disponible'] = $diplomaDisponible;
+
+            return $alumno;
+        })->values();
     }
 
     private function obtenerAlumnosPrimaria(): Collection

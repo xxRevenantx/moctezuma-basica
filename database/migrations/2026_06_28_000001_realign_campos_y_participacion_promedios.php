@@ -1,6 +1,5 @@
 <?php
 
-use App\Support\CampoFormativoClassifier;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -10,32 +9,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('materias') || ! Schema::hasTable('campos_formativos')) {
+        if (! Schema::hasTable('materias')) {
             return;
         }
-
-        if (! Schema::hasColumn('materias', 'campo_formativo_id')) {
-            return;
-        }
-
-        $campos = DB::table('campos_formativos')->pluck('id', 'slug');
-        $sinCampoId = $campos->get(CampoFormativoClassifier::SIN_CAMPO);
-
-        DB::table('materias')
-            ->select(['id', 'materia'])
-            ->orderBy('id')
-            ->chunkById(200, function ($materias) use ($campos, $sinCampoId): void {
-                foreach ($materias as $materia) {
-                    $slug = CampoFormativoClassifier::sugerir((string) $materia->materia);
-                    $campoId = $campos->get($slug, $sinCampoId);
-
-                    if ($campoId !== null) {
-                        DB::table('materias')
-                            ->where('id', $materia->id)
-                            ->update(['campo_formativo_id' => $campoId]);
-                    }
-                }
-            });
 
         if (! Schema::hasColumn('materias', 'participa_en_calificacion_oficial')) {
             return;
@@ -75,6 +51,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        // No se revierte porque la migración únicamente corrige datos de catálogo.
+        // No se revierte porque la migración únicamente corrige la participación
+        // de materias en los promedios oficiales.
     }
 };

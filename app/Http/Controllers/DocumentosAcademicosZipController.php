@@ -1,0 +1,461 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Grado;
+use App\Models\Grupo;
+use App\Models\Inscripcion;
+use App\Models\LugarPreescolar;
+use App\Models\Nivel;
+use App\Models\Semestre;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
+use ZipArchive;
+
+class DocumentosAcademicosZipController extends Controller
+{
+    public function descargar(
+        Request $request,
+        string $slug_nivel,
+        string $tipo,
+        PDFController $pdfController
+    ): BinaryFileResponse {
+        abort_unless(class_exists(ZipArchive::class), 500, 'La extensión ZIP de PHP no está habilitada.');
+        abort_unless(in_array($tipo, ['reconocimientos', 'diplomas'], true), 404);
+
+        $datos = $request->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
+        ]);
+
+        $nivel = Nivel::query()
+            ->where('slug', $slug_nivel)
+            ->firstOrFail();
+
+        abort_if(
+            $nivel->slug === 'preescolar',
+            422,
+            'Las descargas de preescolar se generan desde el módulo Lugares Preescolar.'
+        );
+
+        $grado = Grado::query()
+            ->whereKey((int) $datos['grado_id'])
+            ->where('nivel_id', $nivel->id)
+            ->firstOrFail();
+
+        $esBachillerato = $nivel->slug === 'bachillerato' || (int) $nivel->id === 4;
+
+        if ($tipo === 'reconocimientos') {
+            abort_if(
+                $esBachillerato,
+                403,
+                'Los reconocimientos anuales no están habilitados para bachillerato en este módulo.'
+            );
+
+            abort_unless(
+                in_array($nivel->slug, ['primaria', 'secundaria'], true),
+                403,
+                'La descarga masiva de reconocimientos solo está habilitada para primaria y secundaria.'
+            );
+        }
+
+        $semestreTerminal = null;
+
+        if ($tipo === 'diplomas') {
+            $this->validarGradoTerminal($nivel, $grado);
+
+            if ($esBachillerato) {
+                $semestreTerminal = Semestre::query()
+                    ->where('grado_id', $grado->id)
+                    ->orderByDesc('numero')
+                    ->orderByDesc('id')
+                    ->first();
+
+                abort_unless(
+                    $semestreTerminal,
+                    404,
+                    'No se encontró el semestre terminal de bachillerato.'
+                );
+            }
+        }
+
+        $grupos = Grupo::query()
+            ->with([
+                'asignacionGrupo:id,nombre',
+                'grado:id,nombre,orden',
+                'semestre:id,grado_id,numero',
+            ])
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->when(
+                !empty($datos['generacion_id']),
+                fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
+            )
+            ->when(
+                $esBachillerato && $tipo === 'diplomas' && $semestreTerminal,
+                fn ($query) => $query->where('semestre_id', $semestreTerminal->id)
+            )
+            ->get([
+                'id',
+                'asignacion_grupo_id',
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'semestre_id',
+            ]);
+
+        abort_if($grupos->isEmpty(), 404, 'No se encontraron grupos para el grado seleccionado.');
+
+        $alumnos = Inscripcion::query()
+            ->with([
+                'grupo.asignacionGrupo:id,nombre',
+                'grupo.semestre:id,grado_id,numero',
+            ])
+            ->where('nivel_id', $nivel->id)
+            ->where('grado_id', $grado->id)
+            ->where('activo', true)
+            ->whereIn('grupo_id', $grupos->pluck('id'))
+            ->when(
+                !empty($datos['generacion_id']),
+                fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
+            )
+            ->orderBy('grupo_id')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+
+        abort_if($alumnos->isEmpty(), 404, 'No se encontraron alumnos activos para el grado seleccionado.');
+
+        $zipPath = $this->crearRutaTemporalZip();
+        $zip = new ZipArchive();
+
+        abort_unless(
+            $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true,
+            500,
+            'No fue posible crear el archivo ZIP.'
+        );
+
+        $documentosAgregados = 0;
+
+        try {
+            foreach ($alumnos as $alumno) {
+                $grupo = $alumno->grupo;
+
+                if (!$grupo || !$alumno->generacion_id) {
+                    continue;
+                }
+
+                $parametros = [
+                    'generacion_id' => (int) $alumno->generacion_id,
+                    'grado_id' => (int) $alumno->grado_id,
+                    'grupo_id' => (int) $alumno->grupo_id,
+                    'inscripcion_id' => (int) $alumno->id,
+                    'ciclo_escolar_id' => (int) $datos['ciclo_escolar_id'],
+                ];
+
+                if ($esBachillerato) {
+                    $semestreId = (int) ($grupo->semestre_id ?: $semestreTerminal?->id);
+
+                    if ($semestreId <= 0) {
+                        continue;
+                    }
+
+                    $parametros['semestre_id'] = $semestreId;
+                }
+
+                $requestPdf = Request::create('/', 'GET', $parametros);
+                $requestPdf->setUserResolver(fn () => $request->user());
+
+                try {
+                    $respuestaPdf = $pdfController->boletareconocimientoPromedioPdf(
+                        $requestPdf,
+                        $nivel->slug,
+                        $tipo === 'reconocimientos' ? 'reconocimiento' : 'diploma'
+                    );
+                } catch (HttpExceptionInterface $exception) {
+                    if (in_array($exception->getStatusCode(), [403, 422], true)) {
+                        continue;
+                    }
+
+                    throw $exception;
+                }
+
+                $contenido = $respuestaPdf->getContent();
+
+                if (!is_string($contenido) || $contenido === '') {
+                    continue;
+                }
+
+                if ($zip->addFromString(
+                    $this->rutaDocumentoZip($alumno, $tipo),
+                    $contenido
+                )) {
+                    $documentosAgregados++;
+                }
+            }
+        } catch (Throwable $exception) {
+            $zip->close();
+            File::delete($zipPath);
+            throw $exception;
+        }
+
+        $zip->close();
+
+        if ($documentosAgregados === 0) {
+            File::delete($zipPath);
+
+            abort(
+                404,
+                $tipo === 'reconocimientos'
+                    ? 'No hay alumnos con reconocimiento habilitado en el grado seleccionado.'
+                    : 'No hay alumnos con diploma habilitado en el grado seleccionado.'
+            );
+        }
+
+        $nombreZip = $this->nombreZip($nivel, $grado, $tipo, (int) $datos['ciclo_escolar_id']);
+
+        return response()
+            ->download($zipPath, $nombreZip)
+            ->deleteFileAfterSend(true);
+    }
+
+    public function descargarPreescolar(
+        Request $request,
+        string $tipo,
+        LugarPreescolarPDFController $pdfController
+    ): BinaryFileResponse {
+        abort_unless(class_exists(ZipArchive::class), 500, 'La extensión ZIP de PHP no está habilitada.');
+        abort_unless(in_array($tipo, ['reconocimientos', 'diplomas'], true), 404);
+
+        $datos = $request->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
+            'tipo_reconocimiento' => ['nullable', 'in:periodo,anual'],
+            'periodo' => ['nullable', 'integer', 'in:0,1,2,3'],
+            'fecha' => ['nullable', 'date'],
+        ]);
+
+        $nivel = Nivel::query()
+            ->where('slug', 'preescolar')
+            ->firstOrFail();
+
+        $grado = Grado::query()
+            ->whereKey((int) $datos['grado_id'])
+            ->where('nivel_id', $nivel->id)
+            ->firstOrFail();
+
+        if ($tipo === 'diplomas') {
+            $this->validarGradoTerminal($nivel, $grado);
+        }
+
+        $zipPath = $this->crearRutaTemporalZip();
+        $zip = new ZipArchive();
+
+        abort_unless(
+            $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true,
+            500,
+            'No fue posible crear el archivo ZIP.'
+        );
+
+        $documentosAgregados = 0;
+
+        try {
+            if ($tipo === 'reconocimientos') {
+                $tipoReconocimiento = (string) ($datos['tipo_reconocimiento'] ?? 'periodo');
+                $periodo = $tipoReconocimiento === 'anual'
+                    ? 0
+                    : (int) ($datos['periodo'] ?? 1);
+
+                $registros = LugarPreescolar::query()
+                    ->with([
+                        'alumno.grupo.asignacionGrupo:id,nombre',
+                        'alumno.nivel.director',
+                        'alumno.nivel.supervisor',
+                        'alumno.grado',
+                        'alumno.generacion',
+                        'cicloEscolar',
+                    ])
+                    ->where('nivel_id', $nivel->id)
+                    ->where('grado_id', $grado->id)
+                    ->where('ciclo_escolar_id', (int) $datos['ciclo_escolar_id'])
+                    ->where('tipo_reconocimiento', $tipoReconocimiento)
+                    ->where('periodo', $periodo)
+                    ->when(
+                        !empty($datos['generacion_id']),
+                        fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
+                    )
+                    ->whereHas('alumno', fn ($query) => $query->where('activo', true))
+                    ->orderBy('grupo_id')
+                    ->orderBy('inscripcion_id')
+                    ->get();
+
+                foreach ($registros as $registro) {
+                    $alumno = $registro->alumno;
+
+                    if (!$alumno) {
+                        continue;
+                    }
+
+                    $requestPdf = Request::create('/', 'GET', [
+                        'fecha' => $datos['fecha'] ?? null,
+                    ]);
+                    $requestPdf->setUserResolver(fn () => $request->user());
+
+                    $respuestaPdf = $pdfController->show($requestPdf, $registro);
+                    $contenido = $respuestaPdf->getContent();
+
+                    if (!is_string($contenido) || $contenido === '') {
+                        continue;
+                    }
+
+                    if ($zip->addFromString(
+                        $this->rutaDocumentoZip($alumno, $tipo),
+                        $contenido
+                    )) {
+                        $documentosAgregados++;
+                    }
+                }
+            } else {
+                $alumnos = Inscripcion::query()
+                    ->with([
+                        'grupo.asignacionGrupo:id,nombre',
+                        'nivel.director',
+                        'nivel.supervisor',
+                        'grado',
+                        'generacion',
+                    ])
+                    ->where('nivel_id', $nivel->id)
+                    ->where('grado_id', $grado->id)
+                    ->where('activo', true)
+                    ->when(
+                        !empty($datos['generacion_id']),
+                        fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
+                    )
+                    ->orderBy('grupo_id')
+                    ->orderBy('apellido_paterno')
+                    ->orderBy('apellido_materno')
+                    ->orderBy('nombre')
+                    ->get();
+
+                foreach ($alumnos as $alumno) {
+                    $requestPdf = Request::create('/', 'GET', [
+                        'ciclo_escolar_id' => (int) $datos['ciclo_escolar_id'],
+                        'fecha' => $datos['fecha'] ?? null,
+                    ]);
+                    $requestPdf->setUserResolver(fn () => $request->user());
+
+                    $respuestaPdf = $pdfController->diploma($requestPdf, $alumno);
+                    $contenido = $respuestaPdf->getContent();
+
+                    if (!is_string($contenido) || $contenido === '') {
+                        continue;
+                    }
+
+                    if ($zip->addFromString(
+                        $this->rutaDocumentoZip($alumno, $tipo),
+                        $contenido
+                    )) {
+                        $documentosAgregados++;
+                    }
+                }
+            }
+        } catch (Throwable $exception) {
+            $zip->close();
+            File::delete($zipPath);
+            throw $exception;
+        }
+
+        $zip->close();
+
+        if ($documentosAgregados === 0) {
+            File::delete($zipPath);
+
+            abort(
+                404,
+                $tipo === 'reconocimientos'
+                    ? 'No hay reconocimientos guardados para el grado seleccionado.'
+                    : 'No hay alumnos activos con diploma habilitado en el grado seleccionado.'
+            );
+        }
+
+        $nombreZip = $this->nombreZip($nivel, $grado, $tipo, (int) $datos['ciclo_escolar_id']);
+
+        return response()
+            ->download($zipPath, $nombreZip)
+            ->deleteFileAfterSend(true);
+    }
+
+    private function validarGradoTerminal(Nivel $nivel, Grado $grado): void
+    {
+        $gradoTerminalId = Grado::query()
+            ->where('nivel_id', $nivel->id)
+            ->orderByDesc('orden')
+            ->orderByDesc('id')
+            ->value('id');
+
+        abort_unless(
+            $gradoTerminalId !== null && (int) $grado->id === (int) $gradoTerminalId,
+            403,
+            'Los diplomas solo están disponibles para el último grado del nivel.'
+        );
+    }
+
+    private function crearRutaTemporalZip(): string
+    {
+        $directorio = storage_path('app/temp');
+        File::ensureDirectoryExists($directorio);
+
+        return $directorio . DIRECTORY_SEPARATOR . 'documentos_academicos_' . Str::uuid() . '.zip';
+    }
+
+    private function rutaDocumentoZip(Inscripcion $alumno, string $tipo): string
+    {
+        $grupoNombre = trim((string) ($alumno->grupo?->asignacionGrupo?->nombre ?? 'SIN_GRUPO'));
+        $grupoNombre = preg_replace('/^grupo\s+/iu', '', $grupoNombre) ?: $grupoNombre;
+        $carpeta = 'Grupo_' . $this->segmentoArchivo($grupoNombre);
+        $prefijo = $tipo === 'reconocimientos' ? 'RECONOCIMIENTO' : 'DIPLOMA';
+        $matricula = $this->segmentoArchivo((string) ($alumno->matricula ?: 'SIN_MATRICULA'));
+        $nombre = $this->segmentoArchivo($this->nombreAlumno($alumno));
+
+        return $carpeta . '/' . $prefijo . '_' . $matricula . '_' . $nombre . '_' . $alumno->id . '.pdf';
+    }
+
+    private function nombreZip(Nivel $nivel, Grado $grado, string $tipo, int $cicloEscolarId): string
+    {
+        return mb_strtoupper($tipo)
+            . '_' . $this->segmentoArchivo($grado->nombre)
+            . '_' . $this->segmentoArchivo($nivel->nombre)
+            . '_CICLO_' . $cicloEscolarId
+            . '.zip';
+    }
+
+    private function nombreAlumno(Inscripcion $alumno): string
+    {
+        $nombre = trim(collect([
+            $alumno->apellido_paterno,
+            $alumno->apellido_materno,
+            $alumno->nombre,
+        ])->filter()->implode(' '));
+
+        return $nombre !== '' ? $nombre : 'ALUMNO';
+    }
+
+    private function segmentoArchivo(string $valor): string
+    {
+        $segmento = Str::of($valor)
+            ->ascii()
+            ->upper()
+            ->replaceMatches('/[^A-Z0-9]+/', '_')
+            ->trim('_')
+            ->toString();
+
+        return $segmento !== '' ? $segmento : 'SIN_DATO';
+    }
+}

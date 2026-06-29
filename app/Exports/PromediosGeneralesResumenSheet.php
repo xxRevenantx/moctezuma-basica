@@ -77,8 +77,8 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
         $this->filas[] = ['FÓRMULA APLICADA'];
 
         if ($this->nivelSlug === 'primaria') {
-            $this->filas[] = ['Promedio final de campo', 'PROMEDIO(P1, P2, P3) del campo con precisión completa'];
-            $this->filas[] = ['Promedio general', 'Suma de los cuatro promedios finales precisos de campo / 4'];
+            $this->filas[] = ['Promedio final de campo', 'PROMEDIO(P1, P2, P3), truncado a un decimal para establecer el valor oficial'];
+            $this->filas[] = ['Promedio general', 'Suma de los cuatro promedios oficiales de campo / 4'];
             $this->filas[] = ['Promoción sugerida', '1.º por conclusión del grado; 2.º a 6.º requieren los cuatro campos con mínimo 6.0'];
         } elseif ($this->nivelSlug === 'secundaria') {
             $this->filas[] = ['Promedio anual por materia', 'PROMEDIO(P1, P2, P3) con precisión completa'];
@@ -90,10 +90,11 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
             $this->filas[] = ['Promedio anual', 'PROMEDIO de las evaluaciones numéricas configuradas'];
         }
 
-        $this->filas[] = [
-            'Nota',
-            'Los vacíos y claves especiales no se convierten en cero. Los cálculos intermedios no se truncan; el truncamiento a un decimal se aplica únicamente al presentar.',
-        ];
+        $nota = $this->nivelSlug === 'primaria'
+            ? 'Los vacíos y claves especiales no se convierten en cero. Cada promedio final de campo se establece con un decimal truncado antes de calcular el promedio general.'
+            : 'Los vacíos y claves especiales no se convierten en cero. Los cálculos intermedios no se truncan; el truncamiento a un decimal se aplica únicamente al presentar.';
+
+        $this->filas[] = ['Nota', $nota];
     }
 
     public function registerEvents(): array

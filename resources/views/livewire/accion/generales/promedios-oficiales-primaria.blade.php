@@ -7,7 +7,7 @@
                 <p class="text-xs font-black uppercase tracking-[.18em] text-[#006492] dark:text-sky-300">Fuente oficial de primaria</p>
                 <h3 class="mt-1 text-xl font-black text-slate-950 dark:text-white">Promedios por campos formativos</h3>
                 <p class="mt-2 max-w-4xl text-sm text-slate-600 dark:text-slate-300">
-                    Cada periodo del campo usa la calificación oficial confirmada cuando existe; de lo contrario, se calcula automáticamente desde sus materias participantes. El promedio final de grado es la suma de los cuatro promedios precisos de campo dividida entre cuatro y solo es definitivo cuando todo está completo.
+                    Cada periodo del campo usa la calificación oficial confirmada cuando existe; de lo contrario, se calcula automáticamente desde sus materias participantes. El promedio final de cada campo se trunca a un decimal; el promedio final de grado es la suma de esos cuatro valores oficiales dividida entre cuatro y solo es definitivo cuando todo está completo.
                 </p>
             </div>
 

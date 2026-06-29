@@ -70,7 +70,7 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
                 $fila[] = $datos['periodos'][1];
                 $fila[] = $datos['periodos'][2];
                 $fila[] = $datos['periodos'][3];
-                // Se conserva la precisión en el archivo; Excel solo presenta un decimal.
+                // El promedio oficial del campo ya está truncado a un decimal.
                 $fila[] = $datos['final_preciso'];
             }
 
@@ -87,7 +87,7 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
 
         $filas[] = [];
         $filas[] = [
-            'NOTA: El promedio final de cada campo se obtiene de sus tres periodos. El promedio final de grado es la suma de los cuatro promedios precisos de campo dividida entre cuatro; el truncamiento se aplica únicamente al presentar.',
+            'NOTA: El promedio final de cada campo se obtiene de sus tres periodos y se trunca a un decimal. El promedio final de grado es la suma de los cuatro promedios oficiales de campo dividida entre cuatro; el resultado se presenta con un decimal truncado.',
         ];
 
         return $filas;
@@ -130,7 +130,7 @@ class CalificacionesOficialesPrimariaExport implements FromArray, ShouldAutoSize
                     $indiceInicialCampo += 4;
                 }
 
-                // Los promedios finales conservan el valor preciso y se muestran con un decimal.
+                // Los promedios oficiales se muestran con un decimal.
                 $primeraFilaDatos = 4;
                 $ultimaFilaDatos = max($primeraFilaDatos, $highestRow - 2);
                 $indiceCampo = 5;

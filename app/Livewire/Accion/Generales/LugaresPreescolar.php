@@ -28,6 +28,8 @@ class LugaresPreescolar extends Component
     public Collection $grados;
     public Collection $grupos;
 
+    public ?int $grado_terminal_id = null;
+
     public string $ciclo_escolar_id = '';
     public string $generacion_id = '';
     public string $grado_id = '';
@@ -71,6 +73,10 @@ class LugaresPreescolar extends Component
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get(['id', 'nivel_id', 'nombre', 'orden']);
+
+        $this->grado_terminal_id = $this->grados
+            ->sortByDesc('orden')
+            ->first()?->id;
 
         $this->ciclo_escolar_id = (string) ($this->cicloEscolares->first()?->id ?? '');
 
@@ -302,7 +308,7 @@ class LugaresPreescolar extends Component
         ]);
     }
 
-    public function urlDiploma(int $inscripcionId): ?string
+    public function urlDiploma(int $inscripcionId, ?int $gradoId = null): ?string
     {
         /*
         |--------------------------------------------------------------------------
@@ -315,19 +321,17 @@ class LugaresPreescolar extends Component
             return null;
         }
 
-        $registro = LugarPreescolar::query()
-            ->where('inscripcion_id', $inscripcionId)
-            ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
-            ->where('tipo_reconocimiento', 'anual')
-            ->where('periodo', 0)
-            ->first();
-
-        if (!$registro) {
+        if (
+            $this->grado_terminal_id === null
+            || $gradoId === null
+            || (int) $gradoId !== (int) $this->grado_terminal_id
+        ) {
             return null;
         }
 
         return route('misrutas.lugares-preescolar.diploma', [
-            'lugarPreescolar' => $registro->id,
+            'inscripcion' => $inscripcionId,
+            'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
             'fecha' => $this->fecha_pdf ?: now()->format('Y-m-d'),
         ]);
     }

@@ -21,6 +21,7 @@ return new class extends Migration
 
         DB::table('materias')
             ->select(['id', 'materia'])
+            ->whereNull('campo_formativo_id')
             ->orderBy('id')
             ->chunkById(200, function ($materias) use ($ids): void {
                 foreach ($materias as $materia) {

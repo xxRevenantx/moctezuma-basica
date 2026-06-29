@@ -1,3 +1,21 @@
+@php
+    $puedeDescargarPorGrado = $ciclo_escolar_id !== '' && $grado_id !== '';
+    $esGradoTerminalSeleccionado = $puedeDescargarPorGrado
+        && $grado_terminal_id !== null
+        && (int) $grado_id === (int) $grado_terminal_id;
+    $parametrosZipPreescolar = [
+        'ciclo_escolar_id' => $ciclo_escolar_id,
+        'grado_id' => $grado_id,
+        'tipo_reconocimiento' => $tipo_reconocimiento,
+        'periodo' => $tipo_reconocimiento === 'anual' ? 0 : $periodo,
+        'fecha' => $fecha_pdf,
+    ];
+
+    if ($generacion_id !== '') {
+        $parametrosZipPreescolar['generacion_id'] = $generacion_id;
+    }
+@endphp
+
 <div class="space-y-6">
     <div
         class="overflow-hidden rounded-[1.8rem] border border-pink-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -103,6 +121,33 @@
             <flux:button type="button" wire:click="limpiarFiltros" variant="outline" icon="arrow-path">
                 Limpiar filtros
             </flux:button>
+
+            @if ($puedeDescargarPorGrado)
+                <flux:button href="{{ route('misrutas.lugares-preescolar.documentos.zip', array_merge([
+                    'tipo' => 'reconocimientos',
+                ], $parametrosZipPreescolar)) }}" target="_blank" variant="filled" icon="document-arrow-down">
+                    Reconocimientos ZIP
+                </flux:button>
+            @else
+                <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
+                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                    Reconocimientos ZIP
+                </span>
+            @endif
+
+            @if ($tipo_reconocimiento === 'anual' && $esGradoTerminalSeleccionado)
+                <flux:button href="{{ route('misrutas.lugares-preescolar.documentos.zip', array_merge([
+                    'tipo' => 'diplomas',
+                ], $parametrosZipPreescolar)) }}" target="_blank" variant="primary" icon="academic-cap">
+                    Diplomas ZIP
+                </flux:button>
+            @else
+                <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                    title="Disponible en Fin de curso y únicamente para tercer grado">
+                    <flux:icon.academic-cap class="h-4 w-4" />
+                    Diplomas ZIP
+                </span>
+            @endif
         </div>
     </div>
 
@@ -141,7 +186,9 @@
 
                             $pdfUrl = $this->urlPdf($alumno->id);
                             $mostrarDiploma = $tipo_reconocimiento === 'anual';
-                            $diplomaUrl = $mostrarDiploma ? $this->urlDiploma($alumno->id) : null;
+                            $diplomaUrl = $mostrarDiploma
+                                ? $this->urlDiploma($alumno->id, $alumno->grado_id)
+                                : null;
                         @endphp
 
                         <tr class="hover:bg-pink-50/40 dark:hover:bg-white/5">
@@ -217,7 +264,7 @@
                                         </flux:button>
                                     @else
                                         <span class="text-xs font-semibold text-slate-400">
-                                            Sin guardar
+                                            No aplica
                                         </span>
                                     @endif
                                 </td>

@@ -182,10 +182,11 @@ class CalificacionOficialPrimariaService
      * - Cada periodo de un campo se obtiene promediando sus materias participantes.
      * - La propuesta del periodo se trunca a entero, sin redondear.
      * - Una calificación oficial confirmada, si existe, tiene prioridad.
-     * - El promedio final del campo conserva la precisión de sus tres periodos.
-     * - El promedio final de grado es la suma de los cuatro promedios precisos
+     * - El promedio final de cada campo se obtiene con sus tres periodos y se
+     *   trunca a un decimal para establecer el promedio oficial del campo.
+     * - El promedio final de grado es la suma de los cuatro promedios oficiales
      *   de campo dividida entre cuatro.
-     * - El truncamiento a un decimal se aplica únicamente al presentar.
+     * - El resultado general se trunca a un decimal únicamente al presentarse.
      */
     public function reporteAnual(
         int $nivelId,
@@ -438,7 +439,7 @@ class CalificacionOficialPrimariaService
                 ?? 'Sin grupo';
 
             $camposAlumno = [];
-            $finalesPrecisos = [];
+            $finalesOficiales = [];
             $promediosPorPeriodo = [1 => [], 2 => [], 3 => []];
             $periodosCompletos = [1 => true, 2 => true, 3 => true];
             $materiasDetalle = [];
@@ -510,13 +511,17 @@ class CalificacionOficialPrimariaService
                 }
 
                 $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
-                $provisionalPreciso = PromedioExcel::calcular($periodos);
+                $provisionalCalculoPreciso = PromedioExcel::calcular($periodos);
+                $provisionalOficial = PromedioExcel::truncar($provisionalCalculoPreciso, 1);
                 $campoCompleto = $capturados === 3
                     && collect($estadosPeriodo)->every(fn ($completo) => $completo === true);
-                $finalPreciso = $campoCompleto ? $provisionalPreciso : null;
+                $finalCalculoPreciso = $campoCompleto ? $provisionalCalculoPreciso : null;
+                $finalOficial = $campoCompleto
+                    ? PromedioExcel::truncar($finalCalculoPreciso, 1)
+                    : null;
 
-                if ($finalPreciso !== null) {
-                    $finalesPrecisos[] = $finalPreciso;
+                if ($finalOficial !== null) {
+                    $finalesOficiales[] = $finalOficial;
                 }
 
                 $materiasCampoDetalle = $catalogoCampo->map(function ($materia) use (
@@ -570,20 +575,20 @@ class CalificacionOficialPrimariaService
                     'fuentes_periodo' => $fuentesPeriodo,
                     'capturas_periodo' => $capturasPeriodo,
                     'capturados' => $capturados,
-                    'provisional_calculo_preciso' => $provisionalPreciso,
-                    'provisional_preciso' => $provisionalPreciso,
-                    'provisional' => PromedioExcel::formatear($provisionalPreciso, 1, '—'),
-                    'final_calculo_preciso' => $finalPreciso,
-                    'final_preciso' => $finalPreciso,
-                    'final' => PromedioExcel::formatear($finalPreciso, 1, '—'),
+                    'provisional_calculo_preciso' => $provisionalCalculoPreciso,
+                    'provisional_preciso' => $provisionalOficial,
+                    'provisional' => PromedioExcel::formatear($provisionalOficial, 1, '—'),
+                    'final_calculo_preciso' => $finalCalculoPreciso,
+                    'final_preciso' => $finalOficial,
+                    'final' => PromedioExcel::formatear($finalOficial, 1, '—'),
                     'completo' => $campoCompleto,
                     'materias' => $materiasCampoDetalle->all(),
                 ];
             }
 
-            $todosLosCamposCompletos = count($finalesPrecisos) === 4;
+            $todosLosCamposCompletos = count($finalesOficiales) === 4;
             $promedioGeneralPreciso = $todosLosCamposCompletos
-                ? PromedioExcel::calcular($finalesPrecisos)
+                ? PromedioExcel::calcular($finalesOficiales)
                 : null;
             $promedioProvisionalPreciso = PromedioExcel::calcular(
                 collect($camposAlumno)->pluck('provisional_preciso')
@@ -593,7 +598,7 @@ class CalificacionOficialPrimariaService
             $promocionSugerida = $esPrimerGrado
                 ? true
                 : ($todosLosCamposCompletos
-                    ? collect($finalesPrecisos)->every(fn ($promedio) => (float) $promedio >= 6.0)
+                    ? collect($finalesOficiales)->every(fn ($promedio) => (float) $promedio >= 6.0)
                     : null);
 
             $decision = $decisiones->get($alumnoId . '|' . $gradoActualId);

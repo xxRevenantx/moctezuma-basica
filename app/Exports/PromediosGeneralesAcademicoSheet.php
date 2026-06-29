@@ -38,7 +38,9 @@ class PromediosGeneralesAcademicoSheet implements FromArray, ShouldAutoSize, Wit
     private function preparar(): void
     {
         $this->filas[] = ['DETALLE ACADÉMICO - ' . mb_strtoupper($this->nivelNombre)];
-        $this->filas[] = ['Los cálculos conservan precisión completa y se truncan únicamente al presentar.'];
+        $this->filas[] = [$this->nivelSlug === 'primaria'
+            ? 'Cada promedio final de campo se establece con un decimal truncado antes de calcular el promedio general.'
+            : 'Los cálculos conservan precisión completa y se truncan únicamente al presentar.'];
         $this->filas[] = [];
         $this->filas[] = [
             'Grupo',
@@ -104,15 +106,19 @@ class PromediosGeneralesAcademicoSheet implements FromArray, ShouldAutoSize, Wit
     private function fila(string $grupo, array $alumno, array $campo, ?array $materia): array
     {
         $evaluaciones = $materia['evaluaciones'] ?? [1 => null, 2 => null, 3 => null];
-        $promedioMateria = $materia['promedio_final_preciso']
-            ?? $materia['promedio_provisional_preciso']
-            ?? null;
+        $promedioMateria = $this->nivelSlug === 'secundaria'
+            ? ($materia['promedio_final_preciso'] ?? null)
+            : ($materia['promedio_final_preciso']
+                ?? $materia['promedio_provisional_preciso']
+                ?? null);
         $promedioCampo = $campo['final_preciso']
             ?? $campo['provisional_preciso']
             ?? null;
-        $promedioGeneral = $alumno['promedio_final']
-            ?? $alumno['promedio_provisional']
-            ?? null;
+        $promedioGeneral = $this->nivelSlug === 'secundaria'
+            ? ($alumno['promedio_final'] ?? null)
+            : ($alumno['promedio_final']
+                ?? $alumno['promedio_provisional']
+                ?? null);
 
         return [
             $grupo,
@@ -131,14 +137,15 @@ class PromediosGeneralesAcademicoSheet implements FromArray, ShouldAutoSize, Wit
         ];
     }
 
-    private function valor(mixed $valor): string|float|int
+    private function valor(mixed $valor): string
     {
-        if ($valor === null || $valor === '' || ! is_numeric($valor)) {
-            return '—';
-        }
-
-        // Se conserva el valor preciso; la hoja solo lo presenta con un decimal.
-        return (float) $valor;
+        /*
+         * Excel aplica redondeo cuando recibe el valor preciso y solo se asigna
+         * el formato 0.0. Para respetar la regla institucional, exportamos el
+         * valor ya truncado a un decimal. El cálculo preciso permanece en el
+         * servicio y se usa para promedio general, lugares y promoción.
+         */
+        return PromedioExcel::formatear($valor, 1, '—');
     }
 
     public function registerEvents(): array

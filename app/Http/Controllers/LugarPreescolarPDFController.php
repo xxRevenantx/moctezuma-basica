@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CicloEscolar;
+use App\Models\Grado;
+use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -145,24 +148,50 @@ class LugarPreescolarPDFController extends Controller
     }
 
 
-    public function diploma(Request $request, LugarPreescolar $lugarPreescolar)
+    public function diploma(Request $request, Inscripcion $inscripcion)
     {
-        $lugarPreescolar->load([
-            'alumno.nivel.director',
-            'alumno.grado',
-            'alumno.generacion',
-            'alumno.grupo.asignacionGrupo',
-            'cicloEscolar',
+        $request->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'fecha' => ['nullable', 'date'],
         ]);
 
-        $alumno = $lugarPreescolar->alumno;
+        $inscripcion->load([
+            'nivel.director',
+            'nivel.supervisor',
+            'grado',
+            'generacion',
+            'grupo.asignacionGrupo',
+        ]);
+
+        abort_unless(
+            $inscripcion->nivel?->slug === 'preescolar',
+            404,
+            'El alumno no pertenece al nivel preescolar.'
+        );
+
+        $gradoTerminalId = Grado::query()
+            ->where('nivel_id', $inscripcion->nivel_id)
+            ->orderByDesc('orden')
+            ->orderByDesc('id')
+            ->value('id');
+
+        abort_unless(
+            $gradoTerminalId !== null && (int) $inscripcion->grado_id === (int) $gradoTerminalId,
+            403,
+            'El diploma de preescolar solo está disponible para tercer grado.'
+        );
+
+        $cicloEscolar = CicloEscolar::query()->findOrFail(
+            $request->integer('ciclo_escolar_id')
+        );
+
+        $alumno = $inscripcion;
 
         $fechaPdf = $this->fechaPdf($request->query('fecha'));
 
         $pdf = Pdf::loadView('pdf.diploma_preescolar_pdf', [
-            'reconocimiento' => $lugarPreescolar,
             'alumno' => $alumno,
-            'cicloEscolar' => $lugarPreescolar->cicloEscolar,
+            'cicloEscolar' => $cicloEscolar,
             'fechaPdf' => $fechaPdf,
             'educadoraNombre' => $this->obtenerEducadora($alumno),
             'directoraNombre' => $this->obtenerDirectora($alumno),
