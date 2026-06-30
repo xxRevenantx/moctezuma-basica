@@ -439,17 +439,39 @@
         }
 
         $nombreEscuela = match (true) {
-            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'preescolar') => 'ESCUELA PREESCOLAR MOCTEZUMA',
-            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'primaria') => 'ESC. PRIM. PART. MOCTEZUMA',
-            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'secundaria') => 'ESC. SEC. PART. MOCTEZUMA',
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'preescolar') => 'Jardín de Niños Moctezuma',
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'primaria') => 'Esc. Prim. Part. Moctezuma',
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'secundaria') => 'Esc. Sec. Part. Moctezuma',
             str_contains(mb_strtolower($nivel?->nombre ?? ''), 'bachillerato')
                 => 'BACHILLERATO GENERAL CENTRO UNIVERSITARIO MOCTEZUMA',
             default => 'CENTRO UNIVERSITARIO MOCTEZUMA',
         };
 
+        $escuelaSlug = $nivel->slug == 'preescolar' ? 'del ' : 'de la';
+
         $grupoTexto = $grupo?->nombre ? 'grupo: "' . $grupo->nombre . '"' : 'grupo correspondiente';
 
         $contenidoHtml = trim((string) ($constancia?->contenido_generado_html ?? ''));
+
+        $encabezado = match (true) {
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'preescolar') => 'SECRETARIA DE EDUCACIÓN GUERRERO
+                SUBSECRETARÍA DE EDUCACIÓN BÁSICA
+                DIRECCIÓN GENERAL DE EDUCACIÓN PREESCOLAR',
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'primaria') => 'SECRETARIA DE EDUCACIÓN GUERRERO
+                SUBSECRETARÍA DE EDUCACIÓN BÁSICA
+                DIRECCIÓN GENERAL DE EDUCACIÓN PRIMARIA',
+            str_contains(mb_strtolower($nivel?->nombre ?? ''), 'secundaria') => 'SECRETARIA DE EDUCACIÓN GUERRERO
+                SUBSECRETARÍA DE EDUCACIÓN BÁSICA
+                DIRECCIÓN GENERAL DE EDUCACIÓN SECUNDARIA',
+            str_contains(
+                mb_strtolower($nivel?->nombre ?? ''),
+                'SECRETARIA DE EDUCACIÓN GUERRERO
+               SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR
+               DIRECCIÓN GENERAL DE BACHILLERES',
+            )
+                => 'BACHILLERATO GENERAL CENTRO UNIVERSITARIO MOCTEZUMA',
+            default => 'CENTRO UNIVERSITARIO MOCTEZUMA',
+        };
     @endphp
 
     <div class="pagina">
@@ -472,9 +494,7 @@
                     </td>
 
                     <td class="datos-escuela">
-                        SECRETARIA DE EDUCACIÓN GUERRERO<br>
-                        SUBSECRETARÍA DE EDUCACIÓN BÁSICA<br>
-                        DIRECCIÓN GENERAL DE EDUCACIÓN PRIMARIA<br>
+                        {!! nl2br(e($encabezado)) !!} <br>
                         {{ $nombreEscuela }} C.C.T: {{ $cct }}<br>
                         FRANCISCO I. MADERO #800 OTE. COL. ESQUIPULAS. CD.<br>
                         ALTAMIRANO, GRO. TEL. 767 688 0774
@@ -515,7 +535,8 @@
         <div class="contenido-principal {{ $esCartaConducta ? 'conducta' : '' }}">
             @if ($esCartaConducta)
                 <p class="parrafo">
-                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora de la "{{ $nombreEscuela }}",
+                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora
+                    {{ $escuelaSlug }} <b>"{{ $nombreEscuela }}"</b>,
                     con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
                     Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
                     Guerrero, Región Tierra Caliente.
