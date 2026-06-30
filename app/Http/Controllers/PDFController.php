@@ -24,6 +24,7 @@ use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -39,6 +40,10 @@ class PDFController extends Controller
     // BOLET ANUAL DE LOS PERIODOS Y PARCIALES Y DIPLOMA ANUAL DE LOS PERIODOS Y PARCIALES
     public function boletareconocimientoPromedioPdf(Request $request, string $slug_nivel, string $tipo)
     {
+        $request->validate([
+            'fecha' => ['nullable', 'date'],
+        ]);
+
         $slugNivel = $slug_nivel;
 
         $generacionId = $request->integer('generacion_id');
@@ -1328,6 +1333,7 @@ class PDFController extends Controller
             'numeroMateriasPromediar' => $numeroMateriasPromediar,
 
             'fecha_impresion' => now(),
+            'fechaPdf' => $this->fechaPdf($request->query('fecha')),
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
         ];
@@ -1349,6 +1355,21 @@ class PDFController extends Controller
         return Pdf::loadView($vista, $data)
             ->setPaper('letter', in_array($tipo, ['reconocimiento', 'diploma'], true) ? 'landscape' : 'portrait')
             ->stream($nombreArchivo);
+    }
+
+    private function fechaPdf(?string $fecha): string
+    {
+        try {
+            $fecha = $fecha ?: now()->format('Y-m-d');
+
+            return Carbon::parse($fecha)
+                ->locale('es')
+                ->translatedFormat('d \\d\\e F \\d\\e Y');
+        } catch (\Throwable $exception) {
+            return now()
+                ->locale('es')
+                ->translatedFormat('d \\d\\e F \\d\\e Y');
+        }
     }
 
     private function estatusPromedioPdf(?float $promedio, int $capturados, int $esperados): string

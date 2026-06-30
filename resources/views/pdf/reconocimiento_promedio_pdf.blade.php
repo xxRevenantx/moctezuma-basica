@@ -238,7 +238,7 @@
 
         .datos-extra {
             position: absolute;
-            top: 555px;
+            top: 540px;
             left: 150px;
             right: 150px;
             z-index: 6;
@@ -258,6 +258,19 @@
         .datos-extra strong {
             color: #071846;
             font-weight: 700;
+        }
+
+        .fecha {
+            position: absolute;
+            top: 580px;
+            left: 150px;
+            right: 150px;
+            z-index: 6;
+            text-align: center;
+            font-family: 'calibri', 'ARIAL', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #071846;
         }
 
         .promedio-box,
@@ -311,7 +324,7 @@
         .firmas {
             font-family: 'ARIAL', sans-serif;
             width: 74%;
-            margin: 646px auto 0;
+            margin: 660px auto 0;
             color: #071846;
             border-collapse: collapse;
             table-layout: fixed;
@@ -327,7 +340,7 @@
         }
 
         .firma-celda {
-            padding: 0 24px;
+            padding: 7px 24px;
             text-align: center;
             vertical-align: top;
         }
@@ -473,6 +486,10 @@
         $nombreDocenteTitular = mb_strtoupper($nombreDocenteTitular ?: 'DOCENTE TITULAR', 'UTF-8');
         $nombreDirectorFirma = mb_strtoupper($nombreDirectorFirma ?: 'DIRECCIÓN ESCOLAR', 'UTF-8');
         $nombreSupervisorFirma = mb_strtoupper($nombreSupervisorFirma ?: 'SUPERVISIÓN ESCOLAR', 'UTF-8');
+        $fechaReconocimiento =
+            isset($fechaPdf) && trim((string) $fechaPdf) !== ''
+                ? $fechaPdf
+                : now()->locale('es')->translatedFormat('d \d\e F \d\e Y');
     @endphp
 
     <div class="diploma">
@@ -557,6 +574,10 @@
                 </td>
             </tr>
         </table>
+
+        <div class="fecha">
+            Cd. Altamirano, Guerrero, a {{ $fechaReconocimiento }}
+        </div>
 
         {{-- <div class="promedio-box">
             <div class="promedio-label">

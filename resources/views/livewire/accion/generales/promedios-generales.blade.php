@@ -23,6 +23,7 @@
     $parametrosDescargaMasiva = [
         'ciclo_escolar_id' => $ciclo_escolar_id,
         'grado_id' => $grado_id,
+        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
     ];
 
     if ($generacion_id !== '') {
@@ -199,56 +200,64 @@
                 </p>
             </div>
 
-            <div class="flex flex-wrap gap-2">
-                @if ($puedeDescargarReconocimientos)
-                    <a href="{{ route(
-                        'generales.documentos-academicos.zip',
-                        array_merge(
-                            [
-                                'slug_nivel' => $slug_nivel,
-                                'tipo' => 'reconocimientos',
-                            ],
-                            $parametrosDescargaMasiva,
-                        ),
-                    ) }}"
-                        target="_blank" rel="noopener"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
-                        <flux:icon.trophy class="h-4 w-4" />
-                        Reconocimientos ZIP
-                    </a>
-                @else
-                    <span
-                        class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                        title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
-                        <flux:icon.trophy class="h-4 w-4" />
-                        Reconocimientos ZIP
-                    </span>
-                @endif
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <flux:field class="min-w-[190px]">
+                    <flux:label>Fecha para documentos</flux:label>
+                    <flux:input type="date" wire:model.live="fecha_pdf" />
+                    <flux:error name="fecha_pdf" />
+                </flux:field>
 
-                @if ($puedeDescargarDiplomas)
-                    <a href="{{ route(
-                        'generales.documentos-academicos.zip',
-                        array_merge(
-                            [
-                                'slug_nivel' => $slug_nivel,
-                                'tipo' => 'diplomas',
-                            ],
-                            $parametrosDescargaMasiva,
-                        ),
-                    ) }}"
-                        target="_blank" rel="noopener"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">
-                        <flux:icon.academic-cap class="h-4 w-4" />
-                        Diplomas ZIP
-                    </a>
-                @else
-                    <span
-                        class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                        title="{{ $esBachillerato ? 'Selecciona sexto semestre y su grado correspondiente' : 'Selecciona el último grado del nivel' }}">
-                        <flux:icon.academic-cap class="h-4 w-4" />
-                        Diplomas ZIP
-                    </span>
-                @endif
+                <div class="flex flex-wrap gap-2">
+                    @if ($puedeDescargarReconocimientos)
+                        <a href="{{ route(
+                            'generales.documentos-academicos.zip',
+                            array_merge(
+                                [
+                                    'slug_nivel' => $slug_nivel,
+                                    'tipo' => 'reconocimientos',
+                                ],
+                                $parametrosDescargaMasiva,
+                            ),
+                        ) }}"
+                            target="_blank" rel="noopener"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
+                            <flux:icon.trophy class="h-4 w-4" />
+                            Reconocimientos ZIP
+                        </a>
+                    @else
+                        <span
+                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
+                            <flux:icon.trophy class="h-4 w-4" />
+                            Reconocimientos ZIP
+                        </span>
+                    @endif
+
+                    @if ($puedeDescargarDiplomas)
+                        <a href="{{ route(
+                            'generales.documentos-academicos.zip',
+                            array_merge(
+                                [
+                                    'slug_nivel' => $slug_nivel,
+                                    'tipo' => 'diplomas',
+                                ],
+                                $parametrosDescargaMasiva,
+                            ),
+                        ) }}"
+                            target="_blank" rel="noopener"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">
+                            <flux:icon.academic-cap class="h-4 w-4" />
+                            Diplomas ZIP
+                        </a>
+                    @else
+                        <span
+                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                            title="{{ $esBachillerato ? 'Selecciona sexto semestre y su grado correspondiente' : 'Selecciona el último grado del nivel' }}">
+                            <flux:icon.academic-cap class="h-4 w-4" />
+                            Diplomas ZIP
+                        </span>
+                    @endif
+                </div>
             </div>
         </div>
     </section>
@@ -532,6 +541,7 @@
                                                         'grado_id' => $alumnoGradoId,
                                                         'grupo_id' => $alumnoGrupoId,
                                                         'semestre_id' => $alumnoSemestreId,
+                                                        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
                                                     ]) }}"
                                                         target="_blank"
                                                         class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">
@@ -549,6 +559,7 @@
                                                         'grado_id' => $alumnoGradoId,
                                                         'grupo_id' => $alumnoGrupoId,
                                                         'semestre_id' => $alumnoSemestreId,
+                                                        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
                                                     ]) }}"
                                                         target="_blank"
                                                         class="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">

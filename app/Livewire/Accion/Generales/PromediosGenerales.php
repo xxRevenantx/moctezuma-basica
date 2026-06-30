@@ -39,9 +39,11 @@ class PromediosGenerales extends Component
     public string $grupo_id = '';
     public string $semestre_id = '';
     public string $orden = 'promedio_desc';
+    public string $fecha_pdf = '';
 
     public function mount(string $slug_nivel): void
     {
+        $this->fecha_pdf = now()->format('Y-m-d');
         $this->slug_nivel = $slug_nivel;
 
         $this->nivel = Nivel::query()

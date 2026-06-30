@@ -37,6 +37,7 @@ class DocumentosAcademicosZipController extends Controller
             'grado_id' => ['required', 'integer', 'exists:grados,id'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
             'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
+            'fecha' => ['nullable', 'date'],
         ]);
 
         $nivel = Nivel::query()
@@ -270,6 +271,7 @@ class DocumentosAcademicosZipController extends Controller
                     'grupo_id' => (int) $documento['grupo_id'],
                     'inscripcion_id' => (int) $alumno->id,
                     'ciclo_escolar_id' => (int) $datos['ciclo_escolar_id'],
+                    'fecha' => $datos['fecha'] ?? null,
                 ];
 
                 if ($esBachillerato) {

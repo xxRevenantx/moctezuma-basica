@@ -390,6 +390,7 @@
         $esRelacionesExteriores = str_contains($textoPlantilla, 'relaciones');
         $esCartaConducta = str_contains($textoPlantilla, 'conducta');
         $esConstanciaEstudios = !$esRelacionesExteriores && !$esCartaConducta;
+        // $esConstanciaTermino
 
         $nombreAlumno = trim(
             ($alumno->nombre ?? '') . ' ' . ($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? ''),
