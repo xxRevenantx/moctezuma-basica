@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>Diploma anual</title>
+    <title>DIPLOMA</title>
 
     <style>
         @font-face {
@@ -69,31 +69,45 @@
             background-repeat: no-repeat;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Logotipos
+        |--------------------------------------------------------------------------
+        */
+
         .logo-izquierdo {
             position: absolute;
             top: 80px;
             left: 118px;
             z-index: 5;
-            width: 130px;
+            width: 150px;
             text-align: center;
         }
 
         .logo-izquierdo img {
             max-width: 130px;
+            max-height: 100px;
         }
 
         .logo-derecho {
             position: absolute;
-            top: 80px;
+            top: 90px;
             right: 90px;
             z-index: 5;
-            width: 130px;
+            width: 150px;
             text-align: center;
         }
 
         .logo-derecho img {
-            max-width: 130px;
+            max-width: 150px;
+            max-height: 100px;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Encabezado
+        |--------------------------------------------------------------------------
+        */
 
         .encabezado {
             position: absolute;
@@ -146,6 +160,12 @@
             text-transform: uppercase;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Título
+        |--------------------------------------------------------------------------
+        */
+
         .titulo-diploma {
             position: absolute;
             top: 200px;
@@ -183,9 +203,15 @@
             background: #b5792f;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Alumno
+        |--------------------------------------------------------------------------
+        */
+
         .a-texto {
             position: absolute;
-            top: 374px;
+            top: 350px;
             left: 0;
             right: 0;
             z-index: 6;
@@ -199,7 +225,7 @@
 
         .alumno {
             position: absolute;
-            top: 410px;
+            top: 400px;
             left: 145px;
             right: 145px;
             z-index: 6;
@@ -207,6 +233,7 @@
             font-family: 'calibri', 'ARIAL', sans-serif;
             font-size: 40px;
             font-weight: 700;
+            line-height: 1.05;
             color: #071846;
             letter-spacing: .6px;
             text-transform: uppercase;
@@ -214,7 +241,7 @@
 
         .linea-alumno {
             position: absolute;
-            top: 470px;
+            top: 455px;
             left: 145px;
             right: 145px;
             z-index: 6;
@@ -222,16 +249,22 @@
             background: #eba55f;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Descripción
+        |--------------------------------------------------------------------------
+        */
+
         .descripcion {
             position: absolute;
-            top: 480px;
+            top: 470px;
             left: 135px;
             right: 135px;
             z-index: 6;
             text-align: center;
             font-family: 'calibri', 'ARIAL', sans-serif;
-            font-size: 18px;
-            line-height: 1.15;
+            font-size: 17px;
+            line-height: 1;
             color: #071846;
         }
 
@@ -240,9 +273,15 @@
             color: #071846;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Datos académicos
+        |--------------------------------------------------------------------------
+        */
+
         .datos-extra {
             position: absolute;
-            top: 540px;
+            top: 530px;
             left: 150px;
             right: 150px;
             z-index: 6;
@@ -280,57 +319,117 @@
 
         .firmas {
             position: absolute;
-            top: 660px;
-            left: 15%;
-            right: 15%;
+            top: 625px;
+            left: 10%;
+            right: 10%;
             z-index: 6;
-            width: 70%;
+            width: 80%;
             border-collapse: collapse;
             table-layout: fixed;
             font-family: 'ARIAL', sans-serif;
-            font-size: 15px;
             color: #071846;
         }
 
         .firmas td {
-            width: 50%;
-            padding: 10px 30px 0;
             text-align: center;
             vertical-align: top;
         }
 
-        .firmas.solo-director {
-            left: 25%;
-            right: 25%;
+        /*
+|--------------------------------------------------------------------------
+| Dos firmas: director y supervisor
+|--------------------------------------------------------------------------
+*/
+
+        .firmas.dos-firmas td {
             width: 50%;
+            padding: 10px 28px 0;
         }
 
-        .firmas.solo-director td {
-            width: 100%;
+        /*
+|--------------------------------------------------------------------------
+| Tres firmas: docente y director arriba, supervisor abajo
+|--------------------------------------------------------------------------
+*/
+
+        .firmas.tres-firmas .fila-superior td {
+            width: 50%;
+            padding: 10px 28px 0;
         }
+
+        .firmas.tres-firmas .fila-inferior td {
+            padding-top: 0px;
+        }
+
+        .bloque-firma {
+            width: 280px;
+            margin: 0 auto;
+        }
+
+        /*
+|--------------------------------------------------------------------------
+| Espacio disponible para firmar
+|--------------------------------------------------------------------------
+*/
+
+        .espacio-firma {
+            height: 36px;
+        }
+
+        /*
+|--------------------------------------------------------------------------
+| Línea de firma
+|--------------------------------------------------------------------------
+*/
+
+        .linea-firma {
+            width: 100%;
+            height: 1px;
+            margin-bottom: 5px;
+            background: #071846;
+        }
+
+        /*
+|--------------------------------------------------------------------------
+| Nombre debajo de la línea
+|--------------------------------------------------------------------------
+*/
 
         .firma-nombre {
-            min-height: 18px;
+            min-height: 16px;
+            padding: 0 3px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 12px;
             font-weight: 700;
-            text-decoration: underline;
+            line-height: 1.15;
+            color: #071846;
             text-transform: uppercase;
         }
 
         .cargo {
-            margin-top: 2px;
-            font-size: 10px;
+            margin-top: 3px;
+            font-family: 'ARIAL', sans-serif;
+            font-size: 9px;
             font-weight: 400;
+            line-height: 1.15;
+            color: #071846;
             text-transform: uppercase;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Marca de agua
+        |--------------------------------------------------------------------------
+        */
+
         .watermark {
             position: absolute;
-            left: 240px;
-            bottom: 0;
             top: 100px;
+            bottom: 0;
+            left: 240px;
+            z-index: 1;
             width: 600px;
             opacity: .06;
-            z-index: -1;
         }
     </style>
 </head>
@@ -386,7 +485,7 @@
                 $directorPersona?->apellido_paterno,
                 $directorPersona?->apellido_materno,
             ])
-                ->filter()
+                ->filter(fn($valor) => filled($valor))
                 ->implode(' '),
         );
 
@@ -394,19 +493,54 @@
 
         /*
         |--------------------------------------------------------------------------
-        | Firmas
+        | Supervisor
         |--------------------------------------------------------------------------
         */
 
-        $soloDirector = $mostrarSoloDirector ?? $esSecundaria || $esBachillerato;
+        $supervisorPersona = $director?->supervisor;
+
+        $nombreSupervisor = trim(
+            collect([
+                $supervisorPersona?->titulo,
+                $supervisorPersona?->nombre,
+                $supervisorPersona?->apellido_paterno,
+                $supervisorPersona?->apellido_materno,
+            ])
+                ->filter(fn($valor) => filled($valor))
+                ->implode(' '),
+        );
+
+        $nombreSupervisorFinal = mb_strtoupper(
+            $nombreSupervisor !== '' ? $nombreSupervisor : 'SUPERVISIÓN ESCOLAR ',
+            'UTF-8',
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Docente titular
+        |--------------------------------------------------------------------------
+        */
 
         $nombreDocente = trim(
             collect([$docente?->titulo, $docente?->nombre, $docente?->apellido_paterno, $docente?->apellido_materno])
-                ->filter()
+                ->filter(fn($valor) => filled($valor))
                 ->implode(' '),
         );
 
         $nombreDocenteFinal = mb_strtoupper($nombreDocente !== '' ? $nombreDocente : 'DOCENTE TITULAR', 'UTF-8');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Configuración de firmas
+        |--------------------------------------------------------------------------
+        |
+        | En secundaria y bachillerato se omite el docente titular.
+        | El director y el supervisor se muestran en todos los niveles.
+        */
+
+        $sinDocenteTitular = isset($mostrarSoloDirector)
+            ? (bool) $mostrarSoloDirector
+            : (bool) ($esSecundaria ?? false) || (bool) ($esBachillerato ?? false);
 
         /*
         |--------------------------------------------------------------------------
@@ -434,6 +568,7 @@
                 ', demostrando dedicación, responsabilidad y esfuerzo durante su formación académica.';
 
             $datoEscolarTexto = $gradoTexto;
+
             $etiquetaDatoEscolar = 'Grado y grupo:';
         }
 
@@ -454,7 +589,9 @@
 
     <div class="diploma">
 
-        <img src="{{ $watermark }}" class="watermark" alt="Watermark">
+        @if (!empty($watermark))
+            <img src="{{ $watermark }}" class="watermark" alt="Marca de agua">
+        @endif
 
         <div class="logo-izquierdo">
             @if (!empty($logoIzquierdoFinal))
@@ -514,13 +651,17 @@
         <table class="datos-extra">
             <tr>
                 <td>
-                    <strong>{{ $etiquetaDatoEscolar }}</strong>
+                    <strong>
+                        {{ $etiquetaDatoEscolar }}
+                    </strong>
 
                     {{ $datoEscolarTexto }} · Grupo {{ $grupoTexto }}
                 </td>
 
                 <td>
-                    <strong>Ciclo escolar:</strong>
+                    <strong>
+                        Ciclo escolar:
+                    </strong>
 
                     {{ $cicloEscolarTexto ?? '—' }}
                 </td>
@@ -531,31 +672,99 @@
             Cd. Altamirano, Guerrero, a {{ $fechaDiploma }}
         </div>
 
-        <table class="firmas {{ $soloDirector ? 'solo-director' : '' }}">
-            <tr>
-                @unless ($soloDirector)
+        @if ($sinDocenteTitular)
+            {{-- Director y supervisor lado a lado --}}
+            <table class="firmas dos-firmas">
+                <tr>
                     <td>
-                        <div class="firma-nombre">
-                            {{ $nombreDocenteFinal }}
-                        </div>
+                        <div class="bloque-firma">
+                            <div class="espacio-firma"></div>
 
-                        <div class="cargo">
-                            Firma del docente titular
+                            <div class="linea-firma"></div>
+
+                            <div class="firma-nombre">
+                                {{ $nombreDirectorFinal }}
+                            </div>
+
+                            <div class="cargo">
+                                Dirección escolar
+                            </div>
                         </div>
                     </td>
-                @endunless
 
-                <td>
-                    <div class="firma-nombre">
-                        {{ $nombreDirectorFinal }}
-                    </div>
+                    <td>
+                        <div class="bloque-firma">
+                            <div class="espacio-firma"></div>
 
-                    <div class="cargo">
-                        Firma de la dirección escolar
-                    </div>
-                </td>
-            </tr>
-        </table>
+                            <div class="linea-firma"></div>
+
+                            <div class="firma-nombre">
+                                {{ $nombreSupervisorFinal }}
+                            </div>
+
+                            <div class="cargo">
+                                Supervisión escolar zona {{ $supervisorPersona->zona_escolar }}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        @else
+            {{-- Docente y director arriba; supervisor abajo --}}
+            <table class="firmas tres-firmas">
+                <tr class="fila-superior">
+                    <td>
+                        <div class="bloque-firma">
+                            <div class="espacio-firma"></div>
+
+                            <div class="linea-firma"></div>
+
+                            <div class="firma-nombre">
+                                {{ $nombreDocenteFinal }}
+                            </div>
+
+                            <div class="cargo">
+                                Docente titular
+                            </div>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="bloque-firma">
+                            <div class="espacio-firma"></div>
+
+                            <div class="linea-firma"></div>
+
+                            <div class="firma-nombre">
+                                {{ $nombreDirectorFinal }}
+                            </div>
+
+                            <div class="cargo">
+                                Dirección escolar
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr class="fila-inferior">
+                    <td colspan="2">
+                        <div class="bloque-firma">
+                            <div class="espacio-firma"></div>
+
+                            <div class="linea-firma"></div>
+
+                            <div class="firma-nombre">
+                                {{ $nombreSupervisorFinal }}
+                            </div>
+
+                            <div class="cargo">
+                                Supervisión escolar zona {{ $supervisorPersona->zona_escolar }}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        @endif
     </div>
 </body>
 

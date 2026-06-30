@@ -310,11 +310,12 @@
 
         .firmas {
             font-family: 'ARIAL', sans-serif;
-            width: 70%;
-            /* margin-top: 690px; */
-            margin: 650px auto 0;
-            font-size: 15px;
+            width: 74%;
+            margin: 646px auto 0;
             color: #071846;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 12px;
         }
 
         .firmas.solo-director {
@@ -325,9 +326,34 @@
             width: 100% !important;
         }
 
+        .firma-celda {
+            padding: 0 24px;
+            text-align: center;
+            vertical-align: top;
+        }
+
+        .firma-celda-supervisor {
+            padding-top: 14px;
+        }
+
+        .firma-linea {
+            width: 88%;
+            margin: 0 auto 4px;
+            border-top: 1px solid #071846;
+        }
+
+        .firma-nombre {
+            min-height: 13px;
+            font-size: 12px;
+            line-height: 1.1;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
         .cargo {
             margin-top: 2px;
-            font-size: 10px;
+            font-size: 8.5px;
+            line-height: 1.15;
             font-weight: 400;
             text-transform: uppercase;
         }
@@ -408,6 +434,45 @@
 
         $textoLugarReconocimiento = mb_strtoupper((string) $textoLugarReconocimiento, 'UTF-8');
         $soloDirector = !empty($mostrarSoloDirector) || !empty($esBachillerato);
+
+        $mostrarFirmaDocenteTitular =
+            !empty($mostrarDocenteTitular) &&
+            ($nivel->slug ?? null) === 'primaria' &&
+            ($tipo ?? null) === 'reconocimiento';
+
+        $nombreDocenteTitular = trim(
+            (optional($docente)->titulo ?? '') .
+                ' ' .
+                (optional($docente)->nombre ?? '') .
+                ' ' .
+                (optional($docente)->apellido_paterno ?? '') .
+                ' ' .
+                (optional($docente)->apellido_materno ?? ''),
+        );
+
+        $nombreDirectorFirma = trim(
+            (optional($director->director)->titulo ?? '') .
+                ' ' .
+                (optional($director->director)->nombre ?? '') .
+                ' ' .
+                (optional($director->director)->apellido_paterno ?? '') .
+                ' ' .
+                (optional($director->director)->apellido_materno ?? ''),
+        );
+
+        $nombreSupervisorFirma = trim(
+            (optional($director->supervisor)->titulo ?? '') .
+                ' ' .
+                (optional($director->supervisor)->nombre ?? '') .
+                ' ' .
+                (optional($director->supervisor)->apellido_paterno ?? '') .
+                ' ' .
+                (optional($director->supervisor)->apellido_materno ?? ''),
+        );
+
+        $nombreDocenteTitular = mb_strtoupper($nombreDocenteTitular ?: 'DOCENTE TITULAR', 'UTF-8');
+        $nombreDirectorFirma = mb_strtoupper($nombreDirectorFirma ?: 'DIRECCIÓN ESCOLAR', 'UTF-8');
+        $nombreSupervisorFirma = mb_strtoupper($nombreSupervisorFirma ?: 'SUPERVISIÓN ESCOLAR', 'UTF-8');
     @endphp
 
     <div class="diploma">
@@ -514,30 +579,63 @@
         </div> --}}
 
         <table class="firmas {{ $soloDirector ? 'solo-director' : '' }}">
-            <tr>
-                <td style="width: {{ $soloDirector ? '100%' : '50%' }}; padding-top: 0px; text-align: center;">
-                    <u>{{ mb_strtoupper(trim((optional($director->director)->titulo ?? '') . ' ' . (optional($director->director)->nombre ?? '') . ' ' . (optional($director->director)->apellido_paterno ?? '') . ' ' . (optional($director->director)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
-
-                    @if (optional($director->director)->genero === 'F')
-                        Firma de la directora de la escuela
-                    @else
-                        Firma del director de la escuela
-                    @endif
-                </td>
-                @unless ($soloDirector)
-                    <td style="width: 50%; padding-top: 0px; text-align: center;">
-                        <u>{{ mb_strtoupper(trim((optional($director->supervisor)->titulo ?? '') . ' ' . (optional($director->supervisor)->nombre ?? '') . ' ' . (optional($director->supervisor)->apellido_paterno ?? '') . ' ' . (optional($director->supervisor)->apellido_materno ?? '')) ?: '____________________________', 'UTF-8') }}</u><br>
-
-                        @if (optional($director->supervisor)->genero === 'F')
-                            Firma de la supervisora escolar<br>
-                            Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
-                        @else
-                            Firma del supervisor escolar <br>
-                            Zona escolar {{ $director->supervisor->zona_escolar ?? '—' }}
-                        @endif
+            @if ($mostrarFirmaDocenteTitular)
+                {{-- Primaria: docente titular y dirección en la primera fila; supervisión centrada debajo. --}}
+                <tr>
+                    <td class="firma-celda" style="width: 50%;">
+                        <div class="firma-linea"></div>
+                        <div class="firma-nombre">{{ $nombreDocenteTitular }}</div>
+                        <div class="cargo">Docente titular</div>
                     </td>
-                @endunless
-            </tr>
+
+                    <td class="firma-celda" style="width: 50%;">
+                        <div class="firma-linea"></div>
+                        <div class="firma-nombre">{{ $nombreDirectorFirma }}</div>
+                        <div class="cargo">
+                            {{ optional($director->director)->genero === 'F' ? 'Directora de la escuela' : 'Director de la escuela' }}
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="2" class="firma-celda firma-celda-supervisor">
+                        <table style="width: 50%; margin: 0 auto; border-collapse: collapse;">
+                            <tr>
+                                <td style="text-align: center;">
+                                    <div class="firma-linea"></div>
+                                    <div class="firma-nombre">{{ $nombreSupervisorFirma }}</div>
+                                    <div class="cargo">
+                                        {{ optional($director->supervisor)->genero === 'F' ? 'Supervisora escolar' : 'Supervisor escolar' }}<br>
+                                        Zona escolar {{ optional($director->supervisor)->zona_escolar ?? '—' }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            @else
+                {{-- Los demás niveles conservan su distribución original. --}}
+                <tr>
+                    <td class="firma-celda" style="width: {{ $soloDirector ? '100%' : '50%' }};">
+                        <div class="firma-linea"></div>
+                        <div class="firma-nombre">{{ $nombreDirectorFirma }}</div>
+                        <div class="cargo">
+                            {{ optional($director->director)->genero === 'F' ? 'Directora de la escuela' : 'Director de la escuela' }}
+                        </div>
+                    </td>
+
+                    @unless ($soloDirector)
+                        <td class="firma-celda" style="width: 50%;">
+                            <div class="firma-linea"></div>
+                            <div class="firma-nombre">{{ $nombreSupervisorFirma }}</div>
+                            <div class="cargo">
+                                {{ optional($director->supervisor)->genero === 'F' ? 'Supervisora escolar' : 'Supervisor escolar' }}<br>
+                                Zona escolar {{ optional($director->supervisor)->zona_escolar ?? '—' }}
+                            </div>
+                        </td>
+                    @endunless
+                </tr>
+            @endif
         </table>
     </div>
 </body>

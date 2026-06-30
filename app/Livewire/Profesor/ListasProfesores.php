@@ -143,19 +143,35 @@ class ListasProfesores extends Component
                     ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA),
             ])
-            ->where('status', 1)
-            ->whereHas('personaRoles.rolePersona', function ($consulta) {
-                $consulta->where(function ($rol) {
-                    $rol->where('slug', 'like', '%docente%')
-                        ->orWhere('slug', 'like', '%maestro%')
-                        ->orWhere('slug', 'like', '%profesor%')
-                        ->orWhere('slug', 'like', '%tutor%')
-                        ->orWhere('slug', 'director_con_grupo')
-                        ->orWhere('nombre', 'like', '%Docente%')
-                        ->orWhere('nombre', 'like', '%Maestr%')
-                        ->orWhere('nombre', 'like', '%Profesor%')
-                        ->orWhere('nombre', 'like', '%Tutor%');
-                });
+            // La carga académica del ciclo es la fuente histórica principal.
+            // Así, un profesor asignado a una materia o taller aparece aunque su
+            // rol laboral actual haya cambiado, esté incompleto o no sea docente.
+            // También se conservan en la búsqueda los docentes activos sin carga.
+            ->where(function ($candidato) {
+                $candidato
+                    ->where(function ($docenteActivo) {
+                        $docenteActivo
+                            ->where('status', 1)
+                            ->whereHas('personaRoles.rolePersona', function ($consulta) {
+                                $consulta->where(function ($rol) {
+                                    $rol->where('slug', 'like', '%docente%')
+                                        ->orWhere('slug', 'like', '%maestro%')
+                                        ->orWhere('slug', 'like', '%profesor%')
+                                        ->orWhere('slug', 'like', '%tutor%')
+                                        ->orWhere('slug', 'director_con_grupo')
+                                        ->orWhere('nombre', 'like', '%Docente%')
+                                        ->orWhere('nombre', 'like', '%Maestr%')
+                                        ->orWhere('nombre', 'like', '%Profesor%')
+                                        ->orWhere('nombre', 'like', '%Tutor%');
+                                });
+                            });
+                    })
+                    ->orWhereHas('asignacionMaterias', fn ($q) => $q
+                        ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                    ->orWhereHas('tallerSesiones', fn ($q) => $q
+                        ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
             })
             ->where(function ($consulta) use ($busqueda) {
                 $consulta->where('nombre', 'like', "%{$busqueda}%")

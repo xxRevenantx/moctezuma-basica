@@ -277,14 +277,14 @@
 
         .firmas {
             position: absolute;
-            top: 700px;
-            left: 15%;
-            right: 15%;
+            top: 680px;
+            left: 13%;
+            right: 13%;
             z-index: 6;
-            width: 70%;
-            border-collapse: collapse;
+            width: 74%;
+            border-collapse: separate;
+            border-spacing: 28px 12px;
             font-family: 'ARIAL', sans-serif;
-            font-size: 15px;
             color: #071846;
         }
 
@@ -292,18 +292,32 @@
             width: 50%;
             text-align: center;
             vertical-align: top;
-            padding: 0 20px;
+            padding: 0 12px;
+        }
+
+        .firma-supervisor {
+            padding-top: 2px !important;
+        }
+
+        .firma-linea {
+            width: 100%;
+            height: 1px;
+            margin: 0 auto 5px;
+            border-top: 1.5px solid #071846;
         }
 
         .firma-nombre {
+            min-height: 18px;
+            font-size: 12px;
+            line-height: 1.05;
             font-weight: 700;
             text-transform: uppercase;
-            text-decoration: underline;
         }
 
         .cargo {
-            margin-top: 2px;
-            font-size: 10px;
+            margin-top: 3px;
+            font-size: 9px;
+            line-height: 1.1;
             font-weight: 400;
             text-transform: uppercase;
         }
@@ -354,8 +368,9 @@
         $logoIzquierdoFinal = $logoPrincipal ?? null;
         $logoDerechoFinal = $logoPenacho ?? null;
 
-        $educadoraFinal = mb_strtoupper($educadoraNombre ?: 'EDUCADORA', 'UTF-8');
-        $directoraFinal = mb_strtoupper($directoraNombre ?: 'DIRECCIÓN', 'UTF-8');
+        $educadoraFinal = mb_strtoupper($educadoraNombre ?: 'NOMBRE DE LA EDUCADORA', 'UTF-8');
+        $directoraFinal = mb_strtoupper($directoraNombre ?: 'NOMBRE DE LA DIRECTORA', 'UTF-8');
+        $supervisoraFinal = mb_strtoupper($supervisoraNombre ?: 'NOMBRE DEL SUPERVISOR', 'UTF-8');
     @endphp
 
     <div class="diploma">
@@ -439,22 +454,33 @@
         <table class="firmas">
             <tr>
                 <td>
+                    <div class="firma-linea"></div>
                     <div class="firma-nombre">
                         {{ $educadoraFinal }}
                     </div>
-
                     <div class="cargo">
-                        Firma de la educadora
+                        Educadora
                     </div>
                 </td>
 
                 <td>
+                    <div class="firma-linea"></div>
                     <div class="firma-nombre">
                         {{ $directoraFinal }}
                     </div>
-
                     <div class="cargo">
-                        Firma de la directora de la escuela
+                        Directora de la escuela
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" class="firma-supervisor">
+                    <div class="firma-linea" style="width: 52%;"></div>
+                    <div class="firma-nombre">
+                        {{ $supervisoraFinal }}
+                    </div>
+                    <div class="cargo">
+                        Supervisor escolar · Zona 137, Cd. Altamirano
                     </div>
                 </td>
             </tr>
