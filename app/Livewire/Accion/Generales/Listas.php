@@ -403,64 +403,34 @@ class Listas extends Component
     }
 
     #[Computed]
-    public function urlWord(): ?string
-    {
-        if (!$this->puedeDescargar) {
-            return null;
-        }
-
-        return route('lista.evaluacion.word', $this->parametrosDescarga);
-    }
-
-    #[Computed]
     public function urlDescarga(): ?string
     {
-        if (!$this->puedeDescargar) {
-            return null;
-        }
-
-        if ($this->esWordPreescolarEvaluacion) {
-            return $this->urlWord;
-        }
-
         return $this->urlPdf;
     }
 
-    #[Computed]
-    public function esWordPreescolarEvaluacion(): bool
-    {
-        return $this->esPreescolar()
-            && $this->tipo_descarga === 'evaluacion';
-    }
 
     #[Computed]
     public function extensionDescarga(): string
     {
-        return $this->esWordPreescolarEvaluacion ? 'WORD' : 'PDF';
+        return 'PDF';
     }
 
     #[Computed]
     public function textoBotonDescarga(): string
     {
-        if ($this->modo_descarga === 'nivel') {
-            return $this->esWordPreescolarEvaluacion
-                ? 'Descargar Word por nivel'
-                : 'Descargar PDF por nivel';
-        }
-
-        return $this->esWordPreescolarEvaluacion ? 'Descargar Word' : 'Descargar PDF';
+        return $this->modo_descarga === 'nivel'
+            ? 'Descargar PDF por nivel'
+            : 'Descargar PDF';
     }
 
     #[Computed]
     public function textoModoDescarga(): string
     {
         if ($this->modo_descarga === 'nivel') {
-            return 'Se descargarán todas las listas del nivel seleccionado, sin necesidad de elegir generación, grado ni grupo.';
+            return 'Se generará un PDF con todas las listas del nivel seleccionado, sin necesidad de elegir generación, grado ni grupo.';
         }
 
-        return $this->esWordPreescolarEvaluacion
-            ? 'Este documento se generará en Word porque corresponde a evaluación de preescolar.'
-            : 'Este documento se generará en PDF.';
+        return 'Este documento se generará en PDF.';
     }
 
     #[Computed]

@@ -10,7 +10,6 @@
             })
             ->toArray();
 
-        $esWord = $this->esWordPreescolarEvaluacion;
     @endphp
 
     <section class="space-y-4">
@@ -37,12 +36,7 @@
                         </div>
                     </div>
 
-                    <div
-                        class="h-1.5 w-full
-                            {{ $esWord
-                                ? 'bg-gradient-to-r from-blue-500 via-sky-600 to-cyan-500'
-                                : 'bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600' }}">
-                    </div>
+                    <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
 
                     <div class="p-5 sm:p-6">
                         <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -130,28 +124,6 @@
                                         <p class="mt-1 text-sm">
                                             Las listas de evaluación y asistencia están ocultas para secundaria. Las
                                             opciones de periodo se mantienen disponibles.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-
-                        @if ($esWord)
-                            <div
-                                class="mb-5 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
-                                <div class="flex items-start gap-3">
-                                    <div
-                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200">
-                                        <flux:icon.document-text class="h-5 w-5" />
-                                    </div>
-
-                                    <div>
-                                        <p class="font-black">
-                                            Descarga en Word activa
-                                        </p>
-
-                                        <p class="mt-1 text-sm">
-                                            La lista de evaluación de preescolar se descargará como archivo Word.
                                         </p>
                                     </div>
                                 </div>
@@ -257,12 +229,12 @@
                                 <flux:select id="grupo_id" wire:model.live="grupo_id"
                                     wire:key="lista-grupo-select-{{ $slug_nivel }}-{{ $modo_descarga }}-{{ $generacion_id ?? 'null' }}-{{ $grado_id ?? 'null' }}-{{ $semestre_id ?? 'null' }}-{{ $grupos->count() }}"
                                     :disabled="$modo_descarga === 'nivel'
-                                                                                                                                                    ? true
-                                                                                                                                                    : (
-                                                                                                                                                        $this->esBachillerato()
-                                                                                                                                                            ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
-                                                                                                                                                            : (!$generacion_id || !$grado_id || $grupos->isEmpty())
-                                                                                                                                                    )">
+                                                                                                                                                                                        ? true
+                                                                                                                                                                                        : (
+                                                                                                                                                                                            $this->esBachillerato()
+                                                                                                                                                                                                ? (!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty())
+                                                                                                                                                                                                : (!$generacion_id || !$grado_id || $grupos->isEmpty())
+                                                                                                                                                                                        )">
 
                                     <flux:select.option value="">
                                         Selecciona un grupo
@@ -405,10 +377,7 @@
                             </span>
 
                             <span
-                                class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1
-                                    {{ $esWord
-                                        ? 'border border-blue-200 bg-blue-50 text-blue-700 ring-blue-100 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/60'
-                                        : 'border border-rose-200 bg-rose-50 text-rose-700 ring-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/60' }}">
+                                class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/60">
                                 Formato: {{ $this->extensionDescarga }}
                             </span>
 
@@ -426,10 +395,7 @@
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                 <div class="flex items-start gap-3">
                                     <div
-                                        class="flex h-11 w-11 items-center justify-center rounded-2xl
-                                            {{ $esWord
-                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
-                                                : 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300' }}">
+                                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                                         <flux:icon.information-circle class="h-5 w-5" />
                                     </div>
 
@@ -465,15 +431,8 @@
 
                                 @if ($this->puedeDescargar)
                                     <a href="{{ $this->urlDescarga }}" target="_blank"
-                                        class="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl
-                                            {{ $esWord
-                                                ? 'bg-gradient-to-r from-blue-500 via-sky-600 to-cyan-500 shadow-blue-500/20'
-                                                : 'bg-gradient-to-r from-red-500 via-rose-600 to-pink-600 shadow-rose-500/20' }}">
-                                        @if ($esWord)
-                                            <flux:icon.document-text class="h-5 w-5" />
-                                        @else
-                                            <flux:icon.document-arrow-down class="h-5 w-5" />
-                                        @endif
+                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-500 via-rose-600 to-pink-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-rose-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
+                                        <flux:icon.document-arrow-down class="h-5 w-5" />
 
                                         {{ $this->textoBotonDescarga }}
                                     </a>
