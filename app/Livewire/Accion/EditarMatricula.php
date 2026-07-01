@@ -32,6 +32,7 @@ class EditarMatricula extends Component
 
     public string $slug_nivel;
     public ?int $InscripcionId = null;
+    public ?int $trayectoriaIdContexto = null;
 
     // CURP API
     public bool $consultandoCurp = false;
@@ -51,7 +52,13 @@ class EditarMatricula extends Component
     public ?string $apellido_materno = null;
     public ?string $fecha_nacimiento = null;
     public ?string $genero = null;
-    public ?string $fecha_inscripcion = null;
+
+    // Fechas separadas para evitar mezclar el ingreso general del alumno
+    // con la inscripción de una trayectoria/ciclo específico.
+    public ?string $fecha_ingreso_plantel = null;
+    public ?string $fecha_inscripcion_ciclo = null;
+    public bool $trayectoriaEsActual = false;
+
     public ?int $ciclo_id = null;
     public ?int $ciclo_escolar_id = null;
 
@@ -97,9 +104,13 @@ class EditarMatricula extends Component
 
     public bool $activo = true;
 
-    public function mount(string $slug_nivel, Inscripcion $inscripcion): void
-    {
+    public function mount(
+        string $slug_nivel,
+        Inscripcion $inscripcion,
+        ?int $trayectoriaId = null
+    ): void {
         $this->slug_nivel = $slug_nivel;
+        $this->trayectoriaIdContexto = $trayectoriaId;
 
         $this->niveles = $this->loadNivelesFromGrupos();
         $this->gradosOptions = collect();
@@ -110,25 +121,60 @@ class EditarMatricula extends Component
         $this->cicloEscolaresOptions = $this->loadCicloEscolares();
         $this->tutores = $this->loadTutores();
 
-        $this->cargarInscripcion($inscripcion);
+        $this->cargarInscripcion($inscripcion, $trayectoriaId);
     }
 
-    protected function cargarInscripcion(Inscripcion $inscripcion): void
-    {
+    protected function cargarInscripcion(
+        Inscripcion $inscripcion,
+        ?int $trayectoriaId = null
+    ): void {
         $this->InscripcionId = (int) $inscripcion->id;
 
-        $trayectoria = TrayectoriaAcademica::query()
-            ->where('inscripcion_id', $inscripcion->id)
-            ->where('es_actual', true)
-            ->latest('numero_estancia')
-            ->latest('id')
-            ->first();
+        $nivelContextoId = Nivel::query()
+            ->where('slug', $this->slug_nivel)
+            ->value('id');
+
+        $trayectoria = null;
+
+        /*
+         * Cuando se entra desde una fila histórica, se debe cargar exactamente
+         * la trayectoria mostrada en esa fila. Antes siempre se abría la etapa
+         * marcada como actual, aunque el listado estuviera filtrado en otro ciclo.
+         */
+        if ($trayectoriaId) {
+            $trayectoria = TrayectoriaAcademica::query()
+                ->whereKey($trayectoriaId)
+                ->where('inscripcion_id', $inscripcion->id)
+                ->when(
+                    $nivelContextoId,
+                    fn($query) => $query->where('nivel_id', $nivelContextoId)
+                )
+                ->where('vigente_en_corte', true)
+                ->first();
+        }
+
+        if (!$trayectoria) {
+            $trayectoria = TrayectoriaAcademica::query()
+                ->where('inscripcion_id', $inscripcion->id)
+                ->when(
+                    $nivelContextoId,
+                    fn($query) => $query->where('nivel_id', $nivelContextoId)
+                )
+                ->where('es_actual', true)
+                ->latest('numero_estancia')
+                ->latest('id')
+                ->first();
+        }
 
         if (!$trayectoria) {
             $trayectoria = TrayectoriaAcademica::query()
                 ->select('trayectorias_academicas.*')
                 ->join('ciclo_escolares', 'ciclo_escolares.id', '=', 'trayectorias_academicas.ciclo_escolar_id')
                 ->where('trayectorias_academicas.inscripcion_id', $inscripcion->id)
+                ->when(
+                    $nivelContextoId,
+                    fn($query) => $query->where('trayectorias_academicas.nivel_id', $nivelContextoId)
+                )
                 ->orderByDesc('ciclo_escolares.inicio_anio')
                 ->orderByDesc('ciclo_escolares.fin_anio')
                 ->orderByDesc('trayectorias_academicas.ciclo_id')
@@ -148,6 +194,9 @@ class EditarMatricula extends Component
             : null;
 
         $this->genero = $inscripcion->genero;
+        $this->fecha_ingreso_plantel = $inscripcion->fecha_inscripcion
+            ? Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
+            : null;
 
         $this->pais_nacimiento = $inscripcion->pais_nacimiento;
         $this->estado_nacimiento = $inscripcion->estado_nacimiento;
@@ -179,9 +228,8 @@ class EditarMatricula extends Component
             $this->semestre_id = $inscripcion->semestre_id ? (int) $inscripcion->semestre_id : null;
             $this->grupo_id = $inscripcion->grupo_id ? (int) $inscripcion->grupo_id : null;
             $this->matricula = (string) $inscripcion->matricula;
-            $this->fecha_inscripcion = $inscripcion->fecha_inscripcion
-                ? Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
-                : null;
+            $this->fecha_inscripcion_ciclo = $this->fecha_ingreso_plantel;
+            $this->trayectoriaEsActual = true;
             $this->activo = (bool) $inscripcion->activo;
             $this->recargarCatalogosAcademicos();
         }
@@ -223,6 +271,9 @@ class EditarMatricula extends Component
             ->first();
 
         if (!$trayectoria) {
+            $this->trayectoriaIdContexto = null;
+            $this->trayectoriaEsActual = $this->contextoSeleccionadoDebeSerActual();
+            $this->fecha_inscripcion_ciclo = $this->fecha_ingreso_plantel ?: now()->toDateString();
             return;
         }
 
@@ -238,6 +289,7 @@ class EditarMatricula extends Component
         TrayectoriaAcademica $trayectoria,
         Inscripcion $inscripcion
     ): void {
+        $this->trayectoriaIdContexto = (int) $trayectoria->id;
         $this->ciclo_escolar_id = (int) $trayectoria->ciclo_escolar_id;
         $this->ciclo_id = (int) $trayectoria->ciclo_id;
         $this->nivel_id = (int) $trayectoria->nivel_id;
@@ -245,11 +297,10 @@ class EditarMatricula extends Component
         $this->generacion_id = (int) $trayectoria->generacion_id;
         $this->semestre_id = $trayectoria->semestre_id ? (int) $trayectoria->semestre_id : null;
         $this->grupo_id = (int) $trayectoria->grupo_id;
-        $this->fecha_inscripcion = $trayectoria->fecha_inscripcion
+        $this->trayectoriaEsActual = (bool) $trayectoria->es_actual;
+        $this->fecha_inscripcion_ciclo = $trayectoria->fecha_inscripcion
             ? Carbon::parse($trayectoria->fecha_inscripcion)->format('Y-m-d')
-            : ($inscripcion->fecha_inscripcion
-                ? Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
-                : null);
+            : $this->fecha_ingreso_plantel;
         $this->activo = (bool) $trayectoria->activo;
 
         $this->matricula = (string) (MatriculaAlumno::query()
@@ -309,6 +360,41 @@ class EditarMatricula extends Component
         }
 
         return (int) $this->ciclo_id >= (int) $actual->ciclo_id;
+    }
+
+
+    /**
+     * Determina si realmente cambió algún dato propio de la trayectoria.
+     * Así, editar únicamente datos personales o la fecha general de ingreso
+     * no crea una corrección académica innecesaria en el historial.
+     */
+    private function trayectoriaTieneCambios(
+        TrayectoriaAcademica $trayectoria,
+        Inscripcion $inscripcion,
+        array $destino
+    ): bool {
+        $fechaActual = $trayectoria->fecha_inscripcion
+            ? Carbon::parse($trayectoria->fecha_inscripcion)->toDateString()
+            : null;
+
+        $fechaNueva = filled($destino['fecha_inscripcion'] ?? null)
+            ? Carbon::parse($destino['fecha_inscripcion'])->toDateString()
+            : null;
+
+        $matriculaActual = MatriculaAlumno::query()
+            ->where('inscripcion_id', $inscripcion->id)
+            ->where('nivel_id', $trayectoria->nivel_id)
+            ->latest('fecha_asignacion')
+            ->latest('id')
+            ->value('matricula') ?: $inscripcion->matricula;
+
+        return (int) $trayectoria->nivel_id !== (int) $destino['nivel_id']
+            || (int) $trayectoria->grado_id !== (int) $destino['grado_id']
+            || (int) $trayectoria->generacion_id !== (int) $destino['generacion_id']
+            || (int) $trayectoria->grupo_id !== (int) $destino['grupo_id']
+            || (int) ($trayectoria->semestre_id ?? 0) !== (int) ($destino['semestre_id'] ?? 0)
+            || $fechaActual !== $fechaNueva
+            || (string) $matriculaActual !== (string) $destino['matricula'];
     }
 
     #[On('limpiar-curp-success')]
@@ -1087,7 +1173,7 @@ class EditarMatricula extends Component
             'apellido_materno' => ['nullable', 'string', 'max:255'],
             'fecha_nacimiento' => ['required', 'date'],
             'genero' => ['required', 'in:H,M'],
-            'fecha_inscripcion' => ['required', 'date'],
+            'fecha_inscripcion_ciclo' => ['required', 'date'],
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'ciclo_id' => ['required', 'integer', 'exists:ciclos,id'],
 
@@ -1113,6 +1199,10 @@ class EditarMatricula extends Component
             'activo' => ['required', 'boolean'],
             'foto' => ['nullable', 'image', 'max:2048'],
         ];
+
+        $rules['fecha_ingreso_plantel'] = $this->trayectoriaEsActual
+            ? ['required', 'date']
+            : ['nullable', 'date'];
 
         $rules['grado_id'] = $this->esBachillerato
             ? ['nullable', 'integer', 'exists:grados,id']
@@ -1141,7 +1231,8 @@ class EditarMatricula extends Component
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'genero.required' => 'El género es obligatorio.',
-            'fecha_inscripcion.required' => 'La fecha de inscripción es obligatoria.',
+            'fecha_ingreso_plantel.required' => 'La fecha de ingreso al plantel es obligatoria.',
+            'fecha_inscripcion_ciclo.required' => 'La fecha de inscripción al ciclo es obligatoria.',
             'ciclo_escolar_id.required' => 'Selecciona un ciclo escolar.',
             'ciclo_id.required' => 'Selecciona un ciclo.',
 
@@ -1236,6 +1327,7 @@ class EditarMatricula extends Component
             ->where('ciclo_id', (int) $data['ciclo_id'])
             ->where('vigente_en_corte', true)
             ->latest('numero_estancia')
+            ->latest('id')
             ->first();
 
         if ($trayectoriaContexto && (bool) $data['activo'] !== (bool) $trayectoriaContexto->activo) {
@@ -1248,6 +1340,7 @@ class EditarMatricula extends Component
 
         $inscripcion = Inscripcion::query()->findOrFail($this->InscripcionId);
         $fotoPath = $this->foto_actual;
+        $actualizarFechaIngresoPlantel = $this->trayectoriaEsActual;
 
         if ($this->foto) {
             if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
@@ -1257,8 +1350,13 @@ class EditarMatricula extends Component
             $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
         }
 
-        DB::transaction(function () use ($inscripcion, $data, $fotoPath) {
-            $inscripcion->update([
+        DB::transaction(function () use (
+            $inscripcion,
+            $data,
+            $fotoPath,
+            $actualizarFechaIngresoPlantel
+        ) {
+            $datosInscripcion = [
                 'curp' => $data['curp'],
                 'folio' => $data['folio'] ?? null,
                 'nombre' => $data['nombre'],
@@ -1266,7 +1364,6 @@ class EditarMatricula extends Component
                 'apellido_materno' => $data['apellido_materno'] ?? null,
                 'fecha_nacimiento' => $data['fecha_nacimiento'],
                 'genero' => $data['genero'],
-                'fecha_inscripcion' => $data['fecha_inscripcion'],
 
                 'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
                 'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
@@ -1283,7 +1380,15 @@ class EditarMatricula extends Component
 
                 'foto_path' => $fotoPath,
                 'tutor_id' => $data['tutor_id'] ? (int) $data['tutor_id'] : null,
-            ]);
+            ];
+
+            // En una trayectoria histórica la fecha general de ingreso se conserva.
+            // Solo puede corregirse desde la trayectoria actual del alumno.
+            if ($actualizarFechaIngresoPlantel) {
+                $datosInscripcion['fecha_inscripcion'] = $data['fecha_ingreso_plantel'];
+            }
+
+            $inscripcion->update($datosInscripcion);
 
             $servicio = app(TrayectoriaAcademicaService::class);
 
@@ -1293,6 +1398,7 @@ class EditarMatricula extends Component
                 ->where('ciclo_id', (int) $data['ciclo_id'])
                 ->where('vigente_en_corte', true)
                 ->latest('numero_estancia')
+                ->latest('id')
                 ->first();
 
             $destino = [
@@ -1302,25 +1408,28 @@ class EditarMatricula extends Component
                 'generacion_id' => (int) $data['generacion_id'],
                 'grupo_id' => (int) $data['grupo_id'],
                 'semestre_id' => $data['semestre_id'] ? (int) $data['semestre_id'] : null,
+                // Esta fecha pertenece únicamente al ciclo/trayectoria seleccionada.
+                'fecha_inscripcion' => $data['fecha_inscripcion_ciclo'],
             ];
 
             if ($trayectoria) {
-                $servicio->corregirAsignacion(
-                    [$inscripcion->id],
-                    (int) $data['ciclo_escolar_id'],
-                    (int) $data['ciclo_id'],
-                    $destino,
-                    auth()->id(),
-                    'Corrección realizada desde la edición individual del alumno.',
-                    now()
-                );
+                if ($this->trayectoriaTieneCambios($trayectoria, $inscripcion, $destino)) {
+                    $servicio->corregirAsignacion(
+                        [$inscripcion->id],
+                        (int) $data['ciclo_escolar_id'],
+                        (int) $data['ciclo_id'],
+                        $destino,
+                        auth()->id(),
+                        'Corrección realizada desde la edición individual del alumno.',
+                        now()
+                    );
+                }
             } else {
                 $servicio->registrarInscripcionEnContexto(
                     $inscripcion,
                     array_merge($destino, [
                         'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
                         'ciclo_id' => (int) $data['ciclo_id'],
-                        'fecha_inscripcion' => $data['fecha_inscripcion'],
                         'hacer_actual' => $this->contextoSeleccionadoDebeSerActual(),
                     ]),
                     auth()->id(),
@@ -1333,6 +1442,13 @@ class EditarMatricula extends Component
 
         $inscripcion->refresh();
         $this->cargarInscripcion($inscripcion);
+
+        // Mantiene visible el mismo ciclo escolar y periodo que se acaba de editar.
+        // Esto evita que, al guardar un contexto histórico, el formulario vuelva
+        // automáticamente a la trayectoria actual y parezca que los cambios no se guardaron.
+        $this->ciclo_escolar_id = (int) $data['ciclo_escolar_id'];
+        $this->ciclo_id = (int) $data['ciclo_id'];
+        $this->cargarContextoAcademicoSeleccionado();
 
         $this->dispatch('swal', [
             'title' => 'Inscripción actualizada correctamente',

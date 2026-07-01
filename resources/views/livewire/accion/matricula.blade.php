@@ -639,7 +639,10 @@
                                     @endif
                                 </td>
                                 <td class="max-w-xs px-4 py-4">
-                                    <p class="text-xs text-slate-500">Inscripción: <b
+                                    <p class="text-xs text-slate-500">Ingreso al plantel: <b
+                                            class="text-slate-700 dark:text-slate-200">{{ optional($row->fecha_inscripcion)->format('d/m/Y') ?: '—' }}</b>
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">Inscripción al ciclo: <b
                                             class="text-slate-700 dark:text-slate-200">{{ optional($trayectoria?->fecha_inscripcion ?? $trayectoria?->fecha_inicio)->format('d/m/Y') ?: '—' }}</b>
                                     </p>
                                     @if ($trayectoria?->fecha_baja)
@@ -661,7 +664,11 @@
                                             <flux:icon.clock class="h-4 w-4" />
                                         </button>
                                         <button type="button"
-                                            x-on:click="abrirEdicion({{ $row->id }}, @js(route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $row->id])))"
+                                            x-on:click="abrirEdicion({{ $row->id }}, @js(route('misrutas.matricula.editar', [
+                                                'slug_nivel' => $slug_nivel,
+                                                'inscripcion' => $row->id,
+                                                'trayectoria_id' => $row->trayectoria_id,
+                                            ])))"
                                             title="Editar alumno"
                                             class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
                                             <flux:icon.pencil-square class="h-4 w-4" />

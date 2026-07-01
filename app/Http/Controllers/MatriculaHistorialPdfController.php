@@ -16,16 +16,29 @@ class MatriculaHistorialPdfController extends Controller
     {
         abort_unless(auth()->user()?->is_admin, 403);
 
-        $nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
-        $cicloEscolar = CicloEscolar::query()->findOrFail($request->integer('ciclo_escolar_id'));
-        $corte = Ciclo::query()->findOrFail($request->integer('ciclo_id'));
+        $nivel = Nivel::query()
+            ->where('slug', $slug_nivel)
+            ->firstOrFail();
+
+        $cicloEscolar = CicloEscolar::query()
+            ->findOrFail($request->integer('ciclo_escolar_id'));
+
+        $corte = Ciclo::query()
+            ->findOrFail($request->integer('ciclo_id'));
+
         $mostrarArchivados = $request->boolean('mostrar_archivados');
         $estatus = (string) $request->input('estatus', 'todos');
-        $busqueda = preg_replace('/\s+/', ' ', trim((string) $request->input('search', '')));
+        $busqueda = preg_replace(
+            '/\s+/',
+            ' ',
+            trim((string) $request->input('search', ''))
+        );
 
         $query = TrayectoriaAcademica::query()
             ->with([
-                'inscripcion' => fn($q) => $q->withTrashed()->with('matriculasAlumno'),
+                'inscripcion' => fn ($q) => $q
+                    ->withTrashed()
+                    ->with('matriculasAlumno'),
                 'nivel:id,nombre,slug',
                 'grado:id,nombre,orden',
                 'generacion:id,anio_ingreso,anio_egreso',
@@ -34,35 +47,90 @@ class MatriculaHistorialPdfController extends Controller
                 'cicloEscolar:id,inicio_anio,fin_anio,es_actual,cerrado_at',
                 'ciclo:id,ciclo',
             ])
-            ->where('ciclo_escolar_id', $cicloEscolar->id)
-            ->where('ciclo_id', $corte->id)
-            ->where('nivel_id', $nivel->id)
-            ->where('vigente_en_corte', true)
-            ->when($request->integer('generacion_id'), fn(Builder $q, int $id) => $q->where('generacion_id', $id))
-            ->when($request->integer('grado_id'), fn(Builder $q, int $id) => $q->where('grado_id', $id))
-            ->when($request->integer('semestre_id'), fn(Builder $q, int $id) => $q->where('semestre_id', $id))
-            ->when($request->integer('grupo_id'), fn(Builder $q, int $id) => $q->where('grupo_id', $id))
-            ->when($estatus !== 'todos', fn(Builder $q) => $q->where('estatus', $estatus))
+            ->join(
+                'inscripciones',
+                'inscripciones.id',
+                '=',
+                'trayectorias_academicas.inscripcion_id'
+            )
+            ->where(
+                'trayectorias_academicas.ciclo_escolar_id',
+                $cicloEscolar->id
+            )
+            ->where(
+                'trayectorias_academicas.ciclo_id',
+                $corte->id
+            )
+            ->where(
+                'trayectorias_academicas.nivel_id',
+                $nivel->id
+            )
+            ->where(
+                'trayectorias_academicas.vigente_en_corte',
+                true
+            )
+            ->when(
+                $request->integer('generacion_id'),
+                fn (Builder $q, int $id) => $q->where(
+                    'trayectorias_academicas.generacion_id',
+                    $id
+                )
+            )
+            ->when(
+                $request->integer('grado_id'),
+                fn (Builder $q, int $id) => $q->where(
+                    'trayectorias_academicas.grado_id',
+                    $id
+                )
+            )
+            ->when(
+                $request->integer('semestre_id'),
+                fn (Builder $q, int $id) => $q->where(
+                    'trayectorias_academicas.semestre_id',
+                    $id
+                )
+            )
+            ->when(
+                $request->integer('grupo_id'),
+                fn (Builder $q, int $id) => $q->where(
+                    'trayectorias_academicas.grupo_id',
+                    $id
+                )
+            )
+            ->when(
+                $estatus !== 'todos',
+                fn (Builder $q) => $q->where(
+                    'trayectorias_academicas.estatus',
+                    $estatus
+                )
+            )
             ->whereHas('inscripcion', function (Builder $q) use ($mostrarArchivados, $busqueda) {
                 if (!$mostrarArchivados) {
-                    $q->whereNull('deleted_at');
+                    $q->whereNull('inscripciones.deleted_at');
                 }
 
                 if ($busqueda !== '') {
                     $like = "%{$busqueda}%";
+
                     $q->where(function (Builder $buscar) use ($like) {
-                        $buscar->where('matricula', 'like', $like)
-                            ->orWhere('folio', 'like', $like)
-                            ->orWhere('curp', 'like', $like)
-                            ->orWhere('nombre', 'like', $like)
-                            ->orWhere('apellido_paterno', 'like', $like)
-                            ->orWhere('apellido_materno', 'like', $like)
-                            ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$like])
-                            ->orWhereHas('matriculasAlumno', fn(Builder $m) => $m->where('matricula', 'like', $like));
+                        $buscar
+                            ->where('inscripciones.matricula', 'like', $like)
+                            ->orWhere('inscripciones.folio', 'like', $like)
+                            ->orWhere('inscripciones.curp', 'like', $like)
+                            ->orWhere('inscripciones.nombre', 'like', $like)
+                            ->orWhere('inscripciones.apellido_paterno', 'like', $like)
+                            ->orWhere('inscripciones.apellido_materno', 'like', $like)
+                            ->orWhereRaw(
+                                "CONCAT_WS(' ', inscripciones.apellido_paterno, inscripciones.apellido_materno, inscripciones.nombre) LIKE ?",
+                                [$like]
+                            )
+                            ->orWhereHas(
+                                'matriculasAlumno',
+                                fn (Builder $m) => $m->where('matricula', 'like', $like)
+                            );
                     });
                 }
             })
-            ->join('inscripciones', 'inscripciones.id', '=', 'trayectorias_academicas.inscripcion_id')
             ->orderBy('inscripciones.apellido_paterno')
             ->orderBy('inscripciones.apellido_materno')
             ->orderBy('inscripciones.nombre')
@@ -70,9 +138,12 @@ class MatriculaHistorialPdfController extends Controller
 
         $rows = $query->get()->map(function (TrayectoriaAcademica $trayectoria) {
             $alumno = $trayectoria->inscripcion;
+
             $trayectoria->setAttribute(
                 'matricula_contexto',
-                $alumno?->matriculasAlumno?->firstWhere('nivel_id', $trayectoria->nivel_id)?->matricula
+                $alumno?->matriculasAlumno
+                    ?->firstWhere('nivel_id', $trayectoria->nivel_id)
+                    ?->matricula
                     ?: $alumno?->matricula
                     ?: '—'
             );
@@ -82,9 +153,15 @@ class MatriculaHistorialPdfController extends Controller
 
         $resumen = [
             'total' => $rows->count(),
-            'hombres' => $rows->filter(fn($row) => $row->inscripcion?->genero === 'H')->count(),
-            'mujeres' => $rows->filter(fn($row) => $row->inscripcion?->genero === 'M')->count(),
-            'bajas' => $rows->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'traslado'])->count(),
+            'hombres' => $rows
+                ->filter(fn ($row) => $row->inscripcion?->genero === 'H')
+                ->count(),
+            'mujeres' => $rows
+                ->filter(fn ($row) => $row->inscripcion?->genero === 'M')
+                ->count(),
+            'bajas' => $rows
+                ->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'traslado'])
+                ->count(),
         ];
 
         $pdf = Pdf::loadView('pdf.matricula-historica', compact(
@@ -98,7 +175,13 @@ class MatriculaHistorialPdfController extends Controller
         ))->setPaper('letter', 'landscape');
 
         return $pdf->download(
-            'matricula_historica_' . $nivel->slug . '_' . $cicloEscolar->nombre . '_' . now()->format('Ymd_His') . '.pdf'
+            'matricula_historica_'
+            . $nivel->slug
+            . '_'
+            . $cicloEscolar->nombre
+            . '_'
+            . now()->format('Ymd_His')
+            . '.pdf'
         );
     }
 }

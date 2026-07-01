@@ -108,7 +108,8 @@
                     <td class="ubicacion">{{ $row->grado?->nombre ?? '—' }} · {{ $grupo }}@if($row->semestre)<br><span class="muted">Sem. {{ $row->semestre->numero }}</span>@endif</td>
                     <td class="estatus"><span class="badge {{ $estadoClass }}">{{ $row->etiqueta_estatus }}</span>@if($row->numero_estancia > 1)<br><span class="muted">Estancia {{ $row->numero_estancia }}</span>@endif</td>
                     <td class="fechas">
-                        <span class="muted">Inscripción:</span> {{ optional($row->fecha_inscripcion ?? $row->fecha_inicio)->format('d/m/Y') ?: '—' }}
+                        <span class="muted">Ingreso al plantel:</span> {{ optional($alumno?->fecha_inscripcion)->format('d/m/Y') ?: '—' }}
+                        <br><span class="muted">Inscripción al ciclo:</span> {{ optional($row->fecha_inscripcion ?? $row->fecha_inicio)->format('d/m/Y') ?: '—' }}
                         @if($row->fecha_baja)<br><span class="muted">Baja:</span> {{ $row->fecha_baja->format('d/m/Y') }}@endif
                     </td>
                     <td class="motivo">{{ $row->motivo_baja ?: '—' }}@if($row->observaciones_baja)<br><span class="muted">{{ $row->observaciones_baja }}</span>@endif</td>

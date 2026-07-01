@@ -124,6 +124,14 @@
 
                     $nombreAlumnoEditando =
                         $nombreAlumnoEditando !== '' ? $nombreAlumnoEditando : 'Alumno sin nombre cargado';
+
+                    $fechaIngresoTexto = filled($fecha_ingreso_plantel)
+                        ? \Carbon\Carbon::parse($fecha_ingreso_plantel)->format('d/m/Y')
+                        : 'Sin fecha';
+
+                    $fechaCicloTexto = filled($fecha_inscripcion_ciclo)
+                        ? \Carbon\Carbon::parse($fecha_inscripcion_ciclo)->format('d/m/Y')
+                        : 'Sin fecha';
                 @endphp
 
                 <div
@@ -192,6 +200,14 @@
                                                 Bachillerato
                                             </span>
                                         @endif
+
+                                        @if ($trayectoriaIdContexto)
+                                            <span
+                                                class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide {{ $trayectoriaEsActual ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300' }}">
+                                                <flux:icon.clock class="h-3.5 w-3.5" />
+                                                {{ $trayectoriaEsActual ? 'Trayectoria actual' : 'Trayectoria histórica' }}
+                                            </span>
+                                        @endif
                                     </div>
 
                                     <h1
@@ -216,11 +232,21 @@
 
                                         <div
                                             class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80 dark:text-slate-300">
+                                            <flux:icon.home
+                                                class="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                            <span>Ingreso al plantel:</span>
+                                            <span class="font-bold text-slate-900 dark:text-white">
+                                                {{ $fechaIngresoTexto }}
+                                            </span>
+                                        </div>
+
+                                        <div
+                                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80 dark:text-slate-300">
                                             <flux:icon.calendar-days
                                                 class="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                                            <span>Inscripción:</span>
+                                            <span>Inscripción al ciclo:</span>
                                             <span class="font-bold text-slate-900 dark:text-white">
-                                                {{ $fecha_inscripcion ?: 'Sin fecha' }}
+                                                {{ $fechaCicloTexto }}
                                             </span>
                                         </div>
 
@@ -513,16 +539,47 @@
 
                         <div>
                             <div class="mb-1 flex items-center gap-2">
-                                <flux:label>Fecha de inscripción</flux:label>
+                                <flux:label>Fecha de ingreso al plantel</flux:label>
+                                <span
+                                    class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $trayectoriaEsActual ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300' : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300' }}">
+                                    {{ $trayectoriaEsActual ? 'Obligatorio' : 'Solo lectura' }}
+                                </span>
+                            </div>
+
+                            <flux:input type="date" wire:model="fecha_ingreso_plantel"
+                                :disabled="!$trayectoriaEsActual" />
+                            <p class="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                                @if ($trayectoriaEsActual)
+                                    Fecha original de ingreso del alumno. Es un dato general y no se copia a otras trayectorias.
+                                @else
+                                    Solo lectura al editar historial. La fecha general se conserva sin cambios.
+                                @endif
+                            </p>
+
+                            @error('fecha_ingreso_plantel')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <div class="mb-1 flex flex-wrap items-center gap-2">
+                                <flux:label>Fecha de inscripción al ciclo</flux:label>
                                 <span
                                     class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
                                     Obligatorio
                                 </span>
+                                <span
+                                    class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $trayectoriaEsActual ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300' }}">
+                                    {{ $trayectoriaEsActual ? 'Actual' : 'Histórica' }}
+                                </span>
                             </div>
 
-                            <flux:input type="date" wire:model="fecha_inscripcion" />
+                            <flux:input type="date" wire:model="fecha_inscripcion_ciclo" />
+                            <p class="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                                Solo modifica la trayectoria correspondiente al ciclo y periodo seleccionados.
+                            </p>
 
-                            @error('fecha_inscripcion')
+                            @error('fecha_inscripcion_ciclo')
                                 <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror
                         </div>

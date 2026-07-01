@@ -808,6 +808,9 @@ class TrayectoriaAcademicaService
             'semestre_id' => filled($destino['semestre_id'] ?? null)
                 ? (int) $destino['semestre_id']
                 : null,
+            'fecha_inscripcion' => array_key_exists('fecha_inscripcion', $destino)
+                ? $this->fecha($destino['fecha_inscripcion'])
+                : $origen->fecha_inscripcion,
             'fecha_inicio' => $fecha,
             'fecha_fin' => null,
             'vigente_en_corte' => true,

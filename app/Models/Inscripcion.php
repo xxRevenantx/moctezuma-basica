@@ -71,6 +71,7 @@ class Inscripcion extends Model
 
     protected $casts = [
         'fecha_nacimiento' => 'date',
+        'fecha_inscripcion' => 'date',
         'activo' => 'boolean',
         'indicador_reingreso' => 'boolean',
         'fecha_ultimo_ingreso' => 'date',

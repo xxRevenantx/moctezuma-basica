@@ -24,16 +24,30 @@ class DistribucionEscolarController extends Controller
     ) {
         abort_unless(auth()->user()?->is_admin, 403);
 
-        [$nivel, $filtros] = $this->resolver($request, $slug_nivel, $service);
+        [$nivel, $filtros] = $this->resolver(
+            $request,
+            $slug_nivel,
+            $service
+        );
+
         $bloques = $service->bloques($nivel, $filtros);
         $listado = $service->listadoCompleto($nivel, $filtros);
 
-        abort_if($bloques->isEmpty(), 404, 'No se encontraron datos para generar la distribución escolar.');
+        abort_if(
+            $bloques->isEmpty(),
+            404,
+            'No se encontraron datos para generar la distribución escolar.'
+        );
 
-        return $this->crearPdf($nivel, $bloques, $listado, $filtros)
-            ->download($this->nombreBase($nivel, $filtros) . '.pdf');
+        $nombreArchivo = $this->nombreBase($nivel, $filtros) . '.pdf';
+
+        return $this->crearPdf(
+            $nivel,
+            $bloques,
+            $listado,
+            $filtros
+        )->stream($nombreArchivo);
     }
-
     public function excel(
         Request $request,
         string $slug_nivel,
@@ -88,8 +102,8 @@ class DistribucionEscolarController extends Controller
         );
 
         $generaciones = $bloques
-            ->flatMap(fn (array $bloque) => collect($bloque['filas']))
-            ->filter(fn (array $fila) => !empty($fila['generacion_id']))
+            ->flatMap(fn(array $bloque) => collect($bloque['filas']))
+            ->filter(fn(array $fila) => !empty($fila['generacion_id']))
             ->unique('generacion_id')
             ->sortBy('generacion_ingreso')
             ->values();
@@ -210,7 +224,7 @@ class DistribucionEscolarController extends Controller
             'logo' => $this->imagenBase64(public_path('imagenes/logo-letra.png')),
             'generadoPor' => auth()->user()?->name ?: 'Administración',
             'generadoEn' => now(),
-        ])->setPaper('a3', 'landscape');
+        ])->setPaper('letter', 'landscape');
     }
 
     private function nombreBase(Nivel $nivel, array $filtros): string

@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Inscripcion;
 use Illuminate\Http\Request;
 
 class MatriculaController extends Controller
 {
-    public function editar($slug_nivel, $inscripcion)
+    public function editar(Request $request, string $slug_nivel, Inscripcion $inscripcion)
     {
+        $trayectoriaId = $request->integer('trayectoria_id') ?: null;
 
-
-        // Retorna una vista con el formulario de edición, pasando la matrícula encontrada
-        return view('matricula.index', compact('slug_nivel', 'inscripcion'));
+        return view('matricula.index', compact(
+            'slug_nivel',
+            'inscripcion',
+            'trayectoriaId'
+        ));
     }
 }
