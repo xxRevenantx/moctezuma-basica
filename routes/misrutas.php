@@ -3,6 +3,7 @@
 use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\CicloEscolarController;
+use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
 use App\Http\Controllers\DistribucionEscolarController;
@@ -163,6 +164,12 @@ Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController
 Route::get('/generales/{slug_nivel}/documentos-academicos/{tipo}/zip', [DocumentosAcademicosZipController::class, 'descargar'])
     ->middleware('admin')
     ->name('generales.documentos-academicos.zip');
+
+
+Route::get('/generales/{slug_nivel}/cuadro-honor/{formato}', CuadroHonorPromediosController::class)
+    ->where('formato', 'pdf|word')
+    ->middleware('admin')
+    ->name('generales.cuadro-honor');
 
 
 // FICHAS DESCRIPTIVAS PREESCOLAR

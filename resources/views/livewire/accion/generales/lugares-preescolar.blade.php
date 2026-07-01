@@ -14,6 +14,12 @@
     if ($generacion_id !== '') {
         $parametrosZipPreescolar['generacion_id'] = $generacion_id;
     }
+
+    $parametrosListaPreescolar = $parametrosZipPreescolar;
+
+    if ($grupo_id !== '') {
+        $parametrosListaPreescolar['grupo_id'] = $grupo_id;
+    }
 @endphp
 
 <div class="space-y-6">
@@ -29,8 +35,8 @@
             </h2>
 
             <p class="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-                Asigna manualmente reconocimientos por periodo o anuales. Cada grupo tiene sus propios lugares,
-                se permiten empates y todos los alumnos pueden recibir reconocimiento.
+                Asigna manualmente reconocimientos por periodo o anuales. Cada grupo conserva sus propios lugares,
+                se permiten empates y puedes descargar la lista institucional en PDF o Word.
             </p>
         </div>
 
@@ -93,7 +99,7 @@
             </flux:field>
 
             <flux:field>
-                <flux:label>Fecha para PDF</flux:label>
+                <flux:label>Fecha para documentos</flux:label>
                 <flux:input type="date" wire:model.live="fecha_pdf" />
                 <flux:error name="fecha_pdf" />
             </flux:field>
@@ -148,6 +154,39 @@
                     Diplomas ZIP
                 </span>
             @endif
+
+            @if ($puedeDescargarPorGrado)
+                <a href="{{ route('generales.cuadro-honor', array_merge([
+                    'slug_nivel' => $slug_nivel,
+                    'formato' => 'pdf',
+                ], $parametrosListaPreescolar)) }}" target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-sky-700">
+                    <flux:icon.document-text class="h-4 w-4" />
+                    Lista PDF
+                </a>
+
+                <a href="{{ route('generales.cuadro-honor', array_merge([
+                    'slug_nivel' => $slug_nivel,
+                    'formato' => 'word',
+                ], $parametrosListaPreescolar)) }}"
+                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
+                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                    Lista Word
+                </a>
+            @else
+                <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                    title="Selecciona un grado">
+                    <flux:icon.document-text class="h-4 w-4" />
+                    Lista PDF
+                </span>
+
+                <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                    title="Selecciona un grado">
+                    <flux:icon.document-arrow-down class="h-4 w-4" />
+                    Lista Word
+                </span>
+            @endif
+
         </div>
     </div>
 

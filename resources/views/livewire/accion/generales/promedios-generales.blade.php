@@ -33,6 +33,12 @@
     if ($esBachillerato && $semestre_id !== '') {
         $parametrosDescargaMasiva['semestre_id'] = $semestre_id;
     }
+
+    $parametrosListaPromedios = $parametrosDescargaMasiva;
+
+    if ($grupo_id !== '') {
+        $parametrosListaPromedios['grupo_id'] = $grupo_id;
+    }
 @endphp
 
 <div class="space-y-6">
@@ -193,10 +199,10 @@
                     {{ $esBachillerato ? 'Descargas masivas por semestre' : 'Descargas masivas por grado' }}
                 </p>
                 <h3 class="mt-1 text-lg font-black text-slate-950 dark:text-white">
-                    Reconocimientos y diplomas en archivos ZIP
+                    Reconocimientos, diplomas y listas académicas
                 </h3>
                 <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    {{ $esBachillerato ? 'Selecciona grado y semestre. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.' : 'Selecciona un grado. El ZIP incluirá una carpeta por grupo y únicamente los documentos habilitados.' }}
+                    {{ $esBachillerato ? 'Selecciona grado y semestre. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.' : 'Selecciona un grado. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.' }}
                 </p>
             </div>
 
@@ -257,6 +263,54 @@
                             Diplomas ZIP
                         </span>
                     @endif
+
+                    @if ($puedeDescargarReconocimientos)
+                        <a href="{{ route(
+                            'generales.cuadro-honor',
+                            array_merge(
+                                [
+                                    'slug_nivel' => $slug_nivel,
+                                    'formato' => 'pdf',
+                                ],
+                                $parametrosListaPromedios,
+                            ),
+                        ) }}"
+                            target="_blank" rel="noopener"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-700">
+                            <flux:icon.document-text class="h-4 w-4" />
+                            Lista PDF
+                        </a>
+
+                        <a href="{{ route(
+                            'generales.cuadro-honor',
+                            array_merge(
+                                [
+                                    'slug_nivel' => $slug_nivel,
+                                    'formato' => 'word',
+                                ],
+                                $parametrosListaPromedios,
+                            ),
+                        ) }}"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
+                            <flux:icon.document-arrow-down class="h-4 w-4" />
+                            Lista Word
+                        </a>
+                    @else
+                        <span
+                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
+                            <flux:icon.document-text class="h-4 w-4" />
+                            Lista PDF
+                        </span>
+
+                        <span
+                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
+                            <flux:icon.document-arrow-down class="h-4 w-4" />
+                            Lista Word
+                        </span>
+                    @endif
+
                 </div>
             </div>
         </div>
