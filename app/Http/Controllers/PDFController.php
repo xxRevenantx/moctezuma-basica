@@ -1232,7 +1232,7 @@ class PDFController extends Controller
         */
 
         $logoIzquierdo = $this->imagenBase64Publica('imagenes/logo-letra.png');
-        $logoDerecho = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
+        $logoDerecho = $this->imagenBase64Publica('imagenes/seg.png');
         $watermark = $this->imagenBase64Publica('storage/logos/' . $nivel->logo);
 
 

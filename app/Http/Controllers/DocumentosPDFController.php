@@ -292,6 +292,8 @@ class DocumentosPDFController extends Controller
             );
         }
 
+        $sexoOriginal = strtoupper(trim((string) ($alumno->sexo ?? $alumno->genero ?? '')));
+
         return [
             'id' => $alumno->id,
             'nombre_completo' => trim(
@@ -299,43 +301,40 @@ class DocumentosPDFController extends Controller
                     ($alumno->apellido_paterno ?? '') . ' ' .
                     ($alumno->apellido_materno ?? '')
             ),
-            'curp' => $alumno->curp,
-            'matricula' => $alumno->matricula,
-            'genero' => $alumno->genero,
-            'nivel' => $alumno->nivel?->nombre,
-            'cct' => $alumno->nivel?->cct,
-            'grado' => $alumno->grado?->nombre,
-            'grupo' => $alumno->grupo?->asignacionGrupo?->nombre,
+            'curp' => $alumno->curp ?? '',
+            'matricula' => $alumno->matricula ?? '',
+            'nivel' => $alumno->nivel?->nombre ?? '',
+            'cct' => $alumno->nivel?->cct ?? '',
+            'grado' => $alumno->grado?->nombre ?? '',
+            'grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? '',
             'generacion' => $generacion,
-            'ciclo' => $alumno->ciclo?->ciclo,
+            'ciclo' => $alumno->ciclo?->ciclo ?? '',
+            'sexo_original' => $sexoOriginal,
         ];
     }
 
     /**
      * Reemplaza las variables de la plantilla con datos del alumno.
+     * Mantiene el mismo texto usado en la generación individual.
      */
     private function reemplazarVariablesConAlumno(string $contenido, array $alumno, array $payload): string
     {
-        $genero = mb_strtolower(trim((string) ($alumno['genero'] ?? '')));
+        $sexoOriginal = strtoupper(trim((string) ($alumno['sexo_original'] ?? '')));
 
-        $esMujer = in_array($genero, [
-            'f',
-            'm',
-            'mujer',
-            'femenino',
-            'femenina',
-            'alumna',
-        ], true);
+        $esMasculino = str_contains($sexoOriginal, 'MASCULINO')
+            || $sexoOriginal === 'H'
+            || $sexoOriginal === 'HOMBRE';
 
-        $sexo = $esMujer ? 'La alumna' : 'El alumno';
+        $sexo = $esMasculino ? 'Que el alumno:' : 'Que la alumna:';
+        $descripcion = $esMasculino ? 'regularmente inscrito' : 'regularmente inscrita';
 
-        $descripcion = $esMujer
-            ? 'se encuentra inscrita'
-            : 'se encuentra inscrito';
+        $fechaExpedicion = $payload['fecha_expedicion'] ?? now()->toDateString();
+        $dirigidoA = trim((string) ($payload['dirigido_a'] ?? ''));
 
         $variables = [
-            '@alumno' => $alumno['nombre_completo'] ?? '',
+            '@sexo' => $sexo,
             '@nombre' => $alumno['nombre_completo'] ?? '',
+            '@alumno' => $alumno['nombre_completo'] ?? '',
             '@curp' => $alumno['curp'] ?? '',
             '@matricula' => $alumno['matricula'] ?? '',
             '@grado' => $alumno['grado'] ?? '',
@@ -344,10 +343,9 @@ class DocumentosPDFController extends Controller
             '@generacion' => $alumno['generacion'] ?? '',
             '@ciclo' => $alumno['ciclo'] ?? '',
             '@cct' => $alumno['cct'] ?? '',
-            '@sexo' => $sexo,
             '@descripcion' => $descripcion,
-            '@fecha' => Carbon::parse($payload['fecha_expedicion'])->translatedFormat('d \d\e F \d\e Y'),
-            '@dirigido' => $payload['dirigido_a'] ?: 'A QUIEN CORRESPONDA',
+            '@fecha' => Carbon::parse($fechaExpedicion)->translatedFormat('d \d\e F \d\e Y'),
+            '@dirigido' => $dirigidoA !== '' ? $dirigidoA : 'A QUIEN CORRESPONDA',
         ];
 
         return str_replace(array_keys($variables), array_values($variables), $contenido);
@@ -409,7 +407,7 @@ class DocumentosPDFController extends Controller
         $materias = DB::table('asignacion_materias')
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
             ->where('asignacion_materias.grupo_id', $alumno->grupo_id)
-            ->when($cicloEscolarId, fn ($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
+            ->when($cicloEscolarId, fn($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
             ->where('asignacion_materias.estado', '!=', \App\Models\AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
@@ -603,7 +601,7 @@ class DocumentosPDFController extends Controller
         $materias = DB::table('asignacion_materias')
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
             ->where('asignacion_materias.grupo_id', $alumno->grupo_id)
-            ->when($cicloEscolarId, fn ($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
+            ->when($cicloEscolarId, fn($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
             ->where('asignacion_materias.estado', '!=', \App\Models\AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
