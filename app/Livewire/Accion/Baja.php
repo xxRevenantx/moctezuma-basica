@@ -6,6 +6,7 @@ use App\Models\Generacion;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Services\GestionAcademicaService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -73,7 +74,7 @@ class Baja extends Component
     public function updatedSelectPage(bool $value): void
     {
         $this->selected = $value
-            ? $this->activos()->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all()
+            ? $this->activos()->getCollection()->pluck('id')->map(fn($id) => (string) $id)->all()
             : [];
     }
 
@@ -85,6 +86,16 @@ class Baja extends Component
     public function clearSearch(): void
     {
         $this->search = '';
+        $this->selected = [];
+        $this->selectPage = false;
+        $this->resetPage();
+        $this->resetPage('inactivosPage');
+    }
+
+    public function limpiarFiltros(): void
+    {
+        $this->search = '';
+        $this->filtro_estatus = '';
         $this->selected = [];
         $this->selectPage = false;
         $this->resetPage();
@@ -224,12 +235,63 @@ class Baja extends Component
             ?? '—';
     }
 
+    public function nombreCompleto(Inscripcion $alumno): string
+    {
+        return trim(implode(' ', array_filter([
+            $alumno->apellido_paterno,
+            $alumno->apellido_materno,
+            $alumno->nombre,
+        ], fn($valor) => filled($valor)))) ?: '—';
+    }
+
+    public function iniciales(Inscripcion $alumno): string
+    {
+        $partes = array_values(array_filter([
+            $alumno->nombre,
+            $alumno->apellido_paterno,
+        ], fn($valor) => filled($valor)));
+
+        return collect($partes)
+            ->map(fn($valor) => mb_strtoupper(mb_substr(trim((string) $valor), 0, 1)))
+            ->take(2)
+            ->implode('') ?: 'A';
+    }
+
+    public function claseEstatus(?string $estatus): string
+    {
+        return match ($estatus) {
+            'activo' => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'reingreso' => 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300',
+            'no_promovido' => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+            'trasladado' => 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300',
+            'suspendido' => 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/30 dark:text-orange-300',
+            'egresado' => 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300',
+            'inactivo' => 'border-slate-200 bg-slate-100 text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300',
+            default => 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+        };
+    }
+
+    public function fechaMovimientoTexto(Inscripcion $alumno): string
+    {
+        $fecha = $alumno->fecha_estatus ?: $alumno->fecha_baja;
+
+        if (!$fecha) {
+            return '—';
+        }
+
+        try {
+            return Carbon::parse($fecha)->format('d/m/Y');
+        } catch (\Throwable) {
+            return '—';
+        }
+    }
+
     private function baseQuery(): Builder
     {
         return Inscripcion::query()
             ->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
             ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id, fn (Builder $query) => $query->where('generacion_id', $this->generacion_id))
+            ->when($this->generacion_id, fn(Builder $query) => $query->where('generacion_id', $this->generacion_id))
             ->when(trim($this->search) !== '', function (Builder $query): void {
                 $term = '%' . trim($this->search) . '%';
 
@@ -247,7 +309,7 @@ class Baja extends Component
     {
         return $this->baseQuery()
             ->where('activo', true)
-            ->when($this->filtro_estatus !== '', fn (Builder $query) => $query->where('estatus', $this->filtro_estatus));
+            ->when($this->filtro_estatus !== '', fn(Builder $query) => $query->where('estatus', $this->filtro_estatus));
     }
 
     private function inactivosQuery(): Builder
@@ -295,8 +357,8 @@ class Baja extends Component
             'inactivos' => $this->inactivos(),
             'generacionSeleccionada' => $this->generaciones->firstWhere('id', $this->generacion_id),
             'total' => (clone $activosQuery)->count(),
-            'hombres' => (clone $activosQuery)->where('genero', 'Hombre')->count(),
-            'mujeres' => (clone $activosQuery)->where('genero', 'Mujer')->count(),
+            'hombres' => (clone $activosQuery)->whereIn('genero', ['H', 'Hombre'])->count(),
+            'mujeres' => (clone $activosQuery)->whereIn('genero', ['M', 'Mujer'])->count(),
             'totalBajas' => (clone $inactivosQuery)->count(),
         ]);
     }

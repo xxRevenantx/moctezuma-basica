@@ -239,7 +239,7 @@ class EditarMatricula extends Component
                 $query->where('status', true);
 
                 if ($this->generacion_id) {
-                    $query->orWhereKey($this->generacion_id);
+                    $query->orWhere('generaciones.id', $this->generacion_id);
                 }
             })
             ->orderByDesc('status')

@@ -117,7 +117,7 @@ class EditarGrupo extends Component
             ->where('nivel_id', $this->nivel_id)
             ->where(function ($query) {
                 $query->where('status', true)
-                    ->when($this->generacion_id, fn ($sub) => $sub->orWhereKey($this->generacion_id));
+                    ->when($this->generacion_id, fn ($sub) => $sub->orWhere('generaciones.id', $this->generacion_id));
             })
             ->orderByDesc('anio_ingreso')
             ->get();
