@@ -485,7 +485,7 @@
     {{-- Pie de página --}}
     <div class="footer">
         Centro Universitario Moctezuma · Reporte administrativo confidencial ·
-        La información conserva matrículas, generaciones y trayectoria histórica.
+        La información conserva matrículas, generaciones y movimientos administrativos.
     </div>
 </body>
 

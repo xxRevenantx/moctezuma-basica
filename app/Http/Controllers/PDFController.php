@@ -5626,17 +5626,15 @@ class PDFController extends Controller
             $consulta->whereNull('semestre_id');
         }
 
-        if ($cicloEscolarId) {
-            $grupoIds = \App\Models\TrayectoriaAcademica::query()
-                ->where('ciclo_escolar_id', $cicloEscolarId)
-                ->where('nivel_id', $nivel->id)
-                ->pluck('grupo_id')
-                ->filter()
-                ->unique();
+        $grupoIds = \App\Models\Inscripcion::query()
+            ->where('nivel_id', $nivel->id)
+            ->whereNotNull('grupo_id')
+            ->pluck('grupo_id')
+            ->filter()
+            ->unique();
 
-            if ($grupoIds->isNotEmpty()) {
-                $consulta->whereIn('id', $grupoIds);
-            }
+        if ($grupoIds->isNotEmpty()) {
+            $consulta->whereIn('id', $grupoIds);
         }
 
         return $consulta

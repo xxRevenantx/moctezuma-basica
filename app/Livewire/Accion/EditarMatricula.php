@@ -3,26 +3,22 @@
 namespace App\Livewire\Accion;
 
 use App\Models\Ciclo;
-use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
-use App\Models\MatriculaAlumno;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
-use App\Models\TrayectoriaAcademica;
 use App\Services\CurpService;
 use App\Services\ExpedienteDigitalService;
-use App\Services\TrayectoriaAcademicaService;
+use App\Services\GestionAcademicaService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -30,44 +26,24 @@ class EditarMatricula extends Component
 {
     use WithFileUploads;
 
-    public string $slug_nivel;
+    public string $slug_nivel = '';
     public ?int $InscripcionId = null;
-    public ?int $trayectoriaIdContexto = null;
 
-    // CURP API
-    public bool $consultandoCurp = false;
-    public ?string $curpError = null;
-    public ?string $curpAdvertencia = null;
-    public ?string $curpSuccess = null;
-    public ?string $ultimaCurpConsultada = null;
-
-    // Datos personales
     public string $curp = '';
     public string $matricula = '';
-
-    public bool $matriculaEditadaManual = false;
     public ?string $folio = null;
     public string $nombre = '';
     public string $apellido_paterno = '';
     public ?string $apellido_materno = null;
     public ?string $fecha_nacimiento = null;
     public ?string $genero = null;
-
-    // Fechas separadas para evitar mezclar el ingreso general del alumno
-    // con la inscripción de una trayectoria/ciclo específico.
     public ?string $fecha_ingreso_plantel = null;
-    public ?string $fecha_inscripcion_ciclo = null;
-    public bool $trayectoriaEsActual = false;
-
     public ?int $ciclo_id = null;
-    public ?int $ciclo_escolar_id = null;
 
-    // Nacimiento
     public ?string $pais_nacimiento = null;
     public ?string $estado_nacimiento = null;
     public ?string $lugar_nacimiento = null;
 
-    // Dirección
     public ?string $calle = null;
     public ?string $numero_exterior = null;
     public ?string $numero_interior = null;
@@ -80,664 +56,102 @@ class EditarMatricula extends Component
     public $foto = null;
     public ?string $foto_actual = null;
 
-    // Tutor
     public ?int $tutor_id = null;
     public bool $copiar_direccion_tutor = false;
 
-    // Asignación escolar
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
     public ?int $generacion_id = null;
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
-    public bool $esBachillerato = false;
 
-    // Catálogos
+    public string $estatus = 'activo';
+    public ?string $fecha_estatus = null;
+    public string $motivo_cambio = '';
+    public bool $confirmar_cambio_academico = false;
+
     public Collection $niveles;
     public Collection $gradosOptions;
     public Collection $generacionesOptions;
     public Collection $semestresOptions;
     public array $gruposOptions = [];
     public Collection $ciclosOptions;
-    public Collection $cicloEscolaresOptions;
     public Collection $tutores;
 
-    public bool $activo = true;
+    public bool $consultandoCurp = false;
+    public ?string $curpError = null;
+    public ?string $curpSuccess = null;
 
-    public function mount(
-        string $slug_nivel,
-        Inscripcion $inscripcion,
-        ?int $trayectoriaId = null
-    ): void {
+    public function mount(string $slug_nivel, Inscripcion $inscripcion): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
         $this->slug_nivel = $slug_nivel;
-        $this->trayectoriaIdContexto = $trayectoriaId;
-
         $this->niveles = $this->loadNivelesFromGrupos();
         $this->gradosOptions = collect();
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
-        $this->ciclosOptions = $this->loadCiclos();
-        $this->cicloEscolaresOptions = $this->loadCicloEscolares();
-        $this->tutores = $this->loadTutores();
-
-        $this->cargarInscripcion($inscripcion, $trayectoriaId);
-    }
-
-    protected function cargarInscripcion(
-        Inscripcion $inscripcion,
-        ?int $trayectoriaId = null
-    ): void {
-        $this->InscripcionId = (int) $inscripcion->id;
-
-        $nivelContextoId = Nivel::query()
-            ->where('slug', $this->slug_nivel)
-            ->value('id');
-
-        $trayectoria = null;
-
-        /*
-         * Cuando se entra desde una fila histórica, se debe cargar exactamente
-         * la trayectoria mostrada en esa fila. Antes siempre se abría la etapa
-         * marcada como actual, aunque el listado estuviera filtrado en otro ciclo.
-         */
-        if ($trayectoriaId) {
-            $trayectoria = TrayectoriaAcademica::query()
-                ->whereKey($trayectoriaId)
-                ->where('inscripcion_id', $inscripcion->id)
-                ->when(
-                    $nivelContextoId,
-                    fn($query) => $query->where('nivel_id', $nivelContextoId)
-                )
-                ->where('vigente_en_corte', true)
-                ->first();
-        }
-
-        if (!$trayectoria) {
-            $trayectoria = TrayectoriaAcademica::query()
-                ->where('inscripcion_id', $inscripcion->id)
-                ->when(
-                    $nivelContextoId,
-                    fn($query) => $query->where('nivel_id', $nivelContextoId)
-                )
-                ->where('es_actual', true)
-                ->latest('numero_estancia')
-                ->latest('id')
-                ->first();
-        }
-
-        if (!$trayectoria) {
-            $trayectoria = TrayectoriaAcademica::query()
-                ->select('trayectorias_academicas.*')
-                ->join('ciclo_escolares', 'ciclo_escolares.id', '=', 'trayectorias_academicas.ciclo_escolar_id')
-                ->where('trayectorias_academicas.inscripcion_id', $inscripcion->id)
-                ->when(
-                    $nivelContextoId,
-                    fn($query) => $query->where('trayectorias_academicas.nivel_id', $nivelContextoId)
-                )
-                ->orderByDesc('ciclo_escolares.inicio_anio')
-                ->orderByDesc('ciclo_escolares.fin_anio')
-                ->orderByDesc('trayectorias_academicas.ciclo_id')
-                ->orderByDesc('trayectorias_academicas.numero_estancia')
-                ->orderByDesc('trayectorias_academicas.id')
-                ->first();
-        }
-
-        $this->curp = (string) $inscripcion->curp;
-        $this->folio = $inscripcion->folio;
-        $this->nombre = (string) $inscripcion->nombre;
-        $this->apellido_paterno = (string) $inscripcion->apellido_paterno;
-        $this->apellido_materno = $inscripcion->apellido_materno;
-
-        $this->fecha_nacimiento = $inscripcion->fecha_nacimiento
-            ? Carbon::parse($inscripcion->fecha_nacimiento)->format('Y-m-d')
-            : null;
-
-        $this->genero = $inscripcion->genero;
-        $this->fecha_ingreso_plantel = $inscripcion->fecha_inscripcion
-            ? Carbon::parse($inscripcion->fecha_inscripcion)->format('Y-m-d')
-            : null;
-
-        $this->pais_nacimiento = $inscripcion->pais_nacimiento;
-        $this->estado_nacimiento = $inscripcion->estado_nacimiento;
-        $this->lugar_nacimiento = $inscripcion->lugar_nacimiento;
-
-        $this->calle = $inscripcion->calle;
-        $this->numero_exterior = $inscripcion->numero_exterior;
-        $this->numero_interior = $inscripcion->numero_interior;
-        $this->colonia = $inscripcion->colonia;
-        $this->codigo_postal = $inscripcion->codigo_postal;
-        $this->municipio = $inscripcion->municipio;
-        $this->estado_residencia = $inscripcion->estado_residencia;
-        $this->ciudad_residencia = $inscripcion->ciudad_residencia;
-
-        $this->tutor_id = $inscripcion->tutor_id ? (int) $inscripcion->tutor_id : null;
-        $this->copiar_direccion_tutor = false;
-
-        $this->foto_actual = $inscripcion->foto_path;
-        $this->foto = null;
-
-        if ($trayectoria) {
-            $this->aplicarTrayectoriaAlFormulario($trayectoria, $inscripcion);
-        } else {
-            $this->ciclo_escolar_id = $this->cicloEscolaresOptions->first()?->id;
-            $this->ciclo_id = $inscripcion->ciclo_id ? (int) $inscripcion->ciclo_id : null;
-            $this->nivel_id = $inscripcion->nivel_id ? (int) $inscripcion->nivel_id : null;
-            $this->grado_id = $inscripcion->grado_id ? (int) $inscripcion->grado_id : null;
-            $this->generacion_id = $inscripcion->generacion_id ? (int) $inscripcion->generacion_id : null;
-            $this->semestre_id = $inscripcion->semestre_id ? (int) $inscripcion->semestre_id : null;
-            $this->grupo_id = $inscripcion->grupo_id ? (int) $inscripcion->grupo_id : null;
-            $this->matricula = (string) $inscripcion->matricula;
-            $this->fecha_inscripcion_ciclo = $this->fecha_ingreso_plantel;
-            $this->trayectoriaEsActual = true;
-            $this->activo = (bool) $inscripcion->activo;
-            $this->recargarCatalogosAcademicos();
-        }
-
-        $this->curpError = null;
-        $this->curpAdvertencia = null;
-        $this->curpSuccess = null;
-        $this->ultimaCurpConsultada = $this->curp;
-        $this->consultandoCurp = false;
-
-        $this->resetValidation();
-    }
-
-    public function updatedCicloEscolarId($value): void
-    {
-        $this->ciclo_escolar_id = filled($value) ? (int) $value : null;
-        $this->cargarContextoAcademicoSeleccionado();
-    }
-
-    public function updatedCicloId($value): void
-    {
-        $this->ciclo_id = filled($value) ? (int) $value : null;
-        $this->cargarContextoAcademicoSeleccionado();
-    }
-
-    private function cargarContextoAcademicoSeleccionado(): void
-    {
-        if (!$this->InscripcionId || !$this->ciclo_escolar_id || !$this->ciclo_id) {
-            return;
-        }
-
-        $trayectoria = TrayectoriaAcademica::query()
-            ->where('inscripcion_id', $this->InscripcionId)
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('ciclo_id', $this->ciclo_id)
-            ->where('vigente_en_corte', true)
-            ->latest('numero_estancia')
-            ->latest('id')
-            ->first();
-
-        if (!$trayectoria) {
-            $this->trayectoriaIdContexto = null;
-            $this->trayectoriaEsActual = $this->contextoSeleccionadoDebeSerActual();
-            $this->fecha_inscripcion_ciclo = $this->fecha_ingreso_plantel ?: now()->toDateString();
-            return;
-        }
-
-        $inscripcion = Inscripcion::withTrashed()->find($this->InscripcionId);
-
-        if ($inscripcion) {
-            $this->aplicarTrayectoriaAlFormulario($trayectoria, $inscripcion);
-            $this->resetValidation();
-        }
-    }
-
-    private function aplicarTrayectoriaAlFormulario(
-        TrayectoriaAcademica $trayectoria,
-        Inscripcion $inscripcion
-    ): void {
-        $this->trayectoriaIdContexto = (int) $trayectoria->id;
-        $this->ciclo_escolar_id = (int) $trayectoria->ciclo_escolar_id;
-        $this->ciclo_id = (int) $trayectoria->ciclo_id;
-        $this->nivel_id = (int) $trayectoria->nivel_id;
-        $this->grado_id = (int) $trayectoria->grado_id;
-        $this->generacion_id = (int) $trayectoria->generacion_id;
-        $this->semestre_id = $trayectoria->semestre_id ? (int) $trayectoria->semestre_id : null;
-        $this->grupo_id = (int) $trayectoria->grupo_id;
-        $this->trayectoriaEsActual = (bool) $trayectoria->es_actual;
-        $this->fecha_inscripcion_ciclo = $trayectoria->fecha_inscripcion
-            ? Carbon::parse($trayectoria->fecha_inscripcion)->format('Y-m-d')
-            : $this->fecha_ingreso_plantel;
-        $this->activo = (bool) $trayectoria->activo;
-
-        $this->matricula = (string) (MatriculaAlumno::query()
-            ->where('inscripcion_id', $inscripcion->id)
-            ->where('nivel_id', $trayectoria->nivel_id)
-            ->latest('fecha_asignacion')
-            ->value('matricula') ?: $inscripcion->matricula);
-
-        $this->recargarCatalogosAcademicos();
-    }
-
-    private function recargarCatalogosAcademicos(): void
-    {
-        $this->esBachillerato = $this->nivelEsBachillerato($this->nivel_id);
-        $this->gradosOptions = $this->esBachillerato ? collect() : $this->loadGradosFromGrupos();
-        $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
-        $this->semestresOptions = $this->esBachillerato ? $this->loadSemestresFromGrupos() : collect();
-        $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
-    }
-
-    private function contextoSeleccionadoDebeSerActual(): bool
-    {
-        if (!$this->InscripcionId || !$this->ciclo_escolar_id || !$this->ciclo_id) {
-            return true;
-        }
-
-        $actual = TrayectoriaAcademica::query()
-            ->select('trayectorias_academicas.*')
-            ->with('cicloEscolar:id,inicio_anio,fin_anio')
-            ->where('inscripcion_id', $this->InscripcionId)
-            ->where('es_actual', true)
-            ->latest('numero_estancia')
-            ->latest('id')
-            ->first();
-
-        if (!$actual) {
-            return true;
-        }
-
-        $seleccionado = CicloEscolar::query()->find($this->ciclo_escolar_id);
-
-        if (!$seleccionado || !$actual->cicloEscolar) {
-            return false;
-        }
-
-        $actualAnio = ((int) $actual->cicloEscolar->inicio_anio * 10000)
-            + (int) $actual->cicloEscolar->fin_anio;
-        $seleccionAnio = ((int) $seleccionado->inicio_anio * 10000)
-            + (int) $seleccionado->fin_anio;
-
-        if ($seleccionAnio > $actualAnio) {
-            return true;
-        }
-
-        if ($seleccionAnio < $actualAnio) {
-            return false;
-        }
-
-        return (int) $this->ciclo_id >= (int) $actual->ciclo_id;
-    }
-
-
-    /**
-     * Determina si realmente cambió algún dato propio de la trayectoria.
-     * Así, editar únicamente datos personales o la fecha general de ingreso
-     * no crea una corrección académica innecesaria en el historial.
-     */
-    private function trayectoriaTieneCambios(
-        TrayectoriaAcademica $trayectoria,
-        Inscripcion $inscripcion,
-        array $destino
-    ): bool {
-        $fechaActual = $trayectoria->fecha_inscripcion
-            ? Carbon::parse($trayectoria->fecha_inscripcion)->toDateString()
-            : null;
-
-        $fechaNueva = filled($destino['fecha_inscripcion'] ?? null)
-            ? Carbon::parse($destino['fecha_inscripcion'])->toDateString()
-            : null;
-
-        $matriculaActual = MatriculaAlumno::query()
-            ->where('inscripcion_id', $inscripcion->id)
-            ->where('nivel_id', $trayectoria->nivel_id)
-            ->latest('fecha_asignacion')
-            ->latest('id')
-            ->value('matricula') ?: $inscripcion->matricula;
-
-        return (int) $trayectoria->nivel_id !== (int) $destino['nivel_id']
-            || (int) $trayectoria->grado_id !== (int) $destino['grado_id']
-            || (int) $trayectoria->generacion_id !== (int) $destino['generacion_id']
-            || (int) $trayectoria->grupo_id !== (int) $destino['grupo_id']
-            || (int) ($trayectoria->semestre_id ?? 0) !== (int) ($destino['semestre_id'] ?? 0)
-            || $fechaActual !== $fechaNueva
-            || (string) $matriculaActual !== (string) $destino['matricula'];
-    }
-
-    #[On('limpiar-curp-success')]
-    public function limpiarCurpSuccess(): void
-    {
-        $this->curpSuccess = null;
-    }
-
-    public function updatedMatricula($value): void
-    {
-        $this->matriculaEditadaManual = true;
-
-        $this->matricula = strtoupper(
-            preg_replace('/\s+/', '', trim((string) $value))
-        );
-
-        $this->validateOnly('matricula');
-    }
-
-    private function titleCaseNombre(?string $value): string
-    {
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return '';
-        }
-
-        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
-        $value = mb_convert_case(mb_strtolower($value, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
-
-        $palabrasMinusculas = ['De', 'Del', 'La', 'Las', 'Los', 'Y', 'E', 'San', 'Santa', 'Van', 'Von'];
-
-        foreach ($palabrasMinusculas as $palabra) {
-            $value = preg_replace(
-                '/\b' . preg_quote($palabra, '/') . '\b/u',
-                mb_strtolower($palabra, 'UTF-8'),
-                $value
-            ) ?? $value;
-        }
-
-        return preg_replace_callback('/^(de|del|la|las|los|y|e|san|santa|van|von)\b/iu', function ($m) {
-            return mb_convert_case(mb_strtolower($m[0], 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
-        }, $value) ?? $value;
-    }
-
-    protected function nivelCodeBySlug(?string $slug): string
-    {
-        return match ($slug) {
-            'preescolar' => 'PREES',
-            'primaria' => 'PRIM',
-            'secundaria' => 'SEC',
-            'bachillerato' => 'BACHI',
-            default => 'NIV',
-        };
-    }
-
-    protected function anioInicioCiclo(): string
-    {
-        if ($this->generacion_id) {
-            $generacion = Generacion::query()->find($this->generacion_id);
-
-            if ($generacion?->anio_ingreso) {
-                return (string) $generacion->anio_ingreso;
-            }
-        }
-
-        return (string) now()->year;
-    }
-
-    protected function claveParaMatricula(): string
-    {
-        $curpLimpia = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $this->curp));
-
-        if ($curpLimpia !== '') {
-            return str_pad(substr($curpLimpia, 0, 4), 4, 'X');
-        }
-
-        $iniciales = '';
-
-        $partes = [
-            $this->nombre,
-            $this->apellido_paterno,
-            $this->apellido_materno,
-        ];
-
-        foreach ($partes as $parte) {
-            $parte = trim((string) $parte);
-
-            if ($parte !== '') {
-                $iniciales .= mb_substr($parte, 0, 1);
-            }
-        }
-
-        $iniciales = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $iniciales));
-
-        return str_pad(substr($iniciales ?: 'ALUM', 0, 4), 4, 'X');
-    }
-
-    protected function generarMatriculaConSlug(string $slug): ?string
-    {
-        $actual = $this->InscripcionId ? Inscripcion::query()->find($this->InscripcionId) : null;
-
-        if (
-            $actual
-            && $actual->curp === $this->curp
-            && $actual->matricula
-            && (int) $actual->nivel_id === (int) $this->nivel_id
-            && (int) $actual->generacion_id === (int) $this->generacion_id
-        ) {
-            return $actual->matricula;
-        }
-
-        $anio = $this->anioInicioCiclo();
-        $nivel = $this->nivelCodeBySlug($slug);
-        $clave = $this->claveParaMatricula();
-
-        for ($i = 0; $i < 50; $i++) {
-            $nn = str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT);
-            $matricula = "{$anio}{$nivel}{$clave}{$nn}";
-
-            $existe = Inscripcion::query()
-                ->where('matricula', $matricula)
-                ->where('id', '!=', $this->InscripcionId)
-                ->exists();
-
-            if (!$existe) {
-                return $matricula;
-            }
-        }
-
-        for ($i = 0; $i < 50; $i++) {
-            $nnnn = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            $matricula = "{$anio}{$nivel}{$clave}{$nnnn}";
-
-            $existe = Inscripcion::query()
-                ->where('matricula', $matricula)
-                ->where('id', '!=', $this->InscripcionId)
-                ->exists();
-
-            if (!$existe) {
-                return $matricula;
-            }
-        }
-
-        return null;
-    }
-
-    protected function refrescarMatriculaSiPosible(): void
-    {
-        /*
-            Si la matrícula ya fue escrita manualmente,
-            no se vuelve a generar para no borrar lo capturado.
-        */
-        if ($this->matriculaEditadaManual && trim($this->matricula) !== '') {
-            return;
-        }
-
-        if (!$this->nivel_id) {
-            $this->matricula = '';
-            return;
-        }
-
-        $nivel = $this->niveles->firstWhere('id', $this->nivel_id);
-        $slug = $nivel?->slug;
-
-        if (!$slug) {
-            $this->matricula = '';
-            return;
-        }
-
-        $matricula = $this->generarMatriculaConSlug($slug);
-
-        if ($matricula) {
-            $this->matricula = $matricula;
-            $this->resetValidation('matricula');
-        }
-    }
-
-    public function updatedCurp(string $value): void
-    {
-        $this->curp = strtoupper(trim($value));
-        $this->curpError = null;
-        $this->curpAdvertencia = null;
-        $this->curpSuccess = null;
-
-        $this->curp = preg_replace('/\s+/', '', $this->curp) ?? $this->curp;
-
-        if ($this->curp === '') {
-            $this->ultimaCurpConsultada = null;
-            $this->matricula = '';
-            return;
-        }
-
-        if (!preg_match('/^[A-Z0-9]{1,18}$/', $this->curp)) {
-            $this->curpError = 'La CURP solo debe contener letras y números.';
-            return;
-        }
-
-        if (strlen($this->curp) < 18) {
-            $this->ultimaCurpConsultada = null;
-            $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. No se consultó en RENAPO, pero puedes continuar y llenar la matrícula.';
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-            return;
-        }
-
-        if ($this->ultimaCurpConsultada === $this->curp) {
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        $this->ultimaCurpConsultada = $this->curp;
-        $this->consultandoCurp = true;
-
-        /** @var CurpService $curpService */
-        $curpService = app(CurpService::class);
-
-        try {
-            $payload = $curpService->obtenerDatosPorCurp($this->curp);
-        } catch (\Throwable $e) {
-            $this->consultandoCurp = false;
-            $this->curpAdvertencia = 'No fue posible consultar la CURP en RENAPO. Puedes continuar capturando la información manualmente.';
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        $this->consultandoCurp = false;
-
-        if (!isset($payload['error']) || $payload['error'] === true) {
-            $this->curpAdvertencia = $payload['error_msg']
-                ?? $payload['message']
-                ?? 'La CURP no existe en RENAPO o no fue posible validarla. Puedes continuar capturando la información manualmente.';
-
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-
-            return;
-        }
-
-        $solicitante = data_get($payload, 'response.Solicitante');
-
-        if (!$solicitante || !is_array($solicitante)) {
-            $this->curpAdvertencia = 'La CURP fue consultada, pero RENAPO no regresó datos completos. Puedes continuar capturando la información manualmente.';
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        $this->nombre = $this->titleCaseNombre((string) data_get($solicitante, 'Nombres', $this->nombre));
-        $this->apellido_paterno = $this->titleCaseNombre((string) data_get($solicitante, 'ApellidoPaterno', $this->apellido_paterno));
-
-        $apellidoMaterno = data_get($solicitante, 'ApellidoMaterno');
-        $this->apellido_materno = $apellidoMaterno ? $this->titleCaseNombre((string) $apellidoMaterno) : null;
-
-        $fechaApi = data_get($solicitante, 'FechaNacimiento');
-
-        if (!empty($fechaApi)) {
-            $this->fecha_nacimiento = $fechaApi;
-        }
-
-        $sexo = strtoupper((string) data_get($solicitante, 'ClaveSexo', ''));
-
-        if (in_array($sexo, ['H', 'M'], true)) {
-            $this->genero = $sexo;
-        }
-
-        $this->pais_nacimiento = data_get($solicitante, 'Nacionalidad') ?: $this->pais_nacimiento;
-        $this->estado_nacimiento = data_get($solicitante, 'EntidadNacimiento') ?: $this->estado_nacimiento;
-        $this->lugar_nacimiento = data_get($solicitante, 'EntidadNacimiento') ?: $this->lugar_nacimiento;
-
-        $this->sanitizeStrings();
-        $this->refrescarMatriculaSiPosible();
-
-        $this->curpSuccess = 'La CURP se cargó correctamente y se encuentra registrada en RENAPO.';
-        $this->resetValidation('curp');
-    }
-
-    protected function loadTutores(): Collection
-    {
-        return Tutor::query()
-            ->orderBy('nombre')
+        $this->ciclosOptions = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
+        $this->tutores = Tutor::query()
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
-            ->get([
-                'id',
-                'nombre',
-                'apellido_paterno',
-                'apellido_materno',
-                'calle',
-                'numero',
-                'colonia',
-                'codigo_postal',
-                'municipio',
-                'estado',
-                'ciudad',
-            ]);
+            ->orderBy('nombre')
+            ->get();
+
+        $this->cargar($inscripcion);
     }
 
-    protected function llenarDireccionDesdeTutor(): void
+    private function cargar(Inscripcion $alumno): void
     {
-        if (!$this->tutor_id) {
-            return;
+        $this->InscripcionId = $alumno->id;
+
+        foreach ([
+            'curp',
+            'matricula',
+            'folio',
+            'nombre',
+            'apellido_paterno',
+            'apellido_materno',
+            'genero',
+            'pais_nacimiento',
+            'estado_nacimiento',
+            'lugar_nacimiento',
+            'calle',
+            'numero_exterior',
+            'numero_interior',
+            'colonia',
+            'codigo_postal',
+            'municipio',
+            'estado_residencia',
+            'ciudad_residencia',
+            'tutor_id',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'semestre_id',
+            'grupo_id',
+            'ciclo_id',
+            'estatus',
+        ] as $campo) {
+            $this->{$campo} = $alumno->{$campo};
         }
 
-        $tutor = Tutor::query()->find($this->tutor_id);
+        $this->fecha_nacimiento = optional($alumno->fecha_nacimiento)->format('Y-m-d');
+        $this->fecha_ingreso_plantel = optional($alumno->fecha_inscripcion)->format('Y-m-d');
+        $this->fecha_estatus = optional($alumno->fecha_estatus)->format('Y-m-d') ?: now()->toDateString();
+        $this->foto_actual = $alumno->foto_path;
 
-        if (!$tutor) {
-            return;
-        }
-
-        $this->calle = $tutor->calle ?: $this->calle;
-        $this->numero_exterior = $tutor->numero ?: $this->numero_exterior;
-        $this->colonia = $tutor->colonia ?: $this->colonia;
-        $this->codigo_postal = $tutor->codigo_postal ?: $this->codigo_postal;
-        $this->municipio = $tutor->municipio ?: $this->municipio;
-        $this->estado_residencia = $tutor->estado ?: $this->estado_residencia;
-        $this->ciudad_residencia = $tutor->ciudad ?: $this->ciudad_residencia;
-
-        $this->sanitizeStrings();
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
-    public function updatedTutorId($value): void
+    public function esBachillerato(): bool
     {
-        $this->tutor_id = $value ? (int) $value : null;
+        $nivel = $this->niveles->firstWhere('id', $this->nivel_id)
+            ?: Nivel::query()->find($this->nivel_id);
 
-        if (!$this->tutor_id) {
-            $this->copiar_direccion_tutor = false;
-            return;
-        }
-
-        if ($this->copiar_direccion_tutor) {
-            usleep(250000);
-            $this->llenarDireccionDesdeTutor();
-        }
-    }
-
-    public function updatedCopiarDireccionTutor($value): void
-    {
-        $this->copiar_direccion_tutor = (bool) $value;
-
-        if ($this->copiar_direccion_tutor && $this->tutor_id) {
-            usleep(250000);
-            $this->llenarDireccionDesdeTutor();
-        }
+        return $nivel?->slug === 'bachillerato'
+            || str_contains(mb_strtolower((string) ($nivel?->nombre ?? '')), 'bachillerato');
     }
 
     protected function baseGrupoQuery()
@@ -751,107 +165,95 @@ class EditarMatricula extends Component
         return $query;
     }
 
-    protected function nivelEsBachillerato(?int $nivelId): bool
-    {
-        if (!$nivelId) {
-            return false;
-        }
-
-        $nivel = $this->niveles->firstWhere('id', $nivelId) ?: Nivel::query()->find($nivelId);
-
-        return (bool) ($nivel && $nivel->slug === 'bachillerato');
-    }
-
     protected function loadNivelesFromGrupos(): Collection
     {
-        $nivelIds = $this->baseGrupoQuery()
+        $ids = $this->baseGrupoQuery()
             ->select('nivel_id')
             ->distinct()
             ->pluck('nivel_id')
             ->filter()
             ->values();
 
-        if ($nivelIds->isEmpty()) {
-            return collect();
+        if ($ids->isEmpty()) {
+            return Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug', 'color']);
         }
 
         return Nivel::query()
-            ->whereIn('id', $nivelIds)
+            ->whereIn('id', $ids)
             ->orderBy('id')
             ->get(['id', 'nombre', 'slug', 'color']);
     }
 
     protected function loadGradosFromGrupos(): Collection
     {
-        if (!$this->nivel_id || $this->esBachillerato) {
+        if (! $this->nivel_id || $this->esBachillerato()) {
             return collect();
         }
 
-        $gradoIds = $this->baseGrupoQuery()
+        $ids = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
-            ->whereNull('semestre_id')
             ->select('grado_id')
             ->distinct()
             ->pluck('grado_id')
             ->filter()
             ->values();
 
-        if ($gradoIds->isEmpty()) {
-            return collect();
-        }
-
         return Grado::query()
-            ->whereIn('id', $gradoIds)
             ->where('nivel_id', $this->nivel_id)
+            ->when($ids->isNotEmpty(), fn ($query) => $query->whereIn('id', $ids))
             ->orderBy('orden')
             ->get(['id', 'nivel_id', 'nombre', 'orden']);
     }
 
     protected function loadGeneracionesFromGrupos(): Collection
     {
-        if (!$this->nivel_id) {
+        if (! $this->nivel_id) {
             return collect();
         }
 
-        $query = $this->baseGrupoQuery()
-            ->where('nivel_id', $this->nivel_id);
+        $query = $this->baseGrupoQuery()->where('nivel_id', $this->nivel_id);
 
-        if ($this->esBachillerato) {
-            $query->whereNotNull('semestre_id');
-        } else {
-            if (!$this->grado_id) {
+        if (! $this->esBachillerato()) {
+            if (! $this->grado_id) {
                 return collect();
             }
 
-            $query->where('grado_id', $this->grado_id)
-                ->whereNull('semestre_id');
+            $query->where('grado_id', $this->grado_id)->whereNull('semestre_id');
         }
 
-        $generacionIds = $query
-            ->select('generacion_id')
-            ->distinct()
-            ->pluck('generacion_id')
-            ->filter()
-            ->values();
+        $ids = $query->select('generacion_id')->distinct()->pluck('generacion_id')->filter()->values();
 
-        if ($generacionIds->isEmpty()) {
+        if ($this->generacion_id) {
+            $ids->push($this->generacion_id);
+            $ids = $ids->unique()->values();
+        }
+
+        if ($ids->isEmpty()) {
             return collect();
         }
 
         return Generacion::query()
-            ->whereIn('id', $generacionIds)
             ->where('nivel_id', $this->nivel_id)
+            ->whereIn('id', $ids)
+            ->where(function ($query): void {
+                $query->where('status', true);
+
+                if ($this->generacion_id) {
+                    $query->orWhereKey($this->generacion_id);
+                }
+            })
+            ->orderByDesc('status')
             ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
+            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'nombre', 'status']);
     }
 
     protected function loadSemestresFromGrupos(): Collection
     {
-        if (!$this->esBachillerato || !$this->nivel_id || !$this->generacion_id) {
+        if (! $this->esBachillerato() || ! $this->nivel_id || ! $this->generacion_id) {
             return collect();
         }
 
-        $semestreIds = $this->baseGrupoQuery()
+        $ids = $this->baseGrupoQuery()
             ->where('nivel_id', $this->nivel_id)
             ->where('generacion_id', $this->generacion_id)
             ->whereNotNull('semestre_id')
@@ -861,19 +263,20 @@ class EditarMatricula extends Component
             ->filter()
             ->values();
 
-        if ($semestreIds->isEmpty()) {
+        if ($ids->isEmpty()) {
             return collect();
         }
 
         return Semestre::query()
-            ->whereIn('id', $semestreIds)
+            ->whereIn('id', $ids)
+            ->with('grado:id,nombre')
             ->orderBy('numero')
             ->get(['id', 'grado_id', 'numero']);
     }
 
     protected function loadGruposOptionsFromGrupos(): array
     {
-        if (!$this->nivel_id || !$this->generacion_id) {
+        if (! $this->nivel_id || ! $this->generacion_id) {
             return [];
         }
 
@@ -881,109 +284,103 @@ class EditarMatricula extends Component
             ->where('nivel_id', $this->nivel_id)
             ->where('generacion_id', $this->generacion_id);
 
-        if ($this->esBachillerato) {
-            if (!$this->semestre_id) {
+        if ($this->esBachillerato()) {
+            if (! $this->semestre_id) {
                 return [];
             }
 
             $query->where('semestre_id', $this->semestre_id);
         } else {
-            if (!$this->grado_id) {
+            if (! $this->grado_id) {
                 return [];
             }
 
-            $query->where('grado_id', $this->grado_id)
-                ->whereNull('semestre_id');
+            $query->where('grado_id', $this->grado_id)->whereNull('semestre_id');
         }
 
-        $rows = $query
+        return $query
             ->with([
                 'asignacionGrupo:id,nombre',
-                'generacion:id,anio_ingreso,anio_egreso',
-                'semestre:id,numero',
+                'generacion:id,anio_ingreso,anio_egreso,nombre',
                 'grado:id,nombre',
+                'semestre:id,numero',
             ])
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select('grupos.*')
+            ->orderBy('grupos.grado_id')
             ->orderBy('grupos.semestre_id')
             ->orderBy('asignacion_grupos.nombre')
             ->orderBy('grupos.id')
-            ->get();
+            ->get()
+            ->map(function (Grupo $grupo): array {
+                $generacion = $grupo->generacion?->etiqueta ?? 'Sin generación';
+                $partes = [$grupo->asignacionGrupo?->nombre ?? 'Sin grupo'];
 
-        return $rows->map(function ($grupo) {
-            $generacion = $grupo->generacion
-                ? "{$grupo->generacion->anio_ingreso}–{$grupo->generacion->anio_egreso}"
-                : null;
+                if ($grupo->grado) {
+                    $partes[] = $grupo->grado->nombre;
+                }
 
-            $semestre = $grupo->semestre ? "Semestre {$grupo->semestre->numero}" : null;
-            $grado = $grupo->grado ? "Grado {$grupo->grado->nombre}" : null;
-            $nombreGrupo = $this->textoGrupo($grupo);
+                if ($grupo->semestre) {
+                    $partes[] = 'Semestre ' . $grupo->semestre->numero;
+                }
 
-            $partes = $this->esBachillerato
-                ? collect([$semestre, "Grupo {$nombreGrupo}"])->filter()->implode(' — ')
-                : collect([$grado, "Grupo {$nombreGrupo}"])->filter()->implode(' — ');
+                $partes[] = $generacion;
 
-            return [
-                'id' => (int) $grupo->id,
-                'grado_id' => (int) $grupo->grado_id,
-                'label' => $generacion ? "{$partes} ({$generacion})" : $partes,
-            ];
-        })->values()->all();
+                return [
+                    'id' => (int) $grupo->id,
+                    'grado_id' => $grupo->grado_id ? (int) $grupo->grado_id : null,
+                    'semestre_id' => $grupo->semestre_id ? (int) $grupo->semestre_id : null,
+                    'label' => implode(' · ', array_filter($partes)),
+                ];
+            })
+            ->toArray();
     }
 
-    public function textoGrupo($grupo): string
+    private function recargarOpcionesAsignacionEscolar(): void
     {
-        if (!$grupo) {
-            return 'Sin grupo';
-        }
-
-        return $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
-    }
-
-    protected function loadCiclos(): Collection
-    {
-        return Ciclo::query()
-            ->orderBy('id')
-            ->get(['id', 'ciclo']);
-    }
-
-    protected function loadCicloEscolares(): Collection
-    {
-        return CicloEscolar::query()
-            ->orderByDesc('inicio_anio')
-            ->orderByDesc('fin_anio')
-            ->get(['id', 'inicio_anio', 'fin_anio']);
-    }
-
-    public function updatedNivelId($value): void
-    {
-        $this->nivel_id = $value ? (int) $value : null;
-        $this->esBachillerato = $this->nivelEsBachillerato($this->nivel_id);
-
-        $this->grado_id = null;
-        $this->generacion_id = null;
-        $this->semestre_id = null;
-        $this->grupo_id = null;
-
         $this->gradosOptions = collect();
         $this->generacionesOptions = collect();
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
 
-        $this->resetValidation(['grado_id', 'generacion_id', 'semestre_id', 'grupo_id']);
-
-        if (!$this->nivel_id) {
-            $this->matricula = '';
+        if (! $this->nivel_id) {
             return;
         }
 
-        if ($this->esBachillerato) {
+        if ($this->esBachillerato()) {
             $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
-        } else {
-            $this->gradosOptions = $this->loadGradosFromGrupos();
+
+            if ($this->generacion_id) {
+                $this->semestresOptions = $this->loadSemestresFromGrupos();
+            }
+
+            if ($this->generacion_id && $this->semestre_id) {
+                $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
+            }
+
+            return;
         }
 
-        $this->refrescarMatriculaSiPosible();
+        $this->gradosOptions = $this->loadGradosFromGrupos();
+
+        if ($this->grado_id) {
+            $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
+        }
+
+        if ($this->grado_id && $this->generacion_id) {
+            $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
+        }
+    }
+
+    public function updatedNivelId($value): void
+    {
+        $this->nivel_id = $value ? (int) $value : null;
+        $this->grado_id = null;
+        $this->generacion_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->resetValidation(['nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'grupo_id']);
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
     public function updatedGradoId($value): void
@@ -992,18 +389,8 @@ class EditarMatricula extends Component
         $this->generacion_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
-
-        $this->generacionesOptions = collect();
-        $this->semestresOptions = collect();
-        $this->gruposOptions = [];
-
-        $this->resetValidation(['generacion_id', 'semestre_id', 'grupo_id']);
-
-        if (!$this->nivel_id || !$this->grado_id || $this->esBachillerato) {
-            return;
-        }
-
-        $this->generacionesOptions = $this->loadGeneracionesFromGrupos();
+        $this->resetValidation(['grado_id', 'generacion_id', 'semestre_id', 'grupo_id']);
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
     public function updatedGeneracionId($value): void
@@ -1012,30 +399,12 @@ class EditarMatricula extends Component
         $this->semestre_id = null;
         $this->grupo_id = null;
 
-        $this->semestresOptions = collect();
-        $this->gruposOptions = [];
-
-        $this->resetValidation(['semestre_id', 'grupo_id']);
-
-        if (!$this->nivel_id || !$this->generacion_id) {
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        if ($this->esBachillerato) {
+        if ($this->esBachillerato()) {
             $this->grado_id = null;
-            $this->semestresOptions = $this->loadSemestresFromGrupos();
-            $this->refrescarMatriculaSiPosible();
-            return;
         }
 
-        if (!$this->grado_id) {
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
-        $this->refrescarMatriculaSiPosible();
+        $this->resetValidation(['generacion_id', 'semestre_id', 'grupo_id']);
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
     public function updatedSemestreId($value): void
@@ -1043,121 +412,147 @@ class EditarMatricula extends Component
         $this->semestre_id = $value ? (int) $value : null;
         $this->grupo_id = null;
 
-        $this->resetValidation(['grupo_id']);
+        if ($this->esBachillerato()) {
+            $this->grado_id = null;
+        }
 
-        $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
+        $this->resetValidation(['semestre_id', 'grupo_id']);
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
     public function updatedGrupoId($value): void
     {
         $this->grupo_id = $value ? (int) $value : null;
 
-        if ($this->esBachillerato && $this->grupo_id) {
+        if ($this->esBachillerato() && $this->grupo_id) {
             $grupo = $this->baseGrupoQuery()
-                ->where('id', $this->grupo_id)
+                ->whereKey($this->grupo_id)
                 ->where('nivel_id', $this->nivel_id)
-                ->when($this->generacion_id, fn($query) => $query->where('generacion_id', $this->generacion_id))
-                ->when($this->semestre_id, fn($query) => $query->where('semestre_id', $this->semestre_id))
+                ->where('generacion_id', $this->generacion_id)
+                ->where('semestre_id', $this->semestre_id)
                 ->first(['id', 'grado_id']);
 
             $this->grado_id = $grupo?->grado_id ? (int) $grupo->grado_id : null;
         }
+    }
 
-        $this->refrescarMatriculaSiPosible();
+    public function updatedTutorId($value): void
+    {
+        $this->tutor_id = $value ? (int) $value : null;
+
+        if ($this->copiar_direccion_tutor && $this->tutor_id) {
+            $this->llenarDireccionDesdeTutor();
+        }
+    }
+
+    public function updatedCopiarDireccionTutor($value): void
+    {
+        $this->copiar_direccion_tutor = (bool) $value;
+
+        if ($this->copiar_direccion_tutor && $this->tutor_id) {
+            $this->llenarDireccionDesdeTutor();
+        }
+    }
+
+    private function llenarDireccionDesdeTutor(): void
+    {
+        $tutor = Tutor::query()->find($this->tutor_id);
+
+        if (! $tutor) {
+            return;
+        }
+
+        $this->calle = $tutor->calle;
+        $this->numero_exterior = $tutor->numero_exterior ?? $tutor->numero ?? null;
+        $this->numero_interior = $tutor->numero_interior;
+        $this->colonia = $tutor->colonia;
+        $this->codigo_postal = $tutor->codigo_postal;
+        $this->municipio = $tutor->municipio;
+        $this->estado_residencia = $tutor->estado_residencia ?? $tutor->estado ?? null;
+        $this->ciudad_residencia = $tutor->ciudad_residencia ?? $tutor->ciudad ?? null;
+    }
+
+    public function consultarCurp(CurpService $service): void
+    {
+        $this->consultandoCurp = true;
+        $this->curpError = null;
+        $this->curpSuccess = null;
+
+        try {
+            $respuesta = $service->obtenerDatosPorCurp($this->curp);
+        } finally {
+            $this->consultandoCurp = false;
+        }
+
+        if ($respuesta['error'] ?? true) {
+            $this->curpError = $respuesta['message'] ?? 'No fue posible consultar la CURP.';
+            return;
+        }
+
+        $datos = $respuesta['datos'] ?? [];
+        $this->curp = mb_strtoupper($datos['curp'] ?: $this->curp);
+        $this->nombre = $datos['nombre'] ?: $this->nombre;
+        $this->apellido_paterno = $datos['apellido_paterno'] ?: $this->apellido_paterno;
+        $this->apellido_materno = $datos['apellido_materno'] ?: $this->apellido_materno;
+        $this->genero = in_array($datos['genero'] ?? null, ['H', 'M'], true)
+            ? $datos['genero']
+            : $this->genero;
+
+        if (! empty($datos['fecha_nacimiento'])) {
+            try {
+                $this->fecha_nacimiento = Carbon::parse($datos['fecha_nacimiento'])->format('Y-m-d');
+            } catch (\Throwable) {
+                // Conserva la fecha capturada si el servicio devuelve un formato inesperado.
+            }
+        }
+
+        $this->pais_nacimiento = $datos['pais_nacimiento'] ?: $this->pais_nacimiento;
+        $this->estado_nacimiento = $datos['estado_nacimiento'] ?: $this->estado_nacimiento;
+        $this->lugar_nacimiento = $datos['lugar_nacimiento'] ?: $this->lugar_nacimiento;
+        $this->curpSuccess = 'Los datos de la CURP se actualizaron en el formulario.';
     }
 
     public function quitarFotoTemporal(): void
     {
-        $this->reset('foto');
+        $this->foto = null;
+        $this->resetValidation('foto');
         $this->dispatch('foto-limpiada');
     }
 
-    protected function validarRelacionAcademica(array &$data): bool
+    private function sanitizar(): void
     {
-        $nivelId = (int) $data['nivel_id'];
-        $generacionId = (int) $data['generacion_id'];
-        $grupoId = (int) $data['grupo_id'];
+        $this->curp = mb_strtoupper(trim($this->curp));
+        $this->matricula = mb_strtoupper(trim($this->matricula));
+        $this->folio = filled($this->folio) ? trim((string) $this->folio) : null;
+        $this->nombre = trim($this->nombre);
+        $this->apellido_paterno = trim($this->apellido_paterno);
+        $this->apellido_materno = filled($this->apellido_materno) ? trim((string) $this->apellido_materno) : null;
 
-        $generacionValida = Generacion::query()
-            ->where('id', $generacionId)
-            ->where('nivel_id', $nivelId)
-            ->exists();
-
-        if (!$generacionValida) {
-            $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
-            return false;
+        foreach ([
+            'pais_nacimiento',
+            'estado_nacimiento',
+            'lugar_nacimiento',
+            'calle',
+            'numero_exterior',
+            'numero_interior',
+            'colonia',
+            'codigo_postal',
+            'municipio',
+            'estado_residencia',
+            'ciudad_residencia',
+        ] as $campo) {
+            $this->{$campo} = filled($this->{$campo}) ? trim((string) $this->{$campo}) : null;
         }
-
-        $grupoQuery = $this->baseGrupoQuery()
-            ->where('id', $grupoId)
-            ->where('nivel_id', $nivelId)
-            ->where('generacion_id', $generacionId);
-
-        if ($this->esBachillerato) {
-            $semestreId = (int) ($data['semestre_id'] ?? 0);
-
-            $grupo = (clone $grupoQuery)
-                ->where('semestre_id', $semestreId)
-                ->first(['id', 'grado_id', 'semestre_id']);
-
-            if (!$grupo) {
-                $this->addError('grupo_id', 'El grupo no pertenece al nivel, generación y semestre seleccionado.');
-                return false;
-            }
-
-            $semestreValido = Semestre::query()
-                ->where('id', $semestreId)
-                ->where('grado_id', $grupo->grado_id)
-                ->exists();
-
-            if (!$semestreValido) {
-                $this->addError('semestre_id', 'El semestre no corresponde al grado interno del grupo.');
-                return false;
-            }
-
-            $data['grado_id'] = (int) $grupo->grado_id;
-            $data['semestre_id'] = $semestreId;
-            $this->grado_id = (int) $grupo->grado_id;
-
-            return true;
-        }
-
-        $gradoId = (int) ($data['grado_id'] ?? 0);
-
-        $gradoValido = Grado::query()
-            ->where('id', $gradoId)
-            ->where('nivel_id', $nivelId)
-            ->exists();
-
-        if (!$gradoValido) {
-            $this->addError('grado_id', 'El grado no pertenece al nivel seleccionado.');
-            return false;
-        }
-
-        $grupoValido = $grupoQuery
-            ->where('grado_id', $gradoId)
-            ->whereNull('semestre_id')
-            ->exists();
-
-        if (!$grupoValido) {
-            $this->addError('grupo_id', 'El grupo no pertenece al nivel, grado y generación seleccionado.');
-            return false;
-        }
-
-        $data['grado_id'] = $gradoId;
-        $data['semestre_id'] = null;
-
-        return true;
     }
 
     protected function rules(): array
     {
-        $rules = [
+        return [
             'curp' => [
                 'required',
                 'string',
-                'max:18',
-                'regex:/^[A-Z0-9]{1,18}$/i',
+                'size:18',
+                'regex:/^[A-Z0-9]+$/',
                 Rule::unique('inscripciones', 'curp')->ignore($this->InscripcionId),
             ],
             'matricula' => [
@@ -1171,204 +566,155 @@ class EditarMatricula extends Component
             'nombre' => ['required', 'string', 'max:255'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
             'apellido_materno' => ['nullable', 'string', 'max:255'],
-            'fecha_nacimiento' => ['required', 'date'],
-            'genero' => ['required', 'in:H,M'],
-            'fecha_inscripcion_ciclo' => ['required', 'date'],
-            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
-            'ciclo_id' => ['required', 'integer', 'exists:ciclos,id'],
+            'fecha_nacimiento' => ['required', 'date', 'before:today'],
+            'genero' => ['required', Rule::in(['H', 'M'])],
+            'fecha_ingreso_plantel' => ['required', 'date'],
+            'ciclo_id' => ['required', 'integer', Rule::exists('ciclos', 'id')],
 
-            'pais_nacimiento' => ['nullable', 'string', 'max:255'],
-            'estado_nacimiento' => ['nullable', 'string', 'max:255'],
-            'lugar_nacimiento' => ['nullable', 'string', 'max:255'],
+            'nivel_id' => ['required', 'integer', Rule::exists('niveles', 'id')],
+            'grado_id' => [Rule::requiredIf(! $this->esBachillerato()), 'nullable', 'integer', Rule::exists('grados', 'id')],
+            'generacion_id' => ['required', 'integer', Rule::exists('generaciones', 'id')],
+            'semestre_id' => [Rule::requiredIf($this->esBachillerato()), 'nullable', 'integer', Rule::exists('semestres', 'id')],
+            'grupo_id' => ['required', 'integer', Rule::exists('grupos', 'id')],
 
+            'estatus' => ['required', Rule::in(GestionAcademicaService::ESTATUS)],
+            'fecha_estatus' => ['required', 'date'],
+            'motivo_cambio' => ['nullable', 'string', 'max:1000'],
+            'confirmar_cambio_academico' => ['boolean'],
+
+            'pais_nacimiento' => ['nullable', 'string', 'max:150'],
+            'estado_nacimiento' => ['nullable', 'string', 'max:150'],
+            'lugar_nacimiento' => ['nullable', 'string', 'max:150'],
             'calle' => ['nullable', 'string', 'max:255'],
-            'numero_exterior' => ['nullable', 'string', 'max:20'],
-            'numero_interior' => ['nullable', 'string', 'max:20'],
-            'colonia' => ['nullable', 'string', 'max:255'],
-            'codigo_postal' => ['nullable', 'string', 'max:10', 'regex:/^\d{5}$/'],
-            'municipio' => ['nullable', 'string', 'max:255'],
-            'estado_residencia' => ['nullable', 'string', 'max:255'],
-            'ciudad_residencia' => ['nullable', 'string', 'max:255'],
-
-            'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
-            'generacion_id' => ['required', 'integer', 'exists:generaciones,id'],
-            'grupo_id' => ['required', 'integer', 'exists:grupos,id'],
-
-            'tutor_id' => ['nullable', 'integer', 'exists:tutores,id'],
-            'copiar_direccion_tutor' => ['boolean'],
-            'activo' => ['required', 'boolean'],
-            'foto' => ['nullable', 'image', 'max:2048'],
-        ];
-
-        $rules['fecha_ingreso_plantel'] = $this->trayectoriaEsActual
-            ? ['required', 'date']
-            : ['nullable', 'date'];
-
-        $rules['grado_id'] = $this->esBachillerato
-            ? ['nullable', 'integer', 'exists:grados,id']
-            : ['required', 'integer', 'exists:grados,id'];
-
-        $rules['semestre_id'] = $this->esBachillerato
-            ? ['required', 'integer', 'exists:semestres,id']
-            : ['nullable', 'integer', 'exists:semestres,id'];
-
-        return $rules;
-    }
-
-    protected function messages(): array
-    {
-        return [
-            'curp.required' => 'La CURP es obligatoria.',
-            'curp.max' => 'La CURP no debe tener más de 18 caracteres.',
-            'curp.regex' => 'La CURP solo debe contener letras y números.',
-            'curp.unique' => 'Esa CURP ya existe.',
-
-            'matricula.required' => 'La matrícula es obligatoria.',
-            'matricula.regex' => 'La matrícula solo debe contener letras, números y guiones.',
-            'matricula.unique' => 'Esa matrícula ya existe.',
-
-            'nombre.required' => 'El nombre es obligatorio.',
-            'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
-            'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
-            'genero.required' => 'El género es obligatorio.',
-            'fecha_ingreso_plantel.required' => 'La fecha de ingreso al plantel es obligatoria.',
-            'fecha_inscripcion_ciclo.required' => 'La fecha de inscripción al ciclo es obligatoria.',
-            'ciclo_escolar_id.required' => 'Selecciona un ciclo escolar.',
-            'ciclo_id.required' => 'Selecciona un ciclo.',
-
-            'nivel_id.required' => 'Selecciona un nivel.',
-            'grado_id.required' => 'Selecciona un grado.',
-            'generacion_id.required' => 'Selecciona una generación.',
-            'semestre_id.required' => 'Selecciona un semestre.',
-            'grupo_id.required' => 'Selecciona un grupo.',
-
-            'codigo_postal.regex' => 'El código postal debe tener 5 dígitos.',
-            'tutor_id.exists' => 'El tutor seleccionado no es válido.',
-
-            'foto.image' => 'La foto debe ser una imagen válida.',
-            'foto.max' => 'La foto no debe exceder 2MB.',
-
-            'activo.required' => 'El estado de activo es obligatorio.',
-            'activo.boolean' => 'El estado de activo debe ser verdadero o falso.',
+            'numero_exterior' => ['nullable', 'string', 'max:50'],
+            'numero_interior' => ['nullable', 'string', 'max:50'],
+            'colonia' => ['nullable', 'string', 'max:150'],
+            'codigo_postal' => ['nullable', 'string', 'max:10'],
+            'municipio' => ['nullable', 'string', 'max:150'],
+            'estado_residencia' => ['nullable', 'string', 'max:150'],
+            'ciudad_residencia' => ['nullable', 'string', 'max:150'],
+            'tutor_id' => ['nullable', 'integer', Rule::exists('tutores', 'id')],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:4096'],
         ];
     }
 
-    public function updatedActivo($value): void
+    private function validarRelacionAcademica(array &$data, Inscripcion $alumno): bool
     {
-        $this->activo = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->validateOnly('activo');
-    }
+        $nivel = Nivel::query()->find((int) $data['nivel_id']);
+        $esBachillerato = $nivel?->slug === 'bachillerato';
 
-    protected function sanitizeStrings(): void
-    {
-        $requiredStringFields = ['curp', 'matricula', 'nombre', 'apellido_paterno'];
+        $generacion = Generacion::query()->find((int) $data['generacion_id']);
 
-        $nullableStringFields = [
-            'folio',
-            'apellido_materno',
-            'pais_nacimiento',
-            'estado_nacimiento',
-            'lugar_nacimiento',
-            'calle',
-            'numero_exterior',
-            'numero_interior',
-            'colonia',
-            'codigo_postal',
-            'municipio',
-            'estado_residencia',
-            'ciudad_residencia',
-        ];
-
-        foreach ($requiredStringFields as $field) {
-            $value = $this->{$field} ?? '';
-            $value = is_string($value) ? $value : '';
-            $value = preg_replace('/\s+/u', ' ', trim($value));
-            $this->{$field} = $value;
+        if (! $generacion || (int) $generacion->nivel_id !== (int) $data['nivel_id']) {
+            $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
+            return false;
         }
 
-        foreach ($nullableStringFields as $field) {
-            $value = $this->{$field} ?? null;
+        if (! $generacion->status && (int) $alumno->generacion_id !== (int) $generacion->id) {
+            $this->addError('generacion_id', 'No puedes reasignar al alumno a una generación inactiva.');
+            return false;
+        }
 
-            if (is_string($value)) {
-                $value = preg_replace('/\s+/u', ' ', trim($value));
-                $this->{$field} = $value === '' ? null : $value;
+        $grupoQuery = $this->baseGrupoQuery()
+            ->whereKey((int) $data['grupo_id'])
+            ->where('nivel_id', (int) $data['nivel_id'])
+            ->where('generacion_id', (int) $data['generacion_id']);
+
+        if ($esBachillerato) {
+            $grupo = $grupoQuery
+                ->where('semestre_id', (int) $data['semestre_id'])
+                ->first(['id', 'grado_id', 'semestre_id']);
+
+            if (! $grupo) {
+                $this->addError('grupo_id', 'El grupo no corresponde al nivel, generación y semestre seleccionados.');
+                return false;
             }
+
+            $semestreValido = Semestre::query()
+                ->whereKey((int) $data['semestre_id'])
+                ->where('grado_id', (int) $grupo->grado_id)
+                ->exists();
+
+            if (! $semestreValido) {
+                $this->addError('semestre_id', 'El semestre no corresponde al grado interno del grupo seleccionado.');
+                return false;
+            }
+
+            $data['grado_id'] = (int) $grupo->grado_id;
+            $this->grado_id = (int) $grupo->grado_id;
+
+            return true;
         }
 
-        $this->curp = strtoupper(preg_replace('/\s+/', '', $this->curp) ?? $this->curp);
-        $this->matricula = strtoupper($this->matricula);
-    }
+        $grupo = $grupoQuery
+            ->where('grado_id', (int) $data['grado_id'])
+            ->whereNull('semestre_id')
+            ->first(['id']);
 
-    public function updated($property): void
-    {
-        $this->sanitizeStrings();
-
-        if (in_array($property, ['foto', 'curp', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'grupo_id'], true)) {
-            return;
+        if (! $grupo) {
+            $this->addError('grupo_id', 'El grupo no corresponde al nivel, grado y generación seleccionados.');
+            return false;
         }
 
-        $this->validateOnly($property);
+        $data['semestre_id'] = null;
+        $this->semestre_id = null;
+
+        return true;
     }
 
-    public function actualizarInscripcion(): void
+    public function actualizarInscripcion(GestionAcademicaService $service)
     {
-        $this->sanitizeStrings();
-
-
+        $this->sanitizar();
         $data = $this->validate();
+        $alumno = Inscripcion::withTrashed()->findOrFail($this->InscripcionId);
 
-        if (!$this->validarRelacionAcademica($data)) {
-            return;
+        if (! $this->validarRelacionAcademica($data, $alumno)) {
+            return null;
         }
 
-        $trayectoriaContexto = TrayectoriaAcademica::query()
-            ->where('inscripcion_id', $this->InscripcionId)
-            ->where('ciclo_escolar_id', (int) $data['ciclo_escolar_id'])
-            ->where('ciclo_id', (int) $data['ciclo_id'])
-            ->where('vigente_en_corte', true)
-            ->latest('numero_estancia')
-            ->latest('id')
-            ->first();
+        $cambioAcademico = (int) $alumno->nivel_id !== (int) $data['nivel_id']
+            || (int) $alumno->grado_id !== (int) $data['grado_id']
+            || (int) $alumno->generacion_id !== (int) $data['generacion_id']
+            || (int) $alumno->grupo_id !== (int) $data['grupo_id']
+            || (int) ($alumno->semestre_id ?? 0) !== (int) ($data['semestre_id'] ?? 0);
 
-        if ($trayectoriaContexto && (bool) $data['activo'] !== (bool) $trayectoriaContexto->activo) {
-            $this->addError(
-                'activo',
-                'El estatus debe modificarse desde el módulo Bajas/Reingresos para conservar la fecha, el motivo y la línea de tiempo.'
-            );
-            return;
+        $cambioEstatus = ($alumno->estatus ?? 'activo') !== $data['estatus'];
+
+        if (($cambioAcademico || $cambioEstatus) && mb_strlen(trim($data['motivo_cambio'] ?? '')) < 5) {
+            $this->addError('motivo_cambio', 'Indica el motivo del cambio académico o de estatus.');
+            return null;
         }
 
-        $inscripcion = Inscripcion::query()->findOrFail($this->InscripcionId);
-        $fotoPath = $this->foto_actual;
-        $actualizarFechaIngresoPlantel = $this->trayectoriaEsActual;
+        if ($cambioAcademico && ! $this->confirmar_cambio_academico) {
+            $this->addError('confirmar_cambio_academico', 'Confirma que deseas reemplazar la asignación académica actual.');
+            return null;
+        }
 
-        if ($this->foto) {
-            if ($fotoPath && Storage::disk('public')->exists($fotoPath)) {
-                Storage::disk('public')->delete($fotoPath);
+        DB::transaction(function () use ($alumno, $service, $data, $cambioAcademico, $cambioEstatus): void {
+            $fotoPath = $alumno->foto_path;
+
+            if ($this->foto) {
+                $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
+
+                if ($alumno->foto_path) {
+                    Storage::disk('public')->delete($alumno->foto_path);
+                }
             }
 
-            $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
-        }
-
-        DB::transaction(function () use (
-            $inscripcion,
-            $data,
-            $fotoPath,
-            $actualizarFechaIngresoPlantel
-        ) {
-            $datosInscripcion = [
+            $alumno->update([
                 'curp' => $data['curp'],
+                'matricula' => $data['matricula'],
                 'folio' => $data['folio'] ?? null,
                 'nombre' => $data['nombre'],
                 'apellido_paterno' => $data['apellido_paterno'],
                 'apellido_materno' => $data['apellido_materno'] ?? null,
                 'fecha_nacimiento' => $data['fecha_nacimiento'],
                 'genero' => $data['genero'],
-
+                'fecha_inscripcion' => $data['fecha_ingreso_plantel'],
+                'ciclo_id' => (int) $data['ciclo_id'],
                 'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
                 'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
                 'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
-
                 'calle' => $data['calle'] ?? null,
                 'numero_exterior' => $data['numero_exterior'] ?? null,
                 'numero_interior' => $data['numero_interior'] ?? null,
@@ -1377,91 +723,34 @@ class EditarMatricula extends Component
                 'municipio' => $data['municipio'] ?? null,
                 'estado_residencia' => $data['estado_residencia'] ?? null,
                 'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
-
+                'tutor_id' => $data['tutor_id'] ?? null,
                 'foto_path' => $fotoPath,
-                'tutor_id' => $data['tutor_id'] ? (int) $data['tutor_id'] : null,
-            ];
+            ]);
 
-            // En una trayectoria histórica la fecha general de ingreso se conserva.
-            // Solo puede corregirse desde la trayectoria actual del alumno.
-            if ($actualizarFechaIngresoPlantel) {
-                $datosInscripcion['fecha_inscripcion'] = $data['fecha_ingreso_plantel'];
+            if ($cambioAcademico) {
+                $service->cambiarAsignacion($alumno, [
+                    'nivel_id' => (int) $data['nivel_id'],
+                    'grado_id' => (int) $data['grado_id'],
+                    'generacion_id' => (int) $data['generacion_id'],
+                    'semestre_id' => ! empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                    'grupo_id' => (int) $data['grupo_id'],
+                    'matricula' => $data['matricula'],
+                ], trim((string) $data['motivo_cambio']), auth()->id());
             }
 
-            $inscripcion->update($datosInscripcion);
-
-            $servicio = app(TrayectoriaAcademicaService::class);
-
-            $trayectoria = TrayectoriaAcademica::query()
-                ->where('inscripcion_id', $inscripcion->id)
-                ->where('ciclo_escolar_id', (int) $data['ciclo_escolar_id'])
-                ->where('ciclo_id', (int) $data['ciclo_id'])
-                ->where('vigente_en_corte', true)
-                ->latest('numero_estancia')
-                ->latest('id')
-                ->first();
-
-            $destino = [
-                'matricula' => $data['matricula'],
-                'nivel_id' => (int) $data['nivel_id'],
-                'grado_id' => (int) $data['grado_id'],
-                'generacion_id' => (int) $data['generacion_id'],
-                'grupo_id' => (int) $data['grupo_id'],
-                'semestre_id' => $data['semestre_id'] ? (int) $data['semestre_id'] : null,
-                // Esta fecha pertenece únicamente al ciclo/trayectoria seleccionada.
-                'fecha_inscripcion' => $data['fecha_inscripcion_ciclo'],
-            ];
-
-            if ($trayectoria) {
-                if ($this->trayectoriaTieneCambios($trayectoria, $inscripcion, $destino)) {
-                    $servicio->corregirAsignacion(
-                        [$inscripcion->id],
-                        (int) $data['ciclo_escolar_id'],
-                        (int) $data['ciclo_id'],
-                        $destino,
-                        auth()->id(),
-                        'Corrección realizada desde la edición individual del alumno.',
-                        now()
-                    );
-                }
-            } else {
-                $servicio->registrarInscripcionEnContexto(
-                    $inscripcion,
-                    array_merge($destino, [
-                        'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
-                        'ciclo_id' => (int) $data['ciclo_id'],
-                        'hacer_actual' => $this->contextoSeleccionadoDebeSerActual(),
-                    ]),
+            if ($cambioEstatus) {
+                $service->cambiarEstatus(
+                    $alumno,
+                    $data['estatus'],
+                    trim((string) $data['motivo_cambio']),
                     auth()->id(),
-                    'edicion'
+                    $data['fecha_estatus']
                 );
             }
         });
 
-        $this->foto = null;
+        session()->flash('success', 'Matrícula actualizada correctamente.');
 
-        $inscripcion->refresh();
-        $this->cargarInscripcion($inscripcion);
-
-        // Mantiene visible el mismo ciclo escolar y periodo que se acaba de editar.
-        // Esto evita que, al guardar un contexto histórico, el formulario vuelva
-        // automáticamente a la trayectoria actual y parezca que los cambios no se guardaron.
-        $this->ciclo_escolar_id = (int) $data['ciclo_escolar_id'];
-        $this->ciclo_id = (int) $data['ciclo_id'];
-        $this->cargarContextoAcademicoSeleccionado();
-
-        $this->dispatch('swal', [
-            'title' => 'Inscripción actualizada correctamente',
-            'icon' => 'success',
-            'position' => 'top-end',
-        ]);
-
-        $this->dispatch('foto-limpiada');
-        $this->dispatch('refreshInscripciones');
-    }
-
-    public function cancelar()
-    {
         return redirect()->route('submodulos.accion', [
             'slug_nivel' => $this->slug_nivel,
             'accion' => 'matricula',
@@ -1492,10 +781,9 @@ class EditarMatricula extends Component
             'generaciones' => $this->generacionesOptions,
             'semestres' => $this->semestresOptions,
             'grupos' => $this->gruposOptions,
-            'esBachillerato' => $this->esBachillerato,
             'ciclos' => $this->ciclosOptions,
-            'cicloEscolares' => $this->cicloEscolaresOptions,
             'tutores' => $this->tutores,
+            'esBachillerato' => $this->esBachillerato(),
             'resumenDocumental' => $resumenDocumental,
         ]);
     }

@@ -205,7 +205,7 @@ class RespaldosAcademicos extends Component
                         )
                         ->count()
                     : 0,
-                'trayectorias' => $this->contar('trayectorias_academicas'),
+                'cambios_academicos' => $this->contar('cambios_academicos'),
                 'matriculas' => $this->contar('matriculas_alumnos'),
                 'movimientos' => $this->contar('movimientos_alumnos'),
                 'calificaciones' => $this->contar('calificaciones'),

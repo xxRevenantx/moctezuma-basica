@@ -6,7 +6,6 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
-use App\Models\TrayectoriaAcademica;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -236,7 +235,6 @@ class PromedioBachilleratoService
 
                 return [
                     'inscripcion_id' => (int) $contexto['inscripcion_id'],
-                    'trayectoria_academica_id' => $contexto['trayectoria_academica_id'],
                     'generacion_id' => (int) $contexto['generacion_id'],
                     'matricula' => $alumno->matricula,
                     'alumno' => $this->nombreAlumno($alumno),
@@ -381,7 +379,6 @@ class PromedioBachilleratoService
                 ->get(['id', 'generacion_id', 'grado_id', 'grupo_id', 'semestre_id'])
                 ->map(fn (Inscripcion $item) => [
                     'inscripcion_id' => (int) $item->id,
-                    'trayectoria_academica_id' => null,
                     'generacion_id' => (int) $item->generacion_id,
                     'grado_id' => (int) $item->grado_id,
                     'grupo_id' => (int) $item->grupo_id,
@@ -410,7 +407,6 @@ class PromedioBachilleratoService
             ->get()
             ->map(fn ($item) => [
                 'inscripcion_id' => (int) $item->inscripcion_id,
-                'trayectoria_academica_id' => null,
                 'generacion_id' => (int) $item->generacion_id,
                 'grado_id' => (int) $item->grado_id,
                 'grupo_id' => (int) $item->grupo_id,
@@ -418,36 +414,8 @@ class PromedioBachilleratoService
                 '_prioridad' => 2,
             ]);
 
-        $trayectorias = TrayectoriaAcademica::query()
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('nivel_id', $nivelId)
-            ->whereNotNull('semestre_id')
-            ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
-            ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
-            ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-            ->when($semestreId, fn ($query) => $query->where('semestre_id', $semestreId))
-            ->orderBy('id')
-            ->get([
-                'id',
-                'inscripcion_id',
-                'generacion_id',
-                'grado_id',
-                'grupo_id',
-                'semestre_id',
-            ])
-            ->map(fn (TrayectoriaAcademica $item) => [
-                'inscripcion_id' => (int) $item->inscripcion_id,
-                'trayectoria_academica_id' => (int) $item->id,
-                'generacion_id' => (int) $item->generacion_id,
-                'grado_id' => (int) $item->grado_id,
-                'grupo_id' => (int) $item->grupo_id,
-                'semestre_id' => (int) $item->semestre_id,
-                '_prioridad' => 3,
-            ]);
-
         return $inscripciones
             ->concat($calificaciones)
-            ->concat($trayectorias)
             ->filter(fn (array $contexto) => $contexto['inscripcion_id'] > 0
                 && $contexto['generacion_id'] > 0
                 && $contexto['grado_id'] > 0

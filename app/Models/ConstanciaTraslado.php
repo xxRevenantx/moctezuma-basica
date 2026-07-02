@@ -10,7 +10,6 @@ class ConstanciaTraslado extends Model
 
     protected $fillable = [
         'inscripcion_id',
-        'trayectoria_academica_id',
         'ciclo_escolar_id',
         'folio',
         'fecha_emision',
@@ -30,11 +29,6 @@ class ConstanciaTraslado extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id')->withTrashed();
-    }
-
-    public function trayectoriaAcademica()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_academica_id');
     }
 
     public function cicloEscolar()

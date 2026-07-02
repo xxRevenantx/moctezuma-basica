@@ -2,11 +2,8 @@
 
 namespace App\Imports\Inscripciones;
 
-use App\Models\CicloEscolar;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
-use App\Models\TrayectoriaAcademica;
-use App\Services\TrayectoriaAcademicaService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -56,6 +53,8 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                     'ciclo_id' => (int) $row['ciclo_id'],
 
                     'activo' => true,
+                    'estatus' => 'activo',
+                    'fecha_estatus' => $this->normalizarFecha($row['fecha_inscripcion'] ?? now()->toDateString()),
 
                     'pais_nacimiento' => null,
                     'estado_nacimiento' => null,
@@ -84,68 +83,14 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                     })
                     ->first();
 
-                $cicloEsActual = CicloEscolar::query()
-                    ->whereKey((int) $row['ciclo_escolar_id'])
-                    ->value('es_actual');
-
                 if ($inscripcion) {
                     $inscripcion->restore();
-
-                    $datosPersonales = collect($datosInscripcion)
-                        ->except([
-                            'matricula',
-                            'nivel_id',
-                            'grado_id',
-                            'generacion_id',
-                            'grupo_id',
-                            'semestre_id',
-                            'ciclo_id',
-                            'activo',
-                            'fecha_baja',
-                            'motivo_baja',
-                            'observaciones_baja',
-                        ])
-                        ->all();
-
-                    if ($cicloEsActual) {
-                        $datosPersonales = array_merge($datosPersonales, [
-                            'matricula' => $matricula,
-                            'nivel_id' => (int) $row['nivel_id'],
-                            'grado_id' => (int) $row['grado_id'],
-                            'generacion_id' => (int) $row['generacion_id'],
-                            'grupo_id' => (int) $row['grupo_id'],
-                            'semestre_id' => !empty($row['semestre_id']) ? (int) $row['semestre_id'] : null,
-                            'ciclo_id' => (int) $row['ciclo_id'],
-                            'activo' => true,
-                            'fecha_baja' => null,
-                            'motivo_baja' => null,
-                            'observaciones_baja' => null,
-                        ]);
-                    }
-
-                    $inscripcion->update($datosPersonales);
+                    $inscripcion->update($datosInscripcion);
                     $this->actualizados++;
                 } else {
-                    $inscripcion = Inscripcion::query()->create($datosInscripcion);
+                    Inscripcion::query()->create($datosInscripcion);
                     $this->creados++;
                 }
-
-                app(TrayectoriaAcademicaService::class)->registrarInscripcionEnContexto(
-                    $inscripcion,
-                    [
-                        'matricula' => $matricula,
-                        'ciclo_escolar_id' => (int) $row['ciclo_escolar_id'],
-                        'ciclo_id' => (int) $row['ciclo_id'],
-                        'nivel_id' => (int) $row['nivel_id'],
-                        'grado_id' => (int) $row['grado_id'],
-                        'generacion_id' => (int) $row['generacion_id'],
-                        'grupo_id' => (int) $row['grupo_id'],
-                        'semestre_id' => !empty($row['semestre_id']) ? (int) $row['semestre_id'] : null,
-                        'fecha_inscripcion' => $this->normalizarFecha($row['fecha_inscripcion'] ?? now()->toDateString()),
-                    ],
-                    auth()->id(),
-                    'importacion'
-                );
             }
         });
     }

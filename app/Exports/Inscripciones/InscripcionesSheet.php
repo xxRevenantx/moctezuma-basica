@@ -34,7 +34,6 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 'grupo.semestre',
                 'semestre',
                 'ciclo',
-                'trayectoriaActual.cicloEscolar',
             ])
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
@@ -53,8 +52,6 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
             'fecha_nacimiento',
             'genero',
             'fecha_inscripcion',
-            'ciclo_escolar_id',
-            'ciclo_escolar',
             'nivel_id',
             'nivel',
             'grado_id',
@@ -72,8 +69,6 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
 
     public function map($alumno): array
     {
-        $trayectoria = $alumno->trayectoriaActual;
-
         return [
             $alumno->curp,
             $alumno->matricula,
@@ -85,11 +80,6 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
             $alumno->genero,
             $alumno->fecha_inscripcion
                 ? date('Y-m-d', strtotime($alumno->fecha_inscripcion))
-                : '',
-
-            $trayectoria?->ciclo_escolar_id,
-            $trayectoria?->cicloEscolar
-                ? "{$trayectoria->cicloEscolar->inicio_anio} - {$trayectoria->cicloEscolar->fin_anio}"
                 : '',
 
             $alumno->nivel_id,
@@ -138,9 +128,9 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 $hoja = $event->sheet->getDelegate();
 
                 $hoja->freezePane('A2');
-                $hoja->setAutoFilter('A1:W1');
+                $hoja->setAutoFilter('A1:U1');
 
-                $hoja->getStyle('A1:W1')->applyFromArray([
+                $hoja->getStyle('A1:U1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],

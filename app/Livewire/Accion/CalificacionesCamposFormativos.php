@@ -148,7 +148,6 @@ class CalificacionesCamposFormativos extends Component
                     CalificacionCampoFormativo::query()->updateOrCreate(
                         $condiciones,
                         [
-                            'trayectoria_academica_id' => $alumno['trayectoria_academica_id'],
                             'ciclo_escolar_id' => $this->cicloEscolarId,
                             'nivel_id' => $this->nivelId,
                             'grado_id' => $this->gradoId,

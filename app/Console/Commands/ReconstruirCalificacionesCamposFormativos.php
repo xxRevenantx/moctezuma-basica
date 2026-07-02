@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\CalificacionCampoFormativo;
 use App\Models\Nivel;
-use App\Models\TrayectoriaAcademica;
 use App\Support\PromedioExcel;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -88,14 +87,6 @@ class ReconstruirCalificacionesCamposFormativos extends Command
                 continue;
             }
 
-            $trayectoriaId = TrayectoriaAcademica::query()
-                ->where('inscripcion_id', $primero->inscripcion_id)
-                ->where('ciclo_escolar_id', $primero->ciclo_escolar_id)
-                ->where('grado_id', $primero->grado_id)
-                ->where('grupo_id', $primero->grupo_id)
-                ->latest('id')
-                ->value('id');
-
             $this->line(sprintf(
                 '%s · alumno %d · periodo %d · campo %d · sugerencia %.2f',
                 $aplicar ? 'GUARDANDO' : 'CREARÍA',
@@ -117,7 +108,6 @@ class ReconstruirCalificacionesCamposFormativos extends Command
                     'campo_formativo_id' => $primero->campo_formativo_id,
                 ],
                 [
-                    'trayectoria_academica_id' => $trayectoriaId,
                     'ciclo_escolar_id' => $primero->ciclo_escolar_id,
                     'nivel_id' => $primero->nivel_id,
                     'grado_id' => $primero->grado_id,

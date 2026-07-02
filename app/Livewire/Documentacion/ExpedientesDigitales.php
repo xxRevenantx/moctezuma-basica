@@ -9,7 +9,6 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\MovimientoAlumno;
 use App\Models\TipoDocumento;
-use App\Models\TrayectoriaAcademica;
 use App\Services\ExpedienteDigitalService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -412,14 +411,6 @@ class ExpedientesDigitales extends Component
                     throw new \RuntimeException('No fue posible guardar el archivo.');
                 }
 
-                $trayectoriaId = TrayectoriaAcademica::query()
-                    ->where('inscripcion_id', $this->alumnoSeleccionadoId)
-                    ->when($nivelId, fn(Builder $query) => $query->where('nivel_id', $nivelId))
-                    ->when($gradoId, fn(Builder $query) => $query->where('grado_id', $gradoId))
-                    ->when($cicloEscolarId, fn(Builder $query) => $query->where('ciclo_escolar_id', $cicloEscolarId))
-                    ->latest('id')
-                    ->value('id');
-
                 $documento = DocumentoAlumno::query()->create([
                     'inscripcion_id' => $this->alumnoSeleccionadoId,
                     'tipo_documento_id' => $tipo->id,
@@ -427,7 +418,6 @@ class ExpedientesDigitales extends Component
                     'grado_id' => $gradoId,
                     'grupo_id' => $grupoId,
                     'ciclo_escolar_id' => $cicloEscolarId,
-                    'trayectoria_academica_id' => $trayectoriaId,
                     'fecha_documento' => $this->fecha_documento ?: now()->toDateString(),
                     'folio' => trim($this->folio_documento) ?: null,
                     'origen' => $this->origen_documento,
@@ -449,8 +439,7 @@ class ExpedientesDigitales extends Component
                 if ($tipo->slug === 'constancia-baja-traslado') {
                     MovimientoAlumno::query()->create([
                         'inscripcion_id' => $this->alumnoSeleccionadoId,
-                        'trayectoria_academica_id' => $trayectoriaId,
-                        'documento_alumno_id' => $documento->id,
+                            'documento_alumno_id' => $documento->id,
                         'tipo' => $this->tipo_movimiento_documento,
                         'fecha' => $this->fecha_documento ?: now()->toDateString(),
                         'motivo' => trim($this->motivo_documento),
@@ -725,23 +714,15 @@ class ExpedientesDigitales extends Component
                     'grado:id,nombre,orden',
                     'grupo:id,asignacion_grupo_id',
                     'grupo.asignacionGrupo:id,nombre',
-                    'generacion:id,anio_ingreso,anio_egreso',
+                    'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',
                     'semestre:id,numero',
                     'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
-                    'trayectoriasAcademicas' => fn($query) => $query
+                    'cambiosAcademicos' => fn($query) => $query
                         ->with([
-                            'nivel:id,nombre,slug,color',
-                            'grado:id,nombre,orden',
-                            'grupo:id,asignacion_grupo_id',
-                            'grupo.asignacionGrupo:id,nombre',
-                            'generacion:id,anio_ingreso,anio_egreso',
-                            'semestre:id,numero',
-                            'cicloEscolar:id,inicio_anio,fin_anio,es_actual,cerrado_at',
-                            'ciclo:id,ciclo',
+                            'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',
+                            'usuario:id,name',
                         ])
-                        ->orderByDesc('ciclo_escolar_id')
-                        ->orderByDesc('ciclo_id')
-                        ->orderByDesc('numero_estancia')
+                        ->orderByDesc('realizado_at')
                         ->orderByDesc('id'),
                     'matriculasAlumno.nivel:id,nombre,slug',
                     'movimientos' => fn($query) => $query
@@ -749,10 +730,8 @@ class ExpedientesDigitales extends Component
                             'usuario:id,name',
                             'cicloEscolar:id,inicio_anio,fin_anio',
                             'ciclo:id,ciclo',
-                            'trayectoriaAcademica.nivel:id,nombre,slug',
-                            'trayectoriaAcademica.grado:id,nombre,orden',
-                            'trayectoriaAcademica.grupo:id,asignacion_grupo_id',
-                            'trayectoriaAcademica.grupo.asignacionGrupo:id,nombre',
+                            'nivelAnterior:id,nombre,slug',
+                            'nivelNuevo:id,nombre,slug',
                         ])
                         ->orderByDesc('fecha')
                         ->orderByDesc('id'),

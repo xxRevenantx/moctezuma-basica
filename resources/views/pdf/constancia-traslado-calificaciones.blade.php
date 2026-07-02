@@ -24,8 +24,7 @@
 <body>
 @php
     $alumno = $constancia->inscripcion;
-    $trayectoria = $constancia->trayectoriaAcademica;
-    $grupo = $trayectoria?->grupo?->asignacionGrupo?->nombre ?? $trayectoria?->grupo?->nombre ?? '—';
+    $grupo = $alumno?->grupo?->asignacionGrupo?->nombre ?? '—';
     $nombre = trim(($alumno?->nombre ?? '') . ' ' . ($alumno?->apellido_paterno ?? '') . ' ' . ($alumno?->apellido_materno ?? ''));
 @endphp
 <div class="frame">
@@ -39,8 +38,8 @@
     <table class="data">
         <tr><td><strong>Alumno:</strong> {{ $nombre }}</td><td><strong>Matrícula:</strong> {{ $alumno?->matricula }}</td></tr>
         <tr><td><strong>CURP:</strong> {{ $alumno?->curp }}</td><td><strong>Ciclo:</strong> {{ $constancia->cicloEscolar?->nombre }}</td></tr>
-        <tr><td><strong>Nivel:</strong> {{ $trayectoria?->nivel?->nombre }}</td><td><strong>Generación:</strong> {{ $trayectoria?->generacion ? $trayectoria->generacion->anio_ingreso . '-' . $trayectoria->generacion->anio_egreso : '—' }}</td></tr>
-        <tr><td><strong>Grado:</strong> {{ $trayectoria?->grado?->nombre }}</td><td><strong>Grupo:</strong> {{ $grupo }} @if($trayectoria?->semestre) · Semestre {{ $trayectoria->semestre->numero }} @endif</td></tr>
+        <tr><td><strong>Nivel:</strong> {{ $alumno?->nivel?->nombre }}</td><td><strong>Generación:</strong> {{ $alumno?->generacion?->etiqueta ?? '—' }}</td></tr>
+        <tr><td><strong>Grado:</strong> {{ $alumno?->grado?->nombre }}</td><td><strong>Grupo:</strong> {{ $grupo }} @if($alumno?->semestre) · Semestre {{ $alumno->semestre->numero }} @endif</td></tr>
     </table>
 
     <table class="grades">

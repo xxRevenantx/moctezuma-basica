@@ -7,7 +7,6 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
-use App\Models\TrayectoriaAcademica;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -57,23 +56,15 @@ class PromedioSecundariaService
             ->get(['id', 'nombre', 'orden'])
             ->keyBy('id');
 
-        $trayectorias = TrayectoriaAcademica::query()
-            ->with([
-                'inscripcion' => fn ($query) => $query->withTrashed(),
-                'grupo.asignacionGrupo:id,nombre',
-            ])
-            ->where('ciclo_escolar_id', $cicloEscolarId)
+        $inscripcionesBase = Inscripcion::withTrashed()
+            ->with('grupo.asignacionGrupo:id,nombre')
             ->where('nivel_id', $nivelId)
             ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
             ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
             ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-            ->when($inscripcionId, fn ($query) => $query->where('inscripcion_id', $inscripcionId))
-            ->orderByDesc('fecha_inicio')
-            ->orderByDesc('id')
+            ->when($inscripcionId, fn ($query) => $query->whereKey($inscripcionId))
             ->get()
-            ->filter(fn (TrayectoriaAcademica $trayectoria) => $trayectoria->inscripcion !== null)
-            ->unique('inscripcion_id')
-            ->values();
+            ->keyBy('id');
 
         $contextosCalificacion = DB::table('calificaciones')
             ->where('ciclo_escolar_id', $cicloEscolarId)
@@ -94,7 +85,7 @@ class PromedioSecundariaService
             ->unique('inscripcion_id')
             ->keyBy('inscripcion_id');
 
-        $idsAlumnos = $trayectorias->pluck('inscripcion_id')
+        $idsAlumnos = $inscripcionesBase->keys()
             ->merge($contextosCalificacion->keys())
             ->when($inscripcionId, fn (Collection $ids) => $ids->push($inscripcionId))
             ->filter()
@@ -111,9 +102,7 @@ class PromedioSecundariaService
             ->get()
             ->keyBy('id');
 
-        $trayectoriasPorAlumno = $trayectorias->keyBy('inscripcion_id');
-
-        $grupoIds = $trayectorias->pluck('grupo_id')
+        $grupoIds = $inscripcionesBase->pluck('grupo_id')
             ->merge($contextosCalificacion->pluck('grupo_id'))
             ->when($grupoId, fn (Collection $ids) => $ids->push($grupoId))
             ->filter()
@@ -224,7 +213,6 @@ class PromedioSecundariaService
 
         $filas = $idsAlumnos->map(function (int $alumnoId) use (
             $alumnosPorId,
-            $trayectoriasPorAlumno,
             $contextosCalificacion,
             $grados,
             $grupos,
@@ -241,21 +229,11 @@ class PromedioSecundariaService
                 return null;
             }
 
-            $trayectoria = $trayectoriasPorAlumno->get($alumnoId);
             $contexto = $contextosCalificacion->get($alumnoId);
 
-            $gradoActualId = (int) ($trayectoria?->grado_id
-                ?? $contexto?->grado_id
-                ?? $gradoId
-                ?? $alumno->grado_id);
-            $grupoActualId = (int) ($trayectoria?->grupo_id
-                ?? $contexto?->grupo_id
-                ?? $grupoId
-                ?? $alumno->grupo_id);
-            $generacionActualId = (int) ($trayectoria?->generacion_id
-                ?? $contexto?->generacion_id
-                ?? $generacionId
-                ?? $alumno->generacion_id);
+            $gradoActualId = (int) ($contexto?->grado_id ?? $gradoId ?? $alumno->grado_id);
+            $grupoActualId = (int) ($contexto?->grupo_id ?? $grupoId ?? $alumno->grupo_id);
+            $generacionActualId = (int) ($contexto?->generacion_id ?? $generacionId ?? $alumno->generacion_id);
 
             if ($gradoActualId <= 0 || $grupoActualId <= 0) {
                 return null;
@@ -263,9 +241,7 @@ class PromedioSecundariaService
 
             $grado = $grados->get($gradoActualId) ?: Grado::query()->find($gradoActualId);
             $grupo = $grupos->get($grupoActualId);
-            $grupoNombre = $trayectoria?->grupo?->asignacionGrupo?->nombre
-                ?? $grupo?->asignacionGrupo?->nombre
-                ?? 'Sin grupo';
+            $grupoNombre = $grupo?->asignacionGrupo?->nombre ?? $alumno->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo';
 
             $catalogo = collect($materiasPorGrupo->get($grupoActualId, collect()))
                 ->filter(fn ($materia) => (int) $materia->grado_id === $gradoActualId)
@@ -432,7 +408,6 @@ class PromedioSecundariaService
 
             return [
                 'inscripcion_id' => (int) $alumnoId,
-                'trayectoria_academica_id' => $trayectoria?->id,
                 'matricula' => $alumno->matricula,
                 'alumno' => $this->nombreAlumno($alumno),
                 'grado_id' => $gradoActualId,

@@ -63,11 +63,6 @@ class cicloEscolar extends Model
         return $this->hasMany(BitacoraCalificacion::class, 'ciclo_escolar_id');
     }
 
-    public function trayectorias()
-    {
-        return $this->hasMany(TrayectoriaAcademica::class, 'ciclo_escolar_id');
-    }
-
     public function asignacionMaterias()
     {
         return $this->hasMany(AsignacionMateria::class, 'ciclo_escolar_id');

@@ -132,14 +132,11 @@
                     <p class="text-xs font-black uppercase tracking-[0.18em] text-sky-600 dark:text-sky-300">
                         Estadística
                     </p>
-
                     <h2 class="truncate text-lg font-black text-slate-900 dark:text-white">
                         Estadística general de {{ $nivel->nombre }}
                     </h2>
-
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Inicio de curso, medio curso y fin de curso. El estado abierto o cerrado se guarda en este
-                        navegador.
+                        Padrón actual agrupado por generación, grado, semestre y grupo.
                     </p>
                 </div>
             </div>
@@ -163,208 +160,125 @@
         <div x-cloak x-show="colapsos.estadistica" x-transition.opacity.duration.200ms
             class="border-t border-slate-200 dark:border-neutral-800">
             <div class="space-y-6 p-5 sm:p-6">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div class="flex items-start gap-4">
-                        <div
-                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20">
-                            <flux:icon.chart-bar-square class="h-6 w-6" />
-                        </div>
-
-                        <div>
-                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                                Concentrado estadístico de {{ $nivel->nombre }}
-                            </h2>
-
-                            <p class="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
-                                La información se calcula desde trayectorias académicas y se separa en tres cortes:
-                                inicio, medio y fin de curso.
-                            </p>
-
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <span
-                                    class="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
-                                    Nivel: {{ $nivel->nombre }}
-                                </span>
-
-                                <span
-                                    class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50">
-                                    Generación:
-                                    {{ $this->textoGeneracion($generacion_id ? (int) $generacion_id : null) }}
-                                </span>
-
-                                <span
-                                    class="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/50">
-                                    Ciclo escolar:
-                                    {{ $this->textoCicloEscolar($ciclo_escolar_id ? (int) $ciclo_escolar_id : null) }}
-                                </span>
-
-                                <span
-                                    class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50">
-                                    Existencia fin: {{ $this->totalesFinCurso['existencia']['t'] ?? 0 }}
-                                </span>
-                            </div>
-                        </div>
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div>
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white">
+                            Concentrado por generación
+                        </h3>
+                        <p class="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
+                            La información se obtiene directamente de las inscripciones. Las generaciones inactivas
+                            siguen disponibles para consulta histórica.
+                        </p>
                     </div>
 
-                    <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-[620px]">
-                        <flux:field>
-                            <flux:label>Ciclo escolar</flux:label>
-
-                            <flux:select wire:model.live="ciclo_escolar_id">
-                                <flux:select.option value="">
-                                    Selecciona un ciclo escolar
-                                </flux:select.option>
-
-                                @foreach ($cicloEscolares as $cicloEscolar)
-                                    <flux:select.option value="{{ $cicloEscolar->id }}">
-                                        {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
-                                    </flux:select.option>
-                                @endforeach
-                            </flux:select>
-                        </flux:field>
-
-                        <flux:field>
-                            <flux:label>Generación</flux:label>
-
-                            <flux:select wire:model.live="generacion_id">
-                                <flux:select.option value="">
-                                    Todas las generaciones
-                                </flux:select.option>
-
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div class="min-w-[250px]">
+                            <flux:select wire:model.live="generacion_id" label="Generación">
+                                <flux:select.option value="">Todas las generaciones</flux:select.option>
                                 @foreach ($generaciones as $generacion)
                                     <flux:select.option value="{{ $generacion->id }}">
-                                        {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                                        {{ $generacion->etiqueta }}{{ $generacion->status ? '' : ' · inactiva' }}
                                     </flux:select.option>
                                 @endforeach
                             </flux:select>
-                        </flux:field>
-
-                        <div class="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-end">
-                            <button type="button" wire:click="limpiarFiltroEstadistica"
-                                class="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
-                                <flux:icon.arrow-path class="h-4 w-4" />
-                                Limpiar filtros
-                            </button>
-
-                            <button type="button" wire:click="exportarEstadisticaExcel" wire:loading.attr="disabled"
-                                wire:target="exportarEstadisticaExcel"
-                                class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-green-600 to-lime-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
-                                <span wire:loading.remove wire:target="exportarEstadisticaExcel"
-                                    class="inline-flex items-center gap-2">
-                                    <flux:icon.download class="h-4 w-4" />
-                                    Exportar Excel
-                                </span>
-
-                                <span wire:loading wire:target="exportarEstadisticaExcel">
-                                    Generando Excel...
-                                </span>
-                            </button>
                         </div>
+
+                        <flux:button type="button" wire:click="limpiarFiltroEstadistica" variant="ghost"
+                            icon="arrow-path">
+                            Limpiar
+                        </flux:button>
+
+                        <flux:button type="button" wire:click="exportarEstadisticaExcel" variant="primary"
+                            icon="arrow-down-tray" spinner="exportarEstadisticaExcel">
+                            Exportar Excel
+                        </flux:button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div
-                        class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/40">
-                        <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Inicio
-                            de curso</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
-                            {{ $this->totalesInicioCurso['existencia']['t'] ?? 0 }}</p>
-                        <p class="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">Existencia</p>
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                    @foreach ([
+                        'total' => ['Total único', 'text-slate-900 dark:text-white'],
+                        'activos' => ['Activos', 'text-emerald-700 dark:text-emerald-300'],
+                        'bajas' => ['Bajas', 'text-rose-700 dark:text-rose-300'],
+                        'trasladados' => ['Trasladados', 'text-amber-700 dark:text-amber-300'],
+                        'egresados' => ['Egresados', 'text-sky-700 dark:text-sky-300'],
+                        'suspendidos' => ['Suspendidos', 'text-orange-700 dark:text-orange-300'],
+                        'inactivos' => ['Inactivos', 'text-slate-600 dark:text-slate-300'],
+                        'reingresos' => ['Reingresos', 'text-violet-700 dark:text-violet-300'],
+                        'hombres' => ['Hombres', 'text-blue-700 dark:text-blue-300'],
+                        'mujeres' => ['Mujeres', 'text-pink-700 dark:text-pink-300'],
+                    ] as $clave => [$etiqueta, $color])
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/40">
+                            <p class="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                {{ $etiqueta }}
+                            </p>
+                            <p class="mt-2 text-3xl font-black {{ $color }}">
+                                {{ $this->resumen[$clave] ?? 0 }}
+                            </p>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-800">
+                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/40">
+                        <h3 class="font-black text-slate-900 dark:text-white">Distribución actual</h3>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Conteos por ubicación académica dentro de la generación seleccionada.
+                        </p>
                     </div>
 
-                    <div
-                        class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
-                        <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                            Medio
-                            curso</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
-                            {{ $this->totalesMedioCurso['existencia']['t'] ?? 0 }}</p>
-                        <p class="mt-1 text-xs font-bold text-indigo-700 dark:text-indigo-300">Existencia</p>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                        <p class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                            Fin
-                            de curso</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
-                            {{ $this->totalesFinCurso['existencia']['t'] ?? 0 }}</p>
-                        <p class="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">Existencia</p>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-lime-200 bg-lime-50 p-4 dark:border-lime-900/50 dark:bg-lime-950/20">
-                        <p class="text-xs font-black uppercase tracking-wide text-lime-700 dark:text-lime-300">
-                            Promovidos</p>
-                        <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">
-                            {{ $this->totalesFinCurso['promovidos']['t'] ?? 0 }}</p>
-                        <p class="mt-1 text-xs font-bold text-lime-700 dark:text-lime-300">Al cierre del curso</p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-slate-900 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Grado</th>
+                                    @if ($slug_nivel === 'bachillerato')
+                                        <th class="px-4 py-3 text-center">Semestre</th>
+                                    @endif
+                                    <th class="px-4 py-3 text-center">Grupo</th>
+                                    <th class="px-4 py-3 text-center">H</th>
+                                    <th class="px-4 py-3 text-center">M</th>
+                                    <th class="px-4 py-3 text-center">Total</th>
+                                    <th class="px-4 py-3 text-center">Activos</th>
+                                    <th class="px-4 py-3 text-center">Bajas</th>
+                                    <th class="px-4 py-3 text-center">Egresados</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 dark:divide-neutral-800">
+                                @forelse ($this->distribucionEscolar as $fila)
+                                    <tr class="bg-white dark:bg-neutral-900">
+                                        <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                                            {{ $fila['grado'] }}
+                                        </td>
+                                        @if ($slug_nivel === 'bachillerato')
+                                            <td class="px-4 py-3 text-center">{{ $fila['semestre'] ?? '—' }}</td>
+                                        @endif
+                                        <td class="px-4 py-3 text-center">{{ $fila['grupo'] }}</td>
+                                        <td class="px-4 py-3 text-center">{{ $fila['hombres'] }}</td>
+                                        <td class="px-4 py-3 text-center">{{ $fila['mujeres'] }}</td>
+                                        <td class="px-4 py-3 text-center font-black">{{ $fila['total'] }}</td>
+                                        <td class="px-4 py-3 text-center">{{ $fila['activos'] }}</td>
+                                        <td class="px-4 py-3 text-center">{{ $fila['bajas'] }}</td>
+                                        <td class="px-4 py-3 text-center">{{ $fila['egresados'] }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="{{ $slug_nivel === 'bachillerato' ? 9 : 8 }}"
+                                            class="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
+                                            No hay alumnos para la generación seleccionada.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-
-
-
-
-                @include('partials.tabla-estadistica', [
-                    'titulo' => 'Inicio de curso',
-                    'descripcion' =>
-                        'Muestra la inscripción inicial, bajas y existencia del primer corte del ciclo escolar.',
-                    'filas' => $this->estadisticaInicioCurso,
-                    'totales' => $this->totalesInicioCurso,
-                    'acento' => 'from-slate-600 via-slate-800 to-slate-950',
-                    'bloques' => [
-                        'inicial' => 'Inscripción inicial',
-                        'altas' => 'Altas',
-                        'inscripcion_total' => 'Inscripción total',
-                        'bajas' => 'Bajas',
-                        'existencia' => 'Existencia',
-                    ],
-                ])
-
-                @include('partials.tabla-estadistica', [
-                    'titulo' => 'Medio curso',
-                    'descripcion' => 'Integra la inscripción inicial más las altas registradas como medio ciclo.',
-                    'filas' => $this->estadisticaMedioCurso,
-                    'totales' => $this->totalesMedioCurso,
-                    'acento' => 'from-sky-500 via-blue-600 to-indigo-600',
-                    'bloques' => [
-                        'inicial' => 'Inscripción inicial',
-                        'altas' => 'Altas',
-                        'inscripcion_total' => 'Inscripción total',
-                        'bajas' => 'Bajas',
-                        'existencia' => 'Existencia',
-                    ],
-                ])
-
-                @include('partials.tabla-estadistica', [
-                    'titulo' => 'Fin de curso',
-                    'descripcion' =>
-                        'Cierra el ciclo con altas finales, inscripción total, bajas, existencia, promovidos y no promovidos.',
-                    'filas' => $this->estadisticaFinCurso,
-                    'totales' => $this->totalesFinCurso,
-                    'acento' => 'from-emerald-500 via-teal-600 to-lime-600',
-                    'bloques' => [
-                        'altas' => 'Altas',
-                        'inscripcion_total' => 'Inscripción total',
-                        'bajas' => 'Bajas',
-                        'existencia' => 'Existencia',
-                        'promovidos' => 'Promovidos',
-                        'no_promovidos' => 'No promovidos',
-                    ],
-                ])
-
-                <div
-                    class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                    <p class="font-black">Nota de cálculo</p>
-
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+                    <p class="font-black">Fuente de información</p>
                     <p class="mt-1">
-                        H = hombres, M = mujeres, T = total. La estadística se calcula desde
-                        <b>trayectorias académicas</b> y se filtra por <b>ciclo escolar</b>. Inicio usa alumnos con
-                        <b>Inicio de ciclo</b>. Medio suma alumnos de <b>Inicio de ciclo</b> más altas de
-                        <b>Medio ciclo</b>. Fin suma inicio, medio y altas de <b>Fin de ciclo</b>. Promovidos se toma
-                        del campo <b>promovido</b> de la trayectoria académica.
+                        Esta sección ya no usa trayectorias académicas. El nivel, generación, grado, semestre, grupo y
+                        estatus se consultan directamente desde la inscripción de cada alumno.
                     </p>
                 </div>
             </div>

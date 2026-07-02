@@ -13,11 +13,8 @@ class MovimientoAlumno extends Model
 
     protected $fillable = [
         'inscripcion_id',
-        'trayectoria_academica_id',
         'ciclo_escolar_id',
         'ciclo_id',
-        'trayectoria_origen_id',
-        'trayectoria_destino_id',
         'nivel_anterior_id',
         'nivel_nuevo_id',
         'resultado_continuidad',
@@ -42,21 +39,6 @@ class MovimientoAlumno extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id')->withTrashed();
-    }
-
-    public function trayectoriaAcademica()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_academica_id');
-    }
-
-    public function trayectoriaOrigen()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_origen_id');
-    }
-
-    public function trayectoriaDestino()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_destino_id');
     }
 
     public function nivelAnterior()

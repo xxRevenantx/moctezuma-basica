@@ -320,12 +320,11 @@
 
             $tipoConstanciaEstudios = collect($tiposDocumentos)->firstWhere('slug', 'constancia-estudios');
             $tipoConstanciaBaja = collect($tiposDocumentos)->firstWhere('slug', 'constancia-baja-traslado');
-            $trayectoriaContexto = $alumnoSeleccionado->trayectoriasAcademicas->sortByDesc('id')->first();
-            $nivelContextoId = $trayectoriaContexto?->nivel_id ?? $alumnoSeleccionado->nivel_id;
-            $gradoContextoId = $trayectoriaContexto?->grado_id ?? $alumnoSeleccionado->grado_id;
-            $cicloContextoId = $trayectoriaContexto?->ciclo_escolar_id ?? data_get($ciclosEscolares, '0.id');
-            $slugReingreso = $trayectoriaContexto?->nivel?->slug ?? $alumnoSeleccionado->nivel?->slug;
-            $estatusRetornable = in_array($trayectoriaContexto?->estatus, [
+            $nivelContextoId = $alumnoSeleccionado->nivel_id;
+            $gradoContextoId = $alumnoSeleccionado->grado_id;
+            $cicloContextoId = data_get($ciclosEscolares, '0.id');
+            $slugReingreso = $alumnoSeleccionado->nivel?->slug;
+            $estatusRetornable = in_array($alumnoSeleccionado->estatus, [
                 'egresado', 'traslado', 'baja_temporal', 'baja_definitiva', 'inactivo', 'suspendido',
             ], true);
         @endphp
@@ -359,14 +358,14 @@
 
                     <div class="flex flex-wrap gap-2">
                         @if ($soloHistorico && $estatusRetornable && $slugReingreso)
-                            <a href="{{ route('submodulos.accion', ['slug_nivel' => $slugReingreso, 'accion' => 'matricula', 'reingreso' => $alumnoSeleccionado->id]) }}#reingreso-alumno"
+                            <a href="{{ route('submodulos.accion', ['slug_nivel' => $slugReingreso, 'accion' => 'bajas']) }}"
                                 class="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-400 hover:shadow-lg">
                                 <flux:icon name="arrow-path" class="size-4" />
                                 Reingresar o reincorporar
                             </a>
                         @endif
 
-                        @if ($documentosSeleccionados->isNotEmpty() || $alumnoSeleccionado->trayectoriasAcademicas->isNotEmpty() || $alumnoSeleccionado->movimientos->isNotEmpty())
+                        @if ($documentosSeleccionados->isNotEmpty() || $alumnoSeleccionado->cambiosAcademicos->isNotEmpty() || $alumnoSeleccionado->movimientos->isNotEmpty() || $alumnoSeleccionado->matriculasAlumno->isNotEmpty())
                             <a href="{{ route('misrutas.expedientes.zip', $alumnoSeleccionado) }}"
                                 class="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
                                 <flux:icon name="archive-box" class="size-4" />
@@ -433,16 +432,16 @@
                                     <flux:icon name="academic-cap" class="size-5" />
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-black text-slate-900 dark:text-white">Trayectoria académica</h3>
+                                    <h3 class="text-lg font-black text-slate-900 dark:text-white">Asignación académica actual</h3>
                                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                        Historial por ciclo escolar, corte, estancia, nivel, grado, grupo y matrícula.
+                                        La generación identifica al grupo escolar del alumno; los cambios quedan en la bitácora administrativa.
                                     </p>
                                 </div>
                             </div>
 
                             <div class="flex flex-wrap gap-2">
                                 <span class="rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-black text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-900">
-                                    {{ $alumnoSeleccionado->trayectoriasAcademicas->count() }} etapas
+                                    {{ $alumnoSeleccionado->cambiosAcademicos->count() }} cambios
                                 </span>
                                 <span class="rounded-full bg-sky-100 px-3 py-1.5 text-xs font-black text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900">
                                     {{ $alumnoSeleccionado->movimientos->count() }} movimientos
@@ -452,99 +451,31 @@
                     </div>
 
                     <div class="p-5">
-                        <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-neutral-800">
-                            <table class="min-w-[1100px] w-full divide-y divide-slate-200 text-left text-sm dark:divide-neutral-800">
-                                <thead class="bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500 dark:bg-neutral-900">
-                                    <tr>
-                                        <th class="px-4 py-3">Ciclo escolar</th>
-                                        <th class="px-4 py-3">Corte</th>
-                                        <th class="px-4 py-3">Ubicación académica</th>
-                                        <th class="px-4 py-3">Generación</th>
-                                        <th class="px-4 py-3">Estancia</th>
-                                        <th class="px-4 py-3">Estatus</th>
-                                        <th class="px-4 py-3">Periodo</th>
-                                        <th class="px-4 py-3">Origen</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-950">
-                                    @forelse ($alumnoSeleccionado->trayectoriasAcademicas as $trayectoria)
-                                        @php
-                                            $grupoTrayectoria = $trayectoria->grupo?->asignacionGrupo?->nombre ?? '—';
-                                            $cicloTrayectoria = $trayectoria->cicloEscolar
-                                                ? $trayectoria->cicloEscolar->inicio_anio . '-' . $trayectoria->cicloEscolar->fin_anio
-                                                : 'Sin ciclo';
-                                            $generacionTrayectoria = $trayectoria->generacion
-                                                ? $trayectoria->generacion->anio_ingreso . '-' . $trayectoria->generacion->anio_egreso
-                                                : '—';
-                                            $claseEstatusTrayectoria = match ($trayectoria->estatus) {
-                                                'activo', 'reingreso' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900',
-                                                'promovido', 'egresado' => 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900',
-                                                'baja_temporal' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900',
-                                                'baja_definitiva', 'traslado', 'no_promovido' => 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900',
-                                                default => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700',
-                                            };
-                                        @endphp
-                                        <tr wire:key="trayectoria-expediente-{{ $trayectoria->id }}" class="align-top">
-                                            <td class="px-4 py-4">
-                                                <p class="font-black text-slate-900 dark:text-white">{{ $cicloTrayectoria }}</p>
-                                                <div class="mt-1 flex flex-wrap gap-1">
-                                                    @if ($trayectoria->cicloEscolar?->es_actual)
-                                                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-black uppercase text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">Actual</span>
-                                                    @elseif ($trayectoria->cicloEscolar?->cerrado_at)
-                                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase text-slate-600 dark:bg-neutral-800 dark:text-slate-300">Cerrado</span>
-                                                    @else
-                                                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Histórico</span>
-                                                    @endif
-                                                    @if ($trayectoria->es_actual)
-                                                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Ubicación vigente</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-200">
-                                                {{ $trayectoria->ciclo?->ciclo ?? 'Sin corte' }}
-                                            </td>
-                                            <td class="px-4 py-4">
-                                                <p class="font-black text-slate-900 dark:text-white">{{ $trayectoria->nivel?->nombre ?? 'Sin nivel' }}</p>
-                                                <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $trayectoria->grado?->nombre ?? 'Sin grado' }} · Grupo {{ $grupoTrayectoria }}
-                                                    @if ($trayectoria->semestre)
-                                                        · Semestre {{ $trayectoria->semestre->numero }}
-                                                    @endif
-                                                </p>
-                                            </td>
-                                            <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-200">{{ $generacionTrayectoria }}</td>
-                                            <td class="px-4 py-4">
-                                                <p class="font-black text-slate-900 dark:text-white">#{{ $trayectoria->numero_estancia ?? 1 }}</p>
-                                                <p class="mt-1 text-xs text-slate-500">{{ $trayectoria->vigente_en_corte ? 'Vigente en corte' : 'Cerrada en corte' }}</p>
-                                            </td>
-                                            <td class="px-4 py-4">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $claseEstatusTrayectoria }}">
-                                                    {{ $trayectoria->etiqueta_estatus }}
-                                                </span>
-                                                @if ($trayectoria->motivo_baja)
-                                                    <p class="mt-2 max-w-48 text-xs leading-5 text-slate-500">{{ $trayectoria->motivo_baja }}</p>
-                                                @endif
-                                            </td>
-                                            <td class="px-4 py-4 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                                                <p><strong>Inicio:</strong> {{ $trayectoria->fecha_inicio?->format('d/m/Y') ?? $trayectoria->fecha_inscripcion?->format('d/m/Y') ?? '—' }}</p>
-                                                <p><strong>Fin:</strong> {{ $trayectoria->fecha_fin?->format('d/m/Y') ?? $trayectoria->fecha_baja?->format('d/m/Y') ?? '—' }}</p>
-                                            </td>
-                                            <td class="px-4 py-4">
-                                                <p class="text-xs font-bold text-slate-700 dark:text-slate-200">{{ \Illuminate\Support\Str::headline($trayectoria->origen ?? 'registro') }}</p>
-                                                @if ($trayectoria->datos_reconstruidos)
-                                                    <span class="mt-1 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">Dato reconstruido</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="8" class="px-5 py-10 text-center text-sm text-slate-500">
-                                                Este alumno todavía no tiene etapas académicas registradas.
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Generación</p>
+                                <p class="mt-2 font-black text-slate-900 dark:text-white">{{ $alumnoSeleccionado->generacion?->etiqueta ?? 'Sin generación' }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $alumnoSeleccionado->generacion?->status ? 'Activa' : 'Inactiva' }}</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Ubicación actual</p>
+                                <p class="mt-2 font-black text-slate-900 dark:text-white">{{ $alumnoSeleccionado->nivel?->nombre ?? 'Sin nivel' }}</p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ $alumnoSeleccionado->grado?->nombre ?? 'Sin grado' }}
+                                    @if ($alumnoSeleccionado->semestre) · Semestre {{ $alumnoSeleccionado->semestre->numero }} @endif
+                                    · Grupo {{ $alumnoSeleccionado->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                </p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Estatus actual</p>
+                                <p class="mt-2 font-black text-slate-900 dark:text-white">{{ \Illuminate\Support\Str::headline($alumnoSeleccionado->estatus ?: ($alumnoSeleccionado->activo ? 'activo' : 'inactivo')) }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $alumnoSeleccionado->fecha_estatus?->format('d/m/Y H:i') ?? 'Sin fecha de cambio' }}</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Ingreso al plantel</p>
+                                <p class="mt-2 font-black text-slate-900 dark:text-white">{{ $alumnoSeleccionado->fecha_inscripcion?->format('d/m/Y') ?? 'Sin fecha' }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Dato general del alumno</p>
+                            </div>
                         </div>
 
                         <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -555,7 +486,7 @@
                                     </div>
                                     <div>
                                         <h4 class="font-black text-slate-900 dark:text-white">Matrículas por nivel</h4>
-                                        <p class="text-xs text-slate-500">Las anteriores se conservan al cambiar de nivel.</p>
+                                        <p class="text-xs text-slate-500">Las anteriores se conservan como referencia administrativa.</p>
                                     </div>
                                 </div>
 
@@ -571,67 +502,40 @@
                                             </span>
                                         </div>
                                     @empty
-                                        <p class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-neutral-700">
-                                            No hay historial de matrículas por nivel.
-                                        </p>
+                                        <p class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-neutral-700">No hay matrículas por nivel registradas.</p>
                                     @endforelse
                                 </div>
                             </article>
 
                             <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex size-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                    <div class="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
                                         <flux:icon name="clock" class="size-4" />
                                     </div>
                                     <div>
-                                        <h4 class="font-black text-slate-900 dark:text-white">Línea de tiempo</h4>
-                                        <p class="text-xs text-slate-500">Bajas, reingresos, cambios, promociones y correcciones.</p>
+                                        <h4 class="font-black text-slate-900 dark:text-white">Bitácora de cambios</h4>
+                                        <p class="text-xs text-slate-500">Generación, grado, semestre, grupo, estatus y correcciones.</p>
                                     </div>
                                 </div>
 
                                 <div class="mt-4 max-h-96 space-y-3 overflow-y-auto pr-1">
-                                    @forelse ($alumnoSeleccionado->movimientos as $movimiento)
-                                        @php
-                                            $cicloMovimiento = $movimiento->cicloEscolar
-                                                ? $movimiento->cicloEscolar->inicio_anio . '-' . $movimiento->cicloEscolar->fin_anio
-                                                : null;
-                                            $grupoMovimiento = $movimiento->trayectoriaAcademica?->grupo?->asignacionGrupo?->nombre;
-                                        @endphp
-                                        <div wire:key="movimiento-expediente-{{ $movimiento->id }}" class="relative rounded-xl border border-slate-200 bg-white p-3 pl-4 dark:border-neutral-800 dark:bg-neutral-950">
-                                            <span class="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-indigo-500"></span>
+                                    @forelse ($alumnoSeleccionado->cambiosAcademicos as $cambio)
+                                        <div wire:key="cambio-academico-{{ $cambio->id }}" class="relative rounded-xl border border-slate-200 bg-white p-3 pl-4 dark:border-neutral-800 dark:bg-neutral-950">
+                                            <span class="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-violet-500"></span>
                                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                                                 <div>
-                                                    <p class="font-black text-slate-900 dark:text-white">{{ \Illuminate\Support\Str::headline($movimiento->tipo) }}</p>
-                                                    <p class="mt-1 text-xs text-slate-500">
-                                                        {{ $cicloMovimiento ?? 'Sin ciclo' }}
-                                                        @if ($movimiento->ciclo?->ciclo)
-                                                            · {{ $movimiento->ciclo->ciclo }}
-                                                        @endif
-                                                        @if ($movimiento->trayectoriaAcademica?->nivel)
-                                                            · {{ $movimiento->trayectoriaAcademica->nivel->nombre }}
-                                                        @endif
-                                                        @if ($movimiento->trayectoriaAcademica?->grado)
-                                                            · {{ $movimiento->trayectoriaAcademica->grado->nombre }}
-                                                        @endif
-                                                        @if ($grupoMovimiento)
-                                                            · Grupo {{ $grupoMovimiento }}
-                                                        @endif
-                                                    </p>
+                                                    <p class="font-black text-slate-900 dark:text-white">{{ \Illuminate\Support\Str::headline($cambio->tipo) }}</p>
+                                                    <p class="mt-1 text-xs text-slate-500">Generación {{ $cambio->generacion?->etiqueta ?? '—' }}</p>
                                                 </div>
-                                                <span class="shrink-0 text-xs font-bold text-slate-500">{{ $movimiento->fecha?->format('d/m/Y') ?? 'Sin fecha' }}</span>
+                                                <span class="shrink-0 text-xs font-bold text-slate-500">{{ $cambio->realizado_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</span>
                                             </div>
-                                            @if ($movimiento->motivo)
-                                                <p class="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300"><strong>Motivo:</strong> {{ $movimiento->motivo }}</p>
+                                            @if ($cambio->motivo)
+                                                <p class="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300"><strong>Motivo:</strong> {{ $cambio->motivo }}</p>
                                             @endif
-                                            @if ($movimiento->observaciones)
-                                                <p class="mt-1 text-xs leading-5 text-slate-500">{{ $movimiento->observaciones }}</p>
-                                            @endif
-                                            <p class="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Registró: {{ $movimiento->usuario?->name ?? 'Sistema' }}</p>
+                                            <p class="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Registró: {{ $cambio->usuario?->name ?? 'Sistema' }}</p>
                                         </div>
                                     @empty
-                                        <p class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-neutral-700">
-                                            Todavía no hay movimientos registrados.
-                                        </p>
+                                        <p class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-neutral-700">Todavía no hay cambios académicos registrados.</p>
                                     @endforelse
                                 </div>
                             </article>
@@ -1096,21 +1000,16 @@
                 </section>
 
                 <section class="rounded-3xl border border-slate-200 p-5 dark:border-neutral-800">
-                    <h3 class="font-black text-slate-900 dark:text-white">Trayectoria académica conservada</h3>
-                    <p class="mt-1 text-sm text-slate-500">La documentación permanece aunque el alumno cambie de nivel
-                        o se encuentre de baja.</p>
+                    <h3 class="font-black text-slate-900 dark:text-white">Generación y asignación actual</h3>
+                    <p class="mt-1 text-sm text-slate-500">El alumno conserva una sola generación. La documentación permanece aunque cambie de grado, grupo o estatus.</p>
                     <div class="mt-4 flex flex-wrap gap-2">
-                        @forelse ($alumnoSeleccionado->trayectoriasAcademicas->sortBy('id') as $trayectoria)
-                            <span
-                                class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
-                                <span class="size-2 rounded-full bg-indigo-500"></span>
-                                {{ $trayectoria->nivel?->nombre ?? 'Sin nivel' }} ·
-                                {{ $trayectoria->grado?->nombre ?? 'Sin grado' }} ·
-                                Grupo {{ $trayectoria->grupo?->asignacionGrupo?->nombre ?? '—' }}
-                            </span>
-                        @empty
-                            <span class="text-sm text-slate-500">No hay trayectorias registradas.</span>
-                        @endforelse
+                        <span class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
+                            <span class="size-2 rounded-full bg-indigo-500"></span>
+                            Generación {{ $alumnoSeleccionado->generacion?->etiqueta ?? 'sin asignar' }} ·
+                            {{ $alumnoSeleccionado->nivel?->nombre ?? 'Sin nivel' }} ·
+                            {{ $alumnoSeleccionado->grado?->nombre ?? 'Sin grado' }} ·
+                            Grupo {{ $alumnoSeleccionado->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                        </span>
                     </div>
                 </section>
 
@@ -1133,9 +1032,9 @@
                                             class="text-xs font-bold text-slate-500">{{ $movimiento->fecha?->format('d/m/Y') ?? 'Sin fecha' }}</span>
                                     </div>
                                     <p class="mt-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                                        {{ $movimiento->trayectoriaAcademica?->nivel?->nombre ?? ($alumnoSeleccionado->nivel?->nombre ?? 'Sin nivel') }}
+                                        {{ $movimiento->nivelNuevo?->nombre ?? $movimiento->nivelAnterior?->nombre ?? ($alumnoSeleccionado->nivel?->nombre ?? 'Sin nivel') }}
                                         ·
-                                        {{ $movimiento->trayectoriaAcademica?->grado?->nombre ?? ($alumnoSeleccionado->grado?->nombre ?? 'Sin grado') }}
+                                        {{ $alumnoSeleccionado->grado?->nombre ?? 'Sin grado' }}
                                     </p>
                                     <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                                         {{ $movimiento->motivo ?: 'Sin motivo registrado' }}</p>

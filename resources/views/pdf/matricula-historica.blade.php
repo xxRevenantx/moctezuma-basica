@@ -49,10 +49,10 @@
         <tr>
             <td class="brand" style="width: 55%;">
                 <h1>CENTRO UNIVERSITARIO MOCTEZUMA</h1>
-                <p>Control escolar · Historial académico por ciclo y corte</p>
+                <p>{{ $modoSinTrayectorias ? 'Control escolar · Datos vigentes desde inscripciones' : 'Control escolar · Historial académico por ciclo y corte' }}</p>
             </td>
             <td class="context">
-                <strong>MATRÍCULA HISTÓRICA</strong>
+                <strong>{{ $modoSinTrayectorias ? 'MATRÍCULA ACTUAL' : 'MATRÍCULA HISTÓRICA' }}</strong>
                 <span>{{ $nivel->nombre }} · {{ $cicloEscolar->nombre }} · {{ $corte->ciclo }}</span>
                 <span>Generado el {{ now()->format('d/m/Y H:i') }}</span>
             </td>
@@ -109,7 +109,7 @@
                     <td class="estatus"><span class="badge {{ $estadoClass }}">{{ $row->etiqueta_estatus }}</span>@if($row->numero_estancia > 1)<br><span class="muted">Estancia {{ $row->numero_estancia }}</span>@endif</td>
                     <td class="fechas">
                         <span class="muted">Ingreso al plantel:</span> {{ optional($alumno?->fecha_inscripcion)->format('d/m/Y') ?: '—' }}
-                        <br><span class="muted">Inscripción al ciclo:</span> {{ optional($row->fecha_inscripcion ?? $row->fecha_inicio)->format('d/m/Y') ?: '—' }}
+                        <br><span class="muted">{{ $modoSinTrayectorias ? 'Fecha base registrada:' : 'Inscripción al ciclo:' }}</span> {{ optional($row->fecha_inscripcion ?? $row->fecha_inicio)->format('d/m/Y') ?: '—' }}
                         @if($row->fecha_baja)<br><span class="muted">Baja:</span> {{ $row->fecha_baja->format('d/m/Y') }}@endif
                     </td>
                     <td class="motivo">{{ $row->motivo_baja ?: '—' }}@if($row->observaciones_baja)<br><span class="muted">{{ $row->observaciones_baja }}</span>@endif</td>
@@ -121,7 +121,7 @@
     </table>
 
     <div class="footer">
-        <span>Este reporte conserva la ubicación académica correspondiente al ciclo y corte seleccionados.</span>
+        <span>{{ $modoSinTrayectorias ? 'Reporte temporal basado en la ubicación vigente de inscripciones. Los ciclos históricos están pendientes de reconstrucción.' : 'Este reporte conserva la ubicación académica correspondiente al ciclo y corte seleccionados.' }}</span>
         <span style="float:right;">Página <span class="page"></span></span>
     </div>
 </body>

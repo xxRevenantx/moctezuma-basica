@@ -10,7 +10,6 @@ class CalificacionCampoFormativo extends Model
 
     protected $fillable = [
         'inscripcion_id',
-        'trayectoria_academica_id',
         'campo_formativo_id',
         'periodo_id',
         'ciclo_escolar_id',
@@ -38,11 +37,6 @@ class CalificacionCampoFormativo extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id')->withTrashed();
-    }
-
-    public function trayectoriaAcademica()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_academica_id');
     }
 
     public function campoFormativo()

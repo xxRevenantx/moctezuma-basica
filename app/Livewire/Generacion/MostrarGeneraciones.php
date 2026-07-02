@@ -3,8 +3,7 @@
 namespace App\Livewire\Generacion;
 
 use App\Models\Generacion;
-use App\Services\CierreNivelReingresoService;
-use Illuminate\Validation\ValidationException;
+use App\Services\GestionAcademicaService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -13,77 +12,68 @@ class MostrarGeneraciones extends Component
 {
     use WithPagination;
 
-    public $search = '';
-    protected $paginationTheme = 'tailwind';
+    public string $search = '';
+    public bool $incluir_inactivas = true;
+    public bool $modalDesactivar = false;
+    public ?int $generacionSeleccionada = null;
+    public string $motivo = '';
+    public bool $egresar_activos = true;
 
-    public function updatingSearch()
+    public function updatingSearch(): void { $this->resetPage(); }
+
+    public function prepararDesactivacion(int $id): void
     {
-        $this->resetPage();
+        $this->generacionSeleccionada = $id;
+        $this->motivo = '';
+        $this->egresar_activos = true;
+        $this->modalDesactivar = true;
     }
 
-    public function cerrar(int $id): void
+    public function desactivar(GestionAcademicaService $service): void
     {
-        try {
-            app(CierreNivelReingresoService::class)->cerrarGeneracion(
-                Generacion::query()->findOrFail($id),
-                auth()->id()
-            );
-            $this->dispatch('swal', [
-                'title' => 'Generación cerrada',
-                'text' => 'Ya no aparecerá en módulos operativos, pero seguirá disponible en el historial.',
-                'icon' => 'success',
-                'position' => 'top-end',
-            ]);
-        } catch (ValidationException $e) {
-            $this->dispatch('swal', [
-                'title' => 'No se puede cerrar',
-                'text' => collect($e->errors())->flatten()->first(),
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
-        }
-    }
-
-    public function reactivar(int $id): void
-    {
-        app(CierreNivelReingresoService::class)->reactivarGeneracion(
-            Generacion::query()->findOrFail($id)
-        );
-        $this->dispatch('swal', [
-            'title' => 'Generación reactivada',
-            'icon' => 'success',
-            'position' => 'top-end',
+        $this->validate([
+            'generacionSeleccionada' => ['required', 'exists:generaciones,id'],
+            'motivo' => ['required', 'string', 'min:5', 'max:1000'],
+            'egresar_activos' => ['boolean'],
         ]);
+        $g = Generacion::query()->findOrFail($this->generacionSeleccionada);
+        $afectados = $service->desactivarGeneracion($g, $this->motivo, $this->egresar_activos, auth()->id());
+        $this->modalDesactivar = false;
+        $this->dispatch('swal', [
+            'title' => 'Generación desactivada',
+            'text' => $this->egresar_activos ? "Se marcaron {$afectados} alumno(s) como egresados." : 'Los alumnos conservaron su estatus individual.',
+            'icon' => 'success', 'position' => 'top-end',
+        ]);
+    }
+
+    public function reactivar(int $id, GestionAcademicaService $service): void
+    {
+        $service->reactivarGeneracion(Generacion::query()->findOrFail($id), 'Reactivación administrativa desde el catálogo de generaciones.', auth()->id());
+        $this->dispatch('swal', ['title' => 'Generación reactivada', 'icon' => 'success', 'position' => 'top-end']);
     }
 
     #[On('refreshGeneraciones')]
     public function render()
     {
-        $generaciones = Generacion::with('nivel')->withCount(['trayectoriasAcademicas as alumnos_activos_count' => fn ($q) => $q->where('activo', true)->where('es_actual', true)])
-            ->where(function ($q) {
-                $q->where('anio_ingreso', 'like', '%' . $this->search . '%')
-                  ->orWhere('anio_egreso', 'like', '%' . $this->search . '%');
+        $query = Generacion::query()
+            ->with(['nivel', 'cicloEscolarInicio', 'cicloEscolarFin'])
+            ->withCount([
+                'inscripciones as alumnos_total_count',
+                'inscripciones as alumnos_activos_count' => fn ($q) => $q->whereIn('estatus', ['activo', 'reingreso', 'no_promovido']),
+                'inscripciones as alumnos_egresados_count' => fn ($q) => $q->where('estatus', 'egresado'),
+                'inscripciones as alumnos_bajas_count' => fn ($q) => $q->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'trasladado', 'suspendido', 'inactivo']),
+            ])
+            ->when(! $this->incluir_inactivas, fn ($q) => $q->where('status', true))
+            ->when($this->search !== '', function ($q) {
+                $term = '%' . $this->search . '%';
+                $q->where(fn ($sub) => $sub->where('nombre', 'like', $term)
+                    ->orWhere('anio_ingreso', 'like', $term)
+                    ->orWhere('anio_egreso', 'like', $term)
+                    ->orWhereHas('nivel', fn ($n) => $n->where('nombre', 'like', $term)));
             })
-            ->orderBy('nivel_id', 'asc')
-            ->orderBy('anio_ingreso', 'asc')
-            ->paginate(10);
+            ->orderBy('nivel_id')->orderByDesc('anio_ingreso');
 
-        $collection = $generaciones->getCollection();
-
-        $groupedByNivel = $collection->groupBy(function ($g) {
-            return optional($g->nivel)->nombre ?? 'Sin nivel asignado';
-        });
-
-        $totalGeneraciones     = $generaciones->total();
-        $generacionesActivas   = $collection->where('status', 1)->count();
-        $generacionesInactivas = $collection->where('status', 0)->count();
-
-        return view('livewire.generacion.mostrar-generaciones', compact(
-            'generaciones',
-            'groupedByNivel',
-            'totalGeneraciones',
-            'generacionesActivas',
-            'generacionesInactivas'
-        ));
+        $generaciones = $query->paginate(12);
+        return view('livewire.generacion.mostrar-generaciones', compact('generaciones'));
     }
 }

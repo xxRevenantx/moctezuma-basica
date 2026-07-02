@@ -53,7 +53,7 @@ class EstadisticaCorteSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
         $datos[] = $this->filaTotales();
         $datos[] = [];
         $datos[] = ['Nota: H = hombres, M = mujeres, T = total.'];
-        $datos[] = ['Los datos se calculan desde trayectorias académicas y respetan el ciclo escolar seleccionado.'];
+        $datos[] = ['Los datos se calculan desde la matrícula actual agrupada por generación y estatus.'];
 
         return $datos;
     }

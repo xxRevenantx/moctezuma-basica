@@ -31,8 +31,8 @@
                         <p class="mt-1 text-2xl font-black">{{ number_format($estadisticas['alumnos']) }}</p>
                     </div>
                     <div class="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                        <p class="text-xs font-bold uppercase text-slate-300">Trayectorias</p>
-                        <p class="mt-1 text-2xl font-black">{{ number_format($estadisticas['trayectorias']) }}</p>
+                        <p class="text-xs font-bold uppercase text-slate-300">Cambios académicos</p>
+                        <p class="mt-1 text-2xl font-black">{{ number_format($estadisticas['cambios_academicos']) }}</p>
                     </div>
                     <div class="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
                         <p class="text-xs font-bold uppercase text-slate-300">Calificaciones</p>
@@ -100,9 +100,9 @@
                             {{ number_format($estadisticas['alumnos_activos']) }}</p>
                     </div>
                     <div class="rounded-2xl bg-slate-50 p-3 dark:bg-neutral-800/70">
-                        <p class="text-xs font-bold text-slate-500">Trayectorias</p>
+                        <p class="text-xs font-bold text-slate-500">Cambios académicos</p>
                         <p class="mt-1 text-lg font-black text-slate-900 dark:text-white">
-                            {{ number_format($estadisticas['trayectorias']) }}</p>
+                            {{ number_format($estadisticas['cambios_academicos']) }}</p>
                     </div>
                     <div class="rounded-2xl bg-slate-50 p-3 dark:bg-neutral-800/70">
                         <p class="text-xs font-bold text-slate-500">Matrículas</p>
@@ -120,7 +120,7 @@
                     <p class="text-sm font-black text-slate-800 dark:text-white">El archivo incluye</p>
                     <div class="mt-3 grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
                         <span class="flex items-center gap-2"><flux:icon.file-check class="h-4 w-4 text-emerald-500" /> Tutores y alumnos, incluso archivados</span>
-                        <span class="flex items-center gap-2"><flux:icon.file-check class="h-4 w-4 text-emerald-500" /> Trayectorias por ciclo y corte</span>
+                        <span class="flex items-center gap-2"><flux:icon.file-check class="h-4 w-4 text-emerald-500" /> Cambios académicos por ciclo y corte</span>
                         <span class="flex items-center gap-2"><flux:icon.file-check class="h-4 w-4 text-emerald-500" /> Matrículas históricas</span>
                         <span class="flex items-center gap-2"><flux:icon.file-check class="h-4 w-4 text-emerald-500" /> Línea de tiempo de movimientos</span>
                     </div>
@@ -363,7 +363,7 @@
                 <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Un ID existente se actualiza sin tocar su llave primaria. Un ID inexistente se inserta con el mismo
                     número del archivo. La columna oculta <code>__id_original</code> permite detectar modificaciones
-                    accidentales del ID. No se borran alumnos, trayectorias, matrículas, movimientos, calificaciones ni
+                    accidentales del ID. No se borran alumnos, cambios académicos, matrículas, movimientos, calificaciones ni
                     registros de bitácora que no estén incluidos en el archivo.
                 </p>
             </div>

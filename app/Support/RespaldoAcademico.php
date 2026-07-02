@@ -26,7 +26,7 @@ final class RespaldoAcademico
             self::TIPO_ALUMNOS => [
                 'tipo' => self::TIPO_ALUMNOS,
                 'titulo' => 'Respaldo integral de alumnos',
-                'descripcion' => 'Incluye tutores, alumnos, trayectorias académicas, matrículas históricas y movimientos.',
+                'descripcion' => 'Incluye tutores, alumnos, generaciones asignadas, matrículas por nivel, movimientos y bitácora académica.',
                 'prefijo_archivo' => 'RESPALDO_ALUMNOS',
                 'tablas' => [
                     'tutores' => [
@@ -39,10 +39,10 @@ final class RespaldoAcademico
                         'descripcion' => 'Registro principal de alumnos, incluidos activos, bajas y archivados.',
                         'diferidas' => [],
                     ],
-                    'trayectorias_academicas' => [
-                        'hoja' => 'Trayectorias',
-                        'descripcion' => 'Historial por ciclo escolar, corte, nivel, grado, grupo y estancia.',
-                        'diferidas' => ['trayectoria_origen_id'],
+                    'cambios_academicos' => [
+                        'hoja' => 'CambiosAcademicos',
+                        'descripcion' => 'Bitácora de cambios de generación, grado, semestre, grupo y estatus.',
+                        'diferidas' => [],
                     ],
                     'matriculas_alumnos' => [
                         'hoja' => 'Matriculas',

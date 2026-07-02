@@ -2,120 +2,86 @@
 
 namespace App\Livewire\Generacion;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
+use App\Models\Nivel;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class EditarGeneracion extends Component
 {
-    public $open = false;
-    public $generacionId;
-    public $anio_ingreso;
-    public $anio_egreso;
-    public $nivel_id;
-
-    public $status;
-
-
+    public bool $open = false;
+    public ?int $generacionId = null;
+    public ?int $nivel_id = null;
+    public ?int $anio_ingreso = null;
+    public ?int $anio_egreso = null;
+    public string $nombre = '';
+    public ?int $ciclo_escolar_inicio_id = null;
+    public ?int $ciclo_escolar_fin_id = null;
+    public ?string $fecha_inicio = null;
+    public ?string $fecha_termino = null;
 
     #[On('editarModal')]
-    public function editarModal($id)
+    public function editarModal(int $id): void
     {
-        $generacion = Generacion::findOrFail($id);
-        $this->generacionId = $generacion->id;
-        $this->anio_ingreso = $generacion->anio_ingreso;
-        $this->anio_egreso = $generacion->anio_egreso;
-        $this->nivel_id = $generacion->nivel_id;
-
-        $this->status = $generacion->status == 1 ? true : false;
-
-
-        $this->open = true;
-
+        $g = Generacion::query()->findOrFail($id);
+        $this->fill([
+            'generacionId' => $g->id,
+            'nivel_id' => $g->nivel_id,
+            'anio_ingreso' => (int) $g->anio_ingreso,
+            'anio_egreso' => (int) $g->anio_egreso,
+            'nombre' => $g->etiqueta,
+            'ciclo_escolar_inicio_id' => $g->ciclo_escolar_inicio_id,
+            'ciclo_escolar_fin_id' => $g->ciclo_escolar_fin_id,
+            'fecha_inicio' => optional($g->fecha_inicio)->format('Y-m-d'),
+            'fecha_termino' => optional($g->fecha_termino)->format('Y-m-d'),
+            'open' => true,
+        ]);
         $this->dispatch('editar-cargado');
     }
 
-    public function actualizarGeneracion()
+    public function actualizarGeneracion(): void
     {
-        $this->validate([
-            'anio_ingreso' => 'required|integer|min:0|digits:4',
-            'anio_egreso' => 'required|integer|min:0|digits:4|gt:anio_ingreso',
-            'nivel_id' => 'required|exists:niveles,id',
-            'status' => 'boolean',
-        ], [
-            'anio_ingreso.required' => 'La fecha de inicio es obligatorio.',
-            'anio_ingreso.integer' => 'La fecha de inicio debe ser un número entero.',
-            'anio_ingreso.min' => 'La fecha de inicio no puede ser negativa.',
-            'anio_ingreso.digits' => 'La fecha de inicio debe tener 4 dígitos.',
-            'anio_egreso.required' => 'La fecha de término es obligatoria.',
-            'anio_egreso.integer' => 'La fecha de término debe ser un número entero.',
-            'anio_egreso.min' => 'La fecha de término no puede ser negativa.',
-            'anio_egreso.digits' => 'La fecha de término debe tener 4 dígitos.',
-            'nivel_id.required' => 'El nivel educativo es obligatorio.',
-            'nivel_id.exists' => 'El nivel educativo seleccionado no es válido.',
-            'anio_egreso.gt' => 'La fecha de término debe ser mayor que la fecha de inicio.',
-            'anio_ingreso.unique' => 'La fecha de inicio ya existe en otra generación.',
-            'anio_egreso.unique' => 'La fecha de término ya existe en otra generación.',
+        $data = $this->validate([
+            'nivel_id' => ['required', 'exists:niveles,id'],
+            'anio_ingreso' => ['required', 'integer', 'digits:4'],
+            'anio_egreso' => ['required', 'integer', 'digits:4', 'gt:anio_ingreso'],
+            'nombre' => ['required', 'string', 'max:50'],
+            'ciclo_escolar_inicio_id' => ['nullable', 'exists:ciclo_escolares,id'],
+            'ciclo_escolar_fin_id' => ['nullable', 'exists:ciclo_escolares,id'],
+            'fecha_inicio' => ['required', 'date'],
+            'fecha_termino' => ['required', 'date', 'after:fecha_inicio'],
         ]);
 
-
-        $existe = \App\Models\Generacion::where('nivel_id', $this->nivel_id)
+        $existe = Generacion::query()
+            ->where('nivel_id', $this->nivel_id)
             ->where('anio_ingreso', $this->anio_ingreso)
             ->where('anio_egreso', $this->anio_egreso)
-                ->where('id', '!=', $this->generacionId)
+            ->where('id', '!=', $this->generacionId)
             ->exists();
-
         if ($existe) {
-               $this->dispatch('swal', [
-            'title' => 'Ya existe una generación en este nivel',
-            'icon' => 'error',
-            'position' => 'top',
-        ]);
-
+            $this->addError('anio_ingreso', 'Ya existe esa generación en el nivel seleccionado.');
             return;
         }
 
-        $generacion = Generacion::findOrFail($this->generacionId);
-
-
-
-        $generacion->update([
-            'anio_ingreso' => $this->anio_ingreso,
-            'anio_egreso' => $this->anio_egreso,
-            'nivel_id' => $this->nivel_id,
-           'status' => $this->status ? 1 : 0,
-        ]);
-
-        $this->dispatch('swal', [
-            'title' => '¡Generación actualizada correctamente!',
-            'icon' => 'success',
-            'position' => 'top-end',
-        ]);
-
+        Generacion::query()->findOrFail($this->generacionId)->update($data);
         $this->dispatch('refreshGeneraciones');
         $this->dispatch('cerrar-modal-editar');
+        $this->dispatch('swal', ['title' => 'Generación actualizada', 'icon' => 'success', 'position' => 'top-end']);
         $this->cerrarModal();
     }
 
-
-
-    public function cerrarModal()
+    public function cerrarModal(): void
     {
-        $this->reset([
-            'open',
-            'generacionId',
-            'anio_ingreso',
-            'anio_egreso',
-            'nivel_id',
-            'status'
-        ]);
-            $this->resetValidation();
+        $this->reset();
+        $this->resetValidation();
     }
-
 
     public function render()
     {
-        $niveles = \App\Models\Nivel::all();
-        return view('livewire.generacion.editar-generacion', compact('niveles'));
+        return view('livewire.generacion.editar-generacion', [
+            'niveles' => Nivel::query()->orderBy('id')->get(),
+            'ciclosEscolares' => CicloEscolar::query()->orderByDesc('inicio_anio')->get(),
+        ]);
     }
 }

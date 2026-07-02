@@ -75,13 +75,6 @@ class Grupo extends Model
         return $this->hasMany(Inscripcion::class);
     }
 
-
-
-    public function trayectoriasAcademicas()
-    {
-        return $this->hasMany(TrayectoriaAcademica::class, 'grupo_id');
-    }
-
     // RELACION CON HORARIOS
     public function horarios()
     {

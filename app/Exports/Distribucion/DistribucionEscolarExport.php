@@ -109,7 +109,7 @@ class DistribucionEscolarExport implements WithMultipleSheets
             new DistribucionEscolarSheet(
                 'Resumen',
                 [
-                    'Ciclo escolar', 'Regional', 'Zona', 'CCT', 'Nombre CT', 'Nivel', 'Turno', 'Grado', 'Semestre', 'Grupo',
+                    'Referencia', 'Regional', 'Zona', 'CCT', 'Nombre CT', 'Nivel', 'Turno', 'Grado', 'Semestre', 'Grupo',
                     'Hombres', 'Mujeres', 'Total histórico', 'Activos', 'Inactivos',
                     'Bajas', 'Traslados', 'Suspendidos', 'Egresados', 'Generación',
                     'Maestro', 'Director',
@@ -119,7 +119,7 @@ class DistribucionEscolarExport implements WithMultipleSheets
             new DistribucionEscolarSheet(
                 'Listado nominal',
                 [
-                    'Ciclo escolar', 'Matrícula', 'CURP', 'Alumno', 'Género', 'Nivel',
+                    'Referencia', 'Matrícula', 'CURP', 'Alumno', 'Género', 'Nivel',
                     'Grado', 'Semestre', 'Grupo', 'Generación', 'Estado histórico',
                     'Estado actual', 'Fecha de alta', 'Fecha de baja/término', 'Motivo',
                     'Observaciones', 'Dato reconstruido',
@@ -129,7 +129,7 @@ class DistribucionEscolarExport implements WithMultipleSheets
             new DistribucionEscolarSheet(
                 'Ya no están',
                 [
-                    'Matrícula', 'CURP', 'Alumno', 'Generación', 'Último ciclo consultado',
+                    'Matrícula', 'CURP', 'Alumno', 'Generación', 'Referencia',
                     'Grado', 'Grupo', 'Estado histórico', 'Estado actual', 'Fecha de baja/término',
                     'Motivo', 'Observaciones',
                 ],
@@ -138,7 +138,7 @@ class DistribucionEscolarExport implements WithMultipleSheets
             new DistribucionEscolarSheet(
                 'Egresados',
                 [
-                    'Matrícula', 'CURP', 'Alumno', 'Generación', 'Ciclo escolar',
+                    'Matrícula', 'CURP', 'Alumno', 'Generación', 'Referencia',
                     'Grado', 'Grupo', 'Estado histórico', 'Estado actual',
                 ],
                 $egresados,

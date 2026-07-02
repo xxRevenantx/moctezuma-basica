@@ -10,7 +10,6 @@ class DecisionPromocionOficial extends Model
 
     protected $fillable = [
         'inscripcion_id',
-        'trayectoria_academica_id',
         'ciclo_escolar_id',
         'nivel_id',
         'grado_id',
@@ -34,10 +33,5 @@ class DecisionPromocionOficial extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id')->withTrashed();
-    }
-
-    public function trayectoriaAcademica()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_academica_id');
     }
 }

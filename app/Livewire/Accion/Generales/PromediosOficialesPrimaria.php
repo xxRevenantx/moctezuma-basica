@@ -129,7 +129,6 @@ class PromediosOficialesPrimaria extends Component
                 'grado_id' => (int) $fila['grado_id'],
             ],
             [
-                'trayectoria_academica_id' => $fila['trayectoria_academica_id'],
                 'nivel_id' => $this->nivelId,
                 'grupo_id' => (int) $fila['grupo_id'],
                 'generacion_id' => (int) $fila['generacion_id'],

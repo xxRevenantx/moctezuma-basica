@@ -28,7 +28,6 @@ class DocumentoAlumno extends Model
         'grado_id',
         'grupo_id',
         'ciclo_escolar_id',
-        'trayectoria_academica_id',
         'fecha_documento',
         'folio',
         'origen',
@@ -85,11 +84,6 @@ class DocumentoAlumno extends Model
     public function cicloEscolar()
     {
         return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
-    }
-
-    public function trayectoriaAcademica()
-    {
-        return $this->belongsTo(TrayectoriaAcademica::class, 'trayectoria_academica_id');
     }
 
     public function usuarioQueSubio()

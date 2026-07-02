@@ -14,8 +14,6 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
-use App\Models\TrayectoriaAcademica;
-use App\Services\TrayectoriaAcademicaService;
 use App\Services\CurpService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1315,24 +1313,10 @@ class CrearInscripcion extends Component
                 'foto_path' => $fotoPath,
                 'tutor_id' => $data['tutor_id'] ?? null,
                 'activo' => true,
+                'estatus' => 'activo',
+                'fecha_estatus' => $data['fecha_inscripcion'],
             ]);
 
-            app(TrayectoriaAcademicaService::class)->registrarInscripcionEnContexto(
-                $inscripcion,
-                [
-                    'matricula' => $data['matricula'],
-                    'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
-                    'ciclo_id' => (int) $data['ciclo_id'],
-                    'nivel_id' => (int) $data['nivel_id'],
-                    'grado_id' => (int) $data['grado_id'],
-                    'generacion_id' => (int) $data['generacion_id'],
-                    'grupo_id' => (int) $data['grupo_id'],
-                    'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
-                    'fecha_inscripcion' => $data['fecha_inscripcion'],
-                ],
-                auth()->id(),
-                'inscripcion'
-            );
         });
 
         $this->dispatch('swal', [

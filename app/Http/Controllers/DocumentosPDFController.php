@@ -80,7 +80,6 @@ class DocumentosPDFController extends Controller
         }
 
         $alumno = $constancia->alumno;
-        $trayectoria = $alumno->trayectoriasAcademicas()->latest('id')->first();
         $movimiento = $tipoSlug === 'constancia-baja-traslado'
             ? $alumno->movimientos()
             ->whereIn('tipo', ['baja_definitiva', 'baja_temporal', 'traslado'])
@@ -94,11 +93,10 @@ class DocumentosPDFController extends Controller
             $tipoSlug,
             $contenidoPdf,
             [
-                'nivel_id' => $trayectoria?->nivel_id ?? $alumno->nivel_id,
-                'grado_id' => $trayectoria?->grado_id ?? $alumno->grado_id,
-                'grupo_id' => $trayectoria?->grupo_id ?? $alumno->grupo_id,
-                'ciclo_escolar_id' => $trayectoria?->ciclo_escolar_id,
-                'trayectoria_academica_id' => $trayectoria?->id,
+                'nivel_id' => $alumno->nivel_id,
+                'grado_id' => $alumno->grado_id,
+                'grupo_id' => $alumno->grupo_id,
+                'ciclo_escolar_id' => $movimiento?->ciclo_escolar_id,
                 'fecha_documento' => $constancia->fecha_expedicion?->format('Y-m-d'),
                 'folio' => $constancia->folio,
                 'estado' => $constancia->estado_documento === 'cancelada' ? 'cancelada' : 'emitida',

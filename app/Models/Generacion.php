@@ -17,6 +17,14 @@ class Generacion extends Model
         'nivel_id',
         'anio_ingreso',
         'anio_egreso',
+        'nombre',
+        'ciclo_escolar_inicio_id',
+        'ciclo_escolar_fin_id',
+        'fecha_inicio',
+        'fecha_termino',
+        'motivo_desactivacion',
+        'reactivada_at',
+        'reactivada_por',
         'status',
         'cerrada_at',
         'cerrada_por',
@@ -26,6 +34,9 @@ class Generacion extends Model
     protected $casts = [
         'status' => 'boolean',
         'cerrada_at' => 'datetime',
+        'fecha_inicio' => 'date',
+        'fecha_termino' => 'date',
+        'reactivada_at' => 'datetime',
     ];
 
     // Relaciones y métodos adicionales pueden ser añadidos aquí
@@ -70,13 +81,34 @@ class Generacion extends Model
         return $this->hasMany(BitacoraCalificacion::class, 'generacion_id');
     }
 
-    public function trayectoriasAcademicas()
-    {
-        return $this->hasMany(TrayectoriaAcademica::class, 'generacion_id');
-    }
-
     public function usuarioQueCerro()
     {
         return $this->belongsTo(User::class, 'cerrada_por');
     }
+    public function cambiosAcademicos()
+    {
+        return $this->hasMany(CambioAcademico::class, 'generacion_id')
+            ->orderByDesc('realizado_at')->orderByDesc('id');
+    }
+
+    public function cicloEscolarInicio()
+    {
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_inicio_id');
+    }
+
+    public function cicloEscolarFin()
+    {
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_fin_id');
+    }
+
+    public function usuarioQueReactivo()
+    {
+        return $this->belongsTo(User::class, 'reactivada_por');
+    }
+
+    public function getEtiquetaAttribute(): string
+    {
+        return $this->nombre ?: $this->anio_ingreso . '-' . $this->anio_egreso;
+    }
+
 }

@@ -9,7 +9,7 @@ use App\Models\Horario;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
-use App\Models\TrayectoriaAcademica;
+use App\Models\Inscripcion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -75,9 +75,9 @@ class AsignacionMateria extends Component
             return collect();
         }
 
-        $gruposConTrayectoria = TrayectoriaAcademica::query()
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+        $gruposConAlumnos = Inscripcion::query()
             ->where('nivel_id', $this->nivel->id)
+            ->whereNotNull('grupo_id')
             ->pluck('grupo_id')
             ->filter()
             ->unique();
@@ -90,7 +90,7 @@ class AsignacionMateria extends Component
                 'semestre:id,numero,orden_global',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->when($gruposConTrayectoria->isNotEmpty(), fn ($q) => $q->whereIn('id', $gruposConTrayectoria))
+            ->when($gruposConAlumnos->isNotEmpty(), fn ($q) => $q->whereIn('id', $gruposConAlumnos))
             ->get()
             ->sortBy(fn ($grupo) => sprintf(
                 '%03d|%03d|%s|%04d',
@@ -522,11 +522,11 @@ class AsignacionMateria extends Component
             return null;
         }
 
-        $idsVigentes = TrayectoriaAcademica::query()
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+        $idsVigentes = Inscripcion::query()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $grupoOrigen->grado_id)
             ->whereNotNull('grupo_id')
+            ->where('activo', true)
             ->when($grupoOrigen->semestre_id, fn ($q) => $q->where('semestre_id', $grupoOrigen->semestre_id))
             ->pluck('grupo_id')
             ->unique();

@@ -57,6 +57,9 @@ class Inscripcion extends Model
 
         // Control
         'activo',
+        'estatus',
+        'fecha_estatus',
+        'motivo_estatus',
         'indicador_reingreso',
         'tipo_ultimo_ingreso',
         'fecha_ultimo_ingreso',
@@ -73,6 +76,7 @@ class Inscripcion extends Model
         'fecha_nacimiento' => 'date',
         'fecha_inscripcion' => 'date',
         'activo' => 'boolean',
+        'fecha_estatus' => 'datetime',
         'indicador_reingreso' => 'boolean',
         'fecha_ultimo_ingreso' => 'date',
         'documentacion_reingreso_pendiente' => 'boolean',
@@ -142,18 +146,6 @@ class Inscripcion extends Model
         return $this->hasMany(BitacoraCalificacion::class);
     }
 
-    public function trayectoriasAcademicas()
-    {
-        return $this->hasMany(TrayectoriaAcademica::class, 'inscripcion_id');
-    }
-
-    public function trayectoriaActual()
-    {
-        return $this->hasOne(TrayectoriaAcademica::class, 'inscripcion_id')
-            ->where('es_actual', true)
-            ->latestOfMany();
-    }
-
     public function matriculasAlumno()
     {
         return $this->hasMany(MatriculaAlumno::class, 'inscripcion_id')
@@ -188,6 +180,12 @@ class Inscripcion extends Model
             ->where('es_actual', true);
     }
 
+    public function cambiosAcademicos()
+    {
+        return $this->hasMany(CambioAcademico::class, 'inscripcion_id')
+            ->orderByDesc('realizado_at')->orderByDesc('id');
+    }
+
     public function movimientos()
     {
         return $this->hasMany(MovimientoAlumno::class, 'inscripcion_id');
@@ -217,7 +215,7 @@ class Inscripcion extends Model
     protected static function booted(): void
     {
         static::forceDeleting(function (Inscripcion $inscripcion) {
-            $tieneHistorial = $inscripcion->trayectoriasAcademicas()->exists()
+            $tieneHistorial = $inscripcion->cambiosAcademicos()->exists()
                 || $inscripcion->movimientos()->exists()
                 || $inscripcion->calificaciones()->exists()
                 || $inscripcion->documentos()->exists();

@@ -288,7 +288,6 @@ class PromediosGenerales extends Component
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
-                'trayectoria_academica_id' => $fila['trayectoria_academica_id'] ?? null,
                 'generacion_id' => $fila['generacion_id'],
                 'matricula' => $fila['matricula'],
                 'alumno' => $fila['alumno'],
@@ -343,7 +342,6 @@ class PromediosGenerales extends Component
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
-                'trayectoria_academica_id' => $fila['trayectoria_academica_id'] ?? null,
                 'generacion_id' => $fila['generacion_id'],
                 'matricula' => $fila['matricula'],
                 'alumno' => $fila['alumno'],
@@ -400,7 +398,6 @@ class PromediosGenerales extends Component
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
-                'trayectoria_academica_id' => $fila['trayectoria_academica_id'] ?? null,
                 'generacion_id' => $fila['generacion_id'],
                 'matricula' => $fila['matricula'],
                 'alumno' => $fila['alumno'],
@@ -538,7 +535,6 @@ class PromediosGenerales extends Component
 
                 $fila = [
                     'inscripcion_id' => (int) $primero->inscripcion_id,
-                    'trayectoria_academica_id' => null,
                     'generacion_id' => (int) $primero->generacion_id,
                     'matricula' => $primero->matricula,
                     'alumno' => trim(($primero->apellido_paterno ?? '') . ' ' . ($primero->apellido_materno ?? '') . ' ' . ($primero->nombre ?? '')),
@@ -845,7 +841,6 @@ class PromediosGenerales extends Component
                 'grado_id' => (int) $fila['grado_id'],
             ],
             [
-                'trayectoria_academica_id' => $fila['trayectoria_academica_id'] ?? null,
                 'nivel_id' => (int) $this->nivel->id,
                 'grupo_id' => (int) $fila['grupo_id'],
                 'generacion_id' => (int) $fila['generacion_id'],

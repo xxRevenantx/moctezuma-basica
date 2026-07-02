@@ -172,40 +172,24 @@ class DistribucionEscolarController extends Controller
         $categorias = implode(',', array_keys($service->categorias()));
 
         $datos = $request->validate([
-            'modo' => ['nullable', 'in:ciclo,historico'],
-            'ciclo_escolar_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
             'grado_id' => ['nullable', 'integer', 'exists:grados,id'],
             'grupo_id' => ['nullable', 'integer', 'exists:grupos,id'],
+            'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
             'estado' => ['nullable', 'in:todos,' . $categorias],
             'solo_ya_no_estan' => ['nullable', 'boolean'],
         ]);
 
-        $nivel = Nivel::query()
-            ->with('director')
-            ->where('slug', $slugNivel)
-            ->firstOrFail();
+        $nivel = Nivel::query()->with('director')->where('slug', $slugNivel)->firstOrFail();
 
-        $modo = (string) ($datos['modo'] ?? 'ciclo');
-
-        if ($modo === 'ciclo' && empty($datos['ciclo_escolar_id'])) {
-            abort(422, 'Selecciona un ciclo escolar para generar el reporte.');
-        }
-
-        return [
-            $nivel,
-            [
-                'ciclo_escolar_id' => $modo === 'ciclo'
-                    ? ($datos['ciclo_escolar_id'] ?? null)
-                    : null,
-                'generacion_id' => $datos['generacion_id'] ?? null,
-                'grado_id' => $datos['grado_id'] ?? null,
-                'grupo_id' => $datos['grupo_id'] ?? null,
-                'estado' => $datos['estado'] ?? 'todos',
-                'solo_ya_no_estan' => (bool) ($datos['solo_ya_no_estan'] ?? false),
-                'modo' => $modo,
-            ],
-        ];
+        return [$nivel, [
+            'generacion_id' => $datos['generacion_id'] ?? null,
+            'grado_id' => $datos['grado_id'] ?? null,
+            'grupo_id' => $datos['grupo_id'] ?? null,
+            'semestre_id' => $datos['semestre_id'] ?? null,
+            'estado' => $datos['estado'] ?? 'todos',
+            'solo_ya_no_estan' => (bool) ($datos['solo_ya_no_estan'] ?? false),
+        ]];
     }
 
     private function crearPdf(
@@ -229,9 +213,9 @@ class DistribucionEscolarController extends Controller
 
     private function nombreBase(Nivel $nivel, array $filtros): string
     {
-        $alcance = ($filtros['modo'] ?? 'ciclo') === 'historico'
-            ? 'historial_completo'
-            : 'ciclo_' . ($filtros['ciclo_escolar_id'] ?? 'sin_ciclo');
+        $alcance = filled($filtros['generacion_id'] ?? null)
+            ? 'generacion_' . $filtros['generacion_id']
+            : 'todas_las_generaciones';
 
         return Str::slug(
             'distribucion_escolar_' . $nivel->slug . '_' . $alcance . '_' . now()->format('Ymd_His'),
