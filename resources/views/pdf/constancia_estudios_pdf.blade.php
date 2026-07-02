@@ -615,10 +615,10 @@
 
                 @if (
                     $esConstanciaEstudios &&
-                        !empty($calificacionesConstancia['materias'] ?? []) &&
+                        !empty($calificacionesConstancia['columnas'] ?? []) &&
                         !empty($calificacionesConstancia['filas'] ?? []))
                     <p class="texto-calificaciones">
-                        Se anexan las calificaciones de los siguientes periodos:
+                        Se anexan las calificaciones de los periodos seleccionados:
                     </p>
 
                     <table class="tabla-calificaciones">
@@ -628,10 +628,10 @@
                                     MATERIA
                                 </th>
 
-                                @foreach ($calificacionesConstancia['materias'] as $materiaCalificacion)
+                                @foreach ($calificacionesConstancia['columnas'] as $columnaCalificacion)
                                     <th>
                                         <div class="materia-nombre">
-                                            {{ mb_strtoupper($materiaCalificacion->materia) }}
+                                            {{ mb_strtoupper($columnaCalificacion['label']) }}
                                         </div>
                                     </th>
                                 @endforeach
@@ -649,9 +649,9 @@
                                         {{ $filaCalificacion['periodo'] }}
                                     </td>
 
-                                    @foreach ($calificacionesConstancia['materias'] as $materiaCalificacion)
+                                    @foreach ($calificacionesConstancia['columnas'] as $columnaCalificacion)
                                         <td>
-                                            {{ $filaCalificacion['valores'][$materiaCalificacion->asignacion_materia_id] ?? '' }}
+                                            {{ $filaCalificacion['valores'][$columnaCalificacion['key']] ?? '' }}
                                         </td>
                                     @endforeach
 

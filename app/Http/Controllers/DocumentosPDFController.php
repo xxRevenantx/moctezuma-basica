@@ -49,7 +49,11 @@ class DocumentosPDFController extends Controller
         $nombreArchivo = Str::slug($constancia->folio, '_') . '.pdf';
         $contenidoPdf = $pdf->output();
 
-        $this->archivarConstanciaEnExpediente($constancia, $contenidoPdf);
+        try {
+            $this->archivarConstanciaEnExpediente($constancia, $contenidoPdf);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response($contenidoPdf, 200, [
             'Content-Type' => 'application/pdf',
@@ -358,18 +362,33 @@ class DocumentosPDFController extends Controller
             return [];
         }
 
-        $textoPlantilla = mb_strtolower(
-            trim(($plantilla->clave ?? '') . ' ' . ($plantilla->titulo ?? ''))
-        );
+        $textoPlantilla = Str::lower(trim(($plantilla->clave ?? '') . ' ' . ($plantilla->titulo ?? '')));
 
-        // Las calificaciones solo se muestran en constancia de estudios.
-        if (str_contains($textoPlantilla, 'relaciones') || str_contains($textoPlantilla, 'conducta')) {
+        if (
+            !Str::contains($textoPlantilla, 'estudio')
+            || Str::contains($textoPlantilla, ['relaciones', 'conducta', 'baja', 'traslado'])
+        ) {
             return [];
         }
 
-        $periodosSeleccionados = $this->obtenerPeriodosSeleccionadosConstancia(
-            $constancia->periodos_calificaciones ?? []
-        );
+        $configuracionPeriodos = $constancia->periodos_calificaciones ?? [];
+
+        if (is_string($configuracionPeriodos)) {
+            $configuracionPeriodos = json_decode($configuracionPeriodos, true) ?: [];
+        }
+
+        if (!(bool) ($configuracionPeriodos['incluir_calificaciones'] ?? false)) {
+            return [];
+        }
+
+        $nivelSlug = Str::lower((string) ($alumno->nivel?->slug ?? ''));
+
+        // Preescolar trabaja con fichas descriptivas, no con calificaciones numéricas.
+        if (Str::contains($nivelSlug, 'preescolar')) {
+            return [];
+        }
+
+        $periodosSeleccionados = $this->obtenerPeriodosSeleccionadosConstancia($configuracionPeriodos);
 
         if (empty($periodosSeleccionados)) {
             return [];
@@ -385,15 +404,8 @@ class DocumentosPDFController extends Controller
             ->join('periodos_basica', 'periodos_basica.id', '=', 'periodos.periodo_basica_id')
             ->where('periodos.nivel_id', $alumno->nivel_id)
             ->whereIn('periodos.periodo_basica_id', array_keys($periodosSeleccionados))
-            ->when($cicloEscolarId, function ($consulta) use ($cicloEscolarId) {
-                $consulta->where('periodos.ciclo_escolar_id', $cicloEscolarId);
-            })
-            ->select(
-                'periodos.id',
-                'periodos.periodo_basica_id',
-                'periodos_basica.periodo',
-                'periodos_basica.descripcion'
-            )
+            ->when($cicloEscolarId, fn($consulta) => $consulta->where('periodos.ciclo_escolar_id', $cicloEscolarId))
+            ->select('periodos.id', 'periodos.periodo_basica_id', 'periodos_basica.periodo', 'periodos_basica.descripcion')
             ->orderBy('periodos_basica.periodo')
             ->get()
             ->keyBy('periodo_basica_id');
@@ -402,19 +414,127 @@ class DocumentosPDFController extends Controller
             return [];
         }
 
+        if (Str::contains($nivelSlug, 'primaria')) {
+            return $this->obtenerCamposFormativosPrimaria($alumno, $periodosSeleccionados, $periodos, $cicloEscolarId);
+        }
+
+        return $this->obtenerMateriasCalificables($alumno, $periodosSeleccionados, $periodos, $cicloEscolarId);
+    }
+
+    private function obtenerCamposFormativosPrimaria(
+        Inscripcion $alumno,
+        array $periodosSeleccionados,
+        $periodos,
+        ?int $cicloEscolarId
+    ): array {
+        $campos = DB::table('campos_formativos')
+            ->where('activo', true)
+            ->whereIn('slug', [
+                'lenguajes',
+                'saberes-pensamiento-cientifico',
+                'etica-naturaleza-sociedades',
+                'humano-comunitario',
+            ])
+            ->select('id', 'nombre', 'orden')
+            ->orderBy('orden')
+            ->get();
+
+        if ($campos->isEmpty()) {
+            return [];
+        }
+
+        $periodoIds = $periodos->pluck('id')->values()->all();
+
+        $oficiales = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('calificaciones_campos_formativos')) {
+            $oficiales = DB::table('calificaciones_campos_formativos')
+                ->where('inscripcion_id', $alumno->id)
+                ->whereIn('periodo_id', $periodoIds)
+                ->select('periodo_id', 'campo_formativo_id', 'calificacion_oficial', 'confirmada', 'id')
+                ->orderBy('id')
+                ->get()
+                ->groupBy(fn($fila) => $fila->periodo_id . '_' . $fila->campo_formativo_id)
+                ->map(fn($items) => $items->last());
+        }
+
+        $internas = DB::table('calificaciones')
+            ->join('asignacion_materias', 'asignacion_materias.id', '=', 'calificaciones.asignacion_materia_id')
+            ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
+            ->where('calificaciones.inscripcion_id', $alumno->id)
+            ->whereIn('calificaciones.periodo_id', $periodoIds)
+            ->where('materias.calificable', true)
+            ->where('materias.extra', false)
+            ->where('materias.receso', false)
+            ->whereNotNull('materias.campo_formativo_id')
+            ->where('calificaciones.es_numerica', true)
+            ->whereNotNull('calificaciones.valor_numerico')
+            ->select('calificaciones.periodo_id', 'materias.campo_formativo_id', 'materias.id as materia_id', 'calificaciones.valor_numerico', 'calificaciones.id')
+            ->orderBy('calificaciones.id')
+            ->get()
+            ->groupBy(fn($fila) => $fila->periodo_id . '_' . $fila->campo_formativo_id);
+
+        $columnas = $campos->map(fn($campo) => [
+            'key' => 'campo_' . $campo->id,
+            'label' => $campo->nombre,
+        ])->values()->all();
+
+        $filas = [];
+        foreach ($periodosSeleccionados as $periodoBasicaId => $nombrePeriodo) {
+            $periodo = $periodos->get($periodoBasicaId);
+            if (!$periodo) {
+                continue;
+            }
+
+            $valores = [];
+            $numericas = [];
+
+            foreach ($campos as $campo) {
+                $llave = $periodo->id . '_' . $campo->id;
+                $oficial = $oficiales->get($llave);
+                $valorNumerico = null;
+
+                if ($oficial && is_numeric($oficial->calificacion_oficial)) {
+                    $valorNumerico = (float) $oficial->calificacion_oficial;
+                } else {
+                    $materiasCampo = collect($internas->get($llave, collect()))
+                        ->groupBy('materia_id')
+                        ->map(fn($items) => $items->last());
+                    $valorNumerico = PromedioExcel::calcular($materiasCampo->pluck('valor_numerico'));
+                }
+
+                $key = 'campo_' . $campo->id;
+                $valores[$key] = $valorNumerico === null ? '' : PromedioExcel::formatear($valorNumerico, 1, '');
+
+                if ($valorNumerico !== null) {
+                    $numericas[] = $valorNumerico;
+                }
+            }
+
+            $promedio = PromedioExcel::calcular($numericas);
+            $filas[] = [
+                'periodo' => $nombrePeriodo,
+                'valores' => $valores,
+                'promedio' => PromedioExcel::formatear($promedio, 1, '0.0'),
+            ];
+        }
+
+        return ['columnas' => $columnas, 'filas' => $filas, 'tipo' => 'campos'];
+    }
+
+    private function obtenerMateriasCalificables(
+        Inscripcion $alumno,
+        array $periodosSeleccionados,
+        $periodos,
+        ?int $cicloEscolarId
+    ): array {
         $materias = DB::table('asignacion_materias')
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
             ->where('asignacion_materias.grupo_id', $alumno->grupo_id)
             ->when($cicloEscolarId, fn($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
-            ->where('asignacion_materias.estado', '!=', \App\Models\AsignacionMateria::ESTADO_ARCHIVADA)
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)
-            ->select(
-                'asignacion_materias.id as asignacion_materia_id',
-                'materias.materia',
-                'asignacion_materias.orden'
-            )
+            ->select('asignacion_materias.id as asignacion_materia_id', 'materias.materia', 'asignacion_materias.orden')
             ->orderBy('asignacion_materias.orden')
             ->orderBy('asignacion_materias.id')
             ->get();
@@ -423,41 +543,34 @@ class DocumentosPDFController extends Controller
             return [];
         }
 
-        $periodoIds = $periodos->pluck('id')->values()->toArray();
-
+        $periodoIds = $periodos->pluck('id')->values()->all();
         $calificaciones = DB::table('calificaciones')
             ->where('inscripcion_id', $alumno->id)
             ->whereIn('periodo_id', $periodoIds)
-            ->select(
-                'periodo_id',
-                'asignacion_materia_id',
-                'calificacion',
-                'valor_numerico',
-                'es_numerica'
-            )
+            ->select('periodo_id', 'asignacion_materia_id', 'calificacion', 'valor_numerico', 'es_numerica', 'id')
+            ->orderBy('id')
             ->get()
-            ->groupBy(function ($calificacion) {
-                return $calificacion->periodo_id . '_' . $calificacion->asignacion_materia_id;
-            });
+            ->groupBy(fn($fila) => $fila->periodo_id . '_' . $fila->asignacion_materia_id)
+            ->map(fn($items) => $items->last());
+
+        $columnas = $materias->map(fn($materia) => [
+            'key' => 'materia_' . $materia->asignacion_materia_id,
+            'label' => $materia->materia,
+        ])->values()->all();
 
         $filas = [];
-
         foreach ($periodosSeleccionados as $periodoBasicaId => $nombrePeriodo) {
             $periodo = $periodos->get($periodoBasicaId);
-
             if (!$periodo) {
                 continue;
             }
 
             $valores = [];
             $numericas = [];
-
             foreach ($materias as $materia) {
-                $llave = $periodo->id . '_' . $materia->asignacion_materia_id;
-                $calificacion = $calificaciones->get($llave)?->first();
-
-                $valor = $calificacion?->calificacion ?? '';
-                $valores[$materia->asignacion_materia_id] = $valor;
+                $calificacion = $calificaciones->get($periodo->id . '_' . $materia->asignacion_materia_id);
+                $key = 'materia_' . $materia->asignacion_materia_id;
+                $valores[$key] = $calificacion?->calificacion ?? '';
 
                 if ($calificacion && (bool) $calificacion->es_numerica && is_numeric($calificacion->valor_numerico)) {
                     $numericas[] = (float) $calificacion->valor_numerico;
@@ -465,19 +578,14 @@ class DocumentosPDFController extends Controller
             }
 
             $promedio = PromedioExcel::calcular($numericas);
-
             $filas[] = [
                 'periodo' => $nombrePeriodo,
                 'valores' => $valores,
                 'promedio' => PromedioExcel::formatear($promedio, 1, '0.0'),
-                'promedio_calculo' => $promedio,
             ];
         }
 
-        return [
-            'materias' => $materias,
-            'filas' => $filas,
-        ];
+        return ['columnas' => $columnas, 'filas' => $filas, 'tipo' => 'materias'];
     }
 
     /**

@@ -293,10 +293,11 @@
             text-align: center;
             vertical-align: top;
             padding: 0 12px;
+
         }
 
         .firma-supervisor {
-            padding-top: 2px !important;
+            padding-top: 15px !important;
         }
 
         .firma-linea {
@@ -308,7 +309,7 @@
 
         .firma-nombre {
             min-height: 18px;
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1.05;
             font-weight: 700;
             text-transform: uppercase;
@@ -457,12 +458,12 @@
             </tr>
             <tr>
                 <td colspan="2" class="firma-supervisor">
-                    <div class="firma-linea" style="width: 52%;"></div>
+                    <div class="firma-linea" style="width: 40%;"></div>
                     <div class="firma-nombre">
                         {{ $supervisoraFinal }}
                     </div>
                     <div class="cargo">
-                        Supervisor escolar · Zona 137, Cd. Altamirano
+                        Supervisora escolar · Zona 137, Cd. Altamirano, Gro.
                     </div>
                 </td>
             </tr>

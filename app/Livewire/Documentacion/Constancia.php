@@ -60,6 +60,8 @@ class Constancia extends Component
 
     public bool $tercer_periodo = false;
 
+    public bool $incluir_calificaciones = false;
+
     public string $contenido_html = '';
 
     public bool $mostrar_modal_plantilla = false;
@@ -180,6 +182,13 @@ class Constancia extends Component
     public function updatedTipoConstancia(): void
     {
         $this->cargarPlantilla();
+
+        if (!$this->esConstanciaEstudiosSeleccionada()) {
+            $this->incluir_calificaciones = false;
+            $this->primer_periodo = false;
+            $this->segundo_periodo = false;
+            $this->tercer_periodo = false;
+        }
     }
 
     public function cargarPlantilla(): void
@@ -610,6 +619,12 @@ class Constancia extends Component
             'modo_descarga' => ['required', 'in:alumno,nivel,grado,grupo'],
         ]);
 
+        if ($this->incluir_calificaciones && !$this->hayPeriodosSeleccionados()) {
+            $this->addError('periodos_calificaciones', 'Selecciona al menos un periodo para incluir calificaciones.');
+            $this->dispatch('cerrar-ventana-constancia-vacia');
+            return;
+        }
+
         if ($this->modo_descarga === 'alumno') {
             $this->validate([
                 'selectedAlumno' => ['required'],
@@ -780,10 +795,24 @@ class Constancia extends Component
     private function periodosSeleccionados(): array
     {
         return [
-            'primer_periodo' => $this->primer_periodo,
-            'segundo_periodo' => $this->segundo_periodo,
-            'tercer_periodo' => $this->tercer_periodo,
+            'incluir_calificaciones' => $this->incluir_calificaciones && $this->esConstanciaEstudiosSeleccionada(),
+            'primer_periodo' => $this->incluir_calificaciones && $this->primer_periodo,
+            'segundo_periodo' => $this->incluir_calificaciones && $this->segundo_periodo,
+            'tercer_periodo' => $this->incluir_calificaciones && $this->tercer_periodo,
         ];
+    }
+
+    private function hayPeriodosSeleccionados(): bool
+    {
+        return $this->primer_periodo || $this->segundo_periodo || $this->tercer_periodo;
+    }
+
+    public function esConstanciaEstudiosSeleccionada(): bool
+    {
+        $identificador = Str::lower(trim($this->tipo_constancia . ' ' . $this->plantilla_titulo));
+
+        return Str::contains($identificador, 'estudio')
+            && !Str::contains($identificador, ['baja', 'traslado', 'conducta', 'relaciones']);
     }
 
     private function generarFolio(): string

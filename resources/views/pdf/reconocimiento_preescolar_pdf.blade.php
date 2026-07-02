@@ -222,14 +222,14 @@
 
         .descripcion {
             position: absolute;
-            top: 490px;
+            top: 480px;
             left: 145px;
             right: 145px;
             z-index: 6;
             text-align: center;
             font-family: 'calibri', 'ARIAL', sans-serif;
             font-size: 17px;
-            line-height: 1.18;
+            line-height: 1.1;
             color: #071846;
         }
 
@@ -240,7 +240,7 @@
 
         .datos-extra {
             position: absolute;
-            top: 565px;
+            top: 540px;
             left: 150px;
             right: 150px;
             z-index: 6;
@@ -264,7 +264,7 @@
 
         .fecha {
             position: absolute;
-            top: 606px;
+            top: 590px;
             left: 0;
             right: 0;
             z-index: 6;
@@ -277,7 +277,7 @@
 
         .firmas {
             position: absolute;
-            top: 680px;
+            top: 660px;
             left: 13%;
             right: 13%;
             z-index: 6;
@@ -286,6 +286,7 @@
             border-spacing: 28px 12px;
             font-family: 'ARIAL', sans-serif;
             color: #071846;
+
         }
 
         .firmas td {
@@ -296,11 +297,11 @@
         }
 
         .firma-supervisor {
-            padding-top: 2px !important;
+            padding-top: 15px !important;
         }
 
         .firma-linea {
-            width: 100%;
+            width: 70%;
             height: 1px;
             margin: 0 auto 5px;
             border-top: 1.5px solid #071846;
@@ -308,8 +309,8 @@
 
         .firma-nombre {
             min-height: 18px;
-            font-size: 12px;
-            line-height: 1.05;
+            font-size: 13px;
+            line-height: 1;
             font-weight: 700;
             text-transform: uppercase;
         }
@@ -475,12 +476,12 @@
             </tr>
             <tr>
                 <td colspan="2" class="firma-supervisor">
-                    <div class="firma-linea" style="width: 52%;"></div>
+                    <div class="firma-linea" style="width: 35%;"></div>
                     <div class="firma-nombre">
                         {{ $supervisoraFinal }}
                     </div>
                     <div class="cargo">
-                        Supervisor escolar · Zona 137, Cd. Altamirano
+                        Supervisora escolar · Zona 137, Cd. Altamirano, Gro.
                     </div>
                 </td>
             </tr>

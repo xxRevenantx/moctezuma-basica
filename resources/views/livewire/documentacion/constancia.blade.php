@@ -343,17 +343,46 @@
                     </div>
                 @endif
 
-                <div>
-                    <p class="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                        Agregar calificaciones
-                    </p>
+                @if ($this->esConstanciaEstudiosSeleccionada())
+                    <div
+                        class="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                                    Calificaciones de los periodos
+                                </p>
+                                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                    Activa esta opción para integrar las calificaciones dentro de la constancia de
+                                    estudios.
+                                </p>
+                            </div>
 
-                    <div class="flex flex-wrap gap-4">
-                        <flux:checkbox wire:model.live="primer_periodo" label="1° Periodo" />
-                        <flux:checkbox wire:model.live="segundo_periodo" label="2° Periodo" />
-                        <flux:checkbox wire:model.live="tercer_periodo" label="3° Periodo" />
+                            <flux:switch wire:model.live="incluir_calificaciones" label="Incluir calificaciones" />
+                        </div>
+
+                        @if ($incluir_calificaciones)
+                            <div class="mt-4 border-t border-blue-200 pt-4 dark:border-blue-900">
+                                <p class="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                                    Selecciona uno o varios periodos
+                                </p>
+
+                                <div class="flex flex-wrap gap-5">
+                                    <flux:checkbox wire:model.live="primer_periodo" label="1° periodo" />
+                                    <flux:checkbox wire:model.live="segundo_periodo" label="2° periodo" />
+                                    <flux:checkbox wire:model.live="tercer_periodo" label="3° periodo" />
+                                </div>
+
+                                <flux:error name="periodos_calificaciones" class="mt-3" />
+
+                                <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                                    En primaria se mostrarán los campos formativos y su promedio por periodo. En
+                                    secundaria se mostrarán las materias calificables y el promedio. En preescolar no se
+                                    integran calificaciones.
+                                </p>
+                            </div>
+                        @endif
                     </div>
-                </div>
+                @endif
 
                 <div class="flex justify-start">
                     <flux:button type="button" variant="primary"
@@ -510,12 +539,15 @@
                                                         {{ $constanciaGenerada->plantilla?->titulo ?? 'Sin plantilla' }}
                                                     </div>
 
-                                                    <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                                                    <div
+                                                        class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                                                         <span>{{ $constanciaGenerada->modo_descarga }}</span>
                                                         @if (($constanciaGenerada->estado_documento ?? 'emitida') === 'cancelada')
-                                                            <span class="rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Cancelada</span>
+                                                            <span
+                                                                class="rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Cancelada</span>
                                                         @else
-                                                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Emitida</span>
+                                                            <span
+                                                                class="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Emitida</span>
                                                         @endif
                                                     </div>
                                                 </td>
@@ -532,12 +564,14 @@
                                                         </flux:button>
 
                                                         @if (($constanciaGenerada->estado_documento ?? 'emitida') !== 'cancelada')
-                                                            <flux:button type="button" size="xs" variant="filled"
+                                                            <flux:button type="button" size="xs"
+                                                                variant="filled"
                                                                 wire:click="abrirEditarConstancia({{ $constanciaGenerada->id }})">
                                                                 Editar
                                                             </flux:button>
 
-                                                            <flux:button type="button" size="xs" variant="danger"
+                                                            <flux:button type="button" size="xs"
+                                                                variant="danger"
                                                                 wire:click="eliminarConstanciaGenerada({{ $constanciaGenerada->id }})"
                                                                 wire:confirm="¿Seguro que deseas cancelar esta constancia? El PDF se conservará en el historial.">
                                                                 Cancelar
@@ -1052,6 +1086,12 @@
 
                 window.addEventListener('cerrar-modal-editar-constancia', () => {
                     quitarEditor('editor_constancia_edicion');
+                });
+
+                window.addEventListener('cerrar-ventana-constancia-vacia', () => {
+                    if (window.ventanaConstancia && !window.ventanaConstancia.closed) {
+                        window.ventanaConstancia.close();
+                    }
                 });
 
                 window.addEventListener('abrir-constancia-nueva-ventana', (event) => {
