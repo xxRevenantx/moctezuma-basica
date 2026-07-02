@@ -250,40 +250,47 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                    @forelse ($activos as $alumno)
-                        @php
-                            $nombreCompleto = trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}");
-                        @endphp
-                        <tr wire:key="baja-activo-{{ $alumno->id }}" class="hover:bg-red-50/40 dark:hover:bg-red-950/10">
-                            <td class="px-4 py-4 text-center">
-                                <input
-                                    type="checkbox"
-                                    wire:model.live="selected"
-                                    value="{{ $alumno->id }}"
-                                    class="rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                />
-                            </td>
-                            <td class="px-4 py-4 font-black text-slate-900 dark:text-white">{{ $alumno->matricula ?: '—' }}</td>
-                            <td class="px-4 py-4 font-bold text-slate-800 dark:text-slate-100">{{ $nombreCompleto ?: '—' }}</td>
-                            <td class="px-4 py-4 text-slate-500">{{ $alumno->curp ?: '—' }}</td>
-                            <td class="px-4 py-4">{{ $alumno->generacion?->etiqueta ?? '—' }}</td>
-                            <td class="px-4 py-4">
-                                {{ $alumno->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($alumno->grupo) }}
-                                @if ($alumno->semestre)
-                                    <span class="text-xs text-slate-500">/ Sem. {{ $alumno->semestre->numero }}</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
-                                    {{ $this->etiquetaEstatus($alumno->estatus) }}
-                                </span>
-                            </td>
-                        </tr>
-                    @empty
+                    @if ($activos->isNotEmpty())
+                        @foreach ($activos as $alumnoActivo)
+                            @php
+                                $nombreCompletoActivo = trim(
+                                    ($alumnoActivo->apellido_paterno ?? '') . ' ' .
+                                    ($alumnoActivo->apellido_materno ?? '') . ' ' .
+                                    ($alumnoActivo->nombre ?? '')
+                                );
+                            @endphp
+
+                            <tr wire:key="baja-activo-{{ $alumnoActivo->id }}" class="hover:bg-red-50/40 dark:hover:bg-red-950/10">
+                                <td class="px-4 py-4 text-center">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="selected"
+                                        value="{{ $alumnoActivo->id }}"
+                                        class="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                    />
+                                </td>
+                                <td class="px-4 py-4 font-black text-slate-900 dark:text-white">{{ $alumnoActivo->matricula ?: '—' }}</td>
+                                <td class="px-4 py-4 font-bold text-slate-800 dark:text-slate-100">{{ $nombreCompletoActivo ?: '—' }}</td>
+                                <td class="px-4 py-4 text-slate-500">{{ $alumnoActivo->curp ?: '—' }}</td>
+                                <td class="px-4 py-4">{{ $alumnoActivo->generacion?->etiqueta ?? '—' }}</td>
+                                <td class="px-4 py-4">
+                                    {{ $alumnoActivo->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($alumnoActivo->grupo) }}
+                                    @if ($alumnoActivo->semestre)
+                                        <span class="text-xs text-slate-500">/ Sem. {{ $alumnoActivo->semestre->numero }}</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                        {{ $this->etiquetaEstatus($alumnoActivo->estatus) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    @else
                         <tr>
                             <td colspan="7" class="px-6 py-14 text-center text-slate-500">No hay alumnos activos en esta generación.</td>
                         </tr>
-                    @endforelse
+                    @endif
                 </tbody>
             </table>
         </div>
@@ -344,67 +351,74 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                    @forelse ($inactivos as $alumno)
-                        @php
-                            $nombreCompleto = trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}");
-                            $estatusClase = match ($alumno->estatus) {
-                                'egresado' => 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200',
-                                'trasladado' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200',
-                                'suspendido' => 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-200',
-                                default => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200',
-                            };
-                        @endphp
-                        <tr wire:key="baja-registrada-{{ $alumno->id }}" class="align-top hover:bg-slate-50 dark:hover:bg-neutral-800/50">
-                            <td class="px-4 py-4 font-black text-slate-900 dark:text-white">{{ $alumno->matricula ?: '—' }}</td>
-                            <td class="px-4 py-4">
-                                <p class="font-bold text-slate-800 dark:text-slate-100">{{ $nombreCompleto ?: '—' }}</p>
-                                <p class="mt-1 text-xs text-slate-500">{{ $alumno->curp ?: '—' }}</p>
-                            </td>
-                            <td class="px-4 py-4">
-                                {{ $alumno->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($alumno->grupo) }}
-                                @if ($alumno->semestre)
-                                    <br><span class="text-xs text-slate-500">Semestre {{ $alumno->semestre->numero }}</span>
-                                @endif
-                                <br><span class="text-xs font-semibold text-slate-500">Generación {{ $alumno->generacion?->etiqueta ?? '—' }}</span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="rounded-full px-2.5 py-1 text-xs font-black {{ $estatusClase }}">
-                                    {{ $this->etiquetaEstatus($alumno->estatus) }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-4">
-                                {{ optional($alumno->fecha_estatus)->format('d/m/Y') ?: optional($alumno->fecha_baja)->format('d/m/Y') ?: '—' }}
-                            </td>
-                            <td class="max-w-sm px-4 py-4">
-                                <p class="font-semibold text-slate-700 dark:text-slate-200">{{ $alumno->motivo_estatus ?: $alumno->motivo_baja ?: '—' }}</p>
-                                @if ($alumno->observaciones_baja)
-                                    <p class="mt-1 text-xs text-slate-500">{{ $alumno->observaciones_baja }}</p>
-                                @endif
-                            </td>
-                            <td class="px-4 py-4">
-                                <div class="flex justify-end">
-                                    @if ($alumno->estatus !== 'egresado')
-                                        <button
-                                            type="button"
-                                            x-on:click="confirmarReincorporacion({{ $alumno->id }}, @js($nombreCompleto))"
-                                            wire:loading.attr="disabled"
-                                            wire:target="reactivarAlumno"
-                                            class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-700 disabled:opacity-50"
-                                        >
-                                            <flux:icon.arrow-path class="h-4 w-4" />
-                                            Reincorporar
-                                        </button>
-                                    @else
-                                        <span class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500 dark:bg-neutral-800">Egreso confirmado</span>
+                    @if ($inactivos->isNotEmpty())
+                        @foreach ($inactivos as $alumnoInactivo)
+                            @php
+                                $nombreCompletoInactivo = trim(
+                                    ($alumnoInactivo->apellido_paterno ?? '') . ' ' .
+                                    ($alumnoInactivo->apellido_materno ?? '') . ' ' .
+                                    ($alumnoInactivo->nombre ?? '')
+                                );
+                                $estatusClase = match ($alumnoInactivo->estatus) {
+                                    'egresado' => 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200',
+                                    'trasladado' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200',
+                                    'suspendido' => 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-200',
+                                    default => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200',
+                                };
+                            @endphp
+
+                            <tr wire:key="baja-registrada-{{ $alumnoInactivo->id }}" class="align-top hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                                <td class="px-4 py-4 font-black text-slate-900 dark:text-white">{{ $alumnoInactivo->matricula ?: '—' }}</td>
+                                <td class="px-4 py-4">
+                                    <p class="font-bold text-slate-800 dark:text-slate-100">{{ $nombreCompletoInactivo ?: '—' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $alumnoInactivo->curp ?: '—' }}</p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    {{ $alumnoInactivo->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($alumnoInactivo->grupo) }}
+                                    @if ($alumnoInactivo->semestre)
+                                        <br><span class="text-xs text-slate-500">Semestre {{ $alumnoInactivo->semestre->numero }}</span>
                                     @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
+                                    <br><span class="text-xs font-semibold text-slate-500">Generación {{ $alumnoInactivo->generacion?->etiqueta ?? '—' }}</span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-black {{ $estatusClase }}">
+                                        {{ $this->etiquetaEstatus($alumnoInactivo->estatus) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    {{ optional($alumnoInactivo->fecha_estatus)->format('d/m/Y') ?: optional($alumnoInactivo->fecha_baja)->format('d/m/Y') ?: '—' }}
+                                </td>
+                                <td class="max-w-sm px-4 py-4">
+                                    <p class="font-semibold text-slate-700 dark:text-slate-200">{{ $alumnoInactivo->motivo_estatus ?: $alumnoInactivo->motivo_baja ?: '—' }}</p>
+                                    @if ($alumnoInactivo->observaciones_baja)
+                                        <p class="mt-1 text-xs text-slate-500">{{ $alumnoInactivo->observaciones_baja }}</p>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-4">
+                                    <div class="flex justify-end">
+                                        @if ($alumnoInactivo->estatus !== 'egresado')
+                                            <button
+                                                type="button"
+                                                x-on:click="confirmarReincorporacion({{ $alumnoInactivo->id }}, @js($nombreCompletoInactivo))"
+                                                wire:loading.attr="disabled"
+                                                wire:target="reactivarAlumno"
+                                                class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-700 disabled:opacity-50"
+                                            >
+                                                <flux:icon.arrow-path class="h-4 w-4" />
+                                                Reincorporar
+                                            </button>
+                                        @else
+                                            <span class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500 dark:bg-neutral-800">Egreso confirmado</span>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    @else
                         <tr>
                             <td colspan="7" class="px-6 py-14 text-center text-slate-500">No hay bajas, traslados ni alumnos inactivos en esta generación.</td>
                         </tr>
-                    @endforelse
+                    @endif
                 </tbody>
             </table>
         </div>
