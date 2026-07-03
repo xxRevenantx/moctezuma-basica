@@ -3,6 +3,7 @@
         estadistica: false,
         promocion: false,
         cierre_nivel: false,
+        cierre_ciclo: false,
         listas: false,
         horarios: false,
         promedios: false,
@@ -37,6 +38,7 @@
                 estadistica: guardados.estadistica === true,
                 promocion: guardados.promocion === true,
                 cierre_nivel: guardados.cierre_nivel === true,
+                cierre_ciclo: guardados.cierre_ciclo === true,
                 listas: guardados.listas === true,
                 horarios: guardados.horarios === true,
                 promedios: guardados.promedios === true,
@@ -327,6 +329,15 @@
         </div>
     </section>
 
+
+    {{-- PANEL DE CIERRE DE CICLO ESCOLAR --}}
+    <section class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <button type="button" x-on:click="alternarCollapse('cierre_ciclo')" class="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/70 sm:px-6">
+            <div class="flex min-w-0 items-center gap-4"><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] text-white shadow-lg"><flux:icon.check-badge class="h-6 w-6" /></div><div><p class="text-xs font-black uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Control escolar</p><h2 class="text-lg font-black text-slate-900 dark:text-white">Panel de cierre de ciclo escolar</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Diagnóstico, selección de egresados, cierre de generación y cierre del ciclo en un asistente seguro.</p></div></div>
+            <span class="flex h-10 w-10 items-center justify-center rounded-2xl border dark:border-neutral-700" :class="colapsos.cierre_ciclo ? 'rotate-180' : 'rotate-0'"><flux:icon.chevron-down class="h-5 w-5" /></span>
+        </button>
+        <div x-cloak x-show="colapsos.cierre_ciclo" x-transition.opacity.duration.200ms class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6"><livewire:accion.generales.panel-cierre-ciclo :slug_nivel="$slug_nivel" :key="'panel-cierre-ciclo-' . $slug_nivel" /></div>
+    </section>
 
     {{-- COLLAPSE: CIERRE DE NIVEL Y CONTINUIDAD --}}
     <section class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
