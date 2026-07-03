@@ -707,13 +707,25 @@
                                 <td class="px-4 py-4">
                                     <div class="flex justify-end">
                                         @if ($alumnoInactivo->estatus !== 'egresado')
-                                            <flux:button type="button" variant="primary"
-                                                x-on:click="confirmarReincorporacion({{ $alumnoInactivo->id }}, @js($this->nombreCompleto($alumnoInactivo)))"
-                                                wire:loading.attr="disabled" wire:target="reactivarAlumno"
-                                                class="cursor-pointer rounded-xl bg-violet-600">
-                                                <flux:icon.arrow-path class="h-4 w-4" />
-                                                Reincorporar
-                                            </flux:button>
+                                            <button type="button"
+                                                x-on:click.prevent="confirmarReincorporacion(
+                                                    {{ $alumnoInactivo->id }},
+                                                    @js($this->nombreCompleto($alumnoInactivo))
+                                                )"
+                                                wire:loading.attr="disabled"
+                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
+                                                class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-neutral-900">
+                                                <flux:icon.arrow-path wire:loading.remove
+                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
+                                                    class="h-4 w-4" />
+                                                <flux:icon.arrow-path wire:loading
+                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
+                                                    class="h-4 w-4 animate-spin" />
+                                                <span wire:loading.remove
+                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Reincorporar</span>
+                                                <span wire:loading
+                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Procesando…</span>
+                                            </button>
                                         @else
                                             <span
                                                 class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
