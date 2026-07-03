@@ -90,11 +90,16 @@ class Dashboard extends Component
     {
         if ($this->columnaExiste($tabla, 'activo')) {
             $query->where($tabla . '.activo', 1);
-            return $query;
+        } elseif ($this->columnaExiste($tabla, 'status')) {
+            $query->whereIn($tabla . '.status', [1, '1', true, 'true', 'activo', 'Activo', 'ACTIVO']);
         }
 
-        if ($this->columnaExiste($tabla, 'status')) {
-            $query->whereIn($tabla . '.status', [1, '1', true, 'true', 'activo', 'Activo', 'ACTIVO']);
+        if ($this->columnaExiste($tabla, 'estatus')) {
+            $query->whereRaw('LOWER(' . $tabla . '.estatus) = ?', ['activo']);
+        }
+
+        if ($this->columnaExiste($tabla, 'deleted_at')) {
+            $query->whereNull($tabla . '.deleted_at');
         }
 
         return $query;
@@ -181,22 +186,114 @@ class Dashboard extends Component
             return [];
         }
 
-        return DB::table('niveles')
-            ->select('id', 'nombre')
-            ->orderBy('id')
-            ->get()
+        $niveles = DB::table('niveles')->select('id', 'nombre')->orderBy('id');
+
+        if ($this->nivel_id) {
+            $niveles->where('id', $this->nivel_id);
+        }
+
+        return $niveles->get()
             ->map(function ($nivel) {
+                $grupos = $this->obtenerDistribucionGrupos((int) $nivel->id, (string) $nivel->nombre);
+                $hombres = collect($grupos)->sum('hombres');
+                $mujeres = collect($grupos)->sum('mujeres');
+                $total = $hombres + $mujeres;
+
                 return [
                     'id' => $nivel->id,
                     'nombre' => $nivel->nombre,
-                    'alumnos' => $this->contarPorNivel('inscripciones', $nivel->id, true),
-                    'grupos' => $this->contarPorNivel('grupos', $nivel->id),
+                    'alumnos' => $total,
+                    'hombres' => $hombres,
+                    'mujeres' => $mujeres,
+                    'porcentaje_hombres' => $total > 0 ? round(($hombres / $total) * 100) : 0,
+                    'porcentaje_mujeres' => $total > 0 ? round(($mujeres / $total) * 100) : 0,
+                    'grupos' => count($grupos),
+                    'grupos_con_alumnos' => collect($grupos)->where('total', '>', 0)->count(),
+                    'detalle_grupos' => $grupos,
                     'materias' => $this->contarMateriasAsignadasPorNivel((int) $nivel->id),
                     'horarios' => $this->contarPorNivel('horarios', $nivel->id),
                     'periodos' => $this->contarPorNivel('periodos', $nivel->id),
                 ];
             })
             ->toArray();
+    }
+
+    private function obtenerDistribucionGrupos(int $nivelId, string $nombreNivel): array
+    {
+        if (!$this->tablaExiste('grupos')) {
+            return [];
+        }
+
+        $query = DB::table('grupos')
+            ->leftJoin('grados', 'grados.id', '=', 'grupos.grado_id')
+            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
+            ->leftJoin('generaciones', 'generaciones.id', '=', 'grupos.generacion_id')
+            ->leftJoin('semestres', 'semestres.id', '=', 'grupos.semestre_id')
+            ->where('grupos.nivel_id', $nivelId)
+            ->select([
+                'grupos.id',
+                'grados.nombre as grado',
+                'grados.orden as grado_orden',
+                'asignacion_grupos.nombre as grupo',
+                'generaciones.anio_ingreso',
+                'generaciones.anio_egreso',
+                'semestres.numero as semestre_numero',
+                'semestres.orden_global as semestre_orden',
+            ])
+            ->orderByRaw('COALESCE(semestres.orden_global, grados.orden, 999)')
+            ->orderBy('asignacion_grupos.nombre')
+            ->get();
+
+        if ($query->isEmpty()) {
+            return [];
+        }
+
+        $conteos = DB::table('inscripciones')
+            ->where('nivel_id', $nivelId)
+            ->whereIn('grupo_id', $query->pluck('id'));
+
+        $this->aplicarActivo($conteos, 'inscripciones');
+
+        $conteos = $conteos
+            ->selectRaw("grupo_id, SUM(CASE WHEN genero = 'H' THEN 1 ELSE 0 END) as hombres, SUM(CASE WHEN genero = 'M' THEN 1 ELSE 0 END) as mujeres, COUNT(*) as total")
+            ->groupBy('grupo_id')
+            ->get()
+            ->keyBy('grupo_id');
+
+        $esBachillerato = str_contains(mb_strtolower($nombreNivel), 'bachiller');
+
+        return $query->map(function ($grupo) use ($conteos, $esBachillerato) {
+            $conteo = $conteos->get($grupo->id);
+            $hombres = (int) ($conteo->hombres ?? 0);
+            $mujeres = (int) ($conteo->mujeres ?? 0);
+            $total = (int) ($conteo->total ?? 0);
+            $generacion = $grupo->anio_ingreso && $grupo->anio_egreso
+                ? $grupo->anio_ingreso . '-' . $grupo->anio_egreso
+                : null;
+
+            if ($esBachillerato && $grupo->semestre_orden) {
+                $nombre = $grupo->semestre_orden . '.º semestre';
+            } elseif ($esBachillerato && $grupo->semestre_numero) {
+                $nombre = $grupo->semestre_numero . '.º semestre';
+            } else {
+                $nombre = $grupo->grado ?: 'Sin grado';
+            }
+
+            if ($grupo->grupo) {
+                $nombre .= ' · Grupo ' . $grupo->grupo;
+            }
+
+            return [
+                'id' => $grupo->id,
+                'nombre' => $nombre,
+                'generacion' => $generacion,
+                'hombres' => $hombres,
+                'mujeres' => $mujeres,
+                'total' => $total,
+                'porcentaje_hombres' => $total > 0 ? round(($hombres / $total) * 100) : 0,
+                'porcentaje_mujeres' => $total > 0 ? round(($mujeres / $total) * 100) : 0,
+            ];
+        })->values()->toArray();
     }
 
     private function contarDocentesActivos(): int

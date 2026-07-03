@@ -39,6 +39,15 @@ return [
         'max_alternativas' => (int) env('GROQ_HORARIO_MAX_ALTERNATIVAS', 8),
     ],
 
+    'curp' => [
+        'enabled' => filter_var(env('GROQ_CURP_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'model' => env('GROQ_CURP_MODEL', 'openai/gpt-oss-20b'),
+        'temperature' => (float) env('GROQ_CURP_TEMPERATURE', 0),
+        'max_tokens' => (int) env('GROQ_CURP_MAX_TOKENS', 700),
+        'max_input_chars' => (int) env('GROQ_CURP_MAX_INPUT_CHARS', 12000),
+        'min_confidence' => (int) env('GROQ_CURP_MIN_CONFIDENCE', 65),
+    ],
+
     'dashboard' => [
         'model' => env('GROQ_DASHBOARD_MODEL', 'openai/gpt-oss-20b'),
         'temperature' => (float) env('GROQ_DASHBOARD_TEMPERATURE', 0.20),

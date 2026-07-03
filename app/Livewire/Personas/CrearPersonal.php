@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use App\Services\AzureDocumentIntelligence;
+use App\Services\CurpPdfTextExtractor;
+use App\Services\GroqCurpExtractor;
 
 
 class CrearPersonal extends Component
@@ -57,6 +58,8 @@ class CrearPersonal extends Component
 
     public ?string $autollenadoError = null;
     public bool $autollenar_forzar = false;
+    public ?string $autollenadoOrigen = null;
+    public ?int $autollenadoConfianza = null;
 
     protected function rules(): array
     {
@@ -206,102 +209,239 @@ class CrearPersonal extends Component
     public function autollenarDesdeCurpPdf(): void
     {
         $this->autollenadoError = null;
+        $this->autollenadoOrigen = null;
+        $this->autollenadoConfianza = null;
 
         $this->validate([
             'pdf_curp' => 'required|file|mimes:pdf|max:51200',
         ], [
-            'pdf_curp.required' => 'Sube el PDF del CURP.',
-            'pdf_curp.mimes' => 'El archivo debe ser PDF.',
+            'pdf_curp.required' => 'Sube el PDF de la CURP.',
+            'pdf_curp.mimes' => 'El archivo debe estar en formato PDF.',
+            'pdf_curp.max' => 'El PDF no debe superar los 50 MB.',
         ]);
+
+        $storedPath = null;
 
         try {
             Storage::disk('local')->makeDirectory('tmp/curp-extract');
 
-            $curpPath = $this->pdf_curp->store('tmp/curp-extract', 'local');
-            $absCurp = Storage::disk('local')->path($curpPath);
+            $storedPath = $this->pdf_curp->store('tmp/curp-extract', 'local');
+            $absolutePath = Storage::disk('local')->path($storedPath);
 
-            if (!file_exists($absCurp)) {
-                throw new \RuntimeException("No se encontró el PDF en disco: {$absCurp}");
+            /** @var CurpPdfTextExtractor $textExtractor */
+            $textExtractor = app(CurpPdfTextExtractor::class);
+
+            /** @var CurpPdfParser $localParser */
+            $localParser = app(CurpPdfParser::class);
+
+            /** @var GroqCurpExtractor $groqExtractor */
+            $groqExtractor = app(GroqCurpExtractor::class);
+
+            // 1. Lee localmente el texto seleccionable del PDF.
+            $text = $textExtractor->extract($absolutePath);
+
+            // 2. Mantiene un resultado local como respaldo determinista.
+            $localData = $localParser->parse($text);
+            $data = $localData;
+            $origin = 'lector local';
+
+            // 3. Groq mejora la separación de nombres y los datos estructurados.
+            if ($groqExtractor->isConfigured()) {
+                try {
+                    $groqData = $groqExtractor->extract($text);
+                    $data = $this->mergeExtractedData($groqData, $localData);
+                    $origin = 'GroqCloud + lector local';
+                    $this->autollenadoConfianza = (int) ($groqData['confianza'] ?? 0);
+                } catch (\Throwable $groqError) {
+                    report($groqError);
+
+                    // Si Groq falla, el proceso continúa con el parser local.
+                    $this->autollenadoError = 'GroqCloud no estuvo disponible; se utilizó el lector local. '
+                        . $groqError->getMessage();
+                }
             }
 
-            /** @var AzureDocumentIntelligence $azure */
-            $azure = app(AzureDocumentIntelligence::class);
+            $data = $this->completeDataFromCurp($data);
 
-            /** @var CurpPdfParser $curpParser */
-            $curpParser = app(CurpPdfParser::class);
+            if (empty($data['curp']) || !$this->isValidCurp((string) $data['curp'])) {
+                throw new \RuntimeException(
+                    'No fue posible localizar una CURP válida de 18 caracteres en el documento.'
+                );
+            }
 
-            // 1) OCR con Azure (texto)
-            $text = $azure->extractText($absCurp);
+            if (empty($data['nombres']) && empty($data['nombre_completo'])) {
+                throw new \RuntimeException(
+                    'Se encontró la CURP, pero no fue posible identificar correctamente el nombre del titular.'
+                );
+            }
 
-            // 2) Parsear texto (CURP, nombres, etc.)
-            $data = $curpParser->parse($text);
+            $minimumConfidence = (int) config('groq.curp.min_confidence', 65);
+            if (
+                $this->autollenadoConfianza !== null
+                && $this->autollenadoConfianza < $minimumConfidence
+            ) {
+                $this->autollenadoError = "La extracción tuvo una confianza de {$this->autollenadoConfianza}%. Revisa los datos antes de guardar.";
+            }
 
-            // 3) Aplicar al formulario
             $this->applyExtractedCurpToForm($data, $this->autollenar_forzar);
-
-            @unlink($absCurp);
+            $this->autollenadoOrigen = $origin;
 
             $this->dispatch('swal', [
-                'title' => 'Datos extraídos del CURP PDF (Azure).',
+                'title' => 'Datos de la CURP extraídos correctamente.',
+                'text' => "Método utilizado: {$origin}.",
                 'icon' => 'success',
                 'position' => 'top-end',
             ]);
         } catch (\Throwable $e) {
+            report($e);
             $this->autollenadoError = $e->getMessage();
 
             $this->dispatch('swal', [
-                'title' => 'No se pudo extraer del CURP PDF',
+                'title' => 'No se pudo extraer la CURP del PDF',
                 'text' => $this->autollenadoError,
                 'icon' => 'error',
                 'position' => 'top-end',
             ]);
+        } finally {
+            if ($storedPath !== null) {
+                Storage::disk('local')->delete($storedPath);
+            }
         }
+    }
+
+    private function mergeExtractedData(array $preferred, array $fallback): array
+    {
+        $keys = [
+            'curp',
+            'nombres',
+            'apellido_paterno',
+            'apellido_materno',
+            'nombre_completo',
+            'fecha_nacimiento',
+            'genero',
+            'entidad_nacimiento',
+            'confianza',
+        ];
+
+        $result = [];
+
+        foreach ($keys as $key) {
+            $preferredValue = $preferred[$key] ?? null;
+            $fallbackValue = $fallback[$key] ?? null;
+
+            $result[$key] = $preferredValue !== null && $preferredValue !== ''
+                ? $preferredValue
+                : $fallbackValue;
+        }
+
+        return $result;
+    }
+
+    private function completeDataFromCurp(array $data): array
+    {
+        $curp = strtoupper(preg_replace(
+            '/[^A-Z0-9]/i',
+            '',
+            (string) ($data['curp'] ?? '')
+        ) ?? '');
+
+        $data['curp'] = $curp !== '' ? $curp : null;
+
+        if (!$this->isValidCurp($curp)) {
+            return $data;
+        }
+
+        $year = (int) substr($curp, 4, 2);
+        $month = (int) substr($curp, 6, 2);
+        $day = (int) substr($curp, 8, 2);
+        $centuryMarker = substr($curp, 16, 1);
+        $fullYear = ctype_digit($centuryMarker) ? 1900 + $year : 2000 + $year;
+
+        if (empty($data['fecha_nacimiento']) && checkdate($month, $day, $fullYear)) {
+            $data['fecha_nacimiento'] = sprintf('%04d-%02d-%02d', $fullYear, $month, $day);
+        }
+
+        $gender = substr($curp, 10, 1);
+        if (empty($data['genero']) && in_array($gender, ['H', 'M'], true)) {
+            $data['genero'] = $gender;
+        }
+
+        return $data;
+    }
+
+    private function isValidCurp(string $curp): bool
+    {
+        return preg_match(
+            '/^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/',
+            strtoupper(trim($curp))
+        ) === 1;
     }
 
 
     private function applyExtractedCurpToForm(array $data, bool $force = false): void
     {
-        $set = function (string $prop, $value) use ($force) {
-            if ($value === null || $value === '')
+        $set = function (string $property, mixed $value) use ($force): void {
+            if ($value === null || (is_string($value) && trim($value) === '')) {
                 return;
+            }
 
-            $current = $this->{$prop} ?? null;
+            $current = $this->{$property} ?? null;
             $empty = is_string($current) ? trim($current) === '' : empty($current);
 
             if ($force || $empty) {
-                $this->{$prop} = $value;
+                $this->{$property} = $value;
             }
         };
 
-        // CURP
-        $curp = $data['curp'] ?? null;
-        if ($curp) {
-            $set('curp', strtoupper(trim((string) $curp)));
+        $curp = strtoupper(trim((string) ($data['curp'] ?? '')));
+        if ($curp !== '') {
+            $set('curp', $curp);
         }
 
-        // ✅ Si ya vienen partes (lo ideal)
-        $nombres = trim((string) ($data['nombres'] ?? ''));
-        $apPat = trim((string) ($data['apellido_paterno'] ?? ''));
-        $apMat = trim((string) ($data['apellido_materno'] ?? ''));
+        $names = trim((string) ($data['nombres'] ?? ''));
+        $paternalSurname = trim((string) ($data['apellido_paterno'] ?? ''));
+        $maternalSurname = trim((string) ($data['apellido_materno'] ?? ''));
 
-        if ($nombres !== '' || $apPat !== '' || $apMat !== '') {
-            if ($nombres !== '')
-                $set('nombre', $this->titleCaseNombre($nombres));
-            if ($apPat !== '')
-                $set('apellido_paterno', $this->titleCaseNombre($apPat));
-            if ($apMat !== '')
-                $set('apellido_materno', $this->titleCaseNombre($apMat));
-            return;
+        if ($names !== '' || $paternalSurname !== '' || $maternalSurname !== '') {
+            $set('nombre', $this->titleCaseNombre($names));
+            $set('apellido_paterno', $this->titleCaseNombre($paternalSurname));
+
+            if ($maternalSurname !== '') {
+                $set('apellido_materno', $this->titleCaseNombre($maternalSurname));
+            }
+        } else {
+            $fullName = trim((string) ($data['nombre_completo'] ?? ($data['nombre'] ?? '')));
+
+            if ($fullName !== '') {
+                [$splitNames, $splitPaternal, $splitMaternal] = $this->splitNombreCompletoMxSmart($fullName);
+
+                $set('nombre', $this->titleCaseNombre($splitNames));
+                $set('apellido_paterno', $this->titleCaseNombre($splitPaternal));
+
+                if ($splitMaternal) {
+                    $set('apellido_materno', $this->titleCaseNombre($splitMaternal));
+                }
+            }
         }
 
-        // Fallback: nombre completo (si no hubo etiquetas)
-        $full = trim((string) ($data['nombre_completo'] ?? ($data['nombre'] ?? '')));
-        if ($full !== '') {
-            [$nombres2, $apPat2, $apMat2] = $this->splitNombreCompletoMxSmart($full);
+        $date = trim((string) ($data['fecha_nacimiento'] ?? ''));
+        if ($date !== '') {
+            $set('fecha_nacimiento', $date);
+        }
 
-            $set('nombre', $this->titleCaseNombre($nombres2));
-            $set('apellido_paterno', $this->titleCaseNombre($apPat2));
-            $set('apellido_materno', $apMat2 ? $this->titleCaseNombre($apMat2) : null);
+        $gender = strtoupper(trim((string) ($data['genero'] ?? '')));
+        if (in_array($gender, ['H', 'M'], true)) {
+            $set('genero', $gender);
+        }
+
+        $state = trim((string) ($data['entidad_nacimiento'] ?? ''));
+        if ($state !== '') {
+            $set('estado', $this->titleCaseNombre($state));
+        }
+
+        // Evita que updatedCurp() vuelva a consultar RENAPO al actualizar el input.
+        if ($this->curp && strlen($this->curp) === 18) {
+            $this->ultimaCurpConsultada = $this->curp;
         }
     }
 

@@ -175,67 +175,202 @@
 
     {{-- Resumen por nivel --}}
     <section
-        class="rounded-3xl border border-neutral-200/70 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <div class="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
-            <h3 class="text-base font-semibold text-neutral-900 dark:text-white">
-                Resumen por nivel educativo
-            </h3>
-            <p class="text-sm text-neutral-500 dark:text-neutral-400">
-                Indicadores generales de preescolar, primaria, secundaria y bachillerato.
-            </p>
+        class="overflow-hidden rounded-3xl border border-neutral-200/70 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="relative overflow-hidden border-b border-neutral-200 px-5 py-5 dark:border-neutral-800">
+            <div
+                class="absolute inset-y-0 right-0 w-80 bg-[radial-gradient(circle_at_center,rgba(0,100,146,0.12),transparent_70%)]">
+            </div>
+            <div class="relative flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <div class="mb-1 flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 rounded-full bg-[#88AC2E]"></span>
+                        <h3 class="text-base font-black text-neutral-900 dark:text-white">
+                            Resumen por nivel educativo
+                        </h3>
+                    </div>
+                    <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                        Matrícula activa, distribución por género e indicadores académicos por grupo.
+                    </p>
+                </div>
+
+                <span
+                    class="inline-flex w-fit items-center gap-2 rounded-full border border-[#006492]/15 bg-[#006492]/5 px-3 py-1.5 text-xs font-bold text-[#006492] dark:border-[#006492]/30 dark:bg-[#006492]/10 dark:text-sky-300">
+                    <flux:icon name="users" class="size-4" />
+                    Solo alumnos activos
+                </span>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-4">
             @forelse ($resumenNiveles as $nivel)
                 <article
-                    class="relative overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-950">
-                    <div class="absolute inset-y-0 right-0 w-32 bg-sky-100/40 blur-2xl dark:bg-sky-500/10"></div>
+                    class="group relative overflow-hidden rounded-[1.75rem] border border-neutral-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#006492]/30 hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-950">
+                    <div class="h-1.5 bg-gradient-to-r from-[#006492] via-[#006492] to-[#88AC2E]"></div>
+                    <div
+                        class="absolute right-0 top-0 h-40 w-40 translate-x-10 -translate-y-10 rounded-full bg-[#006492]/5 blur-2xl">
+                    </div>
 
-                    <div class="relative">
-                        <div class="mb-4 flex items-center justify-between gap-3">
-                            <h4 class="text-base font-bold text-neutral-900 dark:text-white">
-                                {{ $nivel['nombre'] }}
-                            </h4>
+                    <div class="relative p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-[#88AC2E]">
+                                    Nivel educativo
+                                </p>
+                                <h4 class="mt-1 text-lg font-black text-neutral-950 dark:text-white">
+                                    {{ $nivel['nombre'] }}
+                                </h4>
+                                <p class="mt-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                    {{ $nivel['grupos'] }} registrados · {{ $nivel['grupos_con_alumnos'] }} con
+                                    alumnos
+                                </p>
+                            </div>
 
                             <div
-                                class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
-                                <flux:icon.academic-cap class="h-5 w-5" />
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#007daf] text-white shadow-lg shadow-[#006492]/20 transition group-hover:scale-105">
+                                <flux:icon.academic-cap class="h-6 w-6" />
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
-                            <div
-                                class="rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Alumnos</p>
-                                <p class="mt-1 text-xl font-bold text-neutral-900 dark:text-white">
-                                    {{ $nivel['alumnos'] }}
-                                </p>
+                        <div
+                            class="mt-5 rounded-3xl bg-gradient-to-br from-[#006492] to-[#0078a9] p-4 text-white shadow-lg shadow-[#006492]/15">
+                            <div class="flex items-end justify-between gap-3">
+                                <div>
+                                    <p class="text-[11px] font-bold uppercase tracking-wider text-white/70">Alumnos
+                                        activos</p>
+                                    <p class="mt-1 text-4xl font-black leading-none">{{ $nivel['alumnos'] }}</p>
+                                </div>
+                                <div class="rounded-2xl bg-white/10 px-3 py-2 text-right backdrop-blur-sm">
+                                    <p class="text-[10px] font-bold text-white/70">Total</p>
+                                    <p class="text-sm font-black">100%</p>
+                                </div>
                             </div>
 
-                            <div
-                                class="rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Grupos</p>
-                                <p class="mt-1 text-xl font-bold text-neutral-900 dark:text-white">
-                                    {{ $nivel['grupos'] }}
-                                </p>
+                            <div class="mt-4 flex h-2.5 overflow-hidden rounded-full bg-white/15">
+                                <span class="bg-white/90" style="width: {{ $nivel['porcentaje_hombres'] }}%"></span>
+                                <span class="bg-[#b9d963]" style="width: {{ $nivel['porcentaje_mujeres'] }}%"></span>
                             </div>
 
-                            <div
-                                class="rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Materias</p>
-                                <p class="mt-1 text-xl font-bold text-neutral-900 dark:text-white">
-                                    {{ $nivel['materias'] }}
-                                </p>
-                            </div>
-
-                            <div
-                                class="rounded-2xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-                                <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Horarios</p>
-                                <p class="mt-1 text-xl font-bold text-neutral-900 dark:text-white">
-                                    {{ $nivel['horarios'] }}
-                                </p>
+                            <div class="mt-3 grid grid-cols-2 gap-2">
+                                <div class="rounded-2xl bg-white/10 px-3 py-2 backdrop-blur-sm">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[10px] font-bold text-white/70">Hombres</span>
+                                        <span
+                                            class="text-[10px] font-black">{{ $nivel['porcentaje_hombres'] }}%</span>
+                                    </div>
+                                    <p class="mt-0.5 text-xl font-black">{{ $nivel['hombres'] }}</p>
+                                </div>
+                                <div class="rounded-2xl bg-[#88AC2E]/85 px-3 py-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[10px] font-bold text-white/80">Mujeres</span>
+                                        <span
+                                            class="text-[10px] font-black">{{ $nivel['porcentaje_mujeres'] }}%</span>
+                                    </div>
+                                    <p class="mt-0.5 text-xl font-black">{{ $nivel['mujeres'] }}</p>
+                                </div>
                             </div>
                         </div>
+
+                        <div class="mt-4 grid grid-cols-3 gap-2">
+                            <div
+                                class="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-bold text-neutral-500">Grupos</p>
+                                <p class="mt-1 text-lg font-black text-neutral-900 dark:text-white">
+                                    {{ $nivel['grupos'] }}</p>
+                            </div>
+                            <div
+                                class="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-bold text-neutral-500">Materias</p>
+                                <p class="mt-1 text-lg font-black text-neutral-900 dark:text-white">
+                                    {{ $nivel['materias'] }}</p>
+                            </div>
+                            <div
+                                class="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                                <p class="text-[10px] font-bold text-neutral-500">Horarios</p>
+                                <p class="mt-1 text-lg font-black text-neutral-900 dark:text-white">
+                                    {{ $nivel['horarios'] }}</p>
+                            </div>
+                        </div>
+
+                        <details
+                            class="group/detalle mt-4 overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+                            <summary
+                                class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-neutral-800 transition hover:bg-neutral-50 dark:text-white dark:hover:bg-neutral-800/60">
+                                <span class="flex items-center gap-2">
+                                    <span
+                                        class="flex h-8 w-8 items-center justify-center rounded-xl bg-[#88AC2E]/15 text-[#66851d] dark:text-[#b9d963]">
+                                        <flux:icon name="chart-bar" class="size-4" />
+                                    </span>
+                                    Distribución por grupo
+                                </span>
+                                <flux:icon name="chevron-down"
+                                    class="size-4 transition group-open/detalle:rotate-180" />
+                            </summary>
+
+                            <div
+                                class="max-h-80 space-y-2 overflow-y-auto border-t border-neutral-200 p-3 dark:border-neutral-800">
+                                @forelse ($nivel['detalle_grupos'] as $grupo)
+                                    <div
+                                        class="rounded-2xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p
+                                                    class="truncate text-xs font-black text-neutral-900 dark:text-white">
+                                                    {{ $grupo['nombre'] }}
+                                                </p>
+                                                @if ($grupo['generacion'])
+                                                    <p class="mt-0.5 text-[10px] font-medium text-neutral-500">
+                                                        Generación {{ $grupo['generacion'] }}
+                                                    </p>
+                                                @endif
+                                            </div>
+
+                                            @if ($grupo['total'] > 0)
+                                                <span
+                                                    class="shrink-0 rounded-full bg-[#006492]/10 px-2.5 py-1 text-[10px] font-black text-[#006492] dark:text-sky-300">
+                                                    {{ $grupo['total'] }} total
+                                                </span>
+                                            @else
+                                                <span
+                                                    class="shrink-0 rounded-full bg-neutral-200 px-2.5 py-1 text-[10px] font-black text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                                    Sin alumnos
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <div
+                                            class="mt-3 flex h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                                            <span class="bg-[#006492]"
+                                                style="width: {{ $grupo['porcentaje_hombres'] }}%"></span>
+                                            <span class="bg-[#88AC2E]"
+                                                style="width: {{ $grupo['porcentaje_mujeres'] }}%"></span>
+                                        </div>
+
+                                        <div class="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                                            <div class="rounded-xl bg-[#006492]/8 px-2 py-1.5">
+                                                <p class="text-[9px] font-bold text-neutral-500">Hombres</p>
+                                                <p class="text-sm font-black text-[#006492] dark:text-sky-300">
+                                                    {{ $grupo['hombres'] }}</p>
+                                            </div>
+                                            <div class="rounded-xl bg-[#88AC2E]/10 px-2 py-1.5">
+                                                <p class="text-[9px] font-bold text-neutral-500">Mujeres</p>
+                                                <p class="text-sm font-black text-[#66851d] dark:text-[#b9d963]">
+                                                    {{ $grupo['mujeres'] }}</p>
+                                            </div>
+                                            <div class="rounded-xl bg-neutral-200/70 px-2 py-1.5 dark:bg-neutral-800">
+                                                <p class="text-[9px] font-bold text-neutral-500">Total</p>
+                                                <p class="text-sm font-black text-neutral-900 dark:text-white">
+                                                    {{ $grupo['total'] }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div
+                                        class="rounded-2xl border border-dashed border-neutral-300 p-4 text-center dark:border-neutral-700">
+                                        <p class="text-xs font-bold text-neutral-500">No hay grupos registrados.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </details>
                     </div>
                 </article>
             @empty

@@ -1,4 +1,3 @@
-{{-- resources/views/livewire/personas/crear-personal.blade.php --}}
 <div>
     <!-- Header -->
     <div class="flex flex-col gap-2">
@@ -76,7 +75,8 @@
                                                 Extraer desde CURP (PDF)
                                             </div>
                                             <div class="text-xs text-neutral-600 dark:text-neutral-400">
-                                                Solo obtiene <b>CURP</b> y <b>Nombre</b> (PDF con texto seleccionable).
+                                                Extrae CURP, nombre, apellidos, fecha de nacimiento y género mediante
+                                                lectura local y GroqCloud.
                                             </div>
                                         </div>
                                     </div>
@@ -109,7 +109,8 @@
                                                     <div class="text-sm font-semibold text-neutral-900 dark:text-white">
                                                         Sube tu CURP (PDF)</div>
                                                     <div class="text-xs text-neutral-600 dark:text-neutral-400">
-                                                        Recomendado: CURP descargada de RENAPO con texto.
+                                                        Recomendado: PDF original descargado de RENAPO con texto
+                                                        seleccionable.
                                                     </div>
                                                 </div>
                                             </div>
@@ -197,13 +198,24 @@
                                                 <div
                                                     class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
                                                 </div>
-                                                Extrayendo datos del PDF…
+                                                Leyendo el PDF y estructurando los datos…
                                             </div>
                                         </div>
 
+                                        @if ($autollenadoOrigen)
+                                            <div
+                                                class="mt-3 flex flex-col gap-1 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                                <span class="font-semibold">Extracción completada</span>
+                                                <span>Método utilizado: {{ $autollenadoOrigen }}.</span>
+                                                @if ($autollenadoConfianza !== null)
+                                                    <span>Confianza estimada: {{ $autollenadoConfianza }}%.</span>
+                                                @endif
+                                            </div>
+                                        @endif
+
                                         @if ($autollenadoError)
                                             <div
-                                                class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                                                class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
                                                 {{ $autollenadoError }}
                                             </div>
                                         @endif

@@ -65,28 +65,39 @@
         {{-- Accesos rápidos --}}
         <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <button type="button" x-on:click.prevent="cambiar('lista')"
-                class="group rounded-3xl border border-emerald-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-emerald-900/40 dark:bg-zinc-900 dark:hover:border-emerald-800">
+                x-bind:style="abierto === 'lista' ?
+                    'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff;' : ''"
+                class="group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                x-bind:class="abierto === 'lista'
+                    ?
+                    'border-emerald-500 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 dark:border-emerald-400 dark:from-emerald-600 dark:to-emerald-700' :
+                    'border-emerald-200 bg-white hover:border-emerald-300 dark:border-emerald-900/40 dark:bg-zinc-900 dark:hover:border-emerald-800'">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <div
-                            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl transition"
+                            x-bind:class="abierto === 'lista'
+                                ?
+                                'bg-white/20 text-white ring-1 ring-white/30' :
+                                'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'">
                             <flux:icon.users class="h-5 w-5" />
                         </div>
 
-                        <h2 class="mt-4 text-base font-black text-slate-900 dark:text-white">
+                        <h2 class="mt-4 text-base font-black transition"
+                            x-bind:class="abierto === 'lista' ? 'text-white' : 'text-slate-900 dark:text-white'">
                             Lista de profesores
                         </h2>
 
-                        <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                        <p class="mt-1 text-sm transition"
+                            x-bind:class="abierto === 'lista' ? 'text-emerald-50' : 'text-slate-500 dark:text-zinc-400'">
                             Consulta y administra el personal docente registrado.
                         </p>
                     </div>
 
-                    <span
-                        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-                        x-bind:class="abierto === 'lista' ?
-                            'rotate-180 border-emerald-200 text-emerald-600 dark:border-emerald-900 dark:text-emerald-300' :
-                            ''">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                        x-bind:class="abierto === 'lista'
+                            ?
+                            'rotate-180 border-white/30 bg-white/20 text-white' :
+                            'border-slate-200 bg-slate-50 text-slate-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400'">
                         <flux:icon.chevron-down class="h-5 w-5" />
                     </span>
                 </div>
@@ -95,55 +106,78 @@
 
 
             <button type="button" x-on:click.prevent="cambiar('credenciales')"
-                class="group rounded-3xl border border-blue-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-blue-900/40 dark:bg-zinc-900 dark:hover:border-blue-800">
+                x-bind:style="abierto === 'credenciales' ?
+                    'background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff;' : ''"
+                class="group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                x-bind:class="abierto === 'credenciales'
+                    ?
+                    'border-blue-500 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20 dark:border-blue-400 dark:from-blue-600 dark:to-blue-700' :
+                    'border-blue-200 bg-white hover:border-blue-300 dark:border-blue-900/40 dark:bg-zinc-900 dark:hover:border-blue-800'">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <div
-                            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl transition"
+                            x-bind:class="abierto === 'credenciales'
+                                ?
+                                'bg-white/20 text-white ring-1 ring-white/30' :
+                                'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'">
                             <flux:icon.identification class="h-5 w-5" />
                         </div>
 
-                        <h2 class="mt-4 text-base font-black text-slate-900 dark:text-white">
+                        <h2 class="mt-4 text-base font-black transition"
+                            x-bind:class="abierto === 'credenciales' ? 'text-white' : 'text-slate-900 dark:text-white'">
                             Credenciales
                         </h2>
 
-                        <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                        <p class="mt-1 text-sm transition"
+                            x-bind:class="abierto === 'credenciales' ? 'text-blue-50' : 'text-slate-500 dark:text-zinc-400'">
                             Genera credenciales del personal por nivel académico.
                         </p>
                     </div>
 
-                    <span
-                        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-                        x-bind:class="abierto === 'credenciales' ?
-                            'rotate-180 border-blue-200 text-blue-600 dark:border-blue-900 dark:text-blue-300' : ''">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                        x-bind:class="abierto === 'credenciales'
+                            ?
+                            'rotate-180 border-white/30 bg-white/20 text-white' :
+                            'border-slate-200 bg-slate-50 text-slate-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400'">
                         <flux:icon.chevron-down class="h-5 w-5" />
                     </span>
                 </div>
             </button>
 
             <button type="button" x-on:click.prevent="cambiar('horario')"
-                class="group rounded-3xl border border-indigo-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-indigo-900/40 dark:bg-zinc-900 dark:hover:border-indigo-800">
+                x-bind:style="abierto === 'horario' ?
+                    'background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%); color: #ffffff;' : ''"
+                class="group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                x-bind:class="abierto === 'horario'
+                    ?
+                    'border-indigo-500 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20 dark:border-indigo-400 dark:from-indigo-600 dark:to-violet-700' :
+                    'border-indigo-200 bg-white hover:border-indigo-300 dark:border-indigo-900/40 dark:bg-zinc-900 dark:hover:border-indigo-800'">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <div
-                            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl transition"
+                            x-bind:class="abierto === 'horario'
+                                ?
+                                'bg-white/20 text-white ring-1 ring-white/30' :
+                                'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'">
                             <flux:icon.calendar-days class="h-5 w-5" />
                         </div>
 
-                        <h2 class="mt-4 text-base font-black text-slate-900 dark:text-white">
+                        <h2 class="mt-4 text-base font-black transition"
+                            x-bind:class="abierto === 'horario' ? 'text-white' : 'text-slate-900 dark:text-white'">
                             Horario docente
                         </h2>
 
-                        <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                        <p class="mt-1 text-sm transition"
+                            x-bind:class="abierto === 'horario' ? 'text-indigo-50' : 'text-slate-500 dark:text-zinc-400'">
                             Consulta el horario del profesor por nivel o completo.
                         </p>
                     </div>
 
-                    <span
-                        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-                        x-bind:class="abierto === 'horario' ?
-                            'rotate-180 border-indigo-200 text-indigo-600 dark:border-indigo-900 dark:text-indigo-300' :
-                            ''">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                        x-bind:class="abierto === 'horario'
+                            ?
+                            'rotate-180 border-white/30 bg-white/20 text-white' :
+                            'border-slate-200 bg-slate-50 text-slate-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400'">
                         <flux:icon.chevron-down class="h-5 w-5" />
                     </span>
                 </div>
@@ -258,10 +292,10 @@
     @script
         <script>
             Alpine.data('panelProfesoresPro', () => ({
-                abierto: null,
+                abierto: 'lista',
 
                 cambiar(seccion) {
-                    this.abierto = this.abierto === seccion ? null : seccion;
+                    this.abierto = seccion;
                 },
             }));
         </script>
