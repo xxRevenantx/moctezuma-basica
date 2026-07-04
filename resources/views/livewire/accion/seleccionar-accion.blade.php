@@ -1,5 +1,5 @@
-<div x-data="{ nav: false }" x-init="window.addEventListener('livewire:navigate:start', () => nav = true);
-window.addEventListener('livewire:navigate:finish', () => nav = false);" class="relative space-y-5">
+<div x-data="{ nav: false }" x-on:livewire:navigate.document="nav = true" x-on:livewire:navigated.document="nav = false"
+    class="relative space-y-5">
 
     @php
         $ui = [
@@ -139,131 +139,102 @@ window.addEventListener('livewire:navigate:finish', () => nav = false);" class="
     @endphp
 
 
-    {{-- MENÚ HORIZONTAL PREMIUM --}}
-    <div class="relative mx-auto w-full">
+    {{-- MENÚ CURVO COMPACTO --}}
+    <nav class="relative mx-auto w-full" aria-label="Módulos del nivel">
         <div
-            class="absolute -inset-[1px] rounded-[32px] bg-gradient-to-r from-sky-500/35 via-indigo-500/35 to-fuchsia-500/35 blur-[2px]">
+            class="pointer-events-none absolute inset-x-4 bottom-0 top-8 rounded-[32px] bg-gradient-to-r from-sky-500/25 via-violet-500/25 to-fuchsia-500/25 blur-md dark:from-sky-500/10 dark:via-violet-500/10 dark:to-fuchsia-500/10">
         </div>
 
-        <div class="absolute left-0 right-0 top-0 z-20 h-[3px] overflow-hidden rounded-t-[32px]" aria-hidden="true">
-            <div class="h-full w-full origin-left scale-x-0 bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500 transition-transform duration-500"
+        <div class="absolute inset-x-0 top-8 z-30 h-[3px] overflow-hidden rounded-t-[30px]" aria-hidden="true">
+            <div class="h-full w-full origin-left scale-x-0 bg-gradient-to-r from-[#006492] via-violet-500 to-[#88AC2E] transition-transform duration-500"
                 :class="nav ? 'scale-x-100' : 'scale-x-0'"></div>
         </div>
 
+        {{-- El padding superior permite que el botón activo sobresalga sin ser recortado al desplazar el menú. --}}
         <div
-            class="relative overflow-hidden rounded-[32px] border border-white/50 bg-white/80 p-3 shadow-[0_18px_45px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80">
-
+            class="relative overflow-x-auto overflow-y-hidden pt-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-                class="overflow-x-auto overflow-y-hidden pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div class="flex min-w-max gap-3">
-                    @foreach ($accionesVisibles as $a)
-                        @php
-                            $cfg = $ui[$a->slug] ?? $fallback;
+                class="relative flex h-[82px] min-w-[720px] items-stretch rounded-[30px] border border-white/80 bg-white/95 px-2 shadow-[0_18px_42px_-24px_rgba(67,56,202,0.50)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/95 sm:min-w-full sm:px-3">
 
-                            $theme = $cardThemes[$a->slug] ?? [
-                                'bg' =>
-                                    'from-slate-50 via-white to-neutral-50 dark:from-slate-500/10 dark:via-neutral-900 dark:to-neutral-500/10',
-                                'iconBox' => 'from-slate-500 to-neutral-600',
-                                'accent' => 'text-slate-700 dark:text-slate-300',
-                                'ring' => 'ring-slate-400/30',
-                                'soft' => 'bg-slate-500/10 text-slate-700 ring-slate-500/20 dark:text-slate-300',
-                            ];
+                @foreach ($accionesVisibles as $a)
+                    @php
+                        $cfg = $ui[$a->slug] ?? $fallback;
 
-                            $isActive = $accionActual === $a->slug;
-                            $badge = $badges[$a->slug] ?? null;
-                        @endphp
+                        $theme = $cardThemes[$a->slug] ?? [
+                            'bg' =>
+                                'from-slate-50 via-white to-neutral-50 dark:from-slate-500/10 dark:via-neutral-900 dark:to-neutral-500/10',
+                            'iconBox' => 'from-slate-500 to-neutral-600',
+                            'accent' => 'text-slate-700 dark:text-slate-300',
+                            'ring' => 'ring-slate-400/30',
+                            'soft' => 'bg-slate-500/10 text-slate-700 ring-slate-500/20 dark:text-slate-300',
+                        ];
 
-                        <button type="button"
-                            class="group relative w-[265px] shrink-0 text-left outline-none disabled:cursor-wait disabled:opacity-80"
-                            wire:click="ir('{{ $a->slug }}')" wire:navigate :disabled="nav"
-                            aria-current="{{ $isActive ? 'page' : 'false' }}">
+                        $isActive = $accionActual === $a->slug;
+                        $badge = $badges[$a->slug] ?? null;
 
-                            <div @class([
-                                'relative min-h-[155px] overflow-hidden rounded-[26px] border p-4 transition-all duration-300',
-                                'bg-gradient-to-br ' .
-                                $theme['bg'] .
-                                ' border-white/80 shadow-[0_18px_42px_-20px_rgba(59,130,246,0.55)] ring-2 ' .
-                                $theme['ring'] .
-                                ' dark:border-white/10' => $isActive,
-                                'bg-gradient-to-br ' .
-                                $theme['bg'] .
-                                ' border-white/60 hover:-translate-y-1 hover:shadow-[0_18px_40px_-20px_rgba(15,23,42,0.32)] dark:border-white/10' => !$isActive,
-                            ])>
+                        $parametrosAccion = [
+                            'slug_nivel' => $slug_nivel,
+                            'accion' => $a->slug,
+                        ];
 
-                                <div
-                                    class="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/50 blur-2xl dark:bg-white/5">
-                                </div>
+                        if (filled($slug_grado)) {
+                            $parametrosAccion['slug_grado'] = $slug_grado;
+                        }
 
-                                <div
-                                    class="pointer-events-none absolute -bottom-10 -left-10 h-24 w-24 rounded-full bg-white/30 blur-2xl dark:bg-white/5">
-                                </div>
+                        $urlAccion = route('submodulos.accion', $parametrosAccion);
+                    @endphp
 
-                                <div class="relative flex items-start justify-between gap-3">
-                                    <div
-                                        class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br {{ $theme['iconBox'] }} text-white shadow-lg shadow-black/10 transition-transform duration-300 group-hover:scale-105">
-                                        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
-                                            <path d="{{ $cfg['icon'] }}"></path>
-                                        </svg>
-                                    </div>
+                    <a href="{{ $urlAccion }}" @if (!$isActive) wire:navigate.hover @endif
+                        @if ($isActive) x-on:click.prevent
+                        @else
+                            x-on:click="if (nav) { $event.preventDefault() } else { nav = true }" @endif
+                        aria-current="{{ $isActive ? 'page' : 'false' }}"
+                        class="group relative flex min-w-[118px] flex-1 flex-col items-center justify-end px-2 pb-3 text-center outline-none transition">
 
-                                    <div class="flex items-center gap-2">
-                                        @if ($a->slug === 'fichas')
-                                            <span
-                                                class="rounded-full bg-pink-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-pink-700 ring-1 ring-pink-500/20 dark:text-pink-300">
-                                                Preescolar
-                                            </span>
-                                        @endif
+                        @if ($isActive)
+                            {{-- Semicírculo blanco que integra el botón elevado con la barra. --}}
+                            <span
+                                class="pointer-events-none absolute -top-[26px] left-1/2 z-10 h-[62px] w-[94px] -translate-x-1/2 rounded-t-[999px] bg-white dark:bg-neutral-900"
+                                aria-hidden="true"></span>
+                        @endif
 
-                                        @if (!is_null($badge))
-                                            <span
-                                                class="inline-flex min-w-7 items-center justify-center rounded-full px-2 py-1 text-[11px] font-bold
-                                                {{ $badge > 0
-                                                    ? 'bg-white/90 text-rose-600 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-500/30'
-                                                    : 'bg-white/80 text-neutral-500 shadow-sm ring-1 ring-neutral-200 dark:bg-white/10 dark:text-neutral-300 dark:ring-white/10' }}">
-                                                {{ $badge }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
+                        <span @class([
+                            'grid place-items-center transition-all duration-300',
+                            'absolute -top-[28px] left-1/2 z-20 h-[62px] w-[62px] -translate-x-1/2 rounded-full border-[6px] border-white bg-gradient-to-br text-white shadow-[0_12px_26px_-10px_rgba(79,70,229,0.80)] dark:border-neutral-900 ' .
+                            $theme['iconBox'] => $isActive,
+                            'relative mb-1.5 h-8 w-8 rounded-xl text-slate-400 group-hover:-translate-y-0.5 group-hover:text-violet-500 dark:text-slate-500 dark:group-hover:text-violet-300' => !$isActive,
+                        ])>
+                            <svg viewBox="0 0 24 24" @class(['h-6 w-6' => $isActive, 'h-5 w-5' => !$isActive]) fill="currentColor"
+                                aria-hidden="true">
+                                <path d="{{ $cfg['icon'] }}"></path>
+                            </svg>
 
-                                <div class="relative mt-4">
-                                    <h3
-                                        class="line-clamp-2 min-h-[38px] text-[15px] font-black tracking-tight text-neutral-800 dark:text-white">
-                                        {{ $a->accion }}
-                                    </h3>
+                            @if (!is_null($badge) && $badge > 0)
+                                <span
+                                    class="absolute -right-1.5 -top-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow-sm ring-2 ring-white dark:ring-neutral-900">
+                                    {{ $badge }}
+                                </span>
+                            @endif
+                        </span>
 
-                                    <p
-                                        class="mt-1 line-clamp-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-                                        {{ $cfg['descripcion'] ?? 'Módulo del sistema escolar' }}
-                                    </p>
+                        <span @class([
+                            'relative z-20 max-w-[115px] truncate text-[11px] font-black transition-colors duration-300 sm:text-xs',
+                            $theme['accent'] => $isActive,
+                            'text-slate-400 group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300' => !$isActive,
+                        ])>
+                            {{ $a->accion }}
+                        </span>
 
-                                    <div class="mt-4 flex items-end justify-between">
-                                        <span class="text-3xl font-extrabold leading-none {{ $theme['accent'] }}">
-                                            {{ str_pad($loop->iteration, 2, '0', STR_PAD_LEFT) }}
-                                        </span>
-
-                                        <span
-                                            class="rounded-full px-3 py-1.5 text-[11px] font-black transition-all duration-300
-                                            {{ $isActive
-                                                ? 'bg-white/90 text-indigo-600 ring-1 ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/20'
-                                                : 'bg-white/70 text-neutral-500 ring-1 ring-neutral-200 group-hover:text-indigo-600 dark:bg-white/10 dark:text-neutral-400 dark:ring-white/10 dark:group-hover:text-indigo-300' }}">
-                                            {{ $isActive ? 'Activo' : 'Entrar' }}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                @if ($isActive)
-                                    <div
-                                        class="absolute inset-x-4 bottom-0 h-1 rounded-full bg-gradient-to-r {{ $cfg['gradient'] }}">
-                                    </div>
-                                @endif
-                            </div>
-                        </button>
-                    @endforeach
-                </div>
+                        @if ($isActive)
+                            <span
+                                class="absolute bottom-1.5 left-1/2 z-20 h-1 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r {{ $cfg['gradient'] }} shadow-sm"
+                                aria-hidden="true"></span>
+                        @endif
+                    </a>
+                @endforeach
             </div>
         </div>
-    </div>
+    </nav>
 
     {{-- PANEL PRINCIPAL --}}
     <div

@@ -54,6 +54,7 @@ class Calificacion extends Component
     public string $busqueda = '';
     public string $filtro_estado = '';
     public string $orden_promedio = '';
+    public string $mensajeContexto = '';
 
     public array $inscripciones = [];
     public array $inscripcionesTabla = [];
@@ -117,7 +118,7 @@ class Calificacion extends Component
 
     public function getEsBachilleratoProperty(): bool
     {
-        return (int) $this->nivel_id === 4;
+        return $this->slug_nivel === 'bachillerato';
     }
 
     public function cargarCatalogos(): void
@@ -132,9 +133,9 @@ class Calificacion extends Component
         $this->grupos = collect();
         $this->semestres = collect();
 
-        $this->parciales = Parcial::query()
-            ->orderBy('parcial')
-            ->get();
+        // En bachillerato los parciales se cargan de forma dinámica,
+        // únicamente cuando existe un periodo para la generación y semestre elegidos.
+        $this->parciales = collect();
 
         $this->periodosBasica = PeriodosBasica::query()
             ->orderBy('periodo')
@@ -156,8 +157,21 @@ class Calificacion extends Component
         $this->grados = collect();
         $this->grupos = collect();
         $this->semestres = collect();
+        $this->parciales = collect();
 
         if (blank($value)) {
+            return;
+        }
+
+        $esValida = Generacion::query()
+            ->whereKey($value)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('status', 1)
+            ->exists();
+
+        if (!$esValida) {
+            $this->generacion_id = null;
+            $this->mensajeContexto = 'La generación seleccionada no pertenece al nivel actual o ya no está activa.';
             return;
         }
 
@@ -177,8 +191,17 @@ class Calificacion extends Component
 
         $this->grupos = collect();
         $this->semestres = collect();
+        $this->parciales = collect();
 
         if (blank($value)) {
+            return;
+        }
+
+        $esValido = $this->grados->contains(fn($grado) => (int) $grado->id === (int) $value);
+
+        if (!$esValido) {
+            $this->grado_id = null;
+            $this->mensajeContexto = 'El grado seleccionado no corresponde a la generación actual.';
             return;
         }
 
@@ -200,12 +223,22 @@ class Calificacion extends Component
         ]);
 
         $this->grupos = collect();
+        $this->parciales = collect();
 
         if (blank($value)) {
             return;
         }
 
+        $esValido = $this->semestres->contains(fn($semestre) => (int) $semestre->id === (int) $value);
+
+        if (!$esValido) {
+            $this->semestre_id = null;
+            $this->mensajeContexto = 'Ese semestre no tiene periodos registrados para la generación seleccionada.';
+            return;
+        }
+
         $this->cargarGrupos();
+        $this->cargarParcialesDisponibles();
     }
 
     public function updatedGrupoId($value = null): void
@@ -221,13 +254,21 @@ class Calificacion extends Component
             return;
         }
 
+        $esValido = $this->grupos->contains(fn($grupo) => (int) $grupo->id === (int) $value);
+
+        if (!$esValido) {
+            $this->grupo_id = null;
+            $this->mensajeContexto = 'El grupo seleccionado no corresponde al contexto académico actual.';
+            return;
+        }
+
         if (!$this->esBachillerato) {
             return;
         }
 
         /*
          * En bachillerato no se cargan datos al seleccionar grupo.
-         * Primero se debe seleccionar el parcial.
+         * Primero se debe seleccionar un parcial disponible.
          */
     }
 
@@ -239,6 +280,14 @@ class Calificacion extends Component
         ]);
 
         if (blank($value)) {
+            return;
+        }
+
+        $esValido = $this->parciales->contains(fn($parcial) => (int) $parcial->id === (int) $value);
+
+        if (!$esValido) {
+            $this->parcial_bachillerato_id = null;
+            $this->mensajeContexto = 'El parcial seleccionado no tiene un periodo registrado para este semestre.';
             return;
         }
 
@@ -320,6 +369,7 @@ class Calificacion extends Component
             'resumenImportacion',
             'diagnosticoIa',
             'diagnosticoIaGeneradoEn',
+            'mensajeContexto',
         ]);
 
         $this->reset($campos);
@@ -350,22 +400,73 @@ class Calificacion extends Component
 
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel_id)
+            ->whereHas('grupos', function ($query) {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('generacion_id', $this->generacion_id);
+            })
             ->orderBy('orden')
             ->orderBy('id')
             ->get();
+
+        if ($this->grados->isEmpty()) {
+            $this->mensajeContexto = 'La generación seleccionada no tiene grados o grupos configurados.';
+        }
     }
 
     private function cargarSemestres(): void
     {
-        if (!$this->esBachillerato || blank($this->grado_id)) {
+        if (
+            !$this->esBachillerato
+            || blank($this->generacion_id)
+            || blank($this->grado_id)
+        ) {
             $this->semestres = collect();
             return;
         }
 
         $this->semestres = Semestre::query()
             ->where('grado_id', $this->grado_id)
+            ->whereHas('grupos', function ($query) {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('generacion_id', $this->generacion_id)
+                    ->where('grado_id', $this->grado_id);
+            })
+            ->whereHas('periodosBachillerato', function ($query) {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('generacion_id', $this->generacion_id);
+            })
             ->orderBy('numero')
             ->get();
+
+        if ($this->semestres->isEmpty()) {
+            $this->mensajeContexto = 'No existen periodos de bachillerato configurados para esta generación y grado.';
+        }
+    }
+
+    private function cargarParcialesDisponibles(): void
+    {
+        $this->parciales = collect();
+
+        if (
+            !$this->esBachillerato
+            || blank($this->generacion_id)
+            || blank($this->semestre_id)
+        ) {
+            return;
+        }
+
+        $this->parciales = Parcial::query()
+            ->whereHas('periodos', function ($query) {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('generacion_id', $this->generacion_id)
+                    ->where('semestre_id', $this->semestre_id);
+            })
+            ->orderBy('parcial')
+            ->get();
+
+        if ($this->parciales->isEmpty()) {
+            $this->mensajeContexto = 'El semestre seleccionado no tiene parciales registrados en Periodos.';
+        }
     }
 
     private function cargarGrupos(): void
@@ -395,6 +496,10 @@ class Calificacion extends Component
             ->orderBy('asignacion_grupos.nombre')
             ->orderBy('grupos.id')
             ->get();
+
+        if ($this->grupos->isEmpty()) {
+            $this->mensajeContexto = 'No existen grupos configurados para la generación, grado y semestre seleccionados.';
+        }
     }
 
     public function limpiarFiltros(): void
@@ -430,11 +535,13 @@ class Calificacion extends Component
             'diagnosticoIaGeneradoEn',
             'boleta_inscripcion_id',
             'reconocimiento_inscripcion_id',
+            'mensajeContexto',
         ]);
 
         $this->grados = collect();
         $this->grupos = collect();
         $this->semestres = collect();
+        $this->parciales = collect();
     }
 
     public function cargarDatos(): void
@@ -459,20 +566,32 @@ class Calificacion extends Component
             'resumenImportacion',
             'diagnosticoIa',
             'diagnosticoIaGeneradoEn',
+            'mensajeContexto',
         ]);
 
         if (!$this->puedeCargarDatos()) {
+            $this->mensajeContexto = $this->esBachillerato
+                ? 'Selecciona una generación, grado, semestre, grupo y parcial válidos.'
+                : 'Selecciona una generación, grado, grupo y periodo válidos.';
             return;
         }
 
         $this->cargarPeriodoSeleccionado();
 
         if (blank($this->periodo_id)) {
+            $this->mensajeContexto = 'No existe un periodo registrado para la generación, semestre y parcial seleccionados.';
             return;
         }
 
         $this->cargarInscripciones();
         $this->cargarMaterias();
+
+        if (empty($this->inscripciones)) {
+            $this->mensajeContexto = 'El contexto seleccionado no tiene alumnos activos asignados.';
+        } elseif (empty($this->materias)) {
+            $this->mensajeContexto = 'El grupo seleccionado no tiene materias calificables asignadas para el ciclo escolar del periodo.';
+        }
+
         $this->cargarCalificaciones();
         $this->calcularPromedios();
         $this->aplicarFiltroEstado();
@@ -580,15 +699,15 @@ class Calificacion extends Component
         }
 
         /*
-         * En bachillerato se toman todos los grupos equivalentes.
-         * Esto permite mostrar los alumnos del mismo grupo lógico,
-         * aunque el alumno no tenga asignado el semestre seleccionado.
+         * En bachillerato se toman todos los grupos equivalentes de la
+         * generación, incluso si el alumno ya avanzó de grado o semestre.
+         * La inscripción guarda la ubicación actual del alumno; por eso,
+         * limitar por grado/semestre impediría consultar periodos históricos.
          */
         if ($this->esBachillerato) {
             return Grupo::query()
                 ->where('nivel_id', $this->nivel_id)
                 ->where('generacion_id', $this->generacion_id)
-                ->where('grado_id', $this->grado_id)
                 ->where('asignacion_grupo_id', $grupoSeleccionado->asignacion_grupo_id)
                 ->pluck('id')
                 ->map(fn($id) => (int) $id)
@@ -617,11 +736,9 @@ class Calificacion extends Component
             grupoIds: $grupoIds,
             fechaCorte: $fechaCorte,
             nivelId: (int) $this->nivel_id,
-            gradoId: (int) $this->grado_id,
+            gradoId: $this->esBachillerato ? null : (int) $this->grado_id,
             generacionId: (int) $this->generacion_id,
-            semestreId: $this->esBachillerato && filled($this->semestre_id)
-                ? (int) $this->semestre_id
-                : null,
+            semestreId: null,
         );
 
         if (filled($this->busqueda)) {
@@ -906,7 +1023,7 @@ class Calificacion extends Component
          */
         return collect($this->materias)
             ->filter(function ($materia): bool {
-                if (! empty($materia['extra'])) {
+                if (!empty($materia['extra'])) {
                     return false;
                 }
 
@@ -950,7 +1067,7 @@ class Calificacion extends Component
 
             // Igual que PROMEDIO de Excel: textos, claves especiales y vacíos
             // no suman ni cuentan como divisor.
-            if (! $this->esCalificacionNumerica($valor)) {
+            if (!$this->esCalificacionNumerica($valor)) {
                 continue;
             }
 

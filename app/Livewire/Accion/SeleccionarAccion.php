@@ -10,7 +10,6 @@ class SeleccionarAccion extends Component
 
     public ?string $slug_nivel = null;
     public ?string $slug_grado = null;
-
     public ?string $accionActual = null;
 
     public array $badges = [
@@ -34,44 +33,10 @@ class SeleccionarAccion extends Component
             $this->accionActual = 'fichas';
         }
 
-        // Evita que "fichas" quede activa si no es preescolar.
+        // Evita que fichas quede activa fuera de preescolar.
         if ($this->accionActual === 'fichas' && $this->slug_nivel !== 'preescolar') {
             $this->accionActual = null;
         }
-    }
-
-    public function ir(string $accion): void
-    {
-        // Preescolar no usa calificaciones; se envía a fichas.
-        if ($accion === 'calificaciones' && $this->slug_nivel === 'preescolar') {
-            $accion = 'fichas';
-        }
-
-        // Bloquea el acceso a fichas si no corresponde a preescolar.
-        if ($accion === 'fichas' && $this->slug_nivel !== 'preescolar') {
-            return;
-        }
-
-        $this->accionActual = $accion;
-
-        if ($this->slug_nivel) {
-            $parametros = [
-                'slug_nivel' => $this->slug_nivel,
-                'accion' => $accion,
-            ];
-
-            if ($this->slug_grado) {
-                $parametros['slug_grado'] = $this->slug_grado;
-            }
-
-            $this->redirectRoute('submodulos.accion', $parametros, navigate: true);
-            return;
-        }
-
-        $this->redirect(
-            request()->fullUrlWithQuery(['accion' => $accion]),
-            navigate: true
-        );
     }
 
     public function render()
