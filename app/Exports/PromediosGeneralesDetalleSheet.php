@@ -29,6 +29,7 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
         protected bool $esBachillerato,
         protected array $encabezadosPeriodos,
         protected Collection $gruposPromedios,
+        protected string $modalidadBachillerato = 'semestral',
     ) {
         $this->totalColumnas = 6 + count($this->encabezadosPeriodos);
 
@@ -73,41 +74,51 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
 
             $this->filasEncabezado[] = count($this->filas) + 1;
 
-            $encabezados = [
-                '#',
-                'Alumno',
-                'Matrícula',
-            ];
+            $esAnualBachillerato = $this->esBachillerato
+                && $this->modalidadBachillerato === 'anual';
+
+            $encabezados = $esAnualBachillerato
+                ? ['#', 'Lugar', 'Alumno', 'Matrícula']
+                : ['#', 'Alumno', 'Matrícula'];
 
             foreach ($this->encabezadosPeriodos as $etiqueta) {
                 $encabezados[] = $etiqueta;
             }
 
-            $encabezados[] = 'Suma';
-            $encabezados[] = 'Promedio';
+            if (! $esAnualBachillerato) {
+                $encabezados[] = 'Suma';
+            }
+
+            $encabezados[] = $esAnualBachillerato ? 'Promedio anual' : 'Promedio';
             $encabezados[] = 'Estatus';
 
             $this->filas[] = $encabezados;
 
             foreach (($grupoPromedio['alumnos'] ?? []) as $index => $alumno) {
-                $fila = [
-                    $index + 1,
-                    $alumno['alumno'] ?? 'Sin nombre',
-                    $alumno['matricula'] ?? '—',
-                ];
+                $fila = [$index + 1];
+
+                if ($esAnualBachillerato) {
+                    $fila[] = $alumno['texto_lugar'] ?? 'Pendiente';
+                }
+
+                $fila[] = $alumno['alumno'] ?? 'Sin nombre';
+                $fila[] = $alumno['matricula'] ?? '—';
 
                 foreach ($this->encabezadosPeriodos as $periodo => $etiqueta) {
                     $fila[] = isset($alumno['periodos'][$periodo]) && $alumno['periodos'][$periodo] !== null
-                        ? $this->formatearDecimal($alumno['periodos'][$periodo])
+                        ? $this->formatearDecimal($alumno['periodos'][$periodo], $esAnualBachillerato ? 2 : 1)
                         : 'Pendiente';
                 }
 
-                $fila[] = collect($alumno['periodos'] ?? [])->contains(fn ($valor) => $valor !== null)
-                    ? $this->formatearDecimal($alumno['suma_periodos'] ?? null)
-                    : 'Pendiente';
+                if (! $esAnualBachillerato) {
+                    $fila[] = collect($alumno['periodos'] ?? [])->contains(fn ($valor) => $valor !== null)
+                        ? $this->formatearDecimal($alumno['suma_periodos'] ?? null)
+                        : 'Pendiente';
+                }
+
                 $promedioMostrar = $alumno['promedio_final'] ?? $alumno['promedio_provisional'] ?? null;
                 $fila[] = $promedioMostrar !== null
-                    ? $this->formatearDecimal($promedioMostrar) . (($alumno['completo'] ?? false) ? '' : ' PROV.')
+                    ? $this->formatearDecimal($promedioMostrar, $esAnualBachillerato ? 2 : 1) . (($alumno['completo'] ?? false) ? '' : ' PROV.')
                     : 'Pendiente';
                 $fila[] = $alumno['estatus'] ?? 'Sin captura';
 
@@ -123,6 +134,8 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $hoja = $event->sheet->getDelegate();
+                $esAnualBachillerato = $this->esBachillerato
+                    && $this->modalidadBachillerato === 'anual';
 
                 $ultimaColumna = Coordinate::stringFromColumnIndex($this->totalColumnas);
                 $ultimaFila = $hoja->getHighestRow();
@@ -230,10 +243,21 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
                 $hoja->freezePane('A4');
 
                 $hoja->getColumnDimension('A')->setWidth(8);
-                $hoja->getColumnDimension('B')->setWidth(38);
-                $hoja->getColumnDimension('C')->setWidth(18);
 
-                for ($columna = 4; $columna <= $this->totalColumnas; $columna++) {
+                if ($esAnualBachillerato) {
+                    $hoja->getColumnDimension('B')->setWidth(14);
+                    $hoja->getColumnDimension('C')->setWidth(38);
+                    $hoja->getColumnDimension('D')->setWidth(18);
+                    $primeraColumnaNumerica = 5;
+                    $columnaAlumno = 'C';
+                } else {
+                    $hoja->getColumnDimension('B')->setWidth(38);
+                    $hoja->getColumnDimension('C')->setWidth(18);
+                    $primeraColumnaNumerica = 4;
+                    $columnaAlumno = 'B';
+                }
+
+                for ($columna = $primeraColumnaNumerica; $columna <= $this->totalColumnas; $columna++) {
                     $letra = Coordinate::stringFromColumnIndex($columna);
                     $hoja->getColumnDimension($letra)->setWidth(15);
                     $hoja->getStyle("{$letra}1:{$letra}{$ultimaFila}")
@@ -245,13 +269,22 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                $hoja->getStyle("B1:B{$ultimaFila}")
+                $hoja->getStyle("{$columnaAlumno}1:{$columnaAlumno}{$ultimaFila}")
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-                $hoja->getStyle("C1:C{$ultimaFila}")
-                    ->getAlignment()
-                    ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                if ($esAnualBachillerato) {
+                    $hoja->getStyle("B1:B{$ultimaFila}")
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $hoja->getStyle("D1:D{$ultimaFila}")
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                } else {
+                    $hoja->getStyle("C1:C{$ultimaFila}")
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                }
 
                 for ($fila = 1; $fila <= $ultimaFila; $fila++) {
                     $valor = (string) $hoja->getCell("{$ultimaColumna}{$fila}")->getValue();
@@ -296,8 +329,8 @@ class PromediosGeneralesDetalleSheet implements FromArray, ShouldAutoSize, WithE
         ];
     }
 
-    protected function formatearDecimal(null|int|float|string $valor): string
+    protected function formatearDecimal(null|int|float|string $valor, int $decimales = 1): string
     {
-        return PromedioExcel::formatear($valor, 1, '0.0');
+        return PromedioExcel::formatear($valor, $decimales, $decimales === 2 ? '0.00' : '0.0');
     }
 }

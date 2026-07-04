@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
+use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\HorariosGeneralesPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
+use App\Http\Controllers\ListaGeneracionesHistoricasController;
 use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
@@ -171,6 +173,18 @@ Route::get('/generales/{slug_nivel}/cuadro-honor/{formato}', CuadroHonorPromedio
     ->middleware('admin')
     ->name('generales.cuadro-honor');
 
+Route::middleware('admin')->prefix('/generales/bachillerato/promedio-anual')->group(function () {
+    Route::get('/reconocimiento/{inscripcion}', [PromedioAnualBachilleratoController::class, 'reconocimiento'])
+        ->name('generales.bachillerato.promedio-anual.reconocimiento');
+
+    Route::get('/reconocimientos/zip', [PromedioAnualBachilleratoController::class, 'reconocimientosZip'])
+        ->name('generales.bachillerato.promedio-anual.reconocimientos.zip');
+
+    Route::get('/lista/{formato}', [PromedioAnualBachilleratoController::class, 'lista'])
+        ->where('formato', 'pdf|word')
+        ->name('generales.bachillerato.promedio-anual.lista');
+});
+
 
 // FICHAS DESCRIPTIVAS PREESCOLAR
 Route::get('/fichas/preescolar/excel', [FichaController::class, 'excel'])
@@ -224,6 +238,11 @@ Route::get('/profesores/horarios/todos/pdf', TodosHorariosProfesoresPdfControlle
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
     ->name('accion.generales.listas.pdf');
+
+Route::get('/generales/{slug_nivel}/generaciones-historicas/{formato}', ListaGeneracionesHistoricasController::class)
+    ->middleware('admin')
+    ->whereIn('formato', ['pdf', 'word'])
+    ->name('generales.generaciones-historicas');
 
 
 Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.pdf');

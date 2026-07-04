@@ -11,12 +11,14 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\CalificacionOficialPrimariaService;
+use App\Services\PromedioAnualBachilleratoService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -40,6 +42,7 @@ class PromediosGenerales extends Component
     public string $semestre_id = '';
     public string $orden = 'promedio_desc';
     public string $fecha_pdf = '';
+    public string $modalidad_bachillerato = 'semestral';
 
     public function mount(string $slug_nivel): void
     {
@@ -98,6 +101,28 @@ class PromediosGenerales extends Component
         $this->cargarSemestres();
     }
 
+    public function updatedCicloEscolarId(): void
+    {
+        if ($this->esAnualBachillerato) {
+            $this->grado_id = '';
+            $this->grupo_id = '';
+            $this->semestre_id = '';
+        }
+    }
+
+    public function updatedModalidadBachillerato(): void
+    {
+        if (! in_array($this->modalidad_bachillerato, ['semestral', 'anual'], true)) {
+            $this->modalidad_bachillerato = 'semestral';
+        }
+
+        $this->grado_id = '';
+        $this->grupo_id = '';
+        $this->semestre_id = '';
+        $this->cargarGrupos();
+        $this->cargarSemestres();
+    }
+
     public function limpiarFiltros(): void
     {
         $this->ciclo_escolar_id = (string) (
@@ -110,6 +135,7 @@ class PromediosGenerales extends Component
         $this->grupo_id = '';
         $this->semestre_id = '';
         $this->orden = 'promedio_desc';
+        $this->modalidad_bachillerato = 'semestral';
 
         $this->cargarGrupos();
         $this->cargarSemestres();
@@ -131,8 +157,43 @@ class PromediosGenerales extends Component
             || (int) ($this->nivel?->id ?? 0) === 4;
     }
 
+    public function getEsAnualBachilleratoProperty(): bool
+    {
+        return $this->esBachillerato && $this->modalidad_bachillerato === 'anual';
+    }
+
+    public function getContextoAnualBachilleratoProperty(): array
+    {
+        if (! $this->esAnualBachillerato || $this->ciclo_escolar_id === '' || $this->generacion_id === '') {
+            return [
+                'valido' => false,
+                'errores' => $this->esAnualBachillerato && $this->generacion_id === ''
+                    ? ['Selecciona una generación para calcular el promedio anual de bachillerato.']
+                    : [],
+                'semestres' => collect(),
+                'numeros_semestre' => [],
+                'nombre_anio' => 'Año no determinado',
+            ];
+        }
+
+        return app(PromedioAnualBachilleratoService::class)->resolverContexto(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+        );
+    }
+
     public function getEncabezadosPeriodosProperty(): array
     {
+        if ($this->esAnualBachillerato) {
+            $numeros = $this->contextoAnualBachillerato['numeros_semestre'] ?? [];
+
+            return [
+                1 => isset($numeros[0]) ? 'Prom. semestre ' . $numeros[0] : 'Primer semestre',
+                2 => isset($numeros[1]) ? 'Prom. semestre ' . $numeros[1] : 'Segundo semestre',
+            ];
+        }
+
         return $this->esBachillerato
             ? [1 => '1er parcial', 2 => '2do parcial']
             : [1 => '1er periodo', 2 => '2do periodo', 3 => '3er periodo'];
@@ -140,6 +201,24 @@ class PromediosGenerales extends Component
 
     public function getConcentradoProperty(): array
     {
+        if ($this->esAnualBachillerato) {
+            if ($this->ciclo_escolar_id === '' || $this->generacion_id === '') {
+                return app(PromedioAnualBachilleratoService::class)->reporteAnual(
+                    nivelId: (int) $this->nivel->id,
+                    cicloEscolarId: (int) ($this->ciclo_escolar_id ?: 0),
+                    generacionId: (int) ($this->generacion_id ?: 0),
+                    orden: $this->orden,
+                );
+            }
+
+            return app(PromedioAnualBachilleratoService::class)->reporteAnual(
+                nivelId: (int) $this->nivel->id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: (int) $this->generacion_id,
+                orden: $this->orden,
+            );
+        }
+
         $alumnos = $this->obtenerAlumnosConPromedio();
 
         return [
@@ -149,11 +228,18 @@ class PromediosGenerales extends Component
             'campos' => $this->esPrimaria
                 ? app(CalificacionOficialPrimariaService::class)->campos()
                 : collect(),
+            'diagnostico' => null,
+            'contexto' => null,
         ];
     }
 
     private function cargarGrupos(): void
     {
+        if ($this->esAnualBachillerato) {
+            $this->grupos = collect();
+            return;
+        }
+
         $this->grupos = Grupo::query()
             ->with([
                 'asignacionGrupo:id,nombre',
@@ -382,6 +468,10 @@ class PromediosGenerales extends Component
 
     private function obtenerAlumnosBachillerato(): Collection
     {
+        if ($this->generacion_id === '') {
+            return collect();
+        }
+
         $reporte = app(PromedioBachilleratoService::class)->reporteSemestral(
             nivelId: (int) $this->nivel->id,
             cicloEscolarId: (int) $this->ciclo_escolar_id,
@@ -867,9 +957,23 @@ class PromediosGenerales extends Component
 
     public function exportarExcel(): BinaryFileResponse
     {
+        if ($this->esBachillerato && $this->generacion_id === '') {
+            throw ValidationException::withMessages([
+                'generacion_id' => 'Selecciona una generación de bachillerato antes de exportar.',
+            ]);
+        }
+
+        if ($this->esAnualBachillerato && ! ($this->contextoAnualBachillerato['valido'] ?? false)) {
+            throw ValidationException::withMessages([
+                'generacion_id' => implode(' ', $this->contextoAnualBachillerato['errores'] ?? [
+                    'La generación no corresponde al ciclo escolar seleccionado.',
+                ]),
+            ]);
+        }
+
         $concentrado = $this->concentrado;
 
-        $nombreArchivo = 'PROMEDIOS_GENERALES_'
+        $nombreArchivo = ($this->esAnualBachillerato ? 'PROMEDIO_ANUAL_BACHILLERATO_' : 'PROMEDIOS_GENERALES_')
             . Str::slug($this->nivel?->nombre ?? $this->slug_nivel, '_')
             . '_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
 
@@ -881,13 +985,19 @@ class PromediosGenerales extends Component
                 encabezadosPeriodos: $this->encabezadosPeriodos,
                 resumen: $concentrado['resumen'],
                 gruposPromedios: $concentrado['grupos'],
+                modalidadBachillerato: $this->modalidad_bachillerato,
                 filtros: [
                     'Nivel' => $this->nivel?->nombre ?? 'Sin nivel',
                     'Ciclo escolar' => $this->ciclo_escolar_id ?: 'Sin seleccionar',
                     'Generación' => $this->generacion_id ?: 'Todas',
                     'Grado' => $this->grado_id ?: 'Todos',
                     'Grupo' => $this->grupo_id ?: 'Todos',
-                    'Semestre' => $this->esBachillerato ? ($this->semestre_id ?: 'Todos') : 'No aplica',
+                    'Modalidad bachillerato' => $this->esBachillerato ? ($this->esAnualBachillerato ? 'Promedio anual' : 'Promedio semestral') : 'No aplica',
+                    'Semestre' => ! $this->esBachillerato
+                        ? 'No aplica'
+                        : ($this->esAnualBachillerato
+                            ? 'Automático por ciclo y generación'
+                            : ($this->semestre_id ?: 'Todos')),
                     'Orden' => match ($this->orden) {
                         'promedio_asc' => 'Promedio menor a mayor',
                         'nombre_asc' => 'Nombre A-Z',

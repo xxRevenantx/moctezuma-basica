@@ -17,6 +17,7 @@ class PromediosGeneralesExport implements WithMultipleSheets
         protected array $encabezadosPeriodos,
         protected array $resumen,
         protected Collection $gruposPromedios,
+        protected string $modalidadBachillerato = 'semestral',
         protected array $filtros = [],
     ) {
     }
@@ -29,6 +30,7 @@ class PromediosGeneralesExport implements WithMultipleSheets
                 nivelSlug: $this->nivelSlug,
                 esBachillerato: $this->esBachillerato,
                 resumen: $this->resumen,
+                modalidadBachillerato: $this->modalidadBachillerato,
                 filtros: $this->filtros,
             ),
             new PromediosGeneralesDetalleSheet(
@@ -36,6 +38,7 @@ class PromediosGeneralesExport implements WithMultipleSheets
                 esBachillerato: $this->esBachillerato,
                 encabezadosPeriodos: $this->encabezadosPeriodos,
                 gruposPromedios: $this->gruposPromedios,
+                modalidadBachillerato: $this->modalidadBachillerato,
             ),
         ];
 

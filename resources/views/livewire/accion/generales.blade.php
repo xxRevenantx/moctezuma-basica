@@ -5,6 +5,7 @@
         cierre_nivel: false,
         cierre_ciclo: false,
         listas: false,
+        generaciones_historicas: false,
         horarios: false,
         promedios: false,
         lugares_preescolar: false,
@@ -40,6 +41,7 @@
                 cierre_nivel: guardados.cierre_nivel === true,
                 cierre_ciclo: guardados.cierre_ciclo === true,
                 listas: guardados.listas === true,
+                generaciones_historicas: guardados.generaciones_historicas === true,
                 horarios: guardados.horarios === true,
                 promedios: guardados.promedios === true,
                 credenciales: guardados.credenciales === true,
@@ -401,6 +403,54 @@
         <div x-cloak x-show="colapsos.listas" x-transition.opacity.duration.200ms
             class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
             <livewire:accion.generales.listas :slug_nivel="$slug_nivel" :key="'listas-generales-' . $slug_nivel" />
+        </div>
+    </section>
+
+    {{-- COLLAPSE: LISTAS HISTÓRICAS DE GENERACIONES --}}
+    <section
+        class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <button type="button" x-on:click="alternarCollapse('generaciones_historicas')"
+            class="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/70 sm:px-6">
+            <div class="flex min-w-0 items-center gap-4">
+                <div
+                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] via-cyan-600 to-[#88AC2E] text-white shadow-lg shadow-sky-600/20">
+                    <flux:icon.archive-box class="h-6 w-6" />
+                </div>
+
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-[#006492] dark:text-sky-300">
+                        Archivo histórico
+                    </p>
+                    <h2 class="truncate text-lg font-black text-slate-900 dark:text-white">
+                        Listas de generaciones egresadas
+                    </h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Descarga padrones por generación en PDF o Word, con selección múltiple, estatus, grupos y alumnos archivados.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2">
+                <span class="hidden rounded-full border px-3 py-1 text-xs font-black sm:inline-flex"
+                    :class="colapsos.generaciones_historicas ?
+                        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300' :
+                        'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300'"
+                    x-text="colapsos.generaciones_historicas ? 'Abierto' : 'Cerrado'"></span>
+
+                <span
+                    class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition duration-300 group-hover:border-sky-200 group-hover:text-[#006492] dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300"
+                    :class="colapsos.generaciones_historicas ? 'rotate-180' : 'rotate-0'">
+                    <flux:icon.chevron-down class="h-5 w-5" />
+                </span>
+            </div>
+        </button>
+
+        <div x-cloak x-show="colapsos.generaciones_historicas" x-transition.opacity.duration.200ms
+            class="border-t border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+            <livewire:accion.generales.listas-generaciones-historicas
+                :slug_nivel="$slug_nivel"
+                :key="'listas-generaciones-historicas-' . $slug_nivel"
+            />
         </div>
     </section>
 

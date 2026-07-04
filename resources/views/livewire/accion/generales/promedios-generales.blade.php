@@ -6,11 +6,20 @@
     $esPrimaria = $this->esPrimaria;
     $esSecundaria = $this->esSecundaria;
     $esBachillerato = $this->esBachillerato;
+    $esAnualBachillerato = $this->esAnualBachillerato;
     $esBasicaConDetalle = $esPrimaria || $esSecundaria;
+    $mostrarDetalleMaterias = $esBasicaConDetalle || $esAnualBachillerato;
+    $diagnosticoAnual = $concentrado['diagnostico'] ?? null;
+    $contextoAnual = $concentrado['contexto'] ?? $this->contextoAnualBachillerato;
+    $puedeMostrarBachillerato = !$esBachillerato || $generacion_id !== '';
     $gradoTerminal = $grados->sortByDesc('orden')->first();
     $semestreTerminal = $semestres->sortByDesc('numero')->first();
     $puedeDescargarPorGrado = $ciclo_escolar_id !== '' && $grado_id !== '';
     $puedeDescargarReconocimientos = $puedeDescargarPorGrado && (!$esBachillerato || $semestre_id !== '');
+    $puedeDescargarAnualBachillerato = $esAnualBachillerato
+        && $ciclo_escolar_id !== ''
+        && $generacion_id !== ''
+        && (bool) data_get($contextoAnual, 'valido', false);
     $esGradoTerminalSeleccionado =
         $puedeDescargarPorGrado && $gradoTerminal && (int) $grado_id === (int) $gradoTerminal->id;
     $esSemestreTerminalSeleccionado =
@@ -39,6 +48,12 @@
     if ($grupo_id !== '') {
         $parametrosListaPromedios['grupo_id'] = $grupo_id;
     }
+
+    $parametrosAnualesBachillerato = [
+        'ciclo_escolar_id' => $ciclo_escolar_id,
+        'generacion_id' => $generacion_id,
+        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
+    ];
 @endphp
 
 <div class="space-y-6">
@@ -69,9 +84,13 @@
                             El promedio de cada materia se obtiene con sus tres periodos. El promedio general se calcula
                             con los promedios anuales de las materias oficiales configuradas en la base de datos.
                             Materias extra, recesos, talleres y materias informativas no se muestran ni participan.
+                        @elseif ($esBachillerato && $esAnualBachillerato)
+                            El promedio anual integra automáticamente los dos semestres que corresponden al ciclo y a la
+                            generación seleccionados. Cada materia calificable se obtiene con sus dos parciales; después,
+                            los promedios semestrales se suman y se dividen entre dos. Ambos semestres representan el 50 %.
                         @elseif ($esBachillerato)
-                            El promedio de cada materia se obtiene con el primer y segundo parcial. El promedio
-                            semestral se calcula con los promedios finales de todas las materias oficiales asignadas. El
+                            El promedio de cada materia calificable se obtiene con el primer y segundo parcial. El promedio
+                            semestral se calcula con los promedios finales de las materias calificables asignadas. El
                             resultado solo es definitivo cuando todas tienen ambos parciales numéricos.
                         @else
                             El promedio se calcula con las evaluaciones numéricas configuradas para el nivel.
@@ -82,7 +101,7 @@
                         <span
                             class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50">
                             <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                            {{ $esBachillerato ? 'Parciales por semestre' : 'Tres periodos' }}
+                            {{ $esAnualBachillerato ? 'Dos semestres · cuatro parciales' : ($esBachillerato ? 'Parciales por semestre' : 'Tres periodos') }}
                         </span>
                         <span
                             class="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
@@ -94,6 +113,8 @@
             </div>
 
             <button type="button" wire:click="exportarExcel" wire:loading.attr="disabled" wire:target="exportarExcel"
+                @disabled($esBachillerato && $generacion_id === '')
+                title="{{ $esBachillerato && $generacion_id === '' ? 'Selecciona una generación de bachillerato' : 'Exportar el concentrado actual' }}"
                 class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60">
                 <span wire:loading.remove wire:target="exportarExcel" class="inline-flex items-center gap-2">
                     <flux:icon.document-arrow-down class="h-4 w-4" />
@@ -106,6 +127,33 @@
             </button>
         </div>
     </section>
+
+    @if ($esBachillerato)
+        <section
+            class="rounded-[1.6rem] border border-sky-200 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-4 shadow-sm dark:border-sky-900/50 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
+                        Modalidad de cálculo para bachillerato
+                    </p>
+                    <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        El cálculo anual se activa únicamente para bachillerato y no modifica los promedios de los demás niveles.
+                    </p>
+                </div>
+
+                <div class="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                    <button type="button" wire:click="$set('modalidad_bachillerato', 'semestral')"
+                        class="rounded-xl px-4 py-2 text-sm font-black transition {{ !$esAnualBachillerato ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-neutral-800' }}">
+                        Promedio semestral
+                    </button>
+                    <button type="button" wire:click="$set('modalidad_bachillerato', 'anual')"
+                        class="rounded-xl px-4 py-2 text-sm font-black transition {{ $esAnualBachillerato ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-neutral-800' }}">
+                        Promedio anual
+                    </button>
+                </div>
+            </div>
+        </section>
+    @endif
 
     <section
         class="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -125,41 +173,62 @@
             <flux:field>
                 <flux:label>Generación</flux:label>
                 <flux:select wire:model.live="generacion_id">
-                    <flux:select.option value="">Todas</flux:select.option>
+                    <flux:select.option value="">{{ $esBachillerato ? 'Selecciona una generación' : 'Todas' }}</flux:select.option>
                     @foreach ($generaciones as $generacion)
                         <flux:select.option value="{{ $generacion->id }}">
                             {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
+                <flux:error name="generacion_id" />
             </flux:field>
 
-            <flux:field>
-                <flux:label>Grado</flux:label>
-                <flux:select wire:model.live="grado_id">
-                    <flux:select.option value="">Todos</flux:select.option>
-                    @foreach ($grados as $grado)
-                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </flux:field>
+            @if (!$esAnualBachillerato)
+                <flux:field>
+                    <flux:label>Grado</flux:label>
+                    <flux:select wire:model.live="grado_id">
+                        <flux:select.option value="">Todos</flux:select.option>
+                        @foreach ($grados as $grado)
+                            <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
 
-            <flux:field>
-                <flux:label>Grupo</flux:label>
-                <flux:select wire:model.live="grupo_id">
-                    <flux:select.option value="">Todos</flux:select.option>
-                    @foreach ($grupos as $grupo)
-                        <flux:select.option value="{{ $grupo->id }}">
-                            {{ $grupo->grado?->nombre ?? 'Grado' }} · {{ $grupo->asignacionGrupo?->nombre ?? '—' }}
-                            @if ($esBachillerato && $grupo->semestre)
-                                · Semestre {{ $grupo->semestre->numero }}
-                            @endif
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </flux:field>
+                <flux:field>
+                    <flux:label>Grupo</flux:label>
+                    <flux:select wire:model.live="grupo_id">
+                        <flux:select.option value="">Todos</flux:select.option>
+                        @foreach ($grupos as $grupo)
+                            <flux:select.option value="{{ $grupo->id }}">
+                                {{ $grupo->grado?->nombre ?? 'Grado' }} · {{ $grupo->asignacionGrupo?->nombre ?? '—' }}
+                                @if ($esBachillerato && $grupo->semestre)
+                                    · Semestre {{ $grupo->semestre->numero }}
+                                @endif
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+            @else
+                <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                    <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Año académico</p>
+                    <p class="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                        {{ data_get($contextoAnual, 'nombre_anio', 'Selecciona ciclo y generación') }}
+                    </p>
+                </div>
 
-            @if ($esBachillerato)
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/20">
+                    <p class="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">Semestres automáticos</p>
+                    <p class="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                        @if (count(data_get($contextoAnual, 'numeros_semestre', [])) === 2)
+                            {{ data_get($contextoAnual, 'numeros_semestre.0') }} y {{ data_get($contextoAnual, 'numeros_semestre.1') }}
+                        @else
+                            Pendientes de determinar
+                        @endif
+                    </p>
+                </div>
+            @endif
+
+            @if ($esBachillerato && !$esAnualBachillerato)
                 <flux:field>
                     <flux:label>Semestre</flux:label>
                     <flux:select wire:model.live="semestre_id">
@@ -196,13 +265,19 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
-                    {{ $esBachillerato ? 'Descargas masivas por semestre' : 'Descargas masivas por grado' }}
+                    {{ $esAnualBachillerato ? 'Descargas anuales por generación' : ($esBachillerato ? 'Descargas masivas por semestre' : 'Descargas masivas por grado') }}
                 </p>
                 <h3 class="mt-1 text-lg font-black text-slate-950 dark:text-white">
-                    Reconocimientos, diplomas y listas académicas
+                    {{ $esAnualBachillerato ? 'Reconocimientos y listas del promedio anual' : 'Reconocimientos, diplomas y listas académicas' }}
                 </h3>
                 <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    {{ $esBachillerato ? 'Selecciona grado y semestre. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.' : 'Selecciona un grado. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.' }}
+                    @if ($esAnualBachillerato)
+                        Selecciona ciclo y generación. El sistema integra automáticamente los dos semestres correspondientes y genera un solo ranking para toda la generación.
+                    @elseif ($esBachillerato)
+                        Selecciona generación, grado y semestre. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.
+                    @else
+                        Selecciona un grado. Descarga los documentos ZIP o la lista institucional ordenada por promedio y lugar.
+                    @endif
                 </p>
             </div>
 
@@ -214,103 +289,139 @@
                 </flux:field>
 
                 <div class="flex flex-wrap gap-2">
-                    @if ($puedeDescargarReconocimientos)
-                        <a href="{{ route(
-                            'generales.documentos-academicos.zip',
-                            array_merge(
-                                [
-                                    'slug_nivel' => $slug_nivel,
-                                    'tipo' => 'reconocimientos',
-                                ],
-                                $parametrosDescargaMasiva,
-                            ),
-                        ) }}"
-                            target="_blank" rel="noopener"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
-                            <flux:icon.trophy class="h-4 w-4" />
-                            Reconocimientos ZIP
-                        </a>
+                    @if ($esAnualBachillerato)
+                        @if ($puedeDescargarAnualBachillerato)
+                            <a href="{{ route('generales.bachillerato.promedio-anual.reconocimientos.zip', $parametrosAnualesBachillerato) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
+                                <flux:icon.trophy class="h-4 w-4" />
+                                Reconocimientos ZIP
+                            </a>
+
+                            <a href="{{ route('generales.bachillerato.promedio-anual.lista', array_merge(['formato' => 'pdf'], $parametrosAnualesBachillerato)) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-700">
+                                <flux:icon.document-text class="h-4 w-4" />
+                                Lista PDF
+                            </a>
+
+                            <a href="{{ route('generales.bachillerato.promedio-anual.lista', array_merge(['formato' => 'word'], $parametrosAnualesBachillerato)) }}"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
+                                <flux:icon.document-arrow-down class="h-4 w-4" />
+                                Lista Word
+                            </a>
+                        @else
+                            @foreach (['Reconocimientos ZIP', 'Lista PDF', 'Lista Word'] as $boton)
+                                <span
+                                    class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                                    title="Selecciona una generación compatible con el ciclo escolar">
+                                    @if ($boton === 'Reconocimientos ZIP')
+                                        <flux:icon.trophy class="h-4 w-4" />
+                                    @else
+                                        <flux:icon.document-text class="h-4 w-4" />
+                                    @endif
+                                    {{ $boton }}
+                                </span>
+                            @endforeach
+                        @endif
                     @else
-                        <span
-                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
-                            <flux:icon.trophy class="h-4 w-4" />
-                            Reconocimientos ZIP
-                        </span>
+                        @if ($puedeDescargarReconocimientos)
+                            <a href="{{ route(
+                                'generales.documentos-academicos.zip',
+                                array_merge(
+                                    [
+                                        'slug_nivel' => $slug_nivel,
+                                        'tipo' => 'reconocimientos',
+                                    ],
+                                    $parametrosDescargaMasiva,
+                                ),
+                            ) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700">
+                                <flux:icon.trophy class="h-4 w-4" />
+                                Reconocimientos ZIP
+                            </a>
+                        @else
+                            <span
+                                class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                                title="{{ $esBachillerato ? 'Selecciona generación, grado y semestre' : 'Selecciona un grado' }}">
+                                <flux:icon.trophy class="h-4 w-4" />
+                                Reconocimientos ZIP
+                            </span>
+                        @endif
+
+                        @if ($puedeDescargarDiplomas)
+                            <a href="{{ route(
+                                'generales.documentos-academicos.zip',
+                                array_merge(
+                                    [
+                                        'slug_nivel' => $slug_nivel,
+                                        'tipo' => 'diplomas',
+                                    ],
+                                    $parametrosDescargaMasiva,
+                                ),
+                            ) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">
+                                <flux:icon.academic-cap class="h-4 w-4" />
+                                Diplomas ZIP
+                            </a>
+                        @else
+                            <span
+                                class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                                title="{{ $esBachillerato ? 'Selecciona sexto semestre y su grado correspondiente' : 'Selecciona el último grado del nivel' }}">
+                                <flux:icon.academic-cap class="h-4 w-4" />
+                                Diplomas ZIP
+                            </span>
+                        @endif
+
+                        @if ($puedeDescargarReconocimientos)
+                            <a href="{{ route(
+                                'generales.cuadro-honor',
+                                array_merge(
+                                    [
+                                        'slug_nivel' => $slug_nivel,
+                                        'formato' => 'pdf',
+                                    ],
+                                    $parametrosListaPromedios,
+                                ),
+                            ) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-700">
+                                <flux:icon.document-text class="h-4 w-4" />
+                                Lista PDF
+                            </a>
+
+                            <a href="{{ route(
+                                'generales.cuadro-honor',
+                                array_merge(
+                                    [
+                                        'slug_nivel' => $slug_nivel,
+                                        'formato' => 'word',
+                                    ],
+                                    $parametrosListaPromedios,
+                                ),
+                            ) }}"
+                                class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
+                                <flux:icon.document-arrow-down class="h-4 w-4" />
+                                Lista Word
+                            </a>
+                        @else
+                            <span
+                                class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                                title="{{ $esBachillerato ? 'Selecciona generación, grado y semestre' : 'Selecciona un grado' }}">
+                                <flux:icon.document-text class="h-4 w-4" />
+                                Lista PDF
+                            </span>
+
+                            <span
+                                class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
+                                title="{{ $esBachillerato ? 'Selecciona generación, grado y semestre' : 'Selecciona un grado' }}">
+                                <flux:icon.document-arrow-down class="h-4 w-4" />
+                                Lista Word
+                            </span>
+                        @endif
                     @endif
-
-                    @if ($puedeDescargarDiplomas)
-                        <a href="{{ route(
-                            'generales.documentos-academicos.zip',
-                            array_merge(
-                                [
-                                    'slug_nivel' => $slug_nivel,
-                                    'tipo' => 'diplomas',
-                                ],
-                                $parametrosDescargaMasiva,
-                            ),
-                        ) }}"
-                            target="_blank" rel="noopener"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">
-                            <flux:icon.academic-cap class="h-4 w-4" />
-                            Diplomas ZIP
-                        </a>
-                    @else
-                        <span
-                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                            title="{{ $esBachillerato ? 'Selecciona sexto semestre y su grado correspondiente' : 'Selecciona el último grado del nivel' }}">
-                            <flux:icon.academic-cap class="h-4 w-4" />
-                            Diplomas ZIP
-                        </span>
-                    @endif
-
-                    @if ($puedeDescargarReconocimientos)
-                        <a href="{{ route(
-                            'generales.cuadro-honor',
-                            array_merge(
-                                [
-                                    'slug_nivel' => $slug_nivel,
-                                    'formato' => 'pdf',
-                                ],
-                                $parametrosListaPromedios,
-                            ),
-                        ) }}"
-                            target="_blank" rel="noopener"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-700">
-                            <flux:icon.document-text class="h-4 w-4" />
-                            Lista PDF
-                        </a>
-
-                        <a href="{{ route(
-                            'generales.cuadro-honor',
-                            array_merge(
-                                [
-                                    'slug_nivel' => $slug_nivel,
-                                    'formato' => 'word',
-                                ],
-                                $parametrosListaPromedios,
-                            ),
-                        ) }}"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700">
-                            <flux:icon.document-arrow-down class="h-4 w-4" />
-                            Lista Word
-                        </a>
-                    @else
-                        <span
-                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
-                            <flux:icon.document-text class="h-4 w-4" />
-                            Lista PDF
-                        </span>
-
-                        <span
-                            class="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400"
-                            title="{{ $esBachillerato ? 'Selecciona grado y semestre' : 'Selecciona un grado' }}">
-                            <flux:icon.document-arrow-down class="h-4 w-4" />
-                            Lista Word
-                        </span>
-                    @endif
-
                 </div>
             </div>
         </div>
@@ -323,6 +434,51 @@
         </div>
     @enderror
 
+    @if (!$puedeMostrarBachillerato)
+        <div class="rounded-[1.6rem] border border-amber-200 bg-amber-50 p-5 text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+            <div class="flex items-start gap-3">
+                <flux:icon.exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                    <p class="font-black">Selecciona una generación de bachillerato</p>
+                    <p class="mt-1 text-sm font-semibold">
+                        La generación es obligatoria para evitar mezclar alumnos de cohortes diferentes en los promedios semestrales y anuales.
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($esAnualBachillerato && $puedeMostrarBachillerato && !empty($diagnosticoAnual))
+        <section class="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Diagnóstico anual por generación</p>
+                    <h3 class="mt-1 text-base font-black text-slate-950 dark:text-white">
+                        Validación de semestres, capturas e inconsistencias
+                    </h3>
+                </div>
+                <div class="flex flex-wrap gap-2 text-xs font-black">
+                    <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700 ring-1 ring-emerald-100">Completos: {{ $diagnosticoAnual['completos'] ?? 0 }}</span>
+                    <span class="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 ring-1 ring-amber-100">Incompletos: {{ $diagnosticoAnual['incompletos'] ?? 0 }}</span>
+                    <span class="rounded-full bg-rose-50 px-3 py-1.5 text-rose-700 ring-1 ring-rose-100">Duplicados: {{ $diagnosticoAnual['duplicados'] ?? 0 }}</span>
+                    <span class="rounded-full bg-violet-50 px-3 py-1.5 text-violet-700 ring-1 ring-violet-100">Inconsistencias: {{ $diagnosticoAnual['inconsistencias'] ?? 0 }}</span>
+                </div>
+            </div>
+
+            @if (!empty($diagnosticoAnual['alertas']))
+                <div class="mt-4 space-y-2">
+                    @foreach ($diagnosticoAnual['alertas'] as $alerta)
+                        <div class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                            <flux:icon.exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>{{ $alerta }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
+    @endif
+
+    @if ($puedeMostrarBachillerato)
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div
             class="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -343,7 +499,7 @@
             <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Acreditados</p>
             <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ $resumen['aprobados'] }}</p>
             <p class="mt-1 text-xs font-bold text-emerald-700">
-                {{ $esBachillerato ? 'Semestre completo y promedio general mínimo de 6' : 'Con todos los requisitos completos' }}
+                {{ $esAnualBachillerato ? 'Ambos semestres completos y todas las materias acreditadas' : ($esBachillerato ? 'Semestre completo y promedio general mínimo de 6' : 'Con todos los requisitos completos') }}
             </p>
         </div>
 
@@ -352,7 +508,7 @@
             <p class="text-xs font-black uppercase tracking-wide text-rose-700">En riesgo</p>
             <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ $resumen['riesgo'] }}</p>
             <p class="mt-1 text-xs font-bold text-rose-700">
-                {{ $esBachillerato ? 'Promedio semestral general menor de 6' : 'Campos o materias por debajo de 6' }}
+                {{ $esAnualBachillerato ? 'Promedio anual menor de 6 o materias no acreditadas' : ($esBachillerato ? 'Promedio semestral general menor de 6' : 'Campos o materias por debajo de 6') }}
             </p>
         </div>
 
@@ -381,8 +537,13 @@
                         <h3 class="truncate text-base font-black text-slate-950 dark:text-white">
                             {{ $grupoPromedio['titulo'] }}</h3>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            {{ $grupoPromedio['total'] }} alumnos · {{ $grupoPromedio['incompletos'] }} incompletos ·
-                            {{ $grupoPromedio['pendientes_decision'] ?? 0 }} decisiones pendientes
+                            @if ($esAnualBachillerato)
+                                {{ $grupoPromedio['total'] }} alumnos · {{ $grupoPromedio['incompletos'] }} incompletos ·
+                                {{ $grupoPromedio['con_reconocimiento'] ?? 0 }} con reconocimiento anual
+                            @else
+                                {{ $grupoPromedio['total'] }} alumnos · {{ $grupoPromedio['incompletos'] }} incompletos ·
+                                {{ $grupoPromedio['pendientes_decision'] ?? 0 }} decisiones pendientes
+                            @endif
                         </p>
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
@@ -400,20 +561,20 @@
 
                 <div x-cloak x-show="abierto" x-transition.opacity.duration.150ms
                     class="border-t border-slate-200 dark:border-neutral-800">
-                    @if ($esBasicaConDetalle)
+                    @if ($mostrarDetalleMaterias)
                         <div
                             class="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/30">
                             <button type="button" x-on:click="tab = 'resumen'"
                                 class="rounded-xl px-4 py-2 text-xs font-black transition"
                                 :class="tab === 'resumen' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' :
                                     'bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700'">
-                                Resumen anual
+                                {{ $esAnualBachillerato ? 'Resumen anual por generación' : 'Resumen anual' }}
                             </button>
                             <button type="button" x-on:click="tab = 'materias'"
                                 class="rounded-xl px-4 py-2 text-xs font-black transition"
                                 :class="tab === 'materias' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' :
                                     'bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700'">
-                                Detalle por materia
+                                {{ $esAnualBachillerato ? 'Detalle de los dos semestres' : 'Detalle por materia' }}
                             </button>
                             @if ($esPrimaria)
                                 <button type="button" x-on:click="tab = 'campos'"
@@ -442,6 +603,10 @@
                                         <th class="px-3 py-3 text-center text-xs font-black uppercase text-slate-500">
                                             {{ $etiqueta }}</th>
                                     @endforeach
+                                    @if ($esAnualBachillerato)
+                                        <th class="px-3 py-3 text-center text-xs font-black uppercase text-slate-500">
+                                            Promedio anual</th>
+                                    @endif
                                     <th
                                         class="min-w-[180px] px-3 py-3 text-center text-xs font-black uppercase text-slate-500">
                                         Situación</th>
@@ -471,17 +636,24 @@
                                             <span
                                                 class="inline-flex flex-col items-center rounded-xl bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50">
                                                 <span>{{ $alumno['texto_lugar'] ?? 'Pendiente' }}</span>
-                                                <span class="mt-0.5 text-[10px] font-bold">
-                                                    Prom.
-                                                    {{ \App\Support\PromedioExcel::formatear($alumno['promedio_final'] ?? ($alumno['promedio_provisional'] ?? null), 2, '—') }}
-                                                </span>
+                                                @if (!$esAnualBachillerato)
+                                                    <span class="mt-0.5 text-[10px] font-bold">
+                                                        Prom.
+                                                        {{ \App\Support\PromedioExcel::formatear($alumno['promedio_final'] ?? ($alumno['promedio_provisional'] ?? null), 2, '—') }}
+                                                    </span>
+                                                @endif
                                             </span>
                                         </td>
                                         <td class="px-3 py-3">
                                             <p class="font-black text-slate-900 dark:text-white">
                                                 {{ $alumno['alumno'] }}</p>
-                                            <p class="text-xs font-semibold text-slate-500">{{ $alumno['grado'] }} ·
-                                                Grupo {{ $alumno['grupo'] }}</p>
+                                            <p class="text-xs font-semibold text-slate-500">
+                                                @if ($esAnualBachillerato)
+                                                    Generación {{ data_get($contextoAnual, 'generacion.anio_ingreso', '—') }}-{{ data_get($contextoAnual, 'generacion.anio_egreso', '—') }} · {{ data_get($contextoAnual, 'nombre_anio', 'Año académico') }}
+                                                @else
+                                                    {{ $alumno['grado'] }} · Grupo {{ $alumno['grupo'] }}
+                                                @endif
+                                            </p>
                                         </td>
                                         <td class="px-3 py-3 font-semibold text-slate-600 dark:text-slate-300">
                                             {{ $alumno['matricula'] ?? '—' }}</td>
@@ -496,7 +668,9 @@
                                                 @if ($valorPeriodo !== null)
                                                     <span
                                                         class="inline-flex min-w-14 flex-col items-center rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
-                                                        {{ $this->formatearDecimal($valorPeriodo) }}
+                                                        {{ $esAnualBachillerato
+                                                            ? \App\Support\PromedioExcel::formatear($valorPeriodo, 2, '—')
+                                                            : $this->formatearDecimal($valorPeriodo) }}
                                                         @if (!$periodoCompleto)
                                                             <small
                                                                 class="text-[9px] uppercase text-amber-600">Prov.</small>
@@ -509,6 +683,17 @@
                                             </td>
                                         @endforeach
 
+                                        @if ($esAnualBachillerato)
+                                            <td class="px-3 py-3 text-center">
+                                                <span class="inline-flex min-w-16 flex-col items-center rounded-xl bg-indigo-50 px-2.5 py-1 text-sm font-black text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50">
+                                                    {{ \App\Support\PromedioExcel::formatear($alumno['promedio_final'] ?? ($alumno['promedio_provisional'] ?? null), 2, '—') }}
+                                                    @if (!($alumno['completo'] ?? false))
+                                                        <small class="text-[9px] uppercase text-amber-600">Prov.</small>
+                                                    @endif
+                                                </span>
+                                            </td>
+                                        @endif
+
                                         <td class="px-3 py-3 text-center">
                                             <span
                                                 class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-800 dark:text-slate-200 dark:ring-neutral-700">
@@ -520,6 +705,17 @@
                                             @elseif ($esSecundaria && !empty($alumno['materias_reprobadas']))
                                                 <p class="mt-1 text-[10px] font-bold text-rose-600">
                                                     {{ implode(', ', $alumno['materias_reprobadas']) }}</p>
+                                            @elseif ($esAnualBachillerato && !empty($alumno['materias_reprobadas']))
+                                                <p class="mt-1 text-[10px] font-bold text-rose-600">
+                                                    {{ implode(', ', array_slice($alumno['materias_reprobadas'], 0, 2)) }}
+                                                    @if (count($alumno['materias_reprobadas']) > 2)
+                                                        y {{ count($alumno['materias_reprobadas']) - 2 }} más
+                                                    @endif
+                                                </p>
+                                            @elseif ($esAnualBachillerato && !empty($alumno['faltantes_anuales']))
+                                                <p class="mt-1 text-[10px] font-bold text-amber-600">
+                                                    {{ implode(' · ', $alumno['faltantes_anuales']) }}
+                                                </p>
                                             @endif
                                         </td>
 
@@ -553,72 +749,90 @@
 
                                         <td class="px-3 py-3 text-center">
                                             <div class="flex flex-wrap justify-center gap-2">
-                                                @if ($esPrimaria)
-                                                    <a href="{{ route('calificaciones.boleta-oficial-primaria', [
-                                                        'inscripcion' => $alumnoInscripcionId,
-                                                        'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                        'generacion_id' => $alumnoGeneracionId,
-                                                        'grado_id' => $alumnoGradoId,
-                                                        'grupo_id' => $alumnoGrupoId,
-                                                    ]) }}"
-                                                        target="_blank"
-                                                        class="inline-flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white">
-                                                        <flux:icon.document-arrow-down class="h-4 w-4" /> Oficial
-                                                    </a>
-                                                @endif
+                                                @if ($esAnualBachillerato)
+                                                    @if ($alumno['reconocimiento_disponible'] ?? false)
+                                                        <a href="{{ route('generales.bachillerato.promedio-anual.reconocimiento', array_merge([
+                                                            'inscripcion' => $alumnoInscripcionId,
+                                                        ], $parametrosAnualesBachillerato)) }}"
+                                                            target="_blank" rel="noopener"
+                                                            class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition hover:bg-indigo-700">
+                                                            <flux:icon.trophy class="h-4 w-4" /> Reconocimiento anual
+                                                        </a>
+                                                    @elseif (!($alumno['completo'] ?? false))
+                                                        <span class="text-xs font-bold text-amber-600">Anual incompleto</span>
+                                                    @elseif (!($alumno['todas_materias_acreditadas'] ?? false))
+                                                        <span class="text-xs font-bold text-rose-600">Tiene materias no acreditadas</span>
+                                                    @else
+                                                        <span class="text-xs font-bold text-slate-500">Sin reconocimiento</span>
+                                                    @endif
+                                                @else
+                                                    @if ($esPrimaria)
+                                                        <a href="{{ route('calificaciones.boleta-oficial-primaria', [
+                                                            'inscripcion' => $alumnoInscripcionId,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                            'generacion_id' => $alumnoGeneracionId,
+                                                            'grado_id' => $alumnoGradoId,
+                                                            'grupo_id' => $alumnoGrupoId,
+                                                        ]) }}"
+                                                            target="_blank"
+                                                            class="inline-flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white">
+                                                            <flux:icon.document-arrow-down class="h-4 w-4" /> Oficial
+                                                        </a>
+                                                    @endif
 
-                                                <a href="{{ route('misrutas.promedios.boleta.pdf', [
-                                                    'slug_nivel' => $slug_nivel,
-                                                    'tipo' => $esBachillerato ? 'semestral' : 'boleta',
-                                                    'inscripcion_id' => $alumnoInscripcionId,
-                                                    'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                    'generacion_id' => $alumnoGeneracionId,
-                                                    'grado_id' => $alumnoGradoId,
-                                                    'grupo_id' => $alumnoGrupoId,
-                                                    'semestre_id' => $alumnoSemestreId,
-                                                ]) }}"
-                                                    target="_blank"
-                                                    class="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 text-xs font-black text-white">
-                                                    <flux:icon.document-arrow-down class="h-4 w-4" /> Boleta
-                                                </a>
-
-                                                @if (
-                                                    $definitivo &&
-                                                        (($esBachillerato && ($alumno['reconocimiento_disponible'] ?? false)) ||
-                                                            (!$esBachillerato && ($alumno['lugar'] ?? null))))
                                                     <a href="{{ route('misrutas.promedios.boleta.pdf', [
                                                         'slug_nivel' => $slug_nivel,
-                                                        'tipo' => 'reconocimiento',
+                                                        'tipo' => $esBachillerato ? 'semestral' : 'boleta',
                                                         'inscripcion_id' => $alumnoInscripcionId,
                                                         'ciclo_escolar_id' => $ciclo_escolar_id,
                                                         'generacion_id' => $alumnoGeneracionId,
                                                         'grado_id' => $alumnoGradoId,
                                                         'grupo_id' => $alumnoGrupoId,
                                                         'semestre_id' => $alumnoSemestreId,
-                                                        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
                                                     ]) }}"
                                                         target="_blank"
-                                                        class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">
-                                                        <flux:icon.trophy class="h-4 w-4" /> Reconocimiento
+                                                        class="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 text-xs font-black text-white">
+                                                        <flux:icon.document-arrow-down class="h-4 w-4" /> Boleta
                                                     </a>
-                                                @endif
 
-                                                @if ($alumno['diploma_disponible'] ?? false)
-                                                    <a href="{{ route('misrutas.promedios.boleta.pdf', [
-                                                        'slug_nivel' => $slug_nivel,
-                                                        'tipo' => 'diploma',
-                                                        'inscripcion_id' => $alumnoInscripcionId,
-                                                        'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                        'generacion_id' => $alumnoGeneracionId,
-                                                        'grado_id' => $alumnoGradoId,
-                                                        'grupo_id' => $alumnoGrupoId,
-                                                        'semestre_id' => $alumnoSemestreId,
-                                                        'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
-                                                    ]) }}"
-                                                        target="_blank"
-                                                        class="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">
-                                                        <flux:icon.academic-cap class="h-4 w-4" /> Diploma
-                                                    </a>
+                                                    @if (
+                                                        $definitivo &&
+                                                            (($esBachillerato && ($alumno['reconocimiento_disponible'] ?? false)) ||
+                                                                (!$esBachillerato && ($alumno['lugar'] ?? null))))
+                                                        <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                            'slug_nivel' => $slug_nivel,
+                                                            'tipo' => 'reconocimiento',
+                                                            'inscripcion_id' => $alumnoInscripcionId,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                            'generacion_id' => $alumnoGeneracionId,
+                                                            'grado_id' => $alumnoGradoId,
+                                                            'grupo_id' => $alumnoGrupoId,
+                                                            'semestre_id' => $alumnoSemestreId,
+                                                            'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
+                                                        ]) }}"
+                                                            target="_blank"
+                                                            class="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">
+                                                            <flux:icon.trophy class="h-4 w-4" /> Reconocimiento
+                                                        </a>
+                                                    @endif
+
+                                                    @if ($alumno['diploma_disponible'] ?? false)
+                                                        <a href="{{ route('misrutas.promedios.boleta.pdf', [
+                                                            'slug_nivel' => $slug_nivel,
+                                                            'tipo' => 'diploma',
+                                                            'inscripcion_id' => $alumnoInscripcionId,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                            'generacion_id' => $alumnoGeneracionId,
+                                                            'grado_id' => $alumnoGradoId,
+                                                            'grupo_id' => $alumnoGrupoId,
+                                                            'semestre_id' => $alumnoSemestreId,
+                                                            'fecha' => $fecha_pdf ?: now()->format('Y-m-d'),
+                                                        ]) }}"
+                                                            target="_blank"
+                                                            class="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">
+                                                            <flux:icon.academic-cap class="h-4 w-4" /> Diploma
+                                                        </a>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </td>
@@ -628,7 +842,7 @@
                         </table>
                     </div>
 
-                    @if ($esBasicaConDetalle)
+                    @if ($mostrarDetalleMaterias)
                         <div x-cloak x-show="tab === 'materias'" class="space-y-5 p-4">
                             @foreach ($grupoPromedio['alumnos'] as $alumno)
                                 <article
@@ -643,77 +857,167 @@
                                         </div>
                                         <span
                                             class="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100">
-                                            General:
+                                            {{ $esAnualBachillerato ? 'Promedio anual:' : 'General:' }}
                                             {{ $this->formatearDecimal($alumno['promedio_final'] ?? ($alumno['promedio_provisional'] ?? null)) }}
-                                            {{ $alumno['completo'] ?? false ? '' : 'PROV.' }}
+                                            {{ ($alumno['completo'] ?? false) ? '' : 'PROV.' }}
                                         </span>
                                     </div>
-                                    <div class="overflow-x-auto">
-                                        <table
-                                            class="min-w-full divide-y divide-slate-200 text-xs dark:divide-neutral-800">
-                                            <thead>
-                                                <tr class="bg-white dark:bg-neutral-900">
-                                                    <th
-                                                        class="px-3 py-2 text-left font-black uppercase text-slate-500">
-                                                        Materia</th>
-                                                    @if ($esPrimaria)
+
+                                    @if ($esAnualBachillerato)
+                                        <div class="space-y-4 p-4">
+                                            @foreach (data_get($contextoAnual, 'numeros_semestre', []) as $numeroSemestre)
+                                                @php
+                                                    $detalleSemestre = data_get($alumno, 'semestres_detalle.' . $numeroSemestre);
+                                                @endphp
+
+                                                @if ($detalleSemestre)
+                                                    <section class="overflow-hidden rounded-2xl border border-slate-200 dark:border-neutral-800">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2 bg-indigo-50 px-4 py-3 dark:bg-indigo-950/20">
+                                                            <div>
+                                                                <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                                                                    Semestre {{ $numeroSemestre }} · Grupo {{ $detalleSemestre['grupo'] ?? '—' }}
+                                                                </p>
+                                                                <p class="mt-1 text-xs font-semibold text-slate-500">
+                                                                    Solo materias calificables · promedio de cada materia = (P1 + P2) ÷ 2
+                                                                </p>
+                                                            </div>
+                                                            <span class="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700 ring-1 ring-indigo-200 dark:bg-neutral-900 dark:text-indigo-300 dark:ring-indigo-900/60">
+                                                                Promedio semestral:
+                                                                {{ \App\Support\PromedioExcel::formatear($detalleSemestre['promedio_general_preciso'] ?? ($detalleSemestre['promedio_provisional_preciso'] ?? null), 2, '—') }}
+                                                                {{ ($detalleSemestre['completo'] ?? false) ? '' : 'PROV.' }}
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="overflow-x-auto">
+                                                            <table class="min-w-full divide-y divide-slate-200 text-xs dark:divide-neutral-800">
+                                                                <thead>
+                                                                    <tr class="bg-white dark:bg-neutral-900">
+                                                                        <th class="min-w-[230px] px-3 py-2 text-left font-black uppercase text-slate-500">Materia calificable</th>
+                                                                        <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Parcial 1</th>
+                                                                        <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Parcial 2</th>
+                                                                        <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Promedio</th>
+                                                                        <th class="px-3 py-2 text-center font-black uppercase text-slate-500">Estado</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                                                    @forelse ($detalleSemestre['materias'] ?? [] as $materia)
+                                                                        <tr>
+                                                                            <td class="px-3 py-2 font-bold text-slate-800 dark:text-slate-200">
+                                                                                {{ $materia['materia'] }}
+                                                                            </td>
+                                                                            @foreach ([1, 2] as $parcial)
+                                                                                <td class="px-3 py-2 text-center">
+                                                                                    @if (($materia['evaluaciones'][$parcial] ?? null) !== null)
+                                                                                        {{ $this->formatearDecimal($materia['evaluaciones'][$parcial]) }}
+                                                                                    @elseif (!empty($materia['especiales'][$parcial] ?? null))
+                                                                                        <span class="font-black text-amber-700">{{ $materia['especiales'][$parcial] }}</span>
+                                                                                    @else
+                                                                                        —
+                                                                                    @endif
+                                                                                </td>
+                                                                            @endforeach
+                                                                            <td class="px-3 py-2 text-center font-black">
+                                                                                {{ \App\Support\PromedioExcel::formatear($materia['promedio_final_preciso'] ?? ($materia['promedio_provisional_preciso'] ?? null), 2, '—') }}
+                                                                            </td>
+                                                                            <td class="px-3 py-2 text-center">
+                                                                                <span class="rounded-full px-2 py-1 font-black {{ ($materia['completo'] ?? false) ? (($materia['promedio_final_preciso'] ?? 0) >= 6 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700') : 'bg-amber-50 text-amber-700' }}">
+                                                                                    @if (!($materia['completo'] ?? false))
+                                                                                        Incompleta
+                                                                                    @elseif (($materia['promedio_final_preciso'] ?? 0) >= 6)
+                                                                                        Acreditada
+                                                                                    @else
+                                                                                        No acreditada
+                                                                                    @endif
+                                                                                </span>
+                                                                            </td>
+                                                                        </tr>
+                                                                    @empty
+                                                                        <tr>
+                                                                            <td colspan="5" class="px-4 py-6 text-center font-semibold text-slate-500">
+                                                                                No hay materias calificables configuradas para este semestre.
+                                                                            </td>
+                                                                        </tr>
+                                                                    @endforelse
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </section>
+                                                @else
+                                                    <div class="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                                        <flux:icon.exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                                                        Sin información del semestre {{ $numeroSemestre }}. El alumno no participa en el ranking anual.
+                                                    </div>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="overflow-x-auto">
+                                            <table
+                                                class="min-w-full divide-y divide-slate-200 text-xs dark:divide-neutral-800">
+                                                <thead>
+                                                    <tr class="bg-white dark:bg-neutral-900">
                                                         <th
-                                                            class="px-3 py-2 text-center font-black uppercase text-slate-500">
-                                                            Participa</th>
-                                                    @endif
-                                                    @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
-                                                        <th
-                                                            class="px-3 py-2 text-center font-black uppercase text-slate-500">
-                                                            {{ $etiqueta }}</th>
-                                                    @endforeach
-                                                    <th
-                                                        class="px-3 py-2 text-center font-black uppercase text-slate-500">
-                                                        Promedio anual</th>
-                                                    <th
-                                                        class="px-3 py-2 text-center font-black uppercase text-slate-500">
-                                                        Estado</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                                                @foreach ($alumno['materias'] ?? [] as $materia)
-                                                    <tr>
-                                                        <td
-                                                            class="px-3 py-2 font-bold text-slate-800 dark:text-slate-200">
-                                                            {{ $materia['materia'] }}</td>
+                                                            class="px-3 py-2 text-left font-black uppercase text-slate-500">
+                                                            Materia</th>
                                                         @if ($esPrimaria)
-                                                            <td class="px-3 py-2 text-center">
-                                                                {{ $materia['participa'] ?? true ? 'Sí' : 'No' }}
-                                                            </td>
+                                                            <th
+                                                                class="px-3 py-2 text-center font-black uppercase text-slate-500">
+                                                                Participa</th>
                                                         @endif
                                                         @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
-                                                            <td class="px-3 py-2 text-center">
-                                                                @if (($materia['evaluaciones'][$periodo] ?? null) !== null)
-                                                                    {{ $this->formatearDecimal($materia['evaluaciones'][$periodo]) }}
-                                                                @elseif (!empty($materia['especiales'][$periodo] ?? null))
-                                                                    {{ $materia['especiales'][$periodo] }}
+                                                            <th
+                                                                class="px-3 py-2 text-center font-black uppercase text-slate-500">
+                                                                {{ $etiqueta }}</th>
+                                                        @endforeach
+                                                        <th
+                                                            class="px-3 py-2 text-center font-black uppercase text-slate-500">
+                                                            Promedio anual</th>
+                                                        <th
+                                                            class="px-3 py-2 text-center font-black uppercase text-slate-500">
+                                                            Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                                    @foreach ($alumno['materias'] ?? [] as $materia)
+                                                        <tr>
+                                                            <td
+                                                                class="px-3 py-2 font-bold text-slate-800 dark:text-slate-200">
+                                                                {{ $materia['materia'] }}</td>
+                                                            @if ($esPrimaria)
+                                                                <td class="px-3 py-2 text-center">
+                                                                    {{ $materia['participa'] ?? true ? 'Sí' : 'No' }}
+                                                                </td>
+                                                            @endif
+                                                            @foreach ($encabezadosPeriodos as $periodo => $etiqueta)
+                                                                <td class="px-3 py-2 text-center">
+                                                                    @if (($materia['evaluaciones'][$periodo] ?? null) !== null)
+                                                                        {{ $this->formatearDecimal($materia['evaluaciones'][$periodo]) }}
+                                                                    @elseif (!empty($materia['especiales'][$periodo] ?? null))
+                                                                        {{ $materia['especiales'][$periodo] }}
+                                                                    @else
+                                                                        —
+                                                                    @endif
+                                                                </td>
+                                                            @endforeach
+                                                            <td class="px-3 py-2 text-center font-black">
+                                                                @if ($esSecundaria)
+                                                                    {{ $materia['promedio'] ?? '—' }}
                                                                 @else
-                                                                    —
+                                                                    {{ $this->formatearDecimal($materia['promedio_final_preciso'] ?? ($materia['promedio_provisional_preciso'] ?? null)) }}
                                                                 @endif
                                                             </td>
-                                                        @endforeach
-                                                        <td class="px-3 py-2 text-center font-black">
-                                                            @if ($esSecundaria)
-                                                                {{ $materia['promedio'] ?? '—' }}
-                                                            @else
-                                                                {{ $this->formatearDecimal($materia['promedio_final_preciso'] ?? ($materia['promedio_provisional_preciso'] ?? null)) }}
-                                                            @endif
-                                                        </td>
-                                                        <td class="px-3 py-2 text-center">
-                                                            <span
-                                                                class="rounded-full px-2 py-1 font-black {{ $materia['completo'] ?? false ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">
-                                                                {{ $materia['completo'] ?? false ? 'Completa' : 'Provisional' }}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                            <td class="px-3 py-2 text-center">
+                                                                <span
+                                                                    class="rounded-full px-2 py-1 font-black {{ $materia['completo'] ?? false ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">
+                                                                    {{ $materia['completo'] ?? false ? 'Completa' : 'Provisional' }}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
                                 </article>
                             @endforeach
                         </div>
@@ -847,4 +1151,5 @@
             </div>
         @endforelse
     </div>
+    @endif
 </div>

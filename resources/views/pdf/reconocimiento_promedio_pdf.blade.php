@@ -407,11 +407,19 @@
 
         $alumnoNombreFinal = mb_strtoupper($alumnoNombre ?? ($nombreAlumno ?? 'NOMBRE DEL ALUMNO'), 'UTF-8');
 
-        $textoDocumento = !empty($esBachillerato) ? 'promedio semestral' : 'promedio anual';
+        $esReconocimientoAnualBachillerato = !empty($reconocimientoAnualBachillerato);
 
-        $textoPeriodoDocumento = !empty($esBachillerato)
-            ? 'los parciales correspondientes'
-            : 'los periodos correspondientes';
+        $textoDocumento = $esReconocimientoAnualBachillerato
+            ? 'promedio anual'
+            : (!empty($esBachillerato)
+                ? 'promedio semestral'
+                : 'promedio anual');
+
+        $textoPeriodoDocumento = $esReconocimientoAnualBachillerato
+            ? 'los cuatro parciales de los dos semestres'
+            : (!empty($esBachillerato)
+                ? 'los parciales correspondientes'
+                : 'los periodos correspondientes');
 
         /*
          * Datos basados en Promedios Generales.
@@ -542,23 +550,34 @@
         <div class="linea-alumno"></div>
 
         <div class="descripcion">
-            Por haber obtenido el
-            <strong>{{ $textoLugarReconocimiento }}</strong>
-            con <strong>{{ $textoDocumento }}</strong>
-            de <strong>{{ $promedioReconocimientoTexto }}</strong>
-            durante <strong>{{ $textoPeriodoDocumento }}</strong>
-            del ciclo escolar <strong>{{ $cicloEscolarTexto ?? '—' }}</strong>,
-            correspondiente al
-            @if (!empty($esBachillerato) && !empty($semestre))
-                <strong>{{ $semestre->numero ?? '—' }}° semestre</strong>
-            @endif
+            @if ($esReconocimientoAnualBachillerato)
+                Por haber obtenido el
+                <strong>{{ $textoLugarReconocimiento }}</strong>
+                en aprovechamiento académico durante el ciclo escolar
+                <strong>{{ $cicloEscolarTexto ?? '—' }}</strong>, correspondiente a los semestres
+                <strong>{{ $semestresAnuales[0] ?? '—' }}</strong> y
+                <strong>{{ $semestresAnuales[1] ?? '—' }}</strong>, con promedio anual de
+                <strong>{{ $promedioReconocimientoTexto }}</strong>
+                de <strong>{{ mb_strtoupper($nivel->nombre ?? 'BACHILLERATO', 'UTF-8') }}</strong>.
+            @else
+                Por haber obtenido el
+                <strong>{{ $textoLugarReconocimiento }}</strong>
+                con <strong>{{ $textoDocumento }}</strong>
+                de <strong>{{ $promedioReconocimientoTexto }}</strong>
+                durante <strong>{{ $textoPeriodoDocumento }}</strong>
+                del ciclo escolar <strong>{{ $cicloEscolarTexto ?? '—' }}</strong>,
+                correspondiente al
+                @if (!empty($esBachillerato) && !empty($semestre))
+                    <strong>{{ $semestre->numero ?? '—' }}° semestre</strong>
+                @endif
 
-            @if (!empty($grado))
-                del <strong>{{ mb_strtoupper($grado->nombre ?? '° GRADO', 'UTF-8') }}</strong>° grado
-            @endif
+                @if (!empty($grado))
+                    del <strong>{{ mb_strtoupper($grado->nombre ?? '° GRADO', 'UTF-8') }}</strong>° grado
+                @endif
 
-            de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') }}</strong>,
-            grupo "<strong>{{ mb_strtoupper($grupo->asignacionGrupo?->nombre ?? 'GRUPO', 'UTF-8') }}</strong>".
+                de <strong>{{ mb_strtoupper($nivel->nombre ?? 'NIVEL', 'UTF-8') }}</strong>,
+                grupo "<strong>{{ mb_strtoupper($grupo->asignacionGrupo?->nombre ?? 'GRUPO', 'UTF-8') }}</strong>".
+            @endif
         </div>
 
         <table class="datos-extra">

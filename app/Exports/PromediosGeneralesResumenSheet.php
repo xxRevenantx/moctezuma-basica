@@ -27,6 +27,7 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
         protected string $nivelSlug,
         protected bool $esBachillerato,
         protected array $resumen,
+        protected string $modalidadBachillerato = 'semestral',
         protected array $filtros = [],
     ) {
         $this->prepararFilas();
@@ -84,8 +85,13 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
             $this->filas[] = ['Promedio anual por materia', 'PROMEDIO(P1, P2, P3) con precisión completa'];
             $this->filas[] = ['Promedio general', 'PROMEDIO de los promedios anuales precisos de las materias participantes'];
             $this->filas[] = ['Tutoría', 'Se muestra, pero no participa en promedio, lugares ni promoción'];
+        } elseif ($this->esBachillerato && $this->modalidadBachillerato === 'anual') {
+            $this->filas[] = ['Promedio por materia', '(Parcial 1 + Parcial 2) / 2, solo materias calificables'];
+            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los promedios finales de las materias calificables'];
+            $this->filas[] = ['Promedio anual', '(Promedio del primer semestre + promedio del segundo semestre) / 2'];
+            $this->filas[] = ['Reconocimiento', 'Solo alumnos completos, con todas las materias acreditadas y lugar anual del 1 al 3'];
         } elseif ($this->esBachillerato) {
-            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los parciales numéricos del semestre'];
+            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los promedios finales de materias calificables obtenidos con los dos parciales'];
         } else {
             $this->filas[] = ['Promedio anual', 'PROMEDIO de las evaluaciones numéricas configuradas'];
         }
