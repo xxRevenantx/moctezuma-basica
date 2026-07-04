@@ -25,8 +25,8 @@
         <div x-show="loading" x-transition.opacity
             class="absolute inset-0 z-30 flex items-center justify-center bg-white/80 backdrop-blur-sm dark:bg-neutral-900/80">
             <div class="flex flex-col items-center gap-2">
-                <svg class="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="h-6 w-6 animate-spin text-[#006492] dark:text-sky-300" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                         stroke-width="4">
                     </circle>
@@ -45,8 +45,8 @@
             class="absolute inset-0 z-20 hidden items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
             <div
                 class="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                <svg class="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 animate-spin text-[#006492] dark:text-sky-300" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                         stroke-width="4">
                     </circle>
@@ -61,14 +61,14 @@
         </div>
 
         {{-- Barra superior --}}
-        <div class="h-1.5 w-full shrink-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500"></div>
+        <div class="h-1.5 w-full shrink-0 bg-gradient-to-r from-[#006492] via-cyan-500 to-[#88AC2E]"></div>
 
         {{-- Header --}}
         <div
             class="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-neutral-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95 sm:px-6">
             <div class="min-w-0 space-y-2">
                 <h2 id="titulo-modal-periodo" class="text-xl font-bold text-neutral-900 dark:text-white sm:text-2xl">
-                    Editar periodo
+                    Editar periodo académico
                 </h2>
 
                 <div class="flex flex-wrap items-center gap-2">

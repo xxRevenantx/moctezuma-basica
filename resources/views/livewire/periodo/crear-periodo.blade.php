@@ -130,7 +130,7 @@
         <div
             class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
 
-            <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500"></div>
+            <div class="h-1.5 w-full bg-gradient-to-r from-[#006492] via-cyan-500 to-[#88AC2E]"></div>
 
             <div wire:loading.flex wire:target="guardarPeriodo,nivel_id"
                 class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-slate-950/70">
@@ -152,12 +152,12 @@
             <div class="space-y-5 p-5">
                 <div class="flex flex-col gap-2">
                     <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                        Crear nuevo periodo
+                        Registrar periodo académico
                     </h2>
 
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Para básica se utiliza mes y periodo. Para bachillerato se utiliza generación, semestre, mes y
-                        parcial.
+                        Completa la configuración académica y el rango de fechas. Los campos se adaptan automáticamente
+                        al nivel seleccionado.
                     </p>
 
                     @if ($this->esBachillerato)
