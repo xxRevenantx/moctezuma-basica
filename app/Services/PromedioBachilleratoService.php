@@ -7,6 +7,7 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Support\PromedioExcel;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -439,7 +440,7 @@ class PromedioBachilleratoService
             ];
         }
 
-        $asignaciones = DB::table('asignacion_materias')
+        $queryAsignaciones = DB::table('asignacion_materias')
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
             ->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
             ->whereIn('asignacion_materias.grupo_id', $idsGrupos->all())
@@ -447,10 +448,11 @@ class PromedioBachilleratoService
             ->where('asignacion_materias.estado', '!=', 'archivada')
             ->where('grupos.nivel_id', $nivelId)
             ->whereNotNull('grupos.semestre_id')
-            ->where('materias.nivel_id', $nivelId)
-            ->where('materias.calificable', true)
-            ->where('materias.extra', false)
-            ->where('materias.receso', false)
+            ->where('materias.nivel_id', $nivelId);
+
+        ReglasMateriaBachillerato::aplicarPromediables($queryAsignaciones);
+
+        $asignaciones = $queryAsignaciones
             ->select([
                 'asignacion_materias.id as asignacion_materia_id',
                 'asignacion_materias.grupo_id',

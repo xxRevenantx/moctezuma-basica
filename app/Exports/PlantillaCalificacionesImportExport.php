@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\ReglasMateriaBachillerato;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -68,7 +69,13 @@ class PlantillaCalificacionesImportExport implements FromArray, ShouldAutoSize, 
         $filas[] = $filaIdsMaterias;
 
         $filas[] = ['Indicaciones: captura únicamente en las columnas de materias. No modifiques inscripcion_id, matrícula, alumno ni las columnas ocultas.'];
-        $filas[] = ['Valores permitidos: 0 a 10, AC, ED, RA, NP, SD. Si dejas una calificación vacía, se eliminará la calificación existente para esa materia.'];
+        $indicacionValores = 'Valores permitidos: 0 a 10, AC, ED, RA, NP, SD. Si dejas una calificación vacía, se eliminará la calificación existente para esa materia.';
+
+        if ($this->esBachillerato()) {
+            $indicacionValores .= ' Las columnas EXTRA se importan y se muestran en boletas, pero no intervienen en promedio_actual.';
+        }
+
+        $filas[] = [$indicacionValores];
 
         $encabezados = [
             'inscripcion_id',
@@ -202,19 +209,36 @@ class PlantillaCalificacionesImportExport implements FromArray, ShouldAutoSize, 
             $columnaMateria = Coordinate::stringFromColumnIndex($columna);
             $nombreMateria = $this->nombreMateria($materia);
             $profesor = $this->limpiarTexto($materia['profesor'] ?? 'SIN PROFESOR ASIGNADO');
+            $esExtraBachillerato = $this->esBachillerato()
+                && ReglasMateriaBachillerato::esExtraInformativa($materia);
 
-            $sheet->setCellValue("{$columnaMateria}6", $nombreMateria);
+            $sheet->setCellValue(
+                "{$columnaMateria}6",
+                $nombreMateria . ($esExtraBachillerato ? ' · EXTRA · NO PROMEDIA' : '')
+            );
+
+            $comentario = $nombreMateria . "\nProfesor: {$profesor}\nCaptura 0 a 10, AC, ED, RA, NP o SD.";
+
+            if ($esExtraBachillerato) {
+                $comentario .= "\nMateria extra informativa: se importa y aparece en boletas, pero no interviene en el promedio.";
+            }
 
             $sheet->getComment("{$columnaMateria}6")
                 ->getText()
-                ->createTextRun($nombreMateria . "\nProfesor: {$profesor}\nCaptura 0 a 10, AC, ED, RA, NP o SD.");
+                ->createTextRun($comentario);
 
-            $sheet->getColumnDimension($columnaMateria)->setWidth(18);
+            $sheet->getColumnDimension($columnaMateria)->setWidth($esExtraBachillerato ? 25 : 18);
 
             $sheet->getStyle("{$columnaMateria}7:{$columnaMateria}{$ultimaFila}")->applyFromArray([
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'ECFDF5']],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => $esExtraBachillerato ? 'FEF3C7' : 'ECFDF5'],
+                ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-                'font' => ['bold' => true],
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => $esExtraBachillerato ? '92400E' : '111827'],
+                ],
             ]);
 
             for ($fila = 7; $fila <= $ultimaFila; $fila++) {
@@ -248,13 +272,34 @@ class PlantillaCalificacionesImportExport implements FromArray, ShouldAutoSize, 
             $columna = 4;
 
             foreach ($this->materias as $materia) {
-                $celdasCalificacion[] = Coordinate::stringFromColumnIndex($columna) . $fila;
+                if (!$this->esBachillerato() || ReglasMateriaBachillerato::esPromediable($materia)) {
+                    $celdasCalificacion[] = Coordinate::stringFromColumnIndex($columna) . $fila;
+                }
+
                 $columna++;
             }
 
-            if (!empty($celdasCalificacion)) {
-                $sheet->setCellValue("{$columnaPromedio}{$fila}", '=IFERROR(ROUNDDOWN(AVERAGE(' . implode(',', $celdasCalificacion) . '),1),"")');
+            if (empty($celdasCalificacion)) {
+                continue;
             }
+
+            if ($this->esBachillerato()) {
+                $divisor = max(0, (int) ($this->contexto['numero_materias_promediar'] ?? count($celdasCalificacion)));
+
+                if ($divisor > 0) {
+                    $sheet->setCellValue(
+                        "{$columnaPromedio}{$fila}",
+                        '=IFERROR(ROUNDDOWN(SUM(' . implode(',', $celdasCalificacion) . ')/' . $divisor . ',1),"")'
+                    );
+                }
+
+                continue;
+            }
+
+            $sheet->setCellValue(
+                "{$columnaPromedio}{$fila}",
+                '=IFERROR(ROUNDDOWN(AVERAGE(' . implode(',', $celdasCalificacion) . '),1),"")'
+            );
         }
 
         $sheet->getStyle("{$columnaPromedio}7:{$columnaPromedio}{$ultimaFila}")->applyFromArray([
@@ -295,6 +340,12 @@ class PlantillaCalificacionesImportExport implements FromArray, ShouldAutoSize, 
 
             $columna++;
         }
+    }
+
+    private function esBachillerato(): bool
+    {
+        return ($this->contexto['tipo_periodo'] ?? null) === 'bachillerato'
+            || ReglasMateriaBachillerato::esBachillerato($this->contexto['nivel_id'] ?? null);
     }
 
     private function textoContexto(): string

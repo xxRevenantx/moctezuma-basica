@@ -22,6 +22,7 @@ use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
 use App\Services\ListaAcademicaService;
 use App\Support\PromedioExcel;
+use App\Support\ReglasMateriaBachillerato;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -799,12 +800,8 @@ class Calificacion extends Component
                      * poder capturar y mostrar su calificación en la boleta.
                      * Nunca se cargan recesos.
                      */
-                    $query->where('semestre_id', $this->semestre_id)
-                        ->where('receso', false)
-                        ->where(function ($query): void {
-                            $query->where('calificable', true)
-                                ->orWhere('extra', true);
-                        });
+                    $query->where('semestre_id', $this->semestre_id);
+                    ReglasMateriaBachillerato::aplicarCapturables($query, '');
                 } else {
                     $query->where('calificable', true)
                         ->whereNull('semestre_id');
@@ -1061,7 +1058,7 @@ class Calificacion extends Component
                 }
 
                 if ($this->esBachillerato) {
-                    return true;
+                    return ReglasMateriaBachillerato::esPromediable($materia);
                 }
 
                 if (in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
@@ -1537,17 +1534,58 @@ class Calificacion extends Component
         return $base . ' border-emerald-300 bg-emerald-50 text-emerald-900 focus:ring-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/30';
     }
 
+    private function materiasParaEstadisticasAcademicas(): Collection
+    {
+        return $this->esBachillerato
+            ? $this->obtenerMateriasOrdenadasParaPromedio()
+            : collect($this->materias);
+    }
+
+    private function idsMateriasAcademicas(): Collection
+    {
+        return $this->materiasParaEstadisticasAcademicas()
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->values();
+    }
+
+    private function materiasExtraBachillerato(): Collection
+    {
+        if (!$this->esBachillerato) {
+            return collect();
+        }
+
+        return collect($this->materias)
+            ->filter(fn($materia) => ReglasMateriaBachillerato::esExtraInformativa($materia))
+            ->values();
+    }
+
+    private function contarCeldasCapturadas(Collection $idsMaterias): int
+    {
+        if ($idsMaterias->isEmpty()) {
+            return 0;
+        }
+
+        $ids = $idsMaterias->all();
+
+        return collect($this->calificaciones)
+            ->sum(function ($materiasAlumno) use ($ids): int {
+                return collect($materiasAlumno)
+                    ->only($ids)
+                    ->filter(fn($valor) => $this->normalizarCalificacion($valor) !== null)
+                    ->count();
+            });
+    }
+
     public function getTotalCeldasProperty(): int
     {
-        return count($this->inscripciones) * count($this->materias);
+        return count($this->inscripciones) * $this->idsMateriasAcademicas()->count();
     }
 
     public function getCeldasCapturadasProperty(): int
     {
-        return collect($this->calificaciones)
-            ->flatten()
-            ->filter(fn($valor) => $this->normalizarCalificacion($valor) !== null)
-            ->count();
+        return $this->contarCeldasCapturadas($this->idsMateriasAcademicas());
     }
 
     public function getPorcentajeCapturaProperty(): int
@@ -1557,6 +1595,31 @@ class Calificacion extends Component
         }
 
         return (int) round(($this->celdasCapturadas / $this->totalCeldas) * 100);
+    }
+
+    public function getTotalCeldasExtraProperty(): int
+    {
+        return count($this->inscripciones) * $this->materiasExtraBachillerato()->count();
+    }
+
+    public function getCeldasExtraCapturadasProperty(): int
+    {
+        $ids = $this->materiasExtraBachillerato()
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        return $this->contarCeldasCapturadas($ids);
+    }
+
+    public function getPorcentajeCapturaExtraProperty(): int
+    {
+        if ($this->totalCeldasExtra === 0) {
+            return 0;
+        }
+
+        return (int) round(($this->celdasExtraCapturadas / $this->totalCeldasExtra) * 100);
     }
 
     public function getPuedeGuardarProperty(): bool
@@ -1738,8 +1801,10 @@ class Calificacion extends Component
 
     public function getEstadisticasCalificacionesProperty(): array
     {
+        $idsMateriasAcademicas = $this->idsMateriasAcademicas()->all();
+
         $valores = collect($this->calificaciones)
-            ->flatten()
+            ->flatMap(fn($materiasAlumno) => collect($materiasAlumno)->only($idsMateriasAcademicas)->values())
             ->map(fn($valor) => $this->normalizarCalificacion($valor))
             ->values();
 
@@ -1778,6 +1843,9 @@ class Calificacion extends Component
             'reprobadas' => $hayMateriasPromediables ? $reprobados : 0,
             'especiales' => $especiales,
             'porcentaje_captura' => $this->porcentajeCaptura,
+            'extras_total' => $this->totalCeldasExtra,
+            'extras_capturadas' => $this->celdasExtraCapturadas,
+            'porcentaje_captura_extra' => $this->porcentajeCapturaExtra,
         ];
     }
 
@@ -2003,7 +2071,9 @@ class Calificacion extends Component
             ->sortByDesc('promedio')
             ->values();
 
-        $materiasResumen = collect($this->materias)
+        $materiasResumen = ($this->esBachillerato
+            ? $this->obtenerMateriasOrdenadasParaPromedio()
+            : collect($this->materias))
             ->map(function ($materia) {
                 $asignacionMateriaId = (int) $materia['id'];
 
@@ -2341,7 +2411,7 @@ class Calificacion extends Component
             ],
             'captura' => [
                 'total_alumnos' => count($this->inscripciones),
-                'total_materias' => count($this->materias),
+                'total_materias' => $this->materiasParaEstadisticasAcademicas()->count(),
                 'total_celdas' => (int) $this->totalCeldas,
                 'celdas_capturadas' => (int) $this->celdasCapturadas,
                 'porcentaje_captura' => (int) ($estadisticas['porcentaje_captura'] ?? 0),
@@ -2732,6 +2802,9 @@ class Calificacion extends Component
             'periodo_id' => (int) $this->periodo_id,
             'tipo_periodo' => $this->tipoPeriodoImportacion(),
             'periodo_referencia_id' => $this->periodoReferenciaIdImportacion(),
+            'numero_materias_promediar' => $this->esBachillerato
+                ? (int) ($this->obtenerNumeroMateriasPromediar() ?? 0)
+                : null,
 
             'nivel' => $nivel?->nombre,
             'grado' => $grado?->nombre,

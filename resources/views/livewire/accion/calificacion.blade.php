@@ -1783,15 +1783,41 @@ iniciarHerramientasAcademicas()" class="w-full">
                 @enderror
 
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div class="w-full md:w-2/3">
-                        <div class="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-300">
-                            <span>Calificaciones introducidas: {{ $this->celdasCapturadas }} de
-                                {{ $this->totalCeldas }} ({{ $this->porcentajeCaptura }}%)</span>
+                    <div class="w-full space-y-3 md:w-2/3">
+                        <div>
+                            <div class="flex items-center justify-between gap-3 text-xs text-neutral-600 dark:text-neutral-300">
+                                <span>
+                                    {{ $this->esBachillerato ? 'Captura académica oficial' : 'Calificaciones introducidas' }}:
+                                    {{ $this->celdasCapturadas }} de {{ $this->totalCeldas }}
+                                    ({{ $this->porcentajeCaptura }}%)
+                                </span>
+                                @if ($this->esBachillerato)
+                                    <span class="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                                        Sin materias extra
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="mt-2 h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-950">
+                                <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
+                                    style="width: {{ $this->porcentajeCaptura }}%"></div>
+                            </div>
                         </div>
-                        <div class="mt-2 h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-950">
-                            <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
-                                style="width: {{ $this->porcentajeCaptura }}%"></div>
-                        </div>
+
+                        @if ($this->esBachillerato && $this->totalCeldasExtra > 0)
+                            <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                                <div class="flex items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-200">
+                                    <span>
+                                        Materias extra informativas: {{ $this->celdasExtraCapturadas }} de
+                                        {{ $this->totalCeldasExtra }} ({{ $this->porcentajeCapturaExtra }}%)
+                                    </span>
+                                    <span class="font-black">No promedian</span>
+                                </div>
+                                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-amber-100 dark:bg-amber-950/50">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+                                        style="width: {{ $this->porcentajeCapturaExtra }}%"></div>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="flex flex-col items-end gap-3">

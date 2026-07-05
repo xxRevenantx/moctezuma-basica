@@ -7,6 +7,7 @@ use App\Models\Materia;
 use App\Models\MateriaPromediar as MateriaPromediarModel;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
@@ -170,19 +171,19 @@ class MateriaPromediar extends Component
             return 0;
         }
 
-        return Materia::query()
+        $query = Materia::query()
             ->where('nivel_id', $this->promediar_nivel_id)
-            ->where('grado_id', $gradoId)
-            ->where('calificable', true)
-            ->when(
-                $this->esBachillerato,
-                fn ($query) => $query
-                    ->where('semestre_id', $semestreId)
-                    ->where('extra', false)
-                    ->where('receso', false),
-                fn ($query) => $query->whereNull('semestre_id')
-            )
-            ->count();
+            ->where('grado_id', $gradoId);
+
+        if ($this->esBachillerato) {
+            $query->where('semestre_id', $semestreId);
+            ReglasMateriaBachillerato::aplicarPromediables($query, '');
+        } else {
+            $query->where('calificable', true)
+                ->whereNull('semestre_id');
+        }
+
+        return $query->count();
     }
 
     public function getMateriasCalificablesDetectadasProperty(): int

@@ -266,7 +266,8 @@
                             <label
                                 class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-neutral-900">
                                 <input type="checkbox" wire:model.live="calificable"
-                                    class="mt-1 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-neutral-700">
+                                    @disabled($this->esBachilleratoFormulario && ($extra || $receso))
+                                    class="mt-1 rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700">
                                 <span>
                                     <span class="block text-sm font-bold text-slate-800 dark:text-white">
                                         Calificable
@@ -286,7 +287,9 @@
                                         Extra
                                     </span>
                                     <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                                        Cuenta como asignada, pero puede omitirse del promedio.
+                                        {{ $this->esBachilleratoFormulario
+                                            ? 'Permite captura y aparece en boleta, pero nunca interviene en promedios, lugares o reconocimientos.'
+                                            : 'Cuenta como asignada, pero puede omitirse del promedio.' }}
                                     </span>
                                 </span>
                             </label>
@@ -309,7 +312,8 @@
                             <label
                                 class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-neutral-900">
                                 <input type="checkbox" wire:model.live="participa_en_calificacion_oficial"
-                                    class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-neutral-700">
+                                    @disabled($this->esBachilleratoFormulario && ($extra || $receso))
+                                    class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700">
                                 <span>
                                     <span class="block text-sm font-bold text-slate-800 dark:text-white">
                                         Participa en calificación oficial
@@ -320,6 +324,18 @@
                                 </span>
                             </label>
                         </div>
+
+                        @if ($this->esBachilleratoFormulario)
+                            <div class="mt-4 flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-sm text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-200">
+                                <flux:icon.information-circle class="mt-0.5 h-5 w-5 shrink-0" />
+                                <div>
+                                    <p class="font-black">Regla exclusiva de bachillerato</p>
+                                    <p class="mt-1 text-xs leading-5">
+                                        Una materia oficial debe ser calificable, no extra y no receso. Una materia extra se captura y se muestra por separado en boletas, PDF y Excel, pero queda excluida de todos los promedios y reconocimientos.
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
                             <flux:error name="calificable" />

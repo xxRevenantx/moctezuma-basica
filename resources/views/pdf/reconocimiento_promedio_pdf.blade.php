@@ -350,7 +350,7 @@
         }
 
         .firma-linea {
-            width: 88%;
+            width: 50%;
             margin: 0 auto 4px;
             border-top: 1px solid #071846;
         }

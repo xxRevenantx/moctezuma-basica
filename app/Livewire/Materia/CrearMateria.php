@@ -8,6 +8,7 @@ use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\CampoFormativoClassifier;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -177,6 +178,10 @@ class CrearMateria extends Component
             $this->calificable = false;
             $this->participa_en_calificacion_oficial = false;
 
+            if ($this->esBachilleratoFormulario) {
+                $this->extra = false;
+            }
+
             if (blank($this->materia)) {
                 $this->materia = 'Receso';
                 $this->slug = 'receso';
@@ -187,6 +192,16 @@ class CrearMateria extends Component
     public function updatedCalificable($value): void
     {
         $this->calificable = (bool) $value;
+
+        if ($this->esBachilleratoFormulario && $this->extra) {
+            // La materia extra debe conservarse capturable; la exclusión se
+            // controla con extra = 1, no desactivando la captura.
+            $this->calificable = true;
+            $this->receso = false;
+            $this->participa_en_calificacion_oficial = false;
+
+            return;
+        }
 
         if ($this->calificable) {
             $this->receso = false;
@@ -201,6 +216,12 @@ class CrearMateria extends Component
 
         if ($this->extra) {
             $this->participa_en_calificacion_oficial = false;
+
+            if ($this->esBachilleratoFormulario) {
+                $this->receso = false;
+                // En bachillerato la materia extra admite captura, pero nunca promedia.
+                $this->calificable = true;
+            }
         }
     }
 
@@ -415,22 +436,32 @@ class CrearMateria extends Component
         $this->receso = (bool) $this->receso;
         $this->participa_en_calificacion_oficial = (bool) $this->participa_en_calificacion_oficial;
 
-        if ($this->receso || $this->extra || ! $this->calificable) {
-            $this->participa_en_calificacion_oficial = false;
-        }
+        if ($this->esBachilleratoFormulario) {
+            $normalizados = ReglasMateriaBachillerato::normalizarAtributos([
+                'nivel_id' => $this->nivel_id,
+                'calificable' => $this->calificable,
+                'extra' => $this->extra,
+                'receso' => $this->receso,
+                'participa_en_calificacion_oficial' => $this->participa_en_calificacion_oficial,
+            ]);
 
-        if ($this->receso) {
-            $this->calificable = false;
-        }
+            $this->calificable = $normalizados['calificable'];
+            $this->extra = $normalizados['extra'];
+            $this->receso = $normalizados['receso'];
+            $this->participa_en_calificacion_oficial = $normalizados['participa_en_calificacion_oficial'];
+        } else {
+            // Se conserva el comportamiento previo de los demás niveles.
+            if ($this->receso || $this->extra || ! $this->calificable) {
+                $this->participa_en_calificacion_oficial = false;
+            }
 
-        if (!$this->esBachilleratoFormulario) {
+            if ($this->receso) {
+                $this->calificable = false;
+                $this->extra = true;
+            }
+
             $this->semestre_id = null;
             $this->clave = null;
-        }
-
-        if ($this->receso) {
-            $this->calificable = false;
-            $this->extra = true;
         }
 
         $this->validate($this->rulesMateria());

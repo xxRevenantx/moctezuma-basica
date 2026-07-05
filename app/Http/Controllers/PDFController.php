@@ -23,6 +23,7 @@ use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
+use App\Support\ReglasMateriaBachillerato;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -305,11 +306,7 @@ class PDFController extends Controller
          * promedio semestral, promedio final, lugares ni reconocimientos.
          */
         if ($esBachillerato) {
-            $queryMaterias->where('materias.receso', false)
-                ->where(function ($query): void {
-                    $query->where('materias.calificable', true)
-                        ->orWhere('materias.extra', true);
-                });
+            ReglasMateriaBachillerato::aplicarCapturables($queryMaterias);
         } else {
             $queryMaterias->where('materias.calificable', true);
         }
@@ -2559,8 +2556,14 @@ class PDFController extends Controller
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        if ($esBachillerato) {
+            // Reconocimientos y diplomas solo consideran materias oficiales.
+            ReglasMateriaBachillerato::aplicarPromediables($queryMaterias);
+        } else {
+            $queryMaterias->where('materias.calificable', 1);
+        }
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
@@ -3340,8 +3343,18 @@ class PDFController extends Controller
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        if ($esBachillerato) {
+            /*
+             * Se recuperan las materias oficiales y las materias extra para
+             * mostrarlas en tablas independientes. Las extra nunca participan
+             * en promedios, lugares, aprobación ni estadísticas académicas.
+             */
+            ReglasMateriaBachillerato::aplicarCapturables($queryMaterias);
+        } else {
+            $queryMaterias->where('materias.calificable', true);
+        }
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
@@ -3356,6 +3369,7 @@ class PDFController extends Controller
                 return [
                     'id' => (int) $item->id,
                     'materia' => $item->materia ?: 'MATERIA',
+                    'clave' => $item->clave ?: '—',
                     'extra' => (int) ($item->extra ?? 0),
                     'calificable' => (int) ($item->calificable ?? 0),
                     'receso' => (int) ($item->receso ?? 0),
@@ -3365,6 +3379,25 @@ class PDFController extends Controller
             })
             ->values()
             ->toArray();
+
+        $materiasOficiales = $esBachillerato
+            ? collect($materias)
+                ->filter(function (array $materia): bool {
+                    return (int) ($materia['calificable'] ?? 0) === 1
+                        && (int) ($materia['extra'] ?? 0) === 0
+                        && (int) ($materia['receso'] ?? 0) === 0;
+                })
+                ->values()
+            : collect($materias)->values();
+
+        $materiasExtra = $esBachillerato
+            ? collect($materias)
+                ->filter(function (array $materia): bool {
+                    return (int) ($materia['extra'] ?? 0) === 1
+                        && (int) ($materia['receso'] ?? 0) === 0;
+                })
+                ->values()
+            : collect();
 
         /*
             |--------------------------------------------------------------------------
@@ -3499,11 +3532,7 @@ class PDFController extends Controller
         $numeroMateriasPromediar = $numeroConfigurado > 0
             ? $numeroConfigurado
             : ($esBachillerato
-                ? collect($materias)->filter(function (array $materia): bool {
-                    return (int) ($materia['calificable'] ?? 0) === 1
-                        && (int) ($materia['extra'] ?? 0) === 0
-                        && (int) ($materia['receso'] ?? 0) === 0;
-                })->count()
+                ? $materiasOficiales->count()
                 : 0);
 
         /*
@@ -3516,7 +3545,7 @@ class PDFController extends Controller
             | El promedio se divide solo entre calificaciones numéricas encontradas.
             */
         $materiasPromediables = $numeroMateriasPromediar > 0
-            ? collect($materias)
+            ? $materiasOficiales
             ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0
                 && (int) ($materia['receso'] ?? 0) === 0
                 && (!$esBachillerato || (int) ($materia['calificable'] ?? 0) === 1)
@@ -3636,7 +3665,7 @@ class PDFController extends Controller
 
         $promediosPorMateria = [];
 
-        foreach ($materias as $materia) {
+        foreach ($materiasPromediables as $materia) {
             $asignacionMateriaId = (int) ($materia['id'] ?? 0);
 
             if ($asignacionMateriaId <= 0) {
@@ -3823,7 +3852,8 @@ class PDFController extends Controller
             'tipoPeriodo' => $tipoPeriodo,
             'busqueda' => $busqueda,
 
-            'materias' => $materias,
+            'materias' => $materiasOficiales->values()->toArray(),
+            'materiasExtra' => $materiasExtra->values()->toArray(),
             'inscripciones' => $inscripciones,
             'calificaciones' => $calificaciones,
             'promedios' => $promedios,
@@ -4045,11 +4075,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
 
         if ($esBachillerato) {
-            $queryMaterias->where('materias.receso', false)
-                ->where(function ($query): void {
-                    $query->where('materias.calificable', true)
-                        ->orWhere('materias.extra', true);
-                });
+            ReglasMateriaBachillerato::aplicarCapturables($queryMaterias);
         } else {
             $queryMaterias->where('materias.calificable', true);
         }
@@ -4829,8 +4855,14 @@ class PDFController extends Controller
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        if ($esBachillerato) {
+            // Reconocimientos y diplomas solo consideran materias oficiales.
+            ReglasMateriaBachillerato::aplicarPromediables($queryMaterias);
+        } else {
+            $queryMaterias->where('materias.calificable', 1);
+        }
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 

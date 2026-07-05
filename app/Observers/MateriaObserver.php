@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Materia;
+use App\Support\ReglasMateriaBachillerato;
 
 class MateriaObserver
 {
@@ -11,6 +12,10 @@ class MateriaObserver
      */
     public function creating(Materia $materia): void
     {
+        if (ReglasMateriaBachillerato::esBachillerato($materia->nivel_id)) {
+            ReglasMateriaBachillerato::normalizarModelo($materia);
+        }
+
         $ultimoOrden = Materia::query()
             ->where('nivel_id', $materia->nivel_id)
             ->where('grado_id', $materia->grado_id)
@@ -22,6 +27,16 @@ class MateriaObserver
             ->max('orden');
 
         $materia->orden = ((int) $ultimoOrden) + 1;
+    }
+
+    /**
+     * Evita combinaciones incompatibles al crear o editar materias.
+     */
+    public function updating(Materia $materia): void
+    {
+        if (ReglasMateriaBachillerato::esBachillerato($materia->nivel_id)) {
+            ReglasMateriaBachillerato::normalizarModelo($materia);
+        }
     }
 
     /**

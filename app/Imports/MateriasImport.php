@@ -8,6 +8,7 @@ use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\CampoFormativoClassifier;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -142,14 +143,18 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 $datos['semestre_id'] = null;
             }
 
-            if ((bool) $datos['receso']) {
-                $datos['calificable'] = false;
-                $datos['extra'] = false;
-                $datos['participa_en_calificacion_oficial'] = false;
-            }
+            if (ReglasMateriaBachillerato::esBachillerato($datos['nivel_id'])) {
+                $datos = ReglasMateriaBachillerato::normalizarAtributos($datos);
+            } else {
+                if ((bool) $datos['receso']) {
+                    $datos['calificable'] = false;
+                    $datos['extra'] = false;
+                    $datos['participa_en_calificacion_oficial'] = false;
+                }
 
-            if (! (bool) $datos['calificable'] || (bool) $datos['extra']) {
-                $datos['participa_en_calificacion_oficial'] = false;
+                if (! (bool) $datos['calificable'] || (bool) $datos['extra']) {
+                    $datos['participa_en_calificacion_oficial'] = false;
+                }
             }
 
             if (blank($datos['campo_formativo_id'])) {

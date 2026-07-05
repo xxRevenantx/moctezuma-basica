@@ -14,6 +14,7 @@ use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
 use App\Support\PromedioExcel;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -55,6 +56,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected string $generacionNombre = '—';
 
     protected array $materias = [];
+    protected array $materiasOficiales = [];
+    protected array $materiasExtra = [];
     protected array $inscripciones = [];
     protected array $calificaciones = [];
     protected array $promedios = [];
@@ -69,6 +72,11 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected int $filaEncabezadoTabla = 0;
     protected int $ultimaFilaTabla = 0;
     protected int $ultimaColumnaTabla = 0;
+
+    protected int $filaMateriasExtraTitulo = 0;
+    protected int $filaMateriasExtraHeader = 0;
+    protected int $ultimaFilaMateriasExtra = 0;
+    protected int $ultimaColumnaMateriasExtra = 0;
 
     protected int $filaPromediosMateriaTitulo = 0;
     protected int $filaPromediosMateriaHeader = 0;
@@ -142,6 +150,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         }
 
         $this->materias = $this->obtenerMaterias();
+        $this->materiasOficiales = $this->obtenerMateriasOficiales($this->materias);
+        $this->materiasExtra = $this->obtenerMateriasExtra($this->materias);
         $this->inscripciones = $this->obtenerInscripciones();
         $this->calificaciones = $this->obtenerCalificaciones($this->inscripciones, $this->materias);
         $this->promediosPrecisos = $this->calcularPromediosAlumnosPrecisos($this->inscripciones, $this->materias, $this->calificaciones);
@@ -149,7 +159,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->map(fn ($valor) => is_numeric($valor) ? PromedioExcel::formatear($valor, 1, 'Pendiente') : $valor)
             ->all();
         $this->promediosPorMateria = $this->calcularPromediosPorMateria($this->inscripciones, $this->materias, $this->calificaciones);
-        $this->periodosPorMateria = $this->obtenerPeriodosPorMateria($this->materias);
+        $this->periodosPorMateria = $this->obtenerPeriodosPorMateria($this->materiasOficiales);
         $this->filas = $this->construirFilas();
         $this->preparado = true;
     }
@@ -179,11 +189,25 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ? round(($totalAprobados / $totalAlumnos) * 100)
             : 0;
 
+        $idsMateriasOficiales = collect($this->materiasOficiales)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
         $totalCapturadas = collect($this->calificaciones)
-            ->filter(fn($valor) => $valor !== null && $valor !== '')
+            ->filter(function ($valor, $clave) use ($idsMateriasOficiales): bool {
+                if ($valor === null || $valor === '') {
+                    return false;
+                }
+
+                $partes = explode('-', (string) $clave);
+                $asignacionMateriaId = (int) end($partes);
+
+                return in_array($asignacionMateriaId, $idsMateriasOficiales, true);
+            })
             ->count();
 
-        $totalCeldas = count($this->inscripciones) * count($this->materias);
+        $totalCeldas = count($this->inscripciones) * count($this->materiasOficiales);
 
         $porcentajeCaptura = $totalCeldas > 0
             ? round(($totalCapturadas / $totalCeldas) * 100)
@@ -279,7 +303,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
         $encabezados[] = 'GRUPO';
 
-        foreach ($this->materias as $materia) {
+        foreach ($this->materiasOficiales as $materia) {
             $encabezados[] = mb_strtoupper($materia['materia']);
         }
 
@@ -319,7 +343,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
             $fila[] = $inscripcion['grupo'];
 
-            foreach ($this->materias as $materia) {
+            foreach ($this->materiasOficiales as $materia) {
                 $clave = $inscripcionId . '-' . $materia['id'];
                 $fila[] = $this->calificaciones[$clave] ?? '';
             }
@@ -331,6 +355,44 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         }
 
         $this->ultimaFilaTabla = count($filas);
+
+        if ($this->esBachillerato && !empty($this->materiasExtra)) {
+            $filas[] = [''];
+            $this->filaMateriasExtraTitulo = count($filas) + 1;
+            $filas[] = ['MATERIAS EXTRA · INFORMATIVAS · NO INTERVIENEN EN EL PROMEDIO'];
+
+            $encabezadosExtra = ['TIPO', 'MATRÍCULA', 'ALUMNO', 'GRADO', 'SEMESTRE', 'GRUPO'];
+
+            foreach ($this->materiasExtra as $materia) {
+                $encabezadosExtra[] = mb_strtoupper($materia['materia']);
+            }
+
+            $this->filaMateriasExtraHeader = count($filas) + 1;
+            $this->ultimaColumnaMateriasExtra = count($encabezadosExtra);
+            $filas[] = $encabezadosExtra;
+
+            foreach ($inscripcionesOrdenadas as $inscripcion) {
+                $inscripcionId = (int) $inscripcion['inscripcion_id'];
+                $filaExtra = [
+                    'NO PROMEDIA',
+                    $inscripcion['matricula'],
+                    $inscripcion['alumno'],
+                    $inscripcion['grado'],
+                    $inscripcion['semestre'],
+                    $inscripcion['grupo'],
+                ];
+
+                foreach ($this->materiasExtra as $materia) {
+                    $clave = $inscripcionId . '-' . $materia['id'];
+                    $filaExtra[] = $this->calificaciones[$clave] ?? '';
+                }
+
+                $filas[] = $filaExtra;
+            }
+
+            $this->ultimaFilaMateriasExtra = count($filas);
+        }
+
         $filas[] = [''];
 
         $this->filaPromediosMateriaTitulo = count($filas) + 1;
@@ -401,7 +463,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 $sheet = $event->sheet->getDelegate();
 
                 $ultimaColumnaLetra = Coordinate::stringFromColumnIndex(max(1, $this->ultimaColumnaTabla));
-                $ultimaFila = max($this->ultimaFilaPeriodosMateria, $this->ultimaFilaTabla, 1);
+                $ultimaFila = max(
+                    $this->ultimaFilaPeriodosMateria,
+                    $this->ultimaFilaMateriasExtra,
+                    $this->ultimaFilaTabla,
+                    1
+                );
 
                 $sheet->getParent()->getDefaultStyle()->getFont()->setName('Aptos')->setSize(10);
 
@@ -499,6 +566,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 $this->estilizarSeccion($sheet, 7, $ultimaColumnaLetra);
                 $this->estilizarFiltros($sheet);
                 $this->estilizarTablaPrincipal($sheet);
+                $this->estilizarTablaMateriasExtra($sheet);
                 $this->estilizarTablaPromediosMateria($sheet);
                 $this->estilizarTablaPromediosAlumno($sheet);
                 $this->estilizarTablaPeriodosMateria($sheet);
@@ -673,6 +741,78 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
             $estado = $sheet->getCell("{$estadoLetra}{$fila}")->getValue();
             $this->pintarEstado($sheet, "{$estadoLetra}{$fila}", $estado);
+        }
+    }
+
+    protected function estilizarTablaMateriasExtra($sheet): void
+    {
+        if (
+            $this->filaMateriasExtraTitulo <= 0
+            || $this->filaMateriasExtraHeader <= 0
+            || $this->ultimaColumnaMateriasExtra <= 0
+        ) {
+            return;
+        }
+
+        $ultimaColumnaLetra = Coordinate::stringFromColumnIndex($this->ultimaColumnaMateriasExtra);
+
+        $this->estilizarTituloTabla(
+            $sheet,
+            $this->filaMateriasExtraTitulo,
+            'A',
+            $ultimaColumnaLetra,
+            'FEF3C7',
+            '92400E'
+        );
+
+        $sheet->getStyle("A{$this->filaMateriasExtraHeader}:{$ultimaColumnaLetra}{$this->filaMateriasExtraHeader}")
+            ->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => '78350F'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FDE68A'],
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                ],
+            ]);
+
+        $sheet->getStyle("A{$this->filaMateriasExtraHeader}:{$ultimaColumnaLetra}{$this->ultimaFilaMateriasExtra}")
+            ->applyFromArray([
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'E2E8F0'],
+                    ],
+                ],
+            ]);
+
+        $sheet->getStyle(
+            'G' . ($this->filaMateriasExtraHeader + 1) . ":{$ultimaColumnaLetra}{$this->ultimaFilaMateriasExtra}"
+        )->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        for ($fila = $this->filaMateriasExtraHeader + 1; $fila <= $this->ultimaFilaMateriasExtra; $fila++) {
+            if ($fila % 2 === 0) {
+                $sheet->getStyle("A{$fila}:{$ultimaColumnaLetra}{$fila}")
+                    ->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()
+                    ->setRGB('FFFBEB');
+            }
+        }
+
+        for ($col = 7; $col <= $this->ultimaColumnaMateriasExtra; $col++) {
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col))->setWidth(18);
         }
     }
 
@@ -1069,11 +1209,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
          * la consulta anterior de materias calificables.
          */
         if ($this->esBachillerato) {
-            $query->where('materias.receso', false)
-                ->where(function ($query): void {
-                    $query->where('materias.calificable', true)
-                        ->orWhere('materias.extra', true);
-                });
+            ReglasMateriaBachillerato::aplicarCapturables($query);
         } else {
             $query->where('materias.calificable', true);
         }
@@ -1400,15 +1536,35 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
          */
         if ($this->esBachillerato) {
             return collect($materias)
-                ->filter(function ($materia): bool {
-                    return (int) ($materia['calificable'] ?? 0) === 1
-                        && (int) ($materia['extra'] ?? 0) === 0
-                        && (int) ($materia['receso'] ?? 0) === 0;
-                })
+                ->filter(fn($materia): bool => ReglasMateriaBachillerato::esPromediable($materia))
                 ->count();
         }
 
         return 0;
+    }
+
+    protected function obtenerMateriasOficiales(array $materias): array
+    {
+        if (!$this->esBachillerato) {
+            return $materias;
+        }
+
+        return collect($materias)
+            ->filter(fn(array $materia): bool => ReglasMateriaBachillerato::esPromediable($materia))
+            ->values()
+            ->toArray();
+    }
+
+    protected function obtenerMateriasExtra(array $materias): array
+    {
+        if (!$this->esBachillerato) {
+            return [];
+        }
+
+        return collect($materias)
+            ->filter(fn(array $materia): bool => ReglasMateriaBachillerato::esExtraInformativa($materia))
+            ->values()
+            ->toArray();
     }
 
     protected function obtenerMateriasPromediables(array $materias): array
@@ -1420,16 +1576,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         }
 
         return collect($materias)
-            ->filter(function ($materia) {
-                if (
-                    (int) ($materia['extra'] ?? 0) !== 0
-                    || (int) ($materia['receso'] ?? 0) !== 0
-                ) {
-                    return false;
+            ->filter(function ($materia): bool {
+                if ($this->esBachillerato) {
+                    return ReglasMateriaBachillerato::esPromediable($materia);
                 }
 
-                return !$this->esBachillerato
-                    || (int) ($materia['calificable'] ?? 0) === 1;
+                return (int) ($materia['extra'] ?? 0) === 0
+                    && (int) ($materia['receso'] ?? 0) === 0;
             })
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,

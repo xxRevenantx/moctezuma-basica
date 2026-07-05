@@ -7,6 +7,7 @@ use App\Models\Generacion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\PromedioExcel;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -391,17 +392,31 @@ class PromedioAnualBachilleratoService
         int $alumnosSemestreInicial,
         int $alumnosSemestreFinal,
     ): array {
-        $duplicados = DB::table('calificaciones')
-            ->where('nivel_id', $nivelId)
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('generacion_id', $generacionId)
-            ->whereIn('semestre_id', $semestreIds)
-            ->selectRaw('inscripcion_id, asignacion_materia_id, periodo_id, COUNT(*) as total')
-            ->groupBy('inscripcion_id', 'asignacion_materia_id', 'periodo_id')
+        /*
+         * El diagnóstico anual debe revisar únicamente la carga académica
+         * oficial. Una captura duplicada o fuera de contexto de una materia
+         * extra sigue siendo visible en su tabla informativa, pero no altera
+         * la salud académica, las alertas ni la elegibilidad del promedio anual.
+         */
+        $queryDuplicados = DB::table('calificaciones as c')
+            ->join('asignacion_materias as am', 'am.id', '=', 'c.asignacion_materia_id')
+            ->join('materias as m', 'm.id', '=', 'am.materia_id')
+            ->where('c.nivel_id', $nivelId)
+            ->where('c.ciclo_escolar_id', $cicloEscolarId)
+            ->where('c.generacion_id', $generacionId)
+            ->whereIn('c.semestre_id', $semestreIds);
+
+        ReglasMateriaBachillerato::aplicarPromediables($queryDuplicados, 'm');
+
+        $duplicados = $queryDuplicados
+            ->selectRaw('c.inscripcion_id, c.asignacion_materia_id, c.periodo_id, COUNT(*) as total')
+            ->groupBy('c.inscripcion_id', 'c.asignacion_materia_id', 'c.periodo_id')
             ->havingRaw('COUNT(*) > 1')
             ->get();
 
-        $inconsistenciasPeriodo = DB::table('calificaciones as c')
+        $queryInconsistenciasPeriodo = DB::table('calificaciones as c')
+            ->join('asignacion_materias as am', 'am.id', '=', 'c.asignacion_materia_id')
+            ->join('materias as m', 'm.id', '=', 'am.materia_id')
             ->join('periodos as p', 'p.id', '=', 'c.periodo_id')
             ->where('c.nivel_id', $nivelId)
             ->where('c.ciclo_escolar_id', $cicloEscolarId)
@@ -412,16 +427,22 @@ class PromedioAnualBachilleratoService
                     ->orWhereColumn('p.ciclo_escolar_id', '!=', 'c.ciclo_escolar_id')
                     ->orWhereColumn('p.generacion_id', '!=', 'c.generacion_id')
                     ->orWhereColumn('p.semestre_id', '!=', 'c.semestre_id');
-            })
-            ->count();
+            });
 
-        $calificacionesFueraDeSemestre = DB::table('calificaciones')
-            ->where('nivel_id', $nivelId)
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('generacion_id', $generacionId)
-            ->whereNotNull('semestre_id')
-            ->whereNotIn('semestre_id', $semestreIds)
-            ->count();
+        ReglasMateriaBachillerato::aplicarPromediables($queryInconsistenciasPeriodo, 'm');
+        $inconsistenciasPeriodo = $queryInconsistenciasPeriodo->count();
+
+        $queryFueraDeSemestre = DB::table('calificaciones as c')
+            ->join('asignacion_materias as am', 'am.id', '=', 'c.asignacion_materia_id')
+            ->join('materias as m', 'm.id', '=', 'am.materia_id')
+            ->where('c.nivel_id', $nivelId)
+            ->where('c.ciclo_escolar_id', $cicloEscolarId)
+            ->where('c.generacion_id', $generacionId)
+            ->whereNotNull('c.semestre_id')
+            ->whereNotIn('c.semestre_id', $semestreIds);
+
+        ReglasMateriaBachillerato::aplicarPromediables($queryFueraDeSemestre, 'm');
+        $calificacionesFueraDeSemestre = $queryFueraDeSemestre->count();
 
         $semestresConGrupo = DB::table('grupos')
             ->where('nivel_id', $nivelId)
