@@ -230,7 +230,66 @@
         </div>
     </section>
 
+
+    {{-- Configuración del número de materias a promediar --}}
+    <section
+        x-data="{
+            abierto: localStorage.getItem('asignacion-materias-promedio-abierto') !== 'false',
+            alternar() {
+                this.abierto = !this.abierto;
+                localStorage.setItem('asignacion-materias-promedio-abierto', this.abierto ? 'true' : 'false');
+            }
+        }"
+        class="overflow-hidden rounded-[1.75rem] border border-violet-200 bg-white shadow-sm dark:border-violet-900/50 dark:bg-slate-950">
+        <div class="h-1.5 bg-gradient-to-r from-[#006492] via-violet-500 to-[#88AC2E]"></div>
+
+        <button type="button" @click="alternar()"
+            class="flex w-full flex-col gap-4 px-5 py-5 text-left transition hover:bg-slate-50/80 dark:hover:bg-slate-900/50 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-start gap-3">
+                <div
+                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20">
+                    <flux:icon.academic-cap class="h-6 w-6" />
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white">
+                            Materias a promediar
+                        </h3>
+                        <span
+                            class="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-black text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                            Configuración académica
+                        </span>
+                    </div>
+                    <p class="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
+                        Define el número de materias por grado y semestre. En bachillerato, si no existe una
+                        configuración, se tomarán automáticamente solo las materias con calificable = 1.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-black text-slate-500" x-text="abierto ? 'Ocultar configuración' : 'Mostrar configuración'"></span>
+                <span
+                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <svg class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': abierto }"
+                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd"
+                            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </span>
+            </div>
+        </button>
+
+        <div x-show="abierto" x-collapse x-cloak
+            class="border-t border-slate-200 bg-slate-50/40 p-5 dark:border-slate-800 dark:bg-slate-900/30 sm:p-6">
+            <livewire:materia-promediar :slug_nivel="$slug_nivel"
+                :key="'materias-promediar-' . $slug_nivel" />
+        </div>
+    </section>
+
     @php($resumen = $this->resumenCargas)
+    @php($asignaciones = $this->asignacionesFiltradas)
 
     <section
         class="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -251,7 +310,7 @@
                     </p>
                 </div>
 
-                @if (auth()->user()?->is_admin && $this->asignacionesFiltradas->contains('estado', 'borrador'))
+                @if (auth()->user()?->is_admin && $this->hayBorradoresFiltrados)
                     <button type="button" wire:click="confirmarTodas"
                         wire:confirm="¿Confirmar todas las cargas en borrador de este nivel?"
                         class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
@@ -311,13 +370,27 @@
                     </div>
                 </div>
 
-                @if ($this->tieneFiltrosActivos)
-                    <button type="button" wire:click="limpiarFiltros"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                        <flux:icon.x-mark class="h-4 w-4" />
-                        Limpiar filtros
-                    </button>
-                @endif
+                <div class="flex flex-wrap items-center gap-2">
+                    <label
+                        class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                        <span>Mostrar</span>
+                        <select wire:model.live="porPaginaMaterias"
+                            class="border-0 bg-transparent p-0 pr-7 text-xs font-black text-slate-700 focus:ring-0 dark:text-slate-200">
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </label>
+
+                    @if ($this->tieneFiltrosActivos)
+                        <button type="button" wire:click="limpiarFiltros"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            <flux:icon.x-mark class="h-4 w-4" />
+                            Limpiar filtros
+                        </button>
+                    @endif
+                </div>
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
@@ -408,7 +481,7 @@
             </div>
         </div>
 
-        @if ($this->asignacionesFiltradas->isEmpty())
+        @if ($asignaciones->count() === 0)
             <div class="p-12 text-center">
                 <div
                     class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 dark:bg-slate-900">
@@ -441,7 +514,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                        @foreach ($this->asignacionesFiltradas as $asignacion)
+                        @foreach ($asignaciones as $asignacion)
                             <tr wire:key="carga-academica-{{ $asignacion->id }}"
                                 class="align-top transition hover:bg-slate-50 dark:hover:bg-slate-900/60">
                                 <td class="px-4 py-4">
@@ -535,6 +608,25 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+
+            <div
+                class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Mostrando
+                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->firstItem() }}</span>
+                    a
+                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->lastItem() }}</span>
+                    de
+                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->total() }}</span>
+                    materias.
+                </p>
+
+                @if ($asignaciones->hasPages())
+                    <div class="min-w-0">
+                        {{ $asignaciones->onEachSide(1)->links() }}
+                    </div>
+                @endif
             </div>
         @endif
     </section>

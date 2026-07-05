@@ -2588,33 +2588,41 @@ class PDFController extends Controller
 
         $registroPromedio = $queryMateriaPromediar->first();
 
-        /*
-         * Si no existe configuración o el número es 0,
-         * no se promedia ninguna materia.
-         */
-        $numeroMateriasPromediar = $registroPromedio
-            ? (int) $registroPromedio->numero_materias
-            : 0;
-
-        /*
-         * promedio-numerico-pro:
-         * Se toman todas las materias normales, no extra y no receso.
-         * No se usa take(numero_materias), porque puede dejar fuera materias
-         * numéricas cuando antes aparecen AC, NP, SD, ED, RA, textos o vacíos.
-         */
-        $materiasPromediables = $numeroMateriasPromediar > 0
-            ? $materias
+        $materiasElegibles = $materias
             ->filter(function ($materia) use ($esBachillerato) {
+                if ((int) ($materia->calificable ?? 0) !== 1) {
+                    return false;
+                }
+
+                if ($esBachillerato) {
+                    return true;
+                }
+
                 return (int) ($materia->extra ?? 0) === 0
                     && (int) ($materia->receso ?? 0) === 0
-                    && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
+                    && (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1;
             })
             ->sortBy([
                 fn($materia) => $materia->orden === null ? 1 : 0,
                 fn($materia) => $materia->orden ?? 999,
                 fn($materia) => $materia->id ?? 999,
             ])
-            ->values()
+            ->values();
+
+        /*
+         * Prioridad del divisor:
+         * 1. materia_promediar.numero_materias, cuando existe y es mayor a 0.
+         * 2. En bachillerato, total de materias con calificable = 1.
+         * 3. En los demás niveles se conserva la configuración obligatoria.
+         */
+        $numeroConfigurado = (int) ($registroPromedio?->numero_materias ?? 0);
+
+        $numeroMateriasPromediar = $numeroConfigurado > 0
+            ? $numeroConfigurado
+            : ($esBachillerato ? $materiasElegibles->count() : 0);
+
+        $materiasPromediables = $numeroMateriasPromediar > 0
+            ? $materiasElegibles
             : collect();
 
         $idsMateriasPromediables = $materiasPromediables
@@ -2726,7 +2734,7 @@ class PDFController extends Controller
              * Se conserva el promedio con precisión completa. El truncamiento
              * se utiliza únicamente para presentar el valor final.
              */
-            $promedioPreciso = (float) ($suma / $capturadasNumericasPromedio);
+            $promedioPreciso = (float) ($suma / $numeroMateriasPromediar);
             $promedioNumero = PromedioExcel::truncar($promedioPreciso) ?? 0.0;
             $promedio = PromedioExcel::formatear($promedioPreciso, 1, '0.0');
             $porcentajePromedio = min(100, $promedioPreciso * 10);
@@ -2758,7 +2766,7 @@ class PDFController extends Controller
         | - Se toman todos los alumnos del mismo contexto.
         | - Se consultan sus calificaciones del mismo periodo.
         | - Se promedian solo materias extra = 0.
-        | - Se divide solo entre calificaciones numéricas encontradas.
+        | - Se divide entre el número configurado o, si falta, entre las materias calificables.
         | - Se toma solo el primer decimal sin redondear.
         | - Se ordena de mayor a menor.
         | - Los empates comparten lugar.
@@ -2886,7 +2894,7 @@ class PDFController extends Controller
                 continue;
             }
 
-            $promedioLugarPreciso = (float) ($sumaLugar / $totalNumericasLugar);
+            $promedioLugarPreciso = (float) ($sumaLugar / $numeroMateriasPromediar);
             $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
             $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso, 1, 'Pendiente');
         }

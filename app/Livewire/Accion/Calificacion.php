@@ -821,6 +821,7 @@ class Calificacion extends Component
                     'clave' => $asignacion->materia?->clave,
                     'slug' => $asignacion->materia?->slug,
                     'extra' => (bool) ($asignacion->materia?->extra ?? false),
+                    'receso' => (bool) ($asignacion->materia?->receso ?? false),
                     'calificable' => (bool) ($asignacion->materia?->calificable ?? false),
                     'participa_en_calificacion_oficial' => (bool) ($asignacion->materia?->participa_en_calificacion_oficial ?? true),
 
@@ -1006,9 +1007,23 @@ class Calificacion extends Component
             $query->whereNull('semestre_id');
         }
 
-        $numeroMaterias = $query->value('numero_materias');
+        $numeroConfigurado = (int) ($query->value('numero_materias') ?? 0);
 
-        return $numeroMaterias !== null ? max(0, (int) $numeroMaterias) : null;
+        if ($numeroConfigurado > 0) {
+            return $numeroConfigurado;
+        }
+
+        /*
+         * Respaldo automático:
+         * En bachillerato, cuando no existe configuración en materia_promediar,
+         * se utiliza el número real de materias calificables del semestre.
+         * Los demás niveles conservan su comportamiento previo.
+         */
+        if ($this->esBachillerato) {
+            return $this->obtenerMateriasOrdenadasParaPromedio()->count();
+        }
+
+        return null;
     }
 
     private function obtenerMateriasOrdenadasParaPromedio(): Collection
@@ -1023,7 +1038,19 @@ class Calificacion extends Component
          */
         return collect($this->materias)
             ->filter(function ($materia): bool {
-                if (!empty($materia['extra'])) {
+                if (empty($materia['calificable'])) {
+                    return false;
+                }
+
+                /*
+                 * En bachillerato la bandera calificable es la única fuente
+                 * automática cuando no existe materia_promediar.
+                 */
+                if ($this->esBachillerato) {
+                    return true;
+                }
+
+                if (!empty($materia['extra']) || !empty($materia['receso'])) {
                     return false;
                 }
 
@@ -1047,12 +1074,19 @@ class Calificacion extends Component
         ?Collection $materiasOrdenadas = null
     ): ?float {
         $materiasOrdenadas ??= $this->obtenerMateriasOrdenadasParaPromedio();
+        $numeroMateriasPromediar ??= $this->obtenerNumeroMateriasPromediar();
 
-        if ($inscripcionId <= 0 || $materiasOrdenadas->isEmpty()) {
+        if (
+            $inscripcionId <= 0
+            || $materiasOrdenadas->isEmpty()
+            || !$numeroMateriasPromediar
+            || $numeroMateriasPromediar <= 0
+        ) {
             return null;
         }
 
-        $valores = [];
+        $suma = 0.0;
+        $tieneNumericas = false;
 
         foreach ($materiasOrdenadas as $materia) {
             $asignacionMateriaId = (int) ($materia['id'] ?? 0);
@@ -1065,16 +1099,23 @@ class Calificacion extends Component
                 $this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null
             );
 
-            // Igual que PROMEDIO de Excel: textos, claves especiales y vacíos
-            // no suman ni cuentan como divisor.
             if (!$this->esCalificacionNumerica($valor)) {
                 continue;
             }
 
-            $valores[] = (float) $valor;
+            $suma += (float) $valor;
+            $tieneNumericas = true;
         }
 
-        return PromedioExcel::calcular($valores);
+        if (!$tieneNumericas) {
+            return null;
+        }
+
+        /*
+         * materia_promediar define el divisor. Si no existe configuración en
+         * bachillerato, el divisor es el total de materias con calificable = 1.
+         */
+        return $suma / $numeroMateriasPromediar;
     }
 
     private function calcularPromedioAlumno(
@@ -1109,6 +1150,7 @@ class Calificacion extends Component
         $this->promediosPrecisos = [];
 
         $materiasOrdenadas = $this->obtenerMateriasOrdenadasParaPromedio();
+        $numeroMateriasPromediar = $this->obtenerNumeroMateriasPromediar();
 
         foreach ($this->inscripciones as $fila) {
             $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
@@ -1119,6 +1161,7 @@ class Calificacion extends Component
 
             $promedioPreciso = $this->calcularPromedioAlumnoPreciso(
                 inscripcionId: $inscripcionId,
+                numeroMateriasPromediar: $numeroMateriasPromediar,
                 materiasOrdenadas: $materiasOrdenadas,
             );
 
@@ -2316,18 +2359,19 @@ class Calificacion extends Component
 
     private function tieneMateriasPromediables(): bool
     {
+        $materiasPromediables = $this->obtenerMateriasOrdenadasParaPromedio();
         $numeroMaterias = $this->obtenerNumeroMateriasPromediar();
 
         return $numeroMaterias !== null
             && $numeroMaterias > 0
-            && $this->obtenerMateriasOrdenadasParaPromedio()->isNotEmpty();
+            && $materiasPromediables->isNotEmpty();
     }
 
     private function obtenerPromediosRealesParaReconocimiento(): Collection
     {
         /*
-         * Si no hay materias configuradas para promediar,
-         * no se muestran alumnos para reconocimiento.
+         * Se respeta primero materia_promediar. En bachillerato, cuando no hay
+         * registro, se usa automáticamente el total de materias calificables.
          */
         if (!$this->tieneMateriasPromediables()) {
             return collect();

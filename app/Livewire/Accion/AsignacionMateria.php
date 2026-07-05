@@ -13,14 +13,17 @@ use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\Semestre;
 use App\Models\Inscripcion;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class AsignacionMateria extends Component
 {
+    use WithPagination;
     public string $slug_nivel = '';
     public $nivel = null;
 
@@ -37,6 +40,7 @@ class AsignacionMateria extends Component
     public string $filtro_grupo = '';
     public string $filtro_horario = '';
     public string $filtro_profesor = '';
+    public int $porPaginaMaterias = 10;
     public ?int $editandoId = null;
     public $grupo_id = '';
     public $materia_id = '';
@@ -86,13 +90,17 @@ class AsignacionMateria extends Component
             return collect();
         }
 
-        $gruposConAlumnos = Inscripcion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->whereNotNull('grupo_id')
-            ->pluck('grupo_id')
-            ->filter()
-            ->unique();
-
+        /*
+         * No limitar esta lista por inscripciones.grupo_id.
+         *
+         * En bachillerato la inscripción conserva el grupo/semestre actual del
+         * alumno. Cuando la generación avanza, el grupo del semestre anterior
+         * deja de aparecer en esa columna, aunque siga siendo un contexto válido
+         * para consultar o editar cargas del mismo ciclo escolar (por ejemplo,
+         * 3.er y 4.º semestre de la generación 2024-2027).
+         *
+         * La fuente correcta para este selector es la tabla grupos.
+         */
         return Grupo::query()
             ->with([
                 'asignacionGrupo:id,nombre',
@@ -101,14 +109,13 @@ class AsignacionMateria extends Component
                 'semestre:id,numero,orden_global',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->when($gruposConAlumnos->isNotEmpty(), fn($q) => $q->whereIn('id', $gruposConAlumnos))
             ->get()
             ->sortBy(fn($grupo) => sprintf(
-                '%03d|%03d|%s|%04d',
-                (int) ($grupo->grado?->orden ?? 999),
+                '%04d|%03d|%03d|%s',
+                9999 - (int) ($grupo->generacion?->anio_ingreso ?? 0),
                 (int) ($grupo->semestre?->orden_global ?? $grupo->semestre?->numero ?? 999),
+                (int) ($grupo->grado?->orden ?? 999),
                 mb_strtolower((string) ($grupo->asignacionGrupo?->nombre ?? '')),
-                (int) ($grupo->generacion?->anio_ingreso ?? 0),
             ))
             ->values();
     }
@@ -276,12 +283,8 @@ class AsignacionMateria extends Component
             ->values();
     }
 
-    public function getAsignacionesFiltradasProperty(): Collection
+    private function consultaAsignacionesFiltradas(): Builder
     {
-        if (!$this->ciclo_escolar_id) {
-            return collect();
-        }
-
         return $this->consultaAsignacionesBase()
             ->with([
                 'materia',
@@ -311,41 +314,81 @@ class AsignacionMateria extends Component
             ))
             ->when(trim($this->buscar) !== '', function (Builder $q) {
                 $buscar = '%' . trim($this->buscar) . '%';
+
                 $q->where(function (Builder $sub) use ($buscar) {
-                    $sub->whereHas('materia', fn(Builder $m) => $m->where('materia', 'like', $buscar)->orWhere('clave', 'like', $buscar))
-                        ->orWhereHas('profesor', fn(Builder $p) => $p->where('nombre', 'like', $buscar)
+                    $sub->whereHas('materia', fn(Builder $m) => $m
+                        ->where('materia', 'like', $buscar)
+                        ->orWhere('clave', 'like', $buscar))
+                        ->orWhereHas('profesor', fn(Builder $p) => $p
+                            ->where('nombre', 'like', $buscar)
                             ->orWhere('apellido_paterno', 'like', $buscar)
                             ->orWhere('apellido_materno', 'like', $buscar))
                         ->orWhereHas('grupo.asignacionGrupo', fn(Builder $g) => $g->where('nombre', 'like', $buscar))
                         ->orWhereHas('grupo.grado', fn(Builder $g) => $g->where('nombre', 'like', $buscar))
-                        ->orWhereHas('grupo.generacion', fn(Builder $g) => $g->where('anio_ingreso', 'like', $buscar)
+                        ->orWhereHas('grupo.generacion', fn(Builder $g) => $g
+                            ->where('anio_ingreso', 'like', $buscar)
                             ->orWhere('anio_egreso', 'like', $buscar)
                             ->orWhere('nombre', 'like', $buscar));
                 });
-            })
-            ->get()
-            ->sortBy(fn($a) => sprintf(
-                '%03d|%03d|%s|%03d|%s',
-                (int) ($a->grupo?->grado?->orden ?? 999),
-                (int) ($a->grupo?->semestre?->orden_global ?? $a->grupo?->semestre?->numero ?? 999),
-                mb_strtolower((string) ($a->grupo?->asignacionGrupo?->nombre ?? '')),
-                (int) ($a->orden ?? 999),
-                mb_strtolower((string) ($a->materia?->materia ?? '')),
-            ))
-            ->values();
+            });
+    }
+
+    public function getAsignacionesFiltradasProperty(): LengthAwarePaginator
+    {
+        if (!$this->ciclo_escolar_id) {
+            return AsignacionMateriaModel::query()
+                ->whereRaw('1 = 0')
+                ->paginate($this->porPaginaMaterias, ['*'], 'materiasPage');
+        }
+
+        return $this->consultaAsignacionesFiltradas()
+            ->orderBy('grado_id')
+            ->orderByRaw('CASE WHEN semestre_id IS NULL THEN 999 ELSE semestre_id END')
+            ->orderBy('grupo_id')
+            ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('orden')
+            ->orderBy('materia_id')
+            ->paginate($this->porPaginaMaterias, ['*'], 'materiasPage');
     }
 
     public function getResumenCargasProperty(): array
     {
-        $asignaciones = $this->asignacionesFiltradas;
+        if (!$this->ciclo_escolar_id) {
+            return [
+                'total' => 0,
+                'borradores' => 0,
+                'activas' => 0,
+                'sin_horario' => 0,
+                'sin_profesor' => 0,
+            ];
+        }
+
+        $query = $this->consultaAsignacionesFiltradas();
 
         return [
-            'total' => $asignaciones->count(),
-            'borradores' => $asignaciones->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)->count(),
-            'activas' => $asignaciones->where('estado', AsignacionMateriaModel::ESTADO_ACTIVA)->count(),
-            'sin_horario' => $asignaciones->filter(fn($asignacion) => $asignacion->horarios->isEmpty())->count(),
-            'sin_profesor' => $asignaciones->whereNull('profesor_id')->count(),
+            'total' => (clone $query)->count(),
+            'borradores' => (clone $query)
+                ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
+                ->count(),
+            'activas' => (clone $query)
+                ->where('estado', AsignacionMateriaModel::ESTADO_ACTIVA)
+                ->count(),
+            'sin_horario' => (clone $query)
+                ->whereDoesntHave(
+                    'horarios',
+                    fn(Builder $h) => $h->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                )
+                ->count(),
+            'sin_profesor' => (clone $query)->whereNull('profesor_id')->count(),
         ];
+    }
+
+    public function getHayBorradoresFiltradosProperty(): bool
+    {
+        return $this->ciclo_escolar_id
+            && $this->consultaAsignacionesFiltradas()
+                ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
+                ->exists();
     }
 
     public function getTieneFiltrosActivosProperty(): bool
@@ -374,21 +417,57 @@ class AsignacionMateria extends Component
     {
         $this->limpiarFormulario();
         $this->limpiarFiltros();
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedBuscar(): void
+    {
+        $this->resetPage('materiasPage');
     }
 
     public function updatedFiltroGeneracion(): void
     {
         $this->reset(['filtro_grado', 'filtro_semestre', 'filtro_grupo']);
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedFiltroEstado(): void
+    {
+        $this->resetPage('materiasPage');
     }
 
     public function updatedFiltroGrado(): void
     {
         $this->reset(['filtro_semestre', 'filtro_grupo']);
+        $this->resetPage('materiasPage');
     }
 
     public function updatedFiltroSemestre(): void
     {
         $this->reset(['filtro_grupo']);
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedFiltroGrupo(): void
+    {
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedFiltroHorario(): void
+    {
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedFiltroProfesor(): void
+    {
+        $this->resetPage('materiasPage');
+    }
+
+    public function updatedPorPaginaMaterias($value): void
+    {
+        $permitidos = [10, 15, 25, 50];
+        $this->porPaginaMaterias = in_array((int) $value, $permitidos, true) ? (int) $value : 10;
+        $this->resetPage('materiasPage');
     }
 
     public function updatedGrupoId(): void
@@ -721,6 +800,8 @@ class AsignacionMateria extends Component
             'filtro_horario',
             'filtro_profesor',
         ]);
+
+        $this->resetPage('materiasPage');
     }
 
     public function limpiarFormularioDespuesDeGuardar(): void

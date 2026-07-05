@@ -145,6 +145,7 @@ class DistribucionEscolarService
         return Inscripcion::query()
             ->with(['nivel', 'generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
             ->where('nivel_id', $nivel->id)
+            ->whereHas('generacion', fn (Builder $q) => $q->where('status', true))
             ->when(filled($filtros['generacion_id'] ?? null), fn (Builder $q) => $q->where('generacion_id', (int) $filtros['generacion_id']))
             ->when(filled($filtros['grado_id'] ?? null), fn (Builder $q) => $q->where('grado_id', (int) $filtros['grado_id']))
             ->when(filled($filtros['grupo_id'] ?? null), fn (Builder $q) => $q->where('grupo_id', (int) $filtros['grupo_id']))
