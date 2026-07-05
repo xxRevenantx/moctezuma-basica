@@ -75,6 +75,12 @@ class Grupo extends Model
         return $this->hasMany(Inscripcion::class);
     }
 
+
+    public function asignacionMaterias()
+    {
+        return $this->hasMany(AsignacionMateria::class, 'grupo_id');
+    }
+
     // RELACION CON HORARIOS
     public function horarios()
     {

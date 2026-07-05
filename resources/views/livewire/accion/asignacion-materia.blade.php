@@ -1,4 +1,97 @@
-<div id="panel-asignacion-materia" class="space-y-6">
+<div id="panel-asignacion-materia" x-data="{
+    async confirmarEliminar(id, nombre, contexto) {
+            await Swal.fire({
+                icon: 'warning',
+                title: '¿Eliminar esta carga académica?',
+                html: `
+                    <div style='text-align:left'>
+                        <div style='margin-bottom:12px;padding:12px 14px;border:1px solid #dbeafe;border-radius:14px;background:#eff6ff'>
+                            <div style='font-weight:800;color:#0f172a'>${nombre}</div>
+                            <div style='margin-top:3px;font-size:12px;color:#64748b'>${contexto}</div>
+                        </div>
+                        <p style='font-size:14px;color:#475569'>
+                            Se quitará únicamente del ciclo seleccionado. Esta acción es permanente y solo procede cuando no existen horarios, calificaciones ni auditoría.
+                        </p>
+                    </div>
+                `,
+                showCancelButton: true,
+                reverseButtons: true,
+                focusCancel: true,
+                confirmButtonText: 'Sí, eliminar carga',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#64748b',
+                showLoaderOnConfirm: true,
+                allowOutsideClick: () => !Swal.isLoading(),
+                allowEscapeKey: () => !Swal.isLoading(),
+                preConfirm: async () => {
+                    try {
+                        await this.$wire.call('eliminar', id);
+                    } catch (error) {
+                        Swal.showValidationMessage('No fue posible eliminar la carga. Revisa la información e inténtalo nuevamente.');
+                    }
+                }
+            });
+        },
+
+        async confirmarArchivar(id, nombre, contexto) {
+            await Swal.fire({
+                icon: 'question',
+                title: 'Archivar carga académica',
+                html: `
+                    <div style='text-align:left'>
+                        <div style='margin-bottom:12px;padding:12px 14px;border:1px solid #fde68a;border-radius:14px;background:#fffbeb'>
+                            <div style='font-weight:800;color:#0f172a'>${nombre}</div>
+                            <div style='margin-top:3px;font-size:12px;color:#64748b'>${contexto}</div>
+                        </div>
+                        <p style='font-size:14px;color:#475569'>
+                            La carga dejará de estar activa, pero conservará horarios, calificaciones y movimientos históricos.
+                        </p>
+                    </div>
+                `,
+                showCancelButton: true,
+                reverseButtons: true,
+                confirmButtonText: 'Sí, archivar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#64748b',
+                showLoaderOnConfirm: true,
+                allowOutsideClick: () => !Swal.isLoading(),
+                allowEscapeKey: () => !Swal.isLoading(),
+                preConfirm: async () => {
+                    try {
+                        await this.$wire.call('archivar', id);
+                    } catch (error) {
+                        Swal.showValidationMessage('No fue posible archivar la carga. Inténtalo nuevamente.');
+                    }
+                }
+            });
+        }
+}" class="space-y-6">
+    {{-- Loader al preparar la edición --}}
+    <div wire:loading.flex wire:target="editar"
+        class="fixed inset-0 z-[9998] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+        <div
+            class="w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/20 bg-white/95 shadow-2xl shadow-blue-950/30 dark:bg-slate-900/95">
+            <div class="h-1.5 bg-gradient-to-r from-[#006492] via-sky-500 to-[#88AC2E]"></div>
+            <div class="p-7 text-center">
+                <div class="relative mx-auto mb-5 h-16 w-16">
+                    <div
+                        class="absolute inset-0 animate-spin rounded-full border-4 border-blue-100 border-r-[#88AC2E] border-t-[#006492] dark:border-slate-700">
+                    </div>
+                    <div
+                        class="absolute inset-[10px] flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] text-white shadow-lg">
+                        <flux:icon.pencil-square class="h-6 w-6" />
+                    </div>
+                </div>
+                <h3 class="text-base font-black text-slate-900 dark:text-white">Preparando la edición</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Cargando materia, grupo y profesor responsable…
+                </p>
+            </div>
+        </div>
+    </div>
+
     <section
         class="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div class="h-1.5 bg-gradient-to-r from-[#006492] to-[#88AC2E]"></div>
@@ -35,7 +128,7 @@
                     <p class="text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                         Protección histórica</p>
                     <p class="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        Archivar o cerrar no elimina horarios, calificaciones ni listas.
+                        Eliminar solo está disponible cuando la carga no tiene horarios, calificaciones ni auditoría.
                     </p>
                 </div>
 
@@ -117,25 +210,18 @@
                 </div>
                 <div>
                     <h3 class="text-lg font-black text-slate-900 dark:text-white">
-                        {{ $editandoId ? 'Editar carga académica' : 'Nueva carga académica' }}</h3>
+                        Nueva carga académica
+                    </h3>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         Selecciona el contexto, la materia y el docente. El horario puede asignarse posteriormente.
                     </p>
                 </div>
             </div>
 
-            @if ($editandoId)
-                <button type="button" wire:click="limpiarFormulario"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                    <flux:icon.x-mark class="h-4 w-4" />
-                    Cancelar edición
-                </button>
-            @else
-                <span
-                    class="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                    Se guardará como borrador
-                </span>
-            @endif
+            <span
+                class="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                Se guardará como borrador
+            </span>
         </div>
 
         <div class="p-5 sm:p-6">
@@ -199,8 +285,7 @@
                     <button type="button" wire:click="guardarMateria" wire:loading.attr="disabled"
                         class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#006492] px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:bg-[#005474] disabled:translate-y-0 disabled:opacity-60">
                         <flux:icon.check class="h-5 w-5" />
-                        <span wire:loading.remove
-                            wire:target="guardarMateria">{{ $editandoId ? 'Actualizar carga' : 'Guardar borrador' }}</span>
+                        <span wire:loading.remove wire:target="guardarMateria">Guardar borrador</span>
                         <span wire:loading wire:target="guardarMateria">Guardando…</span>
                     </button>
                 </div>
@@ -232,14 +317,13 @@
 
 
     {{-- Configuración del número de materias a promediar --}}
-    <section
-        x-data="{
-            abierto: localStorage.getItem('asignacion-materias-promedio-abierto') !== 'false',
-            alternar() {
-                this.abierto = !this.abierto;
-                localStorage.setItem('asignacion-materias-promedio-abierto', this.abierto ? 'true' : 'false');
-            }
-        }"
+    <section x-data="{
+        abierto: localStorage.getItem('asignacion-materias-promedio-abierto') !== 'false',
+        alternar() {
+            this.abierto = !this.abierto;
+            localStorage.setItem('asignacion-materias-promedio-abierto', this.abierto ? 'true' : 'false');
+        }
+    }"
         class="overflow-hidden rounded-[1.75rem] border border-violet-200 bg-white shadow-sm dark:border-violet-900/50 dark:bg-slate-950">
         <div class="h-1.5 bg-gradient-to-r from-[#006492] via-violet-500 to-[#88AC2E]"></div>
 
@@ -268,7 +352,8 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <span class="text-xs font-black text-slate-500" x-text="abierto ? 'Ocultar configuración' : 'Mostrar configuración'"></span>
+                <span class="text-xs font-black text-slate-500"
+                    x-text="abierto ? 'Ocultar configuración' : 'Mostrar configuración'"></span>
                 <span
                     class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                     <svg class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': abierto }"
@@ -283,13 +368,9 @@
 
         <div x-show="abierto" x-collapse x-cloak
             class="border-t border-slate-200 bg-slate-50/40 p-5 dark:border-slate-800 dark:bg-slate-900/30 sm:p-6">
-            <livewire:materia-promediar :slug_nivel="$slug_nivel"
-                :key="'materias-promediar-' . $slug_nivel" />
+            <livewire:materia-promediar :slug_nivel="$slug_nivel" :key="'materias-promediar-' . $slug_nivel" />
         </div>
     </section>
-
-    @php($resumen = $this->resumenCargas)
-    @php($asignaciones = $this->asignacionesFiltradas)
 
     <section
         class="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -306,7 +387,7 @@
                         @endif
                     </div>
                     <p class="mt-1 text-sm text-slate-500">
-                        {{ $resumen['total'] }} registro(s) encontrados en el ciclo seleccionado.
+                        {{ $this->resumenCargas['total'] }} registro(s) encontrados en el ciclo seleccionado.
                     </p>
                 </div>
 
@@ -324,35 +405,36 @@
                 <div
                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
                     <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Resultados</p>
-                    <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">{{ $resumen['total'] }}</p>
+                    <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+                        {{ $this->resumenCargas['total'] }}</p>
                 </div>
                 <div
                     class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
                     <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                         Activas</p>
                     <p class="mt-1 text-2xl font-black text-emerald-800 dark:text-emerald-200">
-                        {{ $resumen['activas'] }}</p>
+                        {{ $this->resumenCargas['activas'] }}</p>
                 </div>
                 <div
                     class="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
                     <p class="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
                         Borradores</p>
                     <p class="mt-1 text-2xl font-black text-amber-800 dark:text-amber-200">
-                        {{ $resumen['borradores'] }}</p>
+                        {{ $this->resumenCargas['borradores'] }}</p>
                 </div>
                 <div
                     class="rounded-2xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/50 dark:bg-orange-950/20">
                     <p class="text-[11px] font-black uppercase tracking-wide text-orange-700 dark:text-orange-300">Sin
                         horario</p>
                     <p class="mt-1 text-2xl font-black text-orange-800 dark:text-orange-200">
-                        {{ $resumen['sin_horario'] }}</p>
+                        {{ $this->resumenCargas['sin_horario'] }}</p>
                 </div>
                 <div
                     class="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
                     <p class="text-[11px] font-black uppercase tracking-wide text-violet-700 dark:text-violet-300">
                         Docente pendiente</p>
                     <p class="mt-1 text-2xl font-black text-violet-800 dark:text-violet-200">
-                        {{ $resumen['sin_profesor'] }}</p>
+                        {{ $this->resumenCargas['sin_profesor'] }}</p>
                 </div>
             </div>
         </div>
@@ -481,7 +563,7 @@
             </div>
         </div>
 
-        @if ($asignaciones->count() === 0)
+        @if ($this->asignacionesFiltradas->count() === 0)
             <div class="p-12 text-center">
                 <div
                     class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 dark:bg-slate-900">
@@ -514,7 +596,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                        @foreach ($asignaciones as $asignacion)
+                        @foreach ($this->asignacionesFiltradas as $asignacion)
                             <tr wire:key="carga-academica-{{ $asignacion->id }}"
                                 class="align-top transition hover:bg-slate-50 dark:hover:bg-slate-900/60">
                                 <td class="px-4 py-4">
@@ -583,24 +665,61 @@
                                 <td class="px-4 py-4">
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <button type="button" wire:click="editar({{ $asignacion->id }})"
-                                            class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700 transition hover:bg-blue-100">Editar</button>
-                                        @if (auth()->user()?->is_admin)
-                                            @if ($asignacion->estado === 'borrador')
-                                                <button type="button" wire:click="confirmar({{ $asignacion->id }})"
-                                                    class="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-emerald-700">Confirmar</button>
-                                            @elseif ($asignacion->estado === 'activa')
-                                                <button type="button" wire:click="cerrar({{ $asignacion->id }})"
-                                                    wire:confirm="¿Cerrar esta carga? Seguirá disponible para consulta histórica."
-                                                    class="rounded-lg bg-slate-700 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-slate-800">Cerrar</button>
-                                            @else
-                                                <button type="button" wire:click="reactivar({{ $asignacion->id }})"
-                                                    class="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-emerald-700">Reactivar</button>
-                                            @endif
-                                            @if ($asignacion->estado !== 'archivada')
-                                                <button type="button" wire:click="archivar({{ $asignacion->id }})"
-                                                    wire:confirm="¿Archivar esta carga? No se eliminará ningún dato relacionado."
-                                                    class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-black text-rose-700 transition hover:bg-rose-100">Archivar</button>
-                                            @endif
+                                            wire:loading.attr="disabled" wire:target="editar"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60">
+                                            <flux:icon.pencil-square class="h-3.5 w-3.5" />
+                                            Editar
+                                        </button>
+
+                                        @if (auth()->user()?->is_admin && $asignacion->estado === 'borrador')
+                                            <button type="button" wire:click="confirmar({{ $asignacion->id }})"
+                                                class="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-emerald-700">
+                                                Confirmar
+                                            </button>
+                                        @endif
+
+                                        @if (auth()->user()?->is_admin && $asignacion->estado === 'activa')
+                                            <button type="button" wire:click="cerrar({{ $asignacion->id }})"
+                                                wire:confirm="¿Cerrar esta carga? Seguirá disponible para consulta histórica."
+                                                class="rounded-lg bg-slate-700 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-slate-800">
+                                                Cerrar
+                                            </button>
+                                        @endif
+
+                                        @if (auth()->user()?->is_admin && in_array($asignacion->estado, ['cerrada', 'archivada'], true))
+                                            <button type="button" wire:click="reactivar({{ $asignacion->id }})"
+                                                class="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-emerald-700">
+                                                Reactivar
+                                            </button>
+                                        @endif
+
+                                        @if (auth()->user()?->is_admin &&
+                                                (int) ($asignacion->horarios_count ?? 0) === 0 &&
+                                                (int) ($asignacion->calificaciones_count ?? 0) === 0 &&
+                                                (int) ($asignacion->bitacora_calificaciones_count ?? 0) === 0)
+                                            <button type="button"
+                                                data-nombre="{{ $asignacion->materia?->materia ?? 'Materia' }}"
+                                                data-contexto="{{ $asignacion->grupo?->grado?->nombre ?? 'Sin grado' }} · Grupo {{ $asignacion->grupo?->asignacionGrupo?->nombre ?? '—' }} · Generación {{ $asignacion->grupo?->generacion?->anio_ingreso ?? '—' }}-{{ $asignacion->grupo?->generacion?->anio_egreso ?? '—' }}{{ $asignacion->grupo?->semestre ? ' · ' . $asignacion->grupo->semestre->numero . '° semestre' : '' }}"
+                                                x-on:click="confirmarEliminar({{ $asignacion->id }}, $el.dataset.nombre, $el.dataset.contexto)"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:-translate-y-0.5 hover:bg-red-700">
+                                                <flux:icon.trash class="h-3.5 w-3.5" />
+                                                Eliminar
+                                            </button>
+                                        @endif
+
+                                        @if (auth()->user()?->is_admin &&
+                                                ((int) ($asignacion->horarios_count ?? 0) > 0 ||
+                                                    (int) ($asignacion->calificaciones_count ?? 0) > 0 ||
+                                                    (int) ($asignacion->bitacora_calificaciones_count ?? 0) > 0) &&
+                                                $asignacion->estado !== 'archivada')
+                                            <button type="button"
+                                                data-nombre="{{ $asignacion->materia?->materia ?? 'Materia' }}"
+                                                data-contexto="{{ $asignacion->grupo?->grado?->nombre ?? 'Sin grado' }} · Grupo {{ $asignacion->grupo?->asignacionGrupo?->nombre ?? '—' }} · Generación {{ $asignacion->grupo?->generacion?->anio_ingreso ?? '—' }}-{{ $asignacion->grupo?->generacion?->anio_egreso ?? '—' }}{{ $asignacion->grupo?->semestre ? ' · ' . $asignacion->grupo->semestre->numero . '° semestre' : '' }}"
+                                                x-on:click="confirmarArchivar({{ $asignacion->id }}, $el.dataset.nombre, $el.dataset.contexto)"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-black text-rose-700 transition hover:-translate-y-0.5 hover:bg-rose-100">
+                                                <flux:icon.archive-box class="h-3.5 w-3.5" />
+                                                Archivar
+                                            </button>
                                         @endif
                                     </div>
                                 </td>
@@ -614,20 +733,239 @@
                 class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     Mostrando
-                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->firstItem() }}</span>
+                    <span
+                        class="font-black text-slate-700 dark:text-slate-200">{{ $this->asignacionesFiltradas->firstItem() }}</span>
                     a
-                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->lastItem() }}</span>
+                    <span
+                        class="font-black text-slate-700 dark:text-slate-200">{{ $this->asignacionesFiltradas->lastItem() }}</span>
                     de
-                    <span class="font-black text-slate-700 dark:text-slate-200">{{ $asignaciones->total() }}</span>
+                    <span
+                        class="font-black text-slate-700 dark:text-slate-200">{{ $this->asignacionesFiltradas->total() }}</span>
                     materias.
                 </p>
 
-                @if ($asignaciones->hasPages())
+                @if ($this->asignacionesFiltradas->hasPages())
                     <div class="min-w-0">
-                        {{ $asignaciones->onEachSide(1)->links() }}
+                        {{ $this->asignacionesFiltradas->onEachSide(1)->links() }}
                     </div>
                 @endif
             </div>
         @endif
     </section>
+
+
+    {{-- Modal profesional de edición --}}
+    <div x-data="{ abierto: $wire.entangle('modalEditarAbierto') }" x-show="abierto" x-cloak
+        x-on:keydown.escape.window="if (abierto) $wire.cerrarModalEdicion()"
+        x-effect="document.body.classList.toggle('overflow-hidden', abierto)"
+        class="fixed inset-0 z-[9997] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true"
+        aria-labelledby="titulo-modal-editar-carga">
+
+        <div x-show="abierto" x-transition.opacity class="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
+            x-on:click="$wire.cerrarModalEdicion()"></div>
+
+        <div x-show="abierto" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+            x-transition:leave-end="opacity-0 translate-y-4 scale-95"
+            class="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/20 bg-white shadow-2xl shadow-blue-950/30 dark:bg-slate-950">
+
+            {{-- Loader al guardar la edición --}}
+            <div wire:loading.flex wire:target="actualizarMateria"
+                class="absolute inset-0 z-30 hidden items-center justify-center rounded-[2rem] bg-white/90 p-5 backdrop-blur-sm dark:bg-slate-950/90">
+                <div class="text-center">
+                    <div class="relative mx-auto mb-4 h-16 w-16">
+                        <div
+                            class="absolute inset-0 animate-spin rounded-full border-4 border-blue-100 border-r-[#88AC2E] border-t-[#006492] dark:border-slate-700">
+                        </div>
+                        <div
+                            class="absolute inset-[10px] flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] text-white shadow-lg">
+                            <flux:icon.arrow-path class="h-6 w-6" />
+                        </div>
+                    </div>
+                    <p class="font-black text-slate-900 dark:text-white">Guardando cambios</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Actualizando la carga académica sin alterar otros ciclos…
+                    </p>
+                </div>
+            </div>
+
+            <div class="h-1.5 bg-gradient-to-r from-[#006492] via-sky-500 to-[#88AC2E]"></div>
+
+            <div
+                class="border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-lime-50 px-5 py-5 dark:border-slate-800 dark:from-blue-950/30 dark:via-slate-950 dark:to-lime-950/20 sm:px-7">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex min-w-0 items-start gap-4">
+                        <div
+                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#006492] text-white shadow-lg shadow-blue-500/20">
+                            <flux:icon.pencil-square class="h-6 w-6" />
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 id="titulo-modal-editar-carga"
+                                    class="text-xl font-black text-slate-900 dark:text-white">
+                                    Editar carga académica
+                                </h3>
+                                <span
+                                    class="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                                    ID {{ $editandoId ?: '—' }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Corrige el contexto, la materia o el profesor. Los cambios se aplicarán únicamente al
+                                ciclo
+                                {{ $this->cicloSeleccionado?->inicio_anio ?? '—' }}-{{ $this->cicloSeleccionado?->fin_anio ?? '—' }}.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button type="button" wire:click="cerrarModalEdicion" wire:loading.attr="disabled"
+                        wire:target="actualizarMateria"
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                        <flux:icon.x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-6 p-5 sm:p-7">
+                <div
+                    class="grid grid-cols-1 gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-blue-950/20 sm:grid-cols-3">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-300">
+                            Nivel</p>
+                        <p class="mt-1 text-sm font-black text-slate-800 dark:text-white">{{ $nivel?->nombre ?? '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-300">
+                            Ciclo</p>
+                        <p class="mt-1 text-sm font-black text-slate-800 dark:text-white">
+                            {{ $this->cicloSeleccionado?->inicio_anio ?? '—' }}-{{ $this->cicloSeleccionado?->fin_anio ?? '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-300">
+                            Alcance</p>
+                        <p class="mt-1 text-sm font-black text-slate-800 dark:text-white">Solo esta carga</p>
+                    </div>
+                </div>
+
+                @if ($edicionTieneHistorial)
+                    <div
+                        class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+                            <flux:icon.shield-exclamation class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <p class="font-black text-amber-900 dark:text-amber-100">Carga con historial protegido</p>
+                            <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/80">
+                                Ya existen horarios, calificaciones o auditoría. Para evitar inconsistencias, el grupo y
+                                la materia
+                                permanecen bloqueados; únicamente puedes actualizar el profesor responsable.
+                            </p>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <div class="lg:col-span-2">
+                        <flux:field>
+                            <flux:label>Grado, grupo y generación</flux:label>
+                            <flux:select wire:model.live="editar_grupo_id" :disabled="$edicionTieneHistorial">
+                                <flux:select.option value="">Selecciona un grupo</flux:select.option>
+                                @foreach ($this->grupos as $grupo)
+                                    <flux:select.option value="{{ $grupo->id }}">
+                                        {{ $grupo->grado?->nombre ?? 'Sin grado' }} · Grupo
+                                        {{ $grupo->asignacionGrupo?->nombre ?? '—' }} ·
+                                        {{ $grupo->generacion?->anio_ingreso ?? '—' }}-{{ $grupo->generacion?->anio_egreso ?? '—' }}{{ $grupo->semestre ? ' · ' . $grupo->semestre->numero . '° semestre' : '' }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            <flux:error name="editar_grupo_id" />
+                        </flux:field>
+                    </div>
+
+                    <flux:field>
+                        <flux:label>Materia</flux:label>
+                        <flux:select wire:model="editar_materia_id"
+                            :disabled="$edicionTieneHistorial || blank($editar_grupo_id)">
+                            <flux:select.option value="">Selecciona una materia</flux:select.option>
+                            @foreach ($this->materiasEdicionDisponibles as $materia)
+                                <flux:select.option value="{{ $materia->id }}">
+                                    {{ $materia->materia }}{{ $materia->clave ? ' · ' . $materia->clave : '' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="editar_materia_id" />
+                    </flux:field>
+
+                    <div class="relative">
+                        <flux:field>
+                            <flux:label>Profesor responsable</flux:label>
+                            <flux:input wire:model.live.debounce.300ms="editarBuscarProfesor" icon="magnifying-glass"
+                                placeholder="Puede quedar pendiente" autocomplete="off" />
+                            <flux:error name="editar_profesor_id" />
+                        </flux:field>
+
+                        @if ($editarBuscarProfesor !== '' && blank($editar_profesor_id))
+                            <div
+                                class="absolute z-40 mt-2 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                                @forelse ($this->profesoresEdicionFiltrados as $profesor)
+                                    <button type="button"
+                                        wire:click="seleccionarProfesorEdicion({{ $profesor['id'] }})"
+                                        class="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-700 last:border-0 hover:bg-blue-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-blue-950/30">
+                                        {{ $profesor['nombre'] }}
+                                    </button>
+                                @empty
+                                    <p class="p-4 text-center text-sm text-slate-500">Sin coincidencias.</p>
+                                @endforelse
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if ($this->grupoEdicionSeleccionado)
+                    <div
+                        class="flex flex-wrap items-center gap-2 rounded-2xl border border-lime-200 bg-lime-50/80 px-4 py-3 text-xs font-bold text-slate-600 dark:border-lime-900/40 dark:bg-lime-950/20 dark:text-slate-300">
+                        <span
+                            class="rounded-full bg-white px-2.5 py-1 text-[#006492] shadow-sm dark:bg-slate-900 dark:text-blue-300">
+                            {{ $this->grupoEdicionSeleccionado->grado?->nombre ?? 'Sin grado' }}
+                        </span>
+                        <span>Grupo {{ $this->grupoEdicionSeleccionado->asignacionGrupo?->nombre ?? '—' }}</span>
+                        <span class="text-slate-300 dark:text-slate-600">•</span>
+                        <span>Generación
+                            {{ $this->grupoEdicionSeleccionado->generacion?->anio_ingreso ?? '—' }}-{{ $this->grupoEdicionSeleccionado->generacion?->anio_egreso ?? '—' }}
+                        </span>
+                        @if ($this->grupoEdicionSeleccionado->semestre)
+                            <span class="text-slate-300 dark:text-slate-600">•</span>
+                            <span class="text-violet-700 dark:text-violet-300">
+                                {{ $this->grupoEdicionSeleccionado->semestre->numero }}° semestre
+                            </span>
+                        @endif
+                    </div>
+                @endif
+
+                <div
+                    class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end">
+                    <button type="button" wire:click="cerrarModalEdicion" wire:loading.attr="disabled"
+                        wire:target="actualizarMateria"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                        Cancelar
+                    </button>
+
+                    <button type="button" wire:click="actualizarMateria" wire:loading.attr="disabled"
+                        wire:target="actualizarMateria"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-60">
+                        <flux:icon.check class="h-5 w-5" />
+                        <span wire:loading.remove wire:target="actualizarMateria">Guardar cambios</span>
+                        <span wire:loading wire:target="actualizarMateria">Actualizando…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>

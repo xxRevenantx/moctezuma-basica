@@ -42,6 +42,13 @@ class AsignacionMateria extends Component
     public string $filtro_profesor = '';
     public int $porPaginaMaterias = 10;
     public ?int $editandoId = null;
+    public bool $modalEditarAbierto = false;
+    public bool $edicionTieneHistorial = false;
+    public $editar_grupo_id = '';
+    public $editar_materia_id = '';
+    public $editar_profesor_id = '';
+    public string $editarBuscarProfesor = '';
+
     public $grupo_id = '';
     public $materia_id = '';
     public $profesor_id = '';
@@ -135,8 +142,29 @@ class AsignacionMateria extends Component
 
     public function getMateriasDisponiblesProperty(): Collection
     {
-        $grupo = $this->grupoSeleccionado;
+        return $this->materiasParaGrupo($this->grupoSeleccionado);
+    }
 
+    public function getGrupoEdicionSeleccionadoProperty(): ?Grupo
+    {
+        if (blank($this->editar_grupo_id)) {
+            return null;
+        }
+
+        return Grupo::query()
+            ->with(['asignacionGrupo', 'grado', 'generacion', 'semestre'])
+            ->whereKey($this->editar_grupo_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->first();
+    }
+
+    public function getMateriasEdicionDisponiblesProperty(): Collection
+    {
+        return $this->materiasParaGrupo($this->grupoEdicionSeleccionado);
+    }
+
+    private function materiasParaGrupo(?Grupo $grupo): Collection
+    {
         if (!$grupo) {
             return collect();
         }
@@ -185,6 +213,15 @@ class AsignacionMateria extends Component
     public function getProfesoresFiltradosProperty(): Collection
     {
         $buscar = mb_strtolower(trim($this->buscarProfesor));
+
+        return $buscar === ''
+            ? $this->profesores
+            : $this->profesores->filter(fn($item) => str_contains($item['buscar'], $buscar))->values();
+    }
+
+    public function getProfesoresEdicionFiltradosProperty(): Collection
+    {
+        $buscar = mb_strtolower(trim($this->editarBuscarProfesor));
 
         return $buscar === ''
             ? $this->profesores
@@ -296,6 +333,11 @@ class AsignacionMateria extends Component
                 'grupo.semestre',
                 'grupo.asignacionGrupo',
                 'horarios' => fn($q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id),
+            ])
+            ->withCount([
+                'horarios',
+                'calificaciones',
+                'bitacoraCalificaciones',
             ])
             ->when(filled($this->filtro_generacion), fn(Builder $q) => $q->where('generacion_id', (int) $this->filtro_generacion))
             ->when(filled($this->filtro_estado), fn(Builder $q) => $q->where('estado', $this->filtro_estado))
@@ -416,6 +458,7 @@ class AsignacionMateria extends Component
     public function updatedCicloEscolarId(): void
     {
         $this->limpiarFormulario();
+        $this->cerrarModalEdicion();
         $this->limpiarFiltros();
         $this->resetPage('materiasPage');
     }
@@ -476,10 +519,23 @@ class AsignacionMateria extends Component
         $this->resetValidation(['grupo_id', 'materia_id']);
     }
 
+    public function updatedEditarGrupoId(): void
+    {
+        $this->editar_materia_id = '';
+        $this->resetValidation(['editar_grupo_id', 'editar_materia_id']);
+    }
+
     public function updatedBuscarProfesor(): void
     {
         if (blank($this->buscarProfesor)) {
             $this->profesor_id = '';
+        }
+    }
+
+    public function updatedEditarBuscarProfesor(): void
+    {
+        if (blank($this->editarBuscarProfesor)) {
+            $this->editar_profesor_id = '';
         }
     }
 
@@ -488,6 +544,13 @@ class AsignacionMateria extends Component
         $profesor = $this->profesores->firstWhere('id', $profesorId);
         $this->profesor_id = $profesorId;
         $this->buscarProfesor = $profesor['nombre'] ?? '';
+    }
+
+    public function seleccionarProfesorEdicion(int $profesorId): void
+    {
+        $profesor = $this->profesores->firstWhere('id', $profesorId);
+        $this->editar_profesor_id = $profesorId;
+        $this->editarBuscarProfesor = $profesor['nombre'] ?? '';
     }
 
     public function guardarMateria(): void
@@ -515,7 +578,6 @@ class AsignacionMateria extends Component
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('grupo_id', $grupo->id)
             ->where('materia_id', $materia->id)
-            ->when($this->editandoId, fn($q) => $q->where('id', '!=', $this->editandoId))
             ->exists();
 
         if ($duplicada) {
@@ -526,41 +588,25 @@ class AsignacionMateria extends Component
         $profesorId = $materia->receso ? null : (filled($this->profesor_id) ? (int) $this->profesor_id : null);
 
         DB::transaction(function () use ($grupo, $materia, $profesorId) {
-            if ($this->editandoId) {
-                $asignacion = AsignacionMateriaModel::query()->findOrFail($this->editandoId);
-                abort_unless((int) $asignacion->ciclo_escolar_id === (int) $this->ciclo_escolar_id, 422);
-
-                $asignacion->update([
-                    'materia_id' => $materia->id,
-                    'grupo_id' => $grupo->id,
-                    'profesor_id' => $profesorId,
-                    'nivel_id' => $grupo->nivel_id,
-                    'grado_id' => $grupo->grado_id,
-                    'generacion_id' => $grupo->generacion_id,
-                    'semestre_id' => $grupo->semestre_id,
-                ]);
-                $this->ultimoMovimiento = 'actualizada';
-            } else {
-                $asignacion = AsignacionMateriaModel::query()->create([
-                    'materia_id' => $materia->id,
-                    'grupo_id' => $grupo->id,
-                    'profesor_id' => $profesorId,
-                    'ciclo_escolar_id' => $this->ciclo_escolar_id,
-                    'nivel_id' => $grupo->nivel_id,
-                    'grado_id' => $grupo->grado_id,
-                    'generacion_id' => $grupo->generacion_id,
-                    'semestre_id' => $grupo->semestre_id,
-                    'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
-                ]);
-                $this->ultimoMovimiento = 'registrada';
-            }
+            $asignacion = AsignacionMateriaModel::query()->create([
+                'materia_id' => $materia->id,
+                'grupo_id' => $grupo->id,
+                'profesor_id' => $profesorId,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'nivel_id' => $grupo->nivel_id,
+                'grado_id' => $grupo->grado_id,
+                'generacion_id' => $grupo->generacion_id,
+                'semestre_id' => $grupo->semestre_id,
+                'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
+            ]);
 
             $this->ultimoRegistroId = $asignacion->id;
+            $this->ultimoMovimiento = 'registrada';
         });
 
         $this->limpiarFormularioDespuesDeGuardar();
         $this->dispatch('swal', [
-            'title' => 'Carga académica ' . $this->ultimoMovimiento,
+            'title' => 'Carga académica registrada',
             'text' => 'Se guardó dentro del ciclo seleccionado sin modificar ciclos anteriores.',
             'icon' => 'success',
             'position' => 'top-end',
@@ -572,38 +618,219 @@ class AsignacionMateria extends Component
         $asignacion = AsignacionMateriaModel::query()
             ->with(['profesor'])
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
             ->findOrFail($id);
 
+        $this->resetValidation([
+            'editar_grupo_id',
+            'editar_materia_id',
+            'editar_profesor_id',
+        ]);
+
         $this->editandoId = $asignacion->id;
-        $this->grupo_id = $asignacion->grupo_id;
-        $this->materia_id = $asignacion->materia_id;
-        $this->profesor_id = $asignacion->profesor_id ?: '';
-        $this->buscarProfesor = $asignacion->profesor
+        $this->edicionTieneHistorial = $asignacion->tieneHistorial();
+        $this->editar_grupo_id = $asignacion->grupo_id;
+        $this->editar_materia_id = $asignacion->materia_id;
+        $this->editar_profesor_id = $asignacion->profesor_id ?: '';
+        $this->editarBuscarProfesor = $asignacion->profesor
             ? trim(($asignacion->profesor->titulo ?? '') . ' ' . ($asignacion->profesor->nombre ?? '') . ' '
                 . ($asignacion->profesor->apellido_paterno ?? '') . ' ' . ($asignacion->profesor->apellido_materno ?? ''))
             : '';
 
-        $this->dispatch('scroll-editar-materia');
+        $this->modalEditarAbierto = true;
+    }
+
+    public function actualizarMateria(): void
+    {
+        $this->validate([
+            'editandoId' => ['required', 'integer', 'exists:asignacion_materias,id'],
+            'editar_grupo_id' => ['required', 'integer', 'exists:grupos,id'],
+            'editar_materia_id' => ['required', 'integer', 'exists:materias,id'],
+            'editar_profesor_id' => ['nullable', 'integer', 'exists:personas,id'],
+        ], [], [
+            'editar_grupo_id' => 'grupo',
+            'editar_materia_id' => 'materia',
+            'editar_profesor_id' => 'profesor',
+        ]);
+
+        $asignacion = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->findOrFail($this->editandoId);
+
+        if (
+            $asignacion->tieneHistorial()
+            && (
+                (int) $asignacion->grupo_id !== (int) $this->editar_grupo_id
+                || (int) $asignacion->materia_id !== (int) $this->editar_materia_id
+            )
+        ) {
+            $this->addError(
+                'editar_grupo_id',
+                'La carga ya tiene historial. Para proteger horarios y calificaciones solo puedes cambiar el profesor responsable.'
+            );
+            return;
+        }
+
+        $grupo = Grupo::query()
+            ->whereKey($this->editar_grupo_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->first();
+
+        $materia = Materia::query()->find($this->editar_materia_id);
+
+        if (!$grupo || !$materia) {
+            $this->addError('editar_grupo_id', 'El grupo o la materia ya no están disponibles.');
+            return;
+        }
+
+        if (
+            (int) $materia->nivel_id !== (int) $grupo->nivel_id
+            || (int) $materia->grado_id !== (int) $grupo->grado_id
+            || ($this->esBachillerato && (int) $materia->semestre_id !== (int) $grupo->semestre_id)
+        ) {
+            $this->addError('editar_materia_id', 'La materia no corresponde al contexto académico del grupo.');
+            return;
+        }
+
+        $duplicada = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('grupo_id', $grupo->id)
+            ->where('materia_id', $materia->id)
+            ->whereKeyNot($asignacion->id)
+            ->exists();
+
+        if ($duplicada) {
+            $this->addError('editar_materia_id', 'Esta materia ya tiene una carga en el grupo y ciclo seleccionados.');
+            return;
+        }
+
+        $profesorId = $materia->receso
+            ? null
+            : (filled($this->editar_profesor_id) ? (int) $this->editar_profesor_id : null);
+
+        DB::transaction(function () use ($asignacion, $grupo, $materia, $profesorId) {
+            $asignacion->update([
+                'materia_id' => $materia->id,
+                'grupo_id' => $grupo->id,
+                'profesor_id' => $profesorId,
+                'nivel_id' => $grupo->nivel_id,
+                'grado_id' => $grupo->grado_id,
+                'generacion_id' => $grupo->generacion_id,
+                'semestre_id' => $grupo->semestre_id,
+            ]);
+
+            $this->ultimoRegistroId = $asignacion->id;
+            $this->ultimoMovimiento = 'actualizada';
+        });
+
+        $this->cerrarModalEdicion();
+        $this->resetPage('materiasPage');
+
+        $this->dispatch('swal', [
+            'title' => 'Carga académica actualizada',
+            'text' => 'Los cambios se aplicaron únicamente a la carga seleccionada.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function cerrarModalEdicion(): void
+    {
+        $this->modalEditarAbierto = false;
+        $this->reset([
+            'editandoId',
+            'edicionTieneHistorial',
+            'editar_grupo_id',
+            'editar_materia_id',
+            'editar_profesor_id',
+            'editarBuscarProfesor',
+        ]);
+        $this->resetValidation([
+            'editandoId',
+            'editar_grupo_id',
+            'editar_materia_id',
+            'editar_profesor_id',
+        ]);
     }
 
     public function confirmar(int $id): void
     {
-        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ACTIVA);
+        $this->cambiarEstado(
+            $id,
+            AsignacionMateriaModel::ESTADO_ACTIVA,
+            'Carga confirmada',
+            'La carga quedó activa y disponible para los procesos académicos.'
+        );
     }
 
     public function cerrar(int $id): void
     {
-        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_CERRADA);
+        $this->cambiarEstado(
+            $id,
+            AsignacionMateriaModel::ESTADO_CERRADA,
+            'Carga cerrada',
+            'Se conservan sus horarios, calificaciones y registros históricos.'
+        );
     }
 
     public function archivar(int $id): void
     {
-        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ARCHIVADA);
+        $this->cambiarEstado(
+            $id,
+            AsignacionMateriaModel::ESTADO_ARCHIVADA,
+            'Carga archivada',
+            'La carga dejó de estar activa, pero todo su historial permanece disponible.'
+        );
+
+        if ((int) $this->editandoId === $id) {
+            $this->cerrarModalEdicion();
+        }
     }
 
     public function reactivar(int $id): void
     {
-        $this->cambiarEstado($id, AsignacionMateriaModel::ESTADO_ACTIVA);
+        $this->cambiarEstado(
+            $id,
+            AsignacionMateriaModel::ESTADO_ACTIVA,
+            'Carga reactivada',
+            'La carga volvió a estar disponible sin perder información histórica.'
+        );
+    }
+
+    public function eliminar(int $id): void
+    {
+        $this->autorizarAdministracion();
+
+        $asignacion = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->findOrFail($id);
+
+        if ($asignacion->tieneHistorial()) {
+            $this->dispatch('swal', [
+                'title' => 'No se puede eliminar',
+                'text' => 'Esta carga ya tiene horarios, calificaciones o movimientos de auditoría. Archívala para conservar el historial.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        DB::transaction(fn() => $asignacion->delete());
+
+        if ((int) $this->editandoId === $id) {
+            $this->cerrarModalEdicion();
+        }
+
+        $this->resetPage('materiasPage');
+
+        $this->dispatch('swal', [
+            'title' => 'Carga eliminada',
+            'text' => 'La materia se eliminó únicamente de este ciclo. No se modificaron otros ciclos.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
     }
 
     public function confirmarTodas(): void
@@ -624,12 +851,13 @@ class AsignacionMateria extends Component
         $this->dispatch('swal', ['title' => 'Cargas confirmadas', 'icon' => 'success', 'position' => 'top-end']);
     }
 
-    private function cambiarEstado(int $id, string $estado): void
+    private function cambiarEstado(int $id, string $estado, string $titulo, string $texto): void
     {
         $this->autorizarAdministracion();
 
         $asignacion = AsignacionMateriaModel::query()
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
             ->findOrFail($id);
 
         $datos = ['estado' => $estado];
@@ -648,8 +876,8 @@ class AsignacionMateria extends Component
         $asignacion->update($datos);
 
         $this->dispatch('swal', [
-            'title' => 'Estado actualizado',
-            'text' => 'No se eliminó ningún horario, calificación o lista histórica.',
+            'title' => $titulo,
+            'text' => $texto,
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -807,15 +1035,15 @@ class AsignacionMateria extends Component
     public function limpiarFormularioDespuesDeGuardar(): void
     {
         $grupo = $this->grupo_id;
-        $this->reset(['editandoId', 'materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->reset(['materia_id', 'profesor_id', 'buscarProfesor']);
         $this->grupo_id = $grupo;
-        $this->resetValidation();
+        $this->resetValidation(['grupo_id', 'materia_id', 'profesor_id']);
     }
 
     public function limpiarFormulario(): void
     {
-        $this->reset(['editandoId', 'grupo_id', 'materia_id', 'profesor_id', 'buscarProfesor']);
-        $this->resetValidation();
+        $this->reset(['grupo_id', 'materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->resetValidation(['grupo_id', 'materia_id', 'profesor_id']);
     }
 
     public function ordenarMateriasPorGrupoJs($grupoId, $ids): void
@@ -835,7 +1063,7 @@ class AsignacionMateria extends Component
 
     private function autorizarAdministracion(): void
     {
-        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede confirmar, cerrar, archivar o copiar cargas.');
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede confirmar, cerrar, archivar, eliminar o copiar cargas.');
     }
 
     public function render()

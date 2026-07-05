@@ -14,8 +14,15 @@ use Illuminate\Validation\ValidationException;
 class GestionAcademicaService
 {
     public const ESTATUS = [
-        'activo', 'baja_temporal', 'baja_definitiva', 'trasladado',
-        'suspendido', 'egresado', 'inactivo', 'reingreso', 'no_promovido',
+        'activo',
+        'baja_temporal',
+        'baja_definitiva',
+        'trasladado',
+        'suspendido',
+        'egresado',
+        'inactivo',
+        'reingreso',
+        'no_promovido',
     ];
 
     public function cambiarAsignacion(Inscripcion $alumno, array $destino, string $motivo, ?int $usuarioId): Inscripcion
@@ -29,7 +36,7 @@ class GestionAcademicaService
                 throw ValidationException::withMessages(['generacion_id' => 'La generación no pertenece al nivel seleccionado.']);
             }
 
-            if (! $generacion->status) {
+            if (!$generacion->status) {
                 throw ValidationException::withMessages(['generacion_id' => 'No se puede asignar un alumno a una generación inactiva.']);
             }
 
@@ -39,12 +46,17 @@ class GestionAcademicaService
                 && (int) $grupo->grado_id === (int) $destino['grado_id']
                 && (int) ($grupo->semestre_id ?? 0) === (int) ($destino['semestre_id'] ?? 0);
 
-            if (! $valido) {
+            if (!$valido) {
                 throw ValidationException::withMessages(['grupo_id' => 'El grupo no corresponde a la generación, grado y semestre seleccionados.']);
             }
 
             $alumno->update(Arr::only($destino, [
-                'nivel_id', 'grado_id', 'generacion_id', 'grupo_id', 'semestre_id', 'matricula',
+                'nivel_id',
+                'grado_id',
+                'generacion_id',
+                'grupo_id',
+                'semestre_id',
+                'matricula',
             ]));
 
             $despues = $this->snapshot($alumno->fresh());
@@ -57,7 +69,7 @@ class GestionAcademicaService
 
     public function cambiarEstatus(Inscripcion $alumno, string $estatus, string $motivo, ?int $usuarioId, ?string $fecha = null): Inscripcion
     {
-        if (! in_array($estatus, self::ESTATUS, true)) {
+        if (!in_array($estatus, self::ESTATUS, true)) {
             throw ValidationException::withMessages(['estatus' => 'El estatus seleccionado no es válido.']);
         }
 
@@ -127,11 +139,16 @@ class GestionAcademicaService
         });
     }
 
-    public function reactivarGeneracion(Generacion $generacion, string $motivo, ?int $usuarioId): void
-    {
-        DB::transaction(function () use ($generacion, $motivo, $usuarioId): void {
+    public function reactivarGeneracion(
+        Generacion $generacion,
+        string $motivo,
+        ?int $usuarioId,
+        bool $reactivarEgresados = false
+    ): int {
+        return DB::transaction(function () use ($generacion, $motivo, $usuarioId, $reactivarEgresados): int {
             $generacion = Generacion::query()->lockForUpdate()->findOrFail($generacion->id);
             $antes = $this->snapshotGeneracion($generacion);
+
             $generacion->update([
                 'status' => true,
                 'cerrada_at' => null,
@@ -141,15 +158,49 @@ class GestionAcademicaService
                 'motivo_desactivacion' => null,
                 'observaciones' => $motivo,
             ]);
+
+            $afectados = 0;
+
+            if ($reactivarEgresados) {
+                $egresados = Inscripcion::query()
+                    ->where('generacion_id', $generacion->id)
+                    ->where('estatus', 'egresado')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($egresados as $alumno) {
+                    $actualizado = $this->cambiarEstatus(
+                        $alumno,
+                        'activo',
+                        'Reactivación administrativa para correcciones de la generación '
+                        . $generacion->etiqueta . '. ' . $motivo,
+                        $usuarioId
+                    );
+
+                    $actualizado->forceFill([
+                        'observaciones_baja' => null,
+                    ])->save();
+
+                    $afectados++;
+                }
+            }
+
             CambioAcademico::query()->create([
                 'generacion_id' => $generacion->id,
-                'tipo' => 'reactivacion_generacion',
+                'tipo' => $reactivarEgresados
+                    ? 'reactivacion_generacion_con_egresados'
+                    : 'reactivacion_generacion',
                 'motivo' => $motivo,
                 'datos_anteriores' => $antes,
-                'datos_nuevos' => $this->snapshotGeneracion($generacion->fresh()),
+                'datos_nuevos' => array_merge(
+                    $this->snapshotGeneracion($generacion->fresh()),
+                    ['alumnos_egresados_reactivados' => $afectados]
+                ),
                 'realizado_por' => $usuarioId,
                 'realizado_at' => now(),
             ]);
+
+            return $afectados;
         });
     }
 
@@ -170,23 +221,42 @@ class GestionAcademicaService
     public function snapshot(Inscripcion $alumno): array
     {
         return Arr::only($alumno->getAttributes(), [
-            'matricula', 'nivel_id', 'grado_id', 'generacion_id', 'grupo_id', 'semestre_id',
-            'estatus', 'activo', 'fecha_estatus', 'motivo_estatus', 'fecha_baja', 'motivo_baja',
-            'fecha_inscripcion', 'deleted_at',
+            'matricula',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'grupo_id',
+            'semestre_id',
+            'estatus',
+            'activo',
+            'fecha_estatus',
+            'motivo_estatus',
+            'fecha_baja',
+            'motivo_baja',
+            'fecha_inscripcion',
+            'deleted_at',
         ]);
     }
 
     private function snapshotGeneracion(Generacion $generacion): array
     {
         return Arr::only($generacion->getAttributes(), [
-            'nombre', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'status', 'fecha_inicio',
-            'fecha_termino', 'cerrada_at', 'cerrada_por', 'motivo_desactivacion',
+            'nombre',
+            'nivel_id',
+            'anio_ingreso',
+            'anio_egreso',
+            'status',
+            'fecha_inicio',
+            'fecha_termino',
+            'cerrada_at',
+            'cerrada_por',
+            'motivo_desactivacion',
         ]);
     }
 
     private function registrarMovimiento(Inscripcion $alumno, string $tipo, string $motivo, array $antes, array $despues, ?int $usuarioId, ?string $fecha = null): void
     {
-        if (! $usuarioId) {
+        if (!$usuarioId) {
             return;
         }
 

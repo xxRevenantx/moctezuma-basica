@@ -17,6 +17,7 @@ use App\Http\Controllers\ExpedientePersonalController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\MatriculaHistorialPdfController;
+use App\Http\Controllers\MediaSuperior\DocumentosOficialesController;
 use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\FichaController;
@@ -137,6 +138,32 @@ Route::get('/generaciones', [GeneracionController::class, 'index'])->name('misru
 
 //RUTAS DE SEMESTRES
 Route::get('/semestres', [SemestreController::class, 'index'])->name('misrutas.semestres');
+
+
+// DOCUMENTOS OFICIALES DE MEDIA SUPERIOR
+Route::middleware('admin')->prefix('media-superior/documentos-oficiales')->group(function () {
+    Route::get('/', [DocumentosOficialesController::class, 'index'])
+        ->name('media-superior.documentos.index');
+
+    Route::get('/configuracion', [DocumentosOficialesController::class, 'configuracion'])
+        ->name('media-superior.documentos.configuracion');
+
+    Route::get('/modulo/{modulo}', [DocumentosOficialesController::class, 'index'])
+        ->whereIn('modulo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->name('media-superior.documentos.modulo');
+
+    Route::get('/descargar/{tipo}/{formato}', [DocumentosOficialesController::class, 'descargar'])
+        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->whereIn('formato', ['pdf', 'word', 'excel'])
+        ->name('media-superior.documentos.descargar');
+
+    Route::get('/zip/{tipo}', [DocumentosOficialesController::class, 'zip'])
+        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->name('media-superior.documentos.zip');
+
+    Route::get('/asistencias/plantilla/excel', [DocumentosOficialesController::class, 'plantillaAsistencias'])
+        ->name('media-superior.documentos.asistencias.plantilla');
+});
 
 
 // RUTAS DE GRUPOS

@@ -229,6 +229,19 @@
                             :current="request()->routeIs('misrutas.semestres')" wire:navigate>
                             Semestres
                         </flux:navlist.item>
+
+
+                        @if (auth()->user()?->is_admin)
+                            <flux:navlist.item icon="document-text" :href="route('media-superior.documentos.index')"
+                                :current="request()->routeIs('media-superior.documentos.index', 'media-superior.documentos.modulo')" wire:navigate>
+                                Documentos oficiales
+                            </flux:navlist.item>
+
+                            <flux:navlist.item icon="cog-6-tooth" :href="route('media-superior.documentos.configuracion')"
+                                :current="request()->routeIs('media-superior.documentos.configuracion')" wire:navigate>
+                                Configuración documental
+                            </flux:navlist.item>
+                        @endif
                     </flux:sidebar.group>
                 </flux:navlist.group>
 

@@ -212,6 +212,17 @@ class Inscripcion extends Model
         return $this->hasOne(LugarPreescolar::class, 'inscripcion_id');
     }
 
+
+    public function asistenciasFinalesBachillerato()
+    {
+        return $this->hasMany(AsistenciaFinalBachillerato::class, 'inscripcion_id');
+    }
+
+    public function emisionesDocumentosMediaSuperior()
+    {
+        return $this->hasMany(EmisionDocumentoMediaSuperior::class, 'inscripcion_id');
+    }
+
     protected static function booted(): void
     {
         static::forceDeleting(function (Inscripcion $inscripcion) {
