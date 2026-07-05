@@ -1060,8 +1060,23 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->where('materias.grado_id', $this->grado_id)
             ->where('asignacion_materias.grupo_id', $this->grupo_id)
             ->when($this->ciclo_escolar_id, fn ($q) => $q->where('asignacion_materias.ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        /*
+         * Bachillerato: se exportan también las materias extra para conservar
+         * su calificación como información adicional, pero se excluyen del
+         * cálculo en obtenerMateriasPromediables(). Los demás niveles mantienen
+         * la consulta anterior de materias calificables.
+         */
+        if ($this->esBachillerato) {
+            $query->where('materias.receso', false)
+                ->where(function ($query): void {
+                    $query->where('materias.calificable', true)
+                        ->orWhere('materias.extra', true);
+                });
+        } else {
+            $query->where('materias.calificable', true);
+        }
 
         if (Schema::hasColumn('materias', 'semestre_id')) {
             if ($this->esBachillerato) {
@@ -1087,6 +1102,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                     'materia' => $item->materia ?: 'MATERIA',
                     'orden' => $item->orden,
                     'extra' => (int) ($item->extra ?? 0),
+                    'calificable' => (int) ($item->calificable ?? 0),
                     'receso' => (int) ($item->receso ?? 0),
                 ];
             })
@@ -1252,14 +1268,22 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
 
             /*
-             * AC, NP o cualquier texto no suma y tampoco cuenta como divisor.
+             * AC, NP o cualquier texto no suma. En bachillerato el divisor es
+             * el número configurado en materia_promediar o, cuando no existe,
+             * el total real de materias calificables no extra. Así la exportación
+             * coincide con la captura, las boletas y los reconocimientos.
+             * Los demás niveles conservan su divisor por valores numéricos.
              */
             if ($totalNumericas === 0) {
                 $promedios[$inscripcionId] = 'Pendiente';
                 continue;
             }
 
-            $promedios[$inscripcionId] = (float) ($suma / $totalNumericas);
+            $divisor = $this->esBachillerato
+                ? $numeroMaterias
+                : $totalNumericas;
+
+            $promedios[$inscripcionId] = (float) ($suma / $divisor);
         }
 
         return $promedios;
@@ -1364,13 +1388,27 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             }
         }
 
-        $registro = $query->first();
+        $numeroConfigurado = (int) ($query->value('numero_materias') ?? 0);
+
+        if ($numeroConfigurado > 0) {
+            return $numeroConfigurado;
+        }
 
         /*
-         * Si no existe registro o el número es 0,
-         * no se promedia ninguna materia.
+         * Respaldo exclusivo de bachillerato: si no existe configuración se
+         * toma el número de materias calificables, normales y no receso.
          */
-        return $registro ? (int) $registro->numero_materias : 0;
+        if ($this->esBachillerato) {
+            return collect($materias)
+                ->filter(function ($materia): bool {
+                    return (int) ($materia['calificable'] ?? 0) === 1
+                        && (int) ($materia['extra'] ?? 0) === 0
+                        && (int) ($materia['receso'] ?? 0) === 0;
+                })
+                ->count();
+        }
+
+        return 0;
     }
 
     protected function obtenerMateriasPromediables(array $materias): array
@@ -1383,8 +1421,15 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
         return collect($materias)
             ->filter(function ($materia) {
-                return (int) ($materia['extra'] ?? 0) === 0
-                    && (int) ($materia['receso'] ?? 0) === 0;
+                if (
+                    (int) ($materia['extra'] ?? 0) !== 0
+                    || (int) ($materia['receso'] ?? 0) !== 0
+                ) {
+                    return false;
+                }
+
+                return !$this->esBachillerato
+                    || (int) ($materia['calificable'] ?? 0) === 1;
             })
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,

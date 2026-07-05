@@ -791,13 +791,23 @@ class Calificacion extends Component
             ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel_id)
-                    ->where('grado_id', $this->grado_id)
-                    ->where('calificable', 1);
+                    ->where('grado_id', $this->grado_id);
 
                 if ($this->esBachillerato) {
-                    $query->where('semestre_id', $this->semestre_id);
+                    /*
+                     * En bachillerato también se cargan las materias extra para
+                     * poder capturar y mostrar su calificación en la boleta.
+                     * Nunca se cargan recesos.
+                     */
+                    $query->where('semestre_id', $this->semestre_id)
+                        ->where('receso', false)
+                        ->where(function ($query): void {
+                            $query->where('calificable', true)
+                                ->orWhere('extra', true);
+                        });
                 } else {
-                    $query->whereNull('semestre_id');
+                    $query->where('calificable', true)
+                        ->whereNull('semestre_id');
                 }
             })
 
@@ -1043,15 +1053,15 @@ class Calificacion extends Component
                 }
 
                 /*
-                 * En bachillerato la bandera calificable es la única fuente
-                 * automática cuando no existe materia_promediar.
+                 * Las materias extra y los recesos nunca participan en ningún
+                 * promedio de bachillerato: parcial, semestral o final.
                  */
-                if ($this->esBachillerato) {
-                    return true;
-                }
-
                 if (!empty($materia['extra']) || !empty($materia['receso'])) {
                     return false;
+                }
+
+                if ($this->esBachillerato) {
+                    return true;
                 }
 
                 if (in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
@@ -1113,7 +1123,7 @@ class Calificacion extends Component
 
         /*
          * materia_promediar define el divisor. Si no existe configuración en
-         * bachillerato, el divisor es el total de materias con calificable = 1.
+         * bachillerato, el divisor es el total de materias calificables que no son extra ni receso.
          */
         return $suma / $numeroMateriasPromediar;
     }
@@ -1175,12 +1185,30 @@ class Calificacion extends Component
     {
         $filas = collect($this->inscripciones);
 
-        if ($this->filtro_estado !== '') {
-            $filas = $filas->filter(function ($fila) {
-                $inscripcionId = (int) $fila['inscripcion_id'];
-                $materiasAlumno = $this->calificaciones[$inscripcionId] ?? [];
+        /*
+         * En bachillerato los filtros académicos se evalúan únicamente con las
+         * materias oficiales que participan en el promedio. Las materias extra
+         * permanecen capturables y visibles, pero no convierten al alumno en
+         * pendiente, aprobado, reprobado o con situación especial.
+         */
+        $idsMateriasAcademicas = $this->esBachillerato
+            ? $this->obtenerMateriasOrdenadasParaPromedio()
+                ->pluck('id')
+                ->map(fn($id) => (int) $id)
+                ->values()
+                ->all()
+            : [];
 
-                $valores = collect($materiasAlumno)
+        if ($this->filtro_estado !== '') {
+            $filas = $filas->filter(function ($fila) use ($idsMateriasAcademicas) {
+                $inscripcionId = (int) $fila['inscripcion_id'];
+                $materiasAlumno = collect($this->calificaciones[$inscripcionId] ?? []);
+
+                if ($this->esBachillerato) {
+                    $materiasAlumno = $materiasAlumno->only($idsMateriasAcademicas);
+                }
+
+                $valores = $materiasAlumno
                     ->map(fn($valor) => $this->normalizarCalificacion($valor));
 
                 $tieneNumericas = $this->alumnoTieneCalificacionesNumericas($inscripcionId);
@@ -1883,8 +1911,9 @@ class Calificacion extends Component
         $pendientes = max(0, $totalCeldas - $celdasCapturadas);
         $porcentajeCaptura = (int) $this->porcentajeCaptura;
 
-        $materiasPromediables = collect($this->materias)
-            ->filter(fn($materia) => empty($materia['extra']))
+        $materiasPromediables = ($this->esBachillerato
+            ? $this->obtenerMateriasOrdenadasParaPromedio()
+            : collect($this->materias)->filter(fn($materia) => empty($materia['extra'])))
             ->pluck('id')
             ->map(fn($id) => (int) $id)
             ->values();
@@ -1911,8 +1940,24 @@ class Calificacion extends Component
                     ->values();
 
                 $reprobadas = $numericas->filter(fn($valor) => $valor < 6)->count();
-                $especiales = $valores->pluck('valor')->filter(fn($valor) => $this->esCalificacionEspecial($valor))->count();
-                $pendientesAlumno = $valores->filter(fn($item) => blank($item['valor']))->count();
+
+                /*
+                 * En bachillerato las materias extra son informativas. Para el
+                 * diagnóstico académico solo se consideran las materias que sí
+                 * forman parte de los promedios parcial, semestral y final.
+                 */
+                $valoresAcademicos = $this->esBachillerato
+                    ? $valoresPromediables
+                    : $valores;
+
+                $especiales = $valoresAcademicos
+                    ->pluck('valor')
+                    ->filter(fn($valor) => $this->esCalificacionEspecial($valor))
+                    ->count();
+
+                $pendientesAlumno = $valoresAcademicos
+                    ->filter(fn($item) => blank($item['valor']))
+                    ->count();
 
                 $promedio = $this->promediosPrecisos[$inscripcionId] ?? null;
 

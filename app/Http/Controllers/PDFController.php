@@ -297,8 +297,22 @@ class PDFController extends Controller
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolar->id)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        /*
+         * Bachillerato: las materias extra se consultan para mostrarlas en una
+         * tabla informativa independiente. Nunca participan en parciales,
+         * promedio semestral, promedio final, lugares ni reconocimientos.
+         */
+        if ($esBachillerato) {
+            $queryMaterias->where('materias.receso', false)
+                ->where(function ($query): void {
+                    $query->where('materias.calificable', true)
+                        ->orWhere('materias.extra', true);
+                });
+        } else {
+            $queryMaterias->where('materias.calificable', true);
+        }
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
@@ -402,7 +416,8 @@ class PDFController extends Controller
         if ($numeroMateriasPromediar <= 0) {
             $numeroMateriasPromediar = $materias
                 ->filter(function ($materia) use ($esBachillerato) {
-                    return (int) ($materia->extra ?? 0) === 0
+                    return (int) ($materia->calificable ?? 0) === 1
+                        && (int) ($materia->extra ?? 0) === 0
                         && (int) ($materia->receso ?? 0) === 0
                         && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
                 })
@@ -485,7 +500,11 @@ class PDFController extends Controller
                         $capturadasMateria++;
                         $sumaMateria += $numero;
 
-                        if ((int) ($materia->extra ?? 0) === 0 && (int) ($materia->receso ?? 0) === 0) {
+                        if (
+                            (int) ($materia->calificable ?? 0) === 1
+                            && (int) ($materia->extra ?? 0) === 0
+                            && (int) ($materia->receso ?? 0) === 0
+                        ) {
                             $sumasPorPeriodo[$numeroPeriodo] += $numero;
                             $capturadasPorPeriodo[$numeroPeriodo]++;
                         }
@@ -546,6 +565,17 @@ class PDFController extends Controller
                 'estado' => $estadoMateria,
             ];
         }
+
+        /*
+         * Se conserva el detalle de materias extra antes de que bachillerato
+         * sustituya las materias oficiales con PromedioBachilleratoService.
+         */
+        $filasMateriasExtras = $esBachillerato
+            ? collect($filasMaterias)
+                ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 1)
+                ->values()
+                ->all()
+            : [];
 
         /*
         |--------------------------------------------------------------------------
@@ -1126,7 +1156,29 @@ class PDFController extends Controller
             );
         }
 
-        $totalMaterias = count($filasMaterias);
+        $filasResumenAcademico = $esBachillerato
+            ? collect($filasMaterias)
+                ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 0)
+                ->values()
+            : collect($filasMaterias);
+
+        $totalMaterias = $filasResumenAcademico->count();
+
+        if ($esBachillerato) {
+            $totalCeldas = $totalMaterias * count($numerosPeriodos);
+            $pendientes = $filasResumenAcademico
+                ->flatMap(fn(array $materia) => $materia['calificaciones'] ?? [])
+                ->where('estado', 'Sin captura')
+                ->count();
+            $especiales = $filasResumenAcademico
+                ->flatMap(fn(array $materia) => $materia['calificaciones'] ?? [])
+                ->where('estado', 'Especial')
+                ->count();
+            $reprobadas = $filasResumenAcademico->where('estado', 'En riesgo')->count();
+            $aprobadas = $filasResumenAcademico
+                ->filter(fn(array $materia) => in_array($materia['estado'], ['Regular', 'Aprobado'], true))
+                ->count();
+        }
 
         $porcentajeCaptura = $totalCeldas > 0
             ? round((($totalCeldas - $pendientes) / $totalCeldas) * 100)
@@ -1317,6 +1369,7 @@ class PDFController extends Controller
             'promediosPeriodos' => $promediosPeriodos,
 
             'filasMaterias' => $filasMaterias,
+            'filasMateriasExtras' => $filasMateriasExtras,
             'promedio' => $promedio,
             'promedioNumero' => $promedioNumero,
             'lugarAlumno' => $lugarAlumno,
@@ -2595,7 +2648,8 @@ class PDFController extends Controller
                 }
 
                 if ($esBachillerato) {
-                    return true;
+                    return (int) ($materia->extra ?? 0) === 0
+                        && (int) ($materia->receso ?? 0) === 0;
                 }
 
                 return (int) ($materia->extra ?? 0) === 0
@@ -3303,6 +3357,9 @@ class PDFController extends Controller
                     'id' => (int) $item->id,
                     'materia' => $item->materia ?: 'MATERIA',
                     'extra' => (int) ($item->extra ?? 0),
+                    'calificable' => (int) ($item->calificable ?? 0),
+                    'receso' => (int) ($item->receso ?? 0),
+                    'participa_en_calificacion_oficial' => (int) ($item->participa_en_calificacion_oficial ?? 1),
                     'orden' => $item->orden,
                 ];
             })
@@ -3437,9 +3494,17 @@ class PDFController extends Controller
 
         $registroPromedio = $queryMateriaPromediar->first();
 
-        $numeroMateriasPromediar = $registroPromedio
-            ? (int) $registroPromedio->numero_materias
-            : 0;
+        $numeroConfigurado = (int) ($registroPromedio?->numero_materias ?? 0);
+
+        $numeroMateriasPromediar = $numeroConfigurado > 0
+            ? $numeroConfigurado
+            : ($esBachillerato
+                ? collect($materias)->filter(function (array $materia): bool {
+                    return (int) ($materia['calificable'] ?? 0) === 1
+                        && (int) ($materia['extra'] ?? 0) === 0
+                        && (int) ($materia['receso'] ?? 0) === 0;
+                })->count()
+                : 0);
 
         /*
             |--------------------------------------------------------------------------
@@ -3453,6 +3518,8 @@ class PDFController extends Controller
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? collect($materias)
             ->filter(fn($materia) => (int) ($materia['extra'] ?? 0) === 0
+                && (int) ($materia['receso'] ?? 0) === 0
+                && (!$esBachillerato || (int) ($materia['calificable'] ?? 0) === 1)
                 && ($esBachillerato || (int) ($materia['participa_en_calificacion_oficial'] ?? 1) === 1))
             ->sortBy([
                 fn($materia) => ($materia['orden'] ?? null) === null ? 1 : 0,
@@ -3550,7 +3617,11 @@ class PDFController extends Controller
              * Se conserva la precisión completa para cálculos posteriores.
              * Solo el valor mostrado se trunca a un decimal.
              */
-            $promedioPreciso = (float) ($suma / $totalNumericas);
+            $divisorPromedio = $esBachillerato
+                ? $numeroMateriasPromediar
+                : $totalNumericas;
+
+            $promedioPreciso = (float) ($suma / $divisorPromedio);
             $promediosPrecisos[$inscripcionId] = $promedioPreciso;
             $promedios[$inscripcionId] = PromedioExcel::formatear($promedioPreciso, 1, 'Pendiente');
         }
@@ -3826,13 +3897,17 @@ class PDFController extends Controller
         $esSecundaria = $this->esSecundaria($nivel);
 
         /*
-         * Se detecta primaria para separar sus materias extra en el PDF.
-         * Las materias extra no se toman en cuenta para el promedio.
+         * Primaria conserva su comportamiento actual. En bachillerato las
+         * materias extra también se muestran en una tabla independiente y son
+         * completamente informativas: no afectan parciales, semestre, final,
+         * estados académicos, lugares ni reconocimientos.
          */
         $esPrimaria = \Illuminate\Support\Str::contains(
             mb_strtolower((string) ($nivel->slug ?? $nivel->nombre ?? '')),
             'primaria'
         );
+
+        $separarMateriasExtras = $esPrimaria || $esBachillerato;
 
         $generacion = Generacion::query()
             ->where('id', $generacionId)
@@ -3967,8 +4042,17 @@ class PDFController extends Controller
             ->where('materias.grado_id', $grado->id)
             ->where('asignacion_materias.grupo_id', $grupo->id)
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-            ->where('materias.calificable', 1);
+            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+
+        if ($esBachillerato) {
+            $queryMaterias->where('materias.receso', false)
+                ->where(function ($query): void {
+                    $query->where('materias.calificable', true)
+                        ->orWhere('materias.extra', true);
+                });
+        } else {
+            $queryMaterias->where('materias.calificable', true);
+        }
 
         $this->aplicarFiltroSemestreAsignacion($queryMaterias, $esBachillerato, $semestre?->id);
 
@@ -4048,13 +4132,17 @@ class PDFController extends Controller
 
         $registroPromedio = $queryMateriaPromediar->first();
 
-        /*
-         * Si no existe configuración o el número es 0,
-         * el promedio queda pendiente.
-         */
-        $numeroMateriasPromediar = $registroPromedio
-            ? max(0, (int) $registroPromedio->numero_materias)
-            : 0;
+        $numeroConfigurado = (int) ($registroPromedio?->numero_materias ?? 0);
+
+        $numeroMateriasPromediar = $numeroConfigurado > 0
+            ? $numeroConfigurado
+            : ($esBachillerato
+                ? $materias->filter(function ($materia): bool {
+                    return (int) ($materia->calificable ?? 0) === 1
+                        && (int) ($materia->extra ?? 0) === 0
+                        && (int) ($materia->receso ?? 0) === 0;
+                })->count()
+                : 0);
 
         /*
          * promedio-numerico-pro:
@@ -4065,7 +4153,8 @@ class PDFController extends Controller
         $materiasPromediables = $numeroMateriasPromediar > 0
             ? $materias
             ->filter(function ($materia) use ($esBachillerato) {
-                return (int) ($materia->extra ?? 0) === 0
+                return (int) ($materia->calificable ?? 0) === 1
+                    && (int) ($materia->extra ?? 0) === 0
                     && (int) ($materia->receso ?? 0) === 0
                     && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1);
             })
@@ -4183,11 +4272,15 @@ class PDFController extends Controller
 
         if ($hayMateriasPromediables && $capturadasNumericasPromedio > 0) {
             /*
-             * Se divide únicamente entre las calificaciones numéricas encontradas.
-             * El resultado preciso se conserva para comparaciones y lugares;
-             * solo la presentación se trunca a un decimal.
+             * En bachillerato se respeta materia_promediar.numero_materias; si
+             * no existe, se usa el total de materias calificables no extra.
+             * En los demás niveles se conserva el divisor anterior.
              */
-            $promedioPreciso = (float) ($sumaPromedio / $capturadasNumericasPromedio);
+            $divisorPromedio = $esBachillerato
+                ? $numeroMateriasPromediar
+                : $capturadasNumericasPromedio;
+
+            $promedioPreciso = (float) ($sumaPromedio / $divisorPromedio);
             $promedioNumero = PromedioExcel::truncar($promedioPreciso) ?? 0.0;
             $promedio = PromedioExcel::formatear($promedioPreciso, 1, '0.0');
             $porcentajePromedio = min(100, $promedioPreciso * 10);
@@ -4202,8 +4295,8 @@ class PDFController extends Controller
         }
 
         /*
-         * En primaria se separan las materias normales y las materias extra.
-         * Las materias extra se muestran en una tabla aparte y no afectan el promedio.
+         * En primaria y bachillerato se separan las materias normales y las
+         * materias extra. En bachillerato la segunda tabla es solo informativa.
          */
         $filasMateriasRegulares = collect($filasMaterias)
             ->filter(fn($fila) => (int) ($fila['extra'] ?? 0) === 0)
@@ -4215,15 +4308,29 @@ class PDFController extends Controller
             ->values()
             ->toArray();
 
-        if (!$esPrimaria) {
+        if (!$separarMateriasExtras) {
             $filasMateriasRegulares = $filasMaterias;
             $filasMateriasExtras = [];
         }
 
         /*
-         * Para primaria, el avance de captura se calcula solo con materias normales.
-         * Así las materias extra no afectan el resumen principal.
+         * El resumen principal se recalcula con materias regulares para que las
+         * extras no alteren aprobadas, reprobadas, especiales ni captura.
          */
+        if ($esBachillerato) {
+            $especiales = collect($filasMateriasRegulares)
+                ->where('estado', 'Especial')
+                ->count();
+
+            $reprobadas = collect($filasMateriasRegulares)
+                ->where('estado', 'En riesgo')
+                ->count();
+
+            $aprobadas = collect($filasMateriasRegulares)
+                ->filter(fn(array $fila) => in_array($fila['estado'], ['Regular', 'Aprobado'], true))
+                ->count();
+        }
+
         $totalMaterias = count($filasMateriasRegulares);
 
         $pendientes = collect($filasMateriasRegulares)
@@ -4361,7 +4468,11 @@ class PDFController extends Controller
                 continue;
             }
 
-            $promedioLugarPreciso = (float) ($sumaLugar / $totalNumericasLugar);
+            $divisorLugar = $esBachillerato
+                ? $numeroMateriasPromediar
+                : $totalNumericasLugar;
+
+            $promedioLugarPreciso = (float) ($sumaLugar / $divisorLugar);
             $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
             $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso, 1, 'Pendiente');
         }
@@ -4803,7 +4914,9 @@ class PDFController extends Controller
 
         if ($numeroMateriasPromediar <= 0) {
             $numeroMateriasPromediar = $materias
-                ->filter(fn($materia) => (int) ($materia->extra ?? 0) === 0
+                ->filter(fn($materia) => (int) ($materia->calificable ?? 0) === 1
+                    && (int) ($materia->extra ?? 0) === 0
+                    && (int) ($materia->receso ?? 0) === 0
                     && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1))
                 ->count();
         }
@@ -4840,7 +4953,9 @@ class PDFController extends Controller
                 $capturadasNumericas++;
 
                 if (
-                    (int) ($materia->extra ?? 0) === 0
+                    (int) ($materia->calificable ?? 0) === 1
+                    && (int) ($materia->extra ?? 0) === 0
+                    && (int) ($materia->receso ?? 0) === 0
                     && ($esBachillerato || (int) ($materia->participa_en_calificacion_oficial ?? 1) === 1)
                 ) {
                     // Igual que PROMEDIO de Excel: solo cuentan celdas numéricas
@@ -4876,7 +4991,11 @@ class PDFController extends Controller
 
         $promedio = '—';
         $promedioNumero = null;
-        $promedioPreciso = PromedioExcel::calcular($valoresPromediables);
+        $promedioPreciso = !empty($valoresPromediables)
+            ? ($esBachillerato
+                ? (float) (array_sum($valoresPromediables) / $numeroMateriasPromediar)
+                : PromedioExcel::calcular($valoresPromediables))
+            : null;
         $porcentajePromedio = 0;
         $estadoPromedio = 'Sin datos';
 
@@ -5016,7 +5135,11 @@ class PDFController extends Controller
             $valoresLugar = [];
 
             foreach ($materias as $materia) {
-                if ((int) ($materia->extra ?? 0) !== 0) {
+                if (
+                    (int) ($materia->calificable ?? 0) !== 1
+                    || (int) ($materia->extra ?? 0) !== 0
+                    || (int) ($materia->receso ?? 0) !== 0
+                ) {
                     continue;
                 }
 
@@ -5029,7 +5152,11 @@ class PDFController extends Controller
                 }
             }
 
-            $promedioLugarPreciso = PromedioExcel::calcular($valoresLugar);
+            $promedioLugarPreciso = !empty($valoresLugar)
+                ? ($esBachillerato
+                    ? (float) (array_sum($valoresLugar) / $numeroMateriasPromediar)
+                    : PromedioExcel::calcular($valoresLugar))
+                : null;
             $promediosLugarPrecisos[$inscripcionLugarId] = $promedioLugarPreciso;
             $promediosLugar[$inscripcionLugarId] = PromedioExcel::formatear($promedioLugarPreciso);
         }

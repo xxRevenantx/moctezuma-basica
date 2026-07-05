@@ -23,7 +23,7 @@
                     <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
                         Cuando existe una configuración en <strong>materia_promediar</strong>, se utiliza ese número.
                         En bachillerato, si no existe, el sistema cuenta automáticamente únicamente las materias con
-                        <strong>calificable = 1</strong> del grado y semestre. Los demás niveles conservan su regla actual.
+                        <strong>calificable = 1</strong>, <strong>extra = 0</strong> y <strong>receso = 0</strong> del grado y semestre. Los demás niveles conservan su regla actual.
                     </p>
                 </div>
             </div>
@@ -128,7 +128,7 @@
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
                         <p class="text-[11px] font-black uppercase tracking-wide text-slate-500">Calificables detectadas</p>
                         <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">{{ $this->materiasCalificablesDetectadas }}</p>
-                        <p class="mt-1 text-xs text-slate-500">Materias con calificable = 1.</p>
+                        <p class="mt-1 text-xs text-slate-500">Calificables, sin extras ni recesos.</p>
                     </div>
 
                     <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
@@ -153,7 +153,7 @@
                         <p class="text-[11px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Validación</p>
                         @if ($this->configuracionSeleccionada && $this->numeroMateriasEfectivo > $this->materiasCalificablesDetectadas)
                             <p class="mt-1 text-sm font-bold text-amber-800 dark:text-amber-200">
-                                El número configurado supera las materias calificables detectadas.
+                                El número configurado supera las materias oficiales detectadas (sin extras ni recesos).
                             </p>
                         @else
                             <p class="mt-1 text-sm font-bold text-emerald-800 dark:text-emerald-200">

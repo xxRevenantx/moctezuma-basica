@@ -176,7 +176,10 @@ class MateriaPromediar extends Component
             ->where('calificable', true)
             ->when(
                 $this->esBachillerato,
-                fn ($query) => $query->where('semestre_id', $semestreId),
+                fn ($query) => $query
+                    ->where('semestre_id', $semestreId)
+                    ->where('extra', false)
+                    ->where('receso', false),
                 fn ($query) => $query->whereNull('semestre_id')
             )
             ->count();
@@ -361,7 +364,7 @@ class MateriaPromediar extends Component
 
         $this->dispatch('swal', [
             'title' => $fueActualizacion ? 'Configuración actualizada' : 'Configuración guardada',
-            'text' => 'Este número tendrá prioridad. Si se elimina, se usarán automáticamente las materias con calificable = 1.',
+            'text' => 'Este número tendrá prioridad. Si se elimina, en bachillerato se usarán automáticamente solo las materias calificables que no sean extra ni receso.',
             'position' => 'top-end',
             'icon' => 'success',
         ]);
@@ -385,7 +388,7 @@ class MateriaPromediar extends Component
 
         $this->dispatch('swal', [
             'title' => 'Configuración eliminada',
-            'text' => 'Ahora se utilizará automáticamente el total de materias con calificable = 1.',
+            'text' => 'Ahora se utilizará automáticamente el total de materias calificables de bachillerato, excluyendo materias extra y recesos.',
             'position' => 'top-end',
             'icon' => 'success',
         ]);
@@ -406,7 +409,7 @@ class MateriaPromediar extends Component
 
         $this->dispatch('swal', [
             'title' => 'Cálculo automático activado',
-            'text' => 'Se tomarán únicamente las materias con calificable = 1.',
+            'text' => 'En bachillerato se tomarán únicamente materias calificables que no sean extra ni receso.',
             'position' => 'top-end',
             'icon' => 'success',
         ]);

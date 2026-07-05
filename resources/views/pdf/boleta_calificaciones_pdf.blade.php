@@ -529,12 +529,21 @@
 
     @php
         /*
-         * En primaria se separan las materias normales y las materias extra.
-         * En secundaria y bachillerato se conserva la lista normal.
+         * Primaria conserva su tabla extra actual. En bachillerato las materias
+         * extra se separan exclusivamente para mostrarlas como información y no
+         * forman parte del promedio del parcial.
          */
-        $materiasPrincipales = $esPrimaria ?? false ? $filasMateriasRegulares ?? [] : $filasMaterias ?? [];
+        $materiasPrincipales = (($esPrimaria ?? false) || ($esBachillerato ?? false))
+            ? $filasMateriasRegulares ?? []
+            : $filasMaterias ?? [];
 
-        $materiasExtrasPrimaria = $esPrimaria ?? false ? $filasMateriasExtras ?? [] : [];
+        $materiasExtrasPrimaria = $esPrimaria ?? false
+            ? $filasMateriasExtras ?? []
+            : [];
+
+        $materiasExtrasBachillerato = $esBachillerato ?? false
+            ? $filasMateriasExtras ?? []
+            : [];
     @endphp
 
     <div class="section-title">
@@ -597,6 +606,7 @@
         </tbody>
     </table>
 
+    {{-- Primaria conserva su presentación previa. --}}
     @if (($esPrimaria ?? false) && count($materiasExtrasPrimaria) > 0)
         <div class="section-title" style="border-left-color: #c4b5fd; background: #f5f3ff;">
             Materias extra no consideradas en el promedio
@@ -646,6 +656,38 @@
 
         <div style="margin-top: 6px; font-size: 9px; color: #64748b;">
             Nota: estas materias se muestran como información adicional y no afectan el promedio general del alumno.
+        </div>
+    @endif
+
+    {{-- Bachillerato: tabla independiente, sin estado académico ni ponderación. --}}
+    @if (($esBachillerato ?? false) && count($materiasExtrasBachillerato) > 0)
+        <div class="section-title"
+            style="border-left-color: #8b5cf6; background: #f5f3ff; color: #5b21b6;">
+            Materias extra - información adicional
+        </div>
+
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th style="width: 18%;">Clave</th>
+                    <th style="width: 52%;">Materia extra</th>
+                    <th style="width: 30%;">Calificación</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($materiasExtrasBachillerato as $fila)
+                    <tr>
+                        <td class="text-center">{{ $fila['clave'] ?? '—' }}</td>
+                        <td class="materia">{{ $fila['materia'] ?? 'Materia extra' }}</td>
+                        <td class="text-center"><strong>{{ $fila['calificacion'] ?? '—' }}</strong></td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <div
+            style="margin-top: 6px; padding: 6px 8px; border:1px solid #ddd6fe; background:#faf5ff; font-size: 9px; color: #5b21b6;">
+            Nota: estas calificaciones son informativas y no afectan el promedio parcial, semestral o final, ni los lugares y reconocimientos.
         </div>
     @endif
 

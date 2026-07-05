@@ -316,7 +316,21 @@
 
         $cantidadColumnas = $esBachillerato ? 5 : 4;
 
-        $mostrarLeyendaCualitativa = collect($filasMaterias ?? [])->contains(function ($fila) {
+        $materiasPrincipales = $esBachillerato
+            ? collect($filasMaterias ?? [])
+                ->filter(fn($fila) => (int) ($fila['extra'] ?? 0) === 0)
+                ->values()
+            : collect($filasMaterias ?? []);
+
+        $materiasExtrasBachillerato = $esBachillerato
+            ? collect($filasMateriasExtras ?? [])->values()
+            : collect();
+
+        $materiasParaLeyenda = $materiasPrincipales
+            ->concat($materiasExtrasBachillerato)
+            ->values();
+
+        $mostrarLeyendaCualitativa = $materiasParaLeyenda->contains(function ($fila) {
             foreach ($fila['calificaciones'] ?? [] as $calificacionPeriodo) {
                 $valor = mb_strtoupper((string) ($calificacionPeriodo['calificacion'] ?? ''));
 
@@ -434,7 +448,7 @@
         </thead>
 
         <tbody>
-            @forelse ($filasMaterias as $fila)
+            @forelse ($materiasPrincipales as $fila)
                 @php
                     $badgeClass = 'badge-empty';
 
@@ -532,6 +546,49 @@
             </tr>
         </tfoot>
     </table>
+
+    @if ($esBachillerato && $materiasExtrasBachillerato->isNotEmpty())
+        <div class="section-title" style="margin-top: 10px; border-left-color:#8b5cf6; background:#f5f3ff; color:#5b21b6;">
+            Materias extra - calificaciones informativas
+        </div>
+
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">CLAVE</th>
+                    <th style="width: 32%;">MATERIA EXTRA</th>
+                    @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
+                        <th style="width: 14%;">
+                            {{ $periodoResumen['nombre'] ?? 'Parcial ' . $numeroPeriodo }}
+                        </th>
+                    @endforeach
+                    <th style="width: 16%;">PROMEDIO INFORMATIVO</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($materiasExtrasBachillerato as $fila)
+                    <tr>
+                        <td class="text-center">{{ $fila['clave'] ?? '—' }}</td>
+                        <td class="materia">{{ $fila['materia'] ?? 'Materia extra' }}</td>
+
+                        @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
+                            <td class="text-center">
+                                <strong>{{ $fila['calificaciones'][$numeroPeriodo]['calificacion'] ?? '—' }}</strong>
+                            </td>
+                        @endforeach
+
+                        <td class="text-center">
+                            <strong>{{ $formatearPromedio($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <div style="margin-top: 6px; padding: 6px 8px; border:1px solid #ddd6fe; background:#faf5ff; font-size:9px; color:#5b21b6;">
+            Nota: estas calificaciones no participan en los promedios parciales, semestral o final, ni modifican lugares y reconocimientos.
+        </div>
+    @endif
 
     @if ($mostrarLeyendaCualitativa)
         <table class="leyenda-cualitativa">

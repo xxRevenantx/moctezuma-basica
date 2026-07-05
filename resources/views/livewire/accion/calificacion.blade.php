@@ -1684,8 +1684,19 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 class="sticky left-[140px] z-20 min-w-[260px] bg-sky-700 px-4 py-3 text-left font-semibold text-white">
                                 ALUMNO</th>
                             @foreach ($materias as $m)
-                                <th class="min-w-[190px] px-4 py-2 text-center font-semibold text-white">
+                                <th @class([
+                                    'min-w-[190px] px-4 py-2 text-center font-semibold text-white',
+                                    'bg-violet-700/90' => $this->esBachillerato && !empty($m['extra']),
+                                ])>
                                     <div class="text-white">{{ mb_strtoupper($m['materia']) }}</div>
+
+                                    @if ($this->esBachillerato && !empty($m['extra']))
+                                        <span
+                                            class="mt-1 inline-flex rounded-full border border-violet-200/40 bg-white/15 px-2 py-0.5 text-[9px] font-black tracking-wide text-white">
+                                            EXTRA · NO PROMEDIA
+                                        </span>
+                                    @endif
+
                                     <div
                                         class="mt-1 text-[11px] leading-tight font-normal text-neutral-200 dark:text-neutral-300">
                                         {{ $m['profesor'] ?? 'SIN PROFESOR ASIGNADO' }}</div>
