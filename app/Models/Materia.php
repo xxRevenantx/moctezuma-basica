@@ -20,6 +20,7 @@ class Materia extends Model
         'campo_formativo_id',
         'materia',
         'clave',
+        'creditos_certificados',
         'slug',
         'calificable',
         'extra',
@@ -33,6 +34,7 @@ class Materia extends Model
         'extra' => 'boolean',
         'receso' => 'boolean',
         'participa_en_calificacion_oficial' => 'boolean',
+        'creditos_certificados' => 'decimal:2',
         'orden' => 'integer',
     ];
 

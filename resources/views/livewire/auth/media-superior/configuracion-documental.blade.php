@@ -16,12 +16,39 @@
             <div class="grid grid-cols-1 gap-5 p-5 sm:p-6 md:grid-cols-2 xl:grid-cols-3">
                 <flux:field><flux:label>Nombre oficial del plantel</flux:label><flux:input wire:model="nombre_plantel_oficial" placeholder="Vacío = usar Escuela.nombre" /><flux:error name="nombre_plantel_oficial" /></flux:field>
                 <flux:field><flux:label>Número de acuerdo</flux:label><flux:input wire:model="numero_acuerdo" placeholder="Ej. SEG/0031/2021" /><flux:error name="numero_acuerdo" /></flux:field>
+                <flux:field><flux:label>Fecha del acuerdo</flux:label><flux:input type="date" wire:model="fecha_acuerdo" /><flux:error name="fecha_acuerdo" /></flux:field>
                 <flux:field><flux:label>Modalidad</flux:label><flux:input wire:model="modalidad" /><flux:error name="modalidad" /></flux:field>
                 <flux:field><flux:label>Turno</flux:label><flux:input wire:model="turno" /><flux:error name="turno" /></flux:field>
+                <flux:field><flux:label>Calificación mínima</flux:label><flux:input type="number" min="0" max="10" step="0.01" wire:model="calificacion_minima" /><flux:error name="calificacion_minima" /></flux:field>
+                <flux:field><flux:label>Calificación máxima</flux:label><flux:input type="number" min="0" max="10" step="0.01" wire:model="calificacion_maxima" /><flux:error name="calificacion_maxima" /></flux:field>
+                <flux:field><flux:label>Mínima aprobatoria</flux:label><flux:input type="number" min="0" max="10" step="0.01" wire:model="minima_aprobatoria" /><flux:error name="minima_aprobatoria" /></flux:field>
                 <flux:field><flux:label>Localidad de expedición</flux:label><flux:input wire:model="localidad_expedicion" placeholder="Vacío = ciudad y estado de Escuela" /><flux:error name="localidad_expedicion" /></flux:field>
                 <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900"><input type="checkbox" wire:model="mostrar_materias_extra" class="rounded border-slate-300 text-[#006492]"><span><span class="block text-sm font-black text-slate-800 dark:text-slate-100">Mostrar materias extra</span><span class="block text-xs text-slate-500">Siempre separadas y sin promedio.</span></span></label>
                 <flux:field><flux:label>Ruta logo SEG</flux:label><flux:input wire:model="logo_seg_path" /><flux:error name="logo_seg_path" /></flux:field>
                 <flux:field><flux:label>Ruta logo plantel</flux:label><flux:input wire:model="logo_plantel_path" /><flux:error name="logo_plantel_path" /></flux:field>
+            </div>
+        </section>
+
+        <section class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div class="border-b border-slate-200 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/70 sm:p-6">
+                <h2 class="text-lg font-black text-slate-950 dark:text-white">Texto del certificado</h2>
+                <p class="mt-1 text-sm text-slate-500">Puedes personalizar la certificación sin tocar el código. Conserva las variables entre llaves.</p>
+            </div>
+            <div class="space-y-5 p-5 sm:p-6">
+                <div class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
+                    <p class="font-black">Variables disponibles</p>
+                    <p class="mt-1 text-xs leading-5">{NOMBRE}, {CURP}, {ACREDITACION}, {PLANTEL}, {ACUERDO}, {FECHA_ACUERDO}, {CCT}, {MODALIDAD}.</p>
+                </div>
+                <flux:field>
+                    <flux:label>Texto de certificación</flux:label>
+                    <flux:textarea wire:model="texto_certificado" rows="7" />
+                    <flux:error name="texto_certificado" />
+                </flux:field>
+                <flux:field>
+                    <flux:label>Leyenda inferior de legalización</flux:label>
+                    <flux:textarea wire:model="leyenda_certificado" rows="3" />
+                    <flux:error name="leyenda_certificado" />
+                </flux:field>
             </div>
         </section>
 

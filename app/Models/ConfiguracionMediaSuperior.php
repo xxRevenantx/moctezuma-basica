@@ -12,15 +12,25 @@ class ConfiguracionMediaSuperior extends Model
         'nivel_id',
         'nombre_plantel_oficial',
         'numero_acuerdo',
+        'fecha_acuerdo',
         'modalidad',
         'turno',
+        'calificacion_minima',
+        'calificacion_maxima',
+        'minima_aprobatoria',
         'localidad_expedicion',
         'logo_seg_path',
         'logo_plantel_path',
+        'texto_certificado',
+        'leyenda_certificado',
         'mostrar_materias_extra',
     ];
 
     protected $casts = [
+        'fecha_acuerdo' => 'date',
+        'calificacion_minima' => 'decimal:2',
+        'calificacion_maxima' => 'decimal:2',
+        'minima_aprobatoria' => 'decimal:2',
         'mostrar_materias_extra' => 'boolean',
     ];
 

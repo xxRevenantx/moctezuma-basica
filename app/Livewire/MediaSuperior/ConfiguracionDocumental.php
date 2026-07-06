@@ -20,11 +20,17 @@ class ConfiguracionDocumental extends Component
 {
     public string $nombre_plantel_oficial = '';
     public string $numero_acuerdo = 'SEG/0031/2021';
+    public string $fecha_acuerdo = '';
     public string $modalidad = 'Escolarizada';
     public string $turno = 'Matutino';
+    public string $calificacion_minima = '5';
+    public string $calificacion_maxima = '10';
+    public string $minima_aprobatoria = '6';
     public string $localidad_expedicion = '';
     public string $logo_seg_path = 'imagenes/logo-seg.png';
     public string $logo_plantel_path = 'imagenes/logo-letra.png';
+    public string $texto_certificado = '';
+    public string $leyenda_certificado = '';
     public bool $mostrar_materias_extra = true;
 
     /** @var array<string, array<string, mixed>> */
@@ -40,12 +46,18 @@ class ConfiguracionDocumental extends Component
 
         $this->nombre_plantel_oficial = (string) ($config->nombre_plantel_oficial ?: $escuela?->nombre);
         $this->numero_acuerdo = (string) ($config->numero_acuerdo ?: 'SEG/0031/2021');
+        $this->fecha_acuerdo = $config->fecha_acuerdo?->format('Y-m-d') ?: '';
         $this->modalidad = (string) ($config->modalidad ?: 'Escolarizada');
         $this->turno = (string) ($config->turno ?: 'Matutino');
+        $this->calificacion_minima = (string) ($config->calificacion_minima ?? 5);
+        $this->calificacion_maxima = (string) ($config->calificacion_maxima ?? 10);
+        $this->minima_aprobatoria = (string) ($config->minima_aprobatoria ?? 6);
         $this->localidad_expedicion = (string) ($config->localidad_expedicion
             ?: collect([$escuela?->ciudad, $escuela?->estado])->filter()->implode(', '));
         $this->logo_seg_path = (string) ($config->logo_seg_path ?: 'imagenes/logo-seg.png');
         $this->logo_plantel_path = (string) ($config->logo_plantel_path ?: 'imagenes/logo-letra.png');
+        $this->texto_certificado = (string) ($config->texto_certificado ?: $this->textoCertificadoPredeterminado());
+        $this->leyenda_certificado = (string) ($config->leyenda_certificado ?: $this->leyendaCertificadoPredeterminada());
         $this->mostrar_materias_extra = (bool) ($config->mostrar_materias_extra ?? true);
 
         $cicloActualId = cicloEscolar::query()->where('es_actual', true)->value('id')
@@ -112,11 +124,17 @@ class ConfiguracionDocumental extends Component
         $this->validate([
             'nombre_plantel_oficial' => ['nullable', 'string', 'max:255'],
             'numero_acuerdo' => ['nullable', 'string', 'max:120'],
+            'fecha_acuerdo' => ['nullable', 'date'],
             'modalidad' => ['required', 'string', 'max:80'],
             'turno' => ['required', 'string', 'max:80'],
+            'calificacion_minima' => ['required', 'numeric', 'min:0', 'max:10', 'lt:calificacion_maxima'],
+            'calificacion_maxima' => ['required', 'numeric', 'min:0', 'max:10', 'gt:calificacion_minima'],
+            'minima_aprobatoria' => ['required', 'numeric', 'gte:calificacion_minima', 'lte:calificacion_maxima'],
             'localidad_expedicion' => ['nullable', 'string', 'max:255'],
             'logo_seg_path' => ['nullable', 'string', 'max:255'],
             'logo_plantel_path' => ['nullable', 'string', 'max:255'],
+            'texto_certificado' => ['required', 'string', 'max:4000'],
+            'leyenda_certificado' => ['required', 'string', 'max:1000'],
             'mostrar_materias_extra' => ['boolean'],
             'firmantes.*.tipo' => ['required', 'in:director,persona'],
             'firmantes.*.id' => ['nullable', 'integer'],
@@ -133,11 +151,17 @@ class ConfiguracionDocumental extends Component
                 [
                     'nombre_plantel_oficial' => $this->vacioANull($this->nombre_plantel_oficial),
                     'numero_acuerdo' => $this->vacioANull($this->numero_acuerdo),
+                    'fecha_acuerdo' => $this->vacioANull($this->fecha_acuerdo),
                     'modalidad' => $this->modalidad,
                     'turno' => $this->turno,
+                    'calificacion_minima' => (float) $this->calificacion_minima,
+                    'calificacion_maxima' => (float) $this->calificacion_maxima,
+                    'minima_aprobatoria' => (float) $this->minima_aprobatoria,
                     'localidad_expedicion' => $this->vacioANull($this->localidad_expedicion),
                     'logo_seg_path' => $this->vacioANull($this->logo_seg_path),
                     'logo_plantel_path' => $this->vacioANull($this->logo_plantel_path),
+                    'texto_certificado' => trim($this->texto_certificado),
+                    'leyenda_certificado' => trim($this->leyenda_certificado),
                     'mostrar_materias_extra' => $this->mostrar_materias_extra,
                 ],
             );
@@ -228,6 +252,21 @@ class ConfiguracionDocumental extends Component
         if ($errores !== []) {
             throw ValidationException::withMessages($errores);
         }
+    }
+
+    private function textoCertificadoPredeterminado(): string
+    {
+        return <<<'TEXT'
+CERTIFICA QUE: {NOMBRE}
+CON CLAVE ÚNICA DE REGISTRO DE POBLACIÓN (CURP) {CURP}
+CURSÓ Y ACREDITÓ {ACREDITACION} EL BACHILLERATO GENERAL
+CON RECONOCIMIENTO DE VALIDEZ OFICIAL DE LA SECRETARÍA DE EDUCACIÓN GUERRERO, SEGÚN ACUERDO: {ACUERDO}, DE FECHA {FECHA_ACUERDO} Y CLAVE DE CENTRO DE TRABAJO {CCT}.
+TEXT;
+    }
+
+    private function leyendaCertificadoPredeterminada(): string
+    {
+        return 'ESTE CERTIFICADO REQUIERE DE TRÁMITES ADICIONALES DE LEGALIZACIÓN, NO ES VÁLIDO SI PRESENTA BORRADURAS O ENMENDADURAS.';
     }
 
     private function vacioANull(?string $valor): ?string

@@ -40,6 +40,7 @@ class CrearMateria extends Component
 
     public string $materia = '';
     public ?string $clave = null;
+    public $creditos_certificados = null;
     public string $slug = '';
 
     public bool $calificable = true;
@@ -320,6 +321,14 @@ class CrearMateria extends Component
                 'max:50',
             ],
 
+            'creditos_certificados' => [
+                Rule::requiredIf($this->esBachilleratoFormulario && $this->calificable && ! $this->extra && ! $this->receso),
+                'nullable',
+                'numeric',
+                'gt:0',
+                'max:9999.99',
+            ],
+
             'slug' => [
                 'required',
                 'string',
@@ -375,6 +384,10 @@ class CrearMateria extends Component
             'materia.max' => 'El nombre de la materia no debe pasar de 150 caracteres.',
 
             'clave.max' => 'La clave no debe pasar de 50 caracteres.',
+            'creditos_certificados.required' => 'Captura los créditos del certificado para la materia oficial de bachillerato.',
+            'creditos_certificados.numeric' => 'Los créditos deben ser un número.',
+            'creditos_certificados.gt' => 'Los créditos deben ser mayores que cero.',
+            'creditos_certificados.max' => 'Los créditos no pueden ser mayores a 9999.99.',
 
             'slug.required' => 'El slug es obligatorio.',
             'slug.alpha_dash' => 'El slug solo puede llevar letras, números, guiones y guiones bajos.',
@@ -430,6 +443,9 @@ class CrearMateria extends Component
         $this->materia = trim($this->materia);
         $this->slug = Str::slug($this->slug ?: $this->materia);
         $this->clave = filled($this->clave) ? mb_strtoupper(trim($this->clave)) : null;
+        $this->creditos_certificados = filled($this->creditos_certificados)
+            ? (float) $this->creditos_certificados
+            : null;
 
         $this->calificable = (bool) $this->calificable;
         $this->extra = (bool) $this->extra;
@@ -462,6 +478,7 @@ class CrearMateria extends Component
 
             $this->semestre_id = null;
             $this->clave = null;
+            $this->creditos_certificados = null;
         }
 
         $this->validate($this->rulesMateria());
@@ -483,6 +500,9 @@ class CrearMateria extends Component
             'campo_formativo_id' => $this->campo_formativo_id,
             'materia' => $this->materia,
             'clave' => $this->esBachilleratoFormulario ? $this->clave : null,
+            'creditos_certificados' => $this->esBachilleratoFormulario && $this->calificable && ! $this->extra && ! $this->receso
+                ? $this->creditos_certificados
+                : null,
             'slug' => $this->slug,
             'calificable' => $this->calificable ? 1 : 0,
             'extra' => $this->extra ? 1 : 0,
@@ -585,6 +605,9 @@ class CrearMateria extends Component
 
         $this->materia = $materia->materia;
         $this->clave = $materia->clave;
+        $this->creditos_certificados = $materia->creditos_certificados !== null
+            ? (float) $materia->creditos_certificados
+            : null;
         $this->slug = $materia->slug;
         $this->calificable = (bool) $materia->calificable;
         $this->extra = (bool) $materia->extra;
@@ -660,6 +683,7 @@ class CrearMateria extends Component
 
         $this->materia = '';
         $this->clave = null;
+        $this->creditos_certificados = null;
         $this->slug = '';
 
         $this->calificable = true;

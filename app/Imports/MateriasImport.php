@@ -36,6 +36,9 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 'campo_formativo_id' => $row['campo_formativo_id'] ?? null,
                 'materia' => trim((string) ($row['materia'] ?? '')),
                 'clave' => trim((string) ($row['clave'] ?? '')),
+                'creditos_certificados' => filled($row['creditos_certificados'] ?? null)
+                    ? (float) $row['creditos_certificados']
+                    : null,
                 'slug' => trim((string) ($row['slug'] ?? '')),
                 'calificable' => $this->convertirBooleano($row['calificable'] ?? 0),
                 'extra' => $this->convertirBooleano($row['extra'] ?? 0),
@@ -77,6 +80,12 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'nullable',
                     'string',
                     'max:50',
+                ],
+                'creditos_certificados' => [
+                    'nullable',
+                    'numeric',
+                    'gt:0',
+                    'max:9999.99',
                 ],
                 'slug' => [
                     'required',
@@ -145,6 +154,15 @@ class MateriasImport implements ToCollection, WithHeadingRow
 
             if (ReglasMateriaBachillerato::esBachillerato($datos['nivel_id'])) {
                 $datos = ReglasMateriaBachillerato::normalizarAtributos($datos);
+
+                if (ReglasMateriaBachillerato::esPromediable($datos) && ! is_numeric($datos['creditos_certificados'])) {
+                    $this->errores[] = [
+                        'fila' => $filaExcel,
+                        'errores' => ['Las materias oficiales de bachillerato requieren creditos_certificados.'],
+                    ];
+
+                    continue;
+                }
             } else {
                 if ((bool) $datos['receso']) {
                     $datos['calificable'] = false;
@@ -155,6 +173,8 @@ class MateriasImport implements ToCollection, WithHeadingRow
                 if (! (bool) $datos['calificable'] || (bool) $datos['extra']) {
                     $datos['participa_en_calificacion_oficial'] = false;
                 }
+
+                $datos['creditos_certificados'] = null;
             }
 
             if (blank($datos['campo_formativo_id'])) {
@@ -174,6 +194,7 @@ class MateriasImport implements ToCollection, WithHeadingRow
                     'campo_formativo_id' => $datos['campo_formativo_id'],
                     'materia' => $datos['materia'],
                     'clave' => $datos['clave'] !== '' ? Str::upper($datos['clave']) : null,
+                    'creditos_certificados' => $datos['creditos_certificados'],
                     'calificable' => $datos['calificable'],
                     'extra' => $datos['extra'],
                     'receso' => $datos['receso'],

@@ -20,7 +20,6 @@ use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
 
 class DocumentosOficialesController extends Controller
@@ -51,7 +50,7 @@ class DocumentosOficialesController extends Controller
         try {
             $datos = $this->construirDatos($request, $tipo, $service);
         } catch (RuntimeException $exception) {
-            abort(422, $exception->getMessage());
+            return $this->redirigirConErrorDocumento($tipo, $exception->getMessage());
         }
 
         $nombre = $this->nombreArchivo($tipo, $datos, $formato);
@@ -80,15 +79,27 @@ class DocumentosOficialesController extends Controller
         Request $request,
         string $tipo,
         DocumentosOficialesService $service,
-    ): BinaryFileResponse {
+    ) {
         abort_unless(Auth::user()?->is_admin, 403);
         abort_unless(in_array($tipo, $this->tipos(), true), 404);
 
         $formato = $request->string('formato')->lower()->toString() ?: 'pdf';
-        abort_unless(in_array($formato, ['pdf', 'word'], true), 422, 'El ZIP solo admite PDF o Word.');
+        if (! in_array($formato, ['pdf', 'word'], true)) {
+            return $this->redirigirConErrorDocumento($tipo, 'El ZIP solo admite documentos en formato PDF o Word.');
+        }
 
-        $lote = $this->construirLote($request, $tipo, $service);
-        abort_if($lote === [], 422, 'No hay documentos disponibles con los filtros seleccionados.');
+        try {
+            $lote = $this->construirLote($request, $tipo, $service);
+        } catch (RuntimeException $exception) {
+            return $this->redirigirConErrorDocumento($tipo, $exception->getMessage());
+        }
+
+        if ($lote === []) {
+            return $this->redirigirConErrorDocumento(
+                $tipo,
+                'No hay documentos disponibles con los filtros seleccionados.'
+            );
+        }
 
         $directorio = storage_path('app/temp');
         File::ensureDirectoryExists($directorio);
@@ -251,13 +262,15 @@ class DocumentosOficialesController extends Controller
             : ['pageSizeW' => 12240, 'pageSizeH' => 15840, 'marginTop' => 500, 'marginBottom' => 500, 'marginLeft' => 600, 'marginRight' => 600];
         $section = $phpWord->addSection($sectionStyle);
 
-        $this->encabezadoWord($section, $datos['institucional'] ?? []);
+        if ($tipo !== DocumentosOficialesService::TIPO_CERTIFICADO) {
+            $this->encabezadoWord($section, $datos['institucional'] ?? []);
+        }
 
         match ($tipo) {
             DocumentosOficialesService::TIPO_REGISTRO => $this->wordRegistro($section, $datos),
             DocumentosOficialesService::TIPO_ACTA => $this->wordActa($section, $datos),
             DocumentosOficialesService::TIPO_KARDEX => $this->wordKardex($section, $datos),
-            DocumentosOficialesService::TIPO_CERTIFICADO => $this->wordCertificado($section, $datos),
+            DocumentosOficialesService::TIPO_CERTIFICADO => $this->wordCertificado($phpWord, $section, $datos, $sectionStyle),
             default => null,
         };
 
@@ -280,8 +293,8 @@ class DocumentosOficialesController extends Controller
         $centro->addText('SISTEMA EDUCATIVO ESTATAL', ['bold' => true, 'size' => 11], ['alignment' => Jc::CENTER]);
         $centro->addText(Str::upper($institucional['plantel'] ?? ''), ['bold' => true, 'size' => 9], ['alignment' => Jc::CENTER]);
         $derecha = $tabla->addCell(1800);
-        if (is_file($institucional['logo_plantel'] ?? '')) {
-            $derecha->addImage($institucional['logo_plantel'], ['width' => 125, 'height' => 42]);
+        if (is_file($institucional['logo_certificado'] ?? '')) {
+            $derecha->addImage($institucional['logo_certificado'], ['width' => 125, 'height' => 42]);
         }
         $section->addTextBreak(1);
     }
@@ -341,22 +354,134 @@ class DocumentosOficialesController extends Controller
         $section->addText('PROMEDIO GENERAL: ' . $datos['promedio_general'], ['bold' => true, 'size' => 10], ['alignment' => Jc::RIGHT]);
     }
 
-    private function wordCertificado($section, array $datos): void
+    private function wordCertificado(PhpWord $phpWord, $section, array $datos, array $sectionStyle): void
     {
-        $section->addText('CERTIFICADO ' . Str::upper($datos['modalidad_certificado']), ['bold' => true, 'size' => 13], ['alignment' => Jc::CENTER]);
-        $section->addText('FOLIO: ' . $datos['folio'], ['bold' => true, 'size' => 9], ['alignment' => Jc::RIGHT]);
-        $this->wordAlumno($section, $datos['alumno']);
-        foreach ($datos['semestres_certificados'] as $semestre) {
-            $section->addText($semestre['numero'] . '° SEMESTRE · ' . ($semestre['ciclo']?->nombre ?: ''), ['bold' => true, 'size' => 9]);
-            $this->wordTablaMaterias($section, $semestre['oficiales'], false);
-            if (($datos['institucional']['mostrar_materias_extra'] ?? true) && $semestre['extras']->isNotEmpty()) {
-                $section->addText('MATERIAS EXTRA INFORMATIVAS · NO PROMEDIAN', ['bold' => true, 'color' => '8A5A00']);
-                $this->wordTablaMaterias($section, $semestre['extras'], true);
+        $institucional = $datos['institucional'] ?? [];
+
+        $encabezado = $section->addTable(['width' => 100 * 50, 'unit' => 'pct', 'borderSize' => 0]);
+        $encabezado->addRow();
+        $izquierda = $encabezado->addCell(3400);
+        if (is_file($institucional['logo_seg'] ?? '')) {
+            $izquierda->addImage($institucional['logo_seg'], ['width' => 128, 'height' => 47]);
+        }
+        $encabezado->addCell(2800);
+        $derecha = $encabezado->addCell(3400);
+        if (is_file($institucional['logo_plantel'] ?? '')) {
+            $derecha->addImage($institucional['logo_plantel'], ['width' => 150, 'height' => 46, 'alignment' => Jc::RIGHT]);
+        }
+
+        $section->addText('CERTIFICACIÓN DE ESTUDIOS', ['size' => 15], ['alignment' => Jc::CENTER, 'spaceBefore' => 120, 'spaceAfter' => 80]);
+        $section->addText(Str::upper($institucional['plantel'] ?? ''), ['size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 220]);
+
+        foreach (preg_split('/\R/u', (string) ($datos['texto_certificado_renderizado'] ?? '')) ?: [] as $linea) {
+            $section->addText(trim($linea), ['size' => 6.5], ['alignment' => Jc::LEFT, 'spaceAfter' => 15]);
+        }
+        $section->addTextBreak(1);
+
+        $tablaSemestres = $section->addTable([
+            'width' => 100 * 50,
+            'unit' => 'pct',
+            'borderSize' => 5,
+            'borderColor' => '000000',
+            'cellMargin' => 18,
+        ]);
+        $tablaSemestres->addRow();
+        $celdaIzquierda = $tablaSemestres->addCell(4800, ['valign' => 'top']);
+        $celdaDerecha = $tablaSemestres->addCell(4800, ['valign' => 'top']);
+        $this->wordColumnaCertificado($celdaIzquierda, $datos['semestres_certificado_izquierda'] ?? []);
+        $this->wordColumnaCertificado($celdaDerecha, $datos['semestres_certificado_derecha'] ?? []);
+
+        $section->addTextBreak(1);
+        $section->addText((string) ($datos['resumen_certificado'] ?? ''), ['size' => 6.5], ['alignment' => Jc::BOTH, 'spaceAfter' => 70]);
+        $section->addText(
+            'EXPEDIDO EN ' . Str::upper($institucional['localidad_expedicion'] ?? '')
+            . ', A LOS ' . ($datos['fecha_documento_texto_letra'] ?? '') . '.',
+            ['size' => 6.5],
+            ['alignment' => Jc::LEFT, 'spaceAfter' => 550],
+        );
+
+        $section->addText('______________________________', ['size' => 7], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+        $section->addText($institucional['firmantes']['director']['nombre'] ?? 'SIN CONFIGURAR', ['size' => 6.5], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+        $section->addText($institucional['firmantes']['director']['cargo'] ?? 'DIRECTOR(A) DEL PLANTEL', ['size' => 6.5], ['alignment' => Jc::CENTER]);
+
+        $segunda = $phpWord->addSection(array_merge($sectionStyle, ['breakType' => 'nextPage']));
+        $cajas = $segunda->addTable(['width' => 100 * 50, 'unit' => 'pct', 'borderSize' => 0, 'cellMargin' => 0]);
+        $cajas->addRow();
+        $izq = $cajas->addCell(4800, ['valign' => 'top']);
+        $cajas->addCell(700);
+        $der = $cajas->addCell(4800, ['valign' => 'top']);
+
+        $cajaIzq = $izq->addTable(['borderSize' => 5, 'borderColor' => '000000', 'cellMargin' => 60]);
+        $cajaIzq->addRow(2450, ['exactHeight' => true]);
+        $celda = $cajaIzq->addCell(4500, ['valign' => 'top']);
+        $celda->addText('REVISADO Y CONFRONTADO POR:', ['size' => 7], ['alignment' => Jc::CENTER]);
+        $celda->addTextBreak(5);
+        $celda->addText(Str::upper((string) ($datos['certificado_revisado_por'] ?? '')), ['size' => 6.5], ['alignment' => Jc::CENTER]);
+        $celda->addText('FECHA:', ['size' => 6.5], ['alignment' => Jc::LEFT]);
+
+        $cajaDer = $der->addTable(['borderSize' => 5, 'borderColor' => '000000', 'cellMargin' => 60]);
+        $cajaDer->addRow(2450, ['exactHeight' => true]);
+        $celda = $cajaDer->addCell(4500, ['valign' => 'top']);
+        $celda->addText('JEFE DEL DEPARTAMENTO DE REGISTRO', ['size' => 7], ['alignment' => Jc::CENTER]);
+        $celda->addText('Y CERTIFICACIÓN', ['size' => 7], ['alignment' => Jc::CENTER]);
+        $celda->addTextBreak(5);
+        $celda->addText(Str::upper((string) ($datos['certificado_jefe_registro_por'] ?? '')), ['size' => 6.5], ['alignment' => Jc::CENTER]);
+
+        $segunda->addText('', [], ['spaceBefore' => 7600, 'spaceAfter' => 0]);
+        $folioTabla = $segunda->addTable(['borderSize' => 5, 'borderColor' => '000000', 'cellMargin' => 45]);
+        $folioTabla->addRow(650, ['exactHeight' => true]);
+        $folioCelda = $folioTabla->addCell(1800, ['valign' => 'center']);
+        $folioCelda->addText('FOLIO', ['size' => 8], ['alignment' => Jc::CENTER]);
+        $folioCelda->addText((string) ($datos['folio'] ?? ''), ['bold' => true, 'size' => 8], ['alignment' => Jc::CENTER]);
+
+        $footer = $segunda->addFooter();
+        $footer->addText(
+            Str::upper((string) ($institucional['leyenda_certificado'] ?? '')),
+            ['size' => 4.5],
+            ['alignment' => Jc::LEFT],
+        );
+    }
+
+    private function wordColumnaCertificado($celda, iterable $semestres): void
+    {
+        $tabla = $celda->addTable([
+            'width' => 100 * 50,
+            'unit' => 'pct',
+            'borderSize' => 4,
+            'borderColor' => '000000',
+            'cellMargin' => 18,
+        ]);
+        $tabla->addRow(280, ['exactHeight' => true]);
+        $tabla->addCell(3000)->addText('ASIGNATURAS', ['bold' => true, 'size' => 5.5], ['alignment' => Jc::CENTER]);
+        $tabla->addCell(700)->addText('CALIF. FINAL', ['bold' => true, 'size' => 5], ['alignment' => Jc::CENTER]);
+        $tabla->addCell(1000)->addText('OBSERVACIONES', ['bold' => true, 'size' => 5], ['alignment' => Jc::CENTER]);
+
+        $ordinales = [1 => 'PRIMER', 2 => 'SEGUNDO', 3 => 'TERCER', 4 => 'CUARTO', 5 => 'QUINTO', 6 => 'SEXTO'];
+        foreach ($semestres as $semestre) {
+            $tabla->addRow(310, ['exactHeight' => true]);
+            $titulo = $tabla->addCell(4700, ['gridSpan' => 3, 'valign' => 'center']);
+            $texto = ($ordinales[$semestre['numero']] ?? $semestre['numero'] . '°') . ' SEMESTRE';
+            if ($semestre['incluido']) {
+                $texto .= ' - CICLO ESCOLAR ' . ($semestre['ciclo']?->nombre ?: '');
+            }
+            $titulo->addText($texto, ['bold' => true, 'size' => 5.2], ['alignment' => Jc::CENTER]);
+
+            if (! $semestre['incluido']) {
+                $tabla->addRow(1250, ['exactHeight' => true]);
+                $vacia = $tabla->addCell(4700, ['gridSpan' => 3, 'valign' => 'center']);
+                $vacia->addText('\\', ['size' => 46], ['alignment' => Jc::CENTER]);
+                continue;
+            }
+
+            $materias = collect($semestre['oficiales'] ?? []);
+            $tamano = $materias->count() > 10 ? 4.2 : ($materias->count() > 8 ? 4.8 : 5.3);
+            foreach ($materias as $materia) {
+                $tabla->addRow(120, ['exactHeight' => true]);
+                $tabla->addCell(3000)->addText(Str::upper((string) $materia['nombre']), ['size' => $tamano]);
+                $tabla->addCell(700)->addText((string) $materia['valor'], ['size' => $tamano], ['alignment' => Jc::CENTER]);
+                $tabla->addCell(1000)->addText('', ['size' => $tamano]);
             }
         }
-        $section->addText('PROMEDIO: ' . $datos['promedio_certificado'], ['bold' => true, 'size' => 11], ['alignment' => Jc::RIGHT]);
-        $section->addText('SE EXPIDE EN ' . Str::upper($datos['institucional']['localidad_expedicion'] ?? '') . ', A ' . ($datos['fecha_documento_texto'] ?? ''), [], ['alignment' => Jc::RIGHT]);
-        $this->firmasWord($section, Arr::only($datos['institucional']['firmantes'] ?? [], ['director', 'jefe_registro']));
     }
 
     private function wordContexto($section, array $datos): void
@@ -480,6 +605,8 @@ class DocumentosOficialesController extends Controller
             'estatus' => $request->string('estatus')->toString() ?: 'todos',
             'modalidad' => $request->string('modalidad')->toString() ?: 'parcial',
             'fecha_documento' => $request->date('fecha_documento')?->format('Y-m-d') ?: now()->format('Y-m-d'),
+            'certificado_revisado_por' => trim($request->string('certificado_revisado_por')->toString()),
+            'certificado_jefe_registro_por' => trim($request->string('certificado_jefe_registro_por')->toString()),
         ];
     }
 
@@ -501,8 +628,21 @@ class DocumentosOficialesController extends Controller
             9 => 'SEPTIEMBRE', 10 => 'OCTUBRE', 11 => 'NOVIEMBRE', 12 => 'DICIEMBRE',
         ];
 
+        if (array_key_exists('modalidad_certificado', $datos)) {
+            $revisadoPor = trim((string) ($filtros['certificado_revisado_por'] ?? ''));
+            $jefeRegistro = trim((string) ($filtros['certificado_jefe_registro_por'] ?? ''));
+
+            if ($revisadoPor === '' || $jefeRegistro === '') {
+                throw new RuntimeException('Captura los nombres de Revisado y confrontado por y del Jefe del Departamento de Registro y Certificación.');
+            }
+
+            $datos['certificado_revisado_por'] = $revisadoPor;
+            $datos['certificado_jefe_registro_por'] = $jefeRegistro;
+        }
+
         $datos['fecha_documento'] = $fecha->copy()->startOfDay();
         $datos['fecha_documento_corta'] = $fecha->format('d/m/Y');
+        $datos['fecha_documento_texto_letra'] = $this->fechaDocumentoEnLetras($fecha);
         $datos['fecha_documento_texto'] = sprintf(
             '%02d DE %s DE %04d',
             $fecha->day,
@@ -511,6 +651,90 @@ class DocumentosOficialesController extends Controller
         );
 
         return $datos;
+    }
+
+    private function fechaDocumentoEnLetras(Carbon $fecha): string
+    {
+        $dias = [
+            1 => 'UN', 2 => 'DOS', 3 => 'TRES', 4 => 'CUATRO', 5 => 'CINCO', 6 => 'SEIS',
+            7 => 'SIETE', 8 => 'OCHO', 9 => 'NUEVE', 10 => 'DIEZ', 11 => 'ONCE', 12 => 'DOCE',
+            13 => 'TRECE', 14 => 'CATORCE', 15 => 'QUINCE', 16 => 'DIECISÉIS', 17 => 'DIECISIETE',
+            18 => 'DIECIOCHO', 19 => 'DIECINUEVE', 20 => 'VEINTE', 21 => 'VEINTIÚN',
+            22 => 'VEINTIDÓS', 23 => 'VEINTITRÉS', 24 => 'VEINTICUATRO', 25 => 'VEINTICINCO',
+            26 => 'VEINTISÉIS', 27 => 'VEINTISIETE', 28 => 'VEINTIOCHO', 29 => 'VEINTINUEVE',
+            30 => 'TREINTA', 31 => 'TREINTA Y UN',
+        ];
+        $meses = [
+            1 => 'ENERO', 2 => 'FEBRERO', 3 => 'MARZO', 4 => 'ABRIL',
+            5 => 'MAYO', 6 => 'JUNIO', 7 => 'JULIO', 8 => 'AGOSTO',
+            9 => 'SEPTIEMBRE', 10 => 'OCTUBRE', 11 => 'NOVIEMBRE', 12 => 'DICIEMBRE',
+        ];
+
+        return sprintf(
+            '%s DÍAS DEL MES DE %s DEL AÑO %s',
+            $dias[$fecha->day] ?? $this->numeroEnLetras($fecha->day),
+            $meses[$fecha->month],
+            $this->numeroEnLetras($fecha->year),
+        );
+    }
+
+    private function numeroEnLetras(int $numero): string
+    {
+        if ($numero === 0) {
+            return 'CERO';
+        }
+
+        if ($numero >= 1000) {
+            $miles = intdiv($numero, 1000);
+            $resto = $numero % 1000;
+            $prefijo = $miles === 1 ? 'MIL' : $this->numeroEnLetras($miles) . ' MIL';
+
+            return trim($prefijo . ($resto ? ' ' . $this->numeroEnLetras($resto) : ''));
+        }
+
+        if ($numero >= 100) {
+            if ($numero === 100) {
+                return 'CIEN';
+            }
+            $centenas = [1 => 'CIENTO', 2 => 'DOSCIENTOS', 3 => 'TRESCIENTOS', 4 => 'CUATROCIENTOS', 5 => 'QUINIENTOS', 6 => 'SEISCIENTOS', 7 => 'SETECIENTOS', 8 => 'OCHOCIENTOS', 9 => 'NOVECIENTOS'];
+            $centena = intdiv($numero, 100);
+            $resto = $numero % 100;
+
+            return trim($centenas[$centena] . ($resto ? ' ' . $this->numeroEnLetras($resto) : ''));
+        }
+
+        $especiales = [
+            1 => 'UNO', 2 => 'DOS', 3 => 'TRES', 4 => 'CUATRO', 5 => 'CINCO', 6 => 'SEIS', 7 => 'SIETE',
+            8 => 'OCHO', 9 => 'NUEVE', 10 => 'DIEZ', 11 => 'ONCE', 12 => 'DOCE', 13 => 'TRECE',
+            14 => 'CATORCE', 15 => 'QUINCE', 16 => 'DIECISÉIS', 17 => 'DIECISIETE', 18 => 'DIECIOCHO',
+            19 => 'DIECINUEVE', 20 => 'VEINTE', 21 => 'VEINTIUNO', 22 => 'VEINTIDÓS', 23 => 'VEINTITRÉS',
+            24 => 'VEINTICUATRO', 25 => 'VEINTICINCO', 26 => 'VEINTISÉIS', 27 => 'VEINTISIETE',
+            28 => 'VEINTIOCHO', 29 => 'VEINTINUEVE',
+        ];
+
+        if (isset($especiales[$numero])) {
+            return $especiales[$numero];
+        }
+
+        $decenas = [3 => 'TREINTA', 4 => 'CUARENTA', 5 => 'CINCUENTA', 6 => 'SESENTA', 7 => 'SETENTA', 8 => 'OCHENTA', 9 => 'NOVENTA'];
+        $decena = intdiv($numero, 10);
+        $unidad = $numero % 10;
+
+        return $decenas[$decena] . ($unidad ? ' Y ' . $this->numeroEnLetras($unidad) : '');
+    }
+
+    private function redirigirConErrorDocumento(string $tipo, string $mensaje)
+    {
+        return redirect()
+            ->route('media-superior.documentos.modulo', ['modulo' => $tipo])
+            ->with('documento_oficial_error', [
+                'tipo' => 'error',
+                'titulo' => 'No fue posible generar el documento',
+                'mensaje' => $mensaje,
+                'detalles' => [
+                    'Corrige la información indicada y vuelve a intentar la descarga.',
+                ],
+            ]);
     }
 
     private function validarTipoFormato(string $tipo, string $formato): void

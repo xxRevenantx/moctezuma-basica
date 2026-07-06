@@ -11,6 +11,7 @@ use App\Models\FirmanteMediaSuperior;
 use App\Models\Generacion;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\Materia;
 use App\Models\MateriaPromediar;
 use App\Models\Nivel;
 use App\Models\Persona;
@@ -204,8 +205,13 @@ class DocumentosOficialesService
             'plantel' => $config?->nombre_plantel_oficial ?: $escuela?->nombre ?: 'Centro Universitario Moctezuma',
             'cct' => $nivel->cct,
             'numero_acuerdo' => $config?->numero_acuerdo,
+            'fecha_acuerdo' => $config?->fecha_acuerdo,
+            'fecha_acuerdo_texto' => $this->fechaAcuerdoTexto($config?->fecha_acuerdo),
             'modalidad' => $config?->modalidad ?: 'Escolarizada',
             'turno' => $config?->turno ?: 'Matutino',
+            'calificacion_minima' => (float) ($config?->calificacion_minima ?? 5),
+            'calificacion_maxima' => (float) ($config?->calificacion_maxima ?? 10),
+            'minima_aprobatoria' => (float) ($config?->minima_aprobatoria ?? 6),
             'direccion' => $direccion,
             'calle' => $escuela?->calle,
             'numero' => $escuela?->no_exterior,
@@ -219,6 +225,11 @@ class DocumentosOficialesService
                 ?: collect([$escuela?->ciudad, $escuela?->estado])->filter()->implode(', '),
             'logo_seg' => $this->rutaPublica($config?->logo_seg_path, 'imagenes/logo-seg.png'),
             'logo_plantel' => $this->rutaPublica($config?->logo_plantel_path, 'imagenes/logo-letra.png'),
+            'logo_certificado' => is_file(public_path('logo.png'))
+                ? public_path('logo.png')
+                : $this->rutaPublica($config?->logo_plantel_path, 'imagenes/logo-letra.png'),
+            'texto_certificado' => $config?->texto_certificado ?: $this->textoCertificadoPredeterminado(),
+            'leyenda_certificado' => $config?->leyenda_certificado ?: $this->leyendaCertificadoPredeterminada(),
             'mostrar_materias_extra' => (bool) ($config?->mostrar_materias_extra ?? true),
             'firmantes' => [
                 'director' => $this->resolverFirmante(FirmanteMediaSuperior::ROL_DIRECTOR, $cicloId, $nivel),
@@ -603,11 +614,11 @@ class DocumentosOficialesService
         $definitivoDisponible = $acreditados->pluck('numero')->unique()->sort()->values()->all() === [1, 2, 3, 4, 5, 6];
         $parcialDisponible = $acreditados->isNotEmpty();
 
-        if ($modalidad === 'definitivo' && !$definitivoDisponible) {
+        if ($modalidad === 'definitivo' && ! $definitivoDisponible) {
             throw new RuntimeException('El certificado definitivo requiere los seis semestres completos y acreditados.');
         }
 
-        if ($modalidad === 'parcial' && !$parcialDisponible) {
+        if ($modalidad === 'parcial' && ! $parcialDisponible) {
             throw new RuntimeException('El certificado parcial requiere por lo menos un semestre completo y acreditado.');
         }
 
@@ -624,19 +635,133 @@ class DocumentosOficialesService
             throw new RuntimeException('El folio de inscripciones está asignado a más de un alumno. Corrige la duplicidad antes de emitir el certificado.');
         }
 
+        $nivel = $this->nivel();
+        $consultaPlan = Materia::query()
+            ->with('semestre:id,numero')
+            ->where('nivel_id', $nivel->id)
+            ->whereHas('semestre', fn (Builder $query) => $query->whereBetween('numero', [1, 6]));
+        ReglasMateriaBachillerato::aplicarPromediables($consultaPlan, '');
+
+        $materiasPlan = $consultaPlan
+            ->orderBy('semestre_id')
+            ->orderBy('orden')
+            ->orderBy('materia')
+            ->get();
+
+        $semestresSinPlan = collect(range(1, 6))
+            ->reject(fn (int $numero) => $materiasPlan->contains(
+                fn (Materia $materia) => (int) $materia->semestre?->numero === $numero
+            ))
+            ->values();
+
+        if ($semestresSinPlan->isNotEmpty()) {
+            throw new RuntimeException(
+                'El plan de estudios está incompleto. No hay materias oficiales configuradas para: '
+                . $semestresSinPlan->map(fn (int $numero) => $numero . '° semestre')->implode(', ')
+                . '.'
+            );
+        }
+
+        $sinCreditos = $materiasPlan
+            ->filter(fn (Materia $materia) => ! is_numeric($materia->creditos_certificados)
+                || (float) $materia->creditos_certificados <= 0)
+            ->values();
+
+        if ($sinCreditos->isNotEmpty()) {
+            $detalle = $sinCreditos
+                ->take(10)
+                ->map(fn (Materia $materia) => $materia->materia . ' (' . ($materia->semestre?->numero ?: '?') . '°)')
+                ->implode(', ');
+            $faltantes = $sinCreditos->count() > 10 ? ' y ' . ($sinCreditos->count() - 10) . ' más' : '';
+
+            throw new RuntimeException(
+                'No se puede emitir el certificado porque faltan créditos en materias oficiales: '
+                . $detalle . $faltantes . '. Captúralos en el catálogo de materias.'
+            );
+        }
+
         $semestresIncluidos = $acreditados;
-        $materias = $semestresIncluidos->flatMap(fn(array $s) => $s['oficiales'])->values();
-        // Cada semestre acreditado conserva el mismo peso, sin importar cuántas
-        // materias oficiales tenga. Es la misma regla usada en el promedio anual.
+        $materias = $semestresIncluidos->flatMap(fn (array $semestre) => $semestre['oficiales'])->values();
         $promedio = PromedioExcel::calcular($semestresIncluidos->pluck('promedio_preciso'));
+
+        $semestresMatriz = collect(range(1, 6))->map(function (int $numero) use ($semestresIncluidos): array {
+            $semestre = $semestresIncluidos->firstWhere('numero', $numero);
+
+            if ($semestre) {
+                return array_merge($semestre, [
+                    'incluido' => true,
+                ]);
+            }
+
+            return [
+                'numero' => $numero,
+                'ciclo' => null,
+                'oficiales' => collect(),
+                'extras' => collect(),
+                'incluido' => false,
+                'promedio' => '—',
+                'promedio_preciso' => null,
+            ];
+        })->values();
+
+        $creditosPlan = (float) $materiasPlan->sum(fn (Materia $materia) => (float) $materia->creditos_certificados);
+        $creditosAcreditados = (float) $materias->sum(
+            fn (array $materia) => (float) ($materia['materia']?->creditos_certificados ?? 0)
+        );
+
+        $institucional = $kardex['institucional'];
+        $alumno = $kardex['alumno'];
+        $nombreAlumno = Str::upper(trim(implode(' ', array_filter([
+            $alumno->nombre,
+            $alumno->apellido_paterno,
+            $alumno->apellido_materno,
+        ]))));
+        $acreditacion = $modalidad === 'definitivo' ? 'TOTALMENTE' : 'PARCIALMENTE';
+
+        $textoCertificado = strtr((string) $institucional['texto_certificado'], [
+            '{NOMBRE}' => $nombreAlumno,
+            '{CURP}' => Str::upper((string) $alumno->curp),
+            '{ACREDITACION}' => $acreditacion,
+            '{PLANTEL}' => Str::upper((string) $institucional['plantel']),
+            '{ACUERDO}' => Str::upper((string) ($institucional['numero_acuerdo'] ?: 'PENDIENTE DE CONFIGURAR')),
+            '{FECHA_ACUERDO}' => Str::upper((string) ($institucional['fecha_acuerdo_texto'] ?: 'PENDIENTE DE CONFIGURAR')),
+            '{CCT}' => Str::upper((string) $institucional['cct']),
+            '{MODALIDAD}' => Str::upper((string) $institucional['modalidad']),
+        ]);
+
+        $promedioMostrado = PromedioExcel::formatear($promedio, 1, '—');
+        $resumen = sprintf(
+            'EL PRESENTE CERTIFICADO AMPARA %d DE %d ASIGNATURAS, LAS CUALES CUBREN %s EL PLAN DE ESTUDIOS DEL BACHILLERATO GENERAL CON UN TOTAL DE %s DE %s CRÉDITOS Y UN PROMEDIO GENERAL DE APROVECHAMIENTO DE %s. LA ESCALA DE CALIFICACIONES ES DE %s A %s Y LA MÍNIMA APROBATORIA ES DE %s.',
+            $materias->count(),
+            $materiasPlan->count(),
+            $acreditacion,
+            $this->formatearCreditos($creditosAcreditados),
+            $this->formatearCreditos($creditosPlan),
+            $promedioMostrado,
+            $this->formatearCalificacion((float) $institucional['calificacion_minima']),
+            $this->formatearCalificacion((float) $institucional['calificacion_maxima']),
+            $this->formatearCalificacion((float) $institucional['minima_aprobatoria']),
+        );
 
         return array_merge($kardex, [
             'modalidad_certificado' => $modalidad,
             'semestres_certificados' => $semestresIncluidos,
+            'semestres_certificado_matriz' => $semestresMatriz,
+            'semestres_certificado_izquierda' => $semestresMatriz->whereIn('numero', [1, 2, 3])->values(),
+            'semestres_certificado_derecha' => $semestresMatriz->whereIn('numero', [4, 5, 6])->values(),
             'materias_certificadas' => $materias,
+            'materias_plan' => $materiasPlan,
+            'materias_acreditadas_total' => $materias->count(),
+            'materias_plan_total' => $materiasPlan->count(),
+            'creditos_acreditados' => $creditosAcreditados,
+            'creditos_acreditados_texto' => $this->formatearCreditos($creditosAcreditados),
+            'creditos_plan' => $creditosPlan,
+            'creditos_plan_texto' => $this->formatearCreditos($creditosPlan),
             'promedio_certificado_preciso' => $promedio,
-            'promedio_certificado' => PromedioExcel::formatear($promedio, 1, '—'),
-            'folio' => $kardex['alumno']->folio,
+            'promedio_certificado' => $promedioMostrado,
+            'texto_certificado_renderizado' => $textoCertificado,
+            'resumen_certificado' => $resumen,
+            'folio' => $alumno->folio,
             'disponibilidad' => [
                 'parcial' => $parcialDisponible,
                 'definitivo' => $definitivoDisponible,
@@ -768,6 +893,7 @@ class DocumentosOficialesService
                     'materia' => $asignacion->materia,
                     'clave' => $asignacion->materia?->clave,
                     'nombre' => $asignacion->materia?->materia,
+                    'creditos_certificados' => $asignacion->materia?->creditos_certificados,
                     'parcial_1' => $parciales[1],
                     'parcial_2' => $parciales[2],
                     'completa' => $completa,
@@ -791,6 +917,7 @@ class DocumentosOficialesService
             'materia' => $asignacion->materia,
             'clave' => $asignacion->materia?->clave,
             'nombre' => $asignacion->materia?->materia,
+            'creditos_certificados' => $asignacion->materia?->creditos_certificados,
             'parcial_1' => null,
             'parcial_2' => null,
             'completa' => false,
@@ -898,6 +1025,52 @@ class DocumentosOficialesService
         $completa = public_path($relativa);
 
         return is_file($completa) ? $completa : public_path($predeterminada);
+    }
+
+    private function textoCertificadoPredeterminado(): string
+    {
+        return <<<'TEXT'
+CERTIFICA QUE: {NOMBRE}
+CON CLAVE ÚNICA DE REGISTRO DE POBLACIÓN (CURP) {CURP}
+CURSÓ Y ACREDITÓ {ACREDITACION} EL BACHILLERATO GENERAL
+CON RECONOCIMIENTO DE VALIDEZ OFICIAL DE LA SECRETARÍA DE EDUCACIÓN GUERRERO, SEGÚN ACUERDO: {ACUERDO}, DE FECHA {FECHA_ACUERDO} Y CLAVE DE CENTRO DE TRABAJO {CCT}.
+TEXT;
+    }
+
+    private function leyendaCertificadoPredeterminada(): string
+    {
+        return 'ESTE CERTIFICADO REQUIERE DE TRÁMITES ADICIONALES DE LEGALIZACIÓN, NO ES VÁLIDO SI PRESENTA BORRADURAS O ENMENDADURAS.';
+    }
+
+    private function fechaAcuerdoTexto(mixed $fecha): string
+    {
+        if (! $fecha) {
+            return '';
+        }
+
+        try {
+            $carbon = $fecha instanceof \Carbon\CarbonInterface ? $fecha : \Carbon\Carbon::parse($fecha);
+        } catch (\Throwable) {
+            return '';
+        }
+
+        $meses = [
+            1 => 'ENERO', 2 => 'FEBRERO', 3 => 'MARZO', 4 => 'ABRIL',
+            5 => 'MAYO', 6 => 'JUNIO', 7 => 'JULIO', 8 => 'AGOSTO',
+            9 => 'SEPTIEMBRE', 10 => 'OCTUBRE', 11 => 'NOVIEMBRE', 12 => 'DICIEMBRE',
+        ];
+
+        return sprintf('%d DE %s DE %d', $carbon->day, $meses[$carbon->month], $carbon->year);
+    }
+
+    private function formatearCreditos(float $creditos): string
+    {
+        return rtrim(rtrim(number_format($creditos, 2, '.', ''), '0'), '.');
+    }
+
+    private function formatearCalificacion(float $calificacion): string
+    {
+        return rtrim(rtrim(number_format($calificacion, 2, '.', ''), '0'), '.');
     }
 
     private function nombreAlumno(Inscripcion $alumno): string

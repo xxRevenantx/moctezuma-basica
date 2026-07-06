@@ -32,6 +32,11 @@ class DocumentosOficiales extends Component
     public string $modalidad_certificado = 'parcial';
     public string $formato_zip = 'pdf';
     public string $fecha_documento = '';
+    public string $certificado_revisado_por = '';
+    public string $certificado_jefe_registro_por = '';
+
+    /** @var array{tipo?:string,titulo?:string,mensaje?:string,detalles?:array<int,string>} */
+    public array $alertaDocumento = [];
 
     /** @var array<int, string|int|float|null> */
     public array $asistencias = [];
@@ -51,6 +56,18 @@ class DocumentosOficiales extends Component
 
         $this->ciclo_escolar_id = (string) ($actual?->id ?? '');
         $this->fecha_documento = now()->format('Y-m-d');
+
+        $alerta = session()->pull('documento_oficial_error');
+        if (is_array($alerta)) {
+            $this->alertaDocumento = $alerta;
+        } elseif (is_string($alerta) && trim($alerta) !== '') {
+            $this->alertaDocumento = [
+                'tipo' => 'error',
+                'titulo' => 'No fue posible generar el documento',
+                'mensaje' => $alerta,
+                'detalles' => [],
+            ];
+        }
     }
 
     public function seleccionarModulo(string $modulo): void
@@ -93,6 +110,18 @@ class DocumentosOficiales extends Component
         if ($this->modulo === 'acta-resultados' && filled($this->asignacion_materia_id)) {
             $this->cargarAsistencias();
         }
+    }
+
+    public function updated(string $property): void
+    {
+        if (! str_starts_with($property, 'asistencias.') && $property !== 'archivo_asistencias') {
+            $this->alertaDocumento = [];
+        }
+    }
+
+    public function cerrarAlertaDocumento(): void
+    {
+        $this->alertaDocumento = [];
     }
 
     #[Computed]
@@ -199,13 +228,15 @@ class DocumentosOficiales extends Component
                     ? $this->service()->kardex((int) $this->inscripcion_id)
                     : null,
                 'certificado' => filled($this->inscripcion_id)
-                    ? $this->service()->certificado((int) $this->inscripcion_id, $this->modalidad_certificado)
+                    ? $this->vistaPreviaCertificado()
                     : null,
                 default => null,
             };
         } catch (Throwable $exception) {
             return [
                 'error' => $exception->getMessage(),
+                'error_titulo' => $this->tituloErrorVistaPrevia(),
+                'error_detalles' => $this->detallesErrorVistaPrevia($exception->getMessage()),
             ];
         }
     }
@@ -318,6 +349,8 @@ class DocumentosOficiales extends Component
             'estatus' => $this->estatus,
             'modalidad' => $this->modalidad_certificado,
             'fecha_documento' => $this->fecha_documento,
+            'certificado_revisado_por' => trim($this->certificado_revisado_por),
+            'certificado_jefe_registro_por' => trim($this->certificado_jefe_registro_por),
         ];
     }
 
@@ -334,6 +367,69 @@ class DocumentosOficiales extends Component
     private function service(): DocumentosOficialesService
     {
         return app(DocumentosOficialesService::class);
+    }
+
+    private function vistaPreviaCertificado(): array
+    {
+        $faltantes = [];
+
+        if (blank(trim($this->certificado_revisado_por))) {
+            $faltantes[] = 'Nombre de quien revisa y confronta el certificado.';
+        }
+
+        if (blank(trim($this->certificado_jefe_registro_por))) {
+            $faltantes[] = 'Nombre del Jefe del Departamento de Registro y Certificación.';
+        }
+
+        if ($faltantes !== []) {
+            return [
+                'error' => 'Completa los responsables que aparecerán en los recuadros de la segunda página.',
+                'error_titulo' => 'Faltan datos de validación del certificado',
+                'error_detalles' => $faltantes,
+            ];
+        }
+
+        $datos = $this->service()->certificado((int) $this->inscripcion_id, $this->modalidad_certificado);
+        $datos['certificado_revisado_por'] = trim($this->certificado_revisado_por);
+        $datos['certificado_jefe_registro_por'] = trim($this->certificado_jefe_registro_por);
+
+        return $datos;
+    }
+
+    private function tituloErrorVistaPrevia(): string
+    {
+        return match ($this->modulo) {
+            'certificado' => 'El certificado todavía no está listo para emitirse',
+            'kardex' => 'El kardex necesita una revisión',
+            'acta-resultados' => 'El acta todavía no puede generarse',
+            'registro-escolaridad' => 'El registro todavía no puede generarse',
+            default => 'No se puede generar el documento',
+        };
+    }
+
+    /** @return array<int, string> */
+    private function detallesErrorVistaPrevia(string $mensaje): array
+    {
+        $mensajeNormalizado = mb_strtolower($mensaje);
+        $detalles = [];
+
+        if (str_contains($mensajeNormalizado, 'crédito')) {
+            $detalles[] = 'Revisa los créditos certificados de las materias oficiales de bachillerato.';
+        }
+
+        if (str_contains($mensajeNormalizado, 'folio')) {
+            $detalles[] = 'Captura o corrige el folio del alumno desde su inscripción.';
+        }
+
+        if (str_contains($mensajeNormalizado, 'semestre')) {
+            $detalles[] = 'Verifica que los semestres requeridos estén completos y acreditados.';
+        }
+
+        if (str_contains($mensajeNormalizado, 'materia')) {
+            $detalles[] = 'Comprueba el catálogo y las calificaciones de las materias oficiales.';
+        }
+
+        return array_values(array_unique($detalles));
     }
 
     private function contextoGrupoCompleto(): bool

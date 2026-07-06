@@ -220,8 +220,8 @@
                     </div>
 
                     <div
-                        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-                        <flux:field class="{{ $this->esBachilleratoFormulario ? 'xl:col-span-2' : 'xl:col-span-2' }}">
+                        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                        <flux:field class="xl:col-span-2">
                             <flux:label badge="Requerido">Materia</flux:label>
                             <flux:input wire:model.live.debounce.400ms="materia" placeholder="Nombre de la materia" />
                             <flux:error name="materia" />
@@ -233,6 +233,18 @@
                                 <flux:input wire:model.live.debounce.400ms="clave" maxlength="50" class="uppercase"
                                     placeholder="Ej. BG101" />
                                 <flux:error name="clave" />
+                            </flux:field>
+
+                            <flux:field>
+                                <flux:label badge="{{ $calificable && ! $extra && ! $receso ? 'Requerido' : 'No aplica' }}">
+                                    Créditos del certificado
+                                </flux:label>
+                                <flux:input type="number" min="0.01" max="9999.99" step="0.01"
+                                    wire:model="creditos_certificados"
+                                    :disabled="$extra || $receso || ! $calificable"
+                                    placeholder="Ej. 6" />
+                                <flux:description>Se usa para calcular los créditos acreditados y totales del plan.</flux:description>
+                                <flux:error name="creditos_certificados" />
                             </flux:field>
                         @endif
 
@@ -576,6 +588,11 @@
 
                                             <th
                                                 class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
+                                                Créditos
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-4 text-center text-xs font-black uppercase tracking-wider">
                                                 Estados
                                             </th>
 
@@ -620,6 +637,10 @@
 
                                                 <td class="px-4 py-4 font-semibold text-slate-700 dark:text-slate-200">
                                                     {{ $item->clave ?: '—' }}
+                                                </td>
+
+                                                <td class="px-4 py-4 text-center font-black text-slate-700 dark:text-slate-200">
+                                                    {{ $item->creditos_certificados !== null ? rtrim(rtrim(number_format((float) $item->creditos_certificados, 2, '.', ''), '0'), '.') : '—' }}
                                                 </td>
 
                                                 <td class="px-4 py-4">
@@ -699,7 +720,7 @@
                                             </span>
                                         </div>
 
-                                        <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                                        <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                                             <div>
                                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
                                                     Clave
@@ -707,6 +728,16 @@
 
                                                 <p class="font-semibold text-slate-700 dark:text-slate-200">
                                                     {{ $item->clave ?: '—' }}
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                                    Créditos
+                                                </p>
+
+                                                <p class="font-semibold text-slate-700 dark:text-slate-200">
+                                                    {{ $item->creditos_certificados !== null ? rtrim(rtrim(number_format((float) $item->creditos_certificados, 2, '.', ''), '0'), '.') : '—' }}
                                                 </p>
                                             </div>
 

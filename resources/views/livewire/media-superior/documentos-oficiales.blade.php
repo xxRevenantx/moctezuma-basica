@@ -205,6 +205,54 @@
             [$tituloModulo, $descripcionModulo, $iconoModulo] = $titulos[$modulo];
         @endphp
 
+        @if (! empty($alertaDocumento))
+            <section id="alerta-documento-oficial"
+                class="relative overflow-hidden rounded-[1.8rem] border border-rose-200 bg-gradient-to-br from-white via-rose-50/80 to-amber-50 shadow-lg shadow-rose-100/60 dark:border-rose-900/60 dark:from-slate-950 dark:via-rose-950/20 dark:to-amber-950/10 dark:shadow-none">
+                <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-400"></div>
+                <div class="flex flex-col gap-5 p-5 pt-7 sm:flex-row sm:items-start sm:p-6 sm:pt-8">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-500/25">
+                        <flux:icon.exclamation-triangle class="h-7 w-7" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span
+                                class="rounded-full border border-rose-200 bg-white/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-rose-700 dark:border-rose-800 dark:bg-slate-950/60 dark:text-rose-300">
+                                Revisión requerida
+                            </span>
+                            <span class="text-xs font-bold text-slate-400">El documento no fue emitido</span>
+                        </div>
+                        <h3 class="mt-3 text-lg font-black text-slate-950 dark:text-white">
+                            {{ $alertaDocumento['titulo'] ?? 'No fue posible generar el documento' }}
+                        </h3>
+                        <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                            {{ $alertaDocumento['mensaje'] ?? 'Revisa la información seleccionada antes de continuar.' }}
+                        </p>
+
+                        @if (! empty($alertaDocumento['detalles']))
+                            <div class="mt-4 grid gap-2 md:grid-cols-2">
+                                @foreach ($alertaDocumento['detalles'] as $detalle)
+                                    <div
+                                        class="flex items-start gap-2 rounded-xl border border-white/80 bg-white/75 px-3.5 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
+                                        <span
+                                            class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                            <flux:icon.check class="h-3.5 w-3.5" />
+                                        </span>
+                                        <span>{{ $detalle }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    <button type="button" wire:click="cerrarAlertaDocumento"
+                        class="absolute right-4 top-5 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white/80 text-rose-600 transition hover:bg-white dark:border-rose-900/60 dark:bg-slate-950/70 dark:text-rose-300"
+                        aria-label="Cerrar aviso">
+                        <flux:icon.x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+            </section>
+        @endif
+
         <section
             class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div class="border-b border-slate-200 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/70 sm:p-6">
@@ -331,6 +379,68 @@
                             </flux:field>
                         @endif
                     </div>
+
+                    @if ($modulo === 'certificado')
+                        <div
+                            class="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-5 dark:border-amber-900/50 dark:from-amber-950/20 dark:via-slate-950 dark:to-blue-950/20 sm:p-6">
+                            <div
+                                class="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-amber-300/20 blur-2xl dark:bg-amber-500/10">
+                            </div>
+                            <div class="relative flex flex-col gap-5">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/20">
+                                            <flux:icon.shield-check class="h-6 w-6" />
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-black uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                                                Segunda página
+                                            </p>
+                                            <h3 class="mt-1 font-black text-slate-950 dark:text-white">Responsables de validación</h3>
+                                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                Estos nombres son obligatorios y se imprimen dentro de los recuadros oficiales.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span @class([
+                                            'rounded-full px-3 py-1 text-xs font-black',
+                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' => filled(trim($certificado_revisado_por)),
+                                            'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' => blank(trim($certificado_revisado_por)),
+                                        ])>
+                                            Revisión {{ filled(trim($certificado_revisado_por)) ? 'lista' : 'pendiente' }}
+                                        </span>
+                                        <span @class([
+                                            'rounded-full px-3 py-1 text-xs font-black',
+                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' => filled(trim($certificado_jefe_registro_por)),
+                                            'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' => blank(trim($certificado_jefe_registro_por)),
+                                        ])>
+                                            Jefatura {{ filled(trim($certificado_jefe_registro_por)) ? 'lista' : 'pendiente' }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-4 lg:grid-cols-2">
+                                    <flux:field>
+                                        <flux:label badge="Requerido">Revisado y confrontado por</flux:label>
+                                        <flux:input wire:model.live.debounce.350ms="certificado_revisado_por"
+                                            icon="user" placeholder="Nombre completo" />
+                                        <flux:description>Cuadro izquierdo de la segunda página.</flux:description>
+                                        <flux:error name="certificado_revisado_por" />
+                                    </flux:field>
+                                    <flux:field>
+                                        <flux:label badge="Requerido">Jefe de Registro y Certificación</flux:label>
+                                        <flux:input wire:model.live.debounce.350ms="certificado_jefe_registro_por"
+                                            icon="user" placeholder="Nombre completo" />
+                                        <flux:description>Cuadro derecho de la segunda página.</flux:description>
+                                        <flux:error name="certificado_jefe_registro_por" />
+                                    </flux:field>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <flux:field>
                         <flux:label>Alumno</flux:label>
                         <flux:select wire:model.live="inscripcion_id" :disabled="blank($generacion_id)">
@@ -442,12 +552,48 @@
         @if ($preview)
             @if (isset($preview['error']))
                 <section
-                    class="rounded-[1.7rem] border border-rose-200 bg-rose-50 p-5 dark:border-rose-900/50 dark:bg-rose-950/20">
-                    <div class="flex items-start gap-3"><flux:icon.exclamation-triangle
-                            class="h-6 w-6 shrink-0 text-rose-600" />
-                        <div>
-                            <h3 class="font-black text-rose-800 dark:text-rose-200">No se puede generar todavía</h3>
-                            <p class="mt-1 text-sm text-rose-700 dark:text-rose-300">{{ $preview['error'] }}</p>
+                    class="relative overflow-hidden rounded-[1.8rem] border border-amber-200 bg-gradient-to-br from-white via-amber-50/80 to-blue-50 shadow-lg shadow-amber-100/60 dark:border-amber-900/60 dark:from-slate-950 dark:via-amber-950/20 dark:to-blue-950/10 dark:shadow-none">
+                    <div class="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-amber-400 via-orange-500 to-rose-500"></div>
+                    <div class="flex flex-col gap-5 p-5 pl-7 sm:flex-row sm:items-start sm:p-6 sm:pl-8">
+                        <div
+                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/25">
+                            <flux:icon.document-magnifying-glass class="h-6 w-6" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                    class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                                    Documento pendiente
+                                </span>
+                                <span class="text-xs font-bold text-slate-400">Las descargas permanecen ocultas</span>
+                            </div>
+                            <h3 class="mt-3 text-lg font-black text-slate-950 dark:text-white">
+                                {{ $preview['error_titulo'] ?? 'No se puede generar todavía' }}
+                            </h3>
+                            <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                                {{ $preview['error'] }}
+                            </p>
+
+                            @if (! empty($preview['error_detalles']))
+                                <div class="mt-4 grid gap-2 md:grid-cols-2">
+                                    @foreach ($preview['error_detalles'] as $detalle)
+                                        <div
+                                            class="flex items-start gap-2 rounded-xl border border-amber-100 bg-white/80 px-3.5 py-3 text-sm text-slate-700 shadow-sm dark:border-amber-900/40 dark:bg-slate-950/50 dark:text-slate-300">
+                                            <span
+                                                class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                                                <flux:icon.arrow-right class="h-3.5 w-3.5" />
+                                            </span>
+                                            <span>{{ $detalle }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            <div
+                                class="mt-4 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/80 px-3.5 py-3 text-xs font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
+                                <flux:icon.information-circle class="h-4 w-4 shrink-0" />
+                                Corrige la información superior; la vista previa se actualizará automáticamente.
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -459,7 +605,7 @@
                     $mostrarCatalogosInconsistentes = $modulo === 'kardex' && $catalogosInconsistentes->isNotEmpty();
                     $semestresVistaPrevia =
                         $modulo === 'certificado'
-                            ? collect($preview['semestres_certificados'] ?? [])
+                            ? collect($preview['semestres_certificado_matriz'] ?? [])
                             : collect($preview['semestres'] ?? []);
                 @endphp
                 <section
@@ -616,45 +762,96 @@
                                     </div>
                                 </div>
                             @endif
-                            <div class="space-y-4">
-                                @foreach ($semestresVistaPrevia as $semestre)
-                                    <div
-                                        class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-                                        <div
-                                            class="flex flex-col gap-2 bg-slate-50 px-4 py-3 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-                                            <div class="flex flex-wrap items-center gap-2">
-                                                <p class="font-black">{{ $semestre['numero'] }}° semestre</p>
-                                                <span
-                                                    class="rounded-full px-2.5 py-1 text-[11px] font-black {{ $semestre['catalogo_consistente'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' }}">
-                                                    {{ $semestre['materias_oficiales'] }}/{{ $semestre['materias_esperadas'] }}
-                                                    materias oficiales
-                                                </span>
-                                                @if ($semestre['numero_materias_configurado'])
-                                                    <span class="text-[11px] font-bold text-slate-400">Configuración
-                                                        manual</span>
-                                                @endif
-                                            </div>
-                                            <span
-                                                class="w-fit rounded-full bg-white px-3 py-1 text-xs font-black shadow-sm dark:bg-slate-950">Prom.
-                                                {{ $semestre['promedio'] }}</span>
-                                        </div>
-                                        <table
-                                            class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                                                @foreach ($semestre['oficiales'] as $materia)
-                                                    <tr>
-                                                        <td class="px-4 py-3 font-mono text-xs">
-                                                            {{ $materia['clave'] }}</td>
-                                                        <td class="px-4 py-3">{{ $materia['nombre'] }}</td>
-                                                        <td class="px-4 py-3 text-right font-black">
-                                                            {{ $materia['valor'] ?: '—' }}</td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                            @if ($modulo === 'certificado')
+                                <div class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                                    <div class="rounded-2xl bg-blue-50 p-4 dark:bg-blue-950/20">
+                                        <p class="text-xs font-black uppercase text-blue-700 dark:text-blue-300">Asignaturas</p>
+                                        <p class="mt-1 text-2xl font-black">{{ $preview['materias_acreditadas_total'] }}/{{ $preview['materias_plan_total'] }}</p>
                                     </div>
-                                @endforeach
-                            </div>
+                                    <div class="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20">
+                                        <p class="text-xs font-black uppercase text-emerald-700 dark:text-emerald-300">Créditos</p>
+                                        <p class="mt-1 text-2xl font-black">{{ $preview['creditos_acreditados_texto'] }}/{{ $preview['creditos_plan_texto'] }}</p>
+                                    </div>
+                                    <div class="rounded-2xl bg-amber-50 p-4 dark:bg-amber-950/20">
+                                        <p class="text-xs font-black uppercase text-amber-700 dark:text-amber-300">Promedio</p>
+                                        <p class="mt-1 text-2xl font-black">{{ $preview['promedio_certificado'] }}</p>
+                                    </div>
+                                    <div class="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900">
+                                        <p class="text-xs font-black uppercase text-slate-500">Modalidad</p>
+                                        <p class="mt-1 text-lg font-black">{{ Str::upper($preview['modalidad_certificado']) }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-5 lg:grid-cols-2">
+                                    @foreach ([collect($semestresVistaPrevia)->whereIn('numero', [1, 2, 3]), collect($semestresVistaPrevia)->whereIn('numero', [4, 5, 6])] as $columna)
+                                        <div class="space-y-4">
+                                            @foreach ($columna as $semestre)
+                                                <div class="relative min-h-48 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                                                    <div class="flex items-center justify-between bg-slate-50 px-4 py-3 dark:bg-slate-900">
+                                                        <p class="font-black">{{ $semestre['numero'] }}° semestre</p>
+                                                        @if ($semestre['incluido'])
+                                                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                                {{ $semestre['ciclo']?->nombre ?: 'Ciclo no disponible' }}
+                                                            </span>
+                                                        @else
+                                                            <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-500 dark:bg-slate-800">No acreditado</span>
+                                                        @endif
+                                                    </div>
+                                                    @if ($semestre['incluido'])
+                                                        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                                            <thead class="bg-white text-xs uppercase text-slate-400 dark:bg-slate-950">
+                                                                <tr><th class="px-4 py-2 text-left">Asignatura</th><th class="px-4 py-2 text-center">Calif.</th><th class="px-4 py-2 text-center">Créditos</th></tr>
+                                                            </thead>
+                                                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                                                @foreach ($semestre['oficiales'] as $materia)
+                                                                    <tr>
+                                                                        <td class="px-4 py-2.5">{{ $materia['nombre'] }}</td>
+                                                                        <td class="px-4 py-2.5 text-center font-black">{{ $materia['valor'] ?: '—' }}</td>
+                                                                        <td class="px-4 py-2.5 text-center font-bold">{{ $materia['creditos_certificados'] !== null ? rtrim(rtrim(number_format((float) $materia['creditos_certificados'], 2, '.', ''), '0'), '.') : '—' }}</td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    @else
+                                                        <div class="absolute left-[-12%] top-1/2 w-[124%] -rotate-12 border-t border-slate-400"></div>
+                                                        <div class="flex min-h-36 items-center justify-center text-sm font-bold text-slate-400">Espacio reservado</div>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="space-y-4">
+                                    @foreach ($semestresVistaPrevia as $semestre)
+                                        <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                                            <div class="flex flex-col gap-2 bg-slate-50 px-4 py-3 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <p class="font-black">{{ $semestre['numero'] }}° semestre</p>
+                                                    <span class="rounded-full px-2.5 py-1 text-[11px] font-black {{ $semestre['catalogo_consistente'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' }}">
+                                                        {{ $semestre['materias_oficiales'] }}/{{ $semestre['materias_esperadas'] }} materias oficiales
+                                                    </span>
+                                                    @if ($semestre['numero_materias_configurado'])
+                                                        <span class="text-[11px] font-bold text-slate-400">Configuración manual</span>
+                                                    @endif
+                                                </div>
+                                                <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-black shadow-sm dark:bg-slate-950">Prom. {{ $semestre['promedio'] }}</span>
+                                            </div>
+                                            <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                                    @foreach ($semestre['oficiales'] as $materia)
+                                                        <tr>
+                                                            <td class="px-4 py-3 font-mono text-xs">{{ $materia['clave'] }}</td>
+                                                            <td class="px-4 py-3">{{ $materia['nombre'] }}</td>
+                                                            <td class="px-4 py-3 text-right font-black">{{ $materia['valor'] ?: '—' }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </section>
