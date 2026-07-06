@@ -10,6 +10,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Services\GroqDocumentoService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -118,6 +119,7 @@ class Constancia extends Component
             '@matricula',
             '@grado',
             '@nivel',
+            '@nivel_minuscula',
             '@grupo',
             '@generacion',
             '@ciclo',
@@ -188,6 +190,12 @@ class Constancia extends Component
             $this->primer_periodo = false;
             $this->segundo_periodo = false;
             $this->tercer_periodo = false;
+        }
+
+        // Evita conservar un egresado seleccionado al cambiar a una constancia
+        // que únicamente admite alumnos activos.
+        if ($this->selectedAlumno !== null) {
+            $this->limpiarAlumno();
         }
     }
 
@@ -523,7 +531,7 @@ class Constancia extends Component
             return;
         }
 
-        $this->alumnos = Inscripcion::query()
+        $consulta = Inscripcion::query()
             ->with([
                 'nivel:id,nombre,cct',
                 'grado:id,nombre',
@@ -531,9 +539,12 @@ class Constancia extends Component
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
-            ])
-            ->where('activo', true)
-            ->where(function ($consulta) use ($texto) {
+            ]);
+
+        $this->aplicarFiltroAlumnosDisponibles($consulta);
+
+        $this->alumnos = $consulta
+            ->where(function (Builder $consulta) use ($texto) {
                 $consulta->where('nombre', 'like', "%{$texto}%")
                     ->orWhere('apellido_paterno', 'like', "%{$texto}%")
                     ->orWhere('apellido_materno', 'like', "%{$texto}%")
@@ -666,7 +677,7 @@ class Constancia extends Component
             return;
         }
 
-        session()->put('constancias_zip_payload', [
+        session()->put('constancias_masivas_payload', [
             'alumno_ids' => $alumnos->pluck('id')->values()->toArray(),
             'plantilla_id' => $this->plantilla_id,
             'contenido_html' => $this->contenido_html,
@@ -676,31 +687,34 @@ class Constancia extends Component
             'periodos_calificaciones' => $this->periodosSeleccionados(),
         ]);
 
-        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.zip'));
+        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.masivas.pdf'));
     }
 
     private function obtenerAlumnosParaDescarga()
     {
-        return Inscripcion::query()
+        $consulta = Inscripcion::query()
             ->with([
-                'nivel:id,nombre,cct',
+                'nivel.director',
                 'grado:id,nombre',
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
-            ])
-            ->where('activo', true)
-            ->when($this->modo_descarga === 'nivel', function ($consulta) {
+            ]);
+
+        $this->aplicarFiltroAlumnosDisponibles($consulta);
+
+        return $consulta
+            ->when($this->modo_descarga === 'nivel', function (Builder $consulta) {
                 $consulta->where('nivel_id', $this->nivel_id);
             })
-            ->when($this->modo_descarga === 'grado', function ($consulta) {
+            ->when($this->modo_descarga === 'grado', function (Builder $consulta) {
                 $consulta->where('nivel_id', $this->nivel_id)
                     ->where('grado_id', $this->grado_id);
             })
-            ->when($this->modo_descarga === 'grupo', function ($consulta) {
+            ->when($this->modo_descarga === 'grupo', function (Builder $consulta) {
                 $consulta->where('nivel_id', $this->nivel_id)
-                    ->when($this->grado_id, function ($query) {
+                    ->when($this->grado_id, function (Builder $query) {
                         $query->where('grado_id', $this->grado_id);
                     })
                     ->where('grupo_id', $this->grupo_id);
@@ -711,18 +725,49 @@ class Constancia extends Component
             ->get();
     }
 
+    private function aplicarFiltroAlumnosDisponibles(Builder $consulta): Builder
+    {
+        $estatusSalida = [
+            'baja_temporal',
+            'baja_definitiva',
+            'trasladado',
+            'traslado',
+            'suspendido',
+            'inactivo',
+            'archivado',
+        ];
+
+        if ($this->esConstanciaTerminoSeleccionada()) {
+            return $consulta->where(function (Builder $query) use ($estatusSalida) {
+                $query->where('estatus', 'egresado')
+                    ->orWhere(function (Builder $activos) use ($estatusSalida) {
+                        $activos->where('activo', true)
+                            ->whereNotIn('estatus', $estatusSalida);
+                    });
+            });
+        }
+
+        return $consulta
+            ->where('activo', true)
+            ->whereNotIn('estatus', $estatusSalida);
+    }
+
     private function crearConstanciaIndividual(int $inscripcionId): ConstanciaModelo
     {
-        $alumno = Inscripcion::query()
+        $consulta = Inscripcion::query()
             ->with([
-                'nivel:id,nombre,cct',
+                'nivel.director',
                 'grado:id,nombre',
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
             ])
-            ->findOrFail($inscripcionId);
+            ->whereKey($inscripcionId);
+
+        $this->aplicarFiltroAlumnosDisponibles($consulta);
+
+        $alumno = $consulta->firstOrFail();
 
         $alumnoArray = $this->formatearAlumno($alumno);
         $contenidoGenerado = $this->reemplazarVariablesConAlumno($this->contenido_html, $alumnoArray);
@@ -779,6 +824,7 @@ class Constancia extends Component
             '@curp' => $alumno['curp'] ?? '',
             '@matricula' => $alumno['matricula'] ?? '',
             '@grado' => $alumno['grado'] ?? '',
+            '@nivel_minuscula' => Str::lower(trim((string) ($alumno['nivel'] ?? ''))),
             '@nivel' => $alumno['nivel'] ?? '',
             '@grupo' => $alumno['grupo'] ?? '',
             '@generacion' => $alumno['generacion'] ?? '',
@@ -813,6 +859,16 @@ class Constancia extends Component
 
         return Str::contains($identificador, 'estudio')
             && !Str::contains($identificador, ['baja', 'traslado', 'conducta', 'relaciones']);
+    }
+
+    public function esConstanciaTerminoSeleccionada(): bool
+    {
+        $identificador = Str::lower(Str::ascii(trim(
+            $this->tipo_constancia . ' ' . $this->plantilla_titulo
+        )));
+
+        return Str::contains($identificador, 'estudio')
+            && Str::contains($identificador, ['termino', 'terminacion', 'conclusion', 'egreso']);
     }
 
     private function generarFolio(): string

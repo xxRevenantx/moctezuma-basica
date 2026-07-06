@@ -318,9 +318,9 @@ Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
 Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales_pdf'])
     ->name('generales.credenciales.pdf');
 
-Route::get('/constancias/descargar/zip', [DocumentosPDFController::class, 'constanciasZip'])
+Route::get('/constancias/abrir/pdf', [DocumentosPDFController::class, 'constanciasMasivasPdf'])
     ->middleware('admin')
-    ->name('misrutas.constancias.zip');
+    ->name('misrutas.constancias.masivas.pdf');
 
 Route::get('/constancias-traslado/{constancia}/pdf', [ConstanciaTrasladoController::class, 'show'])
     ->middleware('admin')

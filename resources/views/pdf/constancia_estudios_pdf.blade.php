@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>{{ $constancia->folio ?? 'constancia-estudios' }}</title>
+    <title>{{ isset($constanciasMasivas) ? 'Constancias' : ($constancia->folio ?? 'constancia-estudios') }}</title>
 
     <style>
         @page {
@@ -42,6 +42,10 @@
             width: 100%;
             min-height: 100%;
             position: relative;
+        }
+
+        .salto-pagina {
+            page-break-after: always;
         }
 
         .marca-agua {
@@ -377,6 +381,27 @@
 
 <body>
     @php
+        $documentos = $constanciasMasivas ?? [[
+            'constancia' => $constancia,
+            'alumno' => $alumno,
+            'plantilla' => $plantilla,
+            'calificacionesConstancia' => $calificacionesConstancia ?? [],
+        ]];
+    @endphp
+
+    @if (file_exists(public_path('imagenes/logo-letra.png')))
+        <img class="marca-agua" src="{{ public_path('imagenes/logo-letra.png') }}" alt="">
+    @elseif (file_exists(public_path('imagenes/marca-agua.png')))
+        <img class="marca-agua" src="{{ public_path('imagenes/marca-agua.png') }}" alt="">
+    @endif
+
+    @foreach ($documentos as $documento)
+    @php
+        $constancia = $documento['constancia'];
+        $alumno = $documento['alumno'];
+        $plantilla = $documento['plantilla'];
+        $calificacionesConstancia = $documento['calificacionesConstancia'] ?? [];
+
         $nivel = $alumno?->nivel;
         $grado = $alumno?->grado;
         $grupo = $alumno?->grupo?->asignacionGrupo;
@@ -406,9 +431,18 @@
                 ($director->apellido_materno ?? ''),
         );
 
-        $nombreDirector = $nombreDirector ?: 'DIRECTORA DE LA ESCUELA';
+        $generoDirector = strtoupper(trim((string) ($director?->genero ?? 'F')));
+        $esDirectorMasculino = in_array($generoDirector, ['H', 'M', 'MASCULINO', 'HOMBRE'], true);
+        $formulaSuscribe = $esDirectorMasculino ? 'El que suscribe' : 'La que suscribe';
 
-        $cargoDirector = $director?->cargo ?: 'DIRECTORA DE LA ESCUELA';
+        $nombreDirector = $nombreDirector ?: ($esDirectorMasculino
+            ? 'DIRECTOR DE LA ESCUELA'
+            : 'DIRECTORA DE LA ESCUELA');
+
+        $cargoRegistrado = trim((string) ($director?->cargo ?? ''));
+        $cargoDirector = $cargoRegistrado !== ''
+            ? $cargoRegistrado
+            : ($esDirectorMasculino ? 'Director' : 'Directora');
 
         $fechaExpedicion = $constancia?->fecha_expedicion
             ? $constancia->fecha_expedicion->translatedFormat('d \d\e F \d\e Y')
@@ -448,7 +482,12 @@
             default => 'CENTRO UNIVERSITARIO MOCTEZUMA',
         };
 
-        $escuelaSlug = $nivel->slug == 'preescolar' ? 'del ' : 'de la';
+        $esPreescolar = str_contains(mb_strtolower($nivel?->nombre ?? ''), 'preescolar')
+            || ($nivel?->slug ?? '') === 'preescolar';
+
+        $presentacionDirector = $esPreescolar
+            ? 'Directora del ' . $nombreEscuela
+            : $cargoDirector . ' de la ' . $nombreEscuela;
 
         $grupoTexto = $grupo?->nombre ? 'grupo: "' . $grupo->nombre . '"' : 'grupo correspondiente';
 
@@ -475,13 +514,7 @@
         };
     @endphp
 
-    <div class="pagina">
-        @if (file_exists(public_path('imagenes/logo-letra.png')))
-            <img class="marca-agua" src="{{ public_path('imagenes/logo-letra.png') }}" alt="">
-        @elseif (file_exists(public_path('imagenes/marca-agua.png')))
-            <img class="marca-agua" src="{{ public_path('imagenes/marca-agua.png') }}" alt="">
-        @endif
-
+    <div class="pagina {{ !$loop->last ? 'salto-pagina' : '' }}">
         <div class="encabezado">
             <table class="tabla-encabezado">
                 <tr>
@@ -536,10 +569,9 @@
         <div class="contenido-principal {{ $esCartaConducta ? 'conducta' : '' }}">
             @if ($esCartaConducta)
                 <p class="parrafo">
-                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora
-                    {{ $escuelaSlug }} <b>"{{ $nombreEscuela }}"</b>,
+                    {{ $formulaSuscribe }} <b>{{ $nombreDirector }}</b>, {{ $presentacionDirector }},
                     con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
-                    Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
+                    Madero No. 800, Col. Esquipulas, Cd. Altamirano, municipio de Pungarabato,
                     Guerrero, Región Tierra Caliente.
                 </p>
 
@@ -567,7 +599,7 @@
                 <p class="parrafo-final">
                     Para fines legales que el interesado convenga, conforme a derecho se extiende la presente
                     a los {{ $diaExpedicion }} días del mes de {{ $mesAnioExpedicion }} en Cd. Altamirano,
-                    municipio de Pungarabato, Gro.
+                    municipio de Pungarabato, Guerrero, Región Tierra Caliente.
                 </p>
 
                 <div class="firma conducta">
@@ -587,9 +619,9 @@
                 </div>
             @else
                 <p class="parrafo">
-                    La que suscribe <b>{{ $nombreDirector }}</b>, Directora de la "{{ $nombreEscuela }}",
+                    {{ $formulaSuscribe }} <b>{{ $nombreDirector }}</b>, {{ $presentacionDirector }},
                     con clave de incorporación <b>{{ $cct }}</b>, ubicada en la Calle Francisco I.
-                    Madero No. 800. Col. Esquipulas de Cd. Altamirano, municipio de Pungarabato
+                    Madero No. 800, Col. Esquipulas, Cd. Altamirano, municipio de Pungarabato,
                     Guerrero, Región Tierra Caliente.
                 </p>
 
@@ -667,7 +699,7 @@
                 <p class="parrafo-final">
                     Para fines legales que el interesado convenga, conforme a derecho se extiende la presente
                     a los {{ $diaExpedicion }} días del mes de {{ $mesAnioExpedicion }} en Cd. Altamirano,
-                    municipio de Pungarabato Guerrero, Región Tierra Caliente.
+                    municipio de Pungarabato, Guerrero, Región Tierra Caliente.
                 </p>
 
                 <div class="firma">
@@ -685,13 +717,15 @@
             @endif
         </div>
 
-        <div class="pie">
-            @if (file_exists(public_path('imagenes/tira.jpg')))
-                <img class="tira" src="{{ public_path('imagenes/tira.jpg') }}" alt="">
-            @elseif (file_exists(public_path('imagenes/tira.png')))
-                <img class="tira" src="{{ public_path('imagenes/tira.png') }}" alt="">
-            @endif
-        </div>
+    </div>
+    @endforeach
+
+    <div class="pie">
+        @if (file_exists(public_path('imagenes/tira.jpg')))
+            <img class="tira" src="{{ public_path('imagenes/tira.jpg') }}" alt="">
+        @elseif (file_exists(public_path('imagenes/tira.png')))
+            <img class="tira" src="{{ public_path('imagenes/tira.png') }}" alt="">
+        @endif
     </div>
 </body>
 

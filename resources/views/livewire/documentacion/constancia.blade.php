@@ -173,7 +173,7 @@
                             </h3>
 
                             <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                Selecciona una plantilla activa y el modo de descarga.
+                                Selecciona una plantilla activa y el modo de generación.
                             </p>
                         </div>
 
@@ -232,7 +232,7 @@
                 </div>
 
                 <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-                    <flux:radio.group wire:model.live="modo_descarga" label="Modo de descarga"
+                    <flux:radio.group wire:model.live="modo_descarga" label="Modo de generación"
                         class="grid gap-4 md:grid-cols-4">
                         <flux:radio value="alumno" label="Por alumno" />
                         <flux:radio value="nivel" label="Por nivel" />
@@ -290,6 +290,22 @@
                         </div>
                     @endif
                 </div>
+
+                @if ($this->esConstanciaTerminoSeleccionada())
+                    <div
+                        class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                        La constancia de término permite seleccionar alumnos activos y egresados. Las bajas,
+                        traslados, suspendidos e inactivos quedan excluidos.
+                    </div>
+                @endif
+
+                @if ($modo_descarga !== 'alumno')
+                    <div
+                        class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200">
+                        Se abrirá un solo PDF en otra pestaña, con una constancia por página y los alumnos
+                        ordenados por apellidos. La generación masiva no se guardará en el historial.
+                    </div>
+                @endif
 
                 @if ($modo_descarga === 'alumno')
                     <div class="relative">
@@ -390,11 +406,11 @@
                         wire:click="descargarConstancia" wire:loading.attr="disabled"
                         wire:target="descargarConstancia">
                         <span wire:loading.remove wire:target="descargarConstancia">
-                            {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Descargar constancias ZIP' }}
+                            {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Abrir constancias' }}
                         </span>
 
                         <span wire:loading wire:target="descargarConstancia">
-                            Generando...
+                            {{ $modo_descarga === 'alumno' ? 'Generando...' : 'Preparando PDF...' }}
                         </span>
                     </flux:button>
                 </div>
@@ -451,7 +467,7 @@
                             </h4>
 
                             <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                Solo aparecen las constancias individuales guardadas en la base de datos.
+                                Aquí aparecen las constancias individuales de estudios, término, conducta y relaciones exteriores.
                             </p>
                         </div>
 
@@ -760,6 +776,7 @@
                                     <span>@matricula</span>
                                     <span>@grado</span>
                                     <span>@nivel</span>
+                                    <span>@nivel_minuscula</span>
                                     <span>@grupo</span>
                                     <span>@generacion</span>
                                     <span>@ciclo</span>
