@@ -283,8 +283,8 @@
                             </td>
 
                             <td class="px-4 py-4">
-                                @if ($alumno->foto_path)
-                                    <img src="{{ asset('storage/' . $alumno->foto_path) }}"
+                                @if ($alumno->foto_existe && $alumno->foto_url)
+                                    <img src="{{ $alumno->foto_url }}"
                                         alt="Foto de {{ $alumno->nombre }}"
                                         class="h-10 w-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-neutral-700">
                                 @else
@@ -423,8 +423,8 @@
                                         <div
                                             class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
                                             <div class="flex items-start gap-3">
-                                                @if ($alumno->foto_path)
-                                                    <img src="{{ asset('storage/' . $alumno->foto_path) }}"
+                                                @if ($alumno->foto_existe && $alumno->foto_url)
+                                                    <img src="{{ $alumno->foto_url }}"
                                                         alt="Foto de {{ $alumno->nombre }}"
                                                         class="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                                                 @else
@@ -677,8 +677,8 @@
                     class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                     <div class="p-4">
                         <div class="flex items-start gap-3">
-                            @if ($alumno->foto_path)
-                                <img src="{{ asset('storage/' . $alumno->foto_path) }}"
+                            @if ($alumno->foto_existe && $alumno->foto_url)
+                                <img src="{{ $alumno->foto_url }}"
                                     alt="Foto de {{ $alumno->nombre }}"
                                     class="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                             @else

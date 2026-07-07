@@ -850,8 +850,8 @@
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                                             </template>
 
-                                            @if ($foto_actual)
-                                                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($foto_actual) }}"
+                                            @if ($foto_actual_existe && $foto_actual_url)
+                                                <img src="{{ $foto_actual_url }}"
                                                     alt="Fotografía actual del alumno"
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                                                     x-show="!preview">
@@ -864,17 +864,17 @@
                                                             class="h-8 w-8 text-slate-400 dark:text-slate-500" />
                                                     </div>
                                                     <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                                                        Sin fotografía
+                                                        {{ $foto_actual ? 'Fotografía no disponible' : 'Sin fotografía' }}
                                                     </p>
                                                     <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                                                        Aquí se mostrará la imagen seleccionada
+                                                        {{ $foto_actual ? 'Vuelve a cargarla porque el archivo físico no existe.' : 'Aquí se mostrará la imagen seleccionada' }}
                                                     </p>
                                                 </div>
                                             @endif
 
                                             <div
                                                 class="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                                                {{ $foto_actual ? 'Foto actual' : 'Foto' }}
+                                                {{ $foto_actual_existe ? 'Foto actual' : ($foto_actual ? 'Volver a cargar foto' : 'Foto') }}
                                             </div>
 
                                             <div x-show="preview" x-transition
@@ -889,7 +889,7 @@
                                     <label for="foto-editar"
                                         class="group relative flex cursor-pointer flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 px-6 py-8 text-center transition duration-300 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
                                         <input id="foto-editar" type="file" wire:model="foto"
-                                            accept="image/png,image/jpeg,image/jpg" class="hidden"
+                                            accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp" class="hidden"
                                             @change="usarTemporal($event)">
 
                                         <div

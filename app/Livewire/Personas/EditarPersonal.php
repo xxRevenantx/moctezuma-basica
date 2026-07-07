@@ -3,7 +3,7 @@
 namespace App\Livewire\Personas;
 
 use App\Models\Persona;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ImagenPersonalService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -22,6 +22,10 @@ class EditarPersonal extends Component
     public $foto_nueva;
 
     public $foto_actual;
+
+    public bool $foto_actual_existe = false;
+
+    public ?string $foto_actual_url = null;
 
     public $curp;
 
@@ -71,6 +75,8 @@ class EditarPersonal extends Component
         $this->titulo = $personal->titulo;
         $this->nombre = $personal->nombre;
         $this->foto_actual = $personal->foto;
+        $this->foto_actual_existe = $personal->foto_existe;
+        $this->foto_actual_url = $personal->foto_url;
         $this->apellido_paterno = $personal->apellido_paterno;
         $this->apellido_materno = $personal->apellido_materno;
         $this->curp = $personal->curp;
@@ -102,7 +108,7 @@ class EditarPersonal extends Component
 
 
     // ACTUALIZAR PERSONAL
-    public function actualizarPersonal()
+    public function actualizarPersonal(ImagenPersonalService $imagenes)
     {
         $this->validate([
             'titulo'=> 'nullable|string|max:10',
@@ -125,17 +131,20 @@ class EditarPersonal extends Component
             'municipio'=> 'nullable|string|max:100',
             'estado'=> 'nullable|string|max:100',
             'codigo_postal'=> 'nullable|string|max:10',
+            'foto_nueva' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'foto_nueva.image' => 'La foto debe ser una imagen válida.',
+            'foto_nueva.mimes' => 'La foto debe ser JPG, JPEG, PNG o WEBP.',
+            'foto_nueva.max' => 'La foto no debe superar los 2 MB.',
         ]);
 
 
         $personal = Persona::findOrFail($this->personaId);
 
-         if ($this->foto_nueva   ) {
-            if ($this->foto_actual) {
-                Storage::disk('public')->delete('personal/' . $this->foto_actual);
-            }
-            $path = $this->foto_nueva->store('personal', 'public'); // storage/app/public/personal
-            $this->foto_actual = basename($path);
+        if ($this->foto_nueva) {
+            $imagenes->eliminar($this->foto_actual);
+            $this->foto_actual = $imagenes->guardar($this->foto_nueva);
+            $this->foto_actual_existe = true;
         }
 
 
@@ -195,6 +204,9 @@ class EditarPersonal extends Component
             'apellido_paterno',
             'apellido_materno',
             'foto_nueva',
+            'foto_actual',
+            'foto_actual_existe',
+            'foto_actual_url',
             'curp',
             'rfc',
             'correo',

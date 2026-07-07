@@ -1058,7 +1058,7 @@
                                             class="group relative flex cursor-pointer flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 px-6 py-8 text-center transition duration-300 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
 
                                             <input id="foto" type="file" wire:model="foto"
-                                                accept="image/png,image/jpeg,image/jpg" class="hidden"
+                                                accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp" class="hidden"
                                                 @change="usarTemporal($event)">
 
                                             <div

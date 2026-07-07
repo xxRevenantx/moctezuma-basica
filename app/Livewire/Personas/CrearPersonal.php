@@ -11,6 +11,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Services\CurpPdfTextExtractor;
 use App\Services\GroqCurpExtractor;
+use App\Services\ImagenPersonalService;
 
 
 class CrearPersonal extends Component
@@ -69,7 +70,7 @@ class CrearPersonal extends Component
             'apellido_paterno' => 'required|string|max:255',
             'apellido_materno' => 'nullable|string|max:255',
 
-            'foto' => 'nullable|image|max:2048',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
 
             'curp' => ['required', 'string', 'size:18', Rule::unique('personas', 'curp')],
             'rfc' => ['nullable', 'string', 'min:12', 'max:13', Rule::unique('personas', 'rfc')],
@@ -516,15 +517,11 @@ class CrearPersonal extends Component
     // =========================
     // Guardar
     // =========================
-    public function crearPersonal(): void
+    public function crearPersonal(ImagenPersonalService $imagenes): void
     {
         $this->validate();
 
-        $fotoPath = null;
-        if ($this->foto) {
-            $path = $this->foto->store('personal', 'public');
-            $fotoPath = basename($path);
-        }
+        $fotoPath = $this->foto ? $imagenes->guardar($this->foto) : null;
 
         Persona::create([
             'titulo' => $this->titulo,

@@ -13,11 +13,11 @@ use App\Models\Tutor;
 use App\Services\CurpService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\GestionAcademicaService;
+use App\Services\ImagenPersonalService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -55,6 +55,8 @@ class EditarMatricula extends Component
 
     public $foto = null;
     public ?string $foto_actual = null;
+    public ?string $foto_actual_url = null;
+    public bool $foto_actual_existe = false;
 
     public ?int $tutor_id = null;
     public bool $copiar_direccion_tutor = false;
@@ -141,6 +143,8 @@ class EditarMatricula extends Component
         $this->fecha_ingreso_plantel = optional($alumno->fecha_inscripcion)->format('Y-m-d');
         $this->fecha_estatus = optional($alumno->fecha_estatus)->format('Y-m-d') ?: now()->toDateString();
         $this->foto_actual = $alumno->foto_path;
+        $this->foto_actual_existe = $alumno->foto_existe;
+        $this->foto_actual_url = $alumno->foto_url;
 
         $this->recargarOpcionesAsignacionEscolar();
     }
@@ -594,7 +598,7 @@ class EditarMatricula extends Component
             'estado_residencia' => ['nullable', 'string', 'max:150'],
             'ciudad_residencia' => ['nullable', 'string', 'max:150'],
             'tutor_id' => ['nullable', 'integer', Rule::exists('tutores', 'id')],
-            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:4096'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];
     }
 
@@ -662,7 +666,7 @@ class EditarMatricula extends Component
         return true;
     }
 
-    public function actualizarInscripcion(GestionAcademicaService $service)
+    public function actualizarInscripcion(GestionAcademicaService $service, ImagenPersonalService $imagenes)
     {
         $this->sanitizar();
         $data = $this->validate();
@@ -690,15 +694,12 @@ class EditarMatricula extends Component
             return null;
         }
 
-        DB::transaction(function () use ($alumno, $service, $data, $cambioAcademico, $cambioEstatus): void {
+        DB::transaction(function () use ($alumno, $service, $imagenes, $data, $cambioAcademico, $cambioEstatus): void {
             $fotoPath = $alumno->foto_path;
 
             if ($this->foto) {
-                $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
-
-                if ($alumno->foto_path) {
-                    Storage::disk('public')->delete($alumno->foto_path);
-                }
+                $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
+                $imagenes->eliminarRuta($alumno->foto_path);
             }
 
             $alumno->update([

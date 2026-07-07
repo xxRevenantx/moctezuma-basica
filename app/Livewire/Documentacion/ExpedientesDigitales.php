@@ -287,7 +287,7 @@ class ExpedientesDigitales extends Component
 
         $reglas = [
             'tipo_documento_id' => ['required', 'integer', 'exists:tipos_documentos,id'],
-            'archivo' => ['required', 'file', 'mimes:pdf', 'mimetypes:application/pdf,application/x-pdf', 'max:5120'],
+            'archivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png,image/webp', 'max:10240'],
             'fecha_documento' => ['nullable', 'date'],
             'folio_documento' => ['nullable', 'string', 'max:100'],
             'origen_documento' => ['required', 'in:externo,subido,digitalizado'],
@@ -310,10 +310,10 @@ class ExpedientesDigitales extends Component
         }
 
         $this->validate($reglas, [
-            'archivo.required' => 'Selecciona un archivo PDF.',
-            'archivo.mimes' => 'El documento debe ser un archivo PDF.',
-            'archivo.mimetypes' => 'El archivo seleccionado no es un PDF válido.',
-            'archivo.max' => 'El PDF no debe superar los 5 MB.',
+            'archivo.required' => 'Selecciona un archivo.',
+            'archivo.mimes' => 'El documento debe ser PDF, JPG, JPEG, PNG o WEBP.',
+            'archivo.mimetypes' => 'El archivo seleccionado no tiene un formato permitido.',
+            'archivo.max' => 'El archivo no debe superar los 10 MB.',
             'nivel_certificado_id.required' => 'Selecciona el nivel relacionado con el documento.',
             'grado_documento_id.required' => 'Selecciona el grado relacionado con el documento.',
             'ciclo_escolar_documento_id.required' => 'Selecciona el ciclo escolar del documento.',
@@ -365,10 +365,18 @@ class ExpedientesDigitales extends Component
         $nombreOriginal = Str::limit($this->archivo->getClientOriginalName(), 250, '');
         $tamanoBytes = (int) $this->archivo->getSize();
         $hashSha256 = hash_file('sha256', $this->archivo->getRealPath()) ?: null;
+        $mimeType = strtolower((string) $this->archivo->getMimeType());
+        $extension = match ($mimeType) {
+            'application/pdf', 'application/x-pdf' => 'pdf',
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => strtolower($this->archivo->getClientOriginalExtension() ?: 'bin'),
+        };
         $reemplazaAnterior = !in_array($tipo->slug, ['constancia-estudios', 'constancia-baja-traslado'], true);
 
         try {
-            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $reemplazaAnterior, $discoExpedientes, &$rutaGuardada) {
+            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $mimeType, $extension, $reemplazaAnterior, $discoExpedientes, &$rutaGuardada) {
                 $consultaVersiones = DocumentoAlumno::query()
                     ->where('inscripcion_id', $this->alumnoSeleccionadoId)
                     ->where('tipo_documento_id', $tipo->id)
@@ -405,7 +413,7 @@ class ExpedientesDigitales extends Component
                 }
 
                 $directorio = implode('/', $segmentos);
-                $nombreInterno = Str::uuid() . '.pdf';
+                $nombreInterno = Str::uuid() . '.' . $extension;
                 $rutaGuardada = $this->archivo->storeAs($directorio, $nombreInterno, $discoExpedientes);
 
                 if (!$rutaGuardada) {
@@ -427,7 +435,7 @@ class ExpedientesDigitales extends Component
                     'disco' => $discoExpedientes,
                     'ruta' => $rutaGuardada,
                     'nombre_original' => $nombreOriginal,
-                    'mime_type' => 'application/pdf',
+                    'mime_type' => $mimeType,
                     'tamano_bytes' => $tamanoBytes,
                     'hash_sha256' => $hashSha256,
                     'version' => $version,

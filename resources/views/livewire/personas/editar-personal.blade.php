@@ -124,13 +124,13 @@
                                                 Quitar
                                             </button>
                                         </div>
-                                    @elseif(!empty($foto_actual))
+                                    @elseif(!empty($foto_actual) && $foto_actual_existe)
                                         {{-- Logo actual guardado en BD --}}
 
                                         <div
                                             class="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700
                                bg-white dark:bg-neutral-900 p-2">
-                                            <img src="{{ asset('storage/personal/' . $foto_actual) }}"
+                                            <img src="{{ $foto_actual_url }}"
                                                 alt="Foto actual de la persona"
                                                 class="w-full h-32 md:h-40 object-contain mx-auto">
                                             <span
@@ -138,8 +138,17 @@
                                                 Foto actual
                                             </span>
                                         </div>
+                                    @elseif(!empty($foto_actual))
+                                        <div class="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-rose-300 bg-rose-50 px-4 py-6 text-center dark:border-rose-900/60 dark:bg-rose-950/20">
+                                            <div class="flex size-10 items-center justify-center rounded-2xl bg-rose-500 text-white">
+                                                <flux:icon name="exclamation-triangle" class="size-5" />
+                                            </div>
+                                            <p class="text-xs font-black text-rose-700 dark:text-rose-300">
+                                                La fotografía registrada no existe. Requiere volver a cargarla.
+                                            </p>
+                                        </div>
                                     @else
-                                        {{-- Estado sin logo --}}
+                                        {{-- Estado sin foto --}}
                                         <div
                                             class="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed
                                border-neutral-300 dark:border-neutral-700 bg-neutral-50/70 dark:bg-neutral-900/40

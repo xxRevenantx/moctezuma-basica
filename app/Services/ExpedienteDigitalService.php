@@ -35,7 +35,9 @@ class ExpedienteDigitalService
         ]);
 
         $actuales = $alumno->documentos->where('es_actual', true);
-        $disponibles = $actuales->reject(fn (DocumentoAlumno $d) => in_array($d->estado, ['pendiente', 'rechazado', 'reemplazado', 'cancelada'], true));
+        $disponibles = $actuales
+            ->reject(fn (DocumentoAlumno $d) => in_array($d->estado, ['pendiente', 'rechazado', 'reemplazado', 'cancelada'], true))
+            ->filter(fn (DocumentoAlumno $d) => $d->archivo_existe);
         $items = collect();
 
         foreach ($this->tiposActivos()->where('es_general', true) as $tipo) {
@@ -50,6 +52,7 @@ class ExpedienteDigitalService
                 'presente' => (bool) $disponible,
                 'estado' => $actual?->estado ?? 'pendiente',
                 'documento_id' => $actual?->id,
+                'archivo_faltante' => (bool) $actual && ! $actual->archivo_existe,
             ]);
         }
 
@@ -67,6 +70,7 @@ class ExpedienteDigitalService
                 'presente' => (bool) $disponible,
                 'estado' => $actual?->estado ?? 'pendiente',
                 'documento_id' => $actual?->id,
+                'archivo_faltante' => (bool) $actual && ! $actual->archivo_existe,
             ]);
         }
 
@@ -93,6 +97,7 @@ class ExpedienteDigitalService
                         'presente' => (bool) $disponible,
                         'estado' => $doc->estado ?? 'pendiente',
                         'documento_id' => $doc->id,
+                        'archivo_faltante' => ! $doc->archivo_existe,
                     ]);
                 });
         }
@@ -106,6 +111,9 @@ class ExpedienteDigitalService
             'porcentaje' => $total > 0 ? (int) floor(($completados / $total) * 100) : 100,
             'completo' => $total === 0 || $completados === $total,
             'items' => $items->values()->all(),
+            'archivos_faltantes' => $actuales->reject(fn(DocumentoAlumno $documento) => $documento->archivo_existe)->count(),
+            'foto_faltante' => filled($alumno->foto_path) && ! $alumno->foto_existe,
+            'sin_foto' => blank($alumno->foto_path),
             'nivel_certificado_requerido' => $nivelCertificado ? ['id' => $nivelCertificado->id, 'nombre' => $nivelCertificado->nombre] : null,
         ];
     }

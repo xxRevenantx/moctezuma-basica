@@ -185,8 +185,9 @@
 
 
                 {{-- Foto del alumno --}}
-                @if (!empty($alumno->foto_path) && file_exists(public_path('storage/' . $alumno->foto_path)))
-                    <img class="fotoAlumno" src="{{ public_path('storage/' . $alumno->foto_path) }}"
+                @php($fotoDataUri = $alumno->foto_data_uri)
+                @if ($fotoDataUri)
+                    <img class="fotoAlumno" src="{{ $fotoDataUri }}"
                         alt="Foto del alumno">
                 @else
                     <div class="sinFoto">

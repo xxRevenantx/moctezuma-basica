@@ -536,8 +536,8 @@
                             </td>
 
                             <td class="px-4 py-4">
-                                @if ($alumno->foto_path)
-                                    <img src="{{ Storage::url($alumno->foto_path) }}" alt="Foto"
+                                @if ($alumno->foto_existe && $alumno->foto_url)
+                                    <img src="{{ $alumno->foto_url }}" alt="Foto"
                                         class="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow">
                                 @else
                                     <div
