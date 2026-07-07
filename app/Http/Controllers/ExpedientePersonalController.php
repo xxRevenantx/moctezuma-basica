@@ -62,7 +62,7 @@ class ExpedientePersonalController extends Controller
         ]);
 
         $documentos = $persona->documentosPersonal
-            ->filter(fn(DocumentoPersonal $documento) => Storage::disk($documento->disco)->exists($documento->ruta));
+            ->filter(fn(DocumentoPersonal $documento) => $documento->archivo_existe);
 
         abort_if($documentos->isEmpty() && $persona->movimientosLaborales->isEmpty(), 404, 'El personal todavía no tiene archivos o movimientos para descargar.');
 
@@ -78,8 +78,10 @@ class ExpedientePersonalController extends Controller
             'No fue posible crear el archivo ZIP.'
         );
 
+        $archivosTemporales = [];
+
         foreach ($documentos as $documento) {
-            $rutaFisica = Storage::disk($documento->disco)->path($documento->ruta);
+            $rutaFisica = $this->rutaFisicaParaZip($documento, $directorioTemporal, $archivosTemporales);
             $zip->addFile($rutaFisica, $this->nombreDentroZip($documento));
         }
 
@@ -123,16 +125,44 @@ class ExpedientePersonalController extends Controller
 
         $zip->close();
 
+        foreach ($archivosTemporales as $archivoTemporal) {
+            File::delete($archivoTemporal);
+        }
+
         $nombre = Str::slug($this->nombreCompleto($persona), '-');
         $nombreZip = 'expediente-personal-' . ($nombre ?: $persona->id) . '.zip';
 
         return response()->download($rutaZip, $nombreZip)->deleteFileAfterSend(true);
     }
 
+    private function rutaFisicaParaZip(DocumentoPersonal $documento, string $directorioTemporal, array &$archivosTemporales): string
+    {
+        $disco = Storage::disk($documento->disco);
+
+        if (method_exists($disco, 'path')) {
+            try {
+                $rutaFisica = $disco->path($documento->ruta);
+
+                if (is_file($rutaFisica)) {
+                    return $rutaFisica;
+                }
+            } catch (\Throwable) {
+                // Algunos discos remotos, como S3, no tienen ruta física local.
+            }
+        }
+
+        $contenido = $disco->get($documento->ruta);
+        $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.pdf';
+        File::put($rutaTemporal, $contenido);
+        $archivosTemporales[] = $rutaTemporal;
+
+        return $rutaTemporal;
+    }
+
     private function asegurarArchivoExiste(DocumentoPersonal $documento): void
     {
         abort_unless(
-            Storage::disk($documento->disco)->exists($documento->ruta),
+            $documento->archivo_existe,
             404,
             'El archivo ya no se encuentra en el almacenamiento privado.'
         );

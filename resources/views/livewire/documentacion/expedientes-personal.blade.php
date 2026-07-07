@@ -8,6 +8,7 @@
             'validado' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50',
             'rechazado' => 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50',
             'reemplazado' => 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700',
+            'faltante' => 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50',
         ];
 
         $coloresEstadoLaboral = [
@@ -308,6 +309,7 @@
             $academicosActuales = $documentosActuales->filter(
                 fn($documento) => $documento->tipoDocumento?->categoria === 'academico',
             );
+            $documentosDescargables = $documentosSeleccionados->filter(fn($documento) => $documento->archivo_existe);
             $soloHistorico = $personaSeleccionada->estado_laboral === 'baja' || !$personaSeleccionada->status;
         @endphp
 
@@ -342,7 +344,7 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
-                        @if ($documentosSeleccionados->isNotEmpty() || $personaSeleccionada->movimientosLaborales->isNotEmpty())
+                        @if ($documentosDescargables->isNotEmpty() || $personaSeleccionada->movimientosLaborales->isNotEmpty())
                             <a href="{{ route('misrutas.expedientes-personal.zip', $personaSeleccionada) }}"
                                 class="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
                                 <flux:icon name="archive-box" class="size-4" />
@@ -377,6 +379,12 @@
                             <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-sky-500"
                                 style="width: {{ $resumenSeleccionado['porcentaje'] }}%"></div>
                         </div>
+
+                        @if (($resumenSeleccionado['archivos_faltantes'] ?? 0) > 0)
+                            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                {{ $resumenSeleccionado['archivos_faltantes'] }} archivo(s) faltante(s). No cuentan como completos.
+                            </div>
+                        @endif
                     </div>
 
                     <div class="rounded-3xl border border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
@@ -413,22 +421,24 @@
                                     ->where('tipo_documento_personal_id', $tipo['id'])
                                     ->sortByDesc('id')
                                     ->first();
-                                $presente = $documentoActual && in_array($documentoActual->estado, ['recibido', 'validado'], true);
+                                $archivoDisponible = $documentoActual?->archivo_existe ?? false;
+                                $archivoFaltante = $documentoActual && !$archivoDisponible;
+                                $presente = $documentoActual && $archivoDisponible && in_array($documentoActual->estado, ['recibido', 'validado'], true);
                                 $claveBoton = 'personal-' . $tipo['id'];
                             @endphp
 
                             <article id="documento-personal-tipo-{{ $tipo['id'] }}"
                                 data-personal-document-type="{{ $tipo['id'] }}"
-                                class="rounded-2xl border p-4 transition {{ $presente ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/10' : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/10' }}">
+                                class="rounded-2xl border p-4 transition {{ $archivoFaltante ? 'border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/10' : ($presente ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/10' : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/10') }}">
                                 <div class="flex items-start gap-3">
-                                    <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl {{ $presente ? 'bg-emerald-500' : 'bg-amber-500' }} text-white">
-                                        <flux:icon :name="$presente ? 'check' : 'clock'" class="size-5" />
+                                    <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl {{ $archivoFaltante ? 'bg-rose-500' : ($presente ? 'bg-emerald-500' : 'bg-amber-500') }} text-white">
+                                        <flux:icon :name="$archivoFaltante ? 'x-mark' : ($presente ? 'check' : 'clock')" class="size-5" />
                                     </div>
                                     <div class="min-w-0">
                                         <h4 class="font-black text-slate-900 dark:text-white">{{ $tipo['nombre'] }}</h4>
                                         <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ $tipo['descripcion'] }}</p>
-                                        <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $documentoActual ? ($coloresEstadoDocumento[$documentoActual->estado] ?? $coloresEstadoDocumento['pendiente']) : $coloresEstadoDocumento['pendiente'] }}">
-                                            {{ $documentoActual ? ucfirst($documentoActual->estado) : 'Pendiente' }}
+                                        <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $archivoFaltante ? $coloresEstadoDocumento['faltante'] : ($documentoActual ? ($coloresEstadoDocumento[$documentoActual->estado] ?? $coloresEstadoDocumento['pendiente']) : $coloresEstadoDocumento['pendiente']) }}">
+                                            {{ $archivoFaltante ? 'Archivo faltante' : ($documentoActual ? ucfirst($documentoActual->estado) : 'Pendiente') }}
                                         </span>
                                     </div>
                                 </div>
@@ -437,10 +447,16 @@
                                     <p class="mt-3 truncate text-xs text-slate-500" title="{{ $documentoActual->nombre_original }}">
                                         {{ $documentoActual->etiqueta_detalle }} · v{{ $documentoActual->version }} · {{ $documentoActual->tamano_legible }}
                                     </p>
+
+                                    @if ($archivoFaltante)
+                                        <p class="mt-2 rounded-xl border border-rose-200 bg-white/70 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                            La BD tiene el registro, pero el PDF no existe en el disco <strong>{{ $documentoActual->disco }}</strong>.
+                                        </p>
+                                    @endif
                                 @endif
 
                                 <div class="mt-4 flex flex-wrap gap-2">
-                                    @if ($documentoActual)
+                                    @if ($documentoActual && $archivoDisponible)
                                         <a href="{{ route('misrutas.expedientes-personal.preview', $documentoActual) }}" target="_blank"
                                             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                                             <flux:icon name="eye" class="size-3.5" /> Ver PDF
@@ -449,6 +465,10 @@
                                             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                                             <flux:icon name="arrow-down-tray" class="size-3.5" /> Descargar
                                         </a>
+                                    @elseif ($documentoActual)
+                                        <span class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Sin PDF
+                                        </span>
                                     @endif
 
                                     @if (!$soloHistorico)
@@ -467,7 +487,7 @@
                                             <select wire:change="actualizarEstado({{ $documentoActual->id }}, $event.target.value)"
                                                 class="ml-auto rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                                                 @foreach (['pendiente', 'recibido', 'validado', 'rechazado'] as $estado)
-                                                    <option value="{{ $estado }}" @selected($documentoActual->estado === $estado)>
+                                                    <option value="{{ $estado }}" @selected($documentoActual->estado === $estado) @disabled($estado === 'validado' && $archivoFaltante)>
                                                         {{ ucfirst($estado) }}
                                                     </option>
                                                 @endforeach
@@ -526,10 +546,12 @@
                         @forelse ($academicosActuales as $documento)
                             @php
                                 $claveVersion = 'serie-' . $documento->serie_uuid;
+                                $archivoDisponible = $documento->archivo_existe;
+                                $archivoFaltante = !$archivoDisponible;
                             @endphp
                             <article id="documento-personal-serie-{{ $documento->serie_uuid }}"
                                 data-personal-document-type="{{ $documento->tipo_documento_personal_id }}"
-                                class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
+                                class="rounded-2xl border p-4 {{ $archivoFaltante ? 'border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/10' : 'border-slate-200 bg-slate-50 dark:border-neutral-800 dark:bg-neutral-950' }}">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
                                         <p class="font-black text-slate-900 dark:text-white">{{ $documento->etiqueta_detalle }}</p>
@@ -550,20 +572,32 @@
                                         <p class="mt-1 text-xs text-slate-500">v{{ $documento->version }} · {{ $documento->tamano_legible }}</p>
                                     </div>
 
-                                    <span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $coloresEstadoDocumento[$documento->estado] ?? $coloresEstadoDocumento['pendiente'] }}">
-                                        {{ ucfirst($documento->estado) }}
+                                    <span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $archivoFaltante ? $coloresEstadoDocumento['faltante'] : ($coloresEstadoDocumento[$documento->estado] ?? $coloresEstadoDocumento['pendiente']) }}">
+                                        {{ $archivoFaltante ? 'Archivo faltante' : ucfirst($documento->estado) }}
                                     </span>
                                 </div>
 
+                                @if ($archivoFaltante)
+                                    <p class="mt-3 rounded-xl border border-rose-200 bg-white/70 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                        La BD tiene el registro, pero el PDF no existe en el disco <strong>{{ $documento->disco }}</strong>.
+                                    </p>
+                                @endif
+
                                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                                    <a href="{{ route('misrutas.expedientes-personal.preview', $documento) }}" target="_blank"
-                                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                                        <flux:icon name="eye" class="size-3.5" /> Ver
-                                    </a>
-                                    <a href="{{ route('misrutas.expedientes-personal.download', $documento) }}"
-                                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                                        <flux:icon name="arrow-down-tray" class="size-3.5" /> Descargar
-                                    </a>
+                                    @if ($archivoDisponible)
+                                        <a href="{{ route('misrutas.expedientes-personal.preview', $documento) }}" target="_blank"
+                                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                                            <flux:icon name="eye" class="size-3.5" /> Ver
+                                        </a>
+                                        <a href="{{ route('misrutas.expedientes-personal.download', $documento) }}"
+                                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                                            <flux:icon name="arrow-down-tray" class="size-3.5" /> Descargar
+                                        </a>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Sin PDF
+                                        </span>
+                                    @endif
 
                                     @if (!$soloHistorico)
                                         <button type="button"
@@ -575,7 +609,7 @@
                                         <select wire:change="actualizarEstado({{ $documento->id }}, $event.target.value)"
                                             class="ml-auto rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                                             @foreach (['pendiente', 'recibido', 'validado', 'rechazado'] as $estado)
-                                                <option value="{{ $estado }}" @selected($documento->estado === $estado)>{{ ucfirst($estado) }}</option>
+                                                <option value="{{ $estado }}" @selected($documento->estado === $estado) @disabled($estado === 'validado' && $archivoFaltante)>{{ ucfirst($estado) }}</option>
                                             @endforeach
                                         </select>
                                     @endif
@@ -608,7 +642,10 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
                                 @forelse ($documentosSeleccionados as $documento)
-                                    <tr wire:key="historial-personal-doc-{{ $documento->id }}">
+                                    @php
+                                        $archivoDisponible = $documento->archivo_existe;
+                                    @endphp
+                                    <tr wire:key="historial-personal-doc-{{ $documento->id }}" class="{{ $archivoDisponible ? '' : 'bg-rose-50/60 dark:bg-rose-950/10' }}">
                                         <td class="px-5 py-4">
                                             <p class="font-bold text-slate-900 dark:text-white">{{ $documento->etiqueta_detalle }}</p>
                                             <p class="mt-1 max-w-md truncate text-xs text-slate-500" title="{{ $documento->nombre_original }}">
@@ -617,8 +654,8 @@
                                         </td>
                                         <td class="px-5 py-4 text-sm font-black text-slate-700 dark:text-slate-200">v{{ $documento->version }}</td>
                                         <td class="px-5 py-4">
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $coloresEstadoDocumento[$documento->estado] ?? $coloresEstadoDocumento['pendiente'] }}">
-                                                {{ ucfirst($documento->estado) }}
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $archivoDisponible ? ($coloresEstadoDocumento[$documento->estado] ?? $coloresEstadoDocumento['pendiente']) : $coloresEstadoDocumento['faltante'] }}">
+                                                {{ $archivoDisponible ? ucfirst($documento->estado) : 'Archivo faltante' }}
                                             </span>
                                         </td>
                                         <td class="px-5 py-4 text-xs text-slate-500">
@@ -626,18 +663,24 @@
                                             <p class="mt-1">{{ $documento->usuarioQueSubio?->name ?? 'Usuario no disponible' }}</p>
                                         </td>
                                         <td class="px-5 py-4 text-right">
-                                            <div class="inline-flex gap-2">
-                                                <a href="{{ route('misrutas.expedientes-personal.preview', $documento) }}" target="_blank"
-                                                    class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
-                                                    title="Ver PDF">
-                                                    <flux:icon name="eye" class="size-4" />
-                                                </a>
-                                                <a href="{{ route('misrutas.expedientes-personal.download', $documento) }}"
-                                                    class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
-                                                    title="Descargar PDF">
-                                                    <flux:icon name="arrow-down-tray" class="size-4" />
-                                                </a>
-                                            </div>
+                                            @if ($archivoDisponible)
+                                                <div class="inline-flex gap-2">
+                                                    <a href="{{ route('misrutas.expedientes-personal.preview', $documento) }}" target="_blank"
+                                                        class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
+                                                        title="Ver PDF">
+                                                        <flux:icon name="eye" class="size-4" />
+                                                    </a>
+                                                    <a href="{{ route('misrutas.expedientes-personal.download', $documento) }}"
+                                                        class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
+                                                        title="Descargar PDF">
+                                                        <flux:icon name="arrow-down-tray" class="size-4" />
+                                                    </a>
+                                                </div>
+                                            @else
+                                                <span class="inline-flex rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                                                    Sin PDF
+                                                </span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

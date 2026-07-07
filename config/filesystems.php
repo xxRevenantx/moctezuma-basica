@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disco privado para expedientes
+    |--------------------------------------------------------------------------
+    |
+    | Usa "local" para desarrollo en una sola computadora. Si trabajas en casa
+    | y en el trabajo, cambia EXPEDIENTES_DISK a "s3" o a otro disco privado
+    | compartido para que la base de datos y los archivos apunten al mismo lugar.
+    |
+    */
+
+    'expedientes_disk' => env('EXPEDIENTES_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

@@ -101,10 +101,12 @@
 
                     {{-- Documentación: acceso exclusivo para administración --}}
                     @if (auth()->user()?->is_admin)
-                        <flux:sidebar.group expandable :expanded="request()->routeIs('misrutas.expedientes*', 'misrutas.constancias', 'misrutas.oficios')" heading="DOCUMENTACIÓN"
-                            class="grid gap-1 text-xs text-zinc-300">
+                        <flux:sidebar.group expandable
+                            :expanded="request()->routeIs('misrutas.expedientes', 'misrutas.expedientes.*', 'misrutas.constancias', 'misrutas.oficios')"
+                            heading="DOCUMENTACIÓN" class="grid gap-1 text-xs text-zinc-300">
                             <flux:navlist.item icon="folder-open" :href="route('misrutas.expedientes')"
-                                :current="request()->routeIs('misrutas.expedientes*')" wire:navigate>
+                                :current="request()->routeIs('misrutas.expedientes', 'misrutas.expedientes.*')"
+                                wire:navigate>
                                 Expedientes digitales
                             </flux:navlist.item>
 
@@ -121,8 +123,9 @@
                     @endif
 
                     {{-- Académica --}}
-                    <flux:sidebar.group expandable :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos')" heading="ACADÉMICA"
-                        class="grid gap-1 text-xs text-zinc-300">
+                    <flux:sidebar.group expandable
+                        :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos')"
+                        heading="ACADÉMICA" class="grid gap-1 text-xs text-zinc-300">
                         <flux:navlist.item icon="graduation-cap" :href="route('misrutas.alumnos')"
                             :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
                             Alumnos
@@ -233,11 +236,13 @@
 
                         @if (auth()->user()?->is_admin)
                             <flux:navlist.item icon="document-text" :href="route('media-superior.documentos.index')"
-                                :current="request()->routeIs('media-superior.documentos.index', 'media-superior.documentos.modulo')" wire:navigate>
+                                :current="request()->routeIs('media-superior.documentos.index', 'media-superior.documentos.modulo')"
+                                wire:navigate>
                                 Documentos oficiales
                             </flux:navlist.item>
 
-                            <flux:navlist.item icon="cog-6-tooth" :href="route('media-superior.documentos.configuracion')"
+                            <flux:navlist.item icon="cog-6-tooth"
+                                :href="route('media-superior.documentos.configuracion')"
                                 :current="request()->routeIs('media-superior.documentos.configuracion')" wire:navigate>
                                 Configuración documental
                             </flux:navlist.item>

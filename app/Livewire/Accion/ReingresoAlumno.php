@@ -406,7 +406,9 @@ class ReingresoAlumno extends Component
 
         $archivo = $this->constancia_traslado_pdf;
         $nombre = Str::uuid() . '.pdf';
-        $ruta = $archivo->storeAs("expedientes/{$alumno->id}/constancia-traslado/nivel-{$trayectoria->nivel_id}", $nombre, 'local');
+        $discoExpedientes = config('filesystems.expedientes_disk', 'local');
+        $hashSha256 = hash_file('sha256', $archivo->getRealPath()) ?: null;
+        $ruta = $archivo->storeAs("expedientes/{$alumno->id}/constancia-traslado/nivel-{$trayectoria->nivel_id}", $nombre, $discoExpedientes);
 
         return DocumentoAlumno::query()->create([
             'inscripcion_id' => $alumno->id,
@@ -419,12 +421,12 @@ class ReingresoAlumno extends Component
             'fecha_documento' => now()->toDateString(),
             'origen' => 'externo',
             'tipo_movimiento' => $this->tipo_retorno,
-            'disco' => 'local',
+            'disco' => $discoExpedientes,
             'ruta' => $ruta,
             'nombre_original' => $archivo->getClientOriginalName(),
             'mime_type' => $archivo->getMimeType() ?: 'application/pdf',
             'tamano_bytes' => $archivo->getSize(),
-            'hash_sha256' => hash_file('sha256', Storage::disk('local')->path($ruta)),
+            'hash_sha256' => $hashSha256,
             'version' => $version,
             'es_actual' => true,
             'estado' => 'validado',

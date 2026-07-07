@@ -25,14 +25,16 @@ class ExpedienteArchivoService
         if (! $usuarioId) throw new RuntimeException('No hay un usuario autenticado para registrar el documento generado.');
 
         $rutaGuardada = null;
+        $discoExpedientes = config('filesystems.expedientes_disk', 'local');
+
         try {
-            return DB::transaction(function () use ($alumno, $tipo, $contenidoPdf, $metadatos, $usuarioId, &$rutaGuardada) {
+            return DB::transaction(function () use ($alumno, $tipo, $contenidoPdf, $metadatos, $usuarioId, $discoExpedientes, &$rutaGuardada) {
                 $folio = trim((string) ($metadatos['folio'] ?? '')) ?: null;
                 $nombreBase = $folio ?: ($tipo->slug . '-' . now()->format('Ymd-His'));
                 $directorio = 'expedientes/' . $alumno->id . '/' . $tipo->slug . '/generados/' . now()->format('Y');
                 $rutaGuardada = $directorio . '/' . Str::uuid() . '.pdf';
 
-                if (! Storage::disk('local')->put($rutaGuardada, $contenidoPdf)) {
+                if (! Storage::disk($discoExpedientes)->put($rutaGuardada, $contenidoPdf)) {
                     throw new RuntimeException('No fue posible guardar el PDF generado.');
                 }
 
@@ -48,7 +50,7 @@ class ExpedienteArchivoService
                     'origen' => 'generado',
                     'tipo_movimiento' => $metadatos['tipo_movimiento'] ?? null,
                     'motivo' => $metadatos['motivo'] ?? null,
-                    'disco' => 'local',
+                    'disco' => $discoExpedientes,
                     'ruta' => $rutaGuardada,
                     'nombre_original' => Str::slug($nombreBase, '_') . '.pdf',
                     'mime_type' => 'application/pdf',
@@ -62,7 +64,7 @@ class ExpedienteArchivoService
                 ]);
             });
         } catch (Throwable $e) {
-            if ($rutaGuardada) Storage::disk('local')->delete($rutaGuardada);
+            if ($rutaGuardada) Storage::disk($discoExpedientes)->delete($rutaGuardada);
             throw $e;
         }
     }

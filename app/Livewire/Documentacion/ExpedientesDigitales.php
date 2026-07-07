@@ -361,13 +361,14 @@ class ExpedientesDigitales extends Component
         }
 
         $rutaGuardada = null;
+        $discoExpedientes = config('filesystems.expedientes_disk', 'local');
         $nombreOriginal = Str::limit($this->archivo->getClientOriginalName(), 250, '');
         $tamanoBytes = (int) $this->archivo->getSize();
         $hashSha256 = hash_file('sha256', $this->archivo->getRealPath()) ?: null;
         $reemplazaAnterior = !in_array($tipo->slug, ['constancia-estudios', 'constancia-baja-traslado'], true);
 
         try {
-            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $reemplazaAnterior, &$rutaGuardada) {
+            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $reemplazaAnterior, $discoExpedientes, &$rutaGuardada) {
                 $consultaVersiones = DocumentoAlumno::query()
                     ->where('inscripcion_id', $this->alumnoSeleccionadoId)
                     ->where('tipo_documento_id', $tipo->id)
@@ -405,7 +406,7 @@ class ExpedientesDigitales extends Component
 
                 $directorio = implode('/', $segmentos);
                 $nombreInterno = Str::uuid() . '.pdf';
-                $rutaGuardada = $this->archivo->storeAs($directorio, $nombreInterno, 'local');
+                $rutaGuardada = $this->archivo->storeAs($directorio, $nombreInterno, $discoExpedientes);
 
                 if (!$rutaGuardada) {
                     throw new \RuntimeException('No fue posible guardar el archivo.');
@@ -423,7 +424,7 @@ class ExpedientesDigitales extends Component
                     'origen' => $this->origen_documento,
                     'tipo_movimiento' => $tipo->slug === 'constancia-baja-traslado' ? $this->tipo_movimiento_documento : null,
                     'motivo' => $tipo->slug === 'constancia-baja-traslado' ? trim($this->motivo_documento) : null,
-                    'disco' => 'local',
+                    'disco' => $discoExpedientes,
                     'ruta' => $rutaGuardada,
                     'nombre_original' => $nombreOriginal,
                     'mime_type' => 'application/pdf',
@@ -470,7 +471,7 @@ class ExpedientesDigitales extends Component
             $this->dispatch('notify', type: 'success', message: $mensaje);
         } catch (Throwable $e) {
             if ($rutaGuardada) {
-                Storage::disk('local')->delete($rutaGuardada);
+                Storage::disk($discoExpedientes)->delete($rutaGuardada);
             }
 
             report($e);

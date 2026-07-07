@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class DocumentoPersonal extends Model
 {
@@ -79,6 +81,20 @@ class DocumentoPersonal extends Model
     {
         return $query->where('es_actual', true)
             ->whereIn('estado', ['recibido', 'validado']);
+    }
+
+
+    public function getArchivoExisteAttribute(): bool
+    {
+        if (blank($this->disco) || blank($this->ruta)) {
+            return false;
+        }
+
+        try {
+            return Storage::disk($this->disco)->exists($this->ruta);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function getTamanoLegibleAttribute(): string
