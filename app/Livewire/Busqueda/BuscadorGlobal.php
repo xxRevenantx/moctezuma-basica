@@ -3,6 +3,7 @@
 namespace App\Livewire\Busqueda;
 
 use App\Services\BusquedaGlobalService;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class BuscadorGlobal extends Component
@@ -20,6 +21,7 @@ class BuscadorGlobal extends Component
 
     public ?string $mensajeError = null;
 
+    #[On('abrir-buscador-global')]
     public function abrir(): void
     {
         abort_unless(auth()->user()?->is_admin, 403);
@@ -27,18 +29,29 @@ class BuscadorGlobal extends Component
         $this->modalAbierto = true;
         $this->mensajeError = null;
 
+        $this->dispatch('enfocar-buscador-global');
         $this->dispatch('buscador-global-abierto');
     }
 
+    #[On('cerrar-buscador-global')]
     public function cerrar(): void
     {
         $this->modalAbierto = false;
         $this->indiceActivo = 0;
+
+        $this->dispatch('buscador-global-cerrado');
     }
 
     public function limpiar(): void
     {
-        $this->reset(['consulta', 'categorias', 'indiceActivo', 'busquedaEjecutada', 'mensajeError']);
+        $this->reset([
+            'consulta',
+            'categorias',
+            'indiceActivo',
+            'busquedaEjecutada',
+            'mensajeError',
+        ]);
+
         $this->dispatch('enfocar-buscador-global');
     }
 
@@ -52,6 +65,7 @@ class BuscadorGlobal extends Component
         if (mb_strlen($consulta) < 2) {
             $this->categorias = [];
             $this->busquedaEjecutada = false;
+
             return;
         }
 
@@ -87,6 +101,7 @@ class BuscadorGlobal extends Component
         }
 
         $this->indiceActivo = ($this->indiceActivo + 1) % $total;
+
         $this->dispatch('resultado-buscador-activo', indice: $this->indiceActivo);
     }
 
@@ -99,6 +114,7 @@ class BuscadorGlobal extends Component
         }
 
         $this->indiceActivo = ($this->indiceActivo - 1 + $total) % $total;
+
         $this->dispatch('resultado-buscador-activo', indice: $this->indiceActivo);
     }
 
@@ -130,7 +146,7 @@ class BuscadorGlobal extends Component
     private function totalResultados(): int
     {
         return collect($this->categorias)
-            ->sum(fn(array $categoria): int => count($categoria['resultados'] ?? []));
+            ->sum(fn (array $categoria): int => count($categoria['resultados'] ?? []));
     }
 
     /** @return array<string, mixed>|null */

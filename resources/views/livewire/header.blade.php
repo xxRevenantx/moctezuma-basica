@@ -22,8 +22,49 @@
                 <!-- Widgets -->
                 <div class="w-full sm:w-auto flex flex-col lg:flex-row items-center gap-3 mt-2 sm:mt-0">
 
-                    {{-- Búsqueda global disponible desde cualquier módulo (Ctrl/Cmd + K) --}}
-                    <livewire:busqueda.buscador-global />
+                    {{-- Disparador del buscador global. El componente vive fuera de Header para evitar
+                         que los eventos wire del modal sean enviados al componente padre. --}}
+                    @if (auth()->user()?->is_admin)
+                        <button type="button"
+                            x-data="{
+                                abriendo: false,
+                                abrirBuscador() {
+                                    if (this.abriendo) return;
+
+                                    this.abriendo = true;
+                                    window.dispatchEvent(new CustomEvent('buscador-global-iniciando'));
+                                    window.Livewire.dispatch('abrir-buscador-global');
+
+                                    // Respaldo visual por si la petición falla antes de responder.
+                                    setTimeout(() => this.abriendo = false, 5000);
+                                }
+                            }"
+                            x-on:click="abrirBuscador()"
+                            x-on:buscador-global-iniciando.window="abriendo = true"
+                            x-on:buscador-global-abierto.window="abriendo = false"
+                            x-bind:disabled="abriendo"
+                            x-bind:aria-busy="abriendo.toString()"
+                            class="group flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-left text-sm text-neutral-500 shadow-sm transition hover:border-[#006492]/40 hover:bg-sky-50/60 hover:text-[#006492] focus:outline-none focus:ring-4 focus:ring-[#006492]/10 disabled:cursor-wait disabled:opacity-80 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-sky-500/40 dark:hover:bg-sky-500/10 sm:w-[270px] lg:w-[330px]"
+                            aria-label="Abrir búsqueda global">
+                            <flux:icon.magnifying-glass class="size-4 shrink-0 transition group-hover:scale-110" />
+
+                            <span class="min-w-0 flex-1 truncate">
+                                Buscar alumno, folio, calificación...
+                            </span>
+
+                            <span x-cloak x-show="abriendo" class="inline-flex shrink-0 items-center" aria-hidden="true">
+                                <svg class="size-4 animate-spin text-[#006492] dark:text-sky-300" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".2" stroke-width="3"></circle>
+                                    <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                                </svg>
+                            </span>
+
+                            <kbd x-show="!abriendo"
+                                class="hidden shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-[10px] font-black text-neutral-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 sm:inline-flex">
+                                Ctrl K
+                            </kbd>
+                        </button>
+                    @endif
 
                     <flux:radio.group x-data variant="segmented" x-model="$flux.appearance">
                         <flux:radio value="light" icon="sun"></flux:radio>
