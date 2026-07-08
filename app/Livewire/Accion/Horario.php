@@ -100,13 +100,46 @@ class Horario extends Component
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get();
-        $this->ciclo_escolar_id = $this->ciclosEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->ciclosEscolares->first()?->id;
+
+        $cicloSolicitado = request()->integer('ciclo_escolar');
+        $this->ciclo_escolar_id = $cicloSolicitado > 0
+            && $this->ciclosEscolares->contains('id', $cicloSolicitado)
+            ? $cicloSolicitado
+            : ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
+                ?? $this->ciclosEscolares->first()?->id);
 
         $this->cargarGeneraciones();
+
+        $generacionSolicitada = request()->integer('generacion');
+        if ($generacionSolicitada > 0 && $this->generaciones->contains('id', $generacionSolicitada)) {
+            $this->generacion_id = $generacionSolicitada;
+        }
+
         $this->cargarGrados();
+
+        $gradoSolicitado = request()->integer('grado');
+        if ($gradoSolicitado > 0 && $this->grados->contains('id', $gradoSolicitado)) {
+            $this->grado_id = $gradoSolicitado;
+        }
+
         $this->cargarSemestres();
+
+        $semestreSolicitado = request()->integer('semestre');
+        if (
+            $this->esBachillerato
+            && $semestreSolicitado > 0
+            && $this->semestres->contains('id', $semestreSolicitado)
+        ) {
+            $this->semestre_id = $semestreSolicitado;
+        }
+
         $this->cargarGrupos();
+
+        $grupoSolicitado = request()->integer('grupo');
+        if ($grupoSolicitado > 0 && $this->grupos->contains('id', $grupoSolicitado)) {
+            $this->grupo_id = $grupoSolicitado;
+        }
+
         $this->cargarHoras();
         $this->cargarDias();
         $this->cargarMateriasDisponibles();
@@ -1514,7 +1547,7 @@ class Horario extends Component
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
             ->where('receso', false)
-            ->when($this->nivel?->slug === 'secundaria', fn ($query) => $query->where('slug', '!=', 'taller'))
+            ->when($this->nivel?->slug === 'secundaria', fn($query) => $query->where('slug', '!=', 'taller'))
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),

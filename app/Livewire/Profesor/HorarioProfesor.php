@@ -27,11 +27,18 @@ class HorarioProfesor extends Component
 
     public function mount(): void
     {
-        $this->cicloEscolarId = cicloEscolar::query()
+        $cicloPredeterminado = cicloEscolar::query()
             ->where('es_actual', true)
             ->value('id') ?: cicloEscolar::query()->orderByDesc('id')->value('id');
 
-        $this->profesorId = Persona::query()
+        $cicloSolicitado = request()->integer('ciclo_escolar_id');
+
+        $this->cicloEscolarId = $cicloSolicitado > 0
+            && cicloEscolar::query()->whereKey($cicloSolicitado)->exists()
+            ? $cicloSolicitado
+            : $cicloPredeterminado;
+
+        $profesoresQuery = Persona::query()
             ->select('personas.id')
             ->where(function ($personasQuery) {
                 $personasQuery->whereExists(function ($query) {
@@ -51,8 +58,14 @@ class HorarioProfesor extends Component
             ->where('personas.status', true)
             ->orderBy('personas.apellido_paterno')
             ->orderBy('personas.apellido_materno')
-            ->orderBy('personas.nombre')
-            ->value('personas.id');
+            ->orderBy('personas.nombre');
+
+        $profesorSolicitado = request()->integer('profesor_id');
+
+        $this->profesorId = $profesorSolicitado > 0
+            && (clone $profesoresQuery)->whereKey($profesorSolicitado)->exists()
+            ? $profesorSolicitado
+            : $profesoresQuery->value('personas.id');
     }
 
     public function updatedProfesorId(): void
@@ -160,9 +173,9 @@ class HorarioProfesor extends Component
             ->map(function ($profesor) {
                 $profesor->nombre_completo = trim(
                     ($profesor->titulo ? $profesor->titulo . ' ' : '') .
-                    $profesor->nombre . ' ' .
-                    $profesor->apellido_paterno . ' ' .
-                    ($profesor->apellido_materno ?? '')
+                        $profesor->nombre . ' ' .
+                        $profesor->apellido_paterno . ' ' .
+                        ($profesor->apellido_materno ?? '')
                 );
 
                 return $profesor;

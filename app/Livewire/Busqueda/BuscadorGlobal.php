@@ -37,7 +37,14 @@ class BuscadorGlobal extends Component
     public function cerrar(): void
     {
         $this->modalAbierto = false;
-        $this->indiceActivo = 0;
+
+        $this->reset([
+            'consulta',
+            'categorias',
+            'indiceActivo',
+            'busquedaEjecutada',
+            'mensajeError',
+        ]);
 
         $this->dispatch('buscador-global-cerrado');
     }
@@ -126,9 +133,13 @@ class BuscadorGlobal extends Component
             return null;
         }
 
+        $url = (string) $resultado['url'];
+
         $this->cerrar();
 
-        return $this->redirect((string) $resultado['url'], navigate: true);
+        // Los módulos dinámicos por nivel se abren con una carga completa para
+        // evitar que Livewire conserve una URL o filtros anteriores.
+        return $this->redirect($url, navigate: false);
     }
 
     public function seleccionarActivo(): mixed
@@ -146,7 +157,7 @@ class BuscadorGlobal extends Component
     private function totalResultados(): int
     {
         return collect($this->categorias)
-            ->sum(fn (array $categoria): int => count($categoria['resultados'] ?? []));
+            ->sum(fn(array $categoria): int => count($categoria['resultados'] ?? []));
     }
 
     /** @return array<string, mixed>|null */

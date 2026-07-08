@@ -1,4 +1,4 @@
-<div x-data="panelProfesoresPro()" class="min-h-screen dark:bg-zinc-950 sm:px-6">
+<div x-data="panelProfesoresPro(@js(request('seccion', 'lista')))" class="min-h-screen dark:bg-zinc-950 sm:px-6">
     <div class="mx-auto space-y-6">
 
         {{-- Encabezado principal --}}
@@ -291,8 +291,9 @@
 
     @script
         <script>
-            Alpine.data('panelProfesoresPro', () => ({
-                abierto: 'lista',
+            Alpine.data('panelProfesoresPro', (seccionInicial = 'lista') => ({
+                abierto: ['lista', 'credenciales', 'horario'].includes(seccionInicial) ?
+                    seccionInicial : 'lista',
 
                 cambiar(seccion) {
                     this.abierto = seccion;
