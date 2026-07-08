@@ -31,6 +31,7 @@ use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\HorariosGeneralesPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\ListaGeneracionesHistoricasController;
+use App\Http\Controllers\ListaAlumnosSeleccionadosController;
 use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
@@ -66,6 +67,10 @@ Route::get('/escuela', [EscuelaController::class, 'index'])->name('misrutas.escu
 
 // RUTA ALUMNOS
 Route::get('/alumnos', [InscripcionController::class, 'alumnos'])->name('misrutas.alumnos');
+Route::post('/alumnos/lista-seleccionados/pdf', [ListaAlumnosSeleccionadosController::class, 'pdf'])
+    ->name('misrutas.alumnos.lista.pdf');
+Route::post('/alumnos/lista-seleccionados/word', [ListaAlumnosSeleccionadosController::class, 'word'])
+    ->name('misrutas.alumnos.lista.word');
 
 
 // RESPALDOS ACADÉMICOS

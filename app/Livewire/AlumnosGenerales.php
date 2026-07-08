@@ -12,6 +12,7 @@ use App\Models\Semestre;
 use App\Services\ExpedienteDigitalService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -40,6 +41,9 @@ class AlumnosGenerales extends Component
     public string $orden = 'apellidos';
 
     public int $perPage = 25;
+
+    /** @var array<int, int|string> */
+    public array $seleccionados = [];
 
     public int $total = 0;
     public int $hombres = 0;
@@ -193,10 +197,98 @@ class AlumnosGenerales extends Component
         }
 
         $alumno->delete();
+        $this->seleccionados = array_values(array_filter(
+            $this->seleccionados,
+            fn ($id) => (int) $id !== $alumnoId,
+        ));
 
         $this->dispatch('notify', type: 'success', message: 'Alumno eliminado correctamente.');
 
         $this->actualizarVista();
+    }
+
+    public function alternarSeleccionPagina(): void
+    {
+        $idsPagina = $this->idsPaginaActual();
+
+        if (empty($idsPagina)) {
+            return;
+        }
+
+        $seleccionados = collect($this->seleccionados)->map(fn ($id) => (int) $id);
+        $todosSeleccionados = collect($idsPagina)->every(fn (int $id) => $seleccionados->contains($id));
+
+        $this->seleccionados = $todosSeleccionados
+            ? $seleccionados->reject(fn (int $id) => in_array($id, $idsPagina, true))->values()->all()
+            : $seleccionados->merge($idsPagina)->unique()->values()->all();
+    }
+
+    public function seleccionarTodosResultados(): void
+    {
+        $ids = $this->consultaBase(false, true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->seleccionados = collect($this->seleccionados)
+            ->map(fn ($id) => (int) $id)
+            ->merge($ids)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->dispatch('notify', type: 'success', message: count($ids) . ' alumno(s) filtrado(s) seleccionados.');
+    }
+
+    public function invertirSeleccion(): void
+    {
+        $idsFiltrados = $this->consultaBase(false, true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $seleccionados = collect($this->seleccionados)->map(fn ($id) => (int) $id);
+        $fueraDelFiltro = $seleccionados->reject(fn (int $id) => $idsFiltrados->contains($id));
+        $invertidos = $idsFiltrados->reject(fn (int $id) => $seleccionados->contains($id));
+
+        $this->seleccionados = $fueraDelFiltro
+            ->merge($invertidos)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function limpiarSeleccion(): void
+    {
+        $this->seleccionados = [];
+    }
+
+    public function prepararGenerador(): void
+    {
+        if (empty($this->seleccionados)) {
+            $this->dispatch('mostrar-alerta-sin-seleccion');
+            return;
+        }
+
+        $this->dispatch('abrir-generador-lista');
+    }
+
+    public function estaSeleccionado(int $alumnoId): bool
+    {
+        return collect($this->seleccionados)
+            ->map(fn ($id) => (int) $id)
+            ->contains($alumnoId);
+    }
+
+    private function idsPaginaActual(): array
+    {
+        $pagina = max(1, Paginator::resolveCurrentPage('page'));
+
+        return $this->consultaBase(false, true)
+            ->forPage($pagina, $this->perPage)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function actualizarVista(): void
@@ -500,8 +592,17 @@ class AlumnosGenerales extends Component
             });
         }
 
+        $idsPagina = $alumnos->getCollection()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $seleccionados = collect($this->seleccionados)->map(fn ($id) => (int) $id);
+
         return view('livewire.alumnos-generales', [
             'alumnos' => $alumnos,
+            'todosPaginaSeleccionados' => $idsPagina->isNotEmpty()
+                && $idsPagina->every(fn (int $id) => $seleccionados->contains($id)),
+            'totalSeleccionados' => $seleccionados->unique()->count(),
         ]);
     }
 }

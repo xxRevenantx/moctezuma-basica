@@ -1,5 +1,7 @@
 <div x-data="{
     editando: false,
+    modalDocumento: false,
+    generando: null,
 
     abrirEdicion(url) {
         this.editando = true;
@@ -7,8 +9,60 @@
         setTimeout(() => {
             window.location.href = url;
         }, 250);
+    },
+
+    enviarDocumento(formato) {
+        const form = this.$refs.formLista;
+        const titulo = form.querySelector(`[name='titulo']`);
+        const columnas = form.querySelectorAll(`input[name='columnas[]']:checked`);
+        const alumnos = form.querySelectorAll(`input[name='alumnos[]']`);
+
+        if (!alumnos.length) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Selecciona alumnos',
+                text: 'Debes seleccionar al menos un alumno para generar la lista.',
+                confirmButtonColor: '#006492'
+            });
+            return;
+        }
+
+        if (!titulo.value.trim()) {
+            titulo.focus();
+            Swal.fire({
+                icon: 'warning',
+                title: 'Falta el título',
+                text: 'Escribe el título que llevará el documento.',
+                confirmButtonColor: '#006492'
+            });
+            return;
+        }
+
+        if (!columnas.length) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Selecciona columnas',
+                text: 'Elige al menos una columna para generar la lista.',
+                confirmButtonColor: '#006492'
+            });
+            return;
+        }
+
+        form.action = formato === 'pdf' ? form.dataset.pdf : form.dataset.word;
+        form.target = formato === 'pdf' ? '_blank' : '_self';
+        this.generando = formato === 'pdf' ? 'Preparando PDF' : 'Preparando Word';
+        this.modalDocumento = false;
+
+        HTMLFormElement.prototype.submit.call(form);
+
+        setTimeout(() => {
+            this.generando = null;
+        }, 3500);
     }
-}" class="space-y-6">
+}"
+    x-on:abrir-generador-lista.window="modalDocumento = true"
+    x-on:mostrar-alerta-sin-seleccion.window="Swal.fire({ icon: 'warning', title: 'Sin alumnos seleccionados', text: 'Marca uno o más alumnos de la tabla antes de generar la lista.', confirmButtonColor: '#006492' })"
+    class="space-y-6">
     <style>
         [x-cloak] {
             display: none !important;
@@ -39,6 +93,178 @@
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 Preparando la información del alumno...
             </p>
+        </div>
+    </div>
+
+    {{-- Loader de generación de documentos --}}
+    <div x-cloak x-show="generando" x-transition.opacity
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+        <div class="w-full max-w-sm rounded-[28px] border border-white/20 bg-white p-7 text-center shadow-2xl dark:bg-neutral-900">
+            <div class="relative mx-auto mb-5 h-20 w-20">
+                <div class="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-neutral-800"></div>
+                <div class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-[#006492] border-r-[#88AC2E]"></div>
+                <div class="absolute inset-3 flex items-center justify-center rounded-full bg-gradient-to-br from-[#006492] to-sky-500 text-white">
+                    <flux:icon.document-text class="h-7 w-7" />
+                </div>
+            </div>
+            <h3 class="text-lg font-black text-slate-900 dark:text-white" x-text="generando"></h3>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Organizando alumnos, encabezado institucional y columnas seleccionadas...
+            </p>
+        </div>
+    </div>
+
+    {{-- Modal para configurar la lista --}}
+    <div x-cloak x-show="modalDocumento" x-transition.opacity
+        x-on:keydown.escape.window="modalDocumento = false"
+        class="fixed inset-0 z-[9998] overflow-y-auto bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
+        <div class="flex min-h-full items-center justify-center">
+            <div x-show="modalDocumento" x-transition.scale.95 x-on:click.outside="modalDocumento = false"
+                class="w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/20 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
+                <div class="relative overflow-hidden bg-gradient-to-r from-[#006492] via-sky-600 to-indigo-700 px-6 py-5 text-white sm:px-8">
+                    <div class="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl"></div>
+                    <div class="relative flex items-start justify-between gap-4">
+                        <div>
+                            <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-black uppercase tracking-wide">
+                                <flux:icon.document-text class="h-4 w-4" />
+                                Exportación personalizada
+                            </div>
+                            <h2 class="mt-3 text-2xl font-black">Generar lista de alumnos</h2>
+                            <p class="mt-1 text-sm text-white/80">
+                                {{ $totalSeleccionados }} alumno(s) seleccionados. Configura el documento antes de descargarlo.
+                            </p>
+                        </div>
+                        <button type="button" x-on:click="modalDocumento = false"
+                            class="rounded-xl bg-white/15 p-2 text-white transition hover:bg-white/25" aria-label="Cerrar">
+                            <flux:icon.x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+
+                <form x-ref="formLista" method="POST"
+                    data-pdf="{{ route('misrutas.alumnos.lista.pdf') }}"
+                    data-word="{{ route('misrutas.alumnos.lista.word') }}">
+                    @csrf
+                    @foreach ($seleccionados as $alumnoSeleccionado)
+                        <input type="hidden" name="alumnos[]" value="{{ (int) $alumnoSeleccionado }}">
+                    @endforeach
+
+                    <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.1fr_1.9fr]">
+                        <div class="space-y-5">
+                            <div>
+                                <label class="mb-1.5 block text-sm font-black text-slate-800 dark:text-white">
+                                    Título del documento
+                                </label>
+                                <input type="text" name="titulo" value="Lista general de alumnos" maxlength="120"
+                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#006492] focus:ring-4 focus:ring-sky-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-sky-950">
+                            </div>
+
+                            <div>
+                                <label class="mb-1.5 block text-sm font-black text-slate-800 dark:text-white">
+                                    Responsable <span class="font-normal text-slate-400">(opcional)</span>
+                                </label>
+                                <input type="text" name="responsable" maxlength="120" placeholder="Nombre de quien elabora o recibe"
+                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#006492] focus:ring-4 focus:ring-sky-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-sky-950">
+                            </div>
+
+                            <div>
+                                <label class="mb-1.5 block text-sm font-black text-slate-800 dark:text-white">Orientación</label>
+                                <select name="orientacion"
+                                    class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#006492] focus:ring-4 focus:ring-sky-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-sky-950">
+                                    <option value="auto" selected>Automática según las columnas</option>
+                                    <option value="portrait">Carta vertical</option>
+                                    <option value="landscape">Carta horizontal</option>
+                                </select>
+                            </div>
+
+                            <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                                <input type="hidden" name="agrupar" value="0">
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" name="agrupar" value="1" checked
+                                        class="mt-0.5 h-5 w-5 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                                    <span>
+                                        <span class="block text-sm font-black text-slate-800 dark:text-white">Separar por nivel, grado y grupo</span>
+                                        <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Cada grupo iniciará en una página independiente.</span>
+                                    </span>
+                                </label>
+
+                                <input type="hidden" name="estadisticas" value="0">
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" name="estadisticas" value="1" checked
+                                        class="mt-0.5 h-5 w-5 rounded border-slate-300 text-[#88AC2E] focus:ring-[#88AC2E]">
+                                    <span>
+                                        <span class="block text-sm font-black text-slate-800 dark:text-white">Incluir estadísticas</span>
+                                        <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Total, hombres, mujeres, activos y bajas.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <h3 class="text-base font-black text-slate-900 dark:text-white">Columnas de la lista</h3>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Puedes activar o quitar campos antes de generar el archivo.</p>
+                                </div>
+                                <span class="inline-flex w-fit rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                                    PDF y Word editable
+                                </span>
+                            </div>
+
+                            @php
+                                $columnasLista = [
+                                    'numero' => ['# consecutivo', true],
+                                    'foto' => ['Fotografía', false],
+                                    'matricula' => ['Matrícula', true],
+                                    'folio' => ['Folio', false],
+                                    'curp' => ['CURP', false],
+                                    'nombre' => ['Nombre completo', true],
+                                    'sexo' => ['Sexo', true],
+                                    'nivel' => ['Nivel', true],
+                                    'grado' => ['Grado / semestre', true],
+                                    'grupo' => ['Grupo', true],
+                                    'generacion' => ['Generación', true],
+                                    'ciclo' => ['Ciclo escolar', false],
+                                    'estatus' => ['Estatus', false],
+                                    'firma' => ['Espacio para firma', true],
+                                    'observaciones' => ['Observaciones', true],
+                                ];
+                            @endphp
+
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($columnasLista as $claveColumna => [$etiquetaColumna, $marcada])
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-sky-300 hover:bg-sky-50/60 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-sky-800 dark:hover:bg-sky-950/20">
+                                        <input type="checkbox" name="columnas[]" value="{{ $claveColumna }}" @checked($marcada)
+                                            class="h-5 w-5 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                                        <span class="text-sm font-bold text-slate-700 dark:text-slate-200">{{ $etiquetaColumna }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                                El sistema ordenará los alumnos por nivel, grado, grupo y apellidos. La orientación automática cambiará a horizontal cuando selecciones muchas columnas.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5 dark:border-neutral-800 dark:bg-neutral-950/60 sm:flex-row sm:items-center sm:justify-end sm:px-8">
+                        <button type="button" x-on:click="modalDocumento = false"
+                            class="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
+                            Cancelar
+                        </button>
+                        <button type="button" x-on:click="enviarDocumento('word')"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#88AC2E] px-5 py-3 text-sm font-black text-white shadow-lg shadow-lime-500/20 transition hover:brightness-95">
+                            <flux:icon.document-text class="h-5 w-5" />
+                            Descargar Word
+                        </button>
+                        <button type="button" x-on:click="enviarDocumento('pdf')"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#006492] px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:brightness-110">
+                            <flux:icon.arrow-down-tray class="h-5 w-5" />
+                            Abrir PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -245,6 +471,53 @@
             </div>
         </div>
 
+        {{-- Herramientas de selección masiva --}}
+        <div class="border-b border-slate-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-[#006492] dark:bg-sky-950/40 dark:text-sky-300">
+                        <flux:icon.users class="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p class="text-sm font-black text-slate-900 dark:text-white">
+                            Selección para listas
+                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ $totalSeleccionados }} alumno(s) seleccionados. La selección se conserva al paginar o cambiar filtros.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" wire:click="seleccionarTodosResultados"
+                        wire:loading.attr="disabled" wire:target="seleccionarTodosResultados"
+                        class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-black text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300 dark:hover:bg-sky-950/50">
+                        <span wire:loading.remove wire:target="seleccionarTodosResultados">Seleccionar resultados ({{ $total }})</span>
+                        <span wire:loading wire:target="seleccionarTodosResultados">Seleccionando...</span>
+                    </button>
+
+                    <button type="button" wire:click="invertirSeleccion"
+                        wire:loading.attr="disabled" wire:target="invertirSeleccion"
+                        class="rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100 disabled:opacity-60 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-300">
+                        Invertir selección
+                    </button>
+
+                    @if ($totalSeleccionados > 0)
+                        <button type="button" wire:click="limpiarSeleccion"
+                            class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700">
+                            Quitar selección
+                        </button>
+                    @endif
+
+                    <button type="button" wire:click="prepararGenerador"
+                        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-sky-500 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:brightness-110">
+                        <flux:icon.document-text class="h-4 w-4" />
+                        Generar lista
+                    </button>
+                </div>
+            </div>
+        </div>
+
         {{-- Loader Livewire --}}
         <div wire:loading.delay
             class="border-b border-slate-200 bg-sky-50 px-5 py-3 text-sm font-bold text-sky-700 dark:border-neutral-800 dark:bg-sky-950/30 dark:text-sky-300">
@@ -260,6 +533,12 @@
                 <thead
                     class="bg-white text-xs uppercase tracking-wide text-slate-500 dark:bg-neutral-900 dark:text-slate-400">
                     <tr>
+                        <th class="w-12 px-4 py-4 text-center font-black">
+                            <input type="checkbox" wire:click="alternarSeleccionPagina"
+                                @checked($todosPaginaSeleccionados)
+                                class="h-5 w-5 cursor-pointer rounded border-slate-300 text-[#006492] focus:ring-[#006492]"
+                                title="Seleccionar alumnos de esta página">
+                        </th>
                         <th class="px-4 py-4 text-left font-black">#</th>
                         <th class="px-4 py-4 text-left font-black">Foto</th>
                         <th class="px-4 py-4 text-left font-black">Matrícula</th>
@@ -277,7 +556,13 @@
                 <tbody x-data="{ detalleAbierto: null }"
                     class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
                     @forelse ($alumnos as $alumno)
-                        <tr class="transition hover:bg-slate-50 dark:hover:bg-neutral-800/60">
+                        <tr class="transition {{ $this->estaSeleccionado($alumno->id) ? 'bg-sky-50/80 dark:bg-sky-950/20' : 'hover:bg-slate-50 dark:hover:bg-neutral-800/60' }}">
+                            <td class="px-4 py-4 text-center">
+                                <input type="checkbox" wire:model.live="seleccionados" value="{{ $alumno->id }}"
+                                    class="h-5 w-5 cursor-pointer rounded border-slate-300 text-[#006492] focus:ring-[#006492]"
+                                    aria-label="Seleccionar a {{ $this->nombreCompleto($alumno) }}">
+                            </td>
+
                             <td class="px-4 py-4 text-sm text-slate-600 dark:text-slate-400">
                                 {{ $loop->iteration + ($alumnos->currentPage() - 1) * $alumnos->perPage() }}
                             </td>
@@ -379,7 +664,7 @@
 
                         {{-- Desplegable detalles --}}
                         <tr x-cloak x-show="detalleAbierto === {{ $alumno->id }}" x-transition>
-                            <td colspan="11" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
+                            <td colspan="12" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
                                 <div
                                     class="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-lg shadow-slate-200/70 dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none">
                                     <div
@@ -648,7 +933,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11" class="px-6 py-14 text-center">
+                            <td colspan="12" class="px-6 py-14 text-center">
                                 <div class="mx-auto max-w-sm">
                                     <div
                                         class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">
@@ -674,9 +959,13 @@
         <div class="space-y-4 p-4 xl:hidden">
             @forelse ($alumnos as $alumno)
                 <article x-data="{ abierto: false }"
-                    class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    class="overflow-hidden rounded-[1.7rem] border bg-white shadow-sm dark:bg-neutral-900 {{ $this->estaSeleccionado($alumno->id) ? 'border-sky-400 ring-2 ring-sky-100 dark:border-sky-700 dark:ring-sky-950/40' : 'border-slate-200 dark:border-neutral-800' }}">
                     <div class="p-4">
                         <div class="flex items-start gap-3">
+                            <input type="checkbox" wire:model.live="seleccionados" value="{{ $alumno->id }}"
+                                class="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 text-[#006492] focus:ring-[#006492]"
+                                aria-label="Seleccionar a {{ $this->nombreCompleto($alumno) }}">
+
                             @if ($alumno->foto_existe && $alumno->foto_url)
                                 <img src="{{ $alumno->foto_url }}"
                                     alt="Foto de {{ $alumno->nombre }}"
@@ -776,4 +1065,32 @@
             {{ $alumnos->links() }}
         </div>
     </section>
+
+    {{-- Barra flotante cuando existen alumnos seleccionados --}}
+    @if ($totalSeleccionados > 0)
+        <div class="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 px-2">
+            <div class="flex flex-col gap-3 rounded-[22px] border border-sky-200 bg-white/95 p-3 shadow-2xl shadow-sky-950/20 backdrop-blur-xl dark:border-sky-900/50 dark:bg-neutral-900/95 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3 px-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#006492] text-white">
+                        <span class="text-sm font-black">{{ $totalSeleccionados }}</span>
+                    </div>
+                    <div>
+                        <p class="text-sm font-black text-slate-900 dark:text-white">Alumnos seleccionados</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Listos para generar una lista institucional.</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" wire:click="limpiarSeleccion"
+                        class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-neutral-800 sm:flex-none">
+                        Limpiar
+                    </button>
+                    <button type="button" wire:click="prepararGenerador"
+                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-sky-500 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-sky-500/20 hover:brightness-110 sm:flex-none">
+                        <flux:icon.document-text class="h-4 w-4" />
+                        Generar lista
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
