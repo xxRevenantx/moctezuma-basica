@@ -2,170 +2,97 @@
 
 namespace App\Console\Commands;
 
-use App\Models\DocumentoAlumno;
-use App\Models\DocumentoPersonal;
+use App\Services\ExpedienteIntegridadService;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 
 class VerificarArchivosExpedientes extends Command
 {
     protected $signature = 'expedientes:verificar-archivos
                             {--personal : Revisar únicamente expedientes del personal}
                             {--alumnos : Revisar únicamente expedientes de alumnos}
-                            {--actuales : Revisar solo documentos marcados como versión actual}
-                            {--marcar-pendiente : Si falta el archivo, cambia recibido/validado/emitida a pendiente}';
+                            {--sin-fotos : Omitir la revisión de fotografías}
+                            {--marcar-pendiente : Cambiar a pendiente los documentos cuyo archivo físico no existe}
+                            {--reporte= : Guardar también un reporte CSV en la ruta indicada}';
 
-    protected $description = 'Detecta registros documentales cuya ruta ya no existe físicamente en el almacenamiento configurado.';
+    protected $description = 'Detecta documentos y fotografías registrados en la BD cuyo archivo físico ya no existe.';
 
-    public function handle(): int
+    public function handle(ExpedienteIntegridadService $servicio): int
     {
-        $revisarPersonal = (bool) $this->option('personal');
-        $revisarAlumnos = (bool) $this->option('alumnos');
+        $soloPersonal = (bool) $this->option('personal');
+        $soloAlumnos = (bool) $this->option('alumnos');
 
-        if (! $revisarPersonal && ! $revisarAlumnos) {
-            $revisarPersonal = true;
-            $revisarAlumnos = true;
+        $incluirPersonal = ! $soloAlumnos || $soloPersonal;
+        $incluirAlumnos = ! $soloPersonal || $soloAlumnos;
+
+        if ($soloPersonal && $soloAlumnos) {
+            $incluirPersonal = true;
+            $incluirAlumnos = true;
         }
 
-        $totalFaltantes = 0;
+        $incidencias = $servicio->incidencias(
+            incluirPersonal: $incluirPersonal,
+            incluirAlumnos: $incluirAlumnos,
+            incluirFotos: ! $this->option('sin-fotos'),
+        );
 
-        if ($revisarPersonal) {
-            $totalFaltantes += $this->revisarPersonal();
-        }
+        if ($incidencias->isEmpty()) {
+            $this->components->info('Todos los archivos revisados existen correctamente.');
 
-        if ($revisarAlumnos) {
-            $totalFaltantes += $this->revisarAlumnos();
-        }
-
-        $this->newLine();
-
-        $totalFaltantes > 0
-            ? $this->warn("Se encontraron {$totalFaltantes} registro(s) con archivo faltante.")
-            : $this->components->info('Todos los archivos revisados existen correctamente.');
-
-        return self::SUCCESS;
-    }
-
-    private function revisarPersonal(): int
-    {
-        $this->newLine();
-        $this->line('<fg=cyan>Revisando expedientes del personal...</>');
-
-        $query = DocumentoPersonal::query()
-            ->with([
-                'persona:id,titulo,nombre,apellido_paterno,apellido_materno',
-                'tipoDocumento:id,nombre,slug',
-            ])
-            ->orderBy('persona_id')
-            ->orderBy('tipo_documento_personal_id')
-            ->orderBy('id');
-
-        return $this->revisarConsulta($query, 'personal');
-    }
-
-    private function revisarAlumnos(): int
-    {
-        $this->newLine();
-        $this->line('<fg=cyan>Revisando expedientes de alumnos...</>');
-
-        $query = DocumentoAlumno::query()
-            ->with([
-                'inscripcion:id,nombre,apellido_paterno,apellido_materno,matricula',
-                'tipoDocumento:id,nombre,slug',
-            ])
-            ->orderBy('inscripcion_id')
-            ->orderBy('tipo_documento_id')
-            ->orderBy('id');
-
-        return $this->revisarConsulta($query, 'alumno');
-    }
-
-    private function revisarConsulta(Builder $query, string $origen): int
-    {
-        if ($this->option('actuales')) {
-            $query->where('es_actual', true);
-        }
-
-        $faltantes = collect();
-        $revisados = 0;
-
-        $query->chunkById(200, function (Collection $documentos) use (&$faltantes, &$revisados, $origen): void {
-            foreach ($documentos as $documento) {
-                $revisados++;
-
-                if ($documento->archivo_existe) {
-                    continue;
-                }
-
-                $faltantes->push([
-                    'id' => $documento->id,
-                    'origen' => $origen,
-                    'persona' => $this->nombreResponsable($documento, $origen),
-                    'tipo' => $documento->tipoDocumento?->nombre ?? 'Documento',
-                    'estado' => $documento->estado,
-                    'disco' => $documento->disco ?: '—',
-                    'ruta' => $documento->ruta ?: '—',
-                ]);
-
-                if ($this->option('marcar-pendiente') && in_array($documento->estado, ['recibido', 'validado', 'emitida'], true)) {
-                    $documento->forceFill([
-                        'estado' => 'pendiente',
-                        'validado_por' => null,
-                        'validado_at' => null,
-                    ])->save();
-                }
-            }
-        });
-
-        $this->line("Registros revisados: {$revisados}");
-
-        if ($faltantes->isEmpty()) {
-            $this->components->info('Sin archivos faltantes.');
-
-            return 0;
+            return self::SUCCESS;
         }
 
         $this->table(
-            ['ID', 'Origen', 'Persona/Alumno', 'Tipo', 'Estado BD', 'Disco', 'Ruta'],
-            $faltantes->map(fn(array $fila) => [
-                $fila['id'],
+            ['Origen', 'Categoría', 'ID', 'Persona/Alumno', 'Detalle', 'Estado BD', 'Disco', 'Ruta'],
+            $incidencias->map(fn(array $fila) => [
                 $fila['origen'],
-                $fila['persona'],
-                $fila['tipo'],
+                $fila['categoria'],
+                $fila['registro_id'],
+                $fila['responsable'],
+                $fila['detalle'],
                 $fila['estado'],
                 $fila['disco'],
                 $fila['ruta'],
             ])->all()
         );
 
+        $this->newLine();
+        $this->warn("Se encontraron {$incidencias->count()} incidencia(s).");
+
         if ($this->option('marcar-pendiente')) {
-            $this->warn('Los documentos faltantes con estado recibido/validado/emitida fueron marcados como pendiente.');
+            $actualizados = $servicio->marcarDocumentosFaltantesPendientes();
+            $this->warn("{$actualizados} documento(s) fueron marcados como pendientes. Las fotografías no modifican estados de BD.");
         }
 
-        return $faltantes->count();
+        if ($rutaReporte = trim((string) $this->option('reporte'))) {
+            $this->guardarReporte($rutaReporte, $incidencias->all());
+            $this->components->info('Reporte guardado en: ' . $rutaReporte);
+        }
+
+        return self::SUCCESS;
     }
 
-    private function nombreResponsable($documento, string $origen): string
+    private function guardarReporte(string $ruta, array $incidencias): void
     {
-        if ($origen === 'personal') {
-            $persona = $documento->persona;
+        File::ensureDirectoryExists(dirname($ruta));
+        $archivo = fopen($ruta, 'w');
 
-            return trim(implode(' ', array_filter([
-                $persona?->titulo,
-                $persona?->nombre,
-                $persona?->apellido_paterno,
-                $persona?->apellido_materno,
-            ]))) ?: 'Personal no disponible';
+        fwrite($archivo, "\xEF\xBB\xBF");
+        fputcsv($archivo, ['Origen', 'Categoría', 'ID', 'Responsable', 'Detalle', 'Estado BD', 'Disco', 'Ruta']);
+
+        foreach ($incidencias as $fila) {
+            fputcsv($archivo, [
+                $fila['origen'],
+                $fila['categoria'],
+                $fila['registro_id'],
+                $fila['responsable'],
+                $fila['detalle'],
+                $fila['estado'],
+                $fila['disco'],
+                $fila['ruta'],
+            ]);
         }
 
-        $alumno = $documento->inscripcion;
-        $nombre = trim(implode(' ', array_filter([
-            $alumno?->nombre,
-            $alumno?->apellido_paterno,
-            $alumno?->apellido_materno,
-        ])));
-
-        return trim(($alumno?->matricula ? $alumno->matricula . ' · ' : '') . ($nombre ?: 'Alumno no disponible'));
+        fclose($archivo);
     }
 }

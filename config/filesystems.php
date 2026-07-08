@@ -28,6 +28,9 @@ return [
 
     'expedientes_disk' => env('EXPEDIENTES_DISK', 'local'),
 
+    // Puede apuntar a public en local o al mismo bucket S3/R2 en varios equipos.
+    'fotos_disk' => env('FOTOS_DISK', 'public'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

@@ -155,10 +155,20 @@
                     Los cinco documentos personales son opcionales; el porcentaje solo funciona como control interno.
                 </p>
             </div>
-            <span class="inline-flex items-center gap-2 self-start rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
-                <flux:icon name="users" class="size-4" />
-                {{ number_format($personal->total()) }} resultados
-            </span>
+            <div class="flex flex-wrap items-center gap-2 self-start">
+                <button type="button" wire:click="abrirAuditoria"
+                    class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                    <flux:icon name="exclamation-triangle" class="size-4" />
+                    Revisar archivos
+                    @if (($metricas['incidencias'] ?? 0) > 0)
+                        <span class="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] text-white">{{ $metricas['incidencias'] }}</span>
+                    @endif
+                </button>
+                <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
+                    <flux:icon name="users" class="size-4" />
+                    {{ number_format($personal->total()) }} resultados
+                </span>
+            </div>
         </div>
 
         <div class="hidden overflow-x-auto lg:block">
@@ -181,12 +191,17 @@
                             class="transition hover:bg-slate-50/80 dark:hover:bg-neutral-800/50">
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-3">
-                                    @if ($persona->foto)
-                                        <img src="{{ asset('storage/' . $persona->foto) }}" alt=""
+                                    @if ($persona->foto_existe)
+                                        <img src="{{ $persona->foto_url }}" alt="Fotografía de {{ $this->nombreCompleto($persona) }}"
                                             class="size-11 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                                     @else
-                                        <div class="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 font-black text-white shadow-sm">
-                                            {{ mb_substr($persona->nombre, 0, 1) }}{{ mb_substr($persona->apellido_paterno, 0, 1) }}
+                                        <div class="relative flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 font-black text-white shadow-sm">
+                                            {{ $persona->iniciales }}
+                                            @if ($persona->foto)
+                                                <span class="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white dark:ring-neutral-900" title="La fotografía registrada no existe">
+                                                    <flux:icon name="exclamation-triangle" class="size-2.5" />
+                                                </span>
+                                            @endif
                                         </div>
                                     @endif
 
@@ -197,6 +212,11 @@
                                         <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                             {{ $persona->curp ?: 'Sin CURP' }} · {{ $persona->rfc ?: 'Sin RFC' }}
                                         </p>
+                                        @if (!$persona->foto_existe)
+                                            <span class="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                                                {{ $persona->foto ? 'Requiere volver a cargar foto' : 'Sin fotografía' }}
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
                             </td>
@@ -234,6 +254,14 @@
                                 <p class="mt-2 text-xs font-bold {{ $resumen['completo'] ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400' }}">
                                     {{ $resumen['completo'] ? 'Expediente completo' : $resumen['pendientes'] . ' pendiente(s)' }}
                                 </p>
+                                @if (($resumen['archivos_faltantes'] ?? 0) > 0)
+                                    <p class="mt-1 text-xs font-black text-rose-600 dark:text-rose-400">
+                                        {{ $resumen['archivos_faltantes'] }} archivo(s) físico(s) faltante(s)
+                                    </p>
+                                @endif
+                                @if (($resumen['foto_faltante'] ?? false))
+                                    <p class="mt-1 text-xs font-black text-amber-600 dark:text-amber-400">Fotografía registrada no disponible</p>
+                                @endif
                             </td>
                             <td class="px-5 py-4 text-right">
                                 <button type="button"
@@ -368,6 +396,25 @@
             </div>
 
             <div class="space-y-7 p-5 sm:p-7">
+                @if (!empty($resumenSeleccionado['incidencias']))
+                    <div class="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                        <div class="flex items-start gap-3">
+                            <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-rose-500 text-white">
+                                <flux:icon name="exclamation-triangle" class="size-5" />
+                            </div>
+                            <div>
+                                <h3 class="font-black">Se detectaron archivos faltantes</h3>
+                                <p class="mt-1 text-sm">Los registros existen en la base de datos, pero debes volver a cargar sus archivos para poder verlos, descargarlos o validarlos.</p>
+                                <ul class="mt-2 list-disc pl-5 text-xs font-bold">
+                                    @foreach ($resumenSeleccionado['incidencias'] as $incidencia)
+                                        <li>{{ $incidencia }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
                     <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-neutral-800 dark:bg-neutral-950">
                         <p class="text-xs font-black uppercase tracking-wide text-slate-500">Avance documental</p>
@@ -450,7 +497,7 @@
 
                                     @if ($archivoFaltante)
                                         <p class="mt-2 rounded-xl border border-rose-200 bg-white/70 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                                            La BD tiene el registro, pero el PDF no existe en el disco <strong>{{ $documentoActual->disco }}</strong>.
+                                            La BD tiene el registro, pero el archivo no existe en el disco <strong>{{ $documentoActual->disco }}</strong>.
                                         </p>
                                     @endif
                                 @endif
@@ -459,7 +506,7 @@
                                     @if ($documentoActual && $archivoDisponible)
                                         <a href="{{ route('misrutas.expedientes-personal.preview', $documentoActual) }}" target="_blank"
                                             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                                            <flux:icon name="eye" class="size-3.5" /> Ver PDF
+                                            <flux:icon name="eye" class="size-3.5" /> Ver archivo
                                         </a>
                                         <a href="{{ route('misrutas.expedientes-personal.download', $documentoActual) }}"
                                             class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -467,7 +514,7 @@
                                         </a>
                                     @elseif ($documentoActual)
                                         <span class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Sin PDF
+                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Archivo faltante
                                         </span>
                                     @endif
 
@@ -579,7 +626,7 @@
 
                                 @if ($archivoFaltante)
                                     <p class="mt-3 rounded-xl border border-rose-200 bg-white/70 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                                        La BD tiene el registro, pero el PDF no existe en el disco <strong>{{ $documento->disco }}</strong>.
+                                        La BD tiene el registro, pero el archivo no existe en el disco <strong>{{ $documento->disco }}</strong>.
                                     </p>
                                 @endif
 
@@ -595,7 +642,7 @@
                                         </a>
                                     @else
                                         <span class="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Sin PDF
+                                            <flux:icon name="exclamation-triangle" class="size-3.5" /> Archivo faltante
                                         </span>
                                     @endif
 
@@ -626,7 +673,7 @@
                 <section class="overflow-hidden rounded-3xl border border-slate-200 dark:border-neutral-800">
                     <div class="border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
                         <h3 class="font-black text-slate-900 dark:text-white">Historial completo de versiones</h3>
-                        <p class="text-sm text-slate-500">Ningún PDF se elimina; las versiones reemplazadas siguen disponibles.</p>
+                        <p class="text-sm text-slate-500">Ningún archivo se elimina; las versiones reemplazadas siguen disponibles.</p>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -667,18 +714,18 @@
                                                 <div class="inline-flex gap-2">
                                                     <a href="{{ route('misrutas.expedientes-personal.preview', $documento) }}" target="_blank"
                                                         class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
-                                                        title="Ver PDF">
+                                                        title="Ver archivo">
                                                         <flux:icon name="eye" class="size-4" />
                                                     </a>
                                                     <a href="{{ route('misrutas.expedientes-personal.download', $documento) }}"
                                                         class="inline-flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-indigo-950/30"
-                                                        title="Descargar PDF">
+                                                        title="Descargar archivo">
                                                         <flux:icon name="arrow-down-tray" class="size-4" />
                                                     </a>
                                                 </div>
                                             @else
                                                 <span class="inline-flex rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                                                    Sin PDF
+                                                    Archivo faltante
                                                 </span>
                                             @endif
                                         </td>
@@ -733,7 +780,76 @@
         </section>
     @endif
 
-    {{-- Modal profesional de carga PDF. --}}
+    {{-- Auditoría y modal profesional de carga de archivos. --}}
+    @if ($mostrarAuditoria)
+        <div class="fixed inset-0 z-[145] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" wire:transition.opacity>
+            <div class="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[30px] bg-white shadow-2xl dark:bg-neutral-900">
+                <div class="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-sky-900 p-5 text-white dark:border-neutral-800 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-sky-200">Auditoría de almacenamiento</p>
+                        <h2 class="mt-1 text-2xl font-black">Archivos faltantes de personal y alumnos</h2>
+                        <p class="mt-1 text-sm text-slate-300">Incluye documentos privados y fotografías públicas registradas en la base de datos.</p>
+                    </div>
+                    <button type="button" wire:click="cerrarAuditoria" class="flex size-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 hover:bg-white/20">
+                        <flux:icon name="x-mark" class="size-5" />
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-neutral-800">
+                    <div>
+                        <p class="font-black text-slate-900 dark:text-white">{{ $incidenciasAuditoria->count() }} incidencia(s) detectada(s)</p>
+                        <p class="text-xs text-slate-500">Las fotografías no cambian el avance documental; solo se muestran como advertencia.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="descargarReporteIncidencias"
+                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800">
+                            <flux:icon name="arrow-down-tray" class="size-4" /> Exportar CSV
+                        </button>
+                        @if ($incidenciasAuditoria->contains('puede_marcar_pendiente', true))
+                            <button type="button" @click="confirmMarkMissing()"
+                                class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-700">
+                                <flux:icon name="exclamation-triangle" class="size-4" /> Marcar documentos pendientes
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-auto">
+                    <table class="min-w-full divide-y divide-slate-200 dark:divide-neutral-800">
+                        <thead class="sticky top-0 z-10 bg-slate-50 dark:bg-neutral-950">
+                            <tr class="text-left text-[11px] font-black uppercase tracking-wider text-slate-500">
+                                <th class="px-4 py-3">Origen</th>
+                                <th class="px-4 py-3">Responsable</th>
+                                <th class="px-4 py-3">Archivo</th>
+                                <th class="px-4 py-3">Estado</th>
+                                <th class="px-4 py-3">Ruta esperada</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                            @forelse ($incidenciasAuditoria as $incidencia)
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">{{ $incidencia['origen'] }}</span>
+                                        <p class="mt-1 text-[10px] font-bold text-slate-500">{{ $incidencia['categoria'] }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-bold text-slate-800 dark:text-slate-200">{{ $incidencia['responsable'] }}</td>
+                                    <td class="px-4 py-3">
+                                        <p class="text-sm font-black text-slate-900 dark:text-white">{{ $incidencia['detalle'] }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">Disco: {{ $incidencia['disco'] }}</p>
+                                    </td>
+                                    <td class="px-4 py-3"><span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">{{ $incidencia['estado'] }}</span></td>
+                                    <td class="max-w-xl px-4 py-3"><code class="break-all text-xs text-slate-500">{{ $incidencia['ruta'] }}</code></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="px-6 py-16 text-center text-sm font-bold text-emerald-600">Todos los archivos registrados existen correctamente.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($mostrarCarga && $personaSeleccionada)
         @php
             $tipoSeleccionado = collect($tiposDocumentos)->firstWhere('id', $tipo_documento_personal_id);
@@ -763,8 +879,8 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">Expediente del personal</p>
-                            <h3 class="mt-1 text-xl font-black sm:text-2xl">Subir documento PDF</h3>
-                            <p class="mt-1 text-sm text-blue-100">Vista previa local · PDF unificado · máximo 5 MB.</p>
+                            <h3 class="mt-1 text-xl font-black sm:text-2xl">Subir documento o imagen</h3>
+                            <p class="mt-1 text-sm text-blue-100">Vista previa local · PDF o imagen · máximo 10 MB.</p>
                         </div>
                         <button type="button" @click="requestCloseUpload()" :disabled="closingUpload || saving"
                             class="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-50">
@@ -854,7 +970,7 @@
                             @endif
 
                             <div>
-                                <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Archivo PDF</label>
+                                <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">Archivo</label>
 
                                 <div @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false"
                                     @drop.prevent="handleDrop($event)"
@@ -862,7 +978,7 @@
                                         ? 'border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100 dark:bg-indigo-950/30 dark:ring-indigo-950/50'
                                         : 'border-slate-300 bg-slate-50 dark:border-neutral-700 dark:bg-neutral-950'"
                                     class="relative rounded-3xl border-2 border-dashed p-5 text-center transition">
-                                    <input data-personal-pdf-input type="file" accept="application/pdf,.pdf"
+                                    <input data-personal-file-input type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
                                         class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                                         :disabled="uploading || saving || closingUpload"
                                         @change="handleInput($event)">
@@ -872,8 +988,8 @@
                                             <flux:icon name="document-text" class="size-6" />
                                         </div>
                                         <p class="mt-3 text-sm font-black text-slate-800 dark:text-white"
-                                            x-text="fileName || 'Arrastra el PDF aquí o haz clic para seleccionarlo'"></p>
-                                        <p class="mt-1 text-xs text-slate-500">PDF real · máximo 5 MB · validación inmediata</p>
+                                            x-text="fileName || 'Arrastra el archivo aquí o haz clic para seleccionarlo'"></p>
+                                        <p class="mt-1 text-xs text-slate-500">PDF, JPG, PNG o WEBP · máximo 10 MB · validación inmediata</p>
                                         <p x-show="fileSize" class="mt-1 text-xs font-bold text-indigo-600" x-text="fileSize"></p>
                                     </div>
                                 </div>
@@ -881,7 +997,7 @@
                                 <div x-cloak x-show="uploading || uploadProgress > 0"
                                     class="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
                                     <div class="flex items-center justify-between gap-3 text-xs font-black text-indigo-700 dark:text-indigo-300">
-                                        <span x-text="uploading ? 'Cargando PDF…' : 'PDF preparado'"></span>
+                                        <span x-text="uploading ? 'Cargando archivo…' : 'Archivo preparado'"></span>
                                         <span x-text="`${uploadProgress}%`"></span>
                                     </div>
                                     <div class="mt-2 h-2 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950">
@@ -924,7 +1040,7 @@
                             <div class="mb-3 flex items-center justify-between gap-3">
                                 <div>
                                     <p class="text-xs font-black uppercase tracking-wide text-slate-500">Vista previa</p>
-                                    <p class="mt-1 text-xs text-slate-500">Usa los controles del visor para cambiar de página o zoom.</p>
+                                    <p class="mt-1 text-xs text-slate-500">Los PDF se muestran en visor y las imágenes se muestran directamente.</p>
                                 </div>
                                 <button x-cloak x-show="hasFile" type="button" @click="clearSelectedFile()"
                                     :disabled="uploading || saving"
@@ -934,9 +1050,14 @@
                             </div>
 
                             <div class="relative min-h-[340px] flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-inner dark:border-neutral-800 dark:bg-neutral-900">
-                                <template x-if="previewUrl">
-                                    <iframe :src="previewUrl" title="Vista previa del PDF"
+                                <template x-if="previewUrl && previewKind === 'pdf'">
+                                    <iframe :src="previewUrl" title="Vista previa del archivo"
                                         class="h-full min-h-[560px] w-full bg-white xl:min-h-full"></iframe>
+                                </template>
+                                <template x-if="previewUrl && previewKind === 'image'">
+                                    <div class="flex h-full min-h-[560px] items-center justify-center bg-slate-100 p-4 dark:bg-neutral-950 xl:min-h-full">
+                                        <img :src="previewUrl" alt="Vista previa de la imagen" class="max-h-full max-w-full rounded-2xl object-contain shadow-lg">
+                                    </div>
                                 </template>
 
                                 <div x-show="!previewUrl" class="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
@@ -944,7 +1065,7 @@
                                         <flux:icon name="document-magnifying-glass" class="size-8" />
                                     </div>
                                     <p class="mt-4 text-sm font-black text-slate-700 dark:text-slate-200">La vista previa aparecerá aquí</p>
-                                    <p class="mt-1 max-w-sm text-xs leading-5 text-slate-500">El PDF se muestra localmente antes de guardarse.</p>
+                                    <p class="mt-1 max-w-sm text-xs leading-5 text-slate-500">El archivo se muestra localmente antes de guardarse.</p>
                                 </div>
                             </div>
                         </div>
@@ -1063,6 +1184,7 @@
                 uploadProgress: 0,
                 uploadReady: false,
                 previewUrl: null,
+                previewKind: null,
                 fileName: '',
                 fileSize: '',
                 fileError: '',
@@ -1136,7 +1258,7 @@
                     if (this.hasFile) {
                         const confirmed = await this.confirm({
                             title: '¿Cerrar sin guardar?',
-                            text: 'El PDF seleccionado y los cambios del formulario se descartarán.',
+                            text: 'El archivo seleccionado y los cambios del formulario se descartarán.',
                             confirmText: 'Sí, cerrar',
                         });
 
@@ -1169,28 +1291,38 @@
                     this.fileError = '';
                     if (!file) return;
 
-                    const maxBytes = 5 * 1024 * 1024;
-                    const extensionValid = file.name.toLowerCase().endsWith('.pdf');
-                    const mimeValid = ['', 'application/pdf', 'application/x-pdf'].includes(file.type);
+                    const maxBytes = 10 * 1024 * 1024;
+                    const extension = file.name.toLowerCase().split('.').pop();
+                    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+                    const allowedMimes = [
+                        '', 'application/pdf', 'application/x-pdf',
+                        'image/jpeg', 'image/png', 'image/webp',
+                    ];
 
-                    if (!extensionValid || !mimeValid) {
-                        await this.rejectFile('Selecciona únicamente un archivo PDF válido.');
+                    if (!allowedExtensions.includes(extension) || !allowedMimes.includes(file.type)) {
+                        await this.rejectFile('Selecciona un archivo PDF, JPG, JPEG, PNG o WEBP válido.');
                         return;
                     }
 
                     if (file.size > maxBytes) {
-                        await this.rejectFile('El PDF supera el límite de 5 MB.');
+                        await this.rejectFile('El archivo supera el límite de 10 MB.');
                         return;
                     }
 
                     try {
-                        const signatureBuffer = await file.slice(0, 5).arrayBuffer();
-                        const signature = new TextDecoder().decode(signatureBuffer);
+                        const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+                        const text = new TextDecoder().decode(bytes);
+                        const isPdf = extension === 'pdf' && text.startsWith('%PDF-');
+                        const isJpeg = ['jpg', 'jpeg'].includes(extension) && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+                        const isPng = extension === 'png' && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+                        const isWebp = extension === 'webp' && text.startsWith('RIFF') && text.slice(8, 12) === 'WEBP';
 
-                        if (signature !== '%PDF-') {
-                            await this.rejectFile('El archivo no contiene una estructura PDF válida.');
+                        if (!(isPdf || isJpeg || isPng || isWebp)) {
+                            await this.rejectFile('El contenido del archivo no coincide con su extensión.');
                             return;
                         }
+
+                        var previewKind = isPdf ? 'pdf' : 'image';
                     } catch (error) {
                         await this.rejectFile('No fue posible validar el archivo seleccionado.');
                         return;
@@ -1198,6 +1330,7 @@
 
                     await this.removeTemporaryUpload();
                     this.revokePreview();
+                    this.previewKind = previewKind;
 
                     this.previewUrl = URL.createObjectURL(file);
                     this.fileName = file.name;
@@ -1221,14 +1354,14 @@
                             () => {
                                 this.uploading = false;
                                 this.uploadReady = false;
-                                this.fileError = 'No fue posible cargar temporalmente el PDF.';
+                                this.fileError = 'No fue posible cargar temporalmente el archivo.';
                                 reject(new Error(this.fileError));
                             },
                             event => {
                                 this.uploadProgress = Number(event.detail?.progress ?? 0);
                             },
                         );
-                    }).catch(() => this.showError(this.fileError || 'No fue posible cargar el PDF.'));
+                    }).catch(() => this.showError(this.fileError || 'No fue posible cargar el archivo.'));
                 },
 
                 async rejectFile(message) {
@@ -1270,7 +1403,7 @@
                     if (this.saving || this.uploading || this.closingUpload) return;
 
                     if (!this.uploadReady) {
-                        this.fileError = 'Selecciona y espera a que termine de cargar un PDF válido.';
+                        this.fileError = 'Selecciona y espera a que termine de cargar un archivo válido.';
                         this.showError(this.fileError);
                         return;
                     }
@@ -1330,6 +1463,8 @@
                         URL.revokeObjectURL(this.previewUrl);
                         this.previewUrl = null;
                     }
+
+                    this.previewKind = null;
                 },
 
                 resetLocalFileState() {
@@ -1342,10 +1477,11 @@
                     this.uploadProgress = 0;
                     this.dragging = false;
                     this.serverUploadName = null;
+                    this.previewKind = null;
                 },
 
                 resetInput() {
-                    const input = this.$root.querySelector('[data-personal-pdf-input]');
+                    const input = this.$root.querySelector('[data-personal-file-input]');
                     if (input) input.value = '';
                 },
 
@@ -1373,6 +1509,17 @@
                     }
 
                     return window.confirm(`${title}\n\n${text}`);
+                },
+
+                async confirmMarkMissing() {
+                    const confirmed = await this.confirm({
+                        title: '¿Marcar documentos como pendientes?',
+                        text: 'Solo cambiarán los documentos cuyo archivo físico no existe. Las fotografías no se modificarán.',
+                        confirmText: 'Sí, marcar pendientes',
+                    });
+
+                    if (!confirmed) return;
+                    await this.$wire.marcarArchivosFaltantesPendientes();
                 },
 
                 showError(message) {

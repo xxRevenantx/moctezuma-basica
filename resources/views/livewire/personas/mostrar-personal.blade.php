@@ -221,9 +221,9 @@
 
                                                 <!-- Foto -->
                                                 <td class="px-4 py-3">
-                                                    @if ($persona->foto)
+                                                    @if ($persona->foto_existe)
                                                         @php
-                                                            $src = asset('storage/personal/' . $persona->foto);
+                                                            $src = $persona->foto_url;
                                                             $alt = 'Foto de ' . $persona->nombre;
                                                         @endphp
 
@@ -232,13 +232,16 @@
                                                             aria-label="Ver foto">
                                                             <img src="{{ $src }}" alt="{{ $alt }}"
                                                                 class="h-9 w-9 rounded-xl object-cover ring-1 ring-black/10 dark:ring-white/10
-                                                                   transition duration-200 group-hover:scale-105 group-hover:ring-blue-500/40"
-                                                                onerror="this.closest('button').outerHTML='<span class=&quot;text-gray-500 dark:text-gray-400&quot;>---</span>';">
+                                                                   transition duration-200 group-hover:scale-105 group-hover:ring-blue-500/40">
                                                             <span
                                                                 class="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-blue-500/30"></span>
                                                         </button>
+                                                    @elseif ($persona->foto)
+                                                        <span class="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-700 dark:bg-rose-950/30 dark:text-rose-300" title="La fotografía registrada no existe">
+                                                            <flux:icon name="exclamation-triangle" class="size-3" /> Faltante
+                                                        </span>
                                                     @else
-                                                        <span class="text-gray-500 dark:text-gray-400">---</span>
+                                                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-xs font-black text-slate-600 dark:bg-neutral-800 dark:text-slate-300">{{ $persona->iniciales }}</span>
                                                     @endif
                                                 </td>
 

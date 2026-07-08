@@ -7,6 +7,7 @@ use App\Models\MovimientoPersonal;
 use App\Models\Persona;
 use App\Models\RolePersona;
 use App\Models\TipoDocumentoPersonal;
+use App\Services\ExpedienteIntegridadService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -28,6 +29,7 @@ class ExpedientesPersonal extends Component
     public string $estado_laboral = 'todos';
     public string $estado_expediente = 'todos';
     public int $perPage = 20;
+    public bool $mostrarAuditoria = false;
 
     public ?int $personaSeleccionadaId = null;
 
@@ -239,9 +241,9 @@ class ExpedientesPersonal extends Component
             'archivo' => [
                 'required',
                 'file',
-                'mimes:pdf',
-                'mimetypes:application/pdf,application/x-pdf',
-                'max:5120',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png,image/webp',
+                'max:10240',
             ],
             'observaciones' => ['nullable', 'string', 'max:2000'],
         ];
@@ -261,10 +263,10 @@ class ExpedientesPersonal extends Component
         }
 
         $this->validate($reglas, [
-            'archivo.required' => 'Selecciona un archivo PDF.',
-            'archivo.mimes' => 'El documento debe ser un archivo PDF.',
-            'archivo.mimetypes' => 'El archivo seleccionado no es un PDF válido.',
-            'archivo.max' => 'El PDF no debe superar los 5 MB.',
+            'archivo.required' => 'Selecciona un archivo.',
+            'archivo.mimes' => 'El documento debe ser PDF, JPG, JPEG, PNG o WEBP.',
+            'archivo.mimetypes' => 'El archivo seleccionado no tiene un formato permitido.',
+            'archivo.max' => 'El archivo no debe superar los 10 MB.',
             'subtipo_identificacion.required' => 'Selecciona el tipo de identificación oficial.',
         ]);
 
@@ -273,6 +275,14 @@ class ExpedientesPersonal extends Component
         $nombreOriginal = Str::limit($this->archivo->getClientOriginalName(), 250, '');
         $tamanoBytes = (int) $this->archivo->getSize();
         $hashSha256 = hash_file('sha256', $this->archivo->getRealPath()) ?: null;
+        $mimeType = strtolower((string) ($this->archivo->getMimeType() ?: $this->archivo->getClientMimeType()));
+        $extension = match ($mimeType) {
+            'application/pdf', 'application/x-pdf' => 'pdf',
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => strtolower($this->archivo->getClientOriginalExtension() ?: 'bin'),
+        };
         $serieUuid = $this->serie_uuid ?: (string) Str::uuid();
 
         try {
@@ -281,6 +291,8 @@ class ExpedientesPersonal extends Component
                 $nombreOriginal,
                 $tamanoBytes,
                 $hashSha256,
+                $mimeType,
+                $extension,
                 $serieUuid,
                 $discoExpedientes,
                 &$rutaGuardada
@@ -323,12 +335,12 @@ class ExpedientesPersonal extends Component
 
                 $rutaGuardada = $this->archivo->storeAs(
                     $directorio,
-                    Str::uuid() . '.pdf',
+                    Str::uuid() . '.' . $extension,
                     $discoExpedientes
                 );
 
                 if (!$rutaGuardada) {
-                    throw new \RuntimeException('No fue posible almacenar el PDF.');
+                    throw new \RuntimeException('No fue posible almacenar el archivo.');
                 }
 
                 $documento = DocumentoPersonal::query()->create([
@@ -353,7 +365,7 @@ class ExpedientesPersonal extends Component
                     'disco' => $discoExpedientes,
                     'ruta' => $rutaGuardada,
                     'nombre_original' => $nombreOriginal,
-                    'mime_type' => 'application/pdf',
+                    'mime_type' => $mimeType,
                     'tamano_bytes' => $tamanoBytes,
                     'hash_sha256' => $hashSha256,
                     'version' => $version,
@@ -420,7 +432,7 @@ class ExpedientesPersonal extends Component
                 $this->dispatch(
                     'notify',
                     type: 'error',
-                    message: 'No se puede validar porque el PDF físico no existe en el almacenamiento.'
+                    message: 'No se puede validar porque el archivo físico no existe en el almacenamiento.'
                 );
 
                 return;
@@ -497,6 +509,58 @@ class ExpedientesPersonal extends Component
         $this->dispatch('notify', type: 'success', message: 'Movimiento laboral registrado correctamente.');
     }
 
+    public function abrirAuditoria(): void
+    {
+        $this->autorizarAdmin();
+        $this->mostrarAuditoria = true;
+    }
+
+    public function cerrarAuditoria(): void
+    {
+        $this->mostrarAuditoria = false;
+    }
+
+    public function marcarArchivosFaltantesPendientes(ExpedienteIntegridadService $servicio): void
+    {
+        $this->autorizarAdmin();
+        $actualizados = $servicio->marcarDocumentosFaltantesPendientes();
+
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: $actualizados > 0
+                ? "{$actualizados} documento(s) faltante(s) fueron marcados como pendientes."
+                : 'No había documentos faltantes que necesitaran cambio de estado.'
+        );
+    }
+
+    public function descargarReporteIncidencias(ExpedienteIntegridadService $servicio)
+    {
+        $this->autorizarAdmin();
+        $incidencias = $servicio->incidencias();
+        $nombre = 'reporte-incidencias-expedientes-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($incidencias): void {
+            $salida = fopen('php://output', 'w');
+            fwrite($salida, "\xEF\xBB\xBF");
+            fputcsv($salida, ['Origen', 'Categoría', 'Responsable', 'Detalle', 'Estado BD', 'Disco', 'Ruta']);
+
+            foreach ($incidencias as $incidencia) {
+                fputcsv($salida, [
+                    $incidencia['origen'],
+                    $incidencia['categoria'],
+                    $incidencia['responsable'],
+                    $incidencia['detalle'],
+                    $incidencia['estado'],
+                    $incidencia['disco'],
+                    $incidencia['ruta'],
+                ]);
+            }
+
+            fclose($salida);
+        }, $nombre, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function nombreCompleto(Persona $persona): string
     {
         return trim(implode(' ', array_filter([
@@ -554,7 +618,8 @@ class ExpedientesPersonal extends Component
             );
 
         $idsFiltrados = (clone $queryBase)->pluck('personas.id');
-        $conteos = $this->conteosDocumentales($idsFiltrados, $tiposPersonalesIds);
+        $resumenes = $this->resumenesDocumentales($idsFiltrados, $tiposPersonalesIds);
+        $conteos = $resumenes->map(fn(array $resumen) => $resumen['completados']);
 
         if ($totalEsperados > 0 && $this->estado_expediente !== 'todos') {
             $idsFiltrados = $idsFiltrados
@@ -572,23 +637,33 @@ class ExpedientesPersonal extends Component
                 : $queryBase->whereIn('personas.id', $idsFiltrados);
         }
 
+        $resumenesFiltrados = $resumenes->only($idsFiltrados->all());
+
         $personal = $queryBase
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
             ->paginate($this->perPage);
 
-        $personal->getCollection()->each(function (Persona $persona) use ($conteos, $totalEsperados) {
-            $completados = (int) ($conteos[$persona->id] ?? 0);
-            $persona->setAttribute('resumen_expediente_personal', [
-                'completados' => $completados,
+        $personal->getCollection()->each(function (Persona $persona) use ($resumenesFiltrados, $totalEsperados) {
+            $base = $resumenesFiltrados->get($persona->id, [
+                'completados' => 0,
+                'archivos_faltantes' => 0,
+                'en_revision' => 0,
+                'rechazados' => 0,
+            ]);
+            $completados = (int) $base['completados'];
+
+            $persona->setAttribute('resumen_expediente_personal', array_merge($base, [
                 'total' => $totalEsperados,
                 'pendientes' => max($totalEsperados - $completados, 0),
                 'porcentaje' => $totalEsperados > 0
                     ? (int) round(($completados / $totalEsperados) * 100)
                     : 100,
                 'completo' => $totalEsperados === 0 || $completados >= $totalEsperados,
-            ]);
+                'foto_faltante' => filled($persona->foto) && ! $persona->foto_existe,
+                'sin_foto' => blank($persona->foto),
+            ]));
         });
 
         $completos = $idsFiltrados->filter(fn($id) => (int) ($conteos[$id] ?? 0) >= $totalEsperados)->count();
@@ -597,6 +672,8 @@ class ExpedientesPersonal extends Component
             'completos' => $completos,
             'incompletos' => max($idsFiltrados->count() - $completos, 0),
             'bajas' => Persona::query()->whereIn('id', $idsFiltrados)->where('estado_laboral', 'baja')->count(),
+            'incidencias' => $resumenesFiltrados->sum('archivos_faltantes')
+                + Persona::query()->whereIn('id', $idsFiltrados)->whereNotNull('foto')->where('foto', '!=', '')->get()->reject(fn(Persona $persona) => $persona->foto_existe)->count(),
         ];
 
         $personaSeleccionada = null;
@@ -619,10 +696,12 @@ class ExpedientesPersonal extends Component
                     ->sortByDesc(fn(DocumentoPersonal $documento) => $documento->created_at?->timestamp ?? 0)
                     ->values();
 
-                $documentosPersonalesVigentes = $documentosSeleccionados
+                $documentosPersonalesActuales = $documentosSeleccionados
                     ->where('es_actual', true)
-                    ->whereIn('estado', ['recibido', 'validado'])
                     ->whereIn('tipo_documento_personal_id', $tiposPersonalesIds);
+
+                $documentosPersonalesVigentes = $documentosPersonalesActuales
+                    ->whereIn('estado', ['recibido', 'validado']);
 
                 $documentosPersonalesConArchivo = $documentosPersonalesVigentes
                     ->filter(fn(DocumentoPersonal $documento) => $documento->archivo_existe);
@@ -632,9 +711,18 @@ class ExpedientesPersonal extends Component
                     ->unique()
                     ->count();
 
-                $archivosFaltantes = $documentosPersonalesVigentes
+                $archivosFaltantes = $documentosPersonalesActuales
                     ->reject(fn(DocumentoPersonal $documento) => $documento->archivo_existe)
                     ->count();
+
+                $incidenciasSeleccionadas = $documentosPersonalesActuales
+                    ->reject(fn(DocumentoPersonal $documento) => $documento->archivo_existe)
+                    ->map(fn(DocumentoPersonal $documento) => $documento->tipoDocumento?->nombre ?? 'Documento')
+                    ->values();
+
+                if (filled($personaSeleccionada->foto) && ! $personaSeleccionada->foto_existe) {
+                    $incidenciasSeleccionadas->prepend('Fotografía del personal');
+                }
 
                 $resumenSeleccionado = [
                     'completados' => $completados,
@@ -645,11 +733,18 @@ class ExpedientesPersonal extends Component
                         : 100,
                     'completo' => $totalEsperados === 0 || $completados >= $totalEsperados,
                     'archivos_faltantes' => $archivosFaltantes,
+                    'foto_faltante' => filled($personaSeleccionada->foto) && ! $personaSeleccionada->foto_existe,
+                    'sin_foto' => blank($personaSeleccionada->foto),
+                    'incidencias' => $incidenciasSeleccionadas->all(),
                 ];
             } else {
                 $this->personaSeleccionadaId = null;
             }
         }
+
+        $incidenciasAuditoria = $this->mostrarAuditoria
+            ? app(ExpedienteIntegridadService::class)->incidencias()
+            : collect();
 
         return view('livewire.documentacion.expedientes-personal', [
             'personal' => $personal,
@@ -657,37 +752,34 @@ class ExpedientesPersonal extends Component
             'personaSeleccionada' => $personaSeleccionada,
             'documentosSeleccionados' => $documentosSeleccionados,
             'resumenSeleccionado' => $resumenSeleccionado,
+            'incidenciasAuditoria' => $incidenciasAuditoria,
         ]);
     }
 
-    private function conteosDocumentales(Collection $personaIds, Collection $tiposIds): Collection
+    private function resumenesDocumentales(Collection $personaIds, Collection $tiposIds): Collection
     {
         if ($personaIds->isEmpty() || $tiposIds->isEmpty()) {
             return collect();
         }
 
         return DocumentoPersonal::query()
-            ->select([
-                'id',
-                'persona_id',
-                'tipo_documento_personal_id',
-                'disco',
-                'ruta',
-                'estado',
-                'es_actual',
-            ])
+            ->with('tipoDocumento:id,nombre')
             ->whereIn('persona_id', $personaIds)
             ->whereIn('tipo_documento_personal_id', $tiposIds)
             ->where('es_actual', true)
-            ->whereIn('estado', ['recibido', 'validado'])
             ->get()
-            ->filter(fn(DocumentoPersonal $documento) => $documento->archivo_existe)
             ->groupBy('persona_id')
-            ->map(fn(Collection $documentos) => $documentos
-                ->pluck('tipo_documento_personal_id')
-                ->unique()
-                ->count()
-            );
+            ->map(function (Collection $documentos): array {
+                $vigentes = $documentos->whereIn('estado', ['recibido', 'validado']);
+                $conArchivo = $vigentes->filter(fn(DocumentoPersonal $documento) => $documento->archivo_existe);
+
+                return [
+                    'completados' => $conArchivo->pluck('tipo_documento_personal_id')->unique()->count(),
+                    'archivos_faltantes' => $documentos->reject(fn(DocumentoPersonal $documento) => $documento->archivo_existe)->count(),
+                    'en_revision' => $documentos->where('estado', 'recibido')->filter(fn(DocumentoPersonal $documento) => $documento->archivo_existe)->count(),
+                    'rechazados' => $documentos->where('estado', 'rechazado')->count(),
+                ];
+            });
     }
 
     private function actualizarIndicadorReemplazo(): void

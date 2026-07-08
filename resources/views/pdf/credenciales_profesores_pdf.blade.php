@@ -198,9 +198,9 @@
 
                 $existeLogo = $rutaLogo && file_exists($rutaLogo);
 
-                $rutaFoto = $persona->foto ? public_path('storage/personal/' . $persona->foto) : null;
+                $rutaFoto = $persona->foto_data_uri;
 
-                $existeFoto = $rutaFoto && file_exists($rutaFoto);
+                $existeFoto = filled($rutaFoto);
             @endphp
 
             <div class="bloqueCredencial">

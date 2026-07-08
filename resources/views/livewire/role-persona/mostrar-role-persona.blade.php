@@ -162,9 +162,9 @@
                                                 <!-- Foto -->
                                                 <td class="px-4 py-3">
 
-                                                    @if ($persona->foto)
+                                                    @if ($persona->foto_existe && $persona->foto_url)
                                                         @php
-                                                            $src = asset('storage/personal/' . $persona->foto);
+                                                            $src = $persona->foto_url;
                                                             $alt = 'Foto de ' . $persona->nombre;
                                                         @endphp
 

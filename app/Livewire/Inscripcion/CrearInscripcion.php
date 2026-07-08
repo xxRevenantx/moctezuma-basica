@@ -15,6 +15,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\CurpService;
+use App\Services\ImagenPersonalService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -290,6 +291,7 @@ class CrearInscripcion extends Component
             'foto' => [
                 'nullable',
                 'image',
+                'mimes:jpg,jpeg,png,webp',
                 'max:2048',
             ],
 
@@ -1248,7 +1250,7 @@ class CrearInscripcion extends Component
         return true;
     }
 
-    public function guardar(): void
+    public function guardar(ImagenPersonalService $imagenes): void
     {
         $this->sanitizeStrings();
 
@@ -1269,7 +1271,7 @@ class CrearInscripcion extends Component
         $fotoPath = null;
 
         if ($this->foto) {
-            $fotoPath = $this->foto->store('inscripciones/fotos', 'public');
+            $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
         }
 
         DB::transaction(function () use ($data, $fotoPath) {

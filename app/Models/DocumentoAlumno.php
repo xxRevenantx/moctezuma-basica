@@ -123,6 +123,35 @@ class DocumentoAlumno extends Model
         }
     }
 
+    public function getExtensionAttribute(): string
+    {
+        $extension = strtolower(pathinfo((string) $this->nombre_original, PATHINFO_EXTENSION));
+
+        if ($extension !== '') {
+            return $extension === 'jpeg' ? 'jpg' : $extension;
+        }
+
+        return match (strtolower((string) $this->mime_type)) {
+            'application/pdf', 'application/x-pdf' => 'pdf',
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => 'bin',
+        };
+    }
+
+    public function getEsPdfAttribute(): bool
+    {
+        return in_array(strtolower((string) $this->mime_type), ['application/pdf', 'application/x-pdf'], true)
+            || $this->extension === 'pdf';
+    }
+
+    public function getEsImagenAttribute(): bool
+    {
+        return str_starts_with(strtolower((string) $this->mime_type), 'image/')
+            || in_array($this->extension, ['jpg', 'jpeg', 'png', 'webp'], true);
+    }
+
     public function getTamanoLegibleAttribute(): string
     {
         $bytes = max((int) $this->tamano_bytes, 0);
