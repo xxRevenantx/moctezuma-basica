@@ -57,6 +57,10 @@ class Calificacion extends Component
     public string $orden_promedio = '';
     public string $mensajeContexto = '';
 
+    public bool $contextoBusquedaGlobal = false;
+    public ?int $alumnoBusquedaId = null;
+    public ?int $periodoBusquedaGlobalId = null;
+
     public array $inscripciones = [];
     public array $inscripcionesTabla = [];
     public array $materias = [];
@@ -115,6 +119,94 @@ class Calificacion extends Component
         $this->periodosBasica = collect();
 
         $this->cargarCatalogos();
+        $this->cargarContextoBusquedaGlobal();
+    }
+
+    private function cargarContextoBusquedaGlobal(): void
+    {
+        if (request()->string('origen')->toString() !== 'busqueda-global') {
+            return;
+        }
+
+        $this->contextoBusquedaGlobal = true;
+        $this->alumnoBusquedaId = request()->integer('alumno') ?: null;
+        $this->periodoBusquedaGlobalId = request()->integer('periodo') ?: null;
+
+        $generacionId = request()->integer('generacion');
+        $gradoId = request()->integer('grado');
+        $grupoId = request()->integer('grupo');
+        $semestreId = request()->integer('semestre');
+
+        $generacion = Generacion::query()
+            ->whereKey($generacionId)
+            ->where('nivel_id', $this->nivel_id)
+            ->first();
+
+        if (! $generacion) {
+            $this->mensajeContexto = 'No fue posible restaurar la generación de la calificación seleccionada.';
+            return;
+        }
+
+        if (! $this->generaciones->contains('id', $generacion->id)) {
+            $this->generaciones->prepend($generacion);
+        }
+
+        $this->generacion_id = $generacion->id;
+        $this->cargarGrados();
+
+        if (! $this->grados->contains(fn ($grado) => (int) $grado->id === $gradoId)) {
+            $this->mensajeContexto = 'El grado guardado en la calificación ya no pertenece al contexto académico actual.';
+            return;
+        }
+
+        $this->grado_id = $gradoId;
+
+        if ($this->esBachillerato) {
+            $this->cargarSemestres();
+
+            if (! $this->semestres->contains(fn ($semestre) => (int) $semestre->id === $semestreId)) {
+                $this->mensajeContexto = 'El semestre de la calificación ya no está disponible.';
+                return;
+            }
+
+            $this->semestre_id = $semestreId;
+        }
+
+        $this->cargarGrupos();
+
+        if (! $this->grupos->contains(fn ($grupo) => (int) $grupo->id === $grupoId)) {
+            $this->mensajeContexto = 'El grupo de la calificación ya no está disponible.';
+            return;
+        }
+
+        $this->grupo_id = $grupoId;
+
+        $periodo = $this->periodoBusquedaGlobalId
+            ? Periodos::query()->find($this->periodoBusquedaGlobalId)
+            : null;
+
+        if ($this->esBachillerato) {
+            $this->cargarParcialesDisponibles();
+            $this->parcial_bachillerato_id = request()->integer('parcial')
+                ?: $periodo?->parcial_bachillerato_id;
+        } else {
+            $this->periodo_basica_id = request()->integer('periodo_basica')
+                ?: $periodo?->periodo_basica_id;
+        }
+
+        $buscar = trim((string) request('buscar', ''));
+
+        if ($buscar === '' && $this->alumnoBusquedaId) {
+            $buscar = (string) Inscripcion::withTrashed()
+                ->whereKey($this->alumnoBusquedaId)
+                ->value('matricula');
+        }
+
+        $this->busqueda = $buscar;
+
+        if ($this->puedeCargarDatos()) {
+            $this->cargarDatos();
+        }
     }
 
     public function getEsBachilleratoProperty(): bool
@@ -604,7 +696,9 @@ class Calificacion extends Component
             ->with(['cicloEscolar', 'mesesBasica', 'periodoBasica', 'mesesBachillerato', 'parcialBachillerato'])
             ->where('nivel_id', $this->nivel_id);
 
-        if ($this->esBachillerato) {
+        if ($this->contextoBusquedaGlobal && $this->periodoBusquedaGlobalId) {
+            $query->whereKey($this->periodoBusquedaGlobalId);
+        } elseif ($this->esBachillerato) {
             $query->where('generacion_id', $this->generacion_id)
                 ->where('semestre_id', $this->semestre_id)
                 ->where('parcial_bachillerato_id', $this->parcial_bachillerato_id);

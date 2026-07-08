@@ -3,6 +3,7 @@
     asigIds: @js(collect($materias)->pluck('id')->values()->all()),
 
     storageKey: 'calificaciones_filtros_{{ $slug_nivel }}',
+    contextoBusquedaGlobal: @js($contextoBusquedaGlobal),
 
     guardandoFiltros: false,
     restaurandoFiltros: false,
@@ -34,7 +35,11 @@
     },
 
     async iniciarFiltrosGuardados() {
-        await this.restaurarFiltros();
+        if (this.contextoBusquedaGlobal) {
+            localStorage.removeItem(this.storageKey);
+        } else {
+            await this.restaurarFiltros();
+        }
 
         this.$watch('$wire.generacion_id', () => this.guardarFiltros());
         this.$watch('$wire.grado_id', () => this.guardarFiltros());
@@ -1710,16 +1715,40 @@ iniciarHerramientasAcademicas()" class="w-full">
                         @forelse ($inscripcionesTabla as $index => $fila)
                             @php($insId = (int) $fila['inscripcion_id'])
 
+                            @php($esResultadoBusqueda = $contextoBusquedaGlobal && (int) $alumnoBusquedaId === $insId)
+
                             <tr wire:key="fila-calificacion-{{ $insId }}"
-                                class="hover:bg-neutral-50/70 dark:hover:bg-neutral-950/40">
+                                @class([
+                                    'transition hover:bg-neutral-50/70 dark:hover:bg-neutral-950/40',
+                                    'bg-sky-50/90 ring-2 ring-inset ring-[#006492]/20 dark:bg-sky-500/10' => $esResultadoBusqueda,
+                                ])
+                                @if ($esResultadoBusqueda)
+                                    x-data
+                                    x-init="$nextTick(() => setTimeout(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350))"
+                                @endif>
 
                                 <td class="px-4 py-3 text-neutral-700 dark:text-neutral-200">{{ $index + 1 }}</td>
-                                <td
-                                    class="sticky left-0 z-10 min-w-[140px] bg-white px-4 py-3 font-medium text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+                                <td @class([
+                                    'sticky left-0 z-10 min-w-[140px] px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100',
+                                    'bg-sky-50 dark:bg-sky-950' => $esResultadoBusqueda,
+                                    'bg-white dark:bg-neutral-900' => ! $esResultadoBusqueda,
+                                ])>
                                     {{ $fila['matricula'] }}</td>
-                                <td
-                                    class="sticky left-[140px] z-10 min-w-[260px] bg-white px-4 py-3 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 uppercase">
-                                    {{ $fila['alumno'] }}</td>
+                                <td @class([
+                                    'sticky left-[140px] z-10 min-w-[260px] px-4 py-3 text-neutral-700 dark:text-neutral-200 uppercase',
+                                    'bg-sky-50 dark:bg-sky-950' => $esResultadoBusqueda,
+                                    'bg-white dark:bg-neutral-900' => ! $esResultadoBusqueda,
+                                ])>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span>{{ $fila['alumno'] }}</span>
+
+                                        @if ($esResultadoBusqueda)
+                                            <span class="rounded-full bg-[#006492]/10 px-2 py-0.5 text-[9px] font-black normal-case tracking-wide text-[#006492] ring-1 ring-[#006492]/20 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
+                                                Resultado de búsqueda
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
 
                                 @foreach ($materias as $m)
                                     @php($asigId = (int) $m['id'])

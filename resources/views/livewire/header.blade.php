@@ -22,6 +22,9 @@
                 <!-- Widgets -->
                 <div class="w-full sm:w-auto flex flex-col lg:flex-row items-center gap-3 mt-2 sm:mt-0">
 
+                    {{-- Búsqueda global disponible desde cualquier módulo (Ctrl/Cmd + K) --}}
+                    <livewire:busqueda.buscador-global />
+
                     <flux:radio.group x-data variant="segmented" x-model="$flux.appearance">
                         <flux:radio value="light" icon="sun"></flux:radio>
                         <flux:radio value="dark" icon="moon"></flux:radio>

@@ -25,6 +25,11 @@ class MostrarGeneraciones extends Component
     public string $motivo_reactivacion = '';
     public bool $reactivar_egresados = true;
 
+    protected $queryString = [
+        'search' => ['as' => 'buscar', 'except' => ''],
+        'incluir_inactivas' => ['as' => 'inactivas', 'except' => true],
+    ];
+
     public function updatingSearch(): void
     {
         $this->resetPage();

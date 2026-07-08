@@ -31,11 +31,24 @@ class MostrarGrupos extends Component
 
     protected $paginationTheme = 'tailwind';
 
+    protected $queryString = [
+        'search' => ['as' => 'buscar', 'except' => ''],
+        'nivel_id' => ['as' => 'nivel', 'except' => ''],
+        'generacion_id' => ['as' => 'generacion', 'except' => ''],
+        'grado_id' => ['as' => 'grado', 'except' => ''],
+        'semestre_id' => ['as' => 'semestre', 'except' => ''],
+    ];
+
     public function mount()
     {
         $this->grados = collect();
         $this->generaciones = collect();
         $this->semestres = collect();
+
+        if (filled($this->nivel_id)) {
+            $this->esBachillerato = (int) $this->nivel_id === 4;
+            $this->cargarFiltrosPorNivel();
+        }
     }
 
     public function updatingSearch()

@@ -101,6 +101,11 @@ class Constancia extends Component
 
     public bool $editar_tercer_periodo = false;
 
+    protected $queryString = [
+        'query' => ['except' => ''],
+        'buscar_constancia' => ['except' => ''],
+    ];
+
     public function mount(): void
     {
         $this->fecha_expedicion = now()->format('Y-m-d');
