@@ -417,7 +417,22 @@ class ExpedientesDigitales extends Component
                 $rutaGuardada = $this->archivo->storeAs($directorio, $nombreInterno, $discoExpedientes);
 
                 if (!$rutaGuardada) {
-                    throw new \RuntimeException('No fue posible guardar el archivo.');
+                    throw new \RuntimeException('No fue posible almacenar el archivo.');
+                }
+
+                try {
+                    $archivoConfirmado = Storage::disk($discoExpedientes)->exists($rutaGuardada);
+                } catch (Throwable $e) {
+                    throw new \RuntimeException(
+                        'El archivo se intentó guardar, pero no fue posible comprobarlo en el disco "' . $discoExpedientes . '".',
+                        previous: $e
+                    );
+                }
+
+                if (! $archivoConfirmado) {
+                    throw new \RuntimeException(
+                        'El almacenamiento no confirmó la existencia del archivo después de guardarlo.'
+                    );
                 }
 
                 $documento = DocumentoAlumno::query()->create([
@@ -479,11 +494,20 @@ class ExpedientesDigitales extends Component
             $this->dispatch('notify', type: 'success', message: $mensaje);
         } catch (Throwable $e) {
             if ($rutaGuardada) {
-                Storage::disk($discoExpedientes)->delete($rutaGuardada);
+                try {
+                    Storage::disk($discoExpedientes)->delete($rutaGuardada);
+                } catch (Throwable $limpiezaError) {
+                    report($limpiezaError);
+                }
             }
 
             report($e);
-            $this->addError('archivo', 'No fue posible guardar el documento. Inténtalo nuevamente.');
+
+            $mensaje = app()->environment('local')
+                ? 'No fue posible guardar el documento: ' . $e->getMessage()
+                : 'No fue posible guardar el documento. Inténtalo nuevamente.';
+
+            $this->addError('archivo', $mensaje);
         }
     }
 

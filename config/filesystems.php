@@ -26,10 +26,16 @@ return [
     |
     */
 
-    'expedientes_disk' => env('EXPEDIENTES_DISK', 'local'),
+    // En desarrollo local (Laragon/XAMPP) se fuerza almacenamiento local,
+    // aunque el .env todavía conserve valores antiguos como s3.
+    'expedientes_disk' => env('APP_ENV', 'production') === 'local'
+        ? 'local'
+        : env('EXPEDIENTES_DISK', 'local'),
 
-    // Puede apuntar a public en local o al mismo bucket S3/R2 en varios equipos.
-    'fotos_disk' => env('FOTOS_DISK', 'public'),
+    // En local, las fotografías se sirven desde /storage mediante el disco public.
+    'fotos_disk' => env('APP_ENV', 'production') === 'local'
+        ? 'public'
+        : env('FOTOS_DISK', 'public'),
 
     /*
     |--------------------------------------------------------------------------

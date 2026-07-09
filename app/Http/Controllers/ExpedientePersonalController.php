@@ -33,7 +33,7 @@ class ExpedientePersonalController extends Controller
             $documento->ruta,
             $this->nombreDescarga($documento),
             [
-                'Content-Type' => 'application/pdf',
+                'Content-Type' => $documento->mime_type ?: 'application/octet-stream',
                 'Content-Disposition' => 'inline; filename="' . $this->nombreDescarga($documento) . '"',
                 'X-Content-Type-Options' => 'nosniff',
             ]
@@ -152,7 +152,8 @@ class ExpedientePersonalController extends Controller
         }
 
         $contenido = $disco->get($documento->ruta);
-        $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.pdf';
+        $extension = $documento->extension ?: 'bin';
+        $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.' . $extension;
         File::put($rutaTemporal, $contenido);
         $archivosTemporales[] = $rutaTemporal;
 
@@ -177,7 +178,7 @@ class ExpedientePersonalController extends Controller
             . ($detalle && $detalle !== $tipo ? '_' . $detalle : '')
             . '_v' . $documento->version
             . '_' . $documento->id
-            . '.pdf';
+            . '.' . ($documento->extension ?: 'bin');
     }
 
     private function nombreDentroZip(DocumentoPersonal $documento): string

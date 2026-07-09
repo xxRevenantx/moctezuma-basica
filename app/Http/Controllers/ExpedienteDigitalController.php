@@ -33,7 +33,7 @@ class ExpedienteDigitalController extends Controller
             $documento->ruta,
             $this->nombreDescarga($documento),
             [
-                'Content-Type' => 'application/pdf',
+                'Content-Type' => $documento->mime_type ?: 'application/octet-stream',
                 'Content-Disposition' => 'inline; filename="' . $this->nombreDescarga($documento) . '"',
                 'X-Content-Type-Options' => 'nosniff',
             ]
@@ -87,7 +87,7 @@ class ExpedienteDigitalController extends Controller
         ]);
 
         $documentos = $inscripcion->documentos
-            ->filter(fn (DocumentoAlumno $documento) => Storage::disk($documento->disco)->exists($documento->ruta));
+            ->filter(fn (DocumentoAlumno $documento) => $documento->archivo_existe);
 
         abort_if(
             $documentos->isEmpty()
@@ -110,8 +110,10 @@ class ExpedienteDigitalController extends Controller
             'No fue posible crear el ZIP.'
         );
 
+        $archivosTemporales = [];
+
         foreach ($documentos as $documento) {
-            $rutaFisica = Storage::disk($documento->disco)->path($documento->ruta);
+            $rutaFisica = $this->rutaFisicaParaZip($documento, $directorioTemporal, $archivosTemporales);
             $zip->addFile($rutaFisica, $this->nombreDentroZip($documento));
         }
 
@@ -129,6 +131,10 @@ class ExpedienteDigitalController extends Controller
 
         $zip->close();
 
+        foreach ($archivosTemporales as $archivoTemporal) {
+            File::delete($archivoTemporal);
+        }
+
         $nombreAlumno = Str::slug(trim(
             $inscripcion->apellido_paterno . ' ' .
             $inscripcion->apellido_materno . ' ' .
@@ -138,6 +144,29 @@ class ExpedienteDigitalController extends Controller
         $nombreZip = 'expediente-' . ($nombreAlumno ?: $inscripcion->id) . '.zip';
 
         return response()->download($rutaZip, $nombreZip)->deleteFileAfterSend(true);
+    }
+
+    private function rutaFisicaParaZip(DocumentoAlumno $documento, string $directorioTemporal, array &$archivosTemporales): string
+    {
+        $disco = Storage::disk($documento->disco);
+
+        try {
+            $rutaFisica = $disco->path($documento->ruta);
+
+            if (is_file($rutaFisica)) {
+                return $rutaFisica;
+            }
+        } catch (\Throwable) {
+            // Los discos remotos no siempre ofrecen una ruta física local.
+        }
+
+        $contenido = $disco->get($documento->ruta);
+        $extension = $documento->extension ?: 'bin';
+        $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.' . $extension;
+        File::put($rutaTemporal, $contenido);
+        $archivosTemporales[] = $rutaTemporal;
+
+        return $rutaTemporal;
     }
 
     private function contenidoAcademico(Inscripcion $inscripcion): string
@@ -272,9 +301,9 @@ class ExpedienteDigitalController extends Controller
     private function asegurarArchivoExiste(DocumentoAlumno $documento): void
     {
         abort_unless(
-            Storage::disk($documento->disco)->exists($documento->ruta),
+            $documento->archivo_existe,
             404,
-            'El archivo ya no se encuentra en el almacenamiento.'
+            'El archivo ya no se encuentra en el almacenamiento privado. Vuelve a cargarlo desde el expediente.'
         );
     }
 
@@ -288,7 +317,9 @@ class ExpedienteDigitalController extends Controller
             : '';
         $folio = $documento->folio ? '_' . Str::slug($documento->folio, '_') : '';
 
-        return $tipo . $nivel . $grado . $ciclo . $folio . '_v' . $documento->version . '_' . $documento->id . '.pdf';
+        $extension = $documento->extension ?: 'bin';
+
+        return $tipo . $nivel . $grado . $ciclo . $folio . '_v' . $documento->version . '_' . $documento->id . '.' . $extension;
     }
 
     private function nombreDentroZip(DocumentoAlumno $documento): string

@@ -34,8 +34,23 @@ class ExpedienteArchivoService
                 $directorio = 'expedientes/' . $alumno->id . '/' . $tipo->slug . '/generados/' . now()->format('Y');
                 $rutaGuardada = $directorio . '/' . Str::uuid() . '.pdf';
 
-                if (! Storage::disk($discoExpedientes)->put($rutaGuardada, $contenidoPdf)) {
+                $disco = Storage::disk($discoExpedientes);
+
+                if (! $disco->put($rutaGuardada, $contenidoPdf)) {
                     throw new RuntimeException('No fue posible guardar el PDF generado.');
+                }
+
+                try {
+                    $archivoConfirmado = $disco->exists($rutaGuardada);
+                } catch (Throwable $e) {
+                    throw new RuntimeException(
+                        'El PDF se intentó guardar, pero no fue posible comprobarlo en el almacenamiento.',
+                        previous: $e
+                    );
+                }
+
+                if (! $archivoConfirmado) {
+                    throw new RuntimeException('El almacenamiento no confirmó la existencia del PDF generado.');
                 }
 
                 return DocumentoAlumno::query()->create([
@@ -64,7 +79,14 @@ class ExpedienteArchivoService
                 ]);
             });
         } catch (Throwable $e) {
-            if ($rutaGuardada) Storage::disk($discoExpedientes)->delete($rutaGuardada);
+            if ($rutaGuardada) {
+                try {
+                    Storage::disk($discoExpedientes)->delete($rutaGuardada);
+                } catch (Throwable $limpiezaError) {
+                    report($limpiezaError);
+                }
+            }
+
             throw $e;
         }
     }

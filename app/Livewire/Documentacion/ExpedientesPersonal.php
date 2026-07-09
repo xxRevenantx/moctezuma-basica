@@ -343,6 +343,21 @@ class ExpedientesPersonal extends Component
                     throw new \RuntimeException('No fue posible almacenar el archivo.');
                 }
 
+                try {
+                    $archivoConfirmado = Storage::disk($discoExpedientes)->exists($rutaGuardada);
+                } catch (Throwable $e) {
+                    throw new \RuntimeException(
+                        'El archivo se intentó guardar, pero no fue posible comprobarlo en el disco "' . $discoExpedientes . '".',
+                        previous: $e
+                    );
+                }
+
+                if (! $archivoConfirmado) {
+                    throw new \RuntimeException(
+                        'El almacenamiento no confirmó la existencia del archivo después de guardarlo.'
+                    );
+                }
+
                 $documento = DocumentoPersonal::query()->create([
                     'persona_id' => $this->personaSeleccionadaId,
                     'tipo_documento_personal_id' => $tipo->id,
@@ -400,11 +415,20 @@ class ExpedientesPersonal extends Component
             );
         } catch (Throwable $e) {
             if ($rutaGuardada) {
-                Storage::disk($discoExpedientes)->delete($rutaGuardada);
+                try {
+                    Storage::disk($discoExpedientes)->delete($rutaGuardada);
+                } catch (Throwable $limpiezaError) {
+                    report($limpiezaError);
+                }
             }
 
             report($e);
-            $this->addError('archivo', 'No fue posible guardar el documento. Inténtalo nuevamente.');
+
+            $mensaje = app()->environment('local')
+                ? 'No fue posible guardar el documento: ' . $e->getMessage()
+                : 'No fue posible guardar el documento. Inténtalo nuevamente.';
+
+            $this->addError('archivo', $mensaje);
         }
     }
 
