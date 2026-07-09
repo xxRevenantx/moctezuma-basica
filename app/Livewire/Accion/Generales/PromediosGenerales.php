@@ -8,6 +8,7 @@ use App\Models\DecisionPromocionOficial;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
+use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\CalificacionOficialPrimariaService;
@@ -43,6 +44,11 @@ class PromediosGenerales extends Component
     public string $orden = 'promedio_desc';
     public string $fecha_pdf = '';
     public string $modalidad_bachillerato = 'semestral';
+
+    public string $busqueda_alumno = '';
+    public ?int $alumno_seleccionado_id = null;
+    public int $indice_sugerencia = 0;
+    public bool $mostrar_sugerencias = false;
 
     public function mount(string $slug_nivel): void
     {
@@ -91,6 +97,7 @@ class PromediosGenerales extends Component
         $this->semestre_id = '';
         $this->cargarGrupos();
         $this->cargarSemestres();
+        $this->validarAlumnoSeleccionado();
     }
 
     public function updatedGradoId(): void
@@ -99,6 +106,7 @@ class PromediosGenerales extends Component
         $this->semestre_id = '';
         $this->cargarGrupos();
         $this->cargarSemestres();
+        $this->validarAlumnoSeleccionado();
     }
 
     public function updatedCicloEscolarId(): void
@@ -108,11 +116,13 @@ class PromediosGenerales extends Component
             $this->grupo_id = '';
             $this->semestre_id = '';
         }
+
+        $this->validarAlumnoSeleccionado();
     }
 
     public function updatedModalidadBachillerato(): void
     {
-        if (! in_array($this->modalidad_bachillerato, ['semestral', 'anual'], true)) {
+        if (!in_array($this->modalidad_bachillerato, ['semestral', 'anual'], true)) {
             $this->modalidad_bachillerato = 'semestral';
         }
 
@@ -121,6 +131,24 @@ class PromediosGenerales extends Component
         $this->semestre_id = '';
         $this->cargarGrupos();
         $this->cargarSemestres();
+        $this->validarAlumnoSeleccionado();
+    }
+
+    public function updatedGrupoId(): void
+    {
+        $this->validarAlumnoSeleccionado();
+    }
+
+    public function updatedSemestreId(): void
+    {
+        $this->validarAlumnoSeleccionado();
+    }
+
+    public function updatedBusquedaAlumno(): void
+    {
+        $this->alumno_seleccionado_id = null;
+        $this->indice_sugerencia = 0;
+        $this->mostrar_sugerencias = mb_strlen(trim($this->busqueda_alumno)) >= 2;
     }
 
     public function limpiarFiltros(): void
@@ -136,14 +164,80 @@ class PromediosGenerales extends Component
         $this->semestre_id = '';
         $this->orden = 'promedio_desc';
         $this->modalidad_bachillerato = 'semestral';
+        $this->limpiarBusquedaAlumno();
 
         $this->cargarGrupos();
         $this->cargarSemestres();
     }
 
+    public function abrirSugerencias(): void
+    {
+        $this->mostrar_sugerencias = mb_strlen(trim($this->busqueda_alumno)) >= 2
+            && $this->alumno_seleccionado_id === null;
+    }
+
+    public function cerrarSugerencias(): void
+    {
+        $this->mostrar_sugerencias = false;
+    }
+
+    public function moverSugerencia(int $direccion): void
+    {
+        $cantidad = $this->sugerenciasAlumnos->count();
+
+        if ($cantidad === 0) {
+            $this->indice_sugerencia = 0;
+            return;
+        }
+
+        $this->mostrar_sugerencias = true;
+        $this->indice_sugerencia = ($this->indice_sugerencia + $direccion + $cantidad) % $cantidad;
+    }
+
+    public function seleccionarSugerenciaActual(): void
+    {
+        $sugerencia = $this->sugerenciasAlumnos->get($this->indice_sugerencia);
+
+        if ($sugerencia) {
+            $this->seleccionarAlumno((int) $sugerencia['id']);
+        }
+    }
+
+    public function seleccionarAlumno(int $inscripcionId): void
+    {
+        $alumno = $this->consultaAlumnosSegunFiltros()
+            ->whereKey($inscripcionId)
+            ->first();
+
+        if (!$alumno) {
+            $this->addError('busqueda_alumno', 'El alumno no pertenece a los filtros académicos seleccionados.');
+            return;
+        }
+
+        $this->resetErrorBag('busqueda_alumno');
+        $this->alumno_seleccionado_id = (int) $alumno->id;
+        $this->busqueda_alumno = $this->nombreCompletoInscripcion($alumno);
+        $this->indice_sugerencia = 0;
+        $this->mostrar_sugerencias = false;
+    }
+
+    public function limpiarBusquedaAlumno(): void
+    {
+        $this->busqueda_alumno = '';
+        $this->alumno_seleccionado_id = null;
+        $this->indice_sugerencia = 0;
+        $this->mostrar_sugerencias = false;
+        $this->resetErrorBag('busqueda_alumno');
+    }
+
     public function getEsPrimariaProperty(): bool
     {
         return ($this->nivel?->slug ?? null) === 'primaria';
+    }
+
+    public function getEsPreescolarProperty(): bool
+    {
+        return ($this->nivel?->slug ?? null) === 'preescolar';
     }
 
     public function getEsSecundariaProperty(): bool
@@ -162,9 +256,122 @@ class PromediosGenerales extends Component
         return $this->esBachillerato && $this->modalidad_bachillerato === 'anual';
     }
 
+    public function getSugerenciasAlumnosProperty(): Collection
+    {
+        $termino = trim($this->busqueda_alumno);
+
+        if (mb_strlen($termino) < 2 || $this->alumno_seleccionado_id !== null) {
+            return collect();
+        }
+
+        return $this->consultaAlumnosSegunFiltros()
+            ->with([
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grado:id,nombre',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id,numero',
+            ])
+            ->where(function ($query) use ($termino): void {
+                $like = '%' . $termino . '%';
+
+                $query
+                    ->where('matricula', 'like', $like)
+                    ->orWhere('curp', 'like', $like)
+                    ->orWhere('nombre', 'like', $like)
+                    ->orWhere('apellido_paterno', 'like', $like)
+                    ->orWhere('apellido_materno', 'like', $like)
+                    ->orWhereRaw(
+                        "TRIM(CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre)) LIKE ?",
+                        [$like]
+                    )
+                    ->orWhereRaw(
+                        "TRIM(CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno)) LIKE ?",
+                        [$like]
+                    );
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->limit(8)
+            ->get()
+            ->map(fn(Inscripcion $alumno): array => $this->normalizarSugerenciaAlumno($alumno))
+            ->values();
+    }
+
+    public function getAvisoBusquedaProperty(): ?string
+    {
+        $termino = trim($this->busqueda_alumno);
+
+        if (
+            mb_strlen($termino) < 2
+            || $this->alumno_seleccionado_id !== null
+            || $this->generacion_id === ''
+            || $this->sugerenciasAlumnos->isNotEmpty()
+        ) {
+            return null;
+        }
+
+        $like = '%' . $termino . '%';
+
+        $coincidencia = Inscripcion::query()
+            ->with('generacion:id,anio_ingreso,anio_egreso')
+            ->where('nivel_id', $this->nivel->id)
+            ->where('activo', true)
+            ->where('generacion_id', '!=', (int) $this->generacion_id)
+            ->where(function ($query) use ($like): void {
+                $query
+                    ->where('matricula', 'like', $like)
+                    ->orWhere('curp', 'like', $like)
+                    ->orWhere('nombre', 'like', $like)
+                    ->orWhere('apellido_paterno', 'like', $like)
+                    ->orWhere('apellido_materno', 'like', $like)
+                    ->orWhereRaw(
+                        "TRIM(CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre)) LIKE ?",
+                        [$like]
+                    );
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->first();
+
+        if (!$coincidencia) {
+            return null;
+        }
+
+        $generacion = $coincidencia->generacion
+            ? $coincidencia->generacion->anio_ingreso . ' - ' . $coincidencia->generacion->anio_egreso
+            : 'otra generación';
+
+        return 'Se encontró a ' . $this->nombreCompletoInscripcion($coincidencia)
+            . ' en la generación ' . $generacion
+            . '. La búsqueda actual respeta la generación seleccionada.';
+    }
+
+    public function getDatosAlumnoSeleccionadoProperty(): ?array
+    {
+        if ($this->alumno_seleccionado_id === null) {
+            return null;
+        }
+
+        $alumno = Inscripcion::query()
+            ->with([
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grado:id,nombre',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id,numero',
+            ])
+            ->whereKey($this->alumno_seleccionado_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('activo', true)
+            ->first();
+
+        return $alumno ? $this->normalizarSugerenciaAlumno($alumno) : null;
+    }
+
     public function getContextoAnualBachilleratoProperty(): array
     {
-        if (! $this->esAnualBachillerato || $this->ciclo_escolar_id === '' || $this->generacion_id === '') {
+        if (!$this->esAnualBachillerato || $this->ciclo_escolar_id === '' || $this->generacion_id === '') {
             return [
                 'valido' => false,
                 'errores' => $this->esAnualBachillerato && $this->generacion_id === ''
@@ -201,25 +408,31 @@ class PromediosGenerales extends Component
 
     public function getConcentradoProperty(): array
     {
-        if ($this->esAnualBachillerato) {
-            if ($this->ciclo_escolar_id === '' || $this->generacion_id === '') {
-                return app(PromedioAnualBachilleratoService::class)->reporteAnual(
-                    nivelId: (int) $this->nivel->id,
-                    cicloEscolarId: (int) ($this->ciclo_escolar_id ?: 0),
-                    generacionId: (int) ($this->generacion_id ?: 0),
-                    orden: $this->orden,
-                );
-            }
+        return $this->construirConcentrado(true);
+    }
 
-            return app(PromedioAnualBachilleratoService::class)->reporteAnual(
+    private function construirConcentrado(bool $aplicarSeleccion): array
+    {
+        if ($this->esAnualBachillerato) {
+            $reporte = app(PromedioAnualBachilleratoService::class)->reporteAnual(
                 nivelId: (int) $this->nivel->id,
-                cicloEscolarId: (int) $this->ciclo_escolar_id,
-                generacionId: (int) $this->generacion_id,
+                cicloEscolarId: (int) ($this->ciclo_escolar_id ?: 0),
+                generacionId: (int) ($this->generacion_id ?: 0),
                 orden: $this->orden,
             );
+
+            $alumnos = $this->prepararAlumnosParaVista(
+                collect($reporte['alumnos'] ?? []),
+                $aplicarSeleccion
+            );
+
+            return $this->reconstruirConcentradoAnual($reporte, $alumnos);
         }
 
-        $alumnos = $this->obtenerAlumnosConPromedio();
+        $alumnos = $this->prepararAlumnosParaVista(
+            $this->obtenerAlumnosConPromedio(),
+            $aplicarSeleccion
+        );
 
         return [
             'resumen' => $this->construirResumen($alumnos),
@@ -247,8 +460,8 @@ class PromediosGenerales extends Component
                 'semestre:id,numero,grado_id',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id !== '', fn ($query) => $query->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn ($query) => $query->where('grado_id', $this->grado_id))
+            ->when($this->generacion_id !== '', fn($query) => $query->where('generacion_id', $this->generacion_id))
+            ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
             ->get([
                 'id',
                 'asignacion_grupo_id',
@@ -282,16 +495,191 @@ class PromediosGenerales extends Component
 
     private function cargarSemestres(): void
     {
-        if (! $this->esBachillerato) {
+        if (!$this->esBachillerato) {
             $this->semestres = collect();
             return;
         }
 
         $this->semestres = Semestre::query()
-            ->whereHas('grado', fn ($query) => $query->where('nivel_id', $this->nivel->id))
-            ->when($this->grado_id !== '', fn ($query) => $query->where('grado_id', $this->grado_id))
+            ->whereHas('grado', fn($query) => $query->where('nivel_id', $this->nivel->id))
+            ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
             ->orderBy('numero')
             ->get(['id', 'grado_id', 'numero', 'orden_global']);
+    }
+
+    private function consultaAlumnosSegunFiltros()
+    {
+        return Inscripcion::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('activo', true)
+            ->when(
+                $this->generacion_id !== '',
+                fn($query) => $query->where('generacion_id', (int) $this->generacion_id)
+            )
+            ->when(
+                !$this->esAnualBachillerato && $this->grado_id !== '',
+                fn($query) => $query->where('grado_id', (int) $this->grado_id)
+            )
+            ->when(
+                !$this->esAnualBachillerato && $this->grupo_id !== '',
+                fn($query) => $query->where('grupo_id', (int) $this->grupo_id)
+            )
+            ->when(
+                $this->esBachillerato && !$this->esAnualBachillerato && $this->semestre_id !== '',
+                fn($query) => $query->where('semestre_id', (int) $this->semestre_id)
+            );
+    }
+
+    private function validarAlumnoSeleccionado(): void
+    {
+        if ($this->alumno_seleccionado_id === null) {
+            return;
+        }
+
+        $valido = $this->consultaAlumnosSegunFiltros()
+            ->whereKey($this->alumno_seleccionado_id)
+            ->exists();
+
+        if ($valido) {
+            return;
+        }
+
+        $this->alumno_seleccionado_id = null;
+        $this->indice_sugerencia = 0;
+        $this->mostrar_sugerencias = mb_strlen(trim($this->busqueda_alumno)) >= 2;
+    }
+
+    private function nombreCompletoInscripcion(Inscripcion $alumno): string
+    {
+        return trim(collect([
+            $alumno->apellido_paterno,
+            $alumno->apellido_materno,
+            $alumno->nombre,
+        ])->filter()->implode(' '));
+    }
+
+    private function normalizarSugerenciaAlumno(Inscripcion $alumno): array
+    {
+        $generacion = $alumno->generacion
+            ? $alumno->generacion->anio_ingreso . ' - ' . $alumno->generacion->anio_egreso
+            : 'Sin generación';
+
+        return [
+            'id' => (int) $alumno->id,
+            'alumno' => $this->nombreCompletoInscripcion($alumno),
+            'matricula' => $alumno->matricula ?: 'Sin matrícula',
+            'curp' => $alumno->curp ?: 'Sin CURP',
+            'generacion_id' => $alumno->generacion_id ? (int) $alumno->generacion_id : null,
+            'generacion' => $generacion,
+            'grado_id' => $alumno->grado_id ? (int) $alumno->grado_id : null,
+            'grado' => $alumno->grado?->nombre ?? 'Sin grado',
+            'grupo_id' => $alumno->grupo_id ? (int) $alumno->grupo_id : null,
+            'grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo',
+            'semestre_id' => $alumno->semestre_id ? (int) $alumno->semestre_id : null,
+            'semestre' => $alumno->semestre?->numero,
+            'estatus_inscripcion' => str($alumno->estatus ?: 'activo')->replace('_', ' ')->headline()->toString(),
+            'activo' => (bool) $alumno->activo,
+        ];
+    }
+
+    private function prepararAlumnosParaVista(Collection $alumnos, bool $aplicarSeleccion): Collection
+    {
+        $ids = $alumnos
+            ->pluck('inscripcion_id')
+            ->filter()
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $inscripciones = Inscripcion::query()
+            ->with([
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grado:id,nombre',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id,numero',
+            ])
+            ->whereIn('id', $ids)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('activo', true)
+            ->get()
+            ->keyBy('id');
+
+        return $alumnos
+            ->filter(fn(array $alumno): bool => $inscripciones->has((int) ($alumno['inscripcion_id'] ?? 0)))
+            ->map(function (array $alumno) use ($inscripciones): array {
+                /** @var Inscripcion $inscripcion */
+                $inscripcion = $inscripciones->get((int) $alumno['inscripcion_id']);
+                $identidad = $this->normalizarSugerenciaAlumno($inscripcion);
+
+                $alumno['curp'] = $identidad['curp'];
+                $alumno['generacion'] = $identidad['generacion'];
+                $alumno['estatus_inscripcion'] = $identidad['estatus_inscripcion'];
+                $alumno['activo'] = true;
+
+                return $alumno;
+            })
+            ->when(
+                $aplicarSeleccion && $this->alumno_seleccionado_id !== null,
+                fn(Collection $items): Collection => $items
+                    ->where('inscripcion_id', $this->alumno_seleccionado_id)
+                    ->values()
+            )
+            ->values();
+    }
+
+    private function reconstruirConcentradoAnual(array $reporte, Collection $alumnos): array
+    {
+        $definitivos = $alumnos
+            ->where('completo', true)
+            ->filter(fn(array $alumno): bool => is_numeric($alumno['promedio_final'] ?? null));
+        $mejor = $definitivos->sortByDesc('promedio_final')->first();
+
+        $resumen = [
+            'total_alumnos' => $alumnos->count(),
+            'promedio_general' => $this->formatearDecimal(PromedioExcel::calcular($definitivos->pluck('promedio_final'))),
+            'aprobados' => $alumnos->where('elegible_reconocimiento', true)->count(),
+            'riesgo' => $alumnos->filter(fn(array $alumno): bool => ($alumno['completo'] ?? false)
+                && !($alumno['todas_materias_acreditadas'] ?? false))->count(),
+            'incompletos' => $alumnos->where('completo', false)->count(),
+            'pendientes_decision' => 0,
+            'mejor_alumno' => $mejor['alumno'] ?? 'Sin datos',
+            'mejor_promedio' => $this->formatearDecimal($mejor['promedio_final'] ?? null),
+            'con_reconocimiento' => $alumnos->where('reconocimiento_disponible', true)->count(),
+        ];
+
+        $grupoOriginal = collect($reporte['grupos'] ?? [])->first();
+        $grupos = collect();
+
+        if ($grupoOriginal || $alumnos->isNotEmpty()) {
+            $grupo = is_array($grupoOriginal) ? $grupoOriginal : [];
+            $grupo['titulo'] = $grupo['titulo'] ?? 'Concentrado anual de bachillerato';
+            $grupo['total'] = $resumen['total_alumnos'];
+            $grupo['promedio'] = $resumen['promedio_general'];
+            $grupo['aprobados'] = $resumen['aprobados'];
+            $grupo['riesgo'] = $resumen['riesgo'];
+            $grupo['incompletos'] = $resumen['incompletos'];
+            $grupo['con_reconocimiento'] = $resumen['con_reconocimiento'];
+            $grupo['pendientes_decision'] = 0;
+            $grupo['alumnos'] = $alumnos;
+            $grupos = collect([$grupo]);
+        }
+
+        $reporte['alumnos'] = $alumnos;
+        $reporte['grupos'] = $grupos;
+        $reporte['resumen'] = $resumen;
+        $reporte['grafica'] = [
+            'categorias' => $grupos->pluck('titulo')->values()->all(),
+            'promedios' => $grupos->pluck('promedio')->map(fn($valor) => $valor === '—' ? 0 : (float) $valor)->values()->all(),
+            'aprobados' => $grupos->pluck('aprobados')->values()->all(),
+            'riesgo' => $grupos->pluck('riesgo')->values()->all(),
+            'incompletos' => $grupos->pluck('incompletos')->values()->all(),
+        ];
+
+        return $reporte;
     }
 
     private function obtenerAlumnosConPromedio(): Collection
@@ -325,7 +713,7 @@ class PromediosGenerales extends Component
 
         $semestreTerminalNumero = $this->esBachillerato
             ? Semestre::query()
-                ->whereHas('grado', fn ($query) => $query->where('nivel_id', $this->nivel->id))
+                ->whereHas('grado', fn($query) => $query->where('nivel_id', $this->nivel->id))
                 ->max('numero')
             : null;
 
@@ -333,7 +721,7 @@ class PromediosGenerales extends Component
             $esGradoTerminal = $gradoTerminalId !== null
                 && (int) ($alumno['grado_id'] ?? 0) === (int) $gradoTerminalId;
 
-            $esSemestreTerminal = ! $this->esBachillerato
+            $esSemestreTerminal = !$this->esBachillerato
                 || (
                     $semestreTerminalNumero !== null
                     && (int) ($alumno['semestre'] ?? 0) === (int) $semestreTerminalNumero
@@ -370,7 +758,7 @@ class PromediosGenerales extends Component
         $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
             $periodos = $fila['promedios_periodo_precisos'];
             $periodosCompletos = $fila['periodos_completos'] ?? [1 => false, 2 => false, 3 => false];
-            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+            $capturados = collect($periodos)->filter(fn($valor) => $valor !== null)->count();
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
@@ -386,12 +774,12 @@ class PromediosGenerales extends Component
                 'semestre' => null,
                 'periodos' => $periodos,
                 'periodos_completos' => $periodosCompletos,
-                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                'suma_periodos' => (float) collect($periodos)->filter(fn($valor) => $valor !== null)->sum(),
                 'promedio_final' => $fila['promedio_general_preciso'],
                 'promedio_provisional' => $fila['promedio_provisional_preciso'],
                 'promedio_mostrado' => $fila['promedio_general_preciso'] ?? $fila['promedio_provisional_preciso'],
                 'periodos_capturados' => $capturados,
-                'periodos_faltantes' => collect($periodosCompletos)->filter(fn ($valor) => ! $valor)->count(),
+                'periodos_faltantes' => collect($periodosCompletos)->filter(fn($valor) => !$valor)->count(),
                 'materias_capturadas' => $fila['materias_capturadas'] ?? 0,
                 'completo' => (bool) $fila['completo'],
                 'campos' => $fila['campos'] ?? [],
@@ -424,7 +812,7 @@ class PromediosGenerales extends Component
         $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
             $periodos = $fila['promedios_periodo_precisos'];
             $periodosCompletos = $fila['periodos_completos'] ?? [1 => false, 2 => false, 3 => false];
-            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+            $capturados = collect($periodos)->filter(fn($valor) => $valor !== null)->count();
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
@@ -440,12 +828,12 @@ class PromediosGenerales extends Component
                 'semestre' => null,
                 'periodos' => $periodos,
                 'periodos_completos' => $periodosCompletos,
-                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                'suma_periodos' => (float) collect($periodos)->filter(fn($valor) => $valor !== null)->sum(),
                 'promedio_final' => $fila['promedio_general_preciso'],
                 'promedio_provisional' => $fila['promedio_provisional_preciso'],
                 'promedio_mostrado' => $fila['promedio_general_preciso'] ?? $fila['promedio_provisional_preciso'],
                 'periodos_capturados' => $capturados,
-                'periodos_faltantes' => collect($periodosCompletos)->filter(fn ($valor) => ! $valor)->count(),
+                'periodos_faltantes' => collect($periodosCompletos)->filter(fn($valor) => !$valor)->count(),
                 'materias_capturadas' => $fila['materias_completas'] ?? 0,
                 'materias_esperadas' => $fila['materias_esperadas'] ?? 0,
                 'completo' => (bool) $fila['completo'],
@@ -484,7 +872,7 @@ class PromediosGenerales extends Component
         $alumnos = collect($reporte['alumnos'])->map(function (array $fila): array {
             $periodos = $fila['promedios_periodo_precisos'] ?? [1 => null, 2 => null];
             $periodosCompletos = $fila['periodos_completos'] ?? [1 => false, 2 => false];
-            $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+            $capturados = collect($periodos)->filter(fn($valor) => $valor !== null)->count();
 
             $filaNormalizada = [
                 'inscripcion_id' => $fila['inscripcion_id'],
@@ -500,12 +888,12 @@ class PromediosGenerales extends Component
                 'semestre' => $fila['semestre'],
                 'periodos' => $periodos,
                 'periodos_completos' => $periodosCompletos,
-                'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                'suma_periodos' => (float) collect($periodos)->filter(fn($valor) => $valor !== null)->sum(),
                 'promedio_final' => $fila['promedio_general_preciso'],
                 'promedio_provisional' => $fila['promedio_provisional_preciso'],
                 'promedio_mostrado' => $fila['promedio_general_preciso'] ?? $fila['promedio_provisional_preciso'],
                 'periodos_capturados' => $capturados,
-                'periodos_faltantes' => collect($periodosCompletos)->filter(fn ($valor) => ! $valor)->count(),
+                'periodos_faltantes' => collect($periodosCompletos)->filter(fn($valor) => !$valor)->count(),
                 'materias_capturadas' => $fila['materias_completas'] ?? 0,
                 'materias_esperadas' => $fila['materias_esperadas'] ?? 0,
                 'completo' => (bool) ($fila['completo'] ?? false),
@@ -550,6 +938,7 @@ class PromediosGenerales extends Component
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->leftJoin('semestres', 'semestres.id', '=', 'calificaciones.semestre_id')
             ->whereNull('inscripciones.deleted_at')
+            ->where('inscripciones.activo', true)
             ->where('calificaciones.nivel_id', $this->nivel->id)
             ->where('calificaciones.ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('calificaciones.es_numerica', true)
@@ -559,11 +948,12 @@ class PromediosGenerales extends Component
             ->where('materias.extra', false)
             ->where('materias.receso', false)
             ->whereIn(DB::raw($campoPeriodo), $limitePeriodos)
-            ->when($this->generacion_id !== '', fn ($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn ($query) => $query->where('calificaciones.grado_id', $this->grado_id))
-            ->when($this->grupo_id !== '', fn ($query) => $query->where('calificaciones.grupo_id', $this->grupo_id))
-            ->when($this->semestre_id !== '', fn ($query) => $query->where('calificaciones.semestre_id', $this->semestre_id))
-            ->selectRaw(''
+            ->when($this->generacion_id !== '', fn($query) => $query->where('calificaciones.generacion_id', $this->generacion_id))
+            ->when($this->grado_id !== '', fn($query) => $query->where('calificaciones.grado_id', $this->grado_id))
+            ->when($this->grupo_id !== '', fn($query) => $query->where('calificaciones.grupo_id', $this->grupo_id))
+            ->when($this->semestre_id !== '', fn($query) => $query->where('calificaciones.semestre_id', $this->semestre_id))
+            ->selectRaw(
+                ''
                 . 'calificaciones.id as calificacion_id, '
                 . 'calificaciones.inscripcion_id, '
                 . 'calificaciones.generacion_id, '
@@ -598,28 +988,28 @@ class PromediosGenerales extends Component
 
                 foreach ($limitePeriodos as $periodo) {
                     $registrosPeriodo = $registros
-                        ->filter(fn ($registro) => (int) $registro->numero_periodo === (int) $periodo)
+                        ->filter(fn($registro) => (int) $registro->numero_periodo === (int) $periodo)
                         ->sortBy([
-                            fn ($registro) => $registro->orden_materia === null ? 1 : 0,
-                            fn ($registro) => $registro->orden_materia ?? 999,
-                            fn ($registro) => $registro->asignacion_materia_id ?? 999,
-                            fn ($registro) => $registro->calificacion_id ?? 999,
+                            fn($registro) => $registro->orden_materia === null ? 1 : 0,
+                            fn($registro) => $registro->orden_materia ?? 999,
+                            fn($registro) => $registro->asignacion_materia_id ?? 999,
+                            fn($registro) => $registro->calificacion_id ?? 999,
                         ])
                         ->groupBy('asignacion_materia_id')
-                        ->map(fn (Collection $items) => $items->last())
+                        ->map(fn(Collection $items) => $items->last())
                         ->values();
 
                     $valores = $registrosPeriodo
                         ->pluck('valor_numerico')
-                        ->filter(fn ($valor) => is_numeric($valor) && (float) $valor >= 0 && (float) $valor <= 10)
-                        ->map(fn ($valor) => (float) $valor)
+                        ->filter(fn($valor) => is_numeric($valor) && (float) $valor >= 0 && (float) $valor <= 10)
+                        ->map(fn($valor) => (float) $valor)
                         ->values();
 
                     $periodos[$periodo] = PromedioExcel::calcular($valores);
                     $materiasCapturadas += $valores->count();
                 }
 
-                $capturados = collect($periodos)->filter(fn ($valor) => $valor !== null)->count();
+                $capturados = collect($periodos)->filter(fn($valor) => $valor !== null)->count();
                 $completo = $capturados === count($limitePeriodos);
                 $promedioProvisional = PromedioExcel::calcular($periodos);
 
@@ -636,8 +1026,8 @@ class PromediosGenerales extends Component
                     'semestre_id' => $primero->semestre_id ? (int) $primero->semestre_id : null,
                     'semestre' => $primero->semestre_numero ? (int) $primero->semestre_numero : null,
                     'periodos' => $periodos,
-                    'periodos_completos' => collect($limitePeriodos)->mapWithKeys(fn ($numero) => [$numero => $periodos[$numero] !== null])->all(),
-                    'suma_periodos' => (float) collect($periodos)->filter(fn ($valor) => $valor !== null)->sum(),
+                    'periodos_completos' => collect($limitePeriodos)->mapWithKeys(fn($numero) => [$numero => $periodos[$numero] !== null])->all(),
+                    'suma_periodos' => (float) collect($periodos)->filter(fn($valor) => $valor !== null)->sum(),
                     'promedio_final' => $completo ? $promedioProvisional : null,
                     'promedio_provisional' => $promedioProvisional,
                     'promedio_mostrado' => $promedioProvisional,
@@ -666,19 +1056,19 @@ class PromediosGenerales extends Component
     private function asignarLugaresPorGrupo(Collection $alumnos): Collection
     {
         return $alumnos
-            ->groupBy(fn (array $alumno) => $this->claveGrupoAlumno($alumno))
+            ->groupBy(fn(array $alumno) => $this->claveGrupoAlumno($alumno))
             ->flatMap(function (Collection $items): Collection {
                 $promediosUnicosDesc = $items
-                    ->filter(fn (array $alumno) => $this->esElegibleParaLugar($alumno))
+                    ->filter(fn(array $alumno) => $this->esElegibleParaLugar($alumno))
                     ->sortByDesc('promedio_final')
                     ->pluck('promedio_final')
-                    ->map(fn ($promedio) => PromedioExcel::claveComparacion($promedio))
+                    ->map(fn($promedio) => PromedioExcel::claveComparacion($promedio))
                     ->filter()
                     ->unique()
                     ->values();
 
                 return $items->map(function (array $alumno) use ($promediosUnicosDesc): array {
-                    if (! $this->esElegibleParaLugar($alumno)) {
+                    if (!$this->esElegibleParaLugar($alumno)) {
                         $alumno['lugar'] = null;
                         $alumno['texto_lugar'] = 'Pendiente';
                         return $alumno;
@@ -700,7 +1090,7 @@ class PromediosGenerales extends Component
 
     private function esElegibleParaLugar(array $alumno): bool
     {
-        if (! ($alumno['completo'] ?? false) || ! is_numeric($alumno['promedio_final'] ?? null)) {
+        if (!($alumno['completo'] ?? false) || !is_numeric($alumno['promedio_final'] ?? null)) {
             return false;
         }
 
@@ -748,7 +1138,7 @@ class PromediosGenerales extends Component
     private function agruparAlumnos(Collection $alumnos): Collection
     {
         return $alumnos
-            ->groupBy(fn (array $alumno) => $this->claveGrupoAlumno($alumno))
+            ->groupBy(fn(array $alumno) => $this->claveGrupoAlumno($alumno))
             ->map(function (Collection $items): array {
                 $primero = $items->first();
                 $titulo = ($primero['grado'] ?? 'Sin grado') . ' · Grupo ' . ($primero['grupo'] ?? 'Sin grupo');
@@ -760,7 +1150,7 @@ class PromediosGenerales extends Component
                 $promediosDefinitivos = $items
                     ->where('completo', true)
                     ->pluck('promedio_final')
-                    ->filter(fn ($valor) => $valor !== null);
+                    ->filter(fn($valor) => $valor !== null);
 
                 return [
                     '_grado_orden' => (int) ($primero['grado_orden'] ?? PHP_INT_MAX),
@@ -769,10 +1159,10 @@ class PromediosGenerales extends Component
                     'titulo' => $titulo,
                     'total' => $items->count(),
                     'promedio' => $this->formatearDecimal(PromedioExcel::calcular($promediosDefinitivos)),
-                    'aprobados' => $items->filter(fn (array $item) => $this->estaAprobadoAcademicamente($item))->count(),
-                    'riesgo' => $items->filter(fn (array $item) => $this->estaEnRiesgoAcademico($item))->count(),
+                    'aprobados' => $items->filter(fn(array $item) => $this->estaAprobadoAcademicamente($item))->count(),
+                    'riesgo' => $items->filter(fn(array $item) => $this->estaEnRiesgoAcademico($item))->count(),
                     'incompletos' => $items->where('completo', false)->count(),
-                    'pendientes_decision' => $items->filter(fn (array $item) => ($item['completo'] ?? false)
+                    'pendientes_decision' => $items->filter(fn(array $item) => ($item['completo'] ?? false)
                         && in_array($this->slug_nivel, ['primaria', 'secundaria'], true)
                         && ($item['promocion_confirmada'] ?? null) === null)->count(),
                     'alumnos' => $items->values(),
@@ -798,16 +1188,16 @@ class PromediosGenerales extends Component
     {
         $definitivos = $alumnos
             ->where('completo', true)
-            ->filter(fn (array $alumno) => is_numeric($alumno['promedio_final'] ?? null));
+            ->filter(fn(array $alumno) => is_numeric($alumno['promedio_final'] ?? null));
         $mejor = $definitivos->sortByDesc('promedio_final')->first();
 
         return [
             'total_alumnos' => $alumnos->count(),
             'promedio_general' => $this->formatearDecimal(PromedioExcel::calcular($definitivos->pluck('promedio_final'))),
-            'aprobados' => $alumnos->filter(fn (array $alumno) => $this->estaAprobadoAcademicamente($alumno))->count(),
-            'riesgo' => $alumnos->filter(fn (array $alumno) => $this->estaEnRiesgoAcademico($alumno))->count(),
+            'aprobados' => $alumnos->filter(fn(array $alumno) => $this->estaAprobadoAcademicamente($alumno))->count(),
+            'riesgo' => $alumnos->filter(fn(array $alumno) => $this->estaEnRiesgoAcademico($alumno))->count(),
             'incompletos' => $alumnos->where('completo', false)->count(),
-            'pendientes_decision' => $alumnos->filter(fn (array $alumno) => ($alumno['completo'] ?? false)
+            'pendientes_decision' => $alumnos->filter(fn(array $alumno) => ($alumno['completo'] ?? false)
                 && in_array($this->slug_nivel, ['primaria', 'secundaria'], true)
                 && ($alumno['promocion_confirmada'] ?? null) === null)->count(),
             'mejor_alumno' => $mejor['alumno'] ?? 'Sin datos',
@@ -821,7 +1211,7 @@ class PromediosGenerales extends Component
 
         return [
             'categorias' => $porGrupo->pluck('titulo')->values()->all(),
-            'promedios' => $porGrupo->pluck('promedio')->map(fn ($valor) => (float) $valor)->values()->all(),
+            'promedios' => $porGrupo->pluck('promedio')->map(fn($valor) => (float) $valor)->values()->all(),
             'aprobados' => $porGrupo->pluck('aprobados')->values()->all(),
             'riesgo' => $porGrupo->pluck('riesgo')->values()->all(),
             'incompletos' => $porGrupo->pluck('incompletos')->values()->all(),
@@ -830,7 +1220,7 @@ class PromediosGenerales extends Component
 
     private function estaAprobadoAcademicamente(array $alumno): bool
     {
-        if (! ($alumno['completo'] ?? false)) {
+        if (!($alumno['completo'] ?? false)) {
             return false;
         }
 
@@ -848,7 +1238,7 @@ class PromediosGenerales extends Component
 
     private function estaEnRiesgoAcademico(array $alumno): bool
     {
-        if (! ($alumno['completo'] ?? false)) {
+        if (!($alumno['completo'] ?? false)) {
             return false;
         }
 
@@ -866,14 +1256,14 @@ class PromediosGenerales extends Component
 
     private function obtenerEstatusAlumno(array $alumno): string
     {
-        $tieneDatos = collect($alumno['periodos'] ?? [])->contains(fn ($valor) => $valor !== null)
+        $tieneDatos = collect($alumno['periodos'] ?? [])->contains(fn($valor) => $valor !== null)
             || ($alumno['promedio_provisional'] ?? null) !== null;
 
-        if (! $tieneDatos) {
+        if (!$tieneDatos) {
             return 'Sin captura';
         }
 
-        if (! ($alumno['completo'] ?? false)) {
+        if (!($alumno['completo'] ?? false)) {
             return 'Incompleto';
         }
 
@@ -893,7 +1283,7 @@ class PromediosGenerales extends Component
 
         $promedio = $alumno['promedio_final'] ?? null;
 
-        if (! is_numeric($promedio)) {
+        if (!is_numeric($promedio)) {
             return 'Incompleto';
         }
 
@@ -906,20 +1296,20 @@ class PromediosGenerales extends Component
 
     public function confirmarPromocion(int $inscripcionId, bool $promovido): void
     {
-        if (! in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
+        if (!in_array($this->slug_nivel, ['primaria', 'secundaria'], true)) {
             return;
         }
 
         $fila = $this->concentrado['grupos']
-            ->flatMap(fn (array $grupo) => $grupo['alumnos'])
+            ->flatMap(fn(array $grupo) => $grupo['alumnos'])
             ->firstWhere('inscripcion_id', $inscripcionId);
 
-        if (! $fila) {
+        if (!$fila) {
             $this->addError('promocion', 'No se encontró al alumno dentro del concentrado actual.');
             return;
         }
 
-        if (! ($fila['completo'] ?? false) || ! is_numeric($fila['promedio_final'] ?? null)) {
+        if (!($fila['completo'] ?? false) || !is_numeric($fila['promedio_final'] ?? null)) {
             $this->addError('promocion', 'No se puede confirmar la promoción mientras existan periodos, campos o materias pendientes.');
             return;
         }
@@ -955,15 +1345,33 @@ class PromediosGenerales extends Component
         return PromedioExcel::formatear($valor, 1, '—');
     }
 
-    public function exportarExcel(): BinaryFileResponse
+    public function exportarExcelGeneracion(): BinaryFileResponse
     {
+        return $this->exportarExcel('generacion');
+    }
+
+    public function exportarExcelAlumno(): BinaryFileResponse
+    {
+        return $this->exportarExcel('alumno');
+    }
+
+    public function exportarExcel(string $alcance = 'generacion'): BinaryFileResponse
+    {
+        $alcance = in_array($alcance, ['generacion', 'alumno'], true) ? $alcance : 'generacion';
+
         if ($this->esBachillerato && $this->generacion_id === '') {
             throw ValidationException::withMessages([
                 'generacion_id' => 'Selecciona una generación de bachillerato antes de exportar.',
             ]);
         }
 
-        if ($this->esAnualBachillerato && ! ($this->contextoAnualBachillerato['valido'] ?? false)) {
+        if ($alcance === 'alumno' && $this->alumno_seleccionado_id === null) {
+            throw ValidationException::withMessages([
+                'busqueda_alumno' => 'Selecciona un alumno antes de generar la exportación individual.',
+            ]);
+        }
+
+        if ($this->esAnualBachillerato && !($this->contextoAnualBachillerato['valido'] ?? false)) {
             throw ValidationException::withMessages([
                 'generacion_id' => implode(' ', $this->contextoAnualBachillerato['errores'] ?? [
                     'La generación no corresponde al ciclo escolar seleccionado.',
@@ -971,10 +1379,19 @@ class PromediosGenerales extends Component
             ]);
         }
 
-        $concentrado = $this->concentrado;
+        $concentrado = $this->construirConcentrado($alcance === 'alumno');
 
-        $nombreArchivo = ($this->esAnualBachillerato ? 'PROMEDIO_ANUAL_BACHILLERATO_' : 'PROMEDIOS_GENERALES_')
+        if ($alcance === 'alumno' && (int) data_get($concentrado, 'resumen.total_alumnos', 0) === 0) {
+            throw ValidationException::withMessages([
+                'busqueda_alumno' => 'El alumno seleccionado no tiene promedios en el ciclo y filtros actuales.',
+            ]);
+        }
+
+        $datosAlumno = $alcance === 'alumno' ? $this->datosAlumnoSeleccionado : null;
+
+        $nombreArchivo = ($alcance === 'alumno' ? 'PROMEDIO_ALUMNO_' : ($this->esAnualBachillerato ? 'PROMEDIO_ANUAL_BACHILLERATO_' : 'PROMEDIOS_GENERALES_'))
             . Str::slug($this->nivel?->nombre ?? $this->slug_nivel, '_')
+            . ($datosAlumno ? '_' . Str::slug($datosAlumno['alumno'], '_') : '')
             . '_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
 
         return Excel::download(
@@ -992,8 +1409,11 @@ class PromediosGenerales extends Component
                     'Generación' => $this->generacion_id ?: 'Todas',
                     'Grado' => $this->grado_id ?: 'Todos',
                     'Grupo' => $this->grupo_id ?: 'Todos',
+                    'Alcance' => $alcance === 'alumno' ? 'Alumno seleccionado' : 'Generación / filtros actuales',
+                    'Alumno' => $datosAlumno['alumno'] ?? 'Todos',
+                    'Matrícula' => $datosAlumno['matricula'] ?? 'No aplica',
                     'Modalidad bachillerato' => $this->esBachillerato ? ($this->esAnualBachillerato ? 'Promedio anual' : 'Promedio semestral') : 'No aplica',
-                    'Semestre' => ! $this->esBachillerato
+                    'Semestre' => !$this->esBachillerato
                         ? 'No aplica'
                         : ($this->esAnualBachillerato
                             ? 'Automático por ciclo y generación'
