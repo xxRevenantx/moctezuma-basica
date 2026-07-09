@@ -458,8 +458,10 @@ class EditarPersonaNivel extends Component
             }
         }
 
+        $duplicadoDetectado = false;
+
         try {
-            DB::transaction(function () {
+            DB::transaction(function () use (&$duplicadoDetectado) {
                 $detalle = PersonaNivelDetalle::query()
                     ->with('cabecera')
                     ->findOrFail($this->detalleId);
@@ -472,17 +474,24 @@ class EditarPersonaNivel extends Component
                 $ingresoSep = $this->esBachillerato() ? null : $this->limpiarFecha($this->ingreso_sep);
                 $ingresoCt = $this->limpiarFecha($this->ingreso_ct);
 
-                $cabecera = PersonaNivel::firstOrCreate(
-                    [
+                $cabecera = PersonaNivel::query()
+                    ->where('persona_id', $this->persona_id)
+                    ->where('nivel_id', $this->nivel_id)
+                    ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                    ->latest('id')
+                    ->first();
+
+                if (!$cabecera) {
+                    $cabecera = PersonaNivel::create([
                         'persona_id' => $this->persona_id,
                         'nivel_id' => $this->nivel_id,
-                    ],
-                    [
                         'ingreso_seg' => $ingresoSeg,
                         'ingreso_sep' => $ingresoSep,
                         'ingreso_ct' => $ingresoCt,
-                    ]
-                );
+                        'fecha_inicio' => now()->toDateString(),
+                        'estado' => PersonaNivel::ESTADO_ACTIVO,
+                    ]);
+                }
 
                 if (!$this->esSecundaria()) {
                     $cabecera->update([
@@ -512,9 +521,7 @@ class EditarPersonaNivel extends Component
                     ->where('id', '!=', $detalle->id)
                     ->exists();
 
-                if ($dup) {
-                    throw new \RuntimeException('DUPLICADO');
-                }
+                $duplicadoDetectado = $dup;
 
                 $ordenNuevo = (int) $detalle->orden;
 
@@ -565,20 +572,17 @@ class EditarPersonaNivel extends Component
             });
 
             $this->dispatch('swal', [
-                'title' => '¡Asignación actualizada correctamente!',
-                'icon' => 'success',
-                'position' => 'top-end',
+                'title' => $duplicadoDetectado
+                    ? 'Asignación actualizada con advertencia de posible duplicado.'
+                    : '¡Asignación actualizada correctamente!',
+                'icon' => $duplicadoDetectado ? 'warning' : 'success',
+                'position' => $duplicadoDetectado ? 'top' : 'top-end',
             ]);
 
             $this->dispatch('refreshPersonaNivelList');
             $this->dispatch('cerrar-modal-editar');
             $this->cerrarModal();
         } catch (\RuntimeException $e) {
-            if ($e->getMessage() === 'DUPLICADO') {
-                $this->addError('persona_role_id', 'Ya existe esa asignación en el nivel destino.');
-                return;
-            }
-
             throw $e;
         }
     }

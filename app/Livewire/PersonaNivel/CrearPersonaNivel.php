@@ -307,6 +307,8 @@ class CrearPersonaNivel extends Component
         $cabecera = PersonaNivel::query()
             ->where('persona_id', $this->persona_id)
             ->where('nivel_id', $this->nivel_id)
+            ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+            ->latest('id')
             ->first();
 
         $this->existeCabecera = (bool) $cabecera;
@@ -413,19 +415,27 @@ class CrearPersonaNivel extends Component
             }
         }
 
-        try {
-            DB::transaction(function () {
-                $cabecera = PersonaNivel::firstOrCreate(
-                    [
+        $duplicadoDetectado = false;
+
+        DB::transaction(function () use (&$duplicadoDetectado) {
+                $cabecera = PersonaNivel::query()
+                    ->where('persona_id', $this->persona_id)
+                    ->where('nivel_id', $this->nivel_id)
+                    ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                    ->latest('id')
+                    ->first();
+
+                if (!$cabecera) {
+                    $cabecera = PersonaNivel::create([
                         'persona_id' => $this->persona_id,
                         'nivel_id' => $this->nivel_id,
-                    ],
-                    [
                         'ingreso_seg' => $this->esBachillerato() ? null : $this->ingreso_seg,
                         'ingreso_sep' => $this->esBachillerato() ? null : $this->ingreso_sep,
                         'ingreso_ct' => $this->ingreso_ct,
-                    ]
-                );
+                        'fecha_inicio' => now()->toDateString(),
+                        'estado' => PersonaNivel::ESTADO_ACTIVO,
+                    ]);
+                }
 
                 if (!$this->bloquearFechasSecundaria) {
                     $updates = [];
@@ -462,9 +472,7 @@ class CrearPersonaNivel extends Component
                     )
                     ->exists();
 
-                if ($dup) {
-                    throw new \RuntimeException('DUPLICADO');
-                }
+                $duplicadoDetectado = $dup;
 
                 $maxOrden = PersonaNivelDetalle::query()
                     ->whereHas('cabecera', fn($q) => $q->where('nivel_id', $this->nivel_id))
@@ -477,26 +485,18 @@ class CrearPersonaNivel extends Component
                     'persona_role_id' => $this->persona_role_id,
                     'grado_id' => $this->grado_id,
                     'grupo_id' => $this->grupo_id,
+                    'fecha_inicio' => now()->toDateString(),
+                    'estado' => PersonaNivelDetalle::ESTADO_ACTIVO,
                     'orden' => $nuevoOrden,
                 ]);
-            });
-        } catch (\RuntimeException $e) {
-            if ($e->getMessage() === 'DUPLICADO') {
-                $this->dispatch('swal', [
-                    'title' => 'Esta asignación ya existe.',
-                    'icon' => 'warning',
-                    'position' => 'top',
-                ]);
-                return;
-            }
-
-            throw $e;
-        }
+        });
 
         $this->dispatch('swal', [
-            'title' => 'Asignación exitosa',
-            'icon' => 'success',
-            'position' => 'top-end',
+            'title' => $duplicadoDetectado
+                ? 'Asignación guardada con advertencia de posible duplicado.'
+                : 'Asignación exitosa',
+            'icon' => $duplicadoDetectado ? 'warning' : 'success',
+            'position' => $duplicadoDetectado ? 'top' : 'top-end',
         ]);
 
         $this->dispatch('refreshPersonaNivelList');

@@ -45,6 +45,11 @@ class Grupo extends Model
         return $this->hasMany(PersonaNivel::class);
     }
 
+    public function personaNivelDetalles()
+    {
+        return $this->hasMany(PersonaNivelDetalle::class, 'grupo_id');
+    }
+
     public function asignacionGrupo()
     {
         return $this->belongsTo(\App\Models\AsignacionGrupo::class, 'asignacion_grupo_id');

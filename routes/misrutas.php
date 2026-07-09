@@ -38,6 +38,7 @@ use App\Http\Controllers\PeriodosBasicoController;
 use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\PersonaNivelController;
+use App\Http\Controllers\PersonaNivelReporteController;
 use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
 use App\Http\Controllers\PromediosMateriasPdfController;
@@ -90,6 +91,11 @@ Route::get('/roles-del-personal', [PersonaController::class, 'rolePersona'])->na
 
 // Plantilla
 Route::get('/plantilla', [PersonaNivelController::class, 'plantilla'])->name('misrutas.plantilla');
+Route::get('/plantilla/reportes/{tipo}/{formato}', PersonaNivelReporteController::class)
+    ->whereIn('tipo', ['plantilla', 'carga', 'historial'])
+    ->whereIn('formato', ['pdf', 'excel'])
+    ->middleware('admin')
+    ->name('misrutas.plantilla-personal.reporte');
 
 // Ruta profesores
 Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');

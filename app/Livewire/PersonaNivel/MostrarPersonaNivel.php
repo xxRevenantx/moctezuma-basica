@@ -297,8 +297,10 @@ class MostrarPersonaNivel extends Component
                 'grupo.asignacionGrupo',
                 'personaRole.rolePersona'
             ])
+            ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
             ->whereHas('cabecera', function ($query) use ($nivelId) {
-                $query->where('nivel_id', $nivelId);
+                $query->where('nivel_id', $nivelId)
+                    ->where('estado', PersonaNivel::ESTADO_ACTIVO);
             })
             ->orderBy(
                 PersonaNivel::select('nivel_id')
@@ -364,6 +366,8 @@ class MostrarPersonaNivel extends Component
                 'grupo.asignacionGrupo',
                 'personaRole.rolePersona',
             ])
+            ->where('persona_nivel_detalles.estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+            ->whereHas('cabecera', fn ($cabecera) => $cabecera->where('estado', PersonaNivel::ESTADO_ACTIVO))
             ->when($this->search, function ($q) {
                 $s = trim($this->search);
 

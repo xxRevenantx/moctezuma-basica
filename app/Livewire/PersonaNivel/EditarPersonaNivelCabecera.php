@@ -95,10 +95,24 @@ class EditarPersonaNivelCabecera extends Component
              * - Actualizar fechas en cabecera destino
              * - Borrar cabecera vieja si se queda sin detalles
              */
-            $dest = PersonaNivel::firstOrCreate(
-                ['persona_id' => $newPersonaId, 'nivel_id' => $newNivelId],
-                ['ingreso_seg' => $this->ingreso_seg, 'ingreso_sep' => $this->ingreso_sep, 'ingreso_ct' => $this->ingreso_ct]
-            );
+            $dest = PersonaNivel::query()
+                ->where('persona_id', $newPersonaId)
+                ->where('nivel_id', $newNivelId)
+                ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                ->latest('id')
+                ->first();
+
+            if (!$dest) {
+                $dest = PersonaNivel::create([
+                    'persona_id' => $newPersonaId,
+                    'nivel_id' => $newNivelId,
+                    'ingreso_seg' => $this->ingreso_seg,
+                    'ingreso_sep' => $this->ingreso_sep,
+                    'ingreso_ct' => $this->ingreso_ct,
+                    'fecha_inicio' => now()->toDateString(),
+                    'estado' => PersonaNivel::ESTADO_ACTIVO,
+                ]);
+            }
 
             $dest->update([
                 'ingreso_seg' => $this->ingreso_seg,
