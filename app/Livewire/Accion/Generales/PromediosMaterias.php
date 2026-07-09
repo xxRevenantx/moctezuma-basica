@@ -11,6 +11,7 @@ use App\Models\Grupo;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Services\PromediosTresPeriodosService;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -258,6 +259,13 @@ class PromediosMaterias extends Component
     public function formatearPromedio(mixed $valor): string
     {
         return PromedioExcel::formatear($valor, 1, '—');
+    }
+
+    public function formatearCalificacionMateria(mixed $valor): string
+    {
+        return $this->nivel?->slug === 'bachillerato'
+            ? CalificacionBachillerato::formatearEntero($valor)
+            : PromedioExcel::formatear($valor, 1, '—');
     }
 
     private function cargarGrupos(): void

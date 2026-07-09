@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\CalificacionBachillerato;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Database\Eloquent\Model;
 
 class Calificacion extends Model
@@ -41,6 +43,30 @@ class Calificacion extends Model
         'equivalencia_autorizada' => 'boolean',
         'fecha_validacion' => 'datetime',
     ];
+
+
+    protected static function booted(): void
+    {
+        static::saving(function (Calificacion $calificacion): void {
+            if (
+                ! ReglasMateriaBachillerato::esBachillerato($calificacion->nivel_id)
+                || ! (bool) $calificacion->es_numerica
+            ) {
+                return;
+            }
+
+            $valor = $calificacion->valor_numerico ?? $calificacion->calificacion;
+            $entero = CalificacionBachillerato::truncarParcial($valor);
+
+            if ($entero === null) {
+                return;
+            }
+
+            $calificacion->calificacion = (string) $entero;
+            $calificacion->valor_numerico = $entero;
+            $calificacion->clave_especial = null;
+        });
+    }
 
     public function inscripcion()
     {

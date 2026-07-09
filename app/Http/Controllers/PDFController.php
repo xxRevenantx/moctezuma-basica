@@ -22,6 +22,7 @@ use App\Services\ListaAcademicaService;
 use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -954,7 +955,7 @@ class PDFController extends Controller
                                     };
 
                                     $calificacionesPeriodo[$numeroPeriodo] = [
-                                        'calificacion' => PromedioExcel::formatear($numero, 1, '—'),
+                                        'calificacion' => CalificacionBachillerato::formatearEntero($numero),
                                         'estado' => $estadoPeriodo,
                                         'porcentaje' => min(100, $numero * 10),
                                     ];
@@ -997,10 +998,10 @@ class PDFController extends Controller
                                 'extra' => 0,
                                 'receso' => 0,
                                 'calificaciones' => $calificacionesPeriodo,
-                                'promedio' => PromedioExcel::formatear($promedioMateriaPreciso, 1, '—'),
+                                'promedio' => CalificacionBachillerato::formatearEntero($promedioMateriaPreciso),
                                 'promedio_numero' => $promedioMateriaPreciso,
                                 'promedio_numero_preciso' => $promedioMateriaPreciso,
-                                'promedio_truncado' => PromedioExcel::truncar($promedioMateriaPreciso, 1),
+                                'promedio_truncado' => CalificacionBachillerato::truncarParcial($promedioMateriaPreciso),
                                 'estado' => $estadoMateria,
                                 'completo' => $completa,
                             ];
@@ -2690,11 +2691,17 @@ class PDFController extends Controller
 
         $hayMateriasPromediables = $numeroMateriasPromediar > 0 && !empty($idsMateriasPromediables);
 
-        $obtenerNumeroValido = function ($valor): ?float {
+        $obtenerNumeroValido = function ($valor) use ($esBachillerato): ?float {
             $valor = strtoupper(trim((string) $valor));
 
             if ($valor === '' || !is_numeric($valor)) {
                 return null;
+            }
+
+            if ($esBachillerato) {
+                $entero = CalificacionBachillerato::truncarParcial($valor);
+
+                return $entero === null ? null : (float) $entero;
             }
 
             $numero = (float) $valor;
@@ -2742,6 +2749,10 @@ class PDFController extends Controller
             $estado = 'Sin captura';
             $porcentaje = 0;
             $numero = $obtenerNumeroValido($valor);
+
+            if ($esBachillerato && $numero !== null) {
+                $valor = (string) (int) $numero;
+            }
 
             if ($numero !== null) {
                 $porcentaje = min(100, $numero * 10);
@@ -3495,12 +3506,15 @@ class PDFController extends Controller
             }
 
             $calificaciones = $queryCalificaciones->get()
-                ->mapWithKeys(function ($item) {
+                ->mapWithKeys(function ($item) use ($esBachillerato) {
                     $clave = $item->inscripcion_id . '-' . $item->asignacion_materia_id;
+                    $valor = strtoupper(trim((string) $item->calificacion));
 
-                    return [
-                        $clave => strtoupper(trim((string) $item->calificacion)),
-                    ];
+                    if ($esBachillerato && is_numeric($valor)) {
+                        $valor = CalificacionBachillerato::formatearEntero($valor, '');
+                    }
+
+                    return [$clave => $valor];
                 })
                 ->toArray();
         }
@@ -3570,11 +3584,17 @@ class PDFController extends Controller
             |--------------------------------------------------------------------------
             */
 
-        $obtenerNumeroValido = function ($valor): ?float {
+        $obtenerNumeroValido = function ($valor) use ($esBachillerato): ?float {
             $valor = strtoupper(trim((string) $valor));
 
             if ($valor === '' || !is_numeric($valor)) {
                 return null;
+            }
+
+            if ($esBachillerato) {
+                $entero = CalificacionBachillerato::truncarParcial($valor);
+
+                return $entero === null ? null : (float) $entero;
             }
 
             $numero = (float) $valor;
@@ -4200,11 +4220,17 @@ class PDFController extends Controller
 
         $hayMateriasPromediables = $numeroMateriasPromediar > 0 && !empty($idsMateriasPromediables);
 
-        $obtenerNumeroValido = function ($valor): ?float {
+        $obtenerNumeroValido = function ($valor) use ($esBachillerato): ?float {
             $valor = strtoupper(trim((string) $valor));
 
             if ($valor === '' || !is_numeric($valor)) {
                 return null;
+            }
+
+            if ($esBachillerato) {
+                $entero = CalificacionBachillerato::truncarParcial($valor);
+
+                return $entero === null ? null : (float) $entero;
             }
 
             $numero = (float) $valor;
@@ -4252,6 +4278,10 @@ class PDFController extends Controller
             $porcentaje = 0;
 
             $numero = $obtenerNumeroValido($valor);
+
+            if ($esBachillerato && $numero !== null) {
+                $valor = (string) (int) $numero;
+            }
 
             if ($numero !== null) {
                 $porcentaje = min(100, $numero * 10);
@@ -4978,7 +5008,13 @@ class PDFController extends Controller
 
             $estado = 'Sin captura';
             $porcentaje = 0;
-            $numero = PromedioExcel::valoresNumericos([$valor])->first();
+            $numero = $esBachillerato
+                ? CalificacionBachillerato::truncarParcial($valor)
+                : PromedioExcel::valoresNumericos([$valor])->first();
+
+            if ($esBachillerato && $numero !== null) {
+                $valor = (string) $numero;
+            }
 
             if ($numero !== null) {
                 $porcentaje = min(100, $numero * 10);
@@ -5032,7 +5068,7 @@ class PDFController extends Controller
         $estadoPromedio = 'Sin datos';
 
         if ($promedioPreciso !== null) {
-            // No se truncan parciales ni materias intermedias. Solo la salida final.
+            // En bachillerato los componentes ya son enteros; el promedio agregado conserva decimales.
             $promedioNumero = PromedioExcel::truncar($promedioPreciso);
             $promedio = PromedioExcel::formatear($promedioPreciso);
             $porcentajePromedio = min(100, $promedioPreciso * 10);

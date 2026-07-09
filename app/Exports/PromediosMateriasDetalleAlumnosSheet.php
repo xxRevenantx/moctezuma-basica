@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -61,11 +62,11 @@ class PromediosMateriasDetalleAlumnosSheet implements FromArray, ShouldAutoSize,
                     $clave = $claves[$i] ?? null;
                     $valor = $clave !== null ? ($materia['evaluaciones'][$clave] ?? null) : null;
                     $especial = $clave !== null ? ($materia['especiales'][$clave] ?? null) : null;
-                    $fila[] = $valor !== null ? $this->valor($valor) : ($especial ?: '—');
+                    $fila[] = $valor !== null ? $this->valorCalificacion($valor) : ($especial ?: '—');
                 }
 
-                $fila[] = $this->valor($materia['suma'] ?? null);
-                $fila[] = $this->valor($materia['promedio'] ?? null);
+                $fila[] = $this->valorEntero($materia['suma'] ?? null);
+                $fila[] = $this->valorCalificacion($materia['promedio'] ?? null);
                 $fila[] = $this->valor($alumno['promedio_general'] ?? null);
                 $fila[] = ($materia['tiene_calificacion_externa'] ?? false) ? 'Sí' : 'No';
                 $fila[] = ($materia['provisional'] ?? true) ? 'Provisional' : 'Definitivo';
@@ -106,5 +107,23 @@ class PromediosMateriasDetalleAlumnosSheet implements FromArray, ShouldAutoSize,
     private function valor(mixed $valor): string
     {
         return PromedioExcel::formatear($valor, 1, '—');
+    }
+
+    private function valorCalificacion(mixed $valor): string
+    {
+        return ($this->reporte['es_bachillerato'] ?? false)
+            ? CalificacionBachillerato::formatearEntero($valor)
+            : PromedioExcel::formatear($valor, 1, '—');
+    }
+
+    private function valorEntero(mixed $valor): string
+    {
+        if ($valor === null || $valor === '' || ! is_numeric($valor)) {
+            return '—';
+        }
+
+        return ($this->reporte['es_bachillerato'] ?? false)
+            ? (string) ((int) floor((float) $valor + 0.000000001))
+            : PromedioExcel::formatear($valor, 1, '—');
     }
 }

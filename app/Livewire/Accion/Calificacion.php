@@ -21,6 +21,7 @@ use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
 use App\Services\ListaAcademicaService;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Carbon\Carbon;
@@ -987,6 +988,15 @@ class Calificacion extends Component
                 $valor = $calificacion?->calificacion;
                 $observacion = $calificacion?->observacion;
 
+                if (
+                    $this->esBachillerato
+                    && $calificacion
+                    && (bool) $calificacion->es_numerica
+                    && is_numeric($calificacion->valor_numerico)
+                ) {
+                    $valor = CalificacionBachillerato::formatearEntero($calificacion->valor_numerico, '');
+                }
+
                 $this->calificaciones[$inscripcionId][$asignacionMateriaId] = $valor !== null ? (string) $valor : '';
                 $this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] = $valor !== null ? (string) $valor : '';
                 $this->observaciones[$inscripcionId][$asignacionMateriaId] = $observacion !== null ? (string) $observacion : '';
@@ -1004,7 +1014,17 @@ class Calificacion extends Component
     {
         $valor = strtoupper(trim((string) $valor));
 
-        return $valor === '' ? null : $valor;
+        if ($valor === '') {
+            return null;
+        }
+
+        if ($this->esBachillerato && is_numeric($valor)) {
+            $entero = CalificacionBachillerato::truncarParcial($valor);
+
+            return $entero !== null ? (string) $entero : $valor;
+        }
+
+        return $valor;
     }
 
     private function esCalificacionEspecial($valor): bool
@@ -1020,6 +1040,10 @@ class Calificacion extends Component
 
         if ($valor === null || !is_numeric($valor)) {
             return false;
+        }
+
+        if ($this->esBachillerato) {
+            return CalificacionBachillerato::esEnteraValida($valor);
         }
 
         $numero = (float) $valor;
@@ -1070,7 +1094,9 @@ class Calificacion extends Component
                     'max:5',
                     function ($attribute, $value, $fail) {
                         if (!$this->validarCalificacionPermitida($value)) {
-                            $fail('Usa una calificación de 0 a 10 o una clave válida: AC, ED, RA, NP, SD.');
+                            $fail($this->esBachillerato
+                                ? 'En bachillerato usa una calificación de 0 a 10 o una clave válida: AC, ED, RA, NP, SD. Los decimales se truncarán a entero.'
+                                : 'Usa una calificación de 0 a 10 o una clave válida: AC, ED, RA, NP, SD.');
                         }
                     },
                 ];

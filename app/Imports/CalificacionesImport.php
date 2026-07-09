@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion;
+use App\Support\CalificacionBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -117,7 +118,9 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
                     if (!$this->validarCalificacionPermitida($valorNuevo)) {
                         $this->agregarError(
                             $filaExcel,
-                            "La materia {$materia['materia']} tiene un valor no permitido. Usa 0 a 10, AC, ED, RA, NP o SD."
+                            $this->esBachillerato
+                                ? "La materia {$materia['materia']} tiene un valor no permitido. En bachillerato usa una calificación de 0 a 10, AC, ED, RA, NP o SD. Los decimales se truncarán a entero."
+                                : "La materia {$materia['materia']} tiene un valor no permitido. Usa 0 a 10, AC, ED, RA, NP o SD."
                         );
                         continue;
                     }
@@ -403,7 +406,18 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
     private function normalizarCalificacion($valor): ?string
     {
         $valor = strtoupper(trim((string) $valor));
-        return $valor === '' ? null : $valor;
+
+        if ($valor === '') {
+            return null;
+        }
+
+        if ($this->esBachillerato && is_numeric($valor)) {
+            $entero = CalificacionBachillerato::truncarParcial($valor);
+
+            return $entero !== null ? (string) $entero : $valor;
+        }
+
+        return $valor;
     }
 
     private function esCalificacionEspecial($valor): bool
@@ -418,6 +432,10 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
 
         if ($valor === null || !is_numeric($valor)) {
             return false;
+        }
+
+        if ($this->esBachillerato) {
+            return CalificacionBachillerato::esEnteraValida($valor);
         }
 
         $numero = (float) $valor;

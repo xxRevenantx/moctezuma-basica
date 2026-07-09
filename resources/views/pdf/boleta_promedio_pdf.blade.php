@@ -307,6 +307,12 @@
             return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : '—';
         };
 
+        $formatearCalificacionMateria = function ($valor) use ($esBachillerato, $formatearPromedio): string {
+            return $esBachillerato
+                ? \App\Support\CalificacionBachillerato::formatearEntero($valor)
+                : $formatearPromedio($valor);
+        };
+
         /*
          * Se normalizan los periodos para pintar encabezados.
          * En bachillerato normalmente serán dos parciales.
@@ -480,15 +486,18 @@
                         @php
                             $calificacionPeriodo = $fila['calificaciones'][$numeroPeriodo] ?? null;
                             $valorPeriodo = $calificacionPeriodo['calificacion'] ?? '—';
+                            $valorPeriodoMostrado = $esBachillerato
+                                ? \App\Support\CalificacionBachillerato::formatearEntero($valorPeriodo, (string) $valorPeriodo)
+                                : $valorPeriodo;
                         @endphp
 
                         <td class="text-center">
-                            <strong>{{ $valorPeriodo }}</strong>
+                            <strong>{{ $valorPeriodoMostrado }}</strong>
                         </td>
                     @endforeach
 
                     <td class="text-center">
-                        <strong>{{ $formatearPromedio($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
+                        <strong>{{ $formatearCalificacionMateria($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
                     </td>
 
                     <td class="text-center">
@@ -573,12 +582,15 @@
 
                         @foreach ($periodosResumen as $numeroPeriodo => $periodoResumen)
                             <td class="text-center">
-                                <strong>{{ $fila['calificaciones'][$numeroPeriodo]['calificacion'] ?? '—' }}</strong>
+                                @php
+                                    $valorExtra = $fila['calificaciones'][$numeroPeriodo]['calificacion'] ?? '—';
+                                @endphp
+                                <strong>{{ \App\Support\CalificacionBachillerato::formatearEntero($valorExtra, (string) $valorExtra) }}</strong>
                             </td>
                         @endforeach
 
                         <td class="text-center">
-                            <strong>{{ $formatearPromedio($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
+                            <strong>{{ $formatearCalificacionMateria($fila['promedio_numero'] ?? ($fila['promedio'] ?? null)) }}</strong>
                         </td>
                     </tr>
                 @endforeach

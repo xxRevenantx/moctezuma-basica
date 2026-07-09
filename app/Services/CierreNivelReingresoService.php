@@ -15,6 +15,8 @@ use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Models\TrayectoriaAcademica;
+use App\Support\CalificacionBachillerato;
+use App\Support\ReglasMateriaBachillerato;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -262,9 +264,14 @@ class CierreNivelReingresoService
 
             $normalizada = mb_strtoupper(trim($calificacion));
             $numerica = is_numeric($normalizada);
+            $esBachillerato = ReglasMateriaBachillerato::esBachillerato($trayectoria->nivel_id);
 
             if ($numerica && ((float) $normalizada < 5 || (float) $normalizada > 10)) {
                 throw ValidationException::withMessages(['calificacion_externa' => 'La calificación numérica debe estar entre 5 y 10.']);
+            }
+
+            if ($numerica && $esBachillerato) {
+                $normalizada = CalificacionBachillerato::formatearEntero($normalizada, '');
             }
 
             if (!$numerica && !in_array($normalizada, ['AC', 'NP'], true)) {

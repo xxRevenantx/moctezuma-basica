@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CicloEscolar;
 use App\Models\MateriaPromediar;
 use App\Models\Nivel;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +60,7 @@ class PromediosTresPeriodosService
             'alumnos' => $alumnos,
             'campos' => $this->catalogoCampos(),
             'nota' => $esBachillerato
-                ? 'NOTA: Se consideran los parciales correspondientes a cada semestre. Las calificaciones y promedios se expresan con un decimal.'
+                ? 'NOTA: En bachillerato cada parcial se usa como entero truncado, el promedio de materia también es entero truncado y el promedio semestral conserva un decimal.'
                 : 'NOTA: Se consideran las evaluaciones de los tres periodos. Las calificaciones y promedios se expresan con un decimal.',
         ];
     }
@@ -179,7 +180,9 @@ class PromediosTresPeriodosService
                         && (float) $registro->valor_numerico <= 10;
 
                     $evaluaciones[(int) $clave] = $esNumerica
-                        ? (float) $registro->valor_numerico
+                        ? ($esBachillerato
+                            ? CalificacionBachillerato::truncarParcial($registro->valor_numerico)
+                            : (float) $registro->valor_numerico)
                         : null;
 
                     if ($registro) {
@@ -199,8 +202,12 @@ class PromediosTresPeriodosService
 
                 $capturadas = $valores->count();
                 $esperadas = count($clavesEsperadas);
-                $promedioCalculo = PromedioExcel::calcular($valores);
-                $promedio = PromedioExcel::truncar($promedioCalculo);
+                $promedioCalculo = $esBachillerato
+                    ? CalificacionBachillerato::promedioMateria($valores)
+                    : PromedioExcel::calcular($valores);
+                $promedio = $esBachillerato
+                    ? $promedioCalculo
+                    : PromedioExcel::truncar($promedioCalculo);
                 $completo = $esperadas > 0 && $capturadas === $esperadas;
 
                 return [
@@ -284,7 +291,9 @@ class PromediosTresPeriodosService
                     ->map(fn ($valor) => (float) $valor)
                     ->values();
 
-                $promedioGeneralCalculo = PromedioExcel::calcular($promedios);
+                $promedioGeneralCalculo = $esBachillerato
+                    ? CalificacionBachillerato::promedioSemestral($promedios)
+                    : PromedioExcel::calcular($promedios);
 
                 $claveConfig = $primero['grado_id'] . '|' . ($esBachillerato ? ($primero['semestre_id'] ?: 0) : 0);
                 $numeroConfigurado = (int) ($configuraciones->get($claveConfig)?->numero_materias ?? 0);

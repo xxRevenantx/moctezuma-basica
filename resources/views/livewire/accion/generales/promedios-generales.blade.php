@@ -103,16 +103,13 @@
                             con los promedios anuales de las materias oficiales configuradas en la base de datos.
                             Materias extra, recesos, talleres y materias informativas no se muestran ni participan.
                         @elseif ($esBachillerato && $esAnualBachillerato)
-                            El promedio anual integra automáticamente los dos semestres que corresponden al ciclo y a la
-                            generación seleccionados. Cada materia calificable se obtiene con sus dos parciales;
-                            después,
-                            los promedios semestrales se suman y se dividen entre dos. Ambos semestres representan el 50
-                            %.
+                            Cada parcial se usa como entero truncado y el promedio de cada materia también queda en
+                            entero. Los promedios semestrales se calculan con esas materias enteras y conservan sus
+                            decimales. El promedio anual integra ambos promedios semestrales sin truncarlos.
                         @elseif ($esBachillerato)
-                            El promedio de cada materia calificable se obtiene con el primer y segundo parcial. El
-                            promedio
-                            semestral se calcula con los promedios finales de las materias calificables asignadas. El
-                            resultado solo es definitivo cuando todas tienen ambos parciales numéricos.
+                            Cada parcial se usa como entero truncado. El promedio de la materia se calcula con esos dos
+                            enteros y también se trunca a entero. El promedio semestral se obtiene con los promedios
+                            enteros de las materias y puede conservar decimales.
                         @else
                             El promedio se calcula con las evaluaciones numéricas configuradas para el nivel.
                         @endif
@@ -127,7 +124,7 @@
                         <span
                             class="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
                             <flux:icon.calculator class="h-3.5 w-3.5" />
-                            Precisión completa · truncamiento final
+                            {{ $esBachillerato ? 'Parciales y materias enteros · semestre con decimales' : 'Precisión completa · truncamiento final' }}
                         </span>
                     </div>
                 </div>
@@ -1181,8 +1178,8 @@
                                                                     </p>
                                                                     <p
                                                                         class="mt-1 text-xs font-semibold text-slate-500">
-                                                                        Solo materias calificables · promedio de cada
-                                                                        materia = (P1 + P2) ÷ 2
+                                                                        Parciales enteros · promedio de materia =
+                                                                        truncar((P1 + P2) ÷ 2)
                                                                     </p>
                                                                 </div>
                                                                 <span
@@ -1236,7 +1233,7 @@
                                                                                     @endphp
                                                                                     <td class="px-3 py-2 text-center">
                                                                                         @if ($evaluacionParcial !== null)
-                                                                                            {{ $this->formatearDecimal($evaluacionParcial) }}
+                                                                                            {{ \App\Support\CalificacionBachillerato::formatearEntero($evaluacionParcial) }}
                                                                                         @else
                                                                                             @if (!empty($especialParcial))
                                                                                                 <span
@@ -1249,7 +1246,7 @@
                                                                                 @endforeach
                                                                                 <td
                                                                                     class="px-3 py-2 text-center font-black">
-                                                                                    {{ \App\Support\PromedioExcel::formatear($materia['promedio_final_preciso'] ?? ($materia['promedio_provisional_preciso'] ?? null), 2, '—') }}
+                                                                                    {{ \App\Support\CalificacionBachillerato::formatearEntero($materia['promedio_final_preciso'] ?? ($materia['promedio_provisional_preciso'] ?? null)) }}
                                                                                 </td>
                                                                                 @php
                                                                                     $materiaCompleta =

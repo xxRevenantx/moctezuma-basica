@@ -86,19 +86,22 @@ class PromediosGeneralesResumenSheet implements FromArray, ShouldAutoSize, WithE
             $this->filas[] = ['Promedio general', 'PROMEDIO de los promedios anuales precisos de las materias participantes'];
             $this->filas[] = ['Tutoría', 'Se muestra, pero no participa en promedio, lugares ni promoción'];
         } elseif ($this->esBachillerato && $this->modalidadBachillerato === 'anual') {
-            $this->filas[] = ['Promedio por materia', '(Parcial 1 + Parcial 2) / 2, solo materias calificables'];
-            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los promedios finales de las materias calificables'];
+            $this->filas[] = ['Promedio por materia', 'Truncar((truncar(Parcial 1) + truncar(Parcial 2)) / 2), solo materias calificables'];
+            $this->filas[] = ['Promedio semestral', 'PROMEDIO decimal de los promedios enteros de las materias calificables'];
             $this->filas[] = ['Promedio anual', '(Promedio del primer semestre + promedio del segundo semestre) / 2'];
             $this->filas[] = ['Reconocimiento', 'Solo alumnos completos, con todas las materias acreditadas y lugar anual del 1 al 3'];
         } elseif ($this->esBachillerato) {
-            $this->filas[] = ['Promedio semestral', 'PROMEDIO de los promedios finales de materias calificables obtenidos con los dos parciales'];
+            $this->filas[] = ['Promedio por materia', 'Truncar((truncar(Parcial 1) + truncar(Parcial 2)) / 2)'];
+            $this->filas[] = ['Promedio semestral', 'PROMEDIO decimal de los promedios enteros de las materias calificables'];
         } else {
             $this->filas[] = ['Promedio anual', 'PROMEDIO de las evaluaciones numéricas configuradas'];
         }
 
-        $nota = $this->nivelSlug === 'primaria'
-            ? 'Los vacíos y claves especiales no se convierten en cero. Cada promedio final de campo se establece con un decimal truncado antes de calcular el promedio general.'
-            : 'Los vacíos y claves especiales no se convierten en cero. Los cálculos intermedios no se truncan; el truncamiento a un decimal se aplica únicamente al presentar.';
+        $nota = match (true) {
+            $this->nivelSlug === 'primaria' => 'Los vacíos y claves especiales no se convierten en cero. Cada promedio final de campo se establece con un decimal truncado antes de calcular el promedio general.',
+            $this->esBachillerato => 'Los vacíos y claves especiales no se convierten en cero. Los parciales y los promedios de materia se manejan como enteros truncados; los promedios semestrales y anuales conservan decimales.',
+            default => 'Los vacíos y claves especiales no se convierten en cero. Los cálculos intermedios no se truncan; el truncamiento a un decimal se aplica únicamente al presentar.',
+        };
 
         $this->filas[] = ['Nota', $nota];
     }

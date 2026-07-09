@@ -20,7 +20,11 @@
                         <p class="text-xs font-black uppercase tracking-[.2em] text-[#006492] dark:text-sky-300">Concentrado institucional</p>
                         <h3 class="mt-1 text-xl font-black text-slate-950 dark:text-white">Promedio de los tres periodos por materia</h3>
                         <p class="mt-2 max-w-4xl text-sm text-slate-600 dark:text-slate-300">
-                            Muestra todos los grados en una sola tabla, agrupa las materias por campo formativo y calcula el promedio del turno Matutino, por grado, grupo y alumno.
+                            @if ($nivel?->slug === 'bachillerato')
+                                Cada parcial se usa como entero truncado; el promedio de cada materia también queda en entero y el promedio semestral conserva decimales.
+                            @else
+                                Muestra todos los grados en una sola tabla, agrupa las materias por campo formativo y calcula el promedio del turno Matutino, por grado, grupo y alumno.
+                            @endif
                         </p>
                     </div>
                 </div>
@@ -338,12 +342,12 @@
                                             <div class="flex justify-center gap-1.5">
                                                 @foreach ($materia['evaluaciones_esperadas'] as $clave)
                                                     <span class="inline-flex min-w-10 justify-center rounded-lg border px-2 py-1 text-xs font-black {{ array_key_exists($clave, $materia['especiales']) ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 bg-slate-50 text-slate-700' }}">
-                                                        {{ $materia['evaluaciones'][$clave] !== null ? $this->formatearPromedio($materia['evaluaciones'][$clave]) : ($materia['especiales'][$clave] ?? '—') }}
+                                                        {{ $materia['evaluaciones'][$clave] !== null ? $this->formatearCalificacionMateria($materia['evaluaciones'][$clave]) : ($materia['especiales'][$clave] ?? '—') }}
                                                     </span>
                                                 @endforeach
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 text-center text-lg font-black">{{ $this->formatearPromedio($materia['promedio']) }}</td>
+                                        <td class="px-4 py-3 text-center text-lg font-black">{{ $this->formatearCalificacionMateria($materia['promedio']) }}</td>
                                         <td class="px-4 py-3 text-center text-lg font-black text-[#006492] dark:text-sky-300">{{ $this->formatearPromedio($alumno['promedio_general']) }}</td>
                                         <td class="px-4 py-3 text-center">
                                             <span class="rounded-full px-2.5 py-1 text-xs font-black {{ $materia['provisional'] ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">

@@ -433,6 +433,14 @@
 
             return $promedioTruncado !== null ? number_format($promedioTruncado, 1, '.', '') : '—';
         };
+
+        $formatearCalificacion = function ($valor) use ($esBachillerato): string {
+            $texto = strtoupper(trim((string) $valor));
+
+            return $esBachillerato && is_numeric($texto)
+                ? \App\Support\CalificacionBachillerato::formatearEntero($texto)
+                : ($texto !== '' ? $texto : '—');
+        };
     @endphp
 
     <div class="header">
@@ -589,7 +597,7 @@
                     </td>
 
                     <td class="text-center">
-                        <strong>{{ $fila['calificacion'] }}</strong>
+                        <strong>{{ $formatearCalificacion($fila['calificacion'] ?? null) }}</strong>
                     </td>
 
                     <td class="text-center">
@@ -643,7 +651,7 @@
                         </td>
 
                         <td class="text-center">
-                            <strong>{{ $fila['calificacion'] }}</strong>
+                            <strong>{{ $formatearCalificacion($fila['calificacion'] ?? null) }}</strong>
                         </td>
 
                         <td class="text-center">
@@ -679,7 +687,7 @@
                     <tr>
                         <td class="text-center">{{ $fila['clave'] ?? '—' }}</td>
                         <td class="materia">{{ $fila['materia'] ?? 'Materia extra' }}</td>
-                        <td class="text-center"><strong>{{ $fila['calificacion'] ?? '—' }}</strong></td>
+                        <td class="text-center"><strong>{{ $formatearCalificacion($fila['calificacion'] ?? null) }}</strong></td>
                     </tr>
                 @endforeach
             </tbody>

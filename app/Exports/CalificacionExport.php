@@ -13,6 +13,7 @@ use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Facades\DB;
@@ -1361,10 +1362,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         return $query->get()
             ->mapWithKeys(function ($item) {
                 $clave = $item->inscripcion_id . '-' . $item->asignacion_materia_id;
+                $valor = strtoupper(trim((string) $item->calificacion));
 
-                return [
-                    $clave => strtoupper(trim((string) $item->calificacion)),
-                ];
+                if ($this->esBachillerato && is_numeric($valor)) {
+                    $valor = CalificacionBachillerato::formatearEntero($valor, '');
+                }
+
+                return [$clave => $valor];
             })
             ->toArray();
     }

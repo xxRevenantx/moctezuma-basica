@@ -6,6 +6,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Support\Collection;
@@ -32,10 +33,12 @@ class PromedioBachilleratoService
      * 1. Solo participan materias calificables asignadas al grupo, semestre y
      *    ciclo escolar. Se excluyen materias extra y recesos; las asignaturas
      *    oficiales cuyo nombre contiene “Taller” sí participan.
-     * 2. Cada materia debe tener calificación numérica de 0 a 10 en ambos
-     *    parciales. NP, AC, textos y vacíos dejan el semestre incompleto.
-     * 3. Promedio de materia = (P1 + P2) / 2.
-     * 4. Promedio semestral = promedio de los promedios finales de materias.
+     * 2. Cada materia debe tener calificación numérica entera de 0 a 10 en
+     *    ambos parciales. Los registros decimales históricos se truncan sin
+     *    redondear. NP, AC, textos y vacíos dejan el semestre incompleto.
+     * 3. Promedio de materia = truncar((truncar(P1) + truncar(P2)) / 2).
+     * 4. Promedio semestral = promedio decimal de los promedios enteros de
+     *    las materias; el resultado semestral no se trunca.
      * 5. Los lugares se calculan por grupo y semestre. Los empates comparten
      *    lugar con numeración consecutiva: 1, 1, 2, 3.
      * 6. Reconocimiento: semestre completo, promedio mínimo de 6 y lugar 1 a 3.
@@ -162,7 +165,7 @@ class PromedioBachilleratoService
                             && (float) $registro->valor_numerico <= 10;
 
                         $evaluaciones[$parcial] = $esNumerica
-                            ? (float) $registro->valor_numerico
+                            ? CalificacionBachillerato::truncarParcial($registro->valor_numerico)
                             : null;
 
                         if ($evaluaciones[$parcial] !== null) {
@@ -183,7 +186,7 @@ class PromedioBachilleratoService
 
                     $capturadas = collect($evaluaciones)->filter(fn ($valor) => $valor !== null)->count();
                     $completa = $capturadas === count(self::PARCIALES);
-                    $promedioProvisional = PromedioExcel::calcular($evaluaciones);
+                    $promedioProvisional = CalificacionBachillerato::promedioMateria($evaluaciones);
                     $promedioFinal = $completa ? $promedioProvisional : null;
 
                     if ($promedioProvisional !== null) {
@@ -212,7 +215,7 @@ class PromedioBachilleratoService
                         'faltantes' => max(count(self::PARCIALES) - $capturadas, 0),
                         'promedio_provisional_preciso' => $promedioProvisional,
                         'promedio_final_preciso' => $promedioFinal,
-                        'promedio' => PromedioExcel::formatear($promedioFinal, 1, '—'),
+                        'promedio' => CalificacionBachillerato::formatearEntero($promedioFinal),
                         'completo' => $completa,
                         'provisional' => ! $completa,
                     ];
@@ -223,9 +226,9 @@ class PromedioBachilleratoService
                     && $materiasColeccion->every(fn (array $materia) => $materia['completo'] === true);
 
                 $promedioFinal = $semestreCompleto
-                    ? PromedioExcel::calcular($promediosFinales)
+                    ? CalificacionBachillerato::promedioSemestral($promediosFinales)
                     : null;
-                $promedioProvisional = PromedioExcel::calcular($promediosProvisionales);
+                $promedioProvisional = CalificacionBachillerato::promedioSemestral($promediosProvisionales);
 
                 $periodosCompletos = collect(self::PARCIALES)
                     ->mapWithKeys(fn (int $parcial) => [

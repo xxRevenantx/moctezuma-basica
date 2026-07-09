@@ -17,6 +17,7 @@ use App\Models\Nivel;
 use App\Models\Persona;
 use App\Models\Semestre;
 use App\Models\cicloEscolar;
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Database\Eloquent\Builder;
@@ -878,15 +879,15 @@ class DocumentosOficialesService
                         ->sortByDesc('id')
                         ->first();
                     $parciales[$numero] = $registro && $registro->es_numerica && is_numeric($registro->valor_numerico)
-                        ? (float) $registro->valor_numerico
+                        ? CalificacionBachillerato::truncarParcial($registro->valor_numerico)
                         : null;
                 }
 
                 $completa = $parciales[1] !== null && $parciales[2] !== null;
-                $promedio = $completa ? PromedioExcel::calcular($parciales) : null;
-                $valorEntero = $promedio === null
-                    ? null
-                    : $this->truncarCalificacionOficial($promedio);
+                $promedio = $completa
+                    ? CalificacionBachillerato::promedioMateria($parciales)
+                    : null;
+                $valorEntero = $promedio;
 
                 $salida[$clave] = [
                     'asignacion' => $asignacion,

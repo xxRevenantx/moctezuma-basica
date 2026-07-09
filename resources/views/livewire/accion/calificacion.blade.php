@@ -1757,7 +1757,8 @@ iniciarHerramientasAcademicas()" class="w-full">
                                             <input
                                                 wire:key="input-calificacion-{{ $insId }}-{{ $asigId }}"
                                                 id="cal-{{ $insId }}-{{ $asigId }}" type="text"
-                                                maxlength="5" inputmode="text"
+                                                maxlength="{{ $this->esBachillerato ? 2 : 5 }}"
+                                                inputmode="{{ $this->esBachillerato ? 'numeric' : 'text' }}"
                                                 wire:model.blur="calificaciones.{{ $insId }}.{{ $asigId }}"
                                                 @focus="$event.target.select()"
                                                 @keydown.enter.prevent="move({{ $insId }}, {{ $asigId }}, $event.shiftKey ? 'up' : 'down')"
@@ -1767,7 +1768,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                                 @keydown.arrow-right.prevent="move({{ $insId }}, {{ $asigId }}, 'right')"
                                                 @keydown.arrow-left.prevent="move({{ $insId }}, {{ $asigId }}, 'left')"
                                                 class="{{ $this->claseInputCalificacion($insId, $asigId) }}"
-                                                placeholder="0-10 / AC" />
+                                                placeholder="{{ $this->esBachillerato ? 'Entero 0-10 / AC' : '0-10 / AC' }}" />
 
                                             @error('calificaciones.' . $insId . '.' . $asigId)
                                                 <div class="mt-1 text-[11px] leading-tight text-red-600 dark:text-red-300">
@@ -1822,7 +1823,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 </span>
                                 @if ($this->esBachillerato)
                                     <span class="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
-                                        Sin materias extra
+                                        Calificaciones enteras · 0 a 10
                                     </span>
                                 @endif
                             </div>

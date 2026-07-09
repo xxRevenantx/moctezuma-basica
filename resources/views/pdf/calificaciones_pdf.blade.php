@@ -606,6 +606,13 @@
                             $clave = $fila['inscripcion_id'] . '-' . $materia['id'];
                             $valor = $calificaciones[$clave] ?? '';
                             $valorNormalizado = strtoupper(trim((string) $valor));
+
+                            if ($esBachillerato && is_numeric($valorNormalizado)) {
+                                $valorNormalizado = \App\Support\CalificacionBachillerato::formatearEntero(
+                                    $valorNormalizado,
+                                    ''
+                                );
+                            }
                         @endphp
 
                         <td class="text-center calificacion">

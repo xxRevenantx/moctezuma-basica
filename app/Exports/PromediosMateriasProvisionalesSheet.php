@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -82,6 +83,8 @@ class PromediosMateriasProvisionalesSheet implements FromArray, ShouldAutoSize, 
 
     private function valor(mixed $valor): string
     {
-        return PromedioExcel::formatear($valor, 1, '—');
+        return ($this->reporte['es_bachillerato'] ?? false)
+            ? CalificacionBachillerato::formatearEntero($valor)
+            : PromedioExcel::formatear($valor, 1, '—');
     }
 }
