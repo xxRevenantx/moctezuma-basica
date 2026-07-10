@@ -37,6 +37,7 @@ class DocumentosOficiales extends Component
     public string $certificado_jefe_registro_por = '';
     public string $historial_modo = 'completo';
     public bool $historial_mostrar_foto = false;
+    public bool $historial_incluir_firmas = true;
 
     /** @var array{tipo?:string,titulo?:string,mensaje?:string,detalles?:array<int,string>} */
     public array $alertaDocumento = [];
@@ -261,6 +262,7 @@ class DocumentosOficiales extends Component
                         (int) $this->inscripcion_id,
                         $this->historial_modo,
                         $this->historial_mostrar_foto,
+                        $this->historial_incluir_firmas,
                     )
                     : null,
                 'certificado' => filled($this->inscripcion_id)
@@ -389,6 +391,7 @@ class DocumentosOficiales extends Component
             'certificado_jefe_registro_por' => trim($this->certificado_jefe_registro_por),
             'historial_modo' => $this->historial_modo,
             'historial_mostrar_foto' => $this->historial_mostrar_foto ? 1 : 0,
+            'historial_incluir_firmas' => $this->historial_incluir_firmas ? 1 : 0,
         ];
     }
 

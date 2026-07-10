@@ -363,7 +363,7 @@
                     </div>
 
                     @if ($modulo === 'historial-academico')
-                        <div class="grid gap-4 rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-blue-50 p-5 dark:border-rose-900/40 dark:from-rose-950/20 dark:via-slate-950 dark:to-blue-950/10 md:grid-cols-2">
+                        <div class="grid gap-4 rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-blue-50 p-5 dark:border-rose-900/40 dark:from-rose-950/20 dark:via-slate-950 dark:to-blue-950/10 md:grid-cols-3">
                             <flux:field>
                                 <flux:label>Contenido del historial</flux:label>
                                 <flux:select wire:model.live="historial_modo">
@@ -375,6 +375,10 @@
                             <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
                                 <input type="checkbox" wire:model.live="historial_mostrar_foto" class="rounded border-slate-300 text-[#006492]">
                                 <span><span class="block text-sm font-black text-slate-900 dark:text-white">Incluir fotografía</span><span class="mt-1 block text-xs leading-5 text-slate-500">Se muestra solo cuando el alumno tiene una fotografía disponible.</span></span>
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                                <input type="checkbox" wire:model.live="historial_incluir_firmas" class="rounded border-slate-300 text-[#006492]">
+                                <span><span class="block text-sm font-black text-slate-900 dark:text-white">Incluir firmas digitales</span><span class="mt-1 block text-xs leading-5 text-slate-500">Activa las imágenes privadas del director y del jefe de departamento.</span></span>
                             </label>
                         </div>
                     @endif
@@ -775,6 +779,18 @@
                                     <div class="rounded-2xl bg-rose-50 p-4 dark:bg-rose-950/20"><p class="text-xs font-black uppercase text-rose-700 dark:text-rose-300">No acreditadas</p><p class="mt-1 text-2xl font-black">{{ data_get($preview, 'resumen_historial.materias_no_acreditadas', 0) }}</p></div>
                                     <div class="rounded-2xl bg-amber-50 p-4 dark:bg-amber-950/20"><p class="text-xs font-black uppercase text-amber-700 dark:text-amber-300">Promedio</p><p class="mt-1 text-2xl font-black">{{ $preview['promedio_general'] }}</p></div>
                                 </div>
+                                @php($firmasPendientes = collect(data_get($preview, 'diagnostico.firmas_digitales_pendientes', [])))
+                                @if ($historial_incluir_firmas && $firmasPendientes->isNotEmpty())
+                                    <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                        <div class="flex items-start gap-3">
+                                            <flux:icon.exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0" />
+                                            <div>
+                                                <p class="font-black">El historial puede generarse, pero faltan imágenes digitales</p>
+                                                <p class="mt-1 text-xs leading-5">{{ $firmasPendientes->implode(', ') }}. El documento conservará los nombres y cargos con espacio para firma física.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
 
                             @if ($modulo === 'certificado')

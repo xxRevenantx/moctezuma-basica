@@ -22,6 +22,7 @@ use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -613,6 +614,7 @@ class DocumentosOficialesService
         int $inscripcionId,
         string $modo = 'completo',
         bool $mostrarFoto = false,
+        bool $incluirFirmasDigitales = true,
     ): array {
         $datos = $this->kardex($inscripcionId);
         $modo = $modo === 'cursado' ? 'cursado' : 'completo';
@@ -701,14 +703,34 @@ class DocumentosOficialesService
         $materiasAcreditadas = $materiasConCalificacion->where('acreditada', true);
         $materiasNoAcreditadas = $materiasConCalificacion->where('acreditada', false);
         $asistencias = $materiasConCalificacion->pluck('asistencia')->filter(fn ($valor) => $valor !== null);
+        $firmantesHistorial = collect(data_get($datos, 'institucional.firmantes', []));
+        $firmasDigitalesPendientes = collect([
+            'director' => 'Director(a) del plantel',
+            'jefe_registro' => 'Jefe del Departamento de Registro y Certificación',
+        ])->flatMap(function (string $etiqueta, string $rol) use ($firmantesHistorial): array {
+            $firmante = (array) $firmantesHistorial->get($rol, []);
+            $pendientes = [];
+            if (blank($firmante['firma_ruta'] ?? null)) {
+                $pendientes[] = "Firma de {$etiqueta}";
+            }
+            if (blank($firmante['sello_ruta'] ?? null)) {
+                $pendientes[] = "Sello de {$etiqueta}";
+            }
+
+            return $pendientes;
+        })->values()->all();
 
         return array_merge($datos, [
             'modo_historial' => $modo,
             'mostrar_foto' => $mostrarFoto,
+            'incluir_firmas_digitales' => $incluirFirmasDigitales,
             'foto_data_uri' => $mostrarFoto ? $datos['alumno']->foto_data_uri : null,
             'semestres_historial' => $semestres,
             'semestres_pagina_1' => $semestres->whereIn('numero', [1, 2, 3, 4])->values(),
             'semestres_pagina_2' => $semestres->whereIn('numero', [5, 6])->values(),
+            'diagnostico' => array_merge($datos['diagnostico'] ?? [], [
+                'firmas_digitales_pendientes' => $firmasDigitalesPendientes,
+            ]),
             'resumen_historial' => [
                 'materias_plan' => $oficiales->count(),
                 'materias_evaluadas' => $materiasConCalificacion->count(),
@@ -1089,6 +1111,10 @@ class DocumentosOficialesService
                 'nombre' => Str::upper($firmante->nombreCompleto()),
                 'cargo' => Str::upper($firmante->cargo_impresion ?: $this->cargoPredeterminado($rol)),
                 'configurado' => true,
+                'firma_path' => $firmante->firma_path,
+                'sello_path' => $firmante->sello_path,
+                'firma_ruta' => $this->rutaArchivoFirmante($firmante->firma_path),
+                'sello_ruta' => $this->rutaArchivoFirmante($firmante->sello_path),
             ];
         }
 
@@ -1102,6 +1128,10 @@ class DocumentosOficialesService
                 ])))),
                 'cargo' => 'DIRECTORA DEL PLANTEL',
                 'configurado' => true,
+                'firma_path' => null,
+                'sello_path' => null,
+                'firma_ruta' => null,
+                'sello_ruta' => null,
             ];
         }
 
@@ -1136,7 +1166,20 @@ class DocumentosOficialesService
             'nombre' => 'SIN CONFIGURAR',
             'cargo' => $this->cargoPredeterminado($rol),
             'configurado' => false,
+            'firma_path' => null,
+            'sello_path' => null,
+            'firma_ruta' => null,
+            'sello_ruta' => null,
         ];
+    }
+
+    private function rutaArchivoFirmante(?string $ruta): ?string
+    {
+        if (blank($ruta) || ! Storage::disk('local')->exists($ruta)) {
+            return null;
+        }
+
+        return Storage::disk('local')->path($ruta);
     }
 
     private function cargoPredeterminado(string $rol): string

@@ -17,7 +17,7 @@
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             color: #20242a;
-            font-size: 7px;
+            font-size: 10px;
         }
 
         .page {
@@ -70,7 +70,7 @@
         .student {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
+
         }
 
         .student th,
@@ -83,12 +83,12 @@
 
         .student th {
             background: #f3f4f6;
-            font-size: 6.2px;
+            font-size: 10px;
             text-transform: uppercase;
         }
 
         .student td {
-            font-size: 6.6px;
+            font-size: 10px;
         }
 
         .student-layout {
@@ -144,7 +144,7 @@
             display: table;
             width: 100%;
             color: #9d4a4a;
-            font-size: 6.3px;
+            font-size: 10px;
             margin-bottom: 1px;
         }
 
@@ -160,12 +160,12 @@
         .subjects {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
+
         }
 
         .subjects th {
             color: #9d4a4a;
-            font-size: 5.5px;
+            font-size: 10px;
             font-weight: 700;
             line-height: 1.05;
             padding: 1.3px 2px;
@@ -173,7 +173,7 @@
         }
 
         .subjects td {
-            font-size: 5.8px;
+            font-size: 10px;
             line-height: 1.05;
             padding: 1.35px 2px;
             border-bottom: .35px solid #ececec;
@@ -208,21 +208,21 @@
         .reg-grid {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
+
         }
 
         .reg-grid td {
             padding: 0;
             border: 0;
             text-align: center;
-            font-size: 5.2px;
+            font-size: 10px;
             color: #777;
         }
 
         .extra-label {
             margin-top: 2px;
             color: #7a5a00;
-            font-size: 5.2px;
+            font-size: 10px;
             font-weight: 700;
         }
 
@@ -245,7 +245,7 @@
         .summary-grid small {
             display: block;
             color: #667085;
-            font-size: 5.5px;
+            font-size: 10px;
             text-transform: uppercase;
         }
 
@@ -312,9 +312,28 @@
             margin-left: -71px;
         }
 
-        .signature-data {
+        .signature-hand {
             position: absolute;
             z-index: 2;
+            width: 122px;
+            height: 43px;
+            object-fit: contain;
+            left: 50%;
+            top: 24px;
+            margin-left: -61px;
+        }
+
+        .signature-physical-line {
+            position: absolute;
+            left: 18%;
+            right: 18%;
+            bottom: 28px;
+            border-top: .6px solid #303030;
+        }
+
+        .signature-data {
+            position: absolute;
+            z-index: 3;
             left: 0;
             right: 0;
             bottom: 0;
@@ -322,14 +341,14 @@
         }
 
         .signatures .name {
-            font-size: 7px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             line-height: 1.15;
         }
 
         .signatures .role {
-            font-size: 6px;
+            font-size: 10px;
             line-height: 1.2;
         }
 
@@ -340,7 +359,7 @@
             bottom: 0;
             text-align: center;
             color: #8a8f98;
-            font-size: 5.5px;
+            font-size: 10px;
         }
     </style>
 </head>
@@ -352,8 +371,7 @@
         );
         $firmanteDirector = data_get($institucional, 'firmantes.director', []);
         $firmanteJefe = data_get($institucional, 'firmantes.jefe_registro', []);
-        $selloBachillerato = public_path('imagenes/sello_bachillerato.png');
-        $selloChilpancingo = public_path('imagenes/sello_chilpancingo.jpg');
+        $incluirFirmas = (bool) ($incluir_firmas_digitales ?? true);
     @endphp
 
     <div class="page page-break">
@@ -477,8 +495,19 @@
             <tr>
                 <td>
                     <div class="signature-box">
-                        @if (is_file($selloBachillerato))
-                            <img class="signature-seal left" src="{{ $selloBachillerato }}" alt="Sello del plantel">
+                        @if ($incluirFirmas && is_file((string) data_get($firmanteDirector, 'sello_ruta')))
+                            <img class="signature-seal left" src="{{ data_get($firmanteDirector, 'sello_ruta') }}"
+                                alt="Sello del plantel">
+                        @endif
+                        @if ($incluirFirmas && is_file((string) data_get($firmanteDirector, 'firma_ruta')))
+                            <img class="signature-hand" src="{{ data_get($firmanteDirector, 'firma_ruta') }}"
+                                alt="Firma del director del plantel">
+                        @endif
+                        @if (
+                            !$incluirFirmas ||
+                                (!is_file((string) data_get($firmanteDirector, 'firma_ruta')) &&
+                                    !is_file((string) data_get($firmanteDirector, 'sello_ruta'))))
+                            <div class="signature-physical-line"></div>
                         @endif
                         <div class="signature-data">
                             <div class="name">{{ data_get($firmanteDirector, 'nombre', 'SIN CONFIGURAR') }}</div>
@@ -489,9 +518,19 @@
                 </td>
                 <td>
                     <div class="signature-box">
-                        @if (is_file($selloChilpancingo))
-                            <img class="signature-seal right" src="{{ $selloChilpancingo }}"
-                                alt="Sello y firma de registro y certificación">
+                        @if ($incluirFirmas && is_file((string) data_get($firmanteJefe, 'sello_ruta')))
+                            <img class="signature-seal right" src="{{ data_get($firmanteJefe, 'sello_ruta') }}"
+                                alt="Sello de registro y certificación">
+                        @endif
+                        @if ($incluirFirmas && is_file((string) data_get($firmanteJefe, 'firma_ruta')))
+                            <img class="signature-hand" src="{{ data_get($firmanteJefe, 'firma_ruta') }}"
+                                alt="Firma del jefe de registro y certificación">
+                        @endif
+                        @if (
+                            !$incluirFirmas ||
+                                (!is_file((string) data_get($firmanteJefe, 'firma_ruta')) &&
+                                    !is_file((string) data_get($firmanteJefe, 'sello_ruta'))))
+                            <div class="signature-physical-line"></div>
                         @endif
                         <div class="signature-data">
                             <div class="name">{{ data_get($firmanteJefe, 'nombre', 'SIN CONFIGURAR') }}</div>

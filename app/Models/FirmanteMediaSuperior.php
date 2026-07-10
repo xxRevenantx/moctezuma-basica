@@ -19,6 +19,10 @@ class FirmanteMediaSuperior extends Model
         'director_id',
         'persona_id',
         'cargo_impresion',
+        'firma_path',
+        'sello_path',
+        'archivos_actualizados_por',
+        'archivos_actualizados_at',
         'ciclo_desde_id',
         'ciclo_hasta_id',
         'activo',
@@ -26,6 +30,7 @@ class FirmanteMediaSuperior extends Model
 
     protected $casts = [
         'activo' => 'boolean',
+        'archivos_actualizados_at' => 'datetime',
     ];
 
     public function nivel()
@@ -41,6 +46,12 @@ class FirmanteMediaSuperior extends Model
     public function persona()
     {
         return $this->belongsTo(Persona::class);
+    }
+
+
+    public function usuarioActualizoArchivos()
+    {
+        return $this->belongsTo(User::class, 'archivos_actualizados_por');
     }
 
     public function cicloDesde()

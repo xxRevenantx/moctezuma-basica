@@ -180,6 +180,7 @@
                         @php
                             $tipoActual = $firmantes[$rol]['tipo'] ?? 'persona';
                             $esJefe = $rol === \App\Models\FirmanteMediaSuperior::ROL_JEFE_REGISTRO;
+                            $permiteArchivos = in_array($rol, [\App\Models\FirmanteMediaSuperior::ROL_DIRECTOR, \App\Models\FirmanteMediaSuperior::ROL_JEFE_REGISTRO], true);
                             $coleccion = $tipoActual === 'persona' ? $this->personas : ($tipoActual === 'autoridad' ? $this->autoridades : $this->directores);
                         @endphp
                         <article class="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
@@ -215,6 +216,9 @@
                                 <flux:field class="xl:col-span-3"><flux:label>Vigente desde</flux:label><flux:select wire:model="firmantes.{{ $rol }}.ciclo_desde_id"><flux:select.option value="">Sin límite</flux:select.option>@foreach($this->ciclos as $ciclo)<flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->nombre }}</flux:select.option>@endforeach</flux:select><flux:error name="firmantes.{{ $rol }}.ciclo_desde_id" /></flux:field>
                                 <flux:field class="xl:col-span-3"><flux:label>Vigente hasta</flux:label><flux:select wire:model="firmantes.{{ $rol }}.ciclo_hasta_id"><flux:select.option value="">Sin límite</flux:select.option>@foreach($this->ciclos as $ciclo)<flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->nombre }}</flux:select.option>@endforeach</flux:select><flux:error name="firmantes.{{ $rol }}.ciclo_hasta_id" /></flux:field>
                             </div>
+                            @if($permiteArchivos)
+                                @include('livewire.media-superior.partials.carga-firma-documental', ['rol' => $rol])
+                            @endif
                         </article>
                     @endforeach
                 </div>

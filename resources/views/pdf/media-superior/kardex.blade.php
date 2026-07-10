@@ -161,8 +161,6 @@
     @php
         $firmanteDirector = data_get($institucional, 'firmantes.director', []);
         $firmanteJefe = data_get($institucional, 'firmantes.jefe_registro', []);
-        $selloBachillerato = public_path('imagenes/sello_bachillerato.png');
-        $selloChilpancingo = public_path('imagenes/sello_chilpancingo.jpg');
     @endphp
     <table class="header">
         <tr>
@@ -251,10 +249,8 @@
         <tr>
             <td>
                 <div class="signature-box">
-                    @if (is_file($selloBachillerato))
-                        <img class="signature-seal left" src="{{ $selloBachillerato }}" alt="Sello del plantel">
-                    @endif
                     <div class="signature-data">
+                        <div style="margin-bottom:4px;">______________________________</div>
                         <div class="signature-name">{{ data_get($firmanteDirector, 'nombre', 'SIN CONFIGURAR') }}</div>
                         <div class="signature-role">
                             {{ data_get($firmanteDirector, 'cargo', 'DIRECTOR(A) DEL PLANTEL') }}</div>
@@ -263,11 +259,8 @@
             </td>
             <td>
                 <div class="signature-box">
-                    @if (is_file($selloChilpancingo))
-                        <img class="signature-seal right" src="{{ $selloChilpancingo }}"
-                            alt="Sello y firma de registro y certificación">
-                    @endif
                     <div class="signature-data">
+                        <div style="margin-bottom:4px;">______________________________</div>
                         <div class="signature-name">{{ data_get($firmanteJefe, 'nombre', 'SIN CONFIGURAR') }}</div>
                         <div class="signature-role">
                             {{ data_get($firmanteJefe, 'cargo', 'JEFE DEL DEPARTAMENTO DE REGISTRO Y CERTIFICACIÓN') }}

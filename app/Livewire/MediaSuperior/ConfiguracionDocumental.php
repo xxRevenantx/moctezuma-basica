@@ -11,13 +11,19 @@ use App\Models\Persona;
 use App\Models\cicloEscolar;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\WithFileUploads;
+use Throwable;
 
 class ConfiguracionDocumental extends Component
 {
+    use WithFileUploads;
+
     public string $nombre_plantel_oficial = '';
     public string $numero_acuerdo = 'SEG/0031/2021';
     public string $fecha_acuerdo = '';
@@ -37,9 +43,21 @@ class ConfiguracionDocumental extends Component
     /** @var array<string, array<string, mixed>> */
     public array $firmantes = [];
 
+    /** @var array<string, mixed> */
+    public array $firmaUploads = [];
+
+    /** @var array<string, mixed> */
+    public array $selloUploads = [];
+
+    /** @var array<string, bool> */
+    public array $eliminarFirmas = [];
+
+    /** @var array<string, bool> */
+    public array $eliminarSellos = [];
+
     public function mount(): void
     {
-        abort_unless(Auth::user()?->is_admin, 403);
+        Gate::authorize('configurar-firmas-documentales');
 
         $nivel = $this->nivel;
         $escuela = Escuela::query()->first();
@@ -80,25 +98,78 @@ class ConfiguracionDocumental extends Component
             }
 
             $this->firmantes[$rol] = [
+                'registro_id' => $actual?->id,
                 'tipo' => $tipo,
                 'id' => (string) ($actual?->director_id ?: $actual?->persona_id ?: ''),
                 'cargo' => (string) ($actual?->cargo_impresion ?: $cargo),
                 'ciclo_desde_id' => (string) ($actual?->ciclo_desde_id ?: ''),
                 'ciclo_hasta_id' => (string) ($actual?->ciclo_hasta_id ?: ''),
+                'firma_path' => $actual?->firma_path,
+                'sello_path' => $actual?->sello_path,
+                'archivos_version' => optional($actual?->archivos_actualizados_at ?: $actual?->updated_at)?->timestamp,
             ];
+
+            $this->eliminarFirmas[$rol] = false;
+            $this->eliminarSellos[$rol] = false;
         }
     }
 
     public function updatedFirmantes(mixed $value, string $key): void
     {
-        if (! Str::endsWith($key, '.tipo')) {
+        $rol = Str::beforeLast($key, '.');
+        if (! isset($this->firmantes[$rol])) {
             return;
         }
 
-        $rol = Str::beforeLast($key, '.tipo');
-        if (isset($this->firmantes[$rol])) {
+        if (Str::endsWith($key, '.tipo')) {
             $this->firmantes[$rol]['id'] = '';
             $this->resetErrorBag("firmantes.$rol.id");
+        }
+
+        if (
+            Str::endsWith($key, '.tipo')
+            || Str::endsWith($key, '.id')
+            || Str::endsWith($key, '.ciclo_desde_id')
+            || Str::endsWith($key, '.ciclo_hasta_id')
+        ) {
+            // La firma pertenece a una persona y vigencia concretas. Al cambiar
+            // cualquiera de esos datos no se reutiliza visualmente el archivo anterior.
+            $this->firmaUploads[$rol] = null;
+            $this->selloUploads[$rol] = null;
+            $this->eliminarFirmas[$rol] = false;
+            $this->eliminarSellos[$rol] = false;
+            $this->firmantes[$rol]['registro_id'] = null;
+            $this->firmantes[$rol]['firma_path'] = null;
+            $this->firmantes[$rol]['sello_path'] = null;
+            $this->firmantes[$rol]['archivos_version'] = now()->timestamp;
+        }
+    }
+
+    public function quitarArchivo(string $rol, string $tipo): void
+    {
+        Gate::authorize('configurar-firmas-documentales');
+        abort_unless($this->rolConArchivos($rol) && in_array($tipo, ['firma', 'sello'], true), 404);
+
+        if ($tipo === 'firma') {
+            $this->firmaUploads[$rol] = null;
+            $this->eliminarFirmas[$rol] = true;
+        } else {
+            $this->selloUploads[$rol] = null;
+            $this->eliminarSellos[$rol] = true;
+        }
+
+        $this->resetErrorBag(($tipo === 'firma' ? 'firmaUploads.' : 'selloUploads.') . $rol);
+    }
+
+    public function restaurarArchivo(string $rol, string $tipo): void
+    {
+        Gate::authorize('configurar-firmas-documentales');
+        abort_unless($this->rolConArchivos($rol) && in_array($tipo, ['firma', 'sello'], true), 404);
+
+        if ($tipo === 'firma') {
+            $this->eliminarFirmas[$rol] = false;
+        } else {
+            $this->eliminarSellos[$rol] = false;
         }
     }
 
@@ -127,7 +198,6 @@ class ConfiguracionDocumental extends Component
     #[Computed]
     public function autoridades()
     {
-        // La sección Autoridades utiliza el catálogo de directores/directivos.
         return Director::query()
             ->where('status', true)
             ->orderBy('cargo')
@@ -175,6 +245,8 @@ class ConfiguracionDocumental extends Component
 
     public function guardar(): void
     {
+        Gate::authorize('configurar-firmas-documentales');
+
         $this->validate([
             'nombre_plantel_oficial' => ['nullable', 'string', 'max:255'],
             'numero_acuerdo' => ['nullable', 'string', 'max:120'],
@@ -196,63 +268,145 @@ class ConfiguracionDocumental extends Component
             'firmantes.*.cargo' => ['required', 'string', 'max:255'],
             'firmantes.*.ciclo_desde_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
             'firmantes.*.ciclo_hasta_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
+            'firmaUploads.*' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'selloUploads.*' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+        ], [
+            'firmaUploads.*.max' => 'La firma no puede superar 2 MB.',
+            'selloUploads.*.max' => 'El sello no puede superar 2 MB.',
+            'firmaUploads.*.mimes' => 'La firma debe ser PNG, JPG, JPEG o WebP.',
+            'selloUploads.*.mimes' => 'El sello debe ser PNG, JPG, JPEG o WebP.',
         ]);
 
         $this->validarFirmantesSeleccionados();
 
-        DB::transaction(function (): void {
-            ConfiguracionMediaSuperior::query()->updateOrCreate(
-                ['nivel_id' => $this->nivel->id],
-                [
-                    'nombre_plantel_oficial' => $this->vacioANull($this->nombre_plantel_oficial),
-                    'numero_acuerdo' => $this->vacioANull($this->numero_acuerdo),
-                    'fecha_acuerdo' => $this->vacioANull($this->fecha_acuerdo),
-                    'modalidad' => $this->modalidad,
-                    'turno' => $this->turno,
-                    'calificacion_minima' => (float) $this->calificacion_minima,
-                    'calificacion_maxima' => (float) $this->calificacion_maxima,
-                    'minima_aprobatoria' => (float) $this->minima_aprobatoria,
-                    'localidad_expedicion' => $this->vacioANull($this->localidad_expedicion),
-                    'logo_seg_path' => $this->vacioANull($this->logo_seg_path),
-                    'logo_plantel_path' => $this->vacioANull($this->logo_plantel_path),
-                    'texto_certificado' => trim($this->texto_certificado),
-                    'leyenda_certificado' => trim($this->leyenda_certificado),
-                    'mostrar_materias_extra' => $this->mostrar_materias_extra,
-                    'mostrar_foto_historial' => $this->mostrar_foto_historial,
-                ],
-            );
+        $archivosNuevos = [];
+        $archivosParaEliminar = [];
 
-            foreach ($this->roles() as $rol => $cargoPredeterminado) {
-                $datos = $this->firmantes[$rol] ?? [];
-                $id = filled($datos['id'] ?? null) ? (int) $datos['id'] : null;
-
-                if (! $id) {
-                    continue;
-                }
-
-                $cicloDesde = filled($datos['ciclo_desde_id'] ?? null) ? (int) $datos['ciclo_desde_id'] : null;
-                $cicloHasta = filled($datos['ciclo_hasta_id'] ?? null) ? (int) $datos['ciclo_hasta_id'] : null;
-                $tipo = (string) ($datos['tipo'] ?? 'persona');
-
-                FirmanteMediaSuperior::query()->updateOrCreate(
+        try {
+            DB::transaction(function () use (&$archivosNuevos, &$archivosParaEliminar): void {
+                ConfiguracionMediaSuperior::query()->updateOrCreate(
+                    ['nivel_id' => $this->nivel->id],
                     [
-                        'nivel_id' => $this->nivel->id,
-                        'rol' => $rol,
-                        'ciclo_desde_id' => $cicloDesde,
-                        'ciclo_hasta_id' => $cicloHasta,
-                    ],
-                    [
-                        'director_id' => in_array($tipo, ['director', 'autoridad'], true) ? $id : null,
-                        'persona_id' => $tipo === 'persona' ? $id : null,
-                        'cargo_impresion' => $datos['cargo'] ?: $cargoPredeterminado,
-                        'activo' => true,
+                        'nombre_plantel_oficial' => $this->vacioANull($this->nombre_plantel_oficial),
+                        'numero_acuerdo' => $this->vacioANull($this->numero_acuerdo),
+                        'fecha_acuerdo' => $this->vacioANull($this->fecha_acuerdo),
+                        'modalidad' => $this->modalidad,
+                        'turno' => $this->turno,
+                        'calificacion_minima' => (float) $this->calificacion_minima,
+                        'calificacion_maxima' => (float) $this->calificacion_maxima,
+                        'minima_aprobatoria' => (float) $this->minima_aprobatoria,
+                        'localidad_expedicion' => $this->vacioANull($this->localidad_expedicion),
+                        'logo_seg_path' => $this->vacioANull($this->logo_seg_path),
+                        'logo_plantel_path' => $this->vacioANull($this->logo_plantel_path),
+                        'texto_certificado' => trim($this->texto_certificado),
+                        'leyenda_certificado' => trim($this->leyenda_certificado),
+                        'mostrar_materias_extra' => $this->mostrar_materias_extra,
+                        'mostrar_foto_historial' => $this->mostrar_foto_historial,
                     ],
                 );
-            }
-        });
+
+                foreach ($this->roles() as $rol => $cargoPredeterminado) {
+                    $datos = $this->firmantes[$rol] ?? [];
+                    $id = filled($datos['id'] ?? null) ? (int) $datos['id'] : null;
+
+                    if (! $id) {
+                        continue;
+                    }
+
+                    $cicloDesde = filled($datos['ciclo_desde_id'] ?? null) ? (int) $datos['ciclo_desde_id'] : null;
+                    $cicloHasta = filled($datos['ciclo_hasta_id'] ?? null) ? (int) $datos['ciclo_hasta_id'] : null;
+                    $tipo = (string) ($datos['tipo'] ?? 'persona');
+
+                    $target = FirmanteMediaSuperior::query()
+                        ->where('nivel_id', $this->nivel->id)
+                        ->where('rol', $rol)
+                        ->where('ciclo_desde_id', $cicloDesde)
+                        ->where('ciclo_hasta_id', $cicloHasta)
+                        ->first();
+
+                    $directorId = in_array($tipo, ['director', 'autoridad'], true) ? $id : null;
+                    $personaId = $tipo === 'persona' ? $id : null;
+                    $cambioPersona = $target && (
+                        (int) ($target->director_id ?? 0) !== (int) ($directorId ?? 0)
+                        || (int) ($target->persona_id ?? 0) !== (int) ($personaId ?? 0)
+                    );
+
+                    $firmaPath = $target?->firma_path;
+                    $selloPath = $target?->sello_path;
+                    $archivosActualizados = false;
+
+                    if ($this->rolConArchivos($rol)) {
+                        $firmaPath = $this->resolverArchivoFirmante(
+                            $rol,
+                            'firma',
+                            $target?->firma_path,
+                            $cambioPersona,
+                            $cicloDesde,
+                            $cicloHasta,
+                            $archivosNuevos,
+                            $archivosParaEliminar,
+                        );
+                        $selloPath = $this->resolverArchivoFirmante(
+                            $rol,
+                            'sello',
+                            $target?->sello_path,
+                            $cambioPersona,
+                            $cicloDesde,
+                            $cicloHasta,
+                            $archivosNuevos,
+                            $archivosParaEliminar,
+                        );
+                        $archivosActualizados = $firmaPath !== $target?->firma_path || $selloPath !== $target?->sello_path;
+                    } else {
+                        $firmaPath = null;
+                        $selloPath = null;
+                    }
+
+                    $registro = FirmanteMediaSuperior::query()->updateOrCreate(
+                        [
+                            'nivel_id' => $this->nivel->id,
+                            'rol' => $rol,
+                            'ciclo_desde_id' => $cicloDesde,
+                            'ciclo_hasta_id' => $cicloHasta,
+                        ],
+                        [
+                            'director_id' => $directorId,
+                            'persona_id' => $personaId,
+                            'cargo_impresion' => $datos['cargo'] ?: $cargoPredeterminado,
+                            'firma_path' => $firmaPath,
+                            'sello_path' => $selloPath,
+                            'archivos_actualizados_por' => $archivosActualizados ? Auth::id() : $target?->archivos_actualizados_por,
+                            'archivos_actualizados_at' => $archivosActualizados ? now() : $target?->archivos_actualizados_at,
+                            'activo' => true,
+                        ],
+                    );
+
+                    $this->firmantes[$rol]['registro_id'] = $registro->id;
+                    $this->firmantes[$rol]['firma_path'] = $registro->firma_path;
+                    $this->firmantes[$rol]['sello_path'] = $registro->sello_path;
+                    $this->firmantes[$rol]['archivos_version'] = optional($registro->archivos_actualizados_at ?: $registro->updated_at)?->timestamp;
+                }
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete(array_values(array_unique($archivosNuevos)));
+            throw $exception;
+        }
+
+        $archivosParaEliminar = array_values(array_diff(
+            array_unique(array_filter($archivosParaEliminar)),
+            array_unique(array_filter($archivosNuevos)),
+        ));
+        Storage::disk('local')->delete($archivosParaEliminar);
+
+        $this->firmaUploads = [];
+        $this->selloUploads = [];
+        foreach (array_keys($this->roles()) as $rol) {
+            $this->eliminarFirmas[$rol] = false;
+            $this->eliminarSellos[$rol] = false;
+        }
 
         unset($this->avance);
-        $this->dispatch('swal', icon: 'success', title: 'Configuración guardada', text: 'Los documentos oficiales usarán estos datos y vigencias.');
+        $this->dispatch('swal', icon: 'success', title: 'Configuración guardada', text: 'Los firmantes, vigencias y archivos privados se actualizaron correctamente.');
     }
 
     public function render()
@@ -272,6 +426,63 @@ class ConfiguracionDocumental extends Component
         ];
     }
 
+    private function rolConArchivos(string $rol): bool
+    {
+        return in_array($rol, [
+            FirmanteMediaSuperior::ROL_DIRECTOR,
+            FirmanteMediaSuperior::ROL_JEFE_REGISTRO,
+        ], true);
+    }
+
+    private function resolverArchivoFirmante(
+        string $rol,
+        string $tipo,
+        ?string $actual,
+        bool $cambioPersona,
+        ?int $cicloDesde,
+        ?int $cicloHasta,
+        array &$archivosNuevos,
+        array &$archivosParaEliminar,
+    ): ?string {
+        $upload = $tipo === 'firma'
+            ? ($this->firmaUploads[$rol] ?? null)
+            : ($this->selloUploads[$rol] ?? null);
+        $eliminar = $tipo === 'firma'
+            ? (bool) ($this->eliminarFirmas[$rol] ?? false)
+            : (bool) ($this->eliminarSellos[$rol] ?? false);
+
+        if ($upload) {
+            $contexto = ($cicloDesde ?: 'inicio') . '-' . ($cicloHasta ?: 'abierto');
+            $directorio = "firmas-documentales/nivel-{$this->nivel->id}/{$rol}/{$contexto}/{$tipo}";
+            $extension = strtolower((string) ($upload->getClientOriginalExtension() ?: 'png'));
+            $extension = in_array($extension, ['png', 'jpg', 'jpeg', 'webp'], true) ? $extension : 'png';
+            $ruta = $upload->storeAs($directorio, Str::uuid() . '.' . $extension, 'local');
+
+            if (! $ruta) {
+                throw ValidationException::withMessages([
+                    ($tipo === 'firma' ? 'firmaUploads.' : 'selloUploads.') . $rol => 'No fue posible guardar el archivo privado.',
+                ]);
+            }
+
+            $archivosNuevos[] = $ruta;
+            if ($actual && $actual !== $ruta) {
+                $archivosParaEliminar[] = $actual;
+            }
+
+            return $ruta;
+        }
+
+        if ($eliminar || $cambioPersona) {
+            if ($actual) {
+                $archivosParaEliminar[] = $actual;
+            }
+
+            return null;
+        }
+
+        return $actual;
+    }
+
     private function validarFirmantesSeleccionados(): void
     {
         $errores = [];
@@ -281,6 +492,10 @@ class ConfiguracionDocumental extends Component
             $datos = $this->firmantes[$rol] ?? [];
             $id = filled($datos['id'] ?? null) ? (int) $datos['id'] : null;
             $tipo = (string) ($datos['tipo'] ?? 'persona');
+
+            if (! $id && $this->rolConArchivos($rol) && (($this->firmaUploads[$rol] ?? null) || ($this->selloUploads[$rol] ?? null))) {
+                $errores["firmantes.$rol.id"] = "Selecciona primero a la persona que será firmante de $cargo.";
+            }
 
             if ($id) {
                 $existe = in_array($tipo, ['director', 'autoridad'], true)

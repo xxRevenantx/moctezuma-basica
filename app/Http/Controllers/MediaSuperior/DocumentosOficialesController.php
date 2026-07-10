@@ -5,6 +5,7 @@ namespace App\Http\Controllers\MediaSuperior;
 use App\Exports\MediaSuperior\DocumentoOficialExport;
 use App\Http\Controllers\Controller;
 use App\Models\EmisionDocumentoMediaSuperior;
+use App\Models\FirmanteMediaSuperior;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Services\MediaSuperior\DocumentosOficialesService;
@@ -14,6 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
@@ -36,6 +39,22 @@ class DocumentosOficialesController extends Controller
         abort_unless(Auth::user()?->is_admin, 403);
 
         return view('media-superior.documentos-oficiales.configuracion');
+    }
+
+    public function archivoFirmante(FirmanteMediaSuperior $firmante, string $tipo)
+    {
+        Gate::authorize('configurar-firmas-documentales');
+        abort_unless(in_array($tipo, ['firma', 'sello'], true), 404);
+
+        $campo = $tipo === 'firma' ? 'firma_path' : 'sello_path';
+        $ruta = (string) $firmante->{$campo};
+        abort_if($ruta === '' || ! Storage::disk('local')->exists($ruta), 404);
+
+        return Storage::disk('local')->response($ruta, basename($ruta), [
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function descargar(
@@ -167,6 +186,7 @@ class DocumentosOficialesController extends Controller
                 (int) ($filtros['inscripcion_id'] ?? 0),
                 (string) ($filtros['historial_modo'] ?? 'completo'),
                 (bool) ($filtros['historial_mostrar_foto'] ?? false),
+                (bool) ($filtros['historial_incluir_firmas'] ?? true),
             ),
             DocumentosOficialesService::TIPO_CERTIFICADO => $service->certificado(
                 (int) ($filtros['inscripcion_id'] ?? 0),
@@ -224,6 +244,7 @@ class DocumentosOficialesController extends Controller
                         $alumno->id,
                         (string) ($filtros['historial_modo'] ?? 'completo'),
                         (bool) ($filtros['historial_mostrar_foto'] ?? false),
+                        (bool) ($filtros['historial_incluir_firmas'] ?? true),
                     ),
                     default => $service->certificado($alumno->id, (string) ($filtros['modalidad'] ?? 'parcial')),
                 };
@@ -364,7 +385,7 @@ class DocumentosOficialesController extends Controller
             }
         }
         $section->addText('PROMEDIO GENERAL: ' . $datos['promedio_general'], ['bold' => true, 'size' => 10], ['alignment' => Jc::RIGHT]);
-        $this->firmasWordConSellos($section, Arr::only($datos['institucional']['firmantes'] ?? [], ['director', 'jefe_registro']));
+        $this->firmasWord($section, Arr::only($datos['institucional']['firmantes'] ?? [], ['director', 'jefe_registro']));
     }
 
 
@@ -397,7 +418,7 @@ class DocumentosOficialesController extends Controller
         $section->addTextBreak(1);
         $section->addText('PROMEDIO GENERAL: ' . ($datos['promedio_general'] ?? '—'), ['bold' => true, 'size' => 10], ['alignment' => Jc::RIGHT]);
         $section->addText('SITUACIÓN: ' . ($resumen['situacion'] ?? 'SIN REGISTROS'), ['bold' => true, 'size' => 8], ['alignment' => Jc::RIGHT]);
-        $this->firmasWordConSellos($section, Arr::only($institucional['firmantes'] ?? [], ['director', 'jefe_registro']));
+        $this->firmasWordHistorial($section, Arr::only($institucional['firmantes'] ?? [], ['director', 'jefe_registro']), (bool) ($datos['incluir_firmas_digitales'] ?? true));
     }
 
     private function wordSemestresHistorial($section, iterable $semestres, array $institucional): void
@@ -631,7 +652,7 @@ class DocumentosOficialesController extends Controller
     }
 
 
-    private function firmasWordConSellos($section, array $firmantes): void
+    private function firmasWordHistorial($section, array $firmantes, bool $incluirFirmas): void
     {
         $section->addTextBreak(1);
         $tabla = $section->addTable([
@@ -642,24 +663,34 @@ class DocumentosOficialesController extends Controller
         ]);
         $tabla->addRow(1750, ['exactHeight' => true]);
 
-        $sellos = [
-            'director' => [public_path('imagenes/sello_bachillerato.png'), 72, 72],
-            'jefe_registro' => [public_path('imagenes/sello_chilpancingo.jpg'), 122, 70],
-        ];
-
         foreach (['director', 'jefe_registro'] as $rol) {
             $firmante = $firmantes[$rol] ?? [];
             $celda = $tabla->addCell(4800, ['valign' => 'bottom']);
-            [$ruta, $ancho, $alto] = $sellos[$rol];
 
-            if (is_file($ruta)) {
-                $celda->addImage($ruta, [
-                    'width' => $ancho,
-                    'height' => $alto,
-                    'alignment' => Jc::CENTER,
-                ]);
-            } else {
+            if ($incluirFirmas) {
+                $sello = (string) ($firmante['sello_ruta'] ?? '');
+                $firma = (string) ($firmante['firma_ruta'] ?? '');
+
+                if ($sello !== '' && is_file($sello)) {
+                    $celda->addImage($sello, [
+                        'width' => $rol === 'director' ? 78 : 105,
+                        'height' => $rol === 'director' ? 78 : 65,
+                        'alignment' => Jc::CENTER,
+                    ]);
+                }
+
+                if ($firma !== '' && is_file($firma)) {
+                    $celda->addImage($firma, [
+                        'width' => 105,
+                        'height' => 35,
+                        'alignment' => Jc::CENTER,
+                    ]);
+                }
+            }
+
+            if (! $incluirFirmas || (! is_file((string) ($firmante['sello_ruta'] ?? '')) && ! is_file((string) ($firmante['firma_ruta'] ?? '')))) {
                 $celda->addTextBreak(3);
+                $celda->addText('______________________________', ['size' => 7], ['alignment' => Jc::CENTER]);
             }
 
             $celda->addText(
@@ -742,6 +773,7 @@ class DocumentosOficialesController extends Controller
             'certificado_jefe_registro_por' => trim($request->string('certificado_jefe_registro_por')->toString()),
             'historial_modo' => $request->string('historial_modo')->toString() === 'cursado' ? 'cursado' : 'completo',
             'historial_mostrar_foto' => $request->boolean('historial_mostrar_foto'),
+            'historial_incluir_firmas' => $request->boolean('historial_incluir_firmas', true),
         ];
     }
 

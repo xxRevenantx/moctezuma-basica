@@ -159,6 +159,10 @@ Route::middleware('admin')->prefix('media-superior/documentos-oficiales')->group
     Route::get('/configuracion', [DocumentosOficialesController::class, 'configuracion'])
         ->name('media-superior.documentos.configuracion');
 
+    Route::get('/firmante/{firmante}/{tipo}', [DocumentosOficialesController::class, 'archivoFirmante'])
+        ->whereIn('tipo', ['firma', 'sello'])
+        ->name('media-superior.documentos.firmante-archivo');
+
     Route::get('/modulo/{modulo}', [DocumentosOficialesController::class, 'index'])
         ->whereIn('modulo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'historial-academico', 'certificado'])
         ->name('media-superior.documentos.modulo');
