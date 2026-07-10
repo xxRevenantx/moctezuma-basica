@@ -377,10 +377,10 @@
     <div class="page page-break">
         <table class="header">
             <tr>
-                <td style="width:20%;"><img class="logo-seg" src="{{ $institucional['logo_seg'] }}"></td>
+                <td style="width:20%;"><img class="logo-seg" src="{{ public_path('imagenes/seg.png') }}"></td>
                 <td style="width:60%;" class="school">{{ mb_strtoupper($institucional['plantel']) }}</td>
                 <td style="width:20%; text-align:right;"><img class="logo-plantel"
-                        src="{{ $institucional['logo_plantel'] }}"></td>
+                        src="{{ public_path('imagenes/plantel.jpg') }}"></td>
             </tr>
         </table>
         <div class="document-title">HISTORIAL ACADÉMICO</div>
