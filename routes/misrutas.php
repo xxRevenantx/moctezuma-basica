@@ -160,16 +160,16 @@ Route::middleware('admin')->prefix('media-superior/documentos-oficiales')->group
         ->name('media-superior.documentos.configuracion');
 
     Route::get('/modulo/{modulo}', [DocumentosOficialesController::class, 'index'])
-        ->whereIn('modulo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->whereIn('modulo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'historial-academico', 'certificado'])
         ->name('media-superior.documentos.modulo');
 
     Route::get('/descargar/{tipo}/{formato}', [DocumentosOficialesController::class, 'descargar'])
-        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'historial-academico', 'certificado'])
         ->whereIn('formato', ['pdf', 'word', 'excel'])
         ->name('media-superior.documentos.descargar');
 
     Route::get('/zip/{tipo}', [DocumentosOficialesController::class, 'zip'])
-        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'])
+        ->whereIn('tipo', ['registro-escolaridad', 'acta-resultados', 'kardex', 'historial-academico', 'certificado'])
         ->name('media-superior.documentos.zip');
 
     Route::get('/asistencias/plantilla/excel', [DocumentosOficialesController::class, 'plantillaAsistencias'])

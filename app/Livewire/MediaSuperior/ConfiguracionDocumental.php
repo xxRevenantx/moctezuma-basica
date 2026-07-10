@@ -32,6 +32,7 @@ class ConfiguracionDocumental extends Component
     public string $texto_certificado = '';
     public string $leyenda_certificado = '';
     public bool $mostrar_materias_extra = true;
+    public bool $mostrar_foto_historial = false;
 
     /** @var array<string, array<string, mixed>> */
     public array $firmantes = [];
@@ -59,6 +60,7 @@ class ConfiguracionDocumental extends Component
         $this->texto_certificado = (string) ($config->texto_certificado ?: $this->textoCertificadoPredeterminado());
         $this->leyenda_certificado = (string) ($config->leyenda_certificado ?: $this->leyendaCertificadoPredeterminada());
         $this->mostrar_materias_extra = (bool) ($config->mostrar_materias_extra ?? true);
+        $this->mostrar_foto_historial = (bool) ($config->mostrar_foto_historial ?? false);
 
         $cicloActualId = cicloEscolar::query()->where('es_actual', true)->value('id')
             ?: cicloEscolar::query()->max('id');
@@ -72,8 +74,13 @@ class ConfiguracionDocumental extends Component
                 ->latest('id')
                 ->first();
 
+            $tipo = 'persona';
+            if ($actual?->director_id) {
+                $tipo = $rol === FirmanteMediaSuperior::ROL_JEFE_REGISTRO ? 'autoridad' : 'director';
+            }
+
             $this->firmantes[$rol] = [
-                'tipo' => $actual?->director_id ? 'director' : 'persona',
+                'tipo' => $tipo,
                 'id' => (string) ($actual?->director_id ?: $actual?->persona_id ?: ''),
                 'cargo' => (string) ($actual?->cargo_impresion ?: $cargo),
                 'ciclo_desde_id' => (string) ($actual?->ciclo_desde_id ?: ''),
@@ -104,7 +111,29 @@ class ConfiguracionDocumental extends Component
     #[Computed]
     public function directores()
     {
-        return Director::query()->where('status', true)->orderBy('apellido_paterno')->orderBy('nombre')->get();
+        return Director::query()
+            ->where('status', true)
+            ->where(function ($query): void {
+                $query->where('identificador', 'like', '%director%')
+                    ->orWhere('identificador', 'like', '%rector%')
+                    ->orWhere('cargo', 'like', '%director%')
+                    ->orWhere('cargo', 'like', '%rector%');
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    #[Computed]
+    public function autoridades()
+    {
+        // La sección Autoridades utiliza el catálogo de directores/directivos.
+        return Director::query()
+            ->where('status', true)
+            ->orderBy('cargo')
+            ->orderBy('apellido_paterno')
+            ->orderBy('nombre')
+            ->get();
     }
 
     #[Computed]
@@ -117,6 +146,31 @@ class ConfiguracionDocumental extends Component
     public function ciclos()
     {
         return cicloEscolar::query()->orderByDesc('inicio_anio')->get();
+    }
+
+    #[Computed]
+    public function avance(): array
+    {
+        $campos = [
+            filled($this->nombre_plantel_oficial),
+            filled($this->numero_acuerdo),
+            filled($this->fecha_acuerdo),
+            filled($this->modalidad),
+            filled($this->turno),
+            filled($this->localidad_expedicion),
+            filled($this->texto_certificado),
+            filled($this->leyenda_certificado),
+        ];
+        $firmantesConfigurados = collect($this->firmantes)->filter(fn (array $firmante) => filled($firmante['id'] ?? null))->count();
+        $completados = collect($campos)->filter()->count() + $firmantesConfigurados;
+        $total = count($campos) + count($this->roles());
+
+        return [
+            'completados' => $completados,
+            'total' => $total,
+            'porcentaje' => $total > 0 ? (int) round(($completados / $total) * 100) : 0,
+            'firmantes' => $firmantesConfigurados,
+        ];
     }
 
     public function guardar(): void
@@ -136,7 +190,8 @@ class ConfiguracionDocumental extends Component
             'texto_certificado' => ['required', 'string', 'max:4000'],
             'leyenda_certificado' => ['required', 'string', 'max:1000'],
             'mostrar_materias_extra' => ['boolean'],
-            'firmantes.*.tipo' => ['required', 'in:director,persona'],
+            'mostrar_foto_historial' => ['boolean'],
+            'firmantes.*.tipo' => ['required', 'in:director,persona,autoridad'],
             'firmantes.*.id' => ['nullable', 'integer'],
             'firmantes.*.cargo' => ['required', 'string', 'max:255'],
             'firmantes.*.ciclo_desde_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
@@ -163,6 +218,7 @@ class ConfiguracionDocumental extends Component
                     'texto_certificado' => trim($this->texto_certificado),
                     'leyenda_certificado' => trim($this->leyenda_certificado),
                     'mostrar_materias_extra' => $this->mostrar_materias_extra,
+                    'mostrar_foto_historial' => $this->mostrar_foto_historial,
                 ],
             );
 
@@ -176,9 +232,8 @@ class ConfiguracionDocumental extends Component
 
                 $cicloDesde = filled($datos['ciclo_desde_id'] ?? null) ? (int) $datos['ciclo_desde_id'] : null;
                 $cicloHasta = filled($datos['ciclo_hasta_id'] ?? null) ? (int) $datos['ciclo_hasta_id'] : null;
+                $tipo = (string) ($datos['tipo'] ?? 'persona');
 
-                // Se conserva cualquier vigencia anterior. Si se vuelve a guardar la misma
-                // ventana de ciclos, únicamente se actualiza ese registro.
                 FirmanteMediaSuperior::query()->updateOrCreate(
                     [
                         'nivel_id' => $this->nivel->id,
@@ -187,8 +242,8 @@ class ConfiguracionDocumental extends Component
                         'ciclo_hasta_id' => $cicloHasta,
                     ],
                     [
-                        'director_id' => ($datos['tipo'] ?? 'persona') === 'director' ? $id : null,
-                        'persona_id' => ($datos['tipo'] ?? 'persona') === 'persona' ? $id : null,
+                        'director_id' => in_array($tipo, ['director', 'autoridad'], true) ? $id : null,
+                        'persona_id' => $tipo === 'persona' ? $id : null,
                         'cargo_impresion' => $datos['cargo'] ?: $cargoPredeterminado,
                         'activo' => true,
                     ],
@@ -196,7 +251,8 @@ class ConfiguracionDocumental extends Component
             }
         });
 
-        $this->dispatch('swal', icon: 'success', title: 'Configuración guardada', text: 'Los documentos oficiales usarán estos datos.');
+        unset($this->avance);
+        $this->dispatch('swal', icon: 'success', title: 'Configuración guardada', text: 'Los documentos oficiales usarán estos datos y vigencias.');
     }
 
     public function render()
@@ -227,7 +283,7 @@ class ConfiguracionDocumental extends Component
             $tipo = (string) ($datos['tipo'] ?? 'persona');
 
             if ($id) {
-                $existe = $tipo === 'director'
+                $existe = in_array($tipo, ['director', 'autoridad'], true)
                     ? Director::query()->whereKey($id)->where('status', true)->exists()
                     : Persona::query()->whereKey($id)->where('status', true)->exists();
 

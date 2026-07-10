@@ -3,6 +3,7 @@
 namespace App\Livewire\MediaSuperior;
 
 use App\Models\AsistenciaFinalBachillerato;
+use App\Models\ConfiguracionMediaSuperior;
 use App\Models\EmisionDocumentoMediaSuperior;
 use App\Services\MediaSuperior\DocumentosOficialesService;
 use Illuminate\Support\Collection;
@@ -34,6 +35,8 @@ class DocumentosOficiales extends Component
     public string $fecha_documento = '';
     public string $certificado_revisado_por = '';
     public string $certificado_jefe_registro_por = '';
+    public string $historial_modo = 'completo';
+    public bool $historial_mostrar_foto = false;
 
     /** @var array{tipo?:string,titulo?:string,mensaje?:string,detalles?:array<int,string>} */
     public array $alertaDocumento = [];
@@ -56,6 +59,10 @@ class DocumentosOficiales extends Component
 
         $this->ciclo_escolar_id = (string) ($actual?->id ?? '');
         $this->fecha_documento = now()->format('Y-m-d');
+        $configuracion = ConfiguracionMediaSuperior::query()
+            ->where('nivel_id', $this->service()->nivel()->id)
+            ->first();
+        $this->historial_mostrar_foto = (bool) ($configuracion?->mostrar_foto_historial ?? false);
 
         $alerta = session()->pull('documento_oficial_error');
         if (is_array($alerta)) {
@@ -72,7 +79,7 @@ class DocumentosOficiales extends Component
 
     public function seleccionarModulo(string $modulo): void
     {
-        $permitidos = ['inicio', 'registro-escolaridad', 'acta-resultados', 'kardex', 'certificado'];
+        $permitidos = ['inicio', 'registro-escolaridad', 'acta-resultados', 'kardex', 'historial-academico', 'certificado'];
         $this->modulo = in_array($modulo, $permitidos, true) ? $modulo : 'inicio';
         $this->resetErrorBag();
         $this->dispatch('documento-oficial-modulo-cambiado');
@@ -181,12 +188,14 @@ class DocumentosOficiales extends Component
     #[Computed]
     public function alumnos(): Collection
     {
-        if (blank($this->generacion_id)) {
+        $individual = in_array($this->modulo, ['kardex', 'historial-academico', 'certificado'], true);
+
+        if (blank($this->generacion_id) && (! $individual || mb_strlen(trim($this->buscar_alumno)) < 2)) {
             return collect();
         }
 
         return $this->service()->alumnos(
-            (int) $this->generacion_id,
+            $this->entero($this->generacion_id),
             $this->entero($this->grupo_id),
             $this->buscar_alumno,
         );
@@ -214,6 +223,26 @@ class DocumentosOficiales extends Component
     }
 
     #[Computed]
+    public function estadisticasEmisiones(): array
+    {
+        $nivelId = $this->service()->nivel()->id;
+        $base = EmisionDocumentoMediaSuperior::query()->where('nivel_id', $nivelId);
+        $cicloId = $this->entero($this->ciclo_escolar_id);
+
+        return [
+            'hoy' => (clone $base)->whereDate('emitido_at', today())->count(),
+            'ciclo' => $cicloId
+                ? (clone $base)->where('contexto->ciclo_escolar_id', $cicloId)->count()
+                : 0,
+            'total' => (clone $base)->count(),
+            'por_tipo' => (clone $base)
+                ->selectRaw('tipo, COUNT(*) as total')
+                ->groupBy('tipo')
+                ->pluck('total', 'tipo'),
+        ];
+    }
+
+    #[Computed]
     public function vistaPrevia(): ?array
     {
         try {
@@ -226,6 +255,13 @@ class DocumentosOficiales extends Component
                     : null,
                 'kardex' => filled($this->inscripcion_id)
                     ? $this->service()->kardex((int) $this->inscripcion_id)
+                    : null,
+                'historial-academico' => filled($this->inscripcion_id)
+                    ? $this->service()->historialAcademico(
+                        (int) $this->inscripcion_id,
+                        $this->historial_modo,
+                        $this->historial_mostrar_foto,
+                    )
                     : null,
                 'certificado' => filled($this->inscripcion_id)
                     ? $this->vistaPreviaCertificado()
@@ -351,6 +387,8 @@ class DocumentosOficiales extends Component
             'fecha_documento' => $this->fecha_documento,
             'certificado_revisado_por' => trim($this->certificado_revisado_por),
             'certificado_jefe_registro_por' => trim($this->certificado_jefe_registro_por),
+            'historial_modo' => $this->historial_modo,
+            'historial_mostrar_foto' => $this->historial_mostrar_foto ? 1 : 0,
         ];
     }
 
@@ -401,6 +439,7 @@ class DocumentosOficiales extends Component
         return match ($this->modulo) {
             'certificado' => 'El certificado todavía no está listo para emitirse',
             'kardex' => 'El kardex necesita una revisión',
+            'historial-academico' => 'El historial académico necesita una revisión',
             'acta-resultados' => 'El acta todavía no puede generarse',
             'registro-escolaridad' => 'El registro todavía no puede generarse',
             default => 'No se puede generar el documento',

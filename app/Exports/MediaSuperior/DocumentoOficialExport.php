@@ -25,6 +25,7 @@ class DocumentoOficialExport implements FromArray, ShouldAutoSize, WithStyles, W
             'registro-escolaridad' => $this->registro(),
             'acta-resultados' => $this->acta(),
             'kardex' => $this->kardex(),
+            'historial-academico' => $this->historialAcademico(),
             'certificado' => $this->certificado(),
             'plantilla-asistencias' => $this->plantillaAsistencias(),
             default => [['Sin información']],
@@ -37,6 +38,7 @@ class DocumentoOficialExport implements FromArray, ShouldAutoSize, WithStyles, W
             'registro-escolaridad' => 'Registro escolaridad',
             'acta-resultados' => 'Acta resultados',
             'kardex' => 'Kardex',
+            'historial-academico' => 'Historial académico',
             'certificado' => 'Certificado',
             'plantilla-asistencias' => 'Asistencias',
             default => 'Documento',
@@ -125,6 +127,62 @@ class DocumentoOficialExport implements FromArray, ShouldAutoSize, WithStyles, W
                     'Extra informativa',
                     'No aplica',
                 ];
+            }
+        }
+
+        return $filas;
+    }
+
+
+    private function historialAcademico(): array
+    {
+        $filas = [[
+            'Semestre',
+            'Ciclo escolar',
+            'Clave',
+            'Asignatura',
+            'Calificación final',
+            '% asistencia',
+            'Tipo',
+            'Acreditada',
+            'Regularización 1',
+            'Regularización 2',
+            'Regularización 3',
+        ]];
+
+        foreach ($this->datos['semestres_historial'] ?? [] as $semestre) {
+            foreach ($semestre['oficiales'] as $materia) {
+                $filas[] = [
+                    $semestre['numero'],
+                    $semestre['ciclo_texto'] ?? '',
+                    $materia['clave'],
+                    $materia['nombre'],
+                    $materia['valor'] !== '' ? $materia['valor'] : '',
+                    $materia['asistencia'] !== null ? (float) $materia['asistencia'] : '',
+                    'Oficial',
+                    $materia['completa'] ? ($materia['acreditada'] ? 'Sí' : 'No') : '',
+                    '',
+                    '',
+                    '',
+                ];
+            }
+
+            if ((bool) data_get($this->datos, 'institucional.mostrar_materias_extra', true)) {
+                foreach ($semestre['extras'] as $materia) {
+                    $filas[] = [
+                        $semestre['numero'],
+                        $semestre['ciclo_texto'] ?? '',
+                        $materia['clave'],
+                        $materia['nombre'],
+                        $materia['valor'] !== '' ? $materia['valor'] : '',
+                        $materia['asistencia'] !== null ? (float) $materia['asistencia'] : '',
+                        'Extra informativa',
+                        'No aplica',
+                        '',
+                        '',
+                        '',
+                    ];
+                }
             }
         }
 

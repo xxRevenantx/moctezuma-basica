@@ -30,6 +30,7 @@ class DocumentosOficialesService
     public const TIPO_REGISTRO = 'registro-escolaridad';
     public const TIPO_ACTA = 'acta-resultados';
     public const TIPO_KARDEX = 'kardex';
+    public const TIPO_HISTORIAL = 'historial-academico';
     public const TIPO_CERTIFICADO = 'certificado';
 
     public function nivel(): Nivel
@@ -605,6 +606,135 @@ class DocumentosOficialesService
                     ->values(),
             ],
         ];
+    }
+
+
+    public function historialAcademico(
+        int $inscripcionId,
+        string $modo = 'completo',
+        bool $mostrarFoto = false,
+    ): array {
+        $datos = $this->kardex($inscripcionId);
+        $modo = $modo === 'cursado' ? 'cursado' : 'completo';
+        $vigentes = $datos['semestres_vigentes']->keyBy('numero');
+
+        $consultaPlan = Materia::query()
+            ->with('semestre:id,numero')
+            ->where('nivel_id', $this->nivel()->id)
+            ->whereHas('semestre', fn (Builder $query) => $query->whereBetween('numero', [1, 6]));
+        ReglasMateriaBachillerato::aplicarCapturables($consultaPlan, '');
+
+        $plan = $consultaPlan
+            ->orderBy('semestre_id')
+            ->orderBy('orden')
+            ->orderBy('materia')
+            ->get()
+            ->groupBy(fn (Materia $materia): int => (int) ($materia->semestre?->numero ?? 0));
+
+        $semestres = collect(range(1, 6))
+            ->map(function (int $numero) use ($vigentes, $plan, $datos, $modo): ?array {
+                $registrado = $vigentes->get($numero);
+
+                if ($registrado) {
+                    return array_merge($registrado, [
+                        'incluido' => true,
+                        'ciclo_texto' => $registrado['ciclo']?->nombre
+                            ?: $this->cicloEstimado($datos['alumno'], $numero),
+                    ]);
+                }
+
+                if ($modo === 'cursado') {
+                    return null;
+                }
+
+                $materias = $plan->get($numero, collect());
+                $convertir = fn (Materia $materia): array => [
+                    'asignacion' => null,
+                    'materia' => $materia,
+                    'clave' => $materia->clave,
+                    'nombre' => $materia->materia,
+                    'creditos_certificados' => $materia->creditos_certificados,
+                    'parcial_1' => null,
+                    'parcial_2' => null,
+                    'completa' => false,
+                    'valor_preciso' => null,
+                    'valor_entero' => null,
+                    'valor' => '',
+                    'acreditada' => false,
+                    'extra' => ReglasMateriaBachillerato::esExtraInformativa($materia),
+                    'asistencia' => null,
+                ];
+                $oficiales = $materias
+                    ->filter(fn (Materia $materia) => ReglasMateriaBachillerato::esPromediable($materia))
+                    ->map($convertir)
+                    ->values();
+                $extras = $materias
+                    ->filter(fn (Materia $materia) => ReglasMateriaBachillerato::esExtraInformativa($materia))
+                    ->map($convertir)
+                    ->values();
+
+                return [
+                    'clave_contexto' => 'plan|' . $numero,
+                    'semestre' => $materias->first()?->semestre,
+                    'numero' => $numero,
+                    'ciclo' => null,
+                    'ciclo_texto' => $this->cicloEstimado($datos['alumno'], $numero),
+                    'grupo' => null,
+                    'oficiales' => $oficiales,
+                    'extras' => $extras,
+                    'materias_esperadas' => $oficiales->count(),
+                    'materias_oficiales' => $oficiales->count(),
+                    'numero_materias_configurado' => null,
+                    'catalogo_consistente' => $oficiales->isNotEmpty(),
+                    'completo' => false,
+                    'acreditado' => false,
+                    'promedio_preciso' => null,
+                    'promedio' => '—',
+                    'incluido' => false,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $oficiales = $semestres->flatMap(fn (array $semestre) => $semestre['oficiales']);
+        $materiasConCalificacion = $oficiales->where('completa', true);
+        $materiasAcreditadas = $materiasConCalificacion->where('acreditada', true);
+        $materiasNoAcreditadas = $materiasConCalificacion->where('acreditada', false);
+        $asistencias = $materiasConCalificacion->pluck('asistencia')->filter(fn ($valor) => $valor !== null);
+
+        return array_merge($datos, [
+            'modo_historial' => $modo,
+            'mostrar_foto' => $mostrarFoto,
+            'foto_data_uri' => $mostrarFoto ? $datos['alumno']->foto_data_uri : null,
+            'semestres_historial' => $semestres,
+            'semestres_pagina_1' => $semestres->whereIn('numero', [1, 2, 3, 4])->values(),
+            'semestres_pagina_2' => $semestres->whereIn('numero', [5, 6])->values(),
+            'resumen_historial' => [
+                'materias_plan' => $oficiales->count(),
+                'materias_evaluadas' => $materiasConCalificacion->count(),
+                'materias_acreditadas' => $materiasAcreditadas->count(),
+                'materias_no_acreditadas' => $materiasNoAcreditadas->count(),
+                'asistencia_promedio' => $asistencias->isNotEmpty()
+                    ? (int) floor((float) $asistencias->avg())
+                    : null,
+                'situacion' => $materiasConCalificacion->isEmpty()
+                    ? 'SIN REGISTROS'
+                    : ($materiasNoAcreditadas->isEmpty() ? 'REGULAR' : 'IRREGULAR'),
+            ],
+        ]);
+    }
+
+    private function cicloEstimado(Inscripcion $alumno, int $numeroSemestre): string
+    {
+        $ingreso = (int) ($alumno->generacion?->anio_ingreso ?? 0);
+
+        if ($ingreso <= 0) {
+            return '—';
+        }
+
+        $inicio = $ingreso + intdiv(max(0, $numeroSemestre - 1), 2);
+
+        return $inicio . '-' . ($inicio + 1);
     }
 
     public function certificado(int $inscripcionId, string $modalidad = 'parcial'): array

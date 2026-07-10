@@ -12,8 +12,7 @@
                     <p class="text-xs font-black uppercase tracking-[0.18em] text-[#006492]">Media Superior</p>
                     <h1 class="mt-1 text-2xl font-black text-slate-950 dark:text-white">Documentos oficiales</h1>
                     <p class="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
-                        Registro de escolaridad, actas, kardex y certificados construidos con las calificaciones
-                        históricas de bachillerato.
+                        Registro de escolaridad, actas, Kardex, Historial académico y Certificados construidos con la trayectoria histórica de bachillerato.
                     </p>
                 </div>
             </div>
@@ -33,150 +32,132 @@
     </section>
 
     @if ($modulo === 'inicio')
-        <section class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            @php
-                $modulos = [
-                    [
-                        'id' => 'registro-escolaridad',
-                        'titulo' => 'Registro de escolaridad',
-                        'texto' => 'Oficio horizontal por ciclo, generación, semestre y grupo.',
-                        'icono' => 'table-cells',
-                        'tono' => 'blue',
-                    ],
-                    [
-                        'id' => 'acta-resultados',
-                        'titulo' => 'Acta de resultados',
-                        'texto' => 'Acta por materia con calificación final, letra y asistencia.',
-                        'icono' => 'clipboard-document-check',
-                        'tono' => 'emerald',
-                    ],
-                    [
-                        'id' => 'kardex',
-                        'titulo' => 'Kardex',
-                        'texto' => 'Historial individual de los seis semestres y materias extra separadas.',
-                        'icono' => 'academic-cap',
-                        'tono' => 'violet',
-                    ],
-                    [
-                        'id' => 'certificado',
-                        'titulo' => 'Certificados',
-                        'texto' => 'Certificado parcial o definitivo usando el folio de inscripción.',
-                        'icono' => 'identification',
-                        'tono' => 'amber',
-                    ],
-                ];
-            @endphp
-            @foreach ($modulos as $item)
-                <button type="button" wire:click="seleccionarModulo('{{ $item['id'] }}')"
-                    class="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-950">
+        @php
+            $estadisticas = $this->estadisticasEmisiones;
+            $modulos = [
+                ['id' => 'registro-escolaridad', 'titulo' => 'Registro de escolaridad', 'texto' => 'Matrícula y resultados por ciclo, generación, semestre y grupo.', 'icono' => 'table-cells', 'tono' => 'blue', 'destacado' => true],
+                ['id' => 'historial-academico', 'titulo' => 'Historial académico', 'texto' => 'Formato oficial de dos páginas, seis semestres, promedio y firmas.', 'icono' => 'document-chart-bar', 'tono' => 'rose', 'destacado' => true],
+                ['id' => 'acta-resultados', 'titulo' => 'Acta de resultados', 'texto' => 'Calificación final, letra y asistencia por materia.', 'icono' => 'clipboard-document-check', 'tono' => 'emerald', 'destacado' => false],
+                ['id' => 'kardex', 'titulo' => 'Kardex', 'texto' => 'Seguimiento interno detallado de intentos, materias y cortes.', 'icono' => 'academic-cap', 'tono' => 'violet', 'destacado' => false],
+                ['id' => 'certificado', 'titulo' => 'Certificados', 'texto' => 'Certificación parcial o definitiva con folio de inscripción.', 'icono' => 'identification', 'tono' => 'amber', 'destacado' => false],
+            ];
+        @endphp
+
+        <section class="grid gap-4 sm:grid-cols-3">
+            @foreach ([
+                ['label' => 'Emitidos hoy', 'value' => $estadisticas['hoy'], 'icon' => 'calendar-days', 'tone' => 'blue'],
+                ['label' => 'Ciclo seleccionado', 'value' => $estadisticas['ciclo'], 'icon' => 'arrow-path-rounded-square', 'tone' => 'emerald'],
+                ['label' => 'Total histórico', 'value' => $estadisticas['total'], 'icon' => 'archive-box', 'tone' => 'violet'],
+            ] as $stat)
+                <article class="relative overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                     <div @class([
-                        'h-1.5',
-                        'bg-blue-500' => $item['tono'] === 'blue',
-                        'bg-emerald-500' => $item['tono'] === 'emerald',
-                        'bg-violet-500' => $item['tono'] === 'violet',
-                        'bg-amber-500' => $item['tono'] === 'amber',
+                        'absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl',
+                        'bg-blue-200/60 dark:bg-blue-900/20' => $stat['tone'] === 'blue',
+                        'bg-emerald-200/60 dark:bg-emerald-900/20' => $stat['tone'] === 'emerald',
+                        'bg-violet-200/60 dark:bg-violet-900/20' => $stat['tone'] === 'violet',
                     ])></div>
-                    <div class="p-6">
-                        <div @class([
-                            'flex h-12 w-12 items-center justify-center rounded-2xl',
-                            'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300' =>
-                                $item['tono'] === 'blue',
-                            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' =>
-                                $item['tono'] === 'emerald',
-                            'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300' =>
-                                $item['tono'] === 'violet',
-                            'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' =>
-                                $item['tono'] === 'amber',
-                        ])>
-                            <flux:icon :name="$item['icono']" class="h-6 w-6" />
+                    <div class="relative flex items-center justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-wider text-slate-400">{{ $stat['label'] }}</p>
+                            <p class="mt-2 text-3xl font-black text-slate-950 dark:text-white">{{ number_format($stat['value']) }}</p>
                         </div>
-                        <h2 class="mt-5 text-lg font-black text-slate-950 dark:text-white">{{ $item['titulo'] }}</h2>
-                        <p class="mt-2 min-h-16 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                            {{ $item['texto'] }}</p>
-                        <span
-                            class="mt-5 inline-flex items-center gap-1 text-sm font-black text-[#006492] group-hover:gap-2">
-                            Abrir módulo <flux:icon.arrow-right class="h-4 w-4" />
-                        </span>
+                        <span @class([
+                            'flex h-12 w-12 items-center justify-center rounded-2xl',
+                            'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300' => $stat['tone'] === 'blue',
+                            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' => $stat['tone'] === 'emerald',
+                            'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300' => $stat['tone'] === 'violet',
+                        ])><flux:icon :name="$stat['icon']" class="h-6 w-6" /></span>
+                    </div>
+                </article>
+            @endforeach
+        </section>
+
+        <section class="grid gap-5 xl:grid-cols-2">
+            @foreach (collect($modulos)->where('destacado', true) as $item)
+                <button type="button" wire:click="seleccionarModulo('{{ $item['id'] }}')"
+                    class="group relative min-h-60 overflow-hidden rounded-[1.9rem] border border-slate-200 bg-slate-950 p-6 text-left text-white shadow-lg transition hover:-translate-y-1 hover:shadow-2xl dark:border-slate-700 sm:p-7">
+                    <div @class([
+                        'absolute inset-x-0 top-0 h-1.5',
+                        'bg-blue-500' => $item['tono'] === 'blue',
+                        'bg-rose-500' => $item['tono'] === 'rose',
+                    ])></div>
+                    <div @class([
+                        'absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl',
+                        'bg-blue-500/25' => $item['tono'] === 'blue',
+                        'bg-rose-500/25' => $item['tono'] === 'rose',
+                    ])></div>
+                    <div class="relative flex h-full flex-col justify-between">
+                        <div class="flex items-start justify-between gap-4">
+                            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15"><flux:icon :name="$item['icono']" class="h-7 w-7" /></span>
+                            <span class="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/80">Módulo principal</span>
+                        </div>
+                        <div class="mt-8">
+                            <h2 class="text-2xl font-black">{{ $item['titulo'] }}</h2>
+                            <p class="mt-2 max-w-xl text-sm leading-6 text-slate-300">{{ $item['texto'] }}</p>
+                            <div class="mt-5 flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-400">{{ number_format((int) ($estadisticas['por_tipo'][$item['id']] ?? 0)) }} emisiones históricas</span>
+                                <span class="inline-flex items-center gap-1 text-sm font-black text-white transition group-hover:gap-2">Abrir módulo <flux:icon.arrow-right class="h-4 w-4" /></span>
+                            </div>
+                        </div>
                     </div>
                 </button>
             @endforeach
         </section>
 
-        <section
-            class="rounded-[1.7rem] border border-blue-100 bg-blue-50/70 p-5 dark:border-blue-900/40 dark:bg-blue-950/20">
+        <section class="grid gap-5 md:grid-cols-3">
+            @foreach (collect($modulos)->where('destacado', false) as $item)
+                <button type="button" wire:click="seleccionarModulo('{{ $item['id'] }}')"
+                    class="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
+                    <div @class([
+                        'h-1.5',
+                        'bg-emerald-500' => $item['tono'] === 'emerald',
+                        'bg-violet-500' => $item['tono'] === 'violet',
+                        'bg-amber-500' => $item['tono'] === 'amber',
+                    ])></div>
+                    <div class="p-6">
+                        <div class="flex items-start justify-between gap-4">
+                            <span @class([
+                                'flex h-12 w-12 items-center justify-center rounded-2xl',
+                                'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' => $item['tono'] === 'emerald',
+                                'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300' => $item['tono'] === 'violet',
+                                'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' => $item['tono'] === 'amber',
+                            ])><flux:icon :name="$item['icono']" class="h-6 w-6" /></span>
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:bg-slate-900">{{ number_format((int) ($estadisticas['por_tipo'][$item['id']] ?? 0)) }}</span>
+                        </div>
+                        <h2 class="mt-5 text-lg font-black text-slate-950 dark:text-white">{{ $item['titulo'] }}</h2>
+                        <p class="mt-2 min-h-16 text-sm leading-6 text-slate-500 dark:text-slate-400">{{ $item['texto'] }}</p>
+                        <span class="mt-5 inline-flex items-center gap-1 text-sm font-black text-[#006492] group-hover:gap-2">Abrir módulo <flux:icon.arrow-right class="h-4 w-4" /></span>
+                    </div>
+                </button>
+            @endforeach
+        </section>
+
+        <section class="rounded-[1.7rem] border border-blue-100 bg-gradient-to-r from-blue-50 to-emerald-50 p-5 dark:border-blue-900/40 dark:from-blue-950/20 dark:to-emerald-950/10">
             <div class="flex items-start gap-3">
-                <flux:icon.information-circle class="mt-0.5 h-6 w-6 shrink-0 text-blue-700 dark:text-blue-300" />
+                <flux:icon.shield-check class="mt-0.5 h-6 w-6 shrink-0 text-blue-700 dark:text-blue-300" />
                 <div>
-                    <h3 class="font-black text-slate-900 dark:text-white">Reglas académicas compartidas</h3>
-                    <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        Solo las materias oficiales de bachillerato intervienen en acreditación y promedios. Las
-                        materias extra se muestran por separado y nunca modifican los resultados. Las columnas de
-                        regularización permanecen vacías.
-                    </p>
+                    <h3 class="font-black text-slate-900 dark:text-white">Reglas académicas protegidas</h3>
+                    <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Solo las materias oficiales intervienen en acreditación y promedios. Las materias extra se separan y las columnas de regularización permanecen visibles pero vacías. Cada emisión se conserva como versión histórica.</p>
                 </div>
             </div>
         </section>
 
-
-        <section x-data="{ abierto: false }"
-            class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <button type="button" @click="abierto = !abierto"
-                class="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6">
+        <section x-data="{ abierto: false }" class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <button type="button" @click="abierto = !abierto" class="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6">
                 <div class="flex items-center gap-3">
-                    <div
-                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                        <flux:icon.clock class="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h3 class="font-black text-slate-950 dark:text-white">Historial reciente de emisiones</h3>
-                        <p class="text-sm text-slate-500">Al reemitir se actualiza el documento vigente del mismo
-                            contexto; no se conserva una copia anterior.</p>
-                    </div>
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300"><flux:icon.clock class="h-5 w-5" /></div>
+                    <div><h3 class="font-black text-slate-950 dark:text-white">Historial reciente de emisiones</h3><p class="text-sm text-slate-500">Cada descarga conserva fecha, usuario, formato y contexto como una nueva versión.</p></div>
                 </div>
-                <div class="flex items-center gap-3"><span
-                        class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-900 dark:text-slate-300">{{ $this->emisionesRecientes->count() }}
-                        registros</span><flux:icon.chevron-down class="h-5 w-5 text-slate-400 transition"
-                        x-bind:class="abierto && 'rotate-180'" /></div>
+                <div class="flex items-center gap-3"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-900 dark:text-slate-300">{{ $this->emisionesRecientes->count() }} registros</span><flux:icon.chevron-down class="h-5 w-5 text-slate-400 transition" x-bind:class="abierto && 'rotate-180'" /></div>
             </button>
             <div x-show="abierto" x-collapse class="border-t border-slate-200 dark:border-slate-800">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                        <thead class="bg-slate-50 dark:bg-slate-900">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Fecha</th>
-                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Documento
-                                </th>
-                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Alumno /
-                                    contexto</th>
-                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Formato</th>
-                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Emitió</th>
-                            </tr>
-                        </thead>
+                        <thead class="bg-slate-50 dark:bg-slate-900"><tr><th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Fecha</th><th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Documento</th><th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Alumno / contexto</th><th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Formato</th><th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Emitió</th></tr></thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             @forelse($this->emisionesRecientes as $emision)
-                                <tr>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        {{ optional($emision->emitido_at)->format('d/m/Y H:i') }}</td>
-                                    <td class="px-4 py-3 font-black">
-                                        {{ str($emision->tipo)->replace('-', ' ')->headline() }}</td>
-                                    <td class="px-4 py-3">
-                                        @if ($emision->inscripcion)
-                                            {{ $emision->inscripcion->matricula }} ·
-                                            {{ $emision->inscripcion->apellido_paterno }}
-                                            {{ $emision->inscripcion->nombre }}
-                                        @else
-                                            <span class="text-xs text-slate-500">{{ $emision->clave_contexto }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3 uppercase font-bold">{{ $emision->formato }}</td>
-                                    <td class="px-4 py-3">{{ $emision->usuario?->name ?: 'Sistema' }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="px-4 py-10 text-center text-slate-500">Todavía no se han
-                                        emitido documentos oficiales.</td>
-                                </tr>
-                            @endforelse
+                                <tr><td class="whitespace-nowrap px-4 py-3">{{ optional($emision->emitido_at)->format('d/m/Y H:i') }}</td><td class="px-4 py-3 font-black">{{ str($emision->tipo)->replace('-', ' ')->headline() }}</td><td class="px-4 py-3">@if($emision->inscripcion){{ $emision->inscripcion->matricula }} · {{ $emision->inscripcion->apellido_paterno }} {{ $emision->inscripcion->nombre }}@else<span class="text-xs text-slate-500">{{ $emision->clave_contexto }}</span>@endif</td><td class="px-4 py-3 font-bold uppercase">{{ $emision->formato }}</td><td class="px-4 py-3">{{ $emision->usuario?->name ?: 'Sistema' }}</td></tr>
+                            @empty<tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">Todavía no se han emitido documentos oficiales.</td></tr>@endforelse
                         </tbody>
                     </table>
                 </div>
@@ -195,7 +176,8 @@
                     'Documento letter vertical por materia.',
                     'clipboard-document-check',
                 ],
-                'kardex' => ['Kardex del alumno', 'Historial académico individual en letter vertical.', 'academic-cap'],
+                'kardex' => ['Kardex del alumno', 'Seguimiento interno de intentos, materias y resultados históricos.', 'academic-cap'],
+                'historial-academico' => ['Historial académico', 'Formato oficial de dos páginas basado en los seis semestres.', 'document-chart-bar'],
                 'certificado' => [
                     'Certificado de estudios',
                     'Certificación parcial o definitiva en letter vertical.',
@@ -343,9 +325,9 @@
                 @else
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <flux:field>
-                            <flux:label>Generación</flux:label>
+                            <flux:label>Generación (opcional)</flux:label>
                             <flux:select wire:model.live="generacion_id">
-                                <flux:select.option value="">Selecciona</flux:select.option>
+                                <flux:select.option value="">Todas las generaciones</flux:select.option>
                                 @foreach ($this->generaciones as $generacion)
                                     <flux:select.option value="{{ $generacion->id }}">{{ $generacion->etiqueta }}
                                     </flux:select.option>
@@ -379,6 +361,23 @@
                             </flux:field>
                         @endif
                     </div>
+
+                    @if ($modulo === 'historial-academico')
+                        <div class="grid gap-4 rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-blue-50 p-5 dark:border-rose-900/40 dark:from-rose-950/20 dark:via-slate-950 dark:to-blue-950/10 md:grid-cols-2">
+                            <flux:field>
+                                <flux:label>Contenido del historial</flux:label>
+                                <flux:select wire:model.live="historial_modo">
+                                    <flux:select.option value="completo">Completo · mostrar los seis semestres</flux:select.option>
+                                    <flux:select.option value="cursado">Solo semestres con trayectoria</flux:select.option>
+                                </flux:select>
+                                <flux:description>El modo completo incluye el plan y coloca “—” donde no existe calificación.</flux:description>
+                            </flux:field>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                                <input type="checkbox" wire:model.live="historial_mostrar_foto" class="rounded border-slate-300 text-[#006492]">
+                                <span><span class="block text-sm font-black text-slate-900 dark:text-white">Incluir fotografía</span><span class="mt-1 block text-xs leading-5 text-slate-500">Se muestra solo cuando el alumno tiene una fotografía disponible.</span></span>
+                            </label>
+                        </div>
+                    @endif
 
                     @if ($modulo === 'certificado')
                         <div
@@ -443,7 +442,7 @@
 
                     <flux:field>
                         <flux:label>Alumno</flux:label>
-                        <flux:select wire:model.live="inscripcion_id" :disabled="blank($generacion_id)">
+                        <flux:select wire:model.live="inscripcion_id" :disabled="blank($generacion_id) && mb_strlen(trim($buscar_alumno)) < 2">
                             <flux:select.option value="">Selecciona un alumno</flux:select.option>
                             @foreach ($this->alumnos as $alumno)
                                 <flux:select.option value="{{ $alumno->id }}">{{ $alumno->matricula }} ·
@@ -602,11 +601,13 @@
                     $query = http_build_query($this->queryDescarga());
                     $base = route('media-superior.documentos.descargar', ['tipo' => $modulo, 'formato' => 'pdf']);
                     $catalogosInconsistentes = collect(data_get($preview, 'diagnostico.catalogos_inconsistentes', []));
-                    $mostrarCatalogosInconsistentes = $modulo === 'kardex' && $catalogosInconsistentes->isNotEmpty();
+                    $mostrarCatalogosInconsistentes = in_array($modulo, ['kardex', 'historial-academico'], true) && $catalogosInconsistentes->isNotEmpty();
                     $semestresVistaPrevia =
                         $modulo === 'certificado'
                             ? collect($preview['semestres_certificado_matriz'] ?? [])
-                            : collect($preview['semestres'] ?? []);
+                            : ($modulo === 'historial-academico'
+                                ? collect($preview['semestres_historial'] ?? [])
+                                : collect($preview['semestres'] ?? []));
                 @endphp
                 <section
                     class="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -622,6 +623,10 @@
                             <a target="_blank" href="{{ $base }}?{{ $query }}&preview=1"
                                 class="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-black text-blue-700 hover:bg-blue-100">
                                 <flux:icon.eye class="h-4 w-4" /> Vista PDF
+                            </a>
+                            <a target="_blank" href="{{ $base }}?{{ $query }}&preview=1"
+                                class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                <flux:icon.printer class="h-4 w-4" /> Imprimir
                             </a>
                             <a href="{{ route('media-superior.documentos.descargar', ['tipo' => $modulo, 'formato' => 'pdf']) }}?{{ $query }}"
                                 class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white hover:bg-rose-700">PDF</a>
@@ -762,6 +767,16 @@
                                     </div>
                                 </div>
                             @endif
+                            @if ($modulo === 'historial-academico')
+                                <div class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+                                    <div class="rounded-2xl bg-blue-50 p-4 dark:bg-blue-950/20"><p class="text-xs font-black uppercase text-blue-700 dark:text-blue-300">Plan</p><p class="mt-1 text-2xl font-black">{{ data_get($preview, 'resumen_historial.materias_plan', 0) }}</p></div>
+                                    <div class="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900"><p class="text-xs font-black uppercase text-slate-500">Evaluadas</p><p class="mt-1 text-2xl font-black">{{ data_get($preview, 'resumen_historial.materias_evaluadas', 0) }}</p></div>
+                                    <div class="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20"><p class="text-xs font-black uppercase text-emerald-700 dark:text-emerald-300">Acreditadas</p><p class="mt-1 text-2xl font-black">{{ data_get($preview, 'resumen_historial.materias_acreditadas', 0) }}</p></div>
+                                    <div class="rounded-2xl bg-rose-50 p-4 dark:bg-rose-950/20"><p class="text-xs font-black uppercase text-rose-700 dark:text-rose-300">No acreditadas</p><p class="mt-1 text-2xl font-black">{{ data_get($preview, 'resumen_historial.materias_no_acreditadas', 0) }}</p></div>
+                                    <div class="rounded-2xl bg-amber-50 p-4 dark:bg-amber-950/20"><p class="text-xs font-black uppercase text-amber-700 dark:text-amber-300">Promedio</p><p class="mt-1 text-2xl font-black">{{ $preview['promedio_general'] }}</p></div>
+                                </div>
+                            @endif
+
                             @if ($modulo === 'certificado')
                                 <div class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
                                     <div class="rounded-2xl bg-blue-50 p-4 dark:bg-blue-950/20">

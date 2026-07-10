@@ -24,6 +24,7 @@ class ConfiguracionMediaSuperior extends Model
         'texto_certificado',
         'leyenda_certificado',
         'mostrar_materias_extra',
+        'mostrar_foto_historial',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class ConfiguracionMediaSuperior extends Model
         'calificacion_maxima' => 'decimal:2',
         'minima_aprobatoria' => 'decimal:2',
         'mostrar_materias_extra' => 'boolean',
+        'mostrar_foto_historial' => 'boolean',
     ];
 
     public function nivel()
