@@ -21,6 +21,7 @@ use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\SimpleType\Jc;
 use RuntimeException;
 use ZipArchive;
@@ -364,33 +365,124 @@ class DocumentosOficialesController extends Controller
 
     private function crearWordTemporal(string $tipo, array $datos): string
     {
-        $phpWord = new PhpWord();
-        $phpWord->setDefaultFontName('Arial');
-        $phpWord->setDefaultFontSize(8);
+        $directorioSalida = storage_path('app/temp/documentos-oficiales');
+        $directorioPhpWord = storage_path('app/temp/phpword');
+        $directorioTrabajo = $directorioPhpWord . DIRECTORY_SEPARATOR . (string) Str::uuid();
 
-        $sectionStyle = $tipo === DocumentosOficialesService::TIPO_REGISTRO
-            ? ['pageSizeW' => 20160, 'pageSizeH' => 12240, 'orientation' => 'landscape', 'marginTop' => 360, 'marginBottom' => 360, 'marginLeft' => 360, 'marginRight' => 360]
-            : ['pageSizeW' => 12240, 'pageSizeH' => 15840, 'marginTop' => 500, 'marginBottom' => 500, 'marginLeft' => 600, 'marginRight' => 600];
-        $section = $phpWord->addSection($sectionStyle);
+        File::ensureDirectoryExists($directorioSalida, 0775, true);
+        File::ensureDirectoryExists($directorioPhpWord, 0775, true);
+        File::ensureDirectoryExists($directorioTrabajo, 0775, true);
 
-        if ($tipo !== DocumentosOficialesService::TIPO_CERTIFICADO) {
-            $this->encabezadoWord($section, $datos['institucional'] ?? []);
+        $this->validarDirectorioWordEscribible($directorioSalida, 'salida');
+        $this->validarDirectorioWordEscribible($directorioPhpWord, 'temporal');
+        $this->validarDirectorioWordEscribible($directorioTrabajo, 'de trabajo');
+
+        // PHPWord 1.4 puede consultar tanto Settings como las variables TMP/TEMP.
+        // Se evita así que intente trabajar dentro de C:\Windows\Temp.
+        putenv('TMP=' . $directorioTrabajo);
+        putenv('TEMP=' . $directorioTrabajo);
+        putenv('TMPDIR=' . $directorioTrabajo);
+
+        $_ENV['TMP'] = $directorioTrabajo;
+        $_ENV['TEMP'] = $directorioTrabajo;
+        $_ENV['TMPDIR'] = $directorioTrabajo;
+        $_SERVER['TMP'] = $directorioTrabajo;
+        $_SERVER['TEMP'] = $directorioTrabajo;
+        $_SERVER['TMPDIR'] = $directorioTrabajo;
+
+        Settings::setTempDir($directorioTrabajo);
+
+        $ruta = $directorioSalida . DIRECTORY_SEPARATOR . Str::uuid() . '.docx';
+
+        try {
+            $phpWord = new PhpWord();
+            $phpWord->setDefaultFontName('Arial');
+            $phpWord->setDefaultFontSize(8);
+
+            $sectionStyle = $tipo === DocumentosOficialesService::TIPO_REGISTRO
+                ? ['pageSizeW' => 20160, 'pageSizeH' => 12240, 'orientation' => 'landscape', 'marginTop' => 360, 'marginBottom' => 360, 'marginLeft' => 360, 'marginRight' => 360]
+                : ['pageSizeW' => 12240, 'pageSizeH' => 15840, 'marginTop' => 500, 'marginBottom' => 500, 'marginLeft' => 600, 'marginRight' => 600];
+            $section = $phpWord->addSection($sectionStyle);
+
+            if ($tipo !== DocumentosOficialesService::TIPO_CERTIFICADO) {
+                $this->encabezadoWord($section, $datos['institucional'] ?? []);
+            }
+
+            match ($tipo) {
+                DocumentosOficialesService::TIPO_REGISTRO => $this->wordRegistro($section, $datos),
+                DocumentosOficialesService::TIPO_ACTA => $this->wordActa($section, $datos),
+                DocumentosOficialesService::TIPO_KARDEX => $this->wordKardex($section, $datos),
+                DocumentosOficialesService::TIPO_HISTORIAL => $this->wordHistorial($section, $datos),
+                DocumentosOficialesService::TIPO_CERTIFICADO => $this->wordCertificado($phpWord, $section, $datos, $sectionStyle),
+                default => throw new RuntimeException('Tipo de documento Word no válido.'),
+            };
+
+            $writer = WordIOFactory::createWriter($phpWord, 'Word2007');
+
+            // Se configura también directamente en el writer porque es la capa
+            // que crea y posteriormente recorre PHPWordWriter_* durante save().
+            if (method_exists($writer, 'setTempDir')) {
+                $writer->setTempDir($directorioTrabajo);
+            }
+
+            if (method_exists($writer, 'setUseDiskCaching')) {
+                $writer->setUseDiskCaching(true, $directorioTrabajo);
+            }
+
+            $writer->save($ruta);
+
+            if (! is_file($ruta) || filesize($ruta) === 0) {
+                throw new RuntimeException('PHPWord no pudo crear correctamente el archivo Word.');
+            }
+
+            return $ruta;
+        } catch (\Throwable $exception) {
+            File::delete($ruta);
+
+            throw new RuntimeException(
+                'No fue posible generar el archivo Word. Verifica los permisos de storage/app/temp. Detalle: '
+                . $exception->getMessage(),
+                previous: $exception,
+            );
+        } finally {
+            // Se restaura un directorio estable para cualquier otro exportador
+            // que se ejecute durante la misma solicitud.
+            putenv('TMP=' . $directorioPhpWord);
+            putenv('TEMP=' . $directorioPhpWord);
+            putenv('TMPDIR=' . $directorioPhpWord);
+            $_ENV['TMP'] = $directorioPhpWord;
+            $_ENV['TEMP'] = $directorioPhpWord;
+            $_ENV['TMPDIR'] = $directorioPhpWord;
+            $_SERVER['TMP'] = $directorioPhpWord;
+            $_SERVER['TEMP'] = $directorioPhpWord;
+            $_SERVER['TMPDIR'] = $directorioPhpWord;
+            Settings::setTempDir($directorioPhpWord);
+
+            File::deleteDirectory($directorioTrabajo);
+        }
+    }
+
+    private function validarDirectorioWordEscribible(string $directorio, string $etiqueta): void
+    {
+        if (! is_dir($directorio)) {
+            throw new RuntimeException("No existe el directorio {$etiqueta} de PHPWord: {$directorio}");
         }
 
-        match ($tipo) {
-            DocumentosOficialesService::TIPO_REGISTRO => $this->wordRegistro($section, $datos),
-            DocumentosOficialesService::TIPO_ACTA => $this->wordActa($section, $datos),
-            DocumentosOficialesService::TIPO_KARDEX => $this->wordKardex($section, $datos),
-            DocumentosOficialesService::TIPO_HISTORIAL => $this->wordHistorial($section, $datos),
-            DocumentosOficialesService::TIPO_CERTIFICADO => $this->wordCertificado($phpWord, $section, $datos, $sectionStyle),
-            default => null,
-        };
+        if (! is_writable($directorio)) {
+            @chmod($directorio, 0775);
+        }
 
-        $ruta = storage_path('app/temp/' . Str::uuid() . '.docx');
-        File::ensureDirectoryExists(dirname($ruta));
-        WordIOFactory::createWriter($phpWord, 'Word2007')->save($ruta);
+        if (! is_writable($directorio)) {
+            throw new RuntimeException("El directorio {$etiqueta} de PHPWord no tiene permisos de escritura: {$directorio}");
+        }
 
-        return $ruta;
+        $prueba = $directorio . DIRECTORY_SEPARATOR . '.phpword-write-test-' . Str::uuid();
+
+        if (@file_put_contents($prueba, 'ok') === false) {
+            throw new RuntimeException("PHP no puede escribir en el directorio {$etiqueta} de PHPWord: {$directorio}");
+        }
+
+        @unlink($prueba);
     }
 
     private function encabezadoWord($section, array $institucional): void
@@ -515,14 +607,9 @@ class DocumentosOficialesController extends Controller
                 $tabla->addCell()->addText($encabezado, ['bold' => true, 'size' => 6], ['alignment' => Jc::CENTER]);
             }
 
+            // El Historial académico solo muestra materias oficiales.
+            // Las materias extra permanecen disponibles en el Kardex, pero no aquí.
             $materias = collect($semestre['oficiales'] ?? []);
-            if ((bool) ($institucional['mostrar_materias_extra'] ?? true)) {
-                $materias = $materias->concat(collect($semestre['extras'] ?? [])->map(function (array $materia): array {
-                    $materia['nombre'] = ($materia['nombre'] ?? '') . ' (EXTRA INFORMATIVA)';
-
-                    return $materia;
-                }));
-            }
 
             if ($materias->isEmpty()) {
                 $tabla->addRow();
