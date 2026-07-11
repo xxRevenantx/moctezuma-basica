@@ -570,9 +570,9 @@ class PDFController extends Controller
          */
         $filasMateriasExtras = $esBachillerato
             ? collect($filasMaterias)
-                ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 1)
-                ->values()
-                ->all()
+            ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 1)
+            ->values()
+            ->all()
             : [];
 
         /*
@@ -1156,8 +1156,8 @@ class PDFController extends Controller
 
         $filasResumenAcademico = $esBachillerato
             ? collect($filasMaterias)
-                ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 0)
-                ->values()
+            ->filter(fn(array $fila) => (int) ($fila['extra'] ?? 0) === 0)
+            ->values()
             : collect($filasMaterias);
 
         $totalMaterias = $filasResumenAcademico->count();
@@ -3393,21 +3393,21 @@ class PDFController extends Controller
 
         $materiasOficiales = $esBachillerato
             ? collect($materias)
-                ->filter(function (array $materia): bool {
-                    return (int) ($materia['calificable'] ?? 0) === 1
-                        && (int) ($materia['extra'] ?? 0) === 0
-                        && (int) ($materia['receso'] ?? 0) === 0;
-                })
-                ->values()
+            ->filter(function (array $materia): bool {
+                return (int) ($materia['calificable'] ?? 0) === 1
+                    && (int) ($materia['extra'] ?? 0) === 0
+                    && (int) ($materia['receso'] ?? 0) === 0;
+            })
+            ->values()
             : collect($materias)->values();
 
         $materiasExtra = $esBachillerato
             ? collect($materias)
-                ->filter(function (array $materia): bool {
-                    return (int) ($materia['extra'] ?? 0) === 1
-                        && (int) ($materia['receso'] ?? 0) === 0;
-                })
-                ->values()
+            ->filter(function (array $materia): bool {
+                return (int) ($materia['extra'] ?? 0) === 1
+                    && (int) ($materia['receso'] ?? 0) === 0;
+            })
+            ->values()
             : collect();
 
         /*
@@ -6153,6 +6153,7 @@ class PDFController extends Controller
         $logoIzquierdo = $this->imagenBase64Publica(!empty($nivel->logo) ? 'storage/logos/' . $nivel->logo : 'imagenes/logo-letra.png');
         $logoDerecho = $this->imagenBase64Publica('imagenes/logo-letra.png');
         $marcaAgua = $this->imagenBase64Publica('imagenes/logo-letra.png');
+        $imagenPersonalizador = $this->imagenBase64Publica('imagenes/personalizador.jpg');
 
         /*
     |--------------------------------------------------------------------------
@@ -6203,6 +6204,7 @@ class PDFController extends Controller
             'logoIzquierdo' => $logoIzquierdo,
             'logoDerecho' => $logoDerecho,
             'marcaAgua' => $marcaAgua,
+            'imagenPersonalizador' => $imagenPersonalizador,
 
             'turno' => $request->input('turno', 'Matutino'),
             'fechaInicio' => $request->input('fecha_inicio'),
