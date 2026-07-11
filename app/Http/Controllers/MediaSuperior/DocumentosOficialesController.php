@@ -267,6 +267,11 @@ class DocumentosOficialesController extends Controller
     private function crearPdf(string $tipo, array $datos)
     {
         $vista = 'pdf.media-superior.' . $tipo;
+
+        if ($tipo === DocumentosOficialesService::TIPO_HISTORIAL) {
+            $datos = $this->prepararImagenesParaPdf($datos);
+        }
+
         $pdf = Pdf::loadView($vista, $datos)
             ->setOptions([
                 'isRemoteEnabled' => true,
@@ -281,6 +286,80 @@ class DocumentosOficialesController extends Controller
         }
 
         return $pdf->setPaper('letter', 'portrait');
+    }
+
+    /**
+     * Dompdf puede fallar al resolver rutas locales absolutas, especialmente en
+     * Windows o cuando los archivos están fuera de public. Para el PDF se
+     * incrustan logos, fotografías, firmas y sellos como data URI.
+     */
+    private function prepararImagenesParaPdf(array $datos): array
+    {
+        $institucional = (array) ($datos['institucional'] ?? []);
+
+        foreach (['logo_seg', 'logo_plantel', 'logo_certificado'] as $campo) {
+            $institucional[$campo . '_pdf'] = $this->archivoImagenComoDataUri(
+                isset($institucional[$campo]) ? (string) $institucional[$campo] : null,
+            );
+        }
+
+        foreach (['director', 'jefe_registro'] as $rol) {
+            $firmante = (array) data_get($institucional, 'firmantes.' . $rol, []);
+            $firmante['firma_pdf'] = $this->archivoImagenComoDataUri(
+                isset($firmante['firma_ruta']) ? (string) $firmante['firma_ruta'] : null,
+            );
+            $firmante['sello_pdf'] = $this->archivoImagenComoDataUri(
+                isset($firmante['sello_ruta']) ? (string) $firmante['sello_ruta'] : null,
+            );
+            data_set($institucional, 'firmantes.' . $rol, $firmante);
+        }
+
+        $datos['institucional'] = $institucional;
+
+        return $datos;
+    }
+
+    private function archivoImagenComoDataUri(?string $ruta): ?string
+    {
+        $ruta = trim((string) $ruta);
+
+        if ($ruta === '') {
+            return null;
+        }
+
+        if (Str::startsWith($ruta, 'data:image/')) {
+            return $ruta;
+        }
+
+        if (Str::startsWith($ruta, 'file://')) {
+            $ruta = rawurldecode((string) parse_url($ruta, PHP_URL_PATH));
+        }
+
+        if (! is_file($ruta) || ! is_readable($ruta)) {
+            return null;
+        }
+
+        $contenido = @file_get_contents($ruta);
+        if ($contenido === false || $contenido === '') {
+            return null;
+        }
+
+        $mime = @mime_content_type($ruta);
+        if (! is_string($mime) || ! Str::startsWith($mime, 'image/')) {
+            $mime = match (strtolower(pathinfo($ruta, PATHINFO_EXTENSION))) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'webp' => 'image/webp',
+                'gif' => 'image/gif',
+                default => null,
+            };
+        }
+
+        if (! $mime) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($contenido);
     }
 
     private function crearWordTemporal(string $tipo, array $datos): string

@@ -167,23 +167,7 @@ class DocumentoOficialExport implements FromArray, ShouldAutoSize, WithStyles, W
                 ];
             }
 
-            if ((bool) data_get($this->datos, 'institucional.mostrar_materias_extra', true)) {
-                foreach ($semestre['extras'] as $materia) {
-                    $filas[] = [
-                        $semestre['numero'],
-                        $semestre['ciclo_texto'] ?? '',
-                        $materia['clave'],
-                        $materia['nombre'],
-                        $materia['valor'] !== '' ? $materia['valor'] : '',
-                        $materia['asistencia'] !== null ? (float) $materia['asistencia'] : '',
-                        'Extra informativa',
-                        'No aplica',
-                        '',
-                        '',
-                        '',
-                    ];
-                }
-            }
+
         }
 
         return $filas;

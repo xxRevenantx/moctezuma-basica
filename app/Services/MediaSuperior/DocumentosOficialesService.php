@@ -624,7 +624,8 @@ class DocumentosOficialesService
             ->with('semestre:id,numero')
             ->where('nivel_id', $this->nivel()->id)
             ->whereHas('semestre', fn (Builder $query) => $query->whereBetween('numero', [1, 6]));
-        ReglasMateriaBachillerato::aplicarCapturables($consultaPlan, '');
+        // El historial académico muestra únicamente materias oficiales.
+        ReglasMateriaBachillerato::aplicarPromediables($consultaPlan, '');
 
         $plan = $consultaPlan
             ->orderBy('semestre_id')
@@ -639,6 +640,7 @@ class DocumentosOficialesService
 
                 if ($registrado) {
                     return array_merge($registrado, [
+                        'extras' => collect(),
                         'incluido' => true,
                         'ciclo_texto' => $registrado['ciclo']?->nombre
                             ?: $this->cicloEstimado($datos['alumno'], $numero),
@@ -670,11 +672,6 @@ class DocumentosOficialesService
                     ->filter(fn (Materia $materia) => ReglasMateriaBachillerato::esPromediable($materia))
                     ->map($convertir)
                     ->values();
-                $extras = $materias
-                    ->filter(fn (Materia $materia) => ReglasMateriaBachillerato::esExtraInformativa($materia))
-                    ->map($convertir)
-                    ->values();
-
                 return [
                     'clave_contexto' => 'plan|' . $numero,
                     'semestre' => $materias->first()?->semestre,
@@ -683,7 +680,7 @@ class DocumentosOficialesService
                     'ciclo_texto' => $this->cicloEstimado($datos['alumno'], $numero),
                     'grupo' => null,
                     'oficiales' => $oficiales,
-                    'extras' => $extras,
+                    'extras' => collect(),
                     'materias_esperadas' => $oficiales->count(),
                     'materias_oficiales' => $oficiales->count(),
                     'numero_materias_configurado' => null,
