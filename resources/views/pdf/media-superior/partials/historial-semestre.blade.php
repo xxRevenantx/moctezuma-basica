@@ -29,14 +29,4 @@
             @endforelse
         </tbody>
     </table>
-    @if(($institucional['mostrar_materias_extra'] ?? true) && $semestre['extras']->isNotEmpty())
-        <div class="extra-label">MATERIAS EXTRA INFORMATIVAS · NO INTERVIENEN EN EL PROMEDIO</div>
-        <table class="subjects">
-            <tbody>
-                @foreach($semestre['extras'] as $materia)
-                    <tr><td class="key">{{ $materia['clave'] }}</td><td class="name">{{ $materia['nombre'] }}</td><td class="grade">{{ $materia['valor'] !== '' ? $materia['valor'] : '—' }}</td><td class="assist"></td><td class="regular"></td></tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
 </div>
