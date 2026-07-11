@@ -502,6 +502,30 @@ class Credenciales extends Component
     }
 
     #[Computed]
+    public function urlDescargaPng(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('generales.credenciales.imagen', array_merge($this->parametrosDescarga, ['formato' => 'png']))
+            : null;
+    }
+
+    #[Computed]
+    public function urlDescargaJpg(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('generales.credenciales.imagen', array_merge($this->parametrosDescarga, ['formato' => 'jpg']))
+            : null;
+    }
+
+    #[Computed]
+    public function urlVistaPrevia(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('generales.credenciales.preview', $this->parametrosDescarga)
+            : null;
+    }
+
+    #[Computed]
     public function generacionSeleccionada(): ?Generacion
     {
         if (!$this->generacion_id) {

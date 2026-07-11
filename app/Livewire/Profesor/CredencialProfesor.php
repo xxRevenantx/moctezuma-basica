@@ -296,7 +296,7 @@ class CredencialProfesor extends Component
         return [
             'nivel_id' => $this->nivel_id,
             'modo_descarga' => $this->modo_descarga,
-            'persona_id' => $this->persona_individual_id,
+            'persona_individual_id' => $this->persona_individual_id,
             'personas' => implode(',', $this->personas_seleccionadas),
             'buscar' => trim($this->buscar_persona),
             'vigencia' => trim($this->vigencia),
@@ -312,6 +312,30 @@ class CredencialProfesor extends Component
         }
 
         return route('credenciales.profesores.pdf', $this->parametrosDescarga);
+    }
+
+    #[Computed]
+    public function urlDescargaPng(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('credenciales.profesores.imagen', array_merge($this->parametrosDescarga, ['formato' => 'png']))
+            : null;
+    }
+
+    #[Computed]
+    public function urlDescargaJpg(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('credenciales.profesores.imagen', array_merge($this->parametrosDescarga, ['formato' => 'jpg']))
+            : null;
+    }
+
+    #[Computed]
+    public function urlVistaPrevia(): ?string
+    {
+        return $this->puedeDescargar
+            ? route('credenciales.profesores.preview', $this->parametrosDescarga)
+            : null;
     }
 
     #[Computed]

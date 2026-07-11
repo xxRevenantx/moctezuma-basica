@@ -4,6 +4,7 @@ use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
+use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
@@ -319,6 +320,13 @@ Route::get('/reconocimiento/calificaciones/pdf', [PDFController::class, 'reconoc
 Route::get('/credenciales/profesores/pdf', [PDFController::class, 'credencial_profesor_pdf'])
     ->name('credenciales.profesores.pdf');
 
+Route::get('/credenciales/profesores/imagen/{formato}', [CredencialImagenController::class, 'profesores'])
+    ->whereIn('formato', ['png', 'jpg'])
+    ->name('credenciales.profesores.imagen');
+
+Route::get('/credenciales/profesores/preview', [CredencialImagenController::class, 'previewProfesores'])
+    ->name('credenciales.profesores.preview');
+
 
 Route::get('/profesor/listas/asistencia/pdf', [ProfesorPdfController::class, 'asistencia'])
     ->name('profesor.listas.asistencia.pdf');
@@ -332,6 +340,13 @@ Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
 
 Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales_pdf'])
     ->name('generales.credenciales.pdf');
+
+Route::get('/generales/{slug_nivel}/credenciales/imagen/{formato}', [CredencialImagenController::class, 'alumnos'])
+    ->whereIn('formato', ['png', 'jpg'])
+    ->name('generales.credenciales.imagen');
+
+Route::get('/generales/{slug_nivel}/credenciales/preview', [CredencialImagenController::class, 'previewAlumnos'])
+    ->name('generales.credenciales.preview');
 
 Route::get('/constancias/abrir/pdf', [DocumentosPDFController::class, 'constanciasMasivasPdf'])
     ->middleware('admin')

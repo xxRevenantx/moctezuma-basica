@@ -485,6 +485,10 @@
                                                 Nivel seleccionado:
                                                 {{ $this->nivelSeleccionado?->nombre ?? 'No especificado' }}.
                                             </p>
+
+                                            <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                                                Si alguna persona no tiene fotografía, se generará con el espacio “FOTO + SELLO” y el ZIP incluirá una advertencia.
+                                            </p>
                                         @else
                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                                 Selecciona un nivel académico y completa la selección del personal.
@@ -494,13 +498,68 @@
                                 </div>
 
                                 @if ($this->puedeDescargar)
-                                    <a href="{{ $this->urlDescarga }}" target="_blank"
-                                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
-                                        <flux:icon.document-arrow-down class="h-5 w-5" />
-                                        Descargar credenciales
-                                    </a>
+                                    <div x-data="{ formatos: false, previa: false }" class="relative flex flex-wrap items-center justify-end gap-2">
+                                        <button type="button" x-on:click="previa = true"
+                                            class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                                            <flux:icon.eye class="h-5 w-5" />
+                                            Vista previa
+                                        </button>
+
+                                        <div class="relative">
+                                            <button type="button" x-on:click="formatos = !formatos"
+                                                x-on:click.outside="formatos = false"
+                                                class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
+                                                <flux:icon.document-arrow-down class="h-5 w-5" />
+                                                Descargar
+                                                <flux:icon.chevron-down class="h-4 w-4" />
+                                            </button>
+
+                                            <div x-cloak x-show="formatos" x-transition
+                                                class="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+                                                <a href="{{ $this->urlDescarga }}" target="_blank"
+                                                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                    <flux:icon.document-text class="h-5 w-5 text-rose-500" />
+                                                    Formato PDF
+                                                </a>
+                                                <a href="{{ $this->urlDescargaPng }}"
+                                                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                    <flux:icon.photo class="h-5 w-5 text-emerald-500" />
+                                                    Imagen PNG
+                                                </a>
+                                                <a href="{{ $this->urlDescargaJpg }}"
+                                                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                    <flux:icon.photo class="h-5 w-5 text-sky-500" />
+                                                    Imagen JPG · 100%
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        <template x-teleport="body">
+                                            <div x-cloak x-show="previa" x-transition.opacity
+                                                x-on:keydown.escape.window="previa = false"
+                                                class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
+                                                <div x-on:click.outside="previa = false"
+                                                    class="w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-neutral-900">
+                                                    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-neutral-800">
+                                                        <div>
+                                                            <p class="font-black text-slate-900 dark:text-white">Vista previa de credencial del profesor</p>
+                                                            <p class="text-xs text-slate-500">Se muestra la primera credencial del alcance seleccionado.</p>
+                                                        </div>
+                                                        <button type="button" x-on:click="previa = false"
+                                                            class="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-neutral-800">
+                                                            <flux:icon.x-mark class="h-5 w-5" />
+                                                        </button>
+                                                    </div>
+                                                    <div class="bg-slate-100 p-4 dark:bg-neutral-950">
+                                                        <img x-bind:src="previa ? @js($this->urlVistaPrevia) : ''" alt="Vista previa de la credencial"
+                                                            class="mx-auto h-auto max-h-[75vh] w-full rounded-xl object-contain shadow-lg">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
                                 @else
-                                    <button type="button" :disabled="true"
+                                    <button type="button" disabled
                                         class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-neutral-500">
                                         <flux:icon.lock-closed class="h-5 w-5" />
                                         Descargar credenciales
