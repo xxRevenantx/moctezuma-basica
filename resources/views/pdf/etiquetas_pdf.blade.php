@@ -9,65 +9,85 @@
     <style>
         @page {
             size: letter portrait;
-            margin: 0.55cm 0.65cm;
+            margin: 0;
         }
 
-        * {
-            box-sizing: border-box;
+        @font-face {
+            font-family: 'RALEWAY';
+            font-style: normal;
+            src: url('{{ storage_path('fonts/Raleway-Regular.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'RALEWAYBD';
+            font-style: normal;
+            font-weight: 700;
+            src: url('{{ storage_path('fonts/Raleway-Bold.ttf') }}') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'calibri';
+            font-style: normal;
+            font-weight: 400;
+            src: url('{{ storage_path('fonts/calibri-regular.ttf') }}') format('truetype');
         }
 
         html,
         body {
             margin: 0;
             padding: 0;
-            font-family: DejaVu Sans, Arial, sans-serif;
+            font-family: 'calibri', Arial, sans-serif;
+            font-weight: 700;
             color: #10233f;
         }
 
         .pagina-etiquetas {
-            width: 100%;
+            position: relative;
+            width: 21.59cm;
+            height: 27.94cm;
             margin: 0;
             padding: 0;
+            overflow: hidden;
         }
 
         .salto-pagina-etiquetas {
             page-break-after: always;
         }
 
-        .etiqueta {
-            position: relative;
-            width: 19.80cm;
-            height: 12.81cm;
-            margin: 0 auto 0.32cm auto;
-            overflow: hidden;
-            border: 0.25mm solid #d6dde5;
-            background: #ffffff;
-        }
-
-        .etiqueta:last-child {
-            margin-bottom: 0;
-        }
-
-        .fondo-etiqueta {
+        /* UNA SOLA IMAGEN DE FONDO POR TODA LA HOJA */
+        .fondo-hoja {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 21.59cm;
+            height: 27.94cm;
+            object-fit: cover;
+            z-index: 1;
         }
 
-        .datos-alumno {
+        .bloque-alumno {
             position: absolute;
-            top: 3.15cm;
-            right: 0.85cm;
-            width: 12.60cm;
+            /* right: 0.85cm; */
+            left: 0.85cm;
+            width: 90%;
+            margin: 0 auto;
             text-align: center;
             text-transform: uppercase;
+            z-index: 2;
+        }
+
+        /* Ajusta estas posiciones según tu plantilla */
+        .bloque-alumno.alumno-1 {
+            top: 3.15cm;
+        }
+
+        .bloque-alumno.alumno-2 {
+            top: 17.10cm;
         }
 
         .leyenda {
             margin: 0 0 0.18cm 0;
-            font-size: 8.5pt;
+            font-size: 60px;
             font-weight: 700;
             letter-spacing: 1.5px;
             color: #6b7788;
@@ -77,29 +97,28 @@
             margin: 0;
             padding: 0 0.25cm 0.18cm 0.25cm;
             border-bottom: 0.5mm solid #006492;
-            font-size: 18pt;
-            line-height: 1.16;
+            font-size: 60px;
+            line-height: 55px;
             font-weight: 700;
             color: #006492;
         }
 
         .datos-escolares {
             margin-top: 0.28cm;
-            font-size: 11pt;
+            font-size: 40px;
             line-height: 1.45;
             font-weight: 700;
             color: #26384f;
         }
 
         .dato-nivel {
+            color: #000000;
+        }
+
+        .dato-generacion {
             color: #4a9f00;
         }
 
-        .separador {
-            display: inline-block;
-            margin: 0 0.18cm;
-            color: #a4afbb;
-        }
 
         .sin-alumnos {
             margin: 2cm auto;
@@ -116,12 +135,17 @@
 <body>
     @php
         $coleccionAlumnos = collect($alumnos ?? [])->values();
-        $paginas = $coleccionAlumnos->chunk(2)->values();
+
+        $paginas = $coleccionAlumnos->chunk(2)->map(fn($pagina) => $pagina->values())->values();
 
         $nombreNivel = mb_strtoupper((string) ($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL')), 'UTF-8');
         $nombreGrado = mb_strtoupper((string) ($grado->nombre ?? ($grado->grado ?? 'SIN GRADO')), 'UTF-8');
+        $nombreGeneracion = mb_strtoupper(
+            (string) ($generacion->anio_ingreso . ' ' . $generacion->anio_egreso ??
+                ($generacion->anio_ingreso ?? 'SIN GENERACION')),
+            'UTF-8',
+        );
 
-        // El controlador la envía en base64 para que Dompdf no falle con rutas locales.
         $fondoPersonalizador =
             $imagenPersonalizador ??
             (file_exists(public_path('imagenes/personalizador.jpg'))
@@ -130,43 +154,61 @@
     @endphp
 
     @forelse ($paginas as $pagina)
+        @php
+            $alumno1 = $pagina->get(0);
+            $alumno2 = $pagina->get(1);
+
+            $nombreAlumno1 = $alumno1
+                ? trim(
+                    (string) ($alumno1->nombre ?? '') .
+                        ' ' .
+                        (string) ($alumno1->apellido_paterno ?? '') .
+                        ' ' .
+                        (string) ($alumno1->apellido_materno ?? ''),
+                )
+                : '';
+
+            $nombreAlumno2 = $alumno2
+                ? trim(
+                    (string) ($alumno2->nombre ?? '') .
+                        ' ' .
+                        (string) ($alumno2->apellido_paterno ?? '') .
+                        ' ' .
+                        (string) ($alumno2->apellido_materno ?? ''),
+                )
+                : '';
+        @endphp
+
         <div class="pagina-etiquetas {{ !$loop->last ? 'salto-pagina-etiquetas' : '' }}">
-            {{-- Siempre se preparan dos espacios por hoja. --}}
-            @for ($posicion = 0; $posicion < 2; $posicion++)
-                @php
-                    $alumno = $pagina->get($posicion);
-                    $nombreCompleto = $alumno
-                        ? trim(
-                            (string) ($alumno->apellido_paterno ?? '') .
-                                ' ' .
-                                (string) ($alumno->apellido_materno ?? '') .
-                                ' ' .
-                                (string) ($alumno->nombre ?? ''),
-                        )
-                        : '';
-                @endphp
+            @if ($fondoPersonalizador)
+                <img class="fondo-hoja" src="{{ $fondoPersonalizador }}" alt="Personalizador">
+            @endif
 
-                <div class="etiqueta">
-                    @if ($fondoPersonalizador)
-                        <img class="fondo-etiqueta" src="{{ $fondoPersonalizador }}" alt="Personalizador">
-                    @endif
+            @if ($alumno1)
+                <div class="bloque-alumno alumno-1">
+                    <p class="nombre-alumno">
+                        {{ $nombreAlumno1 !== '' ? $nombreAlumno1 : 'ALUMNO' }}
+                    </p>
 
-                    @if ($alumno)
-                        <div class="datos-alumno">
-                            <p class="leyenda">NOMBRE DEL ALUMNO</p>
-                            <p class="nombre-alumno">
-                                {{ $nombreCompleto !== '' ? $nombreCompleto : 'ALUMNO' }}
-                            </p>
-
-                            <div class="datos-escolares">
-                                <span class="dato-nivel">NIVEL: {{ $nombreNivel }}</span>
-                                <span class="separador">|</span>
-                                <span>GRADO: {{ $nombreGrado }}</span>
-                            </div>
-                        </div>
-                    @endif
+                    <div class="datos-escolares">
+                        <span class="dato-nivel">{{ $nombreNivel }}</span> |
+                        <span class="dato-generacion">GEN: {{ $nombreGeneracion }}</span>
+                    </div>
                 </div>
-            @endfor
+            @endif
+
+            @if ($alumno2)
+                <div class="bloque-alumno alumno-2">
+                    <p class="nombre-alumno">
+                        {{ $nombreAlumno2 !== '' ? $nombreAlumno2 : 'ALUMNO' }}
+                    </p>
+
+                    <div class="datos-escolares">
+                        <span class="dato-nivel">{{ $nombreNivel }}</span> |
+                        <span class="dato-generacion">GEN: {{ $nombreGeneracion }}</span>
+                    </div>
+                </div>
+            @endif
         </div>
     @empty
         <div class="sin-alumnos">

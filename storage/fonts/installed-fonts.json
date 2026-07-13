@@ -12,5 +12,12 @@
     "calibri": {
         "bold": "calibri_bold_53e40537f13cfe039246430830fe7505",
         "normal": "C:\\laragon\\www\\moctezuma-basica\\storage\\fonts\/calibri_normal_3a44805eec3bd68a7ccf41069b9678c6"
+    },
+    "raleway": {
+        "normal": "C:\\laragon\\www\\moctezuma-basica\\storage\\fonts\/raleway_normal_b9a331167982faec7de37f46f83c1204",
+        "bold": "raleway_bold_c0d34211ad819eda433f4975add61e9d"
+    },
+    "ralewaybd": {
+        "bold": "ralewaybd_bold_c0d34211ad819eda433f4975add61e9d"
     }
 }
