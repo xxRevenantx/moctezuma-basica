@@ -10,7 +10,7 @@
                     <p class="text-xs font-black uppercase tracking-[.2em] text-[#006492] dark:text-sky-300">Gestión integral</p>
                     <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Plantilla de personal por nivel</h1>
                     <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-                        Asignaciones generales, carga laboral, titulares, expediente, movimientos y reportes. Los PDF existentes no fueron modificados.
+                        Asignaciones generales, carga laboral, titulares, expedientes, liberación de sueldos, movimientos y reportes. Los PDF existentes no fueron modificados.
                     </p>
                 </div>
 
@@ -55,14 +55,20 @@
         </div>
     </section>
 
-    <nav class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        @foreach ([
+    @php
+        $tabsPersonaNivel = [
             'plantilla' => ['Plantilla actual', 'users'],
             'carga' => ['Carga laboral', 'clock'],
             'expedientes' => ['Expedientes', 'folder-open'],
             'historial' => ['Movimientos e historial', 'clock'],
-            'reportes' => ['Reportes', 'document-chart-bar'],
-        ] as $key => [$label, $icon])
+        ];
+        if (auth()->user()?->is_admin) {
+            $tabsPersonaNivel['liberacion'] = ['Liberación de sueldos', 'banknotes'];
+        }
+        $tabsPersonaNivel['reportes'] = ['Reportes', 'document-chart-bar'];
+    @endphp
+    <nav class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        @foreach ($tabsPersonaNivel as $key => [$label, $icon])
             <button type="button" @click="tab = '{{ $key }}'"
                 :class="tab === '{{ $key }}' ? 'bg-gradient-to-r from-[#006492] to-blue-700 text-white shadow' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-neutral-800'"
                 class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition">
@@ -322,6 +328,12 @@
             @endforeach
         </div>
     </section>
+
+    @if (auth()->user()?->is_admin)
+        <section x-show="tab === 'liberacion'" x-cloak>
+            <livewire:persona-nivel.liberacion-sueldos />
+        </section>
+    @endif
 
     <section x-show="tab === 'historial'" x-cloak>
         <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">

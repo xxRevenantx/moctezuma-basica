@@ -1,0 +1,411 @@
+<div id="liberacion-sueldos-formulario" class="space-y-5"
+    x-on:abrir-url-liberacion.window="window.open($event.detail.url, '_blank')"
+    x-on:desplazar-liberacion-formulario.window="document.getElementById('liberacion-sueldos-formulario')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
+
+    <section
+        class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-[#006492]"></div>
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[.2em] text-amber-700 dark:text-amber-300">Documento
+                        oficial</p>
+                    <h2 class="mt-1 text-2xl font-black text-slate-950 dark:text-white">Liberación de sueldos</h2>
+                    <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
+                        Genera constancias individuales o masivas para el personal activo. La clave presupuestal
+                        permanece en una sola línea con “S/N” y la firma de dirección queda vacía para llenarse
+                        manualmente.
+                    </p>
+                </div>
+
+                <div
+                    class="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-neutral-700 dark:bg-neutral-950">
+                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Selección actual</p>
+                    <p class="mt-1 text-2xl font-black text-[#006492] dark:text-sky-300">{{ count($seleccionados) }}</p>
+                    @if (count($seleccionados))
+                        <button type="button" wire:click="limpiarSeleccion"
+                            class="mt-1 text-xs font-bold text-slate-500 underline">Limpiar selección</button>
+                    @endif
+                </div>
+            </div>
+
+            @if ($errors->any())
+                <div
+                    class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                    <p class="font-black">Revisa la información:</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+    </section>
+
+    <div class="grid gap-5 2xl:grid-cols-[1.45fr_.9fr]">
+        <section
+            class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                <div class="md:col-span-2 xl:col-span-2">
+                    <flux:input type="search" wire:model.live.debounce.350ms="search" label="Buscar personal activo"
+                        placeholder="Nombre o función..." icon="magnifying-glass" clearable />
+                </div>
+                <div>
+                    <flux:select wire:model.live="nivelFiltro" label="Nivel">
+                        <flux:select.option value="">Todos</flux:select.option>
+                        @foreach ($niveles as $nivel)
+                            <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select wire:model.live="gradoFiltro" label="Grado" :disabled="$nivelFiltro === ''">
+                        <flux:select.option value="">Todos</flux:select.option>
+                        @foreach ($grados as $grado)
+                            <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select wire:model.live="grupoFiltro" label="Grupo" :disabled="$gradoFiltro === ''">
+                        <flux:select.option value="">Todos</flux:select.option>
+                        @foreach ($grupos as $grupo)
+                            <flux:select.option value="{{ $grupo->id }}">
+                                {{ $grupo->asignacionGrupo?->nombre ?? 'Grupo' }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select wire:model.live="rolFiltro" label="Función / rol">
+                        <flux:select.option value="">Todas</flux:select.option>
+                        @foreach ($roles as $rol)
+                            <flux:select.option value="{{ $rol->id }}">{{ $rol->nombre }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div class="flex items-end md:col-span-2 xl:col-span-6 xl:justify-end">
+                    <button type="button" wire:click="seleccionarVisibles"
+                        class="w-full rounded-2xl bg-[#006492] px-4 py-2.5 text-sm font-black text-white hover:bg-sky-800 md:w-auto">
+                        Seleccionar todo lo visible
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-4 max-h-[520px] overflow-auto rounded-2xl border border-slate-200 dark:border-neutral-800">
+                <table class="w-full min-w-[760px] text-left text-sm">
+                    <thead
+                        class="sticky top-0 z-10 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:bg-neutral-950">
+                        <tr>
+                            <th class="px-4 py-3"></th>
+                            <th class="px-4 py-3">Personal</th>
+                            <th class="px-4 py-3">Nivel</th>
+                            <th class="px-4 py-3">Funciones activas</th>
+                            <th class="px-4 py-3">C.C.T.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                        @forelse ($personal as $asignacion)
+                            @php
+                                $persona = $asignacion->persona;
+                                $funciones = $asignacion->detalles
+                                    ->where('estado', 'activo')
+                                    ->map(fn($d) => $d->personaRole?->rolePersona?->nombre)
+                                    ->filter()
+                                    ->unique()
+                                    ->implode(', ');
+                                $nombre = trim(
+                                    ($persona?->nombre ?? '') .
+                                        ' ' .
+                                        ($persona?->apellido_paterno ?? '') .
+                                        ' ' .
+                                        ($persona?->apellido_materno ?? ''),
+                                );
+                            @endphp
+                            <tr wire:key="liberacion-persona-{{ $asignacion->id }}"
+                                class="hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
+                                <td class="px-4 py-3">
+                                    <flux:checkbox wire:model.live="seleccionados" value="{{ $asignacion->id }}" />
+                                </td>
+                                <td class="px-4 py-3">
+                                    <p class="font-black text-slate-900 dark:text-white">{{ $nombre ?: 'Sin nombre' }}
+                                    </p>
+                                    <p class="text-xs text-slate-500">{{ $persona?->titulo ?: 'Sin título' }}</p>
+                                </td>
+                                <td class="px-4 py-3 font-bold">{{ $asignacion->nivel?->nombre ?? '—' }}</td>
+                                <td class="max-w-sm px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                                    {{ $funciones ?: 'Sin función' }}</td>
+                                <td class="px-4 py-3 font-mono text-xs">{{ $asignacion->nivel?->cct ?: '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="px-5 py-14 text-center text-slate-500">No se encontró personal
+                                    activo con esos filtros.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="space-y-5">
+            <div
+                class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="font-black text-slate-950 dark:text-white">Datos del documento</h3>
+                        <p class="text-xs text-slate-500">La fecha es automática, pero puede modificarse.</p>
+                    </div>
+                    @if ($editandoId)
+                        <span
+                            class="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase text-amber-700">Editando
+                            #{{ $editandoId }}</span>
+                    @endif
+                </div>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <flux:input type="date" wire:model="fechaDocumento" label="Fecha del documento" />
+                    <flux:input type="number" min="2000" max="2100" wire:model="anio" label="Año de pago" />
+
+                    <div class="sm:col-span-2">
+                        <flux:input type="text" wire:model="cicloEscolar" label="Ciclo escolar"
+                            placeholder="2025-2026" />
+                    </div>
+
+                    <flux:input type="number" min="1" max="24" wire:model="quincenaInicio"
+                        label="Quincena inicial" />
+                    <flux:input type="number" min="1" max="24" wire:model="quincenaFin"
+                        label="Quincena final" />
+
+                    <div class="sm:col-span-2">
+                        <flux:input type="date" wire:model="fechaReanudacion" label="Reanudación de labores" />
+                    </div>
+                </div>
+
+                <div
+                    class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                    <b>Campos manuales en el documento:</b> lugar de expedición, firma de dirección y una sola línea de
+                    clave presupuestal con “S/N”.
+                </div>
+            </div>
+
+            <div
+                class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <h3 class="font-black text-slate-950 dark:text-white">Logotipo del formato</h3>
+                <p class="mt-1 text-xs text-slate-500">Solo este elemento puede configurarse. El resto conserva la
+                    estructura oficial.</p>
+                <div class="mt-4 rounded-2xl bg-slate-50 p-3 dark:bg-neutral-950">
+                    @if ($config?->logo_encabezado_path)
+                        <img src="{{ Storage::disk('public')->url($config->logo_encabezado_path) }}"
+                            class="max-h-20 max-w-full object-contain" alt="Logo configurado">
+                    @else
+                        <img src="{{ asset('imagenes/liberacion-sueldos/logo-encabezado.png') }}"
+                            class="max-h-20 max-w-full object-contain" alt="Logo oficial">
+                    @endif
+                </div>
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div class="min-w-0 flex-1">
+                        <flux:input type="file" wire:model="logoNuevo" label="Seleccionar logotipo"
+                            accept="image/png,image/jpeg,image/webp" />
+                    </div>
+                    <button type="button" wire:click="guardarLogo" wire:loading.attr="disabled"
+                        class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white dark:bg-white dark:text-slate-900">Guardar
+                        logo</button>
+                    @if ($config?->logo_encabezado_path)
+                        <button type="button" wire:click="restaurarLogo"
+                            class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black">Restaurar</button>
+                    @endif
+                </div>
+            </div>
+        </section>
+    </div>
+
+    @if ($nivelesSeleccionados->isNotEmpty())
+        <section
+            class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div>
+                <h3 class="text-lg font-black text-slate-950 dark:text-white">Firmantes por nivel</h3>
+                <p class="text-sm text-slate-500">Cuando haya más de una dirección registrada en la plantilla,
+                    selecciona la que firmará. Todos los datos pueden corregirse manualmente.</p>
+            </div>
+
+            <div class="mt-4 grid gap-4 xl:grid-cols-2">
+                @foreach ($nivelesSeleccionados as $nivel)
+                    @php
+                        $key = (string) $nivel->id;
+                        $candidatos = $directoresPorNivel->get($nivel->id, collect());
+                    @endphp
+                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-neutral-700"
+                        wire:key="firmante-nivel-{{ $nivel->id }}">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="font-black text-[#006492] dark:text-sky-300">{{ $nivel->nombre }}</p>
+                                <p class="text-xs text-slate-500">C.C.T. {{ $nivel->cct ?: 'sin registrar' }}</p>
+                            </div>
+                            @if ($candidatos->count() > 1)
+                                <span
+                                    class="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">{{ $candidatos->count() }}
+                                    directivos</span>
+                            @endif
+                        </div>
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <flux:select wire:model.live="firmantes.{{ $key }}.director_persona_id"
+                                    label="Dirección desde la plantilla">
+                                    <flux:select.option value="">Captura manual / autoridad del nivel
+                                    </flux:select.option>
+                                    @foreach ($candidatos as $candidato)
+                                        <flux:select.option value="{{ $candidato->id }}">
+                                            {{ trim(($candidato->titulo ? $candidato->titulo . ' ' : '') . $candidato->nombre . ' ' . $candidato->apellido_paterno . ' ' . $candidato->apellido_materno) }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                            </div>
+
+                            <flux:input type="text" wire:model="firmantes.{{ $key }}.director_nombre"
+                                label="Nombre del director(a)" />
+
+                            <flux:input type="text" wire:model="firmantes.{{ $key }}.director_cargo"
+                                label="Cargo" class="uppercase" />
+
+                            <flux:input type="text" wire:model="firmantes.{{ $key }}.supervisor_nombre"
+                                label="Supervisor(a)" />
+
+                            <flux:input type="text" wire:model="firmantes.{{ $key }}.supervisor_cargo"
+                                label="Cargo de supervisión" class="uppercase" />
+                        </div>
+                    </article>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+    <section
+        class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+                <h3 class="text-lg font-black text-slate-950 dark:text-white">Vista previa y exportación</h3>
+                <p class="text-sm text-slate-500">Cada persona ocupa una sola página. En selección múltiple, “PDF
+                    individual” descarga un ZIP con un PDF por trabajador.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" wire:click="previsualizar"
+                    class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-700 hover:bg-violet-100">Vista
+                    previa</button>
+                <button type="button" wire:click="generar('pdf','individual')"
+                    class="rounded-xl bg-[#006492] px-4 py-2.5 text-sm font-black text-white hover:bg-sky-800">PDF
+                    individual</button>
+                <button type="button" wire:click="generar('pdf','masivo')"
+                    class="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white hover:bg-blue-800">PDF
+                    masivo</button>
+                <button type="button" wire:click="generar('zip','individual')"
+                    class="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white hover:bg-amber-700">ZIP de
+                    PDF</button>
+                <button type="button" wire:click="generar('word','masivo')"
+                    class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white dark:bg-white dark:text-slate-900">Word</button>
+                @if ($editandoId)
+                    <button type="button" wire:click="guardarEdicion"
+                        class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700">Guardar
+                        cambios</button>
+                @endif
+            </div>
+        </div>
+    </section>
+
+    <section
+        class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="border-b border-slate-200 p-5 dark:border-neutral-800">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <h3 class="text-lg font-black text-slate-950 dark:text-white">Historial de liberaciones</h3>
+                    <p class="text-sm text-slate-500">Revisa, descarga, edita, duplica o elimina documentos generados.
+                    </p>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <flux:input type="search" wire:model.live.debounce.350ms="historialSearch"
+                        placeholder="Buscar en historial..." icon="magnifying-glass" aria-label="Buscar en historial"
+                        clearable />
+                    <flux:select wire:model.live="historialNivel" aria-label="Filtrar historial por nivel">
+                        <flux:select.option value="">Todos los niveles</flux:select.option>
+                        @foreach ($niveles as $nivel)
+                            <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:select wire:model.live="historialCiclo" aria-label="Filtrar historial por ciclo escolar">
+                        <flux:select.option value="">Todos los ciclos</flux:select.option>
+                        @foreach ($ciclosHistorial as $ciclo)
+                            <flux:select.option value="{{ $ciclo }}">{{ $ciclo }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1180px] text-left text-sm">
+                <thead
+                    class="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:bg-neutral-950">
+                    <tr>
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Personal</th>
+                        <th class="px-4 py-3">Nivel</th>
+                        <th class="px-4 py-3">Quincenas</th>
+                        <th class="px-4 py-3">Dirección</th>
+                        <th class="px-4 py-3">Generó</th>
+                        <th class="px-4 py-3">Archivos</th>
+                        <th class="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                    @forelse ($historial as $item)
+                        <tr wire:key="historial-liberacion-{{ $item->id }}"
+                            class="hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <b>{{ $item->fecha_documento->format('d/m/Y') }}</b><br><span
+                                    class="text-xs text-slate-500">{{ $item->created_at?->format('d/m/Y H:i') }}</span>
+                            </td>
+                            <td class="px-4 py-3 font-black">{{ $item->trabajador_nombre }}</td>
+                            <td class="px-4 py-3">{{ $item->nivel_nombre }}<br><span
+                                    class="font-mono text-xs text-slate-500">{{ $item->cct }}</span></td>
+                            <td class="px-4 py-3">{{ $item->quincena_inicio }} y {{ $item->quincena_fin }} /
+                                {{ $item->anio }}<br><span class="text-xs text-slate-500">Ciclo
+                                    {{ $item->ciclo_escolar ?: '—' }}</span></td>
+                            <td class="px-4 py-3 text-xs">
+                                {{ $item->director_nombre ?: 'Sin nombre' }}<br><b>{{ $item->director_cargo }}</b>
+                            </td>
+                            <td class="px-4 py-3 text-xs">{{ $item->creador?->name ?? 'Sistema' }}</td>
+                            <td class="px-4 py-3 text-xs"><span
+                                    class="rounded bg-blue-50 px-2 py-1 font-black text-blue-700">{{ $item->archivo_pdf_path ? 'PDF' : 'PDF al descargar' }}</span>
+                                <span
+                                    class="rounded bg-slate-100 px-2 py-1 font-black text-slate-700">{{ $item->archivo_word_path ? 'WORD' : 'WORD al descargar' }}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex justify-end gap-1">
+                                    <a target="_blank"
+                                        href="{{ route('misrutas.liberacion-sueldos.descargar', ['formato' => 'pdf', 'ids' => $item->id]) }}"
+                                        class="rounded-lg bg-blue-50 px-2.5 py-2 text-[10px] font-black text-blue-700">PDF</a>
+                                    <a target="_blank"
+                                        href="{{ route('misrutas.liberacion-sueldos.descargar', ['formato' => 'word', 'ids' => $item->id]) }}"
+                                        class="rounded-lg bg-slate-100 px-2.5 py-2 text-[10px] font-black text-slate-700">Word</a>
+                                    <button type="button" wire:click="editarHistorial({{ $item->id }})"
+                                        class="rounded-lg bg-amber-50 px-2.5 py-2 text-[10px] font-black text-amber-700">Editar</button>
+                                    <button type="button" wire:click="duplicarHistorial({{ $item->id }})"
+                                        class="rounded-lg bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-700">Duplicar</button>
+                                    <button type="button" wire:click="eliminarHistorial({{ $item->id }})"
+                                        wire:confirm="¿Eliminar esta liberación del historial?"
+                                        class="rounded-lg bg-rose-50 px-2.5 py-2 text-[10px] font-black text-rose-700">Eliminar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="px-5 py-14 text-center text-slate-500">Todavía no hay
+                                liberaciones registradas.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

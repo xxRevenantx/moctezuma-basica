@@ -33,6 +33,7 @@ use App\Http\Controllers\HorariosGeneralesPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\ListaGeneracionesHistoricasController;
 use App\Http\Controllers\ListaAlumnosSeleccionadosController;
+use App\Http\Controllers\LiberacionSueldosController;
 use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
 use App\Http\Controllers\PeriodosBasicoController;
@@ -97,6 +98,14 @@ Route::get('/plantilla/reportes/{tipo}/{formato}', PersonaNivelReporteController
     ->whereIn('formato', ['pdf', 'excel'])
     ->middleware('admin')
     ->name('misrutas.plantilla-personal.reporte');
+
+Route::middleware('admin')->group(function () {
+    Route::get('/plantilla/liberacion-sueldos/vista-previa/{token}', [LiberacionSueldosController::class, 'preview'])
+        ->name('misrutas.liberacion-sueldos.preview');
+    Route::get('/plantilla/liberacion-sueldos/descargar/{formato}', [LiberacionSueldosController::class, 'descargar'])
+        ->whereIn('formato', ['pdf', 'word', 'zip'])
+        ->name('misrutas.liberacion-sueldos.descargar');
+});
 
 // Ruta profesores
 Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');
