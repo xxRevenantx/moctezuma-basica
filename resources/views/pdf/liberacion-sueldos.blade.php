@@ -240,7 +240,7 @@
             <div class="presente">P R E S E N T E.</div>
             <div class="cuerpo">
                 <p>
-                    El que suscribe C.
+                    La que suscribe C.
                     <span class="campo-subrayado">
                         {{ mb_strtoupper($d['director_nombre'] ?: '____________________________') }}
                     </span>
