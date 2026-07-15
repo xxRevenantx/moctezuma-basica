@@ -2,10 +2,10 @@
 
 namespace App\Livewire\PersonaNivel;
 
-use App\Models\LiberacionSueldo;
 use App\Models\cicloEscolar;
 use App\Models\Grado;
 use App\Models\Grupo;
+use App\Models\LiberacionSueldo;
 use App\Models\LiberacionSueldoConfiguracion;
 use App\Models\Nivel;
 use App\Models\Persona;
@@ -15,10 +15,12 @@ use App\Services\LiberacionSueldosArchivoService;
 use App\Services\LiberacionSueldosService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Throwable;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Throwable;
 
 class LiberacionSueldos extends Component
 {
@@ -46,7 +48,12 @@ class LiberacionSueldos extends Component
     public string $cicloEscolar = '';
     public string $fechaReanudacion = '';
     public ?int $editandoId = null;
+
     public $logoNuevo = null;
+    public $franjaNueva = null;
+    public float $franjaAnchoMm = 200;
+    public float $franjaAltoMm = 5.5;
+    public float $franjaInferiorMm = 4;
 
     public function mount(): void
     {
@@ -54,15 +61,21 @@ class LiberacionSueldos extends Component
 
         $this->fechaDocumento = now()->format('Y-m-d');
         $this->anio = (int) now()->year;
-        $ciclo = cicloEscolar::query()->where('es_actual', true)->first() ?: cicloEscolar::query()->latest('id')->first();
+        $ciclo = cicloEscolar::query()->where('es_actual', true)->first()
+            ?: cicloEscolar::query()->latest('id')->first();
         $this->cicloEscolar = (string) ($ciclo?->nombre ?: (now()->year - 1) . '-' . now()->year);
+
         $reanudacion = now()->copy()->month(8)->day(24);
         if ($reanudacion->isPast()) {
             $reanudacion->addYear();
         }
         $this->fechaReanudacion = $reanudacion->format('Y-m-d');
-    }
 
+        $config = app(LiberacionSueldosService::class)->configuracion();
+        $this->franjaAnchoMm = (float) ($config->franja_ancho_mm ?: 200);
+        $this->franjaAltoMm = (float) ($config->franja_alto_mm ?: 5.5);
+        $this->franjaInferiorMm = (float) ($config->franja_inferior_mm ?? 4);
+    }
 
     public function updatedNivelFiltro(): void
     {
@@ -89,24 +102,55 @@ class LiberacionSueldos extends Component
 
     public function updatedFirmantes($value, string $key): void
     {
-        if (! str_ends_with($key, '.director_persona_id') || ! $value) {
+        $partes = explode('.', $key);
+        if (count($partes) < 2 || ! $value) {
             return;
         }
 
-        [$nivelId] = explode('.', $key);
-        $persona = Persona::query()->find((int) $value);
-        if (! $persona) {
-            return;
-        }
-
+        $nivelId = (string) $partes[0];
+        $campo = (string) end($partes);
         $service = app(LiberacionSueldosService::class);
-        $this->firmantes[$nivelId]['director_nombre'] = $service->nombrePersona($persona);
-        $this->firmantes[$nivelId]['director_cargo'] = $service->cargoDireccion($persona, '');
+
+        if ($campo === 'director_persona_id') {
+            $persona = Persona::query()->find((int) $value);
+            if ($persona) {
+                $this->firmantes[$nivelId]['director_nombre'] = $service->nombrePersona($persona);
+                $this->firmantes[$nivelId]['director_cargo'] = $service->cargoDireccion($persona);
+            }
+
+            return;
+        }
+
+        $nivel = Nivel::query()->with('supervisor')->find((int) $nivelId);
+        if (! $nivel) {
+            return;
+        }
+
+        if ($campo === 'supervisor_director_id') {
+            $director = $service->supervisoresNivel($nivel)->firstWhere('id', (int) $value);
+            if ($director) {
+                $this->firmantes[$nivelId]['supervisor_nombre'] = $service->nombreDirector($director);
+                $this->firmantes[$nivelId]['supervisor_cargo'] = Str::upper((string) ($director->cargo ?: 'SUPERVISOR ESCOLAR'));
+            }
+
+            return;
+        }
+
+        if ($campo === 'jefe_sector_director_id') {
+            $director = $service->jefesSector($nivel)->firstWhere('id', (int) $value);
+            if ($director) {
+                $this->firmantes[$nivelId]['jefe_sector_nombre'] = $service->nombreDirector($director);
+                $this->firmantes[$nivelId]['jefe_sector_cargo'] = Str::upper((string) ($director->cargo ?: 'JEFE DE SECTOR'));
+            }
+        }
     }
 
     public function seleccionarVisibles(): void
     {
-        $this->seleccionados = $this->queryPersonal()->pluck('persona_nivel.id')->map(fn ($id) => (int) $id)->all();
+        $this->seleccionados = $this->queryPersonal()
+            ->pluck('persona_nivel.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
         $this->sincronizarFirmantes();
     }
 
@@ -146,7 +190,10 @@ class LiberacionSueldos extends Component
 
         try {
             $archivos = app(LiberacionSueldosArchivoService::class);
-            LiberacionSueldo::query()->whereIn('id', $ids)->get()->each(fn (LiberacionSueldo $item) => $archivos->guardar($item));
+            LiberacionSueldo::query()
+                ->whereIn('id', $ids)
+                ->get()
+                ->each(fn (LiberacionSueldo $item) => $archivos->guardar($item));
         } catch (Throwable $e) {
             report($e);
             $this->dispatch('notificar', tipo: 'warning', mensaje: 'El historial fue guardado, pero uno de los archivos se regenerará al descargarlo.');
@@ -180,11 +227,15 @@ class LiberacionSueldos extends Component
         $this->fechaReanudacion = $liberacion->fecha_reanudacion?->format('Y-m-d') ?? '';
         $this->firmantes = [
             (string) $liberacion->nivel_id => [
-                'director_persona_id' => '',
+                'director_persona_id' => $liberacion->director_persona_id ?: '',
                 'director_nombre' => $liberacion->director_nombre,
                 'director_cargo' => $liberacion->director_cargo,
+                'supervisor_director_id' => $liberacion->supervisor_director_id ?: '',
                 'supervisor_nombre' => $liberacion->supervisor_nombre,
                 'supervisor_cargo' => $liberacion->supervisor_cargo,
+                'jefe_sector_director_id' => $liberacion->jefe_sector_director_id ?: '',
+                'jefe_sector_nombre' => $liberacion->jefe_sector_nombre,
+                'jefe_sector_cargo' => $liberacion->jefe_sector_cargo ?: 'JEFE DE SECTOR',
             ],
         ];
         $this->resetValidation();
@@ -233,26 +284,83 @@ class LiberacionSueldos extends Component
     public function guardarLogo(): void
     {
         $this->validate([
-            'logoNuevo' => ['required', 'image', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+            'logoNuevo' => ['required', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
         ], [
             'logoNuevo.required' => 'Selecciona un logotipo.',
             'logoNuevo.image' => 'El archivo debe ser una imagen válida.',
+            'logoNuevo.max' => 'El logotipo no debe superar los 5 MB.',
         ]);
 
         $config = LiberacionSueldoConfiguracion::query()->firstOrNew();
-        $config->logo_encabezado_path = $this->logoNuevo->store('liberacion-sueldos', 'public');
+        $anterior = $config->logo_encabezado_path;
+        $config->logo_encabezado_path = $this->logoNuevo->store('liberacion-sueldos/logos', 'public');
         $config->actualizado_por = auth()->id();
         $config->save();
-        $this->logoNuevo = null;
 
+        if ($anterior && $anterior !== $config->logo_encabezado_path) {
+            Storage::disk('public')->delete($anterior);
+        }
+
+        $this->logoNuevo = null;
         $this->dispatch('notificar', tipo: 'success', mensaje: 'El logotipo del formato fue actualizado.');
     }
 
     public function restaurarLogo(): void
     {
         $config = LiberacionSueldoConfiguracion::query()->first();
-        $config?->delete();
+        if ($config?->logo_encabezado_path) {
+            Storage::disk('public')->delete($config->logo_encabezado_path);
+            $config->logo_encabezado_path = null;
+            $config->actualizado_por = auth()->id();
+            $config->save();
+        }
+
         $this->dispatch('notificar', tipo: 'success', mensaje: 'Se restauró el logotipo oficial predeterminado.');
+    }
+
+    public function guardarFranja(): void
+    {
+        $this->validate([
+            'franjaNueva' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+            'franjaAnchoMm' => ['required', 'numeric', 'between:50,210'],
+            'franjaAltoMm' => ['required', 'numeric', 'between:2,30'],
+            'franjaInferiorMm' => ['required', 'numeric', 'between:0,30'],
+        ], [
+            'franjaNueva.image' => 'La franja debe ser una imagen válida.',
+            'franjaNueva.max' => 'La franja no debe superar los 5 MB.',
+            'franjaAnchoMm.between' => 'El ancho debe estar entre 50 y 210 mm.',
+            'franjaAltoMm.between' => 'El alto debe estar entre 2 y 30 mm.',
+            'franjaInferiorMm.between' => 'La distancia inferior debe estar entre 0 y 30 mm.',
+        ]);
+
+        if ($this->franjaNueva) {
+            $dimensiones = @getimagesize($this->franjaNueva->getRealPath());
+            if (! $dimensiones || $dimensiones[0] <= $dimensiones[1]) {
+                throw ValidationException::withMessages([
+                    'franjaNueva' => 'La franja debe ser una imagen horizontal: el ancho debe ser mayor que el alto.',
+                ]);
+            }
+        }
+
+        $config = LiberacionSueldoConfiguracion::query()->firstOrNew();
+        $anterior = $config->franja_inferior_path;
+
+        if ($this->franjaNueva) {
+            $config->franja_inferior_path = $this->franjaNueva->store('liberacion-sueldos/franjas', 'public');
+        }
+
+        $config->franja_ancho_mm = $this->franjaAnchoMm;
+        $config->franja_alto_mm = $this->franjaAltoMm;
+        $config->franja_inferior_mm = $this->franjaInferiorMm;
+        $config->actualizado_por = auth()->id();
+        $config->save();
+
+        if ($this->franjaNueva && $anterior && $anterior !== $config->franja_inferior_path) {
+            Storage::disk('public')->delete($anterior);
+        }
+
+        $this->franjaNueva = null;
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'La franja inferior y sus medidas fueron actualizadas.');
     }
 
     private function sincronizarFirmantes(): void
@@ -274,18 +382,30 @@ class LiberacionSueldos extends Component
                 continue;
             }
 
-            $candidatos = $service->directoresPlantilla((int) $nivel->id);
-            $seleccionado = $candidatos->count() === 1 ? $candidatos->first() : null;
+            $directores = $service->directoresPlantilla((int) $nivel->id);
+            $directorSeleccionado = $directores->count() === 1 ? $directores->first() : null;
+
+            $supervisores = $service->supervisoresNivel($nivel);
+            $supervisorSeleccionado = $nivel->supervisor
+                ?: ($supervisores->count() === 1 ? $supervisores->first() : null);
+
+            $jefes = $service->jefesSector($nivel);
+            $jefeSeleccionado = $jefes->count() === 1 ? $jefes->first() : null;
+
             $nuevos[$key] = [
-                'director_persona_id' => $seleccionado?->id ?: '',
-                'director_nombre' => $seleccionado
-                    ? $service->nombrePersona($seleccionado)
-                    : ($candidatos->count() > 1 ? '' : $service->nombreDirector($nivel->director)),
-                'director_cargo' => $seleccionado
-                    ? $service->cargoDireccion($seleccionado, (string) $nivel->nombre)
+                'director_persona_id' => $directorSeleccionado?->id ?: '',
+                'director_nombre' => $directorSeleccionado
+                    ? $service->nombrePersona($directorSeleccionado)
+                    : ($directores->count() > 1 ? '' : $service->nombreDirector($nivel->director)),
+                'director_cargo' => $directorSeleccionado
+                    ? $service->cargoDireccion($directorSeleccionado, (string) $nivel->nombre)
                     : Str::upper((string) ($nivel->director?->cargo ?: 'DIRECTOR')),
-                'supervisor_nombre' => $service->nombreDirector($nivel->supervisor),
-                'supervisor_cargo' => Str::upper((string) ($nivel->supervisor?->cargo ?: 'SUPERVISOR ESCOLAR')),
+                'supervisor_director_id' => $supervisorSeleccionado?->id ?: '',
+                'supervisor_nombre' => $service->nombreDirector($supervisorSeleccionado),
+                'supervisor_cargo' => Str::upper((string) ($supervisorSeleccionado?->cargo ?: 'SUPERVISOR ESCOLAR')),
+                'jefe_sector_director_id' => $jefeSeleccionado?->id ?: '',
+                'jefe_sector_nombre' => $service->nombreDirector($jefeSeleccionado),
+                'jefe_sector_cargo' => Str::upper((string) ($jefeSeleccionado?->cargo ?: 'JEFE DE SECTOR')),
             ];
         }
 
@@ -308,13 +428,22 @@ class LiberacionSueldos extends Component
             'firmantes.*.director_cargo' => ['required', 'string', 'max:120'],
             'firmantes.*.supervisor_nombre' => ['required', 'string', 'max:255'],
             'firmantes.*.supervisor_cargo' => ['required', 'string', 'max:120'],
+            'firmantes.*.jefe_sector_nombre' => ['nullable', 'string', 'max:255'],
+            'firmantes.*.jefe_sector_cargo' => ['nullable', 'string', 'max:120'],
         ], [
             'seleccionados.required' => 'Selecciona al menos una persona.',
             'quincenaFin.gte' => 'La quincena final debe ser igual o mayor que la inicial.',
+            'firmantes.*.director_nombre.required' => 'Captura o selecciona el nombre de dirección.',
+            'firmantes.*.supervisor_nombre.required' => 'Captura o selecciona el nombre de supervisión.',
         ]);
 
         $personasNivelQuery = PersonaNivel::query()
-            ->with(['persona', 'nivel.director', 'nivel.supervisor'])
+            ->with([
+                'persona',
+                'nivel.director',
+                'nivel.supervisor',
+                'detalles.personaRole.rolePersona',
+            ])
             ->whereIn('id', $this->seleccionados);
 
         if (! $permitirInactivo) {
@@ -326,6 +455,32 @@ class LiberacionSueldos extends Component
 
         abort_if($personasNivel->count() !== count($this->seleccionados), 422, 'Una de las personas seleccionadas ya no está activa.');
 
+        $service = app(LiberacionSueldosService::class);
+        $errores = [];
+        foreach ($personasNivel->groupBy('nivel_id') as $nivelId => $personasDelNivel) {
+            $nivel = $personasDelNivel->first()?->nivel;
+            $datosFirmante = $this->firmantes[(string) $nivelId] ?? [];
+            $supervisores = $nivel ? $service->supervisoresNivel($nivel) : collect();
+
+            if ($supervisores->count() > 1 && empty($datosFirmante['supervisor_director_id'])) {
+                $errores["firmantes.{$nivelId}.supervisor_director_id"] = 'Hay varios supervisores disponibles. Selecciona el que firmará.';
+            }
+
+            $requiereJefeSector = $personasDelNivel->contains(fn (PersonaNivel $item) => $service->esDestinatarioDirectivo($item));
+            if ($requiereJefeSector) {
+                if (trim((string) ($datosFirmante['jefe_sector_nombre'] ?? '')) === '') {
+                    $errores["firmantes.{$nivelId}.jefe_sector_nombre"] = 'Para un destinatario directivo debes seleccionar o capturar al jefe de sector.';
+                }
+                if (trim((string) ($datosFirmante['jefe_sector_cargo'] ?? '')) === '') {
+                    $errores["firmantes.{$nivelId}.jefe_sector_cargo"] = 'Captura el cargo del jefe o jefa de sector.';
+                }
+            }
+        }
+
+        if ($errores) {
+            throw ValidationException::withMessages($errores);
+        }
+
         $formulario = [
             'fecha_documento' => $this->fechaDocumento,
             'quincena_inicio' => $this->quincenaInicio,
@@ -334,7 +489,6 @@ class LiberacionSueldos extends Component
             'ciclo_escolar' => $this->cicloEscolar,
             'fecha_reanudacion' => $this->fechaReanudacion ?: null,
         ];
-        $service = app(LiberacionSueldosService::class);
 
         return $personasNivel
             ->map(fn (PersonaNivel $item) => $service->construirDatos(
@@ -375,6 +529,7 @@ class LiberacionSueldos extends Component
 
     public function render()
     {
+        $service = app(LiberacionSueldosService::class);
         $personal = $this->queryPersonal()->get();
         $niveles = Nivel::query()->orderBy('id')->get();
         $roles = RolePersona::query()->where('status', true)->orderBy('nombre')->get();
@@ -384,17 +539,29 @@ class LiberacionSueldos extends Component
         $grupos = $this->gradoFiltro !== ''
             ? Grupo::query()->with('asignacionGrupo')->where('grado_id', $this->gradoFiltro)->get()
             : collect();
-        $nivelesSeleccionados = PersonaNivel::query()
-            ->with('nivel')
+
+        $seleccionadas = PersonaNivel::query()
+            ->with(['nivel.supervisor', 'detalles.personaRole.rolePersona'])
             ->whereIn('id', $this->seleccionados)
-            ->get()
+            ->get();
+
+        $nivelesSeleccionados = $seleccionadas
             ->pluck('nivel')
             ->filter()
             ->unique('id');
 
         $directoresPorNivel = $nivelesSeleccionados->mapWithKeys(fn (Nivel $nivel) => [
-            $nivel->id => app(LiberacionSueldosService::class)->directoresPlantilla($nivel->id),
+            $nivel->id => $service->directoresPlantilla($nivel->id),
         ]);
+        $supervisoresPorNivel = $nivelesSeleccionados->mapWithKeys(fn (Nivel $nivel) => [
+            $nivel->id => $service->supervisoresNivel($nivel),
+        ]);
+        $jefesSectorPorNivel = $nivelesSeleccionados->mapWithKeys(fn (Nivel $nivel) => [
+            $nivel->id => $service->jefesSector($nivel),
+        ]);
+        $directivosSeleccionadosPorNivel = $seleccionadas
+            ->groupBy('nivel_id')
+            ->map(fn ($items) => $items->filter(fn (PersonaNivel $item) => $service->esDestinatarioDirectivo($item))->count());
 
         $historial = LiberacionSueldo::query()
             ->with(['creador:id,name', 'nivel:id,nombre'])
@@ -406,6 +573,7 @@ class LiberacionSueldos extends Component
                     $sub->where('trabajador_nombre', 'like', "%{$buscar}%")
                         ->orWhere('director_nombre', 'like', "%{$buscar}%")
                         ->orWhere('supervisor_nombre', 'like', "%{$buscar}%")
+                        ->orWhere('jefe_sector_nombre', 'like', "%{$buscar}%")
                         ->orWhere('cct', 'like', "%{$buscar}%");
                 });
             })
@@ -413,11 +581,27 @@ class LiberacionSueldos extends Component
             ->limit(150)
             ->get();
 
-        $ciclosHistorial = LiberacionSueldo::query()->whereNotNull('ciclo_escolar')->distinct()->orderByDesc('ciclo_escolar')->pluck('ciclo_escolar');
+        $ciclosHistorial = LiberacionSueldo::query()
+            ->whereNotNull('ciclo_escolar')
+            ->distinct()
+            ->orderByDesc('ciclo_escolar')
+            ->pluck('ciclo_escolar');
         $config = LiberacionSueldoConfiguracion::query()->first();
 
         return view('livewire.persona-nivel.liberacion-sueldos', compact(
-            'personal', 'niveles', 'grados', 'grupos', 'roles', 'nivelesSeleccionados', 'directoresPorNivel', 'historial', 'ciclosHistorial', 'config'
+            'personal',
+            'niveles',
+            'grados',
+            'grupos',
+            'roles',
+            'nivelesSeleccionados',
+            'directoresPorNivel',
+            'supervisoresPorNivel',
+            'jefesSectorPorNivel',
+            'directivosSeleccionadosPorNivel',
+            'historial',
+            'ciclosHistorial',
+            'config'
         ));
     }
 }

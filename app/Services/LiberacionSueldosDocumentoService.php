@@ -42,30 +42,60 @@ class LiberacionSueldosDocumentoService
         $datos['fecha_reanudacion_texto'] = $this->fechaLarga($datos['fecha_reanudacion'] ?? null);
         $datos['director_articulo'] = $this->articuloCargo((string) ($datos['director_cargo'] ?? ''));
         $datos['supervisor_articulo'] = $this->articuloCargo((string) ($datos['supervisor_cargo'] ?? ''));
-        $datos['logo_data_uri'] = $this->imagenDataUri($datos['logo_encabezado_path'] ?? null, 'imagenes/liberacion-sueldos/logo-encabezado.png');
-        $datos['franja_data_uri'] = $this->imagenDataUri(null, 'imagenes/liberacion-sueldos/franja-inferior.png');
+        $datos['jefe_sector_articulo'] = $this->articuloCargo((string) ($datos['jefe_sector_cargo'] ?? ''));
+        $datos['logo_data_uri'] = $this->imagenDataUri(
+            $datos['logo_encabezado_path'] ?? null,
+            'imagenes/liberacion-sueldos/logo-encabezado.png'
+        );
+        $datos['franja_data_uri'] = $this->imagenDataUri(
+            $datos['franja_inferior_path'] ?? null,
+            'images/franja-inferior.png'
+        );
+        $datos['franja_ancho_mm'] = (float) ($datos['franja_ancho_mm'] ?? 200);
+        $datos['franja_alto_mm'] = (float) ($datos['franja_alto_mm'] ?? 5.5);
+        $datos['franja_inferior_mm'] = (float) ($datos['franja_inferior_mm'] ?? 4);
+
+        $esDirectivo = (bool) ($datos['destinatario_es_directivo'] ?? false)
+            || ($datos['tipo_firmantes'] ?? '') === 'supervision_sector';
+
+        if ($esDirectivo) {
+            $datos['firma_izquierda_nombre'] = (string) ($datos['supervisor_nombre'] ?? '');
+            $datos['firma_izquierda_cargo'] = (string) ($datos['supervisor_cargo'] ?? 'SUPERVISOR ESCOLAR');
+            $datos['firma_izquierda_articulo'] = $datos['supervisor_articulo'];
+            $datos['firma_izquierda_es_direccion'] = false;
+            $datos['firma_derecha_nombre'] = (string) ($datos['jefe_sector_nombre'] ?? '');
+            $datos['firma_derecha_cargo'] = (string) ($datos['jefe_sector_cargo'] ?? 'JEFE DE SECTOR');
+            $datos['firma_derecha_articulo'] = $datos['jefe_sector_articulo'];
+        } else {
+            $datos['firma_izquierda_nombre'] = (string) ($datos['director_nombre'] ?? '');
+            $datos['firma_izquierda_cargo'] = (string) ($datos['director_cargo'] ?? 'DIRECTOR');
+            $datos['firma_izquierda_articulo'] = $datos['director_articulo'];
+            $datos['firma_izquierda_es_direccion'] = true;
+            $datos['firma_derecha_nombre'] = (string) ($datos['supervisor_nombre'] ?? '');
+            $datos['firma_derecha_cargo'] = (string) ($datos['supervisor_cargo'] ?? 'SUPERVISOR ESCOLAR');
+            $datos['firma_derecha_articulo'] = $datos['supervisor_articulo'];
+        }
+
+        $datos['firma_izquierda_cargo_texto'] = trim(
+            $datos['firma_izquierda_articulo'] . ' ' .
+            $datos['firma_izquierda_cargo'] .
+            ($datos['firma_izquierda_es_direccion'] ? ' DE LA ESCUELA' : '')
+        );
+        $datos['firma_derecha_cargo_texto'] = trim(
+            $datos['firma_derecha_articulo'] . ' ' . $datos['firma_derecha_cargo']
+        );
 
         return $datos;
     }
 
     public function rutaLogoLocal(?string $configurada = null): string
     {
-        if ($configurada) {
-            try {
-                if (Storage::disk('public')->exists($configurada)) {
-                    return Storage::disk('public')->path($configurada);
-                }
-            } catch (\Throwable) {
-                // Se usa la imagen institucional predeterminada.
-            }
-        }
-
-        return public_path('imagenes/liberacion-sueldos/logo-encabezado.png');
+        return $this->rutaImagenLocal($configurada, 'imagenes/liberacion-sueldos/logo-encabezado.png');
     }
 
-    public function rutaFranjaLocal(): string
+    public function rutaFranjaLocal(?string $configurada = null): string
     {
-        return public_path('imagenes/liberacion-sueldos/franja-inferior.png');
+        return $this->rutaImagenLocal($configurada, 'images/franja-inferior.png');
     }
 
     /**
@@ -79,14 +109,17 @@ class LiberacionSueldosDocumentoService
 
         $phpWord = new PhpWord();
         $phpWord->setDefaultFontName('Arial');
+        $phpWord->setDefaultFontSize(10);
         $phpWord->getDocInfo()
             ->setCreator('Centro Universitario Moctezuma')
             ->setCompany('Centro Universitario Moctezuma')
             ->setTitle('Constancia de Liberación de sueldos');
-        $phpWord->setDefaultFontSize(10);
 
-        foreach ($documentos->values() as $indice => $documento) {
+        foreach ($documentos->values() as $documento) {
             $d = $this->aArray($documento);
+            $franjaAltoPt = max(6, (float) $d['franja_alto_mm'] * 2.83465);
+            $franjaInferiorPt = max(0, (float) $d['franja_inferior_mm'] * 2.83465);
+
             $section = $phpWord->addSection([
                 'pageSizeW' => 12240,
                 'pageSizeH' => 15840,
@@ -95,13 +128,16 @@ class LiberacionSueldosDocumentoService
                 'marginBottom' => 420,
                 'marginLeft' => 520,
                 'headerHeight' => 150,
-                'footerHeight' => 180,
+                'footerHeight' => (int) round(($franjaAltoPt + $franjaInferiorPt + 4) * 20),
             ]);
 
             $footer = $section->addFooter();
-            $footer->addImage($this->rutaFranjaLocal(), [
-                'width' => 565,
-                'height' => 24,
+            if ($franjaInferiorPt > 0) {
+                $footer->addText('', [], ['spaceAfter' => (int) round($franjaInferiorPt * 20)]);
+            }
+            $footer->addImage($this->rutaFranjaLocal($d['franja_inferior_path'] ?? null), [
+                'width' => max(142, (float) $d['franja_ancho_mm'] * 2.83465),
+                'height' => $franjaAltoPt,
                 'alignment' => Jc::CENTER,
             ]);
 
@@ -125,7 +161,11 @@ class LiberacionSueldosDocumentoService
                 $d['encabezado_direccion'],
                 'DEPARTAMENTO DE ADMINISTRACIÓN Y DESARROLLO DE PERSONAL',
             ] as $linea) {
-                $celdaTitulo->addText($linea, ['bold' => true, 'size' => 9.5], ['alignment' => Jc::CENTER, 'spaceAfter' => 0, 'lineHeight' => 1.0]);
+                $celdaTitulo->addText($linea, ['bold' => true, 'size' => 9.5], [
+                    'alignment' => Jc::CENTER,
+                    'spaceAfter' => 0,
+                    'lineHeight' => 1.0,
+                ]);
             }
 
             $section->addTextBreak(1);
@@ -183,18 +223,18 @@ class LiberacionSueldosDocumentoService
                 'cellMargin' => 20,
             ]);
             $firmas->addRow();
+
             $f1 = $firmas->addCell(5600, ['valign' => 'top']);
             $f1->addText('A T E N T A M E N T E', ['bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-            $f1->addText($d['director_articulo'] . ' ' . $d['director_cargo'] . ' DE LA ESCUELA', ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 380]);
+            $f1->addText(mb_strtoupper((string) $d['firma_izquierda_cargo_texto']), ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 380]);
             $f1->addText('_______________________________', ['bold' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-            $f1->addText('PROFR.', ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER]);
+            $f1->addText(mb_strtoupper((string) $d['firma_izquierda_nombre']), ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER]);
 
             $f2 = $firmas->addCell(5600, ['valign' => 'top']);
             $f2->addText('Vo.    Bo.', ['bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-            $f2->addText($d['supervisor_articulo'] . ' ' . $d['supervisor_cargo'], ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 380]);
+            $f2->addText(mb_strtoupper((string) $d['firma_derecha_cargo_texto']), ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER, 'spaceAfter' => 380]);
             $f2->addText('_______________________________', ['bold' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-            $f2->addText(mb_strtoupper((string) $d['supervisor_nombre']), ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER]);
-
+            $f2->addText(mb_strtoupper((string) $d['firma_derecha_nombre']), ['bold' => true, 'size' => 10], ['alignment' => Jc::CENTER]);
         }
 
         IOFactory::createWriter($phpWord, 'Word2007')->save($rutaSalida);
@@ -218,13 +258,13 @@ class LiberacionSueldosDocumentoService
         $celda->addText($valor, ['bold' => true, 'size' => 11], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
     }
 
-
-
     private function articuloCargo(string $cargo): string
     {
         $cargo = mb_strtoupper($cargo);
 
-        return str_contains($cargo, 'DIRECTORA') || str_contains($cargo, 'SUPERVISORA')
+        return str_contains($cargo, 'DIRECTORA')
+            || str_contains($cargo, 'SUPERVISORA')
+            || str_contains($cargo, 'JEFA')
             ? 'LA'
             : 'EL';
     }
@@ -238,10 +278,23 @@ class LiberacionSueldosDocumentoService
         return ((int) $m[1] + 1) . '-' . ((int) $m[2] + 1);
     }
 
+    private function rutaImagenLocal(?string $configurada, string $predeterminada): string
+    {
+        if ($configurada) {
+            try {
+                if (Storage::disk('public')->exists($configurada)) {
+                    return Storage::disk('public')->path($configurada);
+                }
+            } catch (\Throwable) {
+                // Se usa la imagen predeterminada.
+            }
+        }
+
+        return public_path($predeterminada);
+    }
+
     private function imagenDataUri(?string $configurada, string $predeterminada): string
     {
-        $ruta = public_path($predeterminada);
-
         if ($configurada) {
             try {
                 if (Storage::disk('public')->exists($configurada)) {
@@ -260,7 +313,13 @@ class LiberacionSueldosDocumentoService
             }
         }
 
-        $mime = str_ends_with($ruta, '.jpg') || str_ends_with($ruta, '.jpeg') ? 'image/jpeg' : 'image/png';
+        $ruta = public_path($predeterminada);
+        $extension = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
+        $mime = match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            default => 'image/png',
+        };
 
         return is_file($ruta)
             ? 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($ruta))

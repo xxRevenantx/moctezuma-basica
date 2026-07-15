@@ -7,7 +7,7 @@
     <style>
         @page {
             level: portrait;
-            margin: 22px 65px 25px 65px;
+            margin: 1.5cm 1.75cm 1.5cm 1.75cm;
         }
 
         @font-face {
@@ -34,9 +34,7 @@
             font-size: 14px;
             color: #000;
             line-height: 1.4;
-
         }
-
 
         .pagina {
             page-break-after: always;
@@ -51,7 +49,6 @@
         .encabezado {
             width: 100%;
             border-collapse: collapse;
-
         }
 
         .encabezado td {
@@ -80,7 +77,7 @@
             width: 68%;
             margin: 5mm 250px 0;
             border-collapse: collapse;
-            font-size: 14pt;
+            font-size: 13.5pt;
             font-weight: 700;
         }
 
@@ -190,12 +187,25 @@
 
         .franja {
             position: absolute;
-            left: 8mm;
+            /* left: 8mm; */
             right: 8mm;
             bottom: 4mm;
             width: 200mm;
             height: 5.5mm;
             object-fit: fill;
+        }
+
+        .campo-subrayado {
+            display: inline-block;
+            border-bottom: 1px solid #111;
+            padding: 0 0.1mm 0.15mm;
+            margin: 0;
+            line-height: inherit;
+            white-space: nowrap;
+            text-decoration: none;
+
+            /* Baja ligeramente el campo para alinearlo con el texto normal */
+            vertical-align: -0.7mm;
         }
     </style>
 </head>
@@ -214,7 +224,6 @@
                     </td>
                 </tr>
             </table>
-
             <table class="datos">
                 <tr>
                     <td class="etiqueta">NIVEL:</td>
@@ -225,69 +234,89 @@
                     <td class="valor">Constancia de Liberación de sueldos.</td>
                 </tr>
             </table>
-
             <div class="fecha">Cd. Altamirano, Gro., a <span>{{ $d['fecha_documento_texto'] }}</span>.</div>
-
             <div class="destinatario">C. PROFR. (A): <span
                     class="nombre"><u>{{ mb_strtoupper($d['trabajador_nombre']) }}</u></span></div>
             <div class="presente">P R E S E N T E.</div>
-
             <div class="cuerpo">
                 <p>
                     El que suscribe C.
-                    <span><u>{{ mb_strtoupper($d['director_nombre'] ?: '____________________________') }}</u></span>
-                    en mi carácter de <span><u>{{ mb_strtoupper($d['director_cargo']) }}</u></span>
-                    del C.T. <span><u>{{ mb_strtoupper($d['escuela_nombre']) }}</u></span>,
-                    C.C.T. <span><u>{{ mb_strtoupper($d['cct']) }}</u></span> ubicada en
-                    <span><u>{{ mb_strtoupper(trim($d['localidad'] . ', ' . $d['municipio'], ', ')) }}</u></span>,
-                    Gro., después de haber cumplido con toda la
-                    documentación y actividades relacionadas con el fin de cursos, tengo a bien autorizar el cobro
-                    correspondiente a la(s)
-                    quincena(s) <span><u>{{ $d['quincena_inicio'] }} y {{ $d['quincena_fin'] }} del año
-                            {{ $d['anio'] }}</span>
+                    <span class="campo-subrayado">
+                        {{ mb_strtoupper($d['director_nombre'] ?: '____________________________') }}
+                    </span>
+                    en mi carácter de
+                    <span class="campo-subrayado">
+                        {{ $d['director_cargo'] }}
+                    </span>
+                    del C.T.
+                    <span class="campo-subrayado">
+                        {{ mb_strtoupper($d['escuela_nombre']) }}
+                    </span>,
+                    C.C.T.
+                    <span class="campo-subrayado">
+                        {{ mb_strtoupper($d['cct']) }}
+                    </span>
+                    ubicada en
+                    <span class="campo-subrayado">
+                        Cd. {{ trim($d['localidad'] . ', Municipio de ' . $d['municipio'], ', ') }}
+                    </span>,
+                    Gro., después de haber cumplido con toda la documentación y actividades
+                    relacionadas con el fin de cursos del <span class="campo-subrayado">Ciclo Escolar
+                        {{ $d['ciclo_escolar'] }},</span> tengo a bien
+                    autorizar el cobro
+                    correspondiente a la(s) quincena(s)
+                    <span class="campo-subrayado">
+                        {{ $d['quincena_inicio'] }} y {{ $d['quincena_fin'] }}
+                        del año {{ $d['anio'] }}
+                    </span>
                     en la(s) clave(s) presupuestal(es):
                 </p>
 
-                <div class="linea-clave">{{ $d['clave_presupuestal'] ?: 'S/N' }}</div>
-
-                <p>Lo anterior por haber cumplido con la normatividad establecida del Ciclo Escolar
-                    {{ $d['ciclo_escolar'] }} en función al nombramiento que se le ha conferido.</p>
+                <div class="linea-clave">
+                    {{ $d['clave_presupuestal'] ?: 'S/C' }}
+                </div>
 
                 <p>
-                    Asimismo, aprovecho la ocasión para hacer de su conocimiento que la reanudación de labores será el
-                    día
-                    <span><u>{{ $d['fecha_reanudacion_texto'] ?: '________________' }}</u></span>, de
-                    acuerdo a lo establecido en el calendario
-                    escolar emitido por la Secretaría de Educación Pública (SEP) y a las disposiciones generales de
-                    inicio de cursos
+                    Lo anterior por haber cumplido con la normatividad establecida del Ciclo Escolar
+                    {{ $d['ciclo_escolar'] }} en función al nombramiento que se le ha conferido.
+                </p>
+
+                <p>
+                    Asimismo, aprovecho la ocasión para hacer de su conocimiento que la reanudación
+                    de labores será el día
+                    <span class="campo-subrayado">
+                        {{ $d['fecha_reanudacion_texto'] ?: '________________' }}
+                    </span>,
+                    de acuerdo a lo establecido en el calendario escolar emitido por la Secretaría
+                    de Educación Pública (SEP) y a las disposiciones generales de inicio de cursos
+
                     @if (!empty($d['ciclo_escolar']) && preg_match('/^(\d{4})-(\d{4})$/', $d['ciclo_escolar'], $cicloPartes))
-                        {{ (int) $cicloPartes[1] + 1 . '-' . ((int) $cicloPartes[2] + 1) }}
+                        {{ (int) $cicloPartes[1] + 1 }}-{{ (int) $cicloPartes[2] + 1 }}
                     @endif.
                 </p>
             </div>
-
             <table class="firmas">
                 <tr>
                     <td>
                         <div class="atentamente">A T E N T A M E N T E</div>
-                        <div class="cargo">{{ $d['director_articulo'] }} {{ mb_strtoupper($d['director_cargo']) }} DE
-                            LA ESCUELA</div>
+                        <div class="cargo">{{ mb_strtoupper($d['firma_izquierda_cargo_texto']) }}</div>
                         <div class="espacio"></div>
                         <div class="linea"></div>
-                        <div class="nombre">PROFR.</div>
+                        <div class="nombre">{{ mb_strtoupper($d['firma_izquierda_nombre']) }}</div>
                     </td>
                     <td>
                         <div class="vobo">Vo. &nbsp;&nbsp; Bo.</div>
-                        <div class="cargo">{{ $d['supervisor_articulo'] }}
-                            {{ mb_strtoupper($d['supervisor_cargo']) }}</div>
+                        <div class="cargo">{{ mb_strtoupper($d['firma_derecha_cargo_texto']) }}</div>
                         <div class="espacio"></div>
                         <div class="linea"></div>
-                        <div class="nombre">{{ mb_strtoupper($d['supervisor_nombre']) }}</div>
+                        <div class="nombre">{{ mb_strtoupper($d['firma_derecha_nombre']) }}</div>
                     </td>
                 </tr>
             </table>
 
-            <img class="franja" src="{{ public_path('images/franja-inferior.png') }}" alt="Franja decorativa">
+            <img class="franja"
+                style="left: {{ max(0, (0 - (float) $d['franja_ancho_mm']) / 2) }}mm; bottom: {{ (float) $d['franja_inferior_mm'] }}mm; width: 100%; height: {{ (float) $d['franja_alto_mm'] }}mm;"
+                src="{{ $d['franja_data_uri'] }}" alt="Franja decorativa">
         </section>
     @endforeach
 </body>
