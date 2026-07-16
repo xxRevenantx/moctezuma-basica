@@ -23,6 +23,7 @@ use App\Http\Controllers\NivelController;
 use App\Http\Controllers\PDFController;
 use App\Http\Controllers\FichaController;
 use App\Http\Controllers\SubmoduloNivelController;
+use App\Http\Controllers\SystemControlCenterController;
 use App\Http\Controllers\TodosHorariosProfesoresPdfController;
 use App\Http\Controllers\WordController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,12 @@ use App\Http\Controllers\SemestreController;
 use App\Http\Controllers\TutorController;
 use App\Models\PersonaNivel;
 use App\Models\Profesor;
+
+
+// CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS
+Route::get('/centro-control', [SystemControlCenterController::class, 'index'])
+    ->middleware('permission:administracion.acceder')
+    ->name('misrutas.centro-control');
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');

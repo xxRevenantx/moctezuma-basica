@@ -24,7 +24,12 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
-        'photo'
+        'photo',
+        'is_admin',
+        'rol_sistema',
+        'permisos',
+        'activo',
+        'ultimo_acceso_at',
     ];
 
     /**
@@ -49,6 +54,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'is_admin' => 'boolean',
+            'permisos' => 'array',
+            'activo' => 'boolean',
+            'ultimo_acceso_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -63,6 +71,47 @@ class User extends Authenticatable implements MustVerifyEmail
             ->take(2)
             ->map(fn($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+
+    public function canAccess(string $permission): bool
+    {
+        if (! ($this->activo ?? true)) {
+            return false;
+        }
+
+        if ($this->is_admin) {
+            return true;
+        }
+
+        $overrides = collect($this->permisos ?? [])->filter(fn ($value) => is_string($value));
+
+        if ($overrides->contains(fn (string $value): bool => str_starts_with($value, '!') && Str::is(ltrim($value, '!'), $permission))) {
+            return false;
+        }
+
+        if ($overrides->contains(fn (string $value): bool => ! str_starts_with($value, '!') && Str::is($value, $permission))) {
+            return true;
+        }
+
+        $role = (string) ($this->rol_sistema ?: 'consulta');
+        $permissions = config("system_permissions.roles.{$role}.permissions", []);
+
+        return collect($permissions)->contains(
+            fn (string $allowed): bool => $allowed === '*' || Str::is($allowed, $permission)
+        );
+    }
+
+    public function roleLabel(): string
+    {
+        if ($this->is_admin) {
+            return 'Administrador general';
+        }
+
+        return (string) config(
+            'system_permissions.roles.'.($this->rol_sistema ?: 'consulta').'.label',
+            'Usuario'
+        );
     }
 
     // Relaciones

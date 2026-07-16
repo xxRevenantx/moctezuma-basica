@@ -29,9 +29,40 @@ class RespaldosAcademicos extends Component
     /** @var array<string,mixed> */
     public array $resumenCalificaciones = [];
 
+
+    /** @var array<string,mixed> */
+    public array $vistaPreviaAlumnos = [];
+
+    /** @var array<string,mixed> */
+    public array $vistaPreviaCalificaciones = [];
+
+    public ?string $checksumVistaPreviaAlumnos = null;
+    public ?string $checksumVistaPreviaCalificaciones = null;
+
     public function mount(): void
     {
         abort_unless(auth()->user()?->is_admin, 403);
+    }
+
+
+    public function updatedArchivoAlumnos(): void
+    {
+        $this->reset('vistaPreviaAlumnos', 'checksumVistaPreviaAlumnos', 'confirmarAlumnos');
+    }
+
+    public function updatedArchivoCalificaciones(): void
+    {
+        $this->reset('vistaPreviaCalificaciones', 'checksumVistaPreviaCalificaciones', 'confirmarCalificaciones');
+    }
+
+    public function previsualizarAlumnos(): void
+    {
+        $this->previsualizarTipo(RespaldoAcademico::TIPO_ALUMNOS);
+    }
+
+    public function previsualizarCalificaciones(): void
+    {
+        $this->previsualizarTipo(RespaldoAcademico::TIPO_CALIFICACIONES);
     }
 
     public function exportarAlumnos()
@@ -96,15 +127,23 @@ class RespaldosAcademicos extends Component
         ]);
 
         try {
+            $ruta = $this->archivoAlumnos->getRealPath();
+            $checksum = hash_file('sha256', $ruta);
+
+            if ($this->vistaPreviaAlumnos === [] || $this->checksumVistaPreviaAlumnos !== $checksum) {
+                $this->addError('archivoAlumnos', 'Genera y revisa la vista previa antes de importar este archivo.');
+                return;
+            }
+
             $servicio = app(RespaldoAcademicoService::class);
 
             $this->resumenAlumnos = $servicio->importar(
                 tipo: RespaldoAcademico::TIPO_ALUMNOS,
-                rutaArchivo: $this->archivoAlumnos->getRealPath(),
+                rutaArchivo: $ruta,
                 usuarioId: auth()->id(),
             );
 
-            $this->reset('archivoAlumnos', 'confirmarAlumnos');
+            $this->reset('archivoAlumnos', 'confirmarAlumnos', 'vistaPreviaAlumnos', 'checksumVistaPreviaAlumnos');
 
             $this->dispatch('swal', [
                 'title' => 'Alumnos importados correctamente.',
@@ -151,15 +190,23 @@ class RespaldosAcademicos extends Component
         ]);
 
         try {
+            $ruta = $this->archivoCalificaciones->getRealPath();
+            $checksum = hash_file('sha256', $ruta);
+
+            if ($this->vistaPreviaCalificaciones === [] || $this->checksumVistaPreviaCalificaciones !== $checksum) {
+                $this->addError('archivoCalificaciones', 'Genera y revisa la vista previa antes de importar este archivo.');
+                return;
+            }
+
             $servicio = app(RespaldoAcademicoService::class);
 
             $this->resumenCalificaciones = $servicio->importar(
                 tipo: RespaldoAcademico::TIPO_CALIFICACIONES,
-                rutaArchivo: $this->archivoCalificaciones->getRealPath(),
+                rutaArchivo: $ruta,
                 usuarioId: auth()->id(),
             );
 
-            $this->reset('archivoCalificaciones', 'confirmarCalificaciones');
+            $this->reset('archivoCalificaciones', 'confirmarCalificaciones', 'vistaPreviaCalificaciones', 'checksumVistaPreviaCalificaciones');
 
             $this->dispatch('swal', [
                 'title' => 'Calificaciones importadas correctamente.',
@@ -187,6 +234,53 @@ class RespaldosAcademicos extends Component
                 'icon' => 'error',
                 'position' => 'top-end',
             ]);
+        }
+    }
+
+
+    private function previsualizarTipo(string $tipo): void
+    {
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('respaldos.gestionar'), 403);
+
+        $propiedadArchivo = $tipo === RespaldoAcademico::TIPO_ALUMNOS
+            ? 'archivoAlumnos'
+            : 'archivoCalificaciones';
+        $propiedadResumen = $tipo === RespaldoAcademico::TIPO_ALUMNOS
+            ? 'vistaPreviaAlumnos'
+            : 'vistaPreviaCalificaciones';
+        $propiedadChecksum = $tipo === RespaldoAcademico::TIPO_ALUMNOS
+            ? 'checksumVistaPreviaAlumnos'
+            : 'checksumVistaPreviaCalificaciones';
+
+        $this->validate([
+            $propiedadArchivo => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+        ], [
+            $propiedadArchivo.'.required' => 'Selecciona primero un archivo de respaldo.',
+            $propiedadArchivo.'.mimes' => 'El respaldo debe ser un archivo Excel .xlsx o .xls.',
+            $propiedadArchivo.'.max' => 'El archivo no debe pesar más de 50 MB.',
+        ]);
+
+        try {
+            $archivo = $this->{$propiedadArchivo};
+            $ruta = $archivo->getRealPath();
+            $this->{$propiedadResumen} = app(RespaldoAcademicoService::class)->previsualizar($tipo, $ruta);
+            $this->{$propiedadChecksum} = hash_file('sha256', $ruta);
+
+            $this->dispatch('swal', [
+                'title' => 'Vista previa lista.',
+                'text' => 'No se guardó ningún cambio. Revisa los totales y después confirma la importación.',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+        } catch (RespaldoAcademicoImportException $e) {
+            $this->addError($propiedadArchivo, $e->getMessage());
+            $this->{$propiedadResumen} = [];
+            $this->{$propiedadChecksum} = null;
+        } catch (Throwable $e) {
+            report($e);
+            $this->addError($propiedadArchivo, 'No se pudo analizar el archivo. No se guardó ningún cambio.');
+            $this->{$propiedadResumen} = [];
+            $this->{$propiedadChecksum} = null;
         }
     }
 

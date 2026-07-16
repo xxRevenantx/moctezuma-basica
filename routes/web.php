@@ -16,10 +16,10 @@ Route::get('/register', function () {
 })->name('home');
 
 Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'active', 'verified'])
     ->name('dashboard');
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'active'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
     Route::get('settings/profile', Profile::class)->name('profile.edit');
@@ -38,4 +38,4 @@ Route::middleware(['auth'])->group(function () {
         ->name('two-factor.show');
 });
 
-require __DIR__ . '/misrutas.php';
+Route::middleware(['auth', 'active'])->group(base_path('routes/misrutas.php'));

@@ -13,7 +13,7 @@ class AccionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->canAccess('academico.consultar');
     }
 
     /**
@@ -21,7 +21,7 @@ class AccionPolicy
      */
     public function view(User $user, Accion $accion): bool
     {
-        return false;
+        return $user->canAccess('academico.consultar');
     }
 
     /**
@@ -29,7 +29,7 @@ class AccionPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->canAccess('academico.crear');
     }
 
     /**
@@ -37,7 +37,7 @@ class AccionPolicy
      */
     public function update(User $user, Accion $accion): bool
     {
-        return false;
+        return $user->canAccess('academico.editar');
     }
 
     /**
@@ -45,7 +45,7 @@ class AccionPolicy
      */
     public function delete(User $user, Accion $accion): bool
     {
-        return false;
+        return $user->canAccess('academico.eliminar');
     }
 
     /**
@@ -53,7 +53,7 @@ class AccionPolicy
      */
     public function restore(User $user, Accion $accion): bool
     {
-        return false;
+        return $user->canAccess('academico.editar');
     }
 
     /**
@@ -61,6 +61,6 @@ class AccionPolicy
      */
     public function forceDelete(User $user, Accion $accion): bool
     {
-        return false;
+        return $user->canAccess('academico.eliminar');
     }
 }

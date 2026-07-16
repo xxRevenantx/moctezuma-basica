@@ -99,6 +99,29 @@
                         Inicio
                     </flux:navlist.item>
 
+
+                    @if (auth()->user()?->canAccess('administracion.acceder'))
+                        @php($systemUnread = app(\App\Services\SystemNotificationService::class)->unreadCount(auth()->id()))
+                        <flux:sidebar.group expandable
+                            :expanded="request()->routeIs('misrutas.centro-control', 'misrutas.respaldos-academicos')"
+                            heading="ADMINISTRACIÓN" class="grid gap-1 text-xs text-zinc-300">
+                            <flux:navlist.item icon="shield-check" :href="route('misrutas.centro-control')"
+                                :current="request()->routeIs('misrutas.centro-control')" wire:navigate>
+                                <span class="flex w-full items-center justify-between gap-2">
+                                    <span>Centro de control</span>
+                                    @if ($systemUnread > 0)
+                                        <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">{{ $systemUnread > 99 ? '99+' : $systemUnread }}</span>
+                                    @endif
+                                </span>
+                            </flux:navlist.item>
+
+                            <flux:navlist.item icon="database-backup" :href="route('misrutas.respaldos-academicos')"
+                                :current="request()->routeIs('misrutas.respaldos-academicos')" wire:navigate>
+                                Importar / exportar respaldos
+                            </flux:navlist.item>
+                        </flux:sidebar.group>
+                    @endif
+
                     {{-- Documentación: acceso exclusivo para administración --}}
                     @if (auth()->user()?->is_admin)
                         <flux:sidebar.group expandable
@@ -130,13 +153,6 @@
                             :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
                             Alumnos
                         </flux:navlist.item>
-
-                        @if (auth()->user()?->is_admin)
-                            <flux:navlist.item icon="database-backup" :href="route('misrutas.respaldos-academicos')"
-                                :current="request()->routeIs('misrutas.respaldos-academicos')" wire:navigate>
-                                Respaldos académicos
-                            </flux:navlist.item>
-                        @endif
 
                         <flux:navlist.item icon="school" :href="route('misrutas.escuela')"
                             :current="request()->routeIs('misrutas.escuela')" wire:navigate>

@@ -13,7 +13,7 @@ class DirectorPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->canAccess('personal.consultar');
     }
 
     /**
@@ -21,7 +21,7 @@ class DirectorPolicy
      */
     public function view(User $user, Director $director): bool
     {
-        return false;
+        return $user->canAccess('personal.consultar');
     }
 
     /**
@@ -29,7 +29,7 @@ class DirectorPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->canAccess('personal.crear');
     }
 
     /**
@@ -37,7 +37,7 @@ class DirectorPolicy
      */
     public function update(User $user, Director $director): bool
     {
-        return false;
+        return $user->canAccess('personal.editar');
     }
 
     /**
@@ -45,7 +45,7 @@ class DirectorPolicy
      */
     public function delete(User $user, Director $director): bool
     {
-        return false;
+        return $user->canAccess('personal.eliminar');
     }
 
     /**
@@ -53,7 +53,7 @@ class DirectorPolicy
      */
     public function restore(User $user, Director $director): bool
     {
-        return false;
+        return $user->canAccess('personal.editar');
     }
 
     /**
@@ -61,6 +61,6 @@ class DirectorPolicy
      */
     public function forceDelete(User $user, Director $director): bool
     {
-        return false;
+        return $user->canAccess('personal.eliminar');
     }
 }

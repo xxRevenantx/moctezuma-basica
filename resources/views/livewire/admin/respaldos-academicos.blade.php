@@ -168,25 +168,48 @@
                         </p>
                     @enderror
 
-                    <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800/60">
-                        <input type="checkbox" wire:model="confirmarAlumnos"
-                            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                        <span class="text-sm leading-5 text-slate-600 dark:text-slate-300">
-                            Confirmo que revisé el archivo. Comprendo que se actualizarán datos usando el mismo ID y que
-                            no se cambiará ningún ID existente.
-                        </span>
-                    </label>
-                    @error('confirmarAlumnos')
-                        <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-                    @enderror
-
-                    <button type="button" wire:click="importarAlumnos" wire:loading.attr="disabled"
-                        wire:target="importarAlumnos"
-                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3.5 text-sm font-black text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
-                        <flux:icon.upload wire:loading.remove wire:target="importarAlumnos" class="h-5 w-5" />
-                        <span wire:loading.remove wire:target="importarAlumnos">Importar alumnos conservando IDs</span>
-                        <span wire:loading wire:target="importarAlumnos">Validando e importando...</span>
+                    <button type="button" wire:click="previsualizarAlumnos" wire:loading.attr="disabled"
+                        wire:target="previsualizarAlumnos"
+                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-black text-slate-700 transition hover:border-sky-400 hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                        <flux:icon.document-magnifying-glass wire:loading.remove wire:target="previsualizarAlumnos" class="h-5 w-5" />
+                        <span wire:loading.remove wire:target="previsualizarAlumnos">Analizar y mostrar vista previa</span>
+                        <span wire:loading wire:target="previsualizarAlumnos">Analizando sin guardar...</span>
                     </button>
+
+                    @if ($vistaPreviaAlumnos)
+                        <div class="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/25">
+                            <div class="flex items-center gap-2 font-black text-sky-800 dark:text-sky-200">
+                                <flux:icon.eye class="h-5 w-5" /> Vista previa: ningún cambio ha sido guardado
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Se crearán</p><p class="font-black">{{ $vistaPreviaAlumnos['total_creados'] }}</p></div>
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Se actualizarán</p><p class="font-black">{{ $vistaPreviaAlumnos['total_actualizados'] }}</p></div>
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Sin cambios</p><p class="font-black">{{ $vistaPreviaAlumnos['total_sin_cambios'] }}</p></div>
+                            </div>
+                            <div class="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                                @foreach ($vistaPreviaAlumnos['tablas'] as $tabla => $detalle)
+                                    <div class="flex justify-between gap-3"><span>{{ $detalle['hoja'] }}</span><strong>{{ $detalle['creados'] }} nuevos · {{ $detalle['actualizados'] }} cambios</strong></div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800/60">
+                            <input type="checkbox" wire:model="confirmarAlumnos"
+                                class="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                            <span class="text-sm leading-5 text-slate-600 dark:text-slate-300">
+                                Confirmo que revisé la vista previa. Comprendo que se actualizarán datos usando el mismo ID y que no se cambiará ningún ID existente.
+                            </span>
+                        </label>
+                        @error('confirmarAlumnos')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+
+                        <button type="button" wire:click="importarAlumnos" wire:loading.attr="disabled"
+                            wire:target="importarAlumnos"
+                            class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3.5 text-sm font-black text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
+                            <flux:icon.upload wire:loading.remove wire:target="importarAlumnos" class="h-5 w-5" />
+                            <span wire:loading.remove wire:target="importarAlumnos">Confirmar importación de alumnos</span>
+                            <span wire:loading wire:target="importarAlumnos">Validando e importando...</span>
+                        </button>
+                    @endif
                 </div>
 
                 @if ($resumenAlumnos)
@@ -305,25 +328,48 @@
                         </p>
                     @enderror
 
-                    <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800/60">
-                        <input type="checkbox" wire:model="confirmarCalificaciones"
-                            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm leading-5 text-slate-600 dark:text-slate-300">
-                            Confirmo que revisé el archivo. Comprendo que se actualizarán calificaciones usando el mismo
-                            ID y que ningún ID existente será reemplazado.
-                        </span>
-                    </label>
-                    @error('confirmarCalificaciones')
-                        <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-                    @enderror
-
-                    <button type="button" wire:click="importarCalificaciones" wire:loading.attr="disabled"
-                        wire:target="importarCalificaciones"
-                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300">
-                        <flux:icon.upload wire:loading.remove wire:target="importarCalificaciones" class="h-5 w-5" />
-                        <span wire:loading.remove wire:target="importarCalificaciones">Importar calificaciones conservando IDs</span>
-                        <span wire:loading wire:target="importarCalificaciones">Validando e importando...</span>
+                    <button type="button" wire:click="previsualizarCalificaciones" wire:loading.attr="disabled"
+                        wire:target="previsualizarCalificaciones"
+                        class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-black text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                        <flux:icon.document-magnifying-glass wire:loading.remove wire:target="previsualizarCalificaciones" class="h-5 w-5" />
+                        <span wire:loading.remove wire:target="previsualizarCalificaciones">Analizar y mostrar vista previa</span>
+                        <span wire:loading wire:target="previsualizarCalificaciones">Analizando sin guardar...</span>
                     </button>
+
+                    @if ($vistaPreviaCalificaciones)
+                        <div class="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/25">
+                            <div class="flex items-center gap-2 font-black text-indigo-800 dark:text-indigo-200">
+                                <flux:icon.eye class="h-5 w-5" /> Vista previa: ningún cambio ha sido guardado
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Se crearán</p><p class="font-black">{{ $vistaPreviaCalificaciones['total_creados'] }}</p></div>
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Se actualizarán</p><p class="font-black">{{ $vistaPreviaCalificaciones['total_actualizados'] }}</p></div>
+                                <div class="rounded-xl bg-white/80 p-2 dark:bg-neutral-900/60"><p class="text-xs text-slate-500">Sin cambios</p><p class="font-black">{{ $vistaPreviaCalificaciones['total_sin_cambios'] }}</p></div>
+                            </div>
+                            <div class="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                                @foreach ($vistaPreviaCalificaciones['tablas'] as $tabla => $detalle)
+                                    <div class="flex justify-between gap-3"><span>{{ $detalle['hoja'] }}</span><strong>{{ $detalle['creados'] }} nuevos · {{ $detalle['actualizados'] }} cambios</strong></div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800/60">
+                            <input type="checkbox" wire:model="confirmarCalificaciones"
+                                class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm leading-5 text-slate-600 dark:text-slate-300">
+                                Confirmo que revisé la vista previa. Comprendo que se actualizarán calificaciones usando el mismo ID y que ningún ID existente será reemplazado.
+                            </span>
+                        </label>
+                        @error('confirmarCalificaciones')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+
+                        <button type="button" wire:click="importarCalificaciones" wire:loading.attr="disabled"
+                            wire:target="importarCalificaciones"
+                            class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300">
+                            <flux:icon.upload wire:loading.remove wire:target="importarCalificaciones" class="h-5 w-5" />
+                            <span wire:loading.remove wire:target="importarCalificaciones">Confirmar importación de calificaciones</span>
+                            <span wire:loading wire:target="importarCalificaciones">Validando e importando...</span>
+                        </button>
+                    @endif
                 </div>
 
                 @if ($resumenCalificaciones)

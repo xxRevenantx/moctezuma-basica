@@ -2,8 +2,26 @@
 
 namespace App\Providers;
 
+use App\Models\AsignacionMateria;
+use App\Models\Calificacion;
+use App\Models\Constancia;
+use App\Models\DocumentoAlumno;
+use App\Models\DocumentoPersonal;
+use App\Models\Grupo;
+use App\Models\Horario;
+use App\Models\Inscripcion;
+use App\Models\Materia;
+use App\Models\Oficio;
+use App\Models\Persona;
+use App\Models\Tutor;
+use App\Models\User;
+use App\Observers\SystemAuditObserver;
+use App\Services\DocumentConfigurationService;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use PhpOffice\PhpWord\Settings;
 
@@ -24,7 +42,31 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configurarDirectorioTemporalPhpWord();
 
-        Gate::define('configurar-firmas-documentales', fn ($user): bool => (bool) $user->is_admin);
+        Gate::before(fn (User $user): ?bool => $user->is_admin ? true : null);
+
+        Gate::define('configurar-firmas-documentales',
+            fn (User $user): bool => $user->canAccess('configuracion.gestionar')
+        );
+
+        foreach ([
+            Inscripcion::class, Tutor::class, Persona::class, Grupo::class, Materia::class,
+            AsignacionMateria::class, Horario::class, Calificacion::class,
+            DocumentoAlumno::class, DocumentoPersonal::class, Constancia::class, Oficio::class,
+            User::class,
+        ] as $model) {
+            $model::observe(SystemAuditObserver::class);
+        }
+
+        Event::listen(Login::class, function (Login $event): void {
+            if ($event->user instanceof User) {
+                $event->user->forceFill(['ultimo_acceso_at' => now()])->saveQuietly();
+            }
+        });
+
+
+        View::composer(['PDF.*', 'pdf.*'], function ($view): void {
+            $view->with('documentConfiguration', app(DocumentConfigurationService::class)->get());
+        });
     }
 
     /**

@@ -13,7 +13,7 @@ class TutorPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->canAccess('alumnos.consultar');
     }
 
     /**
@@ -21,7 +21,7 @@ class TutorPolicy
      */
     public function view(User $user, Tutor $tutor): bool
     {
-        return false;
+        return $user->canAccess('alumnos.consultar');
     }
 
     /**
@@ -29,7 +29,7 @@ class TutorPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->canAccess('alumnos.crear');
     }
 
     /**
@@ -37,7 +37,7 @@ class TutorPolicy
      */
     public function update(User $user, Tutor $tutor): bool
     {
-        return false;
+        return $user->canAccess('alumnos.editar');
     }
 
     /**
@@ -45,7 +45,7 @@ class TutorPolicy
      */
     public function delete(User $user, Tutor $tutor): bool
     {
-        return false;
+        return $user->canAccess('alumnos.eliminar');
     }
 
     /**
@@ -53,7 +53,7 @@ class TutorPolicy
      */
     public function restore(User $user, Tutor $tutor): bool
     {
-        return false;
+        return $user->canAccess('alumnos.editar');
     }
 
     /**
@@ -61,6 +61,6 @@ class TutorPolicy
      */
     public function forceDelete(User $user, Tutor $tutor): bool
     {
-        return false;
+        return $user->canAccess('alumnos.eliminar');
     }
 }

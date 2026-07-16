@@ -16,6 +16,67 @@ use Throwable;
 
 class RespaldoAcademicoService
 {
+
+    /**
+     * Analiza un respaldo completo sin escribir ningún dato.
+     *
+     * @return array{
+     *     tipo:string,
+     *     total_creados:int,
+     *     total_actualizados:int,
+     *     total_sin_cambios:int,
+     *     tablas:array<string,array<string,mixed>>
+     * }
+     */
+    public function previsualizar(string $tipo, string $rutaArchivo): array
+    {
+        $configuracion = RespaldoAcademico::configuracion($tipo);
+        $this->validarTablasDisponibles($configuracion['tablas']);
+        $libro = $this->abrirLibro($rutaArchivo);
+
+        try {
+            $this->validarMetadata($libro, $tipo);
+
+            $resultado = [
+                'tipo' => $tipo,
+                'total_creados' => 0,
+                'total_actualizados' => 0,
+                'total_sin_cambios' => 0,
+                'tablas' => [],
+            ];
+
+            foreach ($configuracion['tablas'] as $tabla => $datosTabla) {
+                $hoja = $libro->getSheetByName($datosTabla['hoja']);
+
+                if (! $hoja instanceof Worksheet) {
+                    throw new RespaldoAcademicoImportException(
+                        "Falta la hoja obligatoria «{$datosTabla['hoja']}». Descarga nuevamente el respaldo correcto."
+                    );
+                }
+
+                $filas = $this->leerHoja(
+                    hoja: $hoja,
+                    tabla: $tabla,
+                    columnasDiferidas: $datosTabla['diferidas'],
+                );
+
+                $resumenTabla = $this->compararTabla($tabla, $filas);
+                $resultado['tablas'][$tabla] = [
+                    'hoja' => $datosTabla['hoja'],
+                    ...$resumenTabla,
+                ];
+                $resultado['total_creados'] += $resumenTabla['creados'];
+                $resultado['total_actualizados'] += $resumenTabla['actualizados'];
+                $resultado['total_sin_cambios'] += $resumenTabla['sin_cambios'];
+            }
+
+            return $resultado;
+        } finally {
+            $libro->disconnectWorksheets();
+            unset($libro);
+        }
+    }
+
     /**
      * Importa un respaldo sin cambiar jamás el ID de un registro existente.
      *
@@ -351,6 +412,62 @@ class RespaldoAcademicoService
         }
 
         return $valor;
+    }
+
+
+    /**
+     * @param array<int,array{fila_excel:int,id:int,datos:array<string,mixed>,diferidos:array<string,mixed>}> $filas
+     * @return array{creados:int,actualizados:int,sin_cambios:int,total:int,cambios:array<int,array<string,mixed>>}
+     */
+    private function compararTabla(string $tabla, array $filas): array
+    {
+        $resumen = [
+            'creados' => 0,
+            'actualizados' => 0,
+            'sin_cambios' => 0,
+            'total' => count($filas),
+            'cambios' => [],
+        ];
+
+        foreach ($filas as $fila) {
+            $actual = DB::table($tabla)->where('id', $fila['id'])->first();
+            $datos = [...$fila['datos'], ...$fila['diferidos']];
+
+            if (! $actual) {
+                $resumen['creados']++;
+                if (count($resumen['cambios']) < 50) {
+                    $resumen['cambios'][] = [
+                        'id' => $fila['id'],
+                        'accion' => 'crear',
+                        'columnas' => array_keys($datos),
+                    ];
+                }
+                continue;
+            }
+
+            if ($this->datosIguales((array) $actual, $datos)) {
+                $resumen['sin_cambios']++;
+                continue;
+            }
+
+            $resumen['actualizados']++;
+            if (count($resumen['cambios']) < 50) {
+                $columnas = [];
+                foreach ($datos as $columna => $valor) {
+                    if ($this->valorComparable(((array) $actual)[$columna] ?? null) !== $this->valorComparable($valor)) {
+                        $columnas[] = $columna;
+                    }
+                }
+
+                $resumen['cambios'][] = [
+                    'id' => $fila['id'],
+                    'accion' => 'actualizar',
+                    'columnas' => $columnas,
+                ];
+            }
+        }
+
+        return $resumen;
     }
 
     /**

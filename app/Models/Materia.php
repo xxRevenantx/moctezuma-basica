@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Observers\MateriaObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 
 #[ObservedBy(MateriaObserver::class)]
 class Materia extends Model
 {
+    use SoftDeletes;
 
     protected $table = 'materias';
 

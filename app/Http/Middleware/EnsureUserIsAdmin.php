@@ -10,7 +10,11 @@ class EnsureUserIsAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless($request->user()?->is_admin, 403, 'No tienes permiso para administrar expedientes digitales.');
+        abort_unless(
+            $request->user()?->is_admin || $request->user()?->rol_sistema === 'administrador',
+            403,
+            'No tienes permiso para acceder a esta sección administrativa.'
+        );
 
         return $next($request);
     }

@@ -4,10 +4,13 @@ namespace App\Services;
 
 use App\Models\Calificacion;
 use App\Models\Constancia;
+use App\Models\DocumentoAlumno;
 use App\Models\Generacion;
 use App\Models\Grupo;
 use App\Models\Horario;
 use App\Models\Inscripcion;
+use App\Models\Materia;
+use App\Models\Oficio;
 use App\Models\Persona;
 use App\Models\Tutor;
 use App\Models\User;
@@ -30,7 +33,7 @@ class BusquedaGlobalService
     {
         $termino = trim(preg_replace('/\s+/u', ' ', $termino) ?? '');
 
-        if (! $usuario->is_admin || mb_strlen($termino) < 2) {
+        if (! $usuario->canAccess('administracion.acceder') || mb_strlen($termino) < 2) {
             return [];
         }
 
@@ -113,6 +116,27 @@ class BusquedaGlobalService
                 'Constancias y folios',
                 'document-text',
                 $this->buscarConstancias($termino)
+            );
+
+            $categorias[] = $this->categoria(
+                'expedientes',
+                'Expedientes y documentos',
+                'folder-open',
+                $this->buscarDocumentos($termino)
+            );
+
+            $categorias[] = $this->categoria(
+                'oficios',
+                'Oficios',
+                'envelope-open',
+                $this->buscarOficios($termino)
+            );
+
+            $categorias[] = $this->categoria(
+                'materias',
+                'Materias',
+                'book-open',
+                $this->buscarMaterias($termino)
             );
 
             $categorias[] = $this->categoria(
@@ -867,6 +891,149 @@ class BusquedaGlobalService
                     'url' => route('misrutas.constancias', [
                         'buscar_constancia' => $constancia->folio ?: $nombre,
                     ]),
+                ];
+            })
+            ->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function buscarDocumentos(string $termino): array
+    {
+        $like = $this->like($termino);
+
+        return DocumentoAlumno::query()
+            ->select([
+                'id', 'inscripcion_id', 'tipo_documento_id', 'folio', 'nombre_original',
+                'estado', 'fecha_documento', 'es_actual', 'version',
+            ])
+            ->with([
+                'inscripcion:id,matricula,nombre,apellido_paterno,apellido_materno',
+                'tipoDocumento:id,nombre,slug',
+            ])
+            ->where(function (Builder $query) use ($like): void {
+                $query->where('folio', 'like', $like)
+                    ->orWhere('nombre_original', 'like', $like)
+                    ->orWhere('estado', 'like', $like)
+                    ->orWhereHas('tipoDocumento', fn (Builder $tipo) => $tipo->where('nombre', 'like', $like))
+                    ->orWhereHas('inscripcion', function (Builder $alumno) use ($like): void {
+                        $alumno->where('matricula', 'like', $like)
+                            ->orWhere('curp', 'like', $like)
+                            ->orWhereRaw(
+                                "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                                [$like]
+                            );
+                    });
+            })
+            ->orderByDesc('es_actual')
+            ->orderByDesc('id')
+            ->limit(self::LIMITE_POR_CATEGORIA)
+            ->get()
+            ->map(function (DocumentoAlumno $documento): array {
+                $alumno = $documento->inscripcion;
+                $nombre = $this->nombreCompleto(
+                    $alumno?->nombre,
+                    $alumno?->apellido_paterno,
+                    $alumno?->apellido_materno
+                );
+
+                return [
+                    'tipo' => 'documento',
+                    'titulo' => $documento->tipoDocumento?->nombre ?: ($documento->nombre_original ?: 'Documento de expediente'),
+                    'subtitulo' => collect([$nombre, $alumno?->matricula])->filter()->join(' · '),
+                    'detalle' => collect([
+                        $documento->folio ? 'Folio: '.$documento->folio : null,
+                        $documento->fecha_documento?->format('d/m/Y'),
+                        'Versión '.$documento->version,
+                    ])->filter()->join(' · '),
+                    'estado' => Str::headline((string) ($documento->estado ?: 'pendiente')),
+                    'tono' => $documento->estado === 'validado' ? 'emerald' : ($documento->estado === 'rechazado' ? 'rose' : 'amber'),
+                    'iniciales' => 'EX',
+                    'url' => $alumno ? route('misrutas.expedientes.show', ['inscripcion' => $alumno->id]) : route('misrutas.expedientes'),
+                ];
+            })
+            ->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function buscarOficios(string $termino): array
+    {
+        $like = $this->like($termino);
+
+        return Oficio::query()
+            ->select(['id', 'inscripcion_id', 'folio', 'tipo_oficio', 'seccion', 'fecha_lugar', 'asunto', 'dirigido_1_nombre'])
+            ->with('inscripcion:id,matricula,nombre,apellido_paterno,apellido_materno')
+            ->where(function (Builder $query) use ($like): void {
+                $query->where('folio', 'like', $like)
+                    ->orWhere('tipo_oficio', 'like', $like)
+                    ->orWhere('asunto', 'like', $like)
+                    ->orWhere('dirigido_1_nombre', 'like', $like)
+                    ->orWhereHas('inscripcion', function (Builder $alumno) use ($like): void {
+                        $alumno->where('matricula', 'like', $like)
+                            ->orWhereRaw(
+                                "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                                [$like]
+                            );
+                    });
+            })
+            ->orderByDesc('id')
+            ->limit(self::LIMITE_POR_CATEGORIA)
+            ->get()
+            ->map(function (Oficio $oficio): array {
+                $alumno = $oficio->inscripcion;
+                $nombre = $this->nombreCompleto(
+                    $alumno?->nombre,
+                    $alumno?->apellido_paterno,
+                    $alumno?->apellido_materno
+                );
+
+                return [
+                    'tipo' => 'oficio',
+                    'titulo' => $oficio->folio ?: Str::headline((string) ($oficio->tipo_oficio ?: 'Oficio')),
+                    'subtitulo' => collect([$oficio->asunto, $nombre])->filter()->join(' · '),
+                    'detalle' => collect([$oficio->dirigido_1_nombre, $oficio->fecha_lugar])->filter()->join(' · '),
+                    'estado' => 'Oficio',
+                    'tono' => 'sky',
+                    'iniciales' => 'OF',
+                    'url' => route('misrutas.oficios', ['buscar' => $oficio->folio ?: $nombre]),
+                ];
+            })
+            ->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function buscarMaterias(string $termino): array
+    {
+        $like = $this->like($termino);
+
+        return Materia::query()
+            ->select(['id', 'nivel_id', 'grado_id', 'semestre_id', 'materia', 'clave', 'calificable', 'extra'])
+            ->with(['nivel:id,nombre', 'grado:id,nombre', 'semestre:id,numero'])
+            ->withCount('asignaciones')
+            ->where(function (Builder $query) use ($like): void {
+                $query->where('materia', 'like', $like)
+                    ->orWhere('clave', 'like', $like)
+                    ->orWhereHas('nivel', fn (Builder $nivel) => $nivel->where('nombre', 'like', $like))
+                    ->orWhereHas('grado', fn (Builder $grado) => $grado->where('nombre', 'like', $like));
+            })
+            ->orderBy('nivel_id')
+            ->orderBy('orden')
+            ->limit(self::LIMITE_POR_CATEGORIA)
+            ->get()
+            ->map(function (Materia $materia): array {
+                return [
+                    'tipo' => 'materia',
+                    'titulo' => $materia->materia,
+                    'subtitulo' => collect([
+                        $materia->clave,
+                        $materia->nivel?->nombre,
+                        $materia->grado?->nombre,
+                        $materia->semestre?->numero ? 'Semestre '.$materia->semestre->numero : null,
+                    ])->filter()->join(' · '),
+                    'detalle' => $materia->asignaciones_count.' asignación(es)',
+                    'estado' => $materia->extra ? 'Extra' : ($materia->calificable ? 'Calificable' : 'No calificable'),
+                    'tono' => $materia->calificable ? 'emerald' : 'slate',
+                    'iniciales' => $this->iniciales($materia->materia),
+                    'url' => route('misrutas.materias', ['buscar' => $materia->materia]),
                 ];
             })
             ->all();
