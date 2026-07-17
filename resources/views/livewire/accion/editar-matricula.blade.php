@@ -544,6 +544,72 @@
                     class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
                 </div>
 
+                {{-- OBSERVACIONES Y SEGUIMIENTO --}}
+                <section class="space-y-5">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                <flux:icon.document-text class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="text-lg font-bold text-slate-800 dark:text-white">
+                                        Observaciones y seguimiento
+                                    </h2>
+                                    <span
+                                        class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                        Opcional
+                                    </span>
+                                </div>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">
+                                    Las notas se guardan por ciclo escolar, conservan historial y no se pierden al cambiar de ciclo antes de guardar.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="w-full lg:w-72">
+                            <div class="mb-1 flex items-center gap-2">
+                                <flux:label>Ciclo escolar de la observación</flux:label>
+                                <span
+                                    class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    Obligatorio
+                                </span>
+                            </div>
+                            <flux:select wire:model.live="observacion_ciclo_escolar_id">
+                                <flux:select.option value="">Selecciona un ciclo</flux:select.option>
+                                @foreach ($ciclosEscolaresObservacion as $cicloEscolarObservacion)
+                                    <flux:select.option value="{{ $cicloEscolarObservacion->id }}">
+                                        {{ $cicloEscolarObservacion->inicio_anio }}-{{ $cicloEscolarObservacion->fin_anio }}
+                                        {{ $cicloEscolarObservacion->es_actual ? ' · Actual' : '' }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            @error('observacion_ciclo_escolar_id')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-sky-50/60 p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/10 dark:via-neutral-900 dark:to-sky-950/10 sm:p-5">
+                        <x-forms.tinymce-observaciones
+                            model="observaciones"
+                            id="observaciones-inscripcion-editar"
+                            :value="$observaciones"
+                            :height="280"
+                        />
+
+                        @error('observaciones')
+                            <p class="mt-3 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </section>
+
+                <div
+                    class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
+                </div>
+
                 {{-- CONTROL ADMINISTRATIVO --}}
                 <section class="space-y-5">
                     <div class="flex items-center gap-3">

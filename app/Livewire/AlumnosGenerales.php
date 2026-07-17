@@ -10,6 +10,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\ExpedienteDigitalService;
+use App\Services\ObservacionInscripcionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Pagination\Paginator;
@@ -44,6 +45,9 @@ class AlumnosGenerales extends Component
 
     /** @var array<int, int|string> */
     public array $seleccionados = [];
+
+    public bool $modalObservaciones = false;
+    public ?array $detalleObservaciones = null;
 
     public int $total = 0;
     public int $hombres = 0;
@@ -187,8 +191,73 @@ class AlumnosGenerales extends Component
         $this->actualizarVista();
     }
 
+    public function verObservaciones(int $alumnoId): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
+
+        $alumno = Inscripcion::query()
+            ->select(['id', 'matricula', 'nombre', 'apellido_paterno', 'apellido_materno'])
+            ->with([
+                'observacionesInscripcion' => fn ($query) => $query
+                    ->with([
+                        'cicloEscolar:id,inicio_anio,fin_anio,es_actual',
+                        'actualizador:id,name',
+                        'historial' => fn ($historial) => $historial
+                            ->with('usuario:id,name')
+                            ->latest('created_at'),
+                    ])
+                    ->orderByDesc('ciclo_escolar_id'),
+            ])
+            ->findOrFail($alumnoId);
+
+        $observacionesService = app(ObservacionInscripcionService::class);
+
+        $this->detalleObservaciones = [
+            'id' => $alumno->id,
+            'matricula' => $alumno->matricula,
+            'nombre' => $this->nombreCompleto($alumno),
+            'ciclos' => $alumno->observacionesInscripcion
+                ->map(function ($observacion) use ($observacionesService): array {
+                    return [
+                        'id' => $observacion->id,
+                        'ciclo' => $observacion->cicloEscolar
+                            ? $observacion->cicloEscolar->inicio_anio.'-'.$observacion->cicloEscolar->fin_anio
+                            : 'Ciclo no disponible',
+                        'es_actual' => (bool) ($observacion->cicloEscolar?->es_actual ?? false),
+                        'contenido' => $observacionesService->sanitizar($observacion->contenido),
+                        'actualizado_por' => $observacion->actualizador?->name ?? 'Sistema',
+                        'actualizado_at' => optional($observacion->updated_at)->format('d/m/Y H:i'),
+                        'historial' => $observacion->historial
+                            ->take(20)
+                            ->map(fn ($item): array => [
+                                'id' => $item->id,
+                                'origen' => str($item->origen)->replace('_', ' ')->title()->toString(),
+                                'usuario' => $item->usuario?->name ?? 'Sistema',
+                                'fecha' => optional($item->created_at)->format('d/m/Y H:i'),
+                                'anterior' => $observacionesService->sanitizar($item->contenido_anterior),
+                                'nuevo' => $observacionesService->sanitizar($item->contenido_nuevo),
+                            ])
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->values()
+                ->all(),
+        ];
+
+        $this->modalObservaciones = true;
+    }
+
+    public function cerrarObservaciones(): void
+    {
+        $this->modalObservaciones = false;
+        $this->detalleObservaciones = null;
+    }
+
     public function eliminarAlumno(int $alumnoId): void
     {
+        abort_unless(auth()->user()?->canAccess('alumnos.eliminar'), 403);
+
         $alumno = Inscripcion::query()->find($alumnoId);
 
         if (!$alumno) {

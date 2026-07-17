@@ -114,6 +114,137 @@
         </div>
     </div>
 
+    {{-- Modal de observaciones por ciclo escolar --}}
+    @if ($modalObservaciones && $detalleObservaciones)
+        <div class="fixed inset-0 z-[10000] overflow-y-auto bg-slate-950/60 px-4 py-8 backdrop-blur-sm"
+            wire:keydown.escape="cerrarObservaciones">
+            <div class="flex min-h-full items-center justify-center">
+                <div class="w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/20 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
+                    <div class="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-sky-600 px-6 py-5 text-white sm:px-8">
+                        <div class="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/15 blur-3xl"></div>
+                        <div class="relative flex items-start justify-between gap-4">
+                            <div>
+                                <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-white/20">
+                                    <flux:icon.document-text class="h-4 w-4" />
+                                    Seguimiento interno
+                                </div>
+                                <h2 class="mt-3 text-xl font-black uppercase sm:text-2xl">
+                                    {{ $detalleObservaciones['nombre'] }}
+                                </h2>
+                                <p class="mt-1 text-sm text-white/85">
+                                    Matrícula: {{ $detalleObservaciones['matricula'] ?: 'Sin matrícula' }} · Observaciones organizadas por ciclo escolar
+                                </p>
+                            </div>
+                            <button type="button" wire:click="cerrarObservaciones"
+                                class="rounded-xl bg-white/15 p-2 text-white transition hover:bg-white/25"
+                                aria-label="Cerrar observaciones">
+                                <flux:icon.x-mark class="h-5 w-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="max-h-[72vh] overflow-y-auto p-5 sm:p-7">
+                        @forelse ($detalleObservaciones['ciclos'] as $cicloObservacion)
+                            <article class="mb-5 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm last:mb-0 dark:border-neutral-800 dark:bg-neutral-950/60">
+                                <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-neutral-800 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="inline-flex items-center gap-2 rounded-full bg-[#006492] px-3 py-1.5 text-xs font-black text-white">
+                                            <flux:icon.calendar-days class="h-4 w-4" />
+                                            Ciclo {{ $cicloObservacion['ciclo'] }}
+                                        </span>
+                                        @if ($cicloObservacion['es_actual'])
+                                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                Ciclo actual
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                        Última edición: {{ $cicloObservacion['actualizado_at'] ?: 'Sin fecha' }} · {{ $cicloObservacion['actualizado_por'] }}
+                                    </p>
+                                </div>
+
+                                <div class="p-5">
+                                    @if (filled($cicloObservacion['contenido']))
+                                        <div class="space-y-2 text-sm leading-7 text-slate-700 dark:text-slate-200 [&_blockquote]:border-l-4 [&_blockquote]:border-sky-300 [&_blockquote]:pl-4 [&_h3]:font-black [&_h4]:font-bold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_ul]:list-disc">
+                                            {!! $cicloObservacion['contenido'] !!}
+                                        </div>
+                                    @else
+                                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-400">
+                                            La observación fue limpiada en la última actualización.
+                                        </div>
+                                    @endif
+
+                                    <details class="group mt-5 rounded-2xl border border-slate-200 bg-slate-50 dark:border-neutral-800 dark:bg-neutral-900/70">
+                                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-slate-700 dark:text-slate-200">
+                                            <span class="inline-flex items-center gap-2">
+                                                <flux:icon.clock class="h-4 w-4 text-amber-600" />
+                                                Historial de cambios ({{ count($cicloObservacion['historial']) }})
+                                            </span>
+                                            <flux:icon.chevron-down class="h-4 w-4 transition group-open:rotate-180" />
+                                        </summary>
+
+                                        <div class="space-y-3 border-t border-slate-200 p-4 dark:border-neutral-800">
+                                            @forelse ($cicloObservacion['historial'] as $cambio)
+                                                <details class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                                                    <summary class="cursor-pointer list-none">
+                                                        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                            <p class="text-sm font-black text-slate-800 dark:text-white">
+                                                                {{ $cambio['origen'] }} · {{ $cambio['usuario'] }}
+                                                            </p>
+                                                            <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                                {{ $cambio['fecha'] ?: 'Sin fecha' }}
+                                                            </p>
+                                                        </div>
+                                                    </summary>
+
+                                                    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                                                        <div class="rounded-xl border border-rose-100 bg-rose-50/60 p-3 dark:border-rose-900/30 dark:bg-rose-950/10">
+                                                            <p class="mb-2 text-[11px] font-black uppercase tracking-wide text-rose-700 dark:text-rose-300">Contenido anterior</p>
+                                                            <div class="text-xs leading-6 text-slate-700 dark:text-slate-300 [&_li]:ml-4 [&_ol]:list-decimal [&_ul]:list-disc">
+                                                                {!! filled($cambio['anterior']) ? $cambio['anterior'] : '<p>Sin contenido previo.</p>' !!}
+                                                            </div>
+                                                        </div>
+                                                        <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900/30 dark:bg-emerald-950/10">
+                                                            <p class="mb-2 text-[11px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Contenido nuevo</p>
+                                                            <div class="text-xs leading-6 text-slate-700 dark:text-slate-300 [&_li]:ml-4 [&_ol]:list-decimal [&_ul]:list-disc">
+                                                                {!! filled($cambio['nuevo']) ? $cambio['nuevo'] : '<p>La observación quedó vacía.</p>' !!}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            @empty
+                                                <p class="py-3 text-center text-sm text-slate-500 dark:text-slate-400">
+                                                    No hay cambios registrados para este ciclo.
+                                                </p>
+                                            @endforelse
+                                        </div>
+                                    </details>
+                                </div>
+                            </article>
+                        @empty
+                            <div class="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-10 text-center dark:border-neutral-700 dark:bg-neutral-950/60">
+                                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm dark:bg-neutral-900">
+                                    <flux:icon.document-text class="h-7 w-7" />
+                                </div>
+                                <h3 class="mt-4 font-black text-slate-800 dark:text-white">Sin observaciones registradas</h3>
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    Puedes agregarlas desde la edición de la matrícula o durante una nueva inscripción.
+                                </p>
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <div class="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900">
+                        <flux:button type="button" variant="ghost" wire:click="cerrarObservaciones"
+                            class="cursor-pointer rounded-2xl border border-slate-200 bg-white dark:border-neutral-700 dark:bg-neutral-800">
+                            Cerrar
+                        </flux:button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Modal para configurar la lista --}}
     <div x-cloak x-show="modalDocumento" x-transition.opacity
         x-on:keydown.escape.window="modalDocumento = false"
@@ -643,7 +774,16 @@
                                             x-text="detalleAbierto === {{ $alumno->id }} ? 'Ocultar' : 'Detalles'"></span>
                                     </button>
 
-                                    @if ($alumno->nivel?->slug)
+                                    @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                        <button type="button" wire:click="verObservaciones({{ $alumno->id }})"
+                                            wire:loading.attr="disabled" wire:target="verObservaciones({{ $alumno->id }})"
+                                            class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-wait disabled:opacity-70"
+                                            title="Ver observaciones">
+                                            <flux:icon.document-text class="h-4 w-4" />
+                                        </button>
+                                    @endif
+
+                                    @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
                                         <button type="button"
                                             x-on:click="abrirEdicion('{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}')"
                                             class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-white shadow-sm transition hover:bg-blue-700"
@@ -652,12 +792,14 @@
                                         </button>
                                     @endif
 
-                                    <button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
-                                        wire:confirm="¿Seguro que deseas eliminar este alumno?"
-                                        class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-white shadow-sm transition hover:bg-rose-700"
-                                        title="Eliminar">
-                                        <flux:icon.trash class="h-4 w-4" />
-                                    </button>
+                                    @if (auth()->user()?->canAccess('alumnos.eliminar'))
+                                        <button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
+                                            wire:confirm="¿Seguro que deseas eliminar este alumno?"
+                                            class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-white shadow-sm transition hover:bg-rose-700"
+                                            title="Eliminar">
+                                            <flux:icon.trash class="h-4 w-4" />
+                                        </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -747,7 +889,7 @@
                                             </div>
 
                                             <div class="mt-4 flex flex-wrap gap-2">
-                                                @if ($alumno->nivel?->slug)
+                                                @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
                                                     <a href="{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}"
                                                         class="inline-flex items-center rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-xs font-black text-white transition hover:from-sky-600 hover:to-indigo-700">
                                                         Ver expediente completo
@@ -1011,7 +1153,16 @@
                                 <span x-text="abierto ? 'Ocultar' : 'Detalles'"></span>
                             </button>
 
-                            @if ($alumno->nivel?->slug)
+                            @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                <button type="button" wire:click="verObservaciones({{ $alumno->id }})"
+                                    wire:loading.attr="disabled" wire:target="verObservaciones({{ $alumno->id }})"
+                                    class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-white disabled:opacity-70"
+                                    title="Ver observaciones">
+                                    <flux:icon.document-text class="h-4 w-4" />
+                                </button>
+                            @endif
+
+                            @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
                                 <button type="button"
                                     x-on:click="abrirEdicion('{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}')"
                                     class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-white">

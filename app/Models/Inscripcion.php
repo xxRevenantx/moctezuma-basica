@@ -202,6 +202,18 @@ class Inscripcion extends Model
         return $this->belongsTo(Tutor::class);
     }
 
+    public function observacionesInscripcion()
+    {
+        return $this->hasMany(ObservacionInscripcion::class, 'inscripcion_id')
+            ->orderByDesc('ciclo_escolar_id');
+    }
+
+    public function historialObservacionesInscripcion()
+    {
+        return $this->hasMany(HistorialObservacionInscripcion::class, 'inscripcion_id')
+            ->latest('created_at');
+    }
+
     public function calificaciones()
     {
         return $this->hasMany(Calificacion::class);

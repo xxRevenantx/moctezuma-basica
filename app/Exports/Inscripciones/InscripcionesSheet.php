@@ -3,6 +3,7 @@
 namespace App\Exports\Inscripciones;
 
 use App\Models\Inscripcion;
+use App\Services\ObservacionInscripcionService;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -34,6 +35,7 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 'grupo.semestre',
                 'semestre',
                 'ciclo',
+                'observacionesInscripcion.cicloEscolar',
             ])
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
@@ -64,11 +66,17 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
             'semestre',
             'ciclo_id',
             'periodo_inscripcion',
+            'ciclo_escolar_observacion',
+            'observaciones',
         ];
     }
 
     public function map($alumno): array
     {
+        $observacion = $alumno->observacionesInscripcion
+            ->first(fn ($item) => (bool) $item->cicloEscolar?->es_actual)
+            ?? $alumno->observacionesInscripcion->sortByDesc('ciclo_escolar_id')->first();
+
         return [
             $alumno->curp,
             $alumno->matricula,
@@ -101,6 +109,11 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
 
             $alumno->ciclo_id,
             $alumno->ciclo?->ciclo,
+
+            $observacion?->cicloEscolar
+                ? $observacion->cicloEscolar->inicio_anio . '-' . $observacion->cicloEscolar->fin_anio
+                : '',
+            app(ObservacionInscripcionService::class)->textoPlano($observacion?->contenido),
         ];
     }
 
@@ -128,9 +141,9 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 $hoja = $event->sheet->getDelegate();
 
                 $hoja->freezePane('A2');
-                $hoja->setAutoFilter('A1:U1');
+                $hoja->setAutoFilter('A1:W1');
 
-                $hoja->getStyle('A1:U1')->applyFromArray([
+                $hoja->getStyle('A1:W1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],

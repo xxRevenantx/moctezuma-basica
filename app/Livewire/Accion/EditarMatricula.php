@@ -3,17 +3,20 @@
 namespace App\Livewire\Accion;
 
 use App\Models\Ciclo;
+use App\Models\cicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\ObservacionInscripcion;
 use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\CurpService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\GestionAcademicaService;
 use App\Services\ImagenPersonalService;
+use App\Services\ObservacionInscripcionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -72,12 +75,19 @@ class EditarMatricula extends Component
     public string $motivo_cambio = '';
     public bool $confirmar_cambio_academico = false;
 
+    public ?string $observaciones = null;
+    public ?int $observacion_ciclo_escolar_id = null;
+
+    /** @var array<int, string|null> */
+    public array $observacionesPorCiclo = [];
+
     public Collection $niveles;
     public Collection $gradosOptions;
     public Collection $generacionesOptions;
     public Collection $semestresOptions;
     public array $gruposOptions = [];
     public Collection $ciclosOptions;
+    public Collection $ciclosEscolaresObservacion;
     public Collection $tutores;
 
     public bool $consultandoCurp = false;
@@ -86,7 +96,7 @@ class EditarMatricula extends Component
 
     public function mount(string $slug_nivel, Inscripcion $inscripcion): void
     {
-        abort_unless(auth()->user()?->is_admin, 403);
+        abort_unless(auth()->user()?->canAccess('alumnos.editar'), 403);
 
         $this->slug_nivel = $slug_nivel;
         $this->niveles = $this->loadNivelesFromGrupos();
@@ -95,6 +105,11 @@ class EditarMatricula extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
         $this->ciclosOptions = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
+        $this->ciclosEscolaresObservacion = cicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->tutores = Tutor::query()
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
@@ -146,7 +161,55 @@ class EditarMatricula extends Component
         $this->foto_actual_existe = $alumno->foto_existe;
         $this->foto_actual_url = $alumno->foto_url;
 
+        $this->observacion_ciclo_escolar_id = $this->ciclosEscolaresObservacion
+            ->firstWhere('es_actual', true)?->id
+            ?? $this->ciclosEscolaresObservacion->first()?->id;
+        $this->cargarObservacionCiclo();
+
         $this->recargarOpcionesAsignacionEscolar();
+    }
+
+    public function updatingObservacionCicloEscolarId($value): void
+    {
+        if (! $this->observacion_ciclo_escolar_id) {
+            return;
+        }
+
+        $this->observacionesPorCiclo[(int) $this->observacion_ciclo_escolar_id] =
+            app(ObservacionInscripcionService::class)->sanitizar($this->observaciones);
+    }
+
+    public function updatedObservacionCicloEscolarId($value): void
+    {
+        $this->observacion_ciclo_escolar_id = $value ? (int) $value : null;
+        $this->resetValidation(['observacion_ciclo_escolar_id', 'observaciones']);
+        $this->cargarObservacionCiclo(true);
+    }
+
+    private function cargarObservacionCiclo(bool $actualizarEditor = false): void
+    {
+        if (! $this->InscripcionId || ! $this->observacion_ciclo_escolar_id) {
+            $this->observaciones = null;
+        } elseif (array_key_exists((int) $this->observacion_ciclo_escolar_id, $this->observacionesPorCiclo)) {
+            $this->observaciones = $this->observacionesPorCiclo[(int) $this->observacion_ciclo_escolar_id];
+        } else {
+            $this->observaciones = app(ObservacionInscripcionService::class)->sanitizar(
+                ObservacionInscripcion::query()
+                    ->where('inscripcion_id', $this->InscripcionId)
+                    ->where('ciclo_escolar_id', $this->observacion_ciclo_escolar_id)
+                    ->value('contenido')
+            );
+
+            $this->observacionesPorCiclo[(int) $this->observacion_ciclo_escolar_id] = $this->observaciones;
+        }
+
+        if ($actualizarEditor) {
+            $this->dispatch(
+                'reset-observaciones-editor',
+                editor: 'observaciones-inscripcion-editar',
+                contenido: $this->observaciones ?? '',
+            );
+        }
     }
 
     public function esBachillerato(): bool
@@ -574,6 +637,20 @@ class EditarMatricula extends Component
             'genero' => ['required', Rule::in(['H', 'M'])],
             'fecha_ingreso_plantel' => ['required', 'date'],
             'ciclo_id' => ['required', 'integer', Rule::exists('ciclos', 'id')],
+            'observacion_ciclo_escolar_id' => [
+                'required',
+                'integer',
+                Rule::exists('ciclo_escolares', 'id'),
+            ],
+            'observaciones' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (app(ObservacionInscripcionService::class)->excedeLimite($value)) {
+                        $fail('Las observaciones no deben superar 5,000 caracteres.');
+                    }
+                },
+            ],
 
             'nivel_id' => ['required', 'integer', Rule::exists('niveles', 'id')],
             'grado_id' => [Rule::requiredIf(! $this->esBachillerato()), 'nullable', 'integer', Rule::exists('grados', 'id')],
@@ -666,9 +743,43 @@ class EditarMatricula extends Component
         return true;
     }
 
-    public function actualizarInscripcion(GestionAcademicaService $service, ImagenPersonalService $imagenes)
-    {
+    public function actualizarInscripcion(
+        GestionAcademicaService $service,
+        ImagenPersonalService $imagenes,
+        ObservacionInscripcionService $observacionesService,
+    ) {
         $this->sanitizar();
+        $this->observaciones = $observacionesService->sanitizar($this->observaciones);
+
+        if ($this->observacion_ciclo_escolar_id) {
+            $this->observacionesPorCiclo[(int) $this->observacion_ciclo_escolar_id] = $this->observaciones;
+        }
+
+        foreach ($this->observacionesPorCiclo as $cicloId => $contenido) {
+            if ($contenido !== null && ! is_string($contenido)) {
+                $this->addError('observaciones', 'El contenido de las observaciones no tiene un formato válido.');
+
+                return null;
+            }
+
+            if (! $this->ciclosEscolaresObservacion->contains('id', (int) $cicloId)) {
+                $this->addError('observacion_ciclo_escolar_id', 'El ciclo escolar de una observación ya no está disponible.');
+
+                return null;
+            }
+
+            $contenido = $observacionesService->sanitizar($contenido);
+            $this->observacionesPorCiclo[(int) $cicloId] = $contenido;
+
+            if ($observacionesService->excedeLimite($contenido)) {
+                $ciclo = $this->ciclosEscolaresObservacion->firstWhere('id', (int) $cicloId);
+                $nombreCiclo = $ciclo ? $ciclo->inicio_anio.'-'.$ciclo->fin_anio : (string) $cicloId;
+                $this->addError('observaciones', "Las observaciones del ciclo {$nombreCiclo} superan 5,000 caracteres.");
+
+                return null;
+            }
+        }
+
         $data = $this->validate();
         $alumno = Inscripcion::withTrashed()->findOrFail($this->InscripcionId);
 
@@ -694,7 +805,7 @@ class EditarMatricula extends Component
             return null;
         }
 
-        DB::transaction(function () use ($alumno, $service, $imagenes, $data, $cambioAcademico, $cambioEstatus): void {
+        DB::transaction(function () use ($alumno, $service, $imagenes, $observacionesService, $data, $cambioAcademico, $cambioEstatus): void {
             $fotoPath = $alumno->foto_path;
 
             if ($this->foto) {
@@ -727,6 +838,16 @@ class EditarMatricula extends Component
                 'tutor_id' => $data['tutor_id'] ?? null,
                 'foto_path' => $fotoPath,
             ]);
+
+            foreach ($this->observacionesPorCiclo as $cicloId => $contenido) {
+                $observacionesService->guardar(
+                    inscripcion: $alumno,
+                    cicloEscolarId: (int) $cicloId,
+                    contenido: $contenido,
+                    origen: 'edicion',
+                    usuarioId: auth()->id(),
+                );
+            }
 
             if ($cambioAcademico) {
                 $service->cambiarAsignacion($alumno, [
@@ -783,6 +904,7 @@ class EditarMatricula extends Component
             'semestres' => $this->semestresOptions,
             'grupos' => $this->gruposOptions,
             'ciclos' => $this->ciclosOptions,
+            'ciclosEscolaresObservacion' => $this->ciclosEscolaresObservacion,
             'tutores' => $this->tutores,
             'esBachillerato' => $this->esBachillerato(),
             'resumenDocumental' => $resumenDocumental,

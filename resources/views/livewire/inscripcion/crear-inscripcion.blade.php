@@ -277,7 +277,7 @@
                     @if ($curpSuccess)
                         <div x-data="{ mostrar: true }" x-init="setTimeout(() => {
                             mostrar = false
-                        
+
                             setTimeout(() => {
                                 $wire.dispatch('limpiar-curp-success')
                             }, 500)
@@ -662,6 +662,58 @@
                         @endif
                     </section>
 
+                    <div
+                        class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
+                    </div>
+
+                    {{-- OBSERVACIONES Y SEGUIMIENTO --}}
+                    <section class="space-y-5">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                    <flux:icon.document-text class="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-lg font-bold text-slate-800 dark:text-white">
+                                            Observaciones y seguimiento
+                                        </h2>
+                                        <span
+                                            class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                            Opcional
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Registra notas internas de la inscripción. Cada ciclo escolar conserva su propia observación.
+                                    </p>
+                                </div>
+                            </div>
+
+                            @if ($ciclo_escolar_id)
+                                @php($cicloObservacion = $cicloEscolares->firstWhere('id', (int) $ciclo_escolar_id))
+                                <span
+                                    class="inline-flex w-fit items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                    <flux:icon.calendar-days class="h-4 w-4" />
+                                    Ciclo {{ $cicloObservacion ? $cicloObservacion->inicio_anio . '-' . $cicloObservacion->fin_anio : 'seleccionado' }}
+                                </span>
+                            @endif
+                        </div>
+
+                        <div
+                            class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-sky-50/60 p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/10 dark:via-neutral-900 dark:to-sky-950/10 sm:p-5">
+                            <x-forms.tinymce-observaciones
+                                model="observaciones"
+                                id="observaciones-inscripcion-crear"
+                                :value="$observaciones"
+                                :height="260"
+                            />
+
+                            @error('observaciones')
+                                <p class="mt-3 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </section>
 
                     <div
                         class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
@@ -925,31 +977,31 @@
                         <div x-data="{
                             preview: null,
                             nombreArchivo: '',
-                        
+
                             usarTemporal(event) {
                                 const file = event.target.files[0];
-                        
+
                                 if (!file) {
                                     return;
                                 }
-                        
+
                                 this.nombreArchivo = file.name;
-                        
+
                                 const reader = new FileReader();
-                        
+
                                 reader.onload = (e) => {
                                     this.preview = e.target.result;
                                 };
-                        
+
                                 reader.readAsDataURL(file);
                             },
-                        
+
                             limpiar() {
                                 this.preview = null;
                                 this.nombreArchivo = '';
-                        
+
                                 const input = document.getElementById('foto');
-                        
+
                                 if (input) {
                                     input.value = '';
                                 }

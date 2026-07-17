@@ -16,6 +16,7 @@ use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\CurpService;
 use App\Services\ImagenPersonalService;
+use App\Services\ObservacionInscripcionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -55,6 +56,7 @@ class CrearInscripcion extends Component
     public ?string $fecha_baja = null;
     public ?string $motivo_baja = null;
     public ?string $observaciones_baja = null;
+    public ?string $observaciones = null;
 
     public ?string $pais_nacimiento = null;
     public ?string $estado_nacimiento = null;
@@ -98,6 +100,8 @@ class CrearInscripcion extends Component
 
     public function mount(): void
     {
+        abort_unless(auth()->user()?->canAccess('alumnos.crear'), 403);
+
         $this->niveles = $this->loadNivelesFromGrupos();
         $this->gradosOptions = collect();
         $this->generacionesOptions = collect();
@@ -207,6 +211,15 @@ class CrearInscripcion extends Component
                 'nullable',
                 'string',
                 'max:255',
+            ],
+            'observaciones' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (app(ObservacionInscripcionService::class)->excedeLimite($value)) {
+                        $fail('Las observaciones no deben superar 5,000 caracteres.');
+                    }
+                },
             ],
 
             'pais_nacimiento' => [
@@ -329,6 +342,7 @@ class CrearInscripcion extends Component
             'motivo_baja.max' => 'El motivo de baja no debe superar 255 caracteres.',
             'observaciones_baja.string' => 'Las observaciones de baja no son válidas.',
             'observaciones_baja.max' => 'Las observaciones de baja no deben superar 255 caracteres.',
+            'observaciones.string' => 'Las observaciones no tienen un formato válido.',
 
             'nivel_id.required' => 'Selecciona un nivel.',
             'grado_id.required' => 'Selecciona un grado.',
@@ -1250,9 +1264,10 @@ class CrearInscripcion extends Component
         return true;
     }
 
-    public function guardar(ImagenPersonalService $imagenes): void
+    public function guardar(ImagenPersonalService $imagenes, ObservacionInscripcionService $observacionesService): void
     {
         $this->sanitizeStrings();
+        $this->observaciones = $observacionesService->sanitizar($this->observaciones);
 
         if ($this->curp !== '' && strlen($this->curp) < 18) {
             $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. La inscripción se guardará con datos capturados manualmente.';
@@ -1274,7 +1289,7 @@ class CrearInscripcion extends Component
             $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
         }
 
-        DB::transaction(function () use ($data, $fotoPath) {
+        DB::transaction(function () use ($data, $fotoPath, $observacionesService) {
             $inscripcion = Inscripcion::query()->create([
                 'curp' => $data['curp'],
                 'matricula' => $data['matricula'],
@@ -1319,6 +1334,13 @@ class CrearInscripcion extends Component
                 'fecha_estatus' => $data['fecha_inscripcion'],
             ]);
 
+            $observacionesService->guardar(
+                inscripcion: $inscripcion,
+                cicloEscolarId: (int) $data['ciclo_escolar_id'],
+                contenido: $data['observaciones'] ?? null,
+                origen: 'registro',
+                usuarioId: auth()->id(),
+            );
         });
 
         $this->dispatch('swal', [
@@ -1494,6 +1516,7 @@ class CrearInscripcion extends Component
             'fecha_baja',
             'motivo_baja',
             'observaciones_baja',
+            'observaciones',
 
             'pais_nacimiento',
             'estado_nacimiento',
@@ -1564,6 +1587,7 @@ class CrearInscripcion extends Component
         $this->matricula = '';
 
         $this->dispatch('foto-limpiada');
+        $this->dispatch('reset-observaciones-editor', editor: 'observaciones-inscripcion-crear', contenido: '');
     }
 
     public function render()

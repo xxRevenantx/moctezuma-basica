@@ -29,6 +29,7 @@ class InstruccionesInscripcionesSheet implements FromArray, ShouldAutoSize, With
             ['ciclo_escolar_id', 'Obligatorio. Tomarlo de la hoja Catálogos.'],
             ['ciclo_id', 'Obligatorio. Tomarlo de la hoja Catálogos.'],
             ['grupo_id', 'Obligatorio. Tomarlo de la hoja Catálogos.'],
+            ['observaciones', 'Opcional. Máximo 5,000 caracteres. Se guarda para el ciclo_escolar_id indicado.'],
             ['Importante', 'Nivel, grado, generación y semestre se toman automáticamente desde el grupo seleccionado.'],
         ];
     }

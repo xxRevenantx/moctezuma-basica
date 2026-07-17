@@ -4,6 +4,7 @@ namespace App\Imports\Inscripciones;
 
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Services\ObservacionInscripcionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -25,12 +26,17 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
     public function collection(Collection $rows): void
     {
         DB::transaction(function () use ($rows) {
+            $observacionesService = app(ObservacionInscripcionService::class);
+
             foreach ($rows as $row) {
                 $grupo = Grupo::query()
                     ->with(['nivel', 'grado', 'generacion', 'semestre'])
                     ->findOrFail((int) $row['grupo_id']);
 
                 $matricula = mb_strtoupper(trim((string) $row['matricula']));
+                $observacionImportada = $observacionesService->desdeTextoPlano(
+                    $row['observaciones'] ?? null
+                );
 
                 $datosInscripcion = [
                     'curp' => mb_strtoupper(trim((string) $row['curp'])),
@@ -88,8 +94,19 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                     $inscripcion->update($datosInscripcion);
                     $this->actualizados++;
                 } else {
-                    Inscripcion::query()->create($datosInscripcion);
+                    $inscripcion = Inscripcion::query()->create($datosInscripcion);
                     $this->creados++;
+                }
+
+                // Una celda vacía no elimina observaciones existentes durante importaciones masivas.
+                if ($observacionImportada !== null) {
+                    $observacionesService->guardar(
+                        inscripcion: $inscripcion,
+                        cicloEscolarId: (int) $row['ciclo_escolar_id'],
+                        contenido: $observacionImportada,
+                        origen: 'importacion',
+                        usuarioId: auth()->id(),
+                    );
                 }
             }
         });
@@ -176,6 +193,15 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                 'required',
                 'integer',
                 Rule::exists('ciclos', 'id'),
+            ],
+            '*.observaciones' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (app(ObservacionInscripcionService::class)->excedeLimite($value)) {
+                        $fail('Las observaciones no deben superar 5,000 caracteres.');
+                    }
+                },
             ],
         ];
     }
@@ -308,6 +334,8 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
 
             '*.ciclo_id.required' => 'El periodo de inscripción es obligatorio.',
             '*.ciclo_id.exists' => 'El periodo de inscripción seleccionado no existe.',
+
+            '*.observaciones.string' => 'Las observaciones deben ser texto.',
         ];
     }
 

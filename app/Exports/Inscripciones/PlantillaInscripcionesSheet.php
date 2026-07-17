@@ -37,6 +37,7 @@ class PlantillaInscripcionesSheet implements FromArray, ShouldAutoSize, WithEven
                 'grupo_id',
                 'semestre_id',
                 'ciclo_id',
+                'observaciones',
             ],
             [
                 'NUPD950408HGRXXX01',
@@ -55,6 +56,7 @@ class PlantillaInscripcionesSheet implements FromArray, ShouldAutoSize, WithEven
                 '1',
                 '',
                 '1',
+                'Documentación pendiente: entregar comprobante de domicilio.',
             ],
         ];
     }
@@ -66,9 +68,9 @@ class PlantillaInscripcionesSheet implements FromArray, ShouldAutoSize, WithEven
                 $hoja = $event->sheet->getDelegate();
 
                 $hoja->freezePane('A2');
-                $hoja->setAutoFilter('A1:P1');
+                $hoja->setAutoFilter('A1:Q1');
 
-                $hoja->getStyle('A1:P1')->applyFromArray([
+                $hoja->getStyle('A1:Q1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],
@@ -79,7 +81,7 @@ class PlantillaInscripcionesSheet implements FromArray, ShouldAutoSize, WithEven
                     ],
                 ]);
 
-                $hoja->getStyle('A2:P2')->applyFromArray([
+                $hoja->getStyle('A2:Q2')->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
                         'startColor' => ['rgb' => 'EAF4FF'],
@@ -116,7 +118,7 @@ class PlantillaInscripcionesSheet implements FromArray, ShouldAutoSize, WithEven
                 $hoja->getStyle('G2:G500')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
                 $hoja->getStyle('I2:I500')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
 
-                $hoja->getStyle('A:P')->getAlignment()->setVertical('center');
+                $hoja->getStyle('A:Q')->getAlignment()->setVertical('center');
             },
         ];
     }
