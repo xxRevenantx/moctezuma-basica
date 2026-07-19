@@ -12,5 +12,5 @@ class ProcesoCierreCiclo extends Model
 
     public function detalles() { return $this->hasMany(ProcesoCierreCicloDetalle::class); }
     public function generacion() { return $this->belongsTo(Generacion::class); }
-    public function cicloEscolar() { return $this->belongsTo(cicloEscolar::class, 'ciclo_escolar_id'); }
+    public function cicloEscolar() { return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id'); }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Persona;
@@ -46,7 +46,7 @@ class CredencialImagenService
     public function renderAlumno(
         Inscripcion $alumno,
         Nivel $nivel,
-        ?cicloEscolar $cicloEscolar,
+        ?CicloEscolar $cicloEscolar,
         string $formato = 'png'
     ): string {
         $this->verificarDisponibilidad();

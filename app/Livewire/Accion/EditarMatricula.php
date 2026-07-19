@@ -3,7 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Models\Ciclo;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -105,7 +105,7 @@ class EditarMatricula extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
         $this->ciclosOptions = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
-        $this->ciclosEscolaresObservacion = cicloEscolar::query()
+        $this->ciclosEscolaresObservacion = CicloEscolar::query()
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('fin_anio')

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class cicloEscolar extends Model
+class CicloEscolar extends Model
 {
     use HasFactory;
 
@@ -32,25 +32,6 @@ class cicloEscolar extends Model
     public function periodos()
     {
         return $this->hasMany(Periodos::class, 'ciclo_escolar_id');
-    }
-
-    public function docenteGrupos()
-    {
-        return $this->hasMany(DocenteGrupo::class, 'ciclo_escolar_id');
-    }
-
-    public function grupos()
-    {
-        return $this->belongsToMany(Grupo::class, 'docente_grupo', 'ciclo_escolar_id', 'grupo_id')
-            ->withPivot(['persona_id', 'es_tutor'])
-            ->withTimestamps();
-    }
-
-    public function docentes()
-    {
-        return $this->belongsToMany(Persona::class, 'docente_grupo', 'ciclo_escolar_id', 'persona_id')
-            ->withPivot(['grupo_id', 'es_tutor'])
-            ->withTimestamps();
     }
 
     public function calificaciones()

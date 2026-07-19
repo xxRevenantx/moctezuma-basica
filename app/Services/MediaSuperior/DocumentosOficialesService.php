@@ -16,7 +16,7 @@ use App\Models\MateriaPromediar;
 use App\Models\Nivel;
 use App\Models\Persona;
 use App\Models\Semestre;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
@@ -47,7 +47,7 @@ class DocumentosOficialesService
 
     public function ciclos(): Collection
     {
-        return cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
     }
@@ -55,7 +55,7 @@ class DocumentosOficialesService
     public function generaciones(?int $cicloId = null): Collection
     {
         $nivel = $this->nivel();
-        $ciclo = $cicloId ? cicloEscolar::query()->find($cicloId) : null;
+        $ciclo = $cicloId ? CicloEscolar::query()->find($cicloId) : null;
 
         return Generacion::query()
             ->where('nivel_id', $nivel->id)
@@ -192,7 +192,7 @@ class DocumentosOficialesService
         $nivel = $this->nivel();
         $escuela = Escuela::query()->first();
         $config = ConfiguracionMediaSuperior::query()->where('nivel_id', $nivel->id)->first();
-        $ciclo = cicloEscolar::query()->findOrFail($cicloId);
+        $ciclo = CicloEscolar::query()->findOrFail($cicloId);
 
         $direccion = collect([
             $escuela?->calle,
@@ -575,8 +575,8 @@ class DocumentosOficialesService
         $ultimoSemestre = $semestres->sortByDesc('ciclo_id')->first();
         $cicloReferencia = is_array($ultimoSemestre) ? ($ultimoSemestre['ciclo_id'] ?? null) : null;
         $cicloReferencia = $cicloReferencia
-            ?: cicloEscolar::query()->where('es_actual', true)->value('id')
-            ?: cicloEscolar::query()->max('id');
+            ?: CicloEscolar::query()->where('es_actual', true)->value('id')
+            ?: CicloEscolar::query()->max('id');
 
         return [
             'institucional' => $this->institucional((int) $cicloReferencia),
@@ -940,7 +940,7 @@ class DocumentosOficialesService
     private function contextoGrupo(array $filtros): array
     {
         $nivel = $this->nivel();
-        $ciclo = cicloEscolar::query()->findOrFail((int) ($filtros['ciclo_escolar_id'] ?? 0));
+        $ciclo = CicloEscolar::query()->findOrFail((int) ($filtros['ciclo_escolar_id'] ?? 0));
         $generacion = Generacion::query()
             ->where('nivel_id', $nivel->id)
             ->findOrFail((int) ($filtros['generacion_id'] ?? 0));

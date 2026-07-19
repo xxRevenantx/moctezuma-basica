@@ -2,7 +2,7 @@
 
 namespace App\Livewire\PersonaNivel;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\LiberacionSueldo;
@@ -61,8 +61,8 @@ class LiberacionSueldos extends Component
 
         $this->fechaDocumento = now()->format('Y-m-d');
         $this->anio = (int) now()->year;
-        $ciclo = cicloEscolar::query()->where('es_actual', true)->first()
-            ?: cicloEscolar::query()->latest('id')->first();
+        $ciclo = CicloEscolar::query()->where('es_actual', true)->first()
+            ?: CicloEscolar::query()->latest('id')->first();
         $this->cicloEscolar = (string) ($ciclo?->nombre ?: (now()->year - 1) . '-' . now()->year);
 
         $reanudacion = now()->copy()->month(8)->day(24);

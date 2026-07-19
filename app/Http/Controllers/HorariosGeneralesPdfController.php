@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Escuela;
 use App\Models\Grupo;
 use App\Models\Nivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Services\HorarioGeneralBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -34,7 +34,7 @@ class HorariosGeneralesPdfController extends Controller
             ->where('slug', $datos['slug_nivel'])
             ->firstOrFail();
 
-        $cicloEscolar = cicloEscolar::query()->findOrFail($datos['ciclo_escolar_id']);
+        $cicloEscolar = CicloEscolar::query()->findOrFail($datos['ciclo_escolar_id']);
         $esBachillerato = (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
         $alcance = $datos['alcance'];
 
@@ -128,7 +128,7 @@ class HorariosGeneralesPdfController extends Controller
 
     private function consultarGrupos(
         Nivel $nivel,
-        cicloEscolar $cicloEscolar,
+        CicloEscolar $cicloEscolar,
         string $alcance,
         ?int $generacionId,
         ?int $gradoId,

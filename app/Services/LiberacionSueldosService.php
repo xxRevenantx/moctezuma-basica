@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Director;
 use App\Models\Escuela;
 use App\Models\LiberacionSueldo;
@@ -224,7 +224,7 @@ class LiberacionSueldosService
         $nivel = $personaNivel->nivel;
         $persona = $personaNivel->persona;
         $escuela = Escuela::query()->first();
-        $ciclo = cicloEscolar::query()->where('es_actual', true)->first() ?: cicloEscolar::query()->latest('id')->first();
+        $ciclo = CicloEscolar::query()->where('es_actual', true)->first() ?: CicloEscolar::query()->latest('id')->first();
         $config = $this->configuracion();
 
         $directorPersona = null;

@@ -6,7 +6,7 @@ use App\Exports\FichaDescriptivaExport;
 use App\Models\FichaDescriptiva;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +68,7 @@ class FichaController extends Controller
             'alumno' => $inscripcion,
             'periodo' => $periodo,
             'periodoNombre' => $this->nombrePeriodo($periodo),
-            'cicloEscolar' => $cicloEscolarId ? cicloEscolar::find($cicloEscolarId) : null,
+            'cicloEscolar' => $cicloEscolarId ? CicloEscolar::find($cicloEscolarId) : null,
             'campos' => self::CAMPOS,
             'fichas' => $fichas,
             'fechaLugar' => $request->string('fecha_lugar')->toString(),
@@ -125,7 +125,7 @@ class FichaController extends Controller
             'alumnos' => $alumnos,
             'periodo' => $periodo,
             'periodoNombre' => $this->nombrePeriodo($periodo),
-            'cicloEscolar' => $cicloEscolarId ? cicloEscolar::find($cicloEscolarId) : null,
+            'cicloEscolar' => $cicloEscolarId ? CicloEscolar::find($cicloEscolarId) : null,
             'campos' => self::CAMPOS,
             'fichas' => $fichas,
             'fechaLugar' => $request->string('fecha_lugar')->toString(),
@@ -161,9 +161,9 @@ class FichaController extends Controller
         );
     }
 
-    private function cicloActual(): ?cicloEscolar
+    private function cicloActual(): ?CicloEscolar
     {
-        return cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->first();

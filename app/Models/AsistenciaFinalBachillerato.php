@@ -34,7 +34,7 @@ class AsistenciaFinalBachillerato extends Model
 
     public function cicloEscolar()
     {
-        return $this->belongsTo(cicloEscolar::class);
+        return $this->belongsTo(CicloEscolar::class);
     }
 
     public function capturador()

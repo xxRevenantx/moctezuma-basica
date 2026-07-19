@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Services\GroqDocumentoService;
+use App\Services\HtmlSanitizerService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
@@ -20,6 +21,11 @@ use Throwable;
 class Constancia extends Component
 {
     use WithPagination;
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->canAccess('documentos.crear'), 403);
+    }
 
     public string $query = '';
 
@@ -442,7 +448,7 @@ class Constancia extends Component
             [
                 'clave' => $this->nueva_clave,
                 'titulo' => $this->nuevo_titulo,
-                'contenido_html' => $this->nuevo_contenido_html,
+                'contenido_html' => app(HtmlSanitizerService::class)->sanitize($this->nuevo_contenido_html),
                 'variables' => $variables,
                 'activo' => $this->nuevo_activo,
             ]
@@ -516,7 +522,7 @@ class Constancia extends Component
         ConstanciaPlantilla::query()
             ->where('id', $this->plantilla_id)
             ->update([
-                'contenido_html' => $this->contenido_html,
+                'contenido_html' => app(HtmlSanitizerService::class)->sanitize($this->contenido_html),
             ]);
 
         $this->dispatch('notificar', tipo: 'success', mensaje: 'Contenido guardado correctamente.');
@@ -685,7 +691,7 @@ class Constancia extends Component
         session()->put('constancias_masivas_payload', [
             'alumno_ids' => $alumnos->pluck('id')->values()->toArray(),
             'plantilla_id' => $this->plantilla_id,
-            'contenido_html' => $this->contenido_html,
+            'contenido_html' => app(HtmlSanitizerService::class)->sanitize($this->contenido_html),
             'fecha_expedicion' => $this->fecha_expedicion ?: now()->format('Y-m-d'),
             'dirigido_a' => $this->dirigido_a,
             'modo_descarga' => $this->modo_descarga,

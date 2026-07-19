@@ -51,7 +51,6 @@ use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
 use App\Http\Controllers\TutorController;
 use App\Models\PersonaNivel;
-use App\Models\Profesor;
 
 
 // CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS

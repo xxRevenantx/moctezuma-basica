@@ -7,7 +7,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Services\HorarioGeneralBuilder;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -53,7 +53,7 @@ class HorariosGenerales extends Component
         $this->esBachillerato = (int) $this->nivel->id === 4
             || $this->nivel->slug === 'bachillerato';
 
-        $this->ciclosEscolares = cicloEscolar::query()
+        $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio']);
@@ -343,7 +343,7 @@ class HorariosGenerales extends Component
         }
 
         $ciclo = $this->ciclosEscolares->first(
-            fn(cicloEscolar $item) => (int) $item->id === (int) $this->ciclo_escolar_id
+            fn(CicloEscolar $item) => (int) $item->id === (int) $this->ciclo_escolar_id
         );
 
         if (!$ciclo) {

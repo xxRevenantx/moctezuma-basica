@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Accion;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Dia;
 use App\Models\Grupo;
 use App\Models\Grado;
@@ -48,9 +48,9 @@ class TallerConjunto extends Component
     {
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
-        $this->ciclo_escolar_id = cicloEscolar::query()
+        $this->ciclo_escolar_id = CicloEscolar::query()
             ->where('es_actual', true)
-            ->value('id') ?: cicloEscolar::query()->max('id');
+            ->value('id') ?: CicloEscolar::query()->max('id');
     }
 
     public function getEsSecundariaProperty(): bool
@@ -69,7 +69,7 @@ class TallerConjunto extends Component
 
     public function getCiclosEscolaresProperty()
     {
-        return cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get();
@@ -559,7 +559,7 @@ class TallerConjunto extends Component
 
     public function limpiarFormulario(bool $conservarPanel = true): void
     {
-        $ciclo = $this->ciclo_escolar_id ?: cicloEscolar::query()->max('id');
+        $ciclo = $this->ciclo_escolar_id ?: CicloEscolar::query()->max('id');
 
         $this->reset([
             'editandoSesionId',

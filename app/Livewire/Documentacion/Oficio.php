@@ -6,6 +6,7 @@ use App\Models\Director;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Oficio as OficioModel;
+use App\Services\HtmlSanitizerService;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -14,6 +15,11 @@ use Livewire\WithPagination;
 class Oficio extends Component
 {
     use WithPagination;
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->canAccess('documentos.crear'), 403);
+    }
 
     public string $query = '';
 
@@ -216,7 +222,7 @@ class Oficio extends Component
                 'tercer_periodo' => $this->editar_tercer_periodo,
             ],
 
-            'descripcion_html' => $this->editar_descripcion_html,
+            'descripcion_html' => app(HtmlSanitizerService::class)->sanitize($this->editar_descripcion_html),
         ]);
 
         $this->cerrarModalEditar();
@@ -455,7 +461,7 @@ class Oficio extends Component
             'dirigido_2_cargo' => $this->dirigido_2_cargo,
             'dirigido_2_lugar' => $this->dirigido_2_lugar,
             'periodos_calificaciones' => $this->periodosSeleccionados(),
-            'descripcion_html' => $this->descripcion_html,
+            'descripcion_html' => app(HtmlSanitizerService::class)->sanitize($this->descripcion_html),
         ]);
 
         $this->resetFormulario();

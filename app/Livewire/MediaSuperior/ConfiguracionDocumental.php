@@ -8,7 +8,7 @@ use App\Models\Escuela;
 use App\Models\FirmanteMediaSuperior;
 use App\Models\Nivel;
 use App\Models\Persona;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -80,8 +80,8 @@ class ConfiguracionDocumental extends Component
         $this->mostrar_materias_extra = (bool) ($config->mostrar_materias_extra ?? true);
         $this->mostrar_foto_historial = (bool) ($config->mostrar_foto_historial ?? false);
 
-        $cicloActualId = cicloEscolar::query()->where('es_actual', true)->value('id')
-            ?: cicloEscolar::query()->max('id');
+        $cicloActualId = CicloEscolar::query()->where('es_actual', true)->value('id')
+            ?: CicloEscolar::query()->max('id');
 
         foreach ($this->roles() as $rol => $cargo) {
             $actual = FirmanteMediaSuperior::query()
@@ -215,7 +215,7 @@ class ConfiguracionDocumental extends Component
     #[Computed]
     public function ciclos()
     {
-        return cicloEscolar::query()->orderByDesc('inicio_anio')->get();
+        return CicloEscolar::query()->orderByDesc('inicio_anio')->get();
     }
 
     #[Computed]
@@ -486,7 +486,7 @@ class ConfiguracionDocumental extends Component
     private function validarFirmantesSeleccionados(): void
     {
         $errores = [];
-        $ciclos = cicloEscolar::query()->get(['id', 'inicio_anio', 'fin_anio'])->keyBy('id');
+        $ciclos = CicloEscolar::query()->get(['id', 'inicio_anio', 'fin_anio'])->keyBy('id');
 
         foreach ($this->roles() as $rol => $cargo) {
             $datos = $this->firmantes[$rol] ?? [];

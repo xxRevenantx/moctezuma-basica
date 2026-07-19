@@ -15,7 +15,7 @@
                     </h3>
 
                     <p class="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-                        Reutiliza el mismo alumno, conserva sus etapas anteriores y crea una trayectoria nueva.
+                        Reutiliza el mismo alumno, conserva su historial anterior y registra un nuevo movimiento académico.
                         Reingreso corresponde a un egresado; reincorporación, a quien se trasladó o causó baja
                         antes de concluir.
                     </p>

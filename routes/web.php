@@ -13,7 +13,7 @@ Route::get('/', function () {
 
 Route::get('/register', function () {
     return redirect()->route('login');
-})->name('home');
+})->name('register.disabled');
 
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'active', 'verified'])
@@ -38,4 +38,4 @@ Route::middleware(['auth', 'active'])->group(function () {
         ->name('two-factor.show');
 });
 
-Route::middleware(['auth', 'active'])->group(base_path('routes/misrutas.php'));
+Route::middleware(['auth', 'active', 'route.permission'])->group(base_path('routes/misrutas.php'));

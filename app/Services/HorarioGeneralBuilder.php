@@ -7,7 +7,7 @@ use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Horario;
 use App\Models\Nivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -24,7 +24,7 @@ class HorarioGeneralBuilder
      */
     public function construir(
         Nivel $nivel,
-        cicloEscolar $cicloEscolar,
+        CicloEscolar $cicloEscolar,
         Collection $grupos,
         array $filtros = []
     ): ?array {

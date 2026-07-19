@@ -165,12 +165,12 @@ class SystemControlCenter extends Component
         }
 
         $before = $user->only(['is_admin', 'rol_sistema', 'permisos', 'activo']);
-        $user->update([
+        $user->forceFill([
             'is_admin' => $this->selectedIsAdmin,
             'rol_sistema' => $this->selectedRole,
             'permisos' => array_values(array_unique($this->selectedPermissions)),
             'activo' => $this->selectedActive,
-        ]);
+        ])->save();
 
         $audit->record('permissions_updated', 'usuarios', [
             'user_id' => $user->id,

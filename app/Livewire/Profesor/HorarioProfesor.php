@@ -3,7 +3,7 @@
 namespace App\Livewire\Profesor;
 
 use App\Models\Horario;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Persona;
 use App\Models\AsignacionMateria;
 use App\Models\TallerSesion;
@@ -27,14 +27,14 @@ class HorarioProfesor extends Component
 
     public function mount(): void
     {
-        $cicloPredeterminado = cicloEscolar::query()
+        $cicloPredeterminado = CicloEscolar::query()
             ->where('es_actual', true)
-            ->value('id') ?: cicloEscolar::query()->orderByDesc('id')->value('id');
+            ->value('id') ?: CicloEscolar::query()->orderByDesc('id')->value('id');
 
         $cicloSolicitado = request()->integer('ciclo_escolar_id');
 
         $this->cicloEscolarId = $cicloSolicitado > 0
-            && cicloEscolar::query()->whereKey($cicloSolicitado)->exists()
+            && CicloEscolar::query()->whereKey($cicloSolicitado)->exists()
             ? $cicloSolicitado
             : $cicloPredeterminado;
 
@@ -90,7 +90,7 @@ class HorarioProfesor extends Component
     public function render()
     {
         $profesores = $this->obtenerProfesores();
-        $ciclosEscolares = cicloEscolar::query()->orderByDesc('id')->get();
+        $ciclosEscolares = CicloEscolar::query()->orderByDesc('id')->get();
 
         $horariosBase = $this->obtenerHorarios(false);
         $horarios = $this->obtenerHorarios(true);

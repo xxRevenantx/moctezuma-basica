@@ -9,9 +9,10 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Services\GroqFichaService;
 use App\Services\GroqFichaGrupoService;
+use App\Services\HtmlSanitizerService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,11 @@ class Ficha extends Component
 {
     use WithPagination;
     use WithFileUploads;
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->canAccess('fichas.capturar'), 403);
+    }
 
     public string $descripcion = '';
 
@@ -154,7 +160,7 @@ class Ficha extends Component
         $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
         $this->nivel_id = $nivel->id;
 
-        $this->ciclo_escolar_id = cicloEscolar::query()
+        $this->ciclo_escolar_id = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->value('id');
@@ -340,10 +346,7 @@ class Ficha extends Component
 
         $alumno = Inscripcion::query()->findOrFail($this->inscripcion_id);
 
-        $descripcionLimpia = trim(strip_tags(
-            $this->descripcion,
-            '<p><br><strong><b><em><i><u><s><strike><span><ul><ol><li><table><thead><tbody><tr><th><td><h1><h2><h3><h4><h5><h6><blockquote>'
-        ));
+        $descripcionLimpia = app(HtmlSanitizerService::class)->sanitize($this->descripcion);
 
         FichaDescriptiva::query()->updateOrCreate(
             [
@@ -611,7 +614,7 @@ class Ficha extends Component
             ? Generacion::query()->whereKey($this->generacion_id)->first()
             : null;
 
-        $ciclo = cicloEscolar::query()->whereKey($this->ciclo_escolar_id)->first();
+        $ciclo = CicloEscolar::query()->whereKey($this->ciclo_escolar_id)->first();
 
         return [
             'contexto' => [
@@ -716,7 +719,7 @@ class Ficha extends Component
 
     public function getCiclosEscolaresProperty()
     {
-        return cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get();

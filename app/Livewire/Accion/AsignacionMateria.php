@@ -3,7 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Models\AsignacionMateria as AsignacionMateriaModel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -61,11 +61,11 @@ class AsignacionMateria extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
-        $actual = cicloEscolar::query()->where('es_actual', true)->first()
-            ?? cicloEscolar::query()->orderByDesc('inicio_anio')->first();
+        $actual = CicloEscolar::query()->where('es_actual', true)->first()
+            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->first();
 
         $this->ciclo_escolar_id = $actual?->id;
-        $this->ciclo_origen_id = cicloEscolar::query()
+        $this->ciclo_origen_id = CicloEscolar::query()
             ->when($actual, fn($q) => $q->where('id', '!=', $actual->id)->where('inicio_anio', '<=', $actual->inicio_anio))
             ->orderByDesc('inicio_anio')
             ->value('id');
@@ -78,16 +78,16 @@ class AsignacionMateria extends Component
 
     public function getCiclosEscolaresProperty(): Collection
     {
-        return cicloEscolar::query()
+        return CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('fin_anio')
             ->get();
     }
 
-    public function getCicloSeleccionadoProperty(): ?cicloEscolar
+    public function getCicloSeleccionadoProperty(): ?CicloEscolar
     {
         return $this->ciclo_escolar_id
-            ? cicloEscolar::query()->find($this->ciclo_escolar_id)
+            ? CicloEscolar::query()->find($this->ciclo_escolar_id)
             : null;
     }
 

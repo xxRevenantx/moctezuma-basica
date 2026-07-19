@@ -168,7 +168,7 @@
 
     <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl bg-slate-50 p-3 dark:bg-neutral-800">
-            <p class="text-xs font-bold uppercase text-slate-500">Última trayectoria</p>
+            <p class="text-xs font-bold uppercase text-slate-500">Estado anterior</p>
             <p class="mt-1 font-black">
                 {{ $this->ultimaTrayectoriaSeleccionada?->nivel?->nombre ?? '—' }} ·
                 {{ $this->ultimaTrayectoriaSeleccionada?->etiqueta_estatus ?? '—' }}
@@ -176,7 +176,7 @@
         </div>
 
         <div class="rounded-2xl bg-sky-50 p-3 dark:bg-sky-950/30">
-            <p class="text-xs font-bold uppercase text-sky-600">Nueva trayectoria</p>
+            <p class="text-xs font-bold uppercase text-sky-600">Nueva ubicación</p>
             <p class="mt-1 font-black text-sky-900 dark:text-sky-100">
                 {{ $niveles->firstWhere('id', $nivel_destino_id)?->nombre ?? '—' }} ·
                 {{ $this->grados->firstWhere('id', $grado_destino_id)?->nombre ?? '—' }}
@@ -201,7 +201,7 @@
     <div class="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <flux:checkbox
             wire:model.live="confirmar"
-            label="Confirmo que la trayectoria anterior permanecerá cerrada y se creará una etapa nueva."
+            label="Confirmo que el estado anterior quedará en el historial y se activará la nueva ubicación académica."
         />
 
         <flux:button

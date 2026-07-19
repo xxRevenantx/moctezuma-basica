@@ -3,7 +3,7 @@
 namespace App\Livewire\Profesor;
 
 use App\Models\AsignacionMateria;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Persona;
 use App\Models\TallerSesion;
 use Illuminate\Support\Collection;
@@ -33,10 +33,10 @@ class ListasProfesores extends Component
 
     public function mount(): void
     {
-        $ciclo = cicloEscolar::query()
+        $ciclo = CicloEscolar::query()
             ->where('es_actual', true)
             ->first()
-            ?? cicloEscolar::query()->orderByDesc('inicio_anio')->first();
+            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->first();
 
         $this->ciclo_escolar_id = $ciclo?->id;
         $this->fecha_corte = $this->fechaSugeridaParaCiclo($ciclo);
@@ -49,7 +49,7 @@ class ListasProfesores extends Component
 
     public function updatedCicloEscolarId($value): void
     {
-        $cicloActualId = (int) cicloEscolar::query()->where('es_actual', true)->value('id');
+        $cicloActualId = (int) CicloEscolar::query()->where('es_actual', true)->value('id');
 
         if (!$this->esAdministrador() && (int) $value !== $cicloActualId) {
             $this->ciclo_escolar_id = $cicloActualId ?: null;
@@ -59,7 +59,7 @@ class ListasProfesores extends Component
         $this->profesor_id = null;
         $this->buscar_profesor = '';
         $this->fecha_corte = $this->fechaSugeridaParaCiclo(
-            cicloEscolar::query()->find($this->ciclo_escolar_id)
+            CicloEscolar::query()->find($this->ciclo_escolar_id)
         );
         $this->limpiarFiltrosMaterias();
     }
@@ -105,7 +105,7 @@ class ListasProfesores extends Component
     #[Computed]
     public function ciclosEscolares(): Collection
     {
-        $query = cicloEscolar::query()
+        $query = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('fin_anio');
 
@@ -117,10 +117,10 @@ class ListasProfesores extends Component
     }
 
     #[Computed]
-    public function cicloSeleccionado(): ?cicloEscolar
+    public function cicloSeleccionado(): ?CicloEscolar
     {
         return $this->ciclo_escolar_id
-            ? cicloEscolar::query()->find($this->ciclo_escolar_id)
+            ? CicloEscolar::query()->find($this->ciclo_escolar_id)
             : null;
     }
 
@@ -578,7 +578,7 @@ class ListasProfesores extends Component
         };
     }
 
-    private function fechaSugeridaParaCiclo(?cicloEscolar $ciclo): string
+    private function fechaSugeridaParaCiclo(?CicloEscolar $ciclo): string
     {
         if (!$ciclo || $ciclo->es_actual) {
             return now()->toDateString();

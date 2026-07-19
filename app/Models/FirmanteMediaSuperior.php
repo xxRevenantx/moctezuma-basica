@@ -56,17 +56,17 @@ class FirmanteMediaSuperior extends Model
 
     public function cicloDesde()
     {
-        return $this->belongsTo(cicloEscolar::class, 'ciclo_desde_id');
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_desde_id');
     }
 
     public function cicloHasta()
     {
-        return $this->belongsTo(cicloEscolar::class, 'ciclo_hasta_id');
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_hasta_id');
     }
 
     public function scopeVigentePara(Builder $query, int $cicloId): Builder
     {
-        $ciclo = cicloEscolar::query()->find($cicloId, ['id', 'inicio_anio']);
+        $ciclo = CicloEscolar::query()->find($cicloId, ['id', 'inicio_anio']);
 
         if (! $ciclo) {
             return $query->whereRaw('1 = 0');

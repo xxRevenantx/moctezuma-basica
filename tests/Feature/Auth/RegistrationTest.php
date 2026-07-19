@@ -1,23 +1,15 @@
 <?php
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+test('public registration is disabled', function () {
+    $this->get('/register')
+        ->assertRedirect(route('login'));
 
-test('registration screen can be rendered', function () {
-    $response = $this->get(route('register'));
-
-    $response->assertStatus(200);
-});
-
-test('new users can register', function () {
-    $response = $this->post(route('register.store'), [
-        'name' => 'John Doe',
-        'email' => 'test@example.com',
+    $this->post('/register', [
+        'name' => 'Usuario no autorizado',
+        'email' => 'registro-no-autorizado@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ]);
+    ])->assertNotFound();
 
-    $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
-
-    $this->assertAuthenticated();
+    $this->assertGuest();
 });

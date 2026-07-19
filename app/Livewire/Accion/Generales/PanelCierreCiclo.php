@@ -4,7 +4,7 @@ namespace App\Livewire\Accion\Generales;
 
 use App\Models\Generacion;
 use App\Models\Nivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Services\CierreCicloEscolarService;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -31,7 +31,7 @@ class PanelCierreCiclo extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
         $this->generaciones = Generacion::query()->where('nivel_id', $this->nivel->id)->orderByDesc('status')->orderByDesc('anio_ingreso')->get();
-        $this->ciclos = cicloEscolar::query()->orderByDesc('inicio_anio')->get();
+        $this->ciclos = CicloEscolar::query()->orderByDesc('inicio_anio')->get();
         $this->ciclo_escolar_id = $this->ciclos->firstWhere('es_actual', true)?->id ?? $this->ciclos->first()?->id;
         $this->fecha_egreso = now()->toDateString();
     }

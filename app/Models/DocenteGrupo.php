@@ -9,17 +9,16 @@ class DocenteGrupo extends Model
 {
     use HasFactory;
 
-    protected $table = 'docente_grupo';
+    protected $table = 'docente_grupos';
 
     protected $fillable = [
         'persona_id',
         'grupo_id',
-        'ciclo_escolar_id',
-        'es_tutor',
+        'status',
     ];
 
     protected $casts = [
-        'es_tutor' => 'boolean',
+        'status' => 'boolean',
     ];
 
     public function persona()
@@ -30,10 +29,5 @@ class DocenteGrupo extends Model
     public function grupo()
     {
         return $this->belongsTo(Grupo::class, 'grupo_id');
-    }
-
-    public function cicloEscolar()
-    {
-        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
     }
 }

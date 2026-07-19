@@ -10,6 +10,8 @@ class Periodos extends Model
     /** @use HasFactory<\Database\Factories\PeriodosFactory> */
     use HasFactory;
 
+    protected $table = 'periodos';
+
     protected $fillable = [
         "nivel_id",
         "generacion_id",

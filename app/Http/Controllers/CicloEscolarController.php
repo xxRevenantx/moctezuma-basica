@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Http\Requests\StorecicloEscolarRequest;
 use App\Http\Requests\UpdatecicloEscolarRequest;
 

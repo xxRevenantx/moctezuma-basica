@@ -3,7 +3,7 @@
 namespace App\Exports;
 
 use App\Http\Controllers\FichaController;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Inscripcion;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -52,7 +52,7 @@ class FichaDescriptivaPlantillaImportacionExport implements FromArray, WithHeadi
 
     public function array(): array
     {
-        $ciclo = cicloEscolar::query()->find($this->cicloEscolarId);
+        $ciclo = CicloEscolar::query()->find($this->cicloEscolarId);
 
         return Inscripcion::query()
             ->with([

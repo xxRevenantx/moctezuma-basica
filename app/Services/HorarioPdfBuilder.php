@@ -8,7 +8,7 @@ use App\Models\Hora;
 use App\Models\Horario;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -19,7 +19,7 @@ class HorarioPdfBuilder
      * Construye todos los datos necesarios para una página de horario.
      * Devuelve null cuando el grupo no tiene registros válidos en el ciclo.
      */
-    public function construirBloque(Nivel $nivel, Grupo $grupo, cicloEscolar $cicloEscolar): ?array
+    public function construirBloque(Nivel $nivel, Grupo $grupo, CicloEscolar $cicloEscolar): ?array
     {
         $grupo->loadMissing([
             'asignacionGrupo:id,nombre',

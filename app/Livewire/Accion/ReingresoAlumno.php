@@ -14,11 +14,9 @@ use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Models\TipoDocumento;
-use App\Models\TrayectoriaAcademica;
 use App\Services\CierreNivelReingresoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -65,13 +63,16 @@ class ReingresoAlumno extends Component
 
     public function mount(?string $slug_nivel = null): void
     {
-        abort_unless(auth()->user()?->is_admin, 403);
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
+
         $this->slug_nivel = $slug_nivel;
         $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
         $this->ciclosEscolares = CicloEscolar::query()
-            ->orderByDesc('es_actual')->orderByDesc('inicio_anio')
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->ciclos = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
+
         $actual = $this->ciclosEscolares->firstWhere('es_actual', true) ?: $this->ciclosEscolares->first();
         $this->ciclo_escolar_id = $actual?->id;
         $this->ciclo_id = $this->ciclos->first()?->id;
@@ -86,12 +87,16 @@ class ReingresoAlumno extends Component
 
     public function updatedNivelDestinoId(): void
     {
-        $this->grado_destino_id = $this->generacion_destino_id = $this->semestre_destino_id = $this->grupo_destino_id = null;
+        $this->grado_destino_id = null;
+        $this->generacion_destino_id = null;
+        $this->semestre_destino_id = null;
+        $this->grupo_destino_id = null;
     }
 
     public function updatedGradoDestinoId(): void
     {
-        $this->semestre_destino_id = $this->grupo_destino_id = null;
+        $this->semestre_destino_id = null;
+        $this->grupo_destino_id = null;
     }
 
     public function updatedGeneracionDestinoId(): void
@@ -108,18 +113,21 @@ class ReingresoAlumno extends Component
     {
         $this->alumno_id = $id;
         $alumno = $this->alumnoSeleccionado;
-        $ultima = $alumno?->trayectoriasAcademicas?->first();
 
-        if ($ultima) {
-            $this->tipo_retorno = $ultima->estatus === 'egresado' ? 'reingreso' : 'reincorporacion';
+        if ($alumno) {
+            $estatus = $this->normalizarEstatus((string) $alumno->estatus);
+            $this->tipo_retorno = $estatus === 'egresado' ? 'reingreso' : 'reincorporacion';
             $this->nivel_destino_id = $this->tipo_retorno === 'reincorporacion'
-                ? $ultima->nivel_id
-                : ($this->nivel_destino_id ?: $ultima->nivel_id);
-            $this->escuela_procedencia = (string) ($ultima->escuela_procedencia ?? '');
-            $this->cct_procedencia = (string) ($ultima->cct_procedencia ?? '');
-            $this->ciclo_procedencia = (string) ($ultima->ciclo_procedencia ?? '');
-            $this->ultimo_grado_procedencia = (string) ($ultima->ultimo_grado_procedencia ?? '');
+                ? $alumno->nivel_id
+                : ($this->nivel_destino_id ?: $alumno->nivel_id);
+
+            $procedencia = data_get($alumno->ultimoMovimiento?->estado_nuevo, 'procedencia', []);
+            $this->escuela_procedencia = (string) ($procedencia['escuela_procedencia'] ?? '');
+            $this->cct_procedencia = (string) ($procedencia['cct_procedencia'] ?? '');
+            $this->ciclo_procedencia = (string) ($procedencia['ciclo_procedencia'] ?? '');
+            $this->ultimo_grado_procedencia = (string) ($procedencia['ultimo_grado_procedencia'] ?? '');
         }
+
         $this->resetValidation();
     }
 
@@ -135,48 +143,60 @@ class ReingresoAlumno extends Component
     public function getResultadosProperty(): Collection
     {
         $termino = trim($this->search);
-        if (mb_strlen($termino) < 2)
+        if (mb_strlen($termino) < 2) {
             return collect();
+        }
 
         return Inscripcion::withTrashed()
             ->with([
-                'trayectoriasAcademicas' => fn($q) => $q->with(['nivel:id,nombre', 'grado:id,nombre', 'generacion:id,anio_ingreso,anio_egreso'])
-                    ->orderByDesc('es_actual')->orderByDesc('fecha_inicio')->orderByDesc('id')
+                'nivel:id,nombre,slug',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'ultimoMovimiento',
             ])
-            ->where(function (Builder $q) use ($termino) {
+            ->where(function (Builder $query) use ($termino): void {
                 $like = "%{$termino}%";
-                $q->where('matricula', 'like', $like)
+                $query->where('matricula', 'like', $like)
                     ->orWhere('curp', 'like', $like)
                     ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$like]);
             })
-            ->whereHas('trayectoriasAcademicas', fn(Builder $q) => $q->whereIn('estatus', [
-                'egresado',
-                'traslado',
-                'baja_temporal',
-                'baja_definitiva',
-                'inactivo',
-                'suspendido',
-            ]))
-            ->whereDoesntHave('trayectoriasAcademicas', fn(Builder $q) => $q
-                ->where('activo', true)
-                ->where('es_actual', true)
-                ->whereNotIn('estatus', ['egresado', 'traslado', 'baja_definitiva', 'archivado']))
-            ->orderBy('apellido_paterno')->orderBy('apellido_materno')->orderBy('nombre')
-            ->limit(15)->get();
+            ->where(function (Builder $query): void {
+                $query->where('activo', false)
+                    ->orWhereIn('estatus', [
+                        'egresado',
+                        'traslado',
+                        'trasladado',
+                        'baja_temporal',
+                        'baja_definitiva',
+                        'inactivo',
+                        'suspendido',
+                    ]);
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->limit(15)
+            ->get();
     }
 
     public function getAlumnoSeleccionadoProperty(): ?Inscripcion
     {
-        return $this->alumno_id ? Inscripcion::withTrashed()->with([
-            'trayectoriasAcademicas' => fn($q) => $q->with(['nivel:id,nombre', 'grado:id,nombre', 'generacion:id,anio_ingreso,anio_egreso', 'grupo.asignacionGrupo:id,nombre', 'semestre:id,numero'])
-                ->orderByDesc('es_actual')->orderByDesc('fecha_inicio')->orderByDesc('id'),
-            'documentosActuales.tipoDocumento:id,nombre,slug',
-        ])->find($this->alumno_id) : null;
+        return $this->alumno_id
+            ? Inscripcion::withTrashed()->with([
+                'nivel:id,nombre,slug',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id,numero',
+                'documentosActuales.tipoDocumento:id,nombre,slug',
+                'ultimoMovimiento',
+            ])->find($this->alumno_id)
+            : null;
     }
 
-    public function getUltimaTrayectoriaSeleccionadaProperty(): ?TrayectoriaAcademica
+    public function getUltimaTrayectoriaSeleccionadaProperty(): ?Inscripcion
     {
-        return $this->alumnoSeleccionado?->trayectoriasAcademicas?->first();
+        return $this->alumnoSeleccionado;
     }
 
     public function getGeneracionDestinoSeleccionadaProperty(): ?Generacion
@@ -184,28 +204,30 @@ class ReingresoAlumno extends Component
         return $this->generaciones->firstWhere('id', $this->generacion_destino_id);
     }
 
-    public function ultimaTrayectoriaDe(?Inscripcion $alumno): ?TrayectoriaAcademica
+    public function ultimaTrayectoriaDe(?Inscripcion $alumno): ?Inscripcion
     {
-        return $alumno?->trayectoriasAcademicas?->first();
+        return $alumno;
     }
 
     public function textoGeneracion(?Generacion $generacion): string
     {
-        if (!$generacion) {
-            return 'Sin generación';
-        }
-
-        return $generacion->anio_ingreso . '-' . $generacion->anio_egreso;
+        return $generacion
+            ? $generacion->anio_ingreso.'-'.$generacion->anio_egreso
+            : 'Sin generación';
     }
 
     public function getGradosProperty(): Collection
     {
-        return $this->nivel_destino_id ? Grado::query()->where('nivel_id', $this->nivel_destino_id)->orderBy('orden')->get(['id', 'nivel_id', 'nombre', 'orden']) : collect();
+        return $this->nivel_destino_id
+            ? Grado::query()->where('nivel_id', $this->nivel_destino_id)->orderBy('orden')->get(['id', 'nivel_id', 'nombre', 'orden'])
+            : collect();
     }
 
     public function getGeneracionesProperty(): Collection
     {
-        return $this->nivel_destino_id ? Generacion::query()->where('nivel_id', $this->nivel_destino_id)->where('status', true)->orderByDesc('anio_ingreso')->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']) : collect();
+        return $this->nivel_destino_id
+            ? Generacion::query()->where('nivel_id', $this->nivel_destino_id)->where('status', true)->orderByDesc('anio_ingreso')->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso'])
+            : collect();
     }
 
     public function getSemestresProperty(): Collection
@@ -217,63 +239,72 @@ class ReingresoAlumno extends Component
 
     public function getGruposProperty(): Collection
     {
-        if (!$this->nivel_destino_id || !$this->grado_destino_id || !$this->generacion_destino_id)
+        if (! $this->nivel_destino_id || ! $this->grado_destino_id || ! $this->generacion_destino_id) {
             return collect();
-        return Grupo::query()->with('asignacionGrupo:id,nombre')
+        }
+
+        return Grupo::query()
+            ->with('asignacionGrupo:id,nombre')
             ->where('nivel_id', $this->nivel_destino_id)
             ->where('grado_id', $this->grado_destino_id)
             ->where('generacion_id', $this->generacion_destino_id)
-            ->when($this->esBachillerato, fn(Builder $q) => $q->where('semestre_id', $this->semestre_destino_id))
-            ->when(!$this->esBachillerato, fn(Builder $q) => $q->whereNull('semestre_id'))
-            ->orderBy('asignacion_grupo_id')->get();
+            ->when($this->esBachillerato, fn (Builder $query) => $query->where('semestre_id', $this->semestre_destino_id))
+            ->when(! $this->esBachillerato, fn (Builder $query) => $query->whereNull('semestre_id'))
+            ->orderBy('asignacion_grupo_id')
+            ->get();
     }
 
     public function getEsBachilleratoProperty(): bool
     {
         $nivel = $this->niveles->firstWhere('id', $this->nivel_destino_id);
-        return str_contains(mb_strtolower(($nivel?->slug ?? '') . ' ' . ($nivel?->nombre ?? '')), 'bachillerato');
+
+        return str_contains(
+            mb_strtolower(($nivel?->slug ?? '').' '.($nivel?->nombre ?? '')),
+            'bachillerato'
+        );
     }
 
     public function getAsignacionesExternasProperty(): Collection
     {
-        $trayectoria = $this->trayectoriaReingresada();
-        if (!$trayectoria)
+        $alumno = $this->alumnoReingresado();
+        if (! $alumno || ! $this->ciclo_escolar_id) {
             return collect();
+        }
 
-        return AsignacionMateria::query()->with('materia:id,nombre')
-            ->where('ciclo_escolar_id', $trayectoria->ciclo_escolar_id)
-            ->where('nivel_id', $trayectoria->nivel_id)
-            ->where('grado_id', $trayectoria->grado_id)
-            ->where('generacion_id', $trayectoria->generacion_id)
-            ->where('grupo_id', $trayectoria->grupo_id)
-            ->when(
-                $trayectoria->semestre_id,
-                fn(Builder $q) => $q->where('semestre_id', $trayectoria->semestre_id),
-                fn(Builder $q) => $q->whereNull('semestre_id')
-            )
-            ->where('estado', '!=', 'archivada')->orderBy('orden')->get();
+        return AsignacionMateria::query()
+            ->with('materia:id,nombre')
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $alumno->nivel_id)
+            ->where('grado_id', $alumno->grado_id)
+            ->where('generacion_id', $alumno->generacion_id)
+            ->where('grupo_id', $alumno->grupo_id)
+            ->when($alumno->semestre_id, fn (Builder $query) => $query->where('semestre_id', $alumno->semestre_id), fn (Builder $query) => $query->whereNull('semestre_id'))
+            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->orderBy('orden')
+            ->get();
     }
 
     public function getPeriodosExternosProperty(): Collection
     {
-        $trayectoria = $this->trayectoriaReingresada();
-        if (!$trayectoria)
+        $alumno = $this->alumnoReingresado();
+        if (! $alumno || ! $this->ciclo_escolar_id) {
             return collect();
+        }
 
-        return Periodos::query()->with(['periodoBasica:id,periodo', 'parcialBachillerato:id,parcial', 'cicloEscolar:id,inicio_anio,fin_anio'])
-            ->where('ciclo_escolar_id', $trayectoria->ciclo_escolar_id)
-            ->where('nivel_id', $trayectoria->nivel_id)
-            ->where('generacion_id', $trayectoria->generacion_id)
-            ->when(
-                $trayectoria->semestre_id,
-                fn(Builder $q) => $q->where('semestre_id', $trayectoria->semestre_id),
-                fn(Builder $q) => $q->whereNull('semestre_id')
-            )
-            ->orderBy('fecha_inicio')->get();
+        return Periodos::query()
+            ->with(['periodoBasica:id,periodo', 'parcialBachillerato:id,parcial', 'cicloEscolar:id,inicio_anio,fin_anio'])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $alumno->nivel_id)
+            ->where('generacion_id', $alumno->generacion_id)
+            ->when($alumno->semestre_id, fn (Builder $query) => $query->where('semestre_id', $alumno->semestre_id), fn (Builder $query) => $query->whereNull('semestre_id'))
+            ->orderBy('fecha_inicio')
+            ->get();
     }
 
     public function confirmarReingreso(): void
     {
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
+
         $this->validate([
             'alumno_id' => ['required', 'exists:inscripciones,id'],
             'tipo_retorno' => ['required', 'in:reingreso,reincorporacion'],
@@ -285,17 +316,19 @@ class ReingresoAlumno extends Component
             'semestre_destino_id' => [$this->esBachillerato ? 'required' : 'nullable', 'exists:semestres,id'],
             'grupo_destino_id' => ['required', 'exists:grupos,id'],
             'fecha_ingreso' => ['required', 'date'],
+            'matricula' => ['nullable', 'string', 'max:50'],
             'constancia_traslado_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
-        if (!$this->confirmar) {
+        if (! $this->confirmar) {
             $this->addError('confirmar', 'Confirma el resumen antes de continuar.');
             return;
         }
 
         $alumno = Inscripcion::withTrashed()->findOrFail($this->alumno_id);
+
         try {
-            $trayectoria = app(CierreNivelReingresoService::class)->reingresarExalumno(
+            $alumnoActualizado = app(CierreNivelReingresoService::class)->reingresarExalumno(
                 $alumno,
                 $this->tipo_retorno,
                 [
@@ -317,39 +350,45 @@ class ReingresoAlumno extends Component
                     'ciclo_procedencia' => trim($this->ciclo_procedencia) ?: null,
                     'ultimo_grado_procedencia' => trim($this->ultimo_grado_procedencia) ?: null,
                     'observaciones_procedencia' => trim($this->observaciones_procedencia) ?: null,
-                    'documentacion_pendiente' => $this->documentacion_pendiente && !$this->constancia_traslado_pdf,
+                    'documentacion_pendiente' => $this->documentacion_pendiente && ! $this->constancia_traslado_pdf,
                 ],
                 auth()->id()
             );
 
             if ($this->constancia_traslado_pdf) {
-                $this->documento_respaldo_id = $this->guardarConstanciaTraslado($alumno, $trayectoria);
+                $this->documento_respaldo_id = $this->guardarConstanciaTraslado($alumnoActualizado);
                 $documento = DocumentoAlumno::query()->findOrFail($this->documento_respaldo_id);
+
                 app(\App\Services\ConstanciaTrasladoService::class)->registrarExterna(
-                    $trayectoria,
+                    $alumnoActualizado,
                     $documento,
                     'Documento externo registrado durante el retorno del alumno.',
                     auth()->id()
                 );
-                $alumno->update(['documentacion_reingreso_pendiente' => false]);
-                $trayectoria->update(['documentacion_pendiente' => false]);
+
+                $alumnoActualizado->update(['documentacion_reingreso_pendiente' => false]);
             }
 
-            $this->alumno_reingresado_id = $alumno->id;
+            $this->alumno_reingresado_id = $alumnoActualizado->id;
             $this->confirmar = false;
             $this->dispatch('swal', [
-                'title' => $this->tipo_retorno === 'reingreso' ? 'Exalumno reingresado correctamente.' : 'Alumno reincorporado correctamente.',
+                'title' => $this->tipo_retorno === 'reingreso'
+                    ? 'Exalumno reingresado correctamente.'
+                    : 'Alumno reincorporado correctamente.',
                 'icon' => 'success',
                 'position' => 'top-end',
             ]);
-        } catch (ValidationException $e) {
-            foreach ($e->errors() as $campo => $mensajes)
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $campo => $mensajes) {
                 $this->addError($campo, $mensajes[0]);
+            }
         }
     }
 
     public function guardarCalificacionExterna(): void
     {
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('calificaciones.capturar'), 403);
+
         $this->validate([
             'alumno_reingresado_id' => ['required', 'exists:inscripciones,id'],
             'periodo_externo_id' => ['required', 'exists:periodos,id'],
@@ -368,13 +407,18 @@ class ReingresoAlumno extends Component
             auth()->id()
         );
 
-        $this->calificacion_externa = $this->observacion_calificacion = '';
-        $this->dispatch('swal', ['title' => 'Calificación externa integrada y marcada como equivalencia.', 'icon' => 'success', 'position' => 'top-end']);
+        $this->calificacion_externa = '';
+        $this->observacion_calificacion = '';
+        $this->dispatch('swal', [
+            'title' => 'Calificación externa integrada y marcada como equivalencia.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
     }
 
     public function nombreAlumno(?Inscripcion $alumno): string
     {
-        return trim(($alumno?->apellido_paterno ?? '') . ' ' . ($alumno?->apellido_materno ?? '') . ' ' . ($alumno?->nombre ?? ''));
+        return trim(($alumno?->apellido_paterno ?? '').' '.($alumno?->apellido_materno ?? '').' '.($alumno?->nombre ?? ''));
     }
 
     public function textoGrupo($grupo): string
@@ -384,40 +428,46 @@ class ReingresoAlumno extends Component
 
     public function etiquetaPeriodo($periodo): string
     {
-        $nombre = $periodo->periodoBasica?->periodo ?: $periodo->parcialBachillerato?->parcial ?: 'Periodo ' . $periodo->id;
-        return $nombre . ($periodo->cicloEscolar ? ' · ' . $periodo->cicloEscolar->nombre : '');
+        $nombre = $periodo->periodoBasica?->periodo
+            ?: $periodo->parcialBachillerato?->parcial
+            ?: 'Periodo '.$periodo->id;
+
+        return $nombre.($periodo->cicloEscolar ? ' · '.$periodo->cicloEscolar->nombre : '');
     }
 
-    private function guardarConstanciaTraslado(Inscripcion $alumno, TrayectoriaAcademica $trayectoria): int
+    private function guardarConstanciaTraslado(Inscripcion $alumno): int
     {
         $tipo = TipoDocumento::query()->where('slug', 'constancia-traslado-calificaciones')->firstOrFail();
         $version = ((int) DocumentoAlumno::query()
             ->where('inscripcion_id', $alumno->id)
             ->where('tipo_documento_id', $tipo->id)
-            ->where('nivel_id', $trayectoria->nivel_id)
+            ->where('nivel_id', $alumno->nivel_id)
             ->max('version')) + 1;
 
         DocumentoAlumno::query()
             ->where('inscripcion_id', $alumno->id)
             ->where('tipo_documento_id', $tipo->id)
-            ->where('nivel_id', $trayectoria->nivel_id)
+            ->where('nivel_id', $alumno->nivel_id)
             ->where('es_actual', true)
             ->update(['es_actual' => false, 'estado' => 'reemplazado']);
 
         $archivo = $this->constancia_traslado_pdf;
-        $nombre = Str::uuid() . '.pdf';
-        $discoExpedientes = config('filesystems.expedientes_disk', 'local');
+        $nombre = Str::uuid().'.pdf';
+        $discoExpedientes = (string) config('filesystems.expedientes_disk', 'local');
         $hashSha256 = hash_file('sha256', $archivo->getRealPath()) ?: null;
-        $ruta = $archivo->storeAs("expedientes/{$alumno->id}/constancia-traslado/nivel-{$trayectoria->nivel_id}", $nombre, $discoExpedientes);
+        $ruta = $archivo->storeAs(
+            "expedientes/{$alumno->id}/constancia-traslado/nivel-{$alumno->nivel_id}",
+            $nombre,
+            $discoExpedientes
+        );
 
         return DocumentoAlumno::query()->create([
             'inscripcion_id' => $alumno->id,
             'tipo_documento_id' => $tipo->id,
-            'nivel_id' => $trayectoria->nivel_id,
-            'grado_id' => $trayectoria->grado_id,
-            'grupo_id' => $trayectoria->grupo_id,
-            'ciclo_escolar_id' => $trayectoria->ciclo_escolar_id,
-            'trayectoria_academica_id' => $trayectoria->id,
+            'nivel_id' => $alumno->nivel_id,
+            'grado_id' => $alumno->grado_id,
+            'grupo_id' => $alumno->grupo_id,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'fecha_documento' => now()->toDateString(),
             'origen' => 'externo',
             'tipo_movimiento' => $this->tipo_retorno,
@@ -437,11 +487,19 @@ class ReingresoAlumno extends Component
         ])->id;
     }
 
-    private function trayectoriaReingresada(): ?TrayectoriaAcademica
+    private function alumnoReingresado(): ?Inscripcion
     {
-        return $this->alumno_reingresado_id ? TrayectoriaAcademica::query()
-            ->where('inscripcion_id', $this->alumno_reingresado_id)
-            ->where('es_actual', true)->where('activo', true)->first() : null;
+        return $this->alumno_reingresado_id
+            ? Inscripcion::query()->find($this->alumno_reingresado_id)
+            : null;
+    }
+
+    private function normalizarEstatus(string $estatus): string
+    {
+        return match (mb_strtolower(trim($estatus))) {
+            'trasladado' => 'traslado',
+            default => mb_strtolower(trim($estatus)),
+        };
     }
 
     public function render()

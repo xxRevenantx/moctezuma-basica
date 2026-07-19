@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Persona;
@@ -36,7 +36,7 @@ class CredencialImagenController extends Controller
         $alumnos = $this->obtenerAlumnos($request, $nivel);
         $this->asegurarResultados($alumnos, 'No se encontraron alumnos para generar credenciales.');
 
-        $cicloEscolar = cicloEscolar::query()
+        $cicloEscolar = CicloEscolar::query()
             ->orderByDesc('es_actual')
             ->orderByDesc('id')
             ->first();
@@ -55,7 +55,7 @@ class CredencialImagenController extends Controller
         $alumno = $this->obtenerAlumnos($request, $nivel)->first();
         abort_unless($alumno, 404, 'No se encontró un alumno para mostrar la vista previa.');
 
-        $cicloEscolar = cicloEscolar::query()
+        $cicloEscolar = CicloEscolar::query()
             ->orderByDesc('es_actual')
             ->orderByDesc('id')
             ->first();
@@ -139,7 +139,7 @@ class CredencialImagenController extends Controller
     private function descargarAlumnos(
         Collection $alumnos,
         Nivel $nivel,
-        ?cicloEscolar $cicloEscolar,
+        ?CicloEscolar $cicloEscolar,
         string $formato
     ): Response|BinaryFileResponse {
         if ($alumnos->count() === 1) {

@@ -3,7 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Models\AsignacionMateria;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Dia;
 use App\Models\Generacion;
 use App\Models\Grado;
@@ -96,7 +96,7 @@ class Horario extends Component
         $this->materiasDisponibles = collect();
         $this->horariosGuardados = collect();
         $this->talleresGuardados = collect();
-        $this->ciclosEscolares = cicloEscolar::query()
+        $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get();

@@ -12,7 +12,7 @@ return [
                 'administracion.acceder', 'integridad.consultar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'respaldos.gestionar', 'papelera.gestionar',
                 'flujos.gestionar', 'alumnos.*', 'personal.*', 'academico.*',
-                'calificaciones.*', 'documentos.*', 'horarios.*',
+                'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*',
             ],
         ],
         'direccion' => [
@@ -22,7 +22,7 @@ return [
                 'notificaciones.gestionar', 'flujos.gestionar', 'alumnos.consultar',
                 'personal.consultar', 'academico.consultar', 'calificaciones.consultar',
                 'calificaciones.autorizar', 'documentos.consultar', 'documentos.autorizar',
-                'horarios.consultar',
+                'horarios.consultar', 'fichas.consultar',
             ],
         ],
         'profesor' => [
@@ -30,6 +30,7 @@ return [
             'permissions' => [
                 'alumnos.consultar', 'academico.consultar', 'calificaciones.consultar',
                 'calificaciones.capturar', 'documentos.consultar', 'horarios.consultar',
+                'fichas.consultar', 'fichas.capturar',
             ],
         ],
         'consulta' => [
@@ -37,6 +38,7 @@ return [
             'permissions' => [
                 'alumnos.consultar', 'personal.consultar', 'academico.consultar',
                 'calificaciones.consultar', 'documentos.consultar', 'horarios.consultar',
+                'fichas.consultar',
             ],
         ],
     ],
@@ -72,6 +74,8 @@ return [
         'documentos.eliminar' => 'Eliminar documentos',
         'horarios.consultar' => 'Consultar horarios',
         'horarios.editar' => 'Editar horarios',
+        'fichas.consultar' => 'Consultar fichas descriptivas',
+        'fichas.capturar' => 'Capturar fichas descriptivas',
     ],
 
     'policy_modules' => [
@@ -81,7 +85,6 @@ return [
         'Ciclo' => 'academico',
         'Director' => 'personal',
         'Escuela' => 'academico',
-        'GeneracionBasica' => 'academico',
         'Generacion' => 'academico',
         'Grado' => 'academico',
         'Grupo' => 'academico',
@@ -89,11 +92,8 @@ return [
         'Materia' => 'academico',
         'Nivel' => 'academico',
         'Periodo' => 'academico',
-        'PeriodosBachillerato' => 'academico',
-        'PeriodosBasico' => 'academico',
         'PersonaNivel' => 'personal',
         'Persona' => 'personal',
-        'Profesor' => 'personal',
         'Semestre' => 'academico',
         'Tutor' => 'alumnos',
     ],

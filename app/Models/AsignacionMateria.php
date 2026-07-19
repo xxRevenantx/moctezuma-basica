@@ -76,7 +76,7 @@ class AsignacionMateria extends Model
 
     public function cicloEscolar()
     {
-        return $this->belongsTo(cicloEscolar::class, 'ciclo_escolar_id');
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
     }
 
     public function nivel()

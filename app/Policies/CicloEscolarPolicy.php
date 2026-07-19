@@ -3,7 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Illuminate\Auth\Access\Response;
 
 class CicloEscolarPolicy
@@ -19,7 +19,7 @@ class CicloEscolarPolicy
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, cicloEscolar $cicloEscolar): bool
+    public function view(User $user, CicloEscolar $cicloEscolar): bool
     {
         return $user->canAccess('academico.consultar');
     }
@@ -35,7 +35,7 @@ class CicloEscolarPolicy
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, cicloEscolar $cicloEscolar): bool
+    public function update(User $user, CicloEscolar $cicloEscolar): bool
     {
         return $user->canAccess('academico.editar');
     }
@@ -43,7 +43,7 @@ class CicloEscolarPolicy
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, cicloEscolar $cicloEscolar): bool
+    public function delete(User $user, CicloEscolar $cicloEscolar): bool
     {
         return $user->canAccess('academico.eliminar');
     }
@@ -51,7 +51,7 @@ class CicloEscolarPolicy
     /**
      * Determine whether the user can restore the model.
      */
-    public function restore(User $user, cicloEscolar $cicloEscolar): bool
+    public function restore(User $user, CicloEscolar $cicloEscolar): bool
     {
         return $user->canAccess('academico.editar');
     }
@@ -59,7 +59,7 @@ class CicloEscolarPolicy
     /**
      * Determine whether the user can permanently delete the model.
      */
-    public function forceDelete(User $user, cicloEscolar $cicloEscolar): bool
+    public function forceDelete(User $user, CicloEscolar $cicloEscolar): bool
     {
         return $user->canAccess('academico.eliminar');
     }

@@ -159,8 +159,8 @@ class Persona extends Model
 
     public function gruposAsignados()
     {
-        return $this->belongsToMany(Grupo::class, 'docente_grupo', 'persona_id', 'grupo_id')
-            ->withPivot(['ciclo_escolar_id', 'es_tutor'])
+        return $this->belongsToMany(Grupo::class, 'docente_grupos', 'persona_id', 'grupo_id')
+            ->withPivot(['status'])
             ->withTimestamps();
     }
 
@@ -174,10 +174,4 @@ class Persona extends Model
         return $this->hasMany(MovimientoPersonal::class, 'persona_id');
     }
 
-    public function ciclosEscolares()
-    {
-        return $this->belongsToMany(CicloEscolar::class, 'docente_grupo', 'persona_id', 'ciclo_escolar_id')
-            ->withPivot(['grupo_id', 'es_tutor'])
-            ->withTimestamps();
-    }
 }

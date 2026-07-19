@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Dia;
 use App\Models\Director;
 use App\Models\Hora;
@@ -148,13 +148,13 @@ class PDFController extends Controller
         $cicloEscolar = null;
 
         if (!blank($cicloEscolarId)) {
-            $cicloEscolar = cicloEscolar::query()
+            $cicloEscolar = CicloEscolar::query()
                 ->where('id', $cicloEscolarId)
                 ->first();
         }
 
         if (!$cicloEscolar) {
-            $cicloEscolar = cicloEscolar::query()
+            $cicloEscolar = CicloEscolar::query()
                 ->orderByDesc('id')
                 ->first();
         }
@@ -1236,13 +1236,12 @@ class PDFController extends Controller
             /*
              * Respaldo para instalaciones que utilizan la tabla docente_grupo.
              */
-            if (!$docente && Schema::hasTable('docente_grupo')) {
+            if (!$docente && Schema::hasTable('docente_grupos')) {
                 $docente = Persona::query()
                     ->whereHas('docenteGrupos', function ($query) use ($grupo, $cicloEscolar) {
                         $query
                             ->where('grupo_id', $grupo->id)
-                            ->where('ciclo_escolar_id', $cicloEscolar->id)
-                            ->where('es_tutor', true);
+                            ->where('status', true);
                     })
                     ->where(function ($query) {
                         $query->whereNull('status')
@@ -1641,7 +1640,7 @@ class PDFController extends Controller
         $directorAdministracion = Director::where("identificador", "director-general-administracion")->first();
         $directorMagisterio = Director::where("identificador", "director-magisterio-estatal")->first();
 
-        $cicloEscolar = cicloEscolar::find($ciclo_escolar);
+        $cicloEscolar = CicloEscolar::find($ciclo_escolar);
 
         // ✅ IMPORTANTE: ordenar por persona_nivel.orden
         $asignacionesNivel = PersonaNivel::query()
@@ -1831,11 +1830,11 @@ class PDFController extends Controller
         */
 
         $cicloEscolar = $cicloEscolarId
-            ? cicloEscolar::query()->find($cicloEscolarId)
+            ? CicloEscolar::query()->find($cicloEscolarId)
             : null;
 
         if (!$cicloEscolar) {
-            $cicloEscolar = cicloEscolar::query()
+            $cicloEscolar = CicloEscolar::query()
                 ->orderByDesc('id')
                 ->first();
         }
@@ -5537,11 +5536,11 @@ class PDFController extends Controller
     // LISTAS PDF
     public function lista_pdf(Request $request, string $slug_nivel)
     {
-        $cicloEscolar = cicloEscolar::query()
+        $cicloEscolar = CicloEscolar::query()
             ->when($request->integer('ciclo_escolar_id'), fn($q) => $q->whereKey($request->integer('ciclo_escolar_id')))
             ->when(!$request->integer('ciclo_escolar_id'), fn($q) => $q->where('es_actual', true))
             ->first()
-            ?? cicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->firstOrFail();
+            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->firstOrFail();
 
         if (!$cicloEscolar->es_actual) {
             abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede consultar listas históricas.');
@@ -6049,7 +6048,7 @@ class PDFController extends Controller
             abort(404, 'No se encontró la escuela.');
         }
 
-        $cicloEscolar = cicloEscolar::query()
+        $cicloEscolar = CicloEscolar::query()
             ->whereKey($cicloEscolarId)
             ->first();
 

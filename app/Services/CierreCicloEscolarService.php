@@ -6,7 +6,7 @@ use App\Models\Generacion;
 use App\Models\Inscripcion;
 use App\Models\ProcesoCierreCiclo;
 use App\Models\ProcesoCierreCicloDetalle;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +106,7 @@ class CierreCicloEscolarService
                 $procesados++;
             }
             if ($datos['cerrar_generacion'] ?? false) $generacion->update(['status' => false, 'cerrada_at' => now(), 'cerrada_por' => $usuarioId, 'motivo_desactivacion' => $datos['motivo'], 'observaciones' => $datos['motivo']]);
-            if (($datos['cerrar_ciclo'] ?? false) && ! empty($datos['ciclo_escolar_id'])) cicloEscolar::query()->whereKey($datos['ciclo_escolar_id'])->update(['es_actual' => false, 'cerrado_at' => now(), 'cerrado_por' => $usuarioId]);
+            if (($datos['cerrar_ciclo'] ?? false) && ! empty($datos['ciclo_escolar_id'])) CicloEscolar::query()->whereKey($datos['ciclo_escolar_id'])->update(['es_actual' => false, 'cerrado_at' => now(), 'cerrado_por' => $usuarioId]);
             $proceso->update(['total_procesados' => $procesados, 'total_excluidos' => $excluidos, 'resumen' => $this->diagnostico($datos['nivel_id'], $generacion->id, $datos['ciclo_escolar_id'] ?? null)]);
             return $proceso->fresh();
         });

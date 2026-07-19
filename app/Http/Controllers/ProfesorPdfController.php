@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AsignacionMateria;
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\Escuela;
 use App\Models\Grupo;
 use App\Models\Horario;
@@ -44,7 +44,7 @@ class ProfesorPdfController extends Controller
             'periodos' => ['nullable', 'array'],
         ]);
 
-        $ciclo = cicloEscolar::query()->findOrFail((int) $datos['ciclo_escolar_id']);
+        $ciclo = CicloEscolar::query()->findOrFail((int) $datos['ciclo_escolar_id']);
         $this->autorizarConsultaDelCiclo($ciclo);
 
         $profesor = Persona::query()
@@ -123,7 +123,7 @@ class ProfesorPdfController extends Controller
         ])->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
-    private function autorizarConsultaDelCiclo(cicloEscolar $ciclo): void
+    private function autorizarConsultaDelCiclo(CicloEscolar $ciclo): void
     {
         if (!$ciclo->es_actual) {
             abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede consultar listas históricas.');

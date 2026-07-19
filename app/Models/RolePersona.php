@@ -6,25 +6,31 @@ use Illuminate\Database\Eloquent\Model;
 
 class RolePersona extends Model
 {
-     protected $table = 'role_personas';
+    protected $table = 'role_personas';
 
     protected $fillable = [
         'nombre',
         'slug',
         'descripcion',
-        'estatus',
+        'status',
     ];
 
-    public function rolesPersona()
-{
-    return $this->belongsToMany(\App\Models\RolePersona::class, 'persona_role', 'persona_id', 'role_persona_id')
-        ->withTimestamps();
-}
-public function personaNiveles()
-{
-    return $this->hasMany(\App\Models\PersonaNivel::class, foreignKey: 'role_persona_id');
-}
+    protected $casts = [
+        'status' => 'boolean',
+    ];
 
+    public function personas()
+    {
+        return $this->belongsToMany(
+            Persona::class,
+            'persona_role',
+            'role_persona_id',
+            'persona_id'
+        )->withTimestamps();
+    }
 
-
+    public function personaNiveles()
+    {
+        return $this->hasMany(PersonaNivel::class, 'role_persona_id');
+    }
 }

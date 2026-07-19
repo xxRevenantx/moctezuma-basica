@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\cicloEscolar;
+use App\Models\CicloEscolar;
 use App\Models\AsignacionMateria;
 use App\Models\TallerSesion;
 use App\Models\Escuela;
@@ -24,7 +24,7 @@ class ProfesorHorarioPdfController extends Controller
 
         $profesor = Persona::query()->findOrFail($profesorId);
 
-        $cicloEscolar = cicloEscolar::query()
+        $cicloEscolar = CicloEscolar::query()
             ->when($request->filled('ciclo_escolar_id'), fn($query) => $query->where('id', $request->integer('ciclo_escolar_id')))
             ->when(!$request->filled('ciclo_escolar_id'), fn($query) => $query->orderByDesc('es_actual'))
             ->orderBy('id', 'desc')

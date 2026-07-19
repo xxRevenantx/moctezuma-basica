@@ -156,6 +156,22 @@ class Inscripcion extends Model
         }
     }
 
+    public function getEtiquetaEstatusAttribute(): string
+    {
+        return match (mb_strtolower((string) $this->estatus)) {
+            'activo' => 'Activo',
+            'reingreso' => 'Reingreso',
+            'no_promovido' => 'No promovido',
+            'egresado' => 'Egresado',
+            'traslado', 'trasladado' => 'Traslado',
+            'baja_temporal' => 'Baja temporal',
+            'baja_definitiva' => 'Baja definitiva',
+            'suspendido' => 'Suspendido',
+            'inactivo' => 'Inactivo',
+            default => ucfirst(str_replace('_', ' ', (string) $this->estatus)),
+        };
+    }
+
     public function getInicialesAttribute(): string
     {
         $primera = mb_substr(trim((string) $this->nombre), 0, 1);
