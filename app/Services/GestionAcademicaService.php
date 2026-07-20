@@ -74,6 +74,113 @@ class GestionAcademicaService
         });
     }
 
+    public function activarPreinscripcion(
+        Inscripcion $alumno,
+        string $motivo,
+        ?int $usuarioId,
+        ?string $fecha = null
+    ): Inscripcion {
+        $motivo = trim($motivo);
+
+        if (mb_strlen($motivo) < 5) {
+            throw ValidationException::withMessages([
+                'motivo_activacion' => 'Escribe un motivo de activación de al menos 5 caracteres.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($alumno, $motivo, $usuarioId, $fecha): Inscripcion {
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($alumno->id);
+
+            if ($alumno->trashed()) {
+                throw ValidationException::withMessages([
+                    'alumno' => 'Primero restaura el expediente antes de activar la inscripción.',
+                ]);
+            }
+
+            if (($alumno->estatus ?? 'activo') !== 'preinscrito') {
+                throw ValidationException::withMessages([
+                    'estatus' => 'Solo se pueden activar alumnos que estén en estatus preinscrito.',
+                ]);
+            }
+
+            $camposRequeridos = [
+                'matricula' => $alumno->matricula,
+                'ciclo_escolar_id' => $alumno->ciclo_escolar_id,
+                'nivel_id' => $alumno->nivel_id,
+                'grado_id' => $alumno->grado_id,
+                'generacion_id' => $alumno->generacion_id,
+                'grupo_id' => $alumno->grupo_id,
+            ];
+
+            if (collect($camposRequeridos)->contains(fn ($valor) => blank($valor))) {
+                throw ValidationException::withMessages([
+                    'alumno' => 'La preinscripción está incompleta. Revisa matrícula, ciclo escolar, nivel, grado, generación y grupo.',
+                ]);
+            }
+
+            $generacion = Generacion::query()->find((int) $alumno->generacion_id);
+
+            if (! $generacion || ! $generacion->status) {
+                throw ValidationException::withMessages([
+                    'generacion_id' => 'La generación asignada está inactiva. Corrige la asignación antes de activar.',
+                ]);
+            }
+
+            $grupo = Grupo::query()->find((int) $alumno->grupo_id);
+            $grupoValido = $grupo
+                && ($grupo->estado ?? 'activo') === 'activo'
+                && (int) $grupo->ciclo_escolar_id === (int) $alumno->ciclo_escolar_id
+                && (int) $grupo->nivel_id === (int) $alumno->nivel_id
+                && (int) $grupo->grado_id === (int) $alumno->grado_id
+                && (int) $grupo->generacion_id === (int) $alumno->generacion_id
+                && (int) ($grupo->semestre_id ?? 0) === (int) ($alumno->semestre_id ?? 0);
+
+            if (! $grupoValido) {
+                throw ValidationException::withMessages([
+                    'grupo_id' => 'El grupo asignado ya no está activo o no coincide con la ubicación académica del alumno.',
+                ]);
+            }
+
+            $antes = $this->snapshot($alumno);
+            $fechaMovimiento = $fecha ?: now()->toDateString();
+
+            $alumno->update([
+                'estatus' => 'activo',
+                'activo' => true,
+                'fecha_estatus' => $fechaMovimiento,
+                'motivo_estatus' => $motivo,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'indicador_reingreso' => false,
+                'documentacion_reingreso_pendiente' => false,
+                'usuario_acceso_activo' => true,
+            ]);
+
+            $despues = $this->snapshot($alumno->fresh());
+
+            $this->registrarCambio(
+                $alumno,
+                'activacion_preinscripcion',
+                $motivo,
+                $antes,
+                $despues,
+                $usuarioId
+            );
+
+            $this->registrarMovimiento(
+                $alumno,
+                'activacion_preinscripcion',
+                $motivo,
+                $antes,
+                $despues,
+                $usuarioId,
+                $fechaMovimiento
+            );
+
+            return $alumno->fresh();
+        });
+    }
+
     public function cambiarEstatus(Inscripcion $alumno, string $estatus, string $motivo, ?int $usuarioId, ?string $fecha = null): Inscripcion
     {
         if (!in_array($estatus, self::ESTATUS, true)) {
@@ -242,6 +349,11 @@ class GestionAcademicaService
             'fecha_baja',
             'motivo_baja',
             'fecha_inscripcion',
+            'indicador_reingreso',
+            'tipo_ultimo_ingreso',
+            'fecha_ultimo_ingreso',
+            'documentacion_reingreso_pendiente',
+            'usuario_acceso_activo',
             'deleted_at',
         ]);
     }
@@ -270,8 +382,11 @@ class GestionAcademicaService
 
         MovimientoAlumno::query()->create([
             'inscripcion_id' => $alumno->id,
+            'ciclo_escolar_id' => $despues['ciclo_escolar_id'] ?? $antes['ciclo_escolar_id'] ?? null,
+            'ciclo_id' => $alumno->ciclo_id,
             'nivel_anterior_id' => $antes['nivel_id'] ?? null,
             'nivel_nuevo_id' => $despues['nivel_id'] ?? null,
+            'usuario_acceso_activo' => $despues['usuario_acceso_activo'] ?? null,
             'tipo' => $tipo,
             'fecha' => $fecha ?: now()->toDateString(),
             'motivo' => $motivo,

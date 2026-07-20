@@ -97,9 +97,9 @@ class Matricula extends Component
     {
         return Generacion::query()
             ->where('nivel_id', $this->nivel->id)
-            ->when($cicloEscolarId, fn (Builder $query) => $query->whereHas(
+            ->when($cicloEscolarId, fn(Builder $query) => $query->whereHas(
                 'grupos',
-                fn (Builder $grupos) => $grupos
+                fn(Builder $grupos) => $grupos
                     ->where('ciclo_escolar_id', $cicloEscolarId)
                     ->where('estado', 'activo')
             ))
@@ -125,7 +125,7 @@ class Matricula extends Component
 
         return Grupo::query()
             ->with('asignacionGrupo')
-            ->withCount(['inscripciones as alumnos_activos_count' => fn (Builder $alumnos) => $alumnos
+            ->withCount(['inscripciones as alumnos_activos_count' => fn(Builder $alumnos) => $alumnos
                 ->where('activo', true)
                 ->whereNull('deleted_at')])
             ->where('ciclo_escolar_id', $cicloEscolarId)
@@ -135,11 +135,11 @@ class Matricula extends Component
             ->where('grado_id', $gradoId)
             ->when(
                 $this->esBachillerato(),
-                fn (Builder $query) => $query->where('semestre_id', $semestreId),
-                fn (Builder $query) => $query->whereNull('semestre_id')
+                fn(Builder $query) => $query->where('semestre_id', $semestreId),
+                fn(Builder $query) => $query->whereNull('semestre_id')
             )
             ->get()
-            ->sortBy(fn ($grupo) => $grupo->asignacionGrupo?->nombre ?? $grupo->id)
+            ->sortBy(fn($grupo) => $grupo->asignacionGrupo?->nombre ?? $grupo->id)
             ->values();
     }
 
@@ -272,7 +272,7 @@ class Matricula extends Component
         $this->selected = $this->query()
             ->forPage($this->getPage(), $this->perPage)
             ->pluck('id')
-            ->map(fn ($id) => (string) $id)
+            ->map(fn($id) => (string) $id)
             ->all();
     }
 
@@ -288,16 +288,16 @@ class Matricula extends Component
         return $query
             ->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo', 'nivel'])
             ->where('nivel_id', $this->nivel->id)
-            ->when($this->ciclo_escolar_id, fn (Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->when($this->ciclo_escolar_id, fn(Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when(
                 $this->generacion_id,
-                fn (Builder $q) => $q->where('generacion_id', $this->generacion_id),
-                fn (Builder $q) => $q->whereHas('generacion', fn (Builder $g) => $g->where('status', true))
+                fn(Builder $q) => $q->where('generacion_id', $this->generacion_id),
+                fn(Builder $q) => $q->whereHas('generacion', fn(Builder $g) => $g->where('status', true))
             )
-            ->when($this->grado_id, fn (Builder $q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->semestre_id, fn (Builder $q) => $q->where('semestre_id', $this->semestre_id))
-            ->when($this->grupo_id, fn (Builder $q) => $q->where('grupo_id', $this->grupo_id))
-            ->when($this->estatus !== 'todos', fn (Builder $q) => $q->where('estatus', $this->estatus))
+            ->when($this->grado_id, fn(Builder $q) => $q->where('grado_id', $this->grado_id))
+            ->when($this->semestre_id, fn(Builder $q) => $q->where('semestre_id', $this->semestre_id))
+            ->when($this->grupo_id, fn(Builder $q) => $q->where('grupo_id', $this->grupo_id))
+            ->when($this->estatus !== 'todos', fn(Builder $q) => $q->where('estatus', $this->estatus))
             ->when(trim($this->search) !== '', function (Builder $q): void {
                 $term = '%' . trim($this->search) . '%';
                 $q->where(function (Builder $s) use ($term): void {
@@ -372,7 +372,7 @@ class Matricula extends Component
 
         $this->selected = array_values(array_filter(
             $this->selected,
-            fn ($id) => (int) $id !== $inscripcionId
+            fn($id) => (int) $id !== $inscripcionId
         ));
 
         $this->dispatch('swal', [
@@ -390,6 +390,83 @@ class Matricula extends Component
 
         $this->dispatch('swal', [
             'title' => 'Alumno restaurado',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function activarPreinscripcion(
+        int $inscripcionId,
+        string $motivo,
+        GestionAcademicaService $service
+    ): void {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $motivo = trim($motivo);
+
+        if (mb_strlen($motivo) < 5 || mb_strlen($motivo) > 500) {
+            $this->dispatch('swal', [
+                'title' => 'Motivo no válido',
+                'text' => 'Escribe un motivo de activación de 5 a 500 caracteres.',
+                'icon' => 'warning',
+                'position' => 'center',
+            ]);
+
+            return;
+        }
+
+        $alumno = Inscripcion::query()->find($inscripcionId);
+
+        if (! $alumno) {
+            $this->dispatch('swal', [
+                'title' => 'Alumno no disponible',
+                'text' => 'El expediente no existe, está archivado o ya no se encuentra disponible.',
+                'icon' => 'error',
+                'position' => 'center',
+            ]);
+
+            return;
+        }
+
+        if (($alumno->estatus ?? 'activo') !== 'preinscrito') {
+            $this->dispatch('swal', [
+                'title' => 'La inscripción ya cambió',
+                'text' => 'Solo los alumnos preinscritos pueden activarse desde este botón.',
+                'icon' => 'info',
+                'position' => 'center',
+            ]);
+
+            return;
+        }
+
+        try {
+            $service->activarPreinscripcion(
+                $alumno,
+                $motivo,
+                auth()->id()
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $mensaje = collect($exception->errors())->flatten()->first()
+                ?: 'No fue posible activar la inscripción. Revisa la asignación académica.';
+
+            $this->dispatch('swal', [
+                'title' => 'No se pudo activar',
+                'text' => $mensaje,
+                'icon' => 'warning',
+                'position' => 'center',
+            ]);
+
+            return;
+        }
+
+        $this->selected = array_values(array_filter(
+            $this->selected,
+            fn($id) => (int) $id !== $inscripcionId
+        ));
+
+        $this->dispatch('swal', [
+            'title' => 'Inscripción activada',
+            'text' => 'El alumno quedó inscrito y activo. También se habilitó su acceso y se registró el movimiento en la bitácora.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -433,9 +510,9 @@ class Matricula extends Component
         $this->semestres = $this->cargarSemestres($this->grado_id);
         $this->grupos = $this->cargarGrupos($this->generacion_id, $this->grado_id, $this->semestre_id);
         $this->grupo_id = $grupoSeleccionado
-            && $this->grupos->contains(fn ($grupo) => (int) $grupo->id === (int) $grupoSeleccionado)
-                ? (int) $grupoSeleccionado
-                : null;
+            && $this->grupos->contains(fn($grupo) => (int) $grupo->id === (int) $grupoSeleccionado)
+            ? (int) $grupoSeleccionado
+            : null;
 
         $this->selected = [];
         $this->selectPage = false;
@@ -456,9 +533,9 @@ class Matricula extends Component
         $this->semestres = $this->cargarSemestres($this->grado_id);
         $this->grupos = $this->cargarGrupos($this->generacion_id, $this->grado_id, $this->semestre_id);
         $this->grupo_id = $alumno->grupo_id
-            && $this->grupos->contains(fn ($grupo) => (int) $grupo->id === (int) $alumno->grupo_id)
-                ? (int) $alumno->grupo_id
-                : null;
+            && $this->grupos->contains(fn($grupo) => (int) $grupo->id === (int) $alumno->grupo_id)
+            ? (int) $alumno->grupo_id
+            : null;
         $this->estatus = 'todos';
         $this->mostrar_archivados = $alumno->trashed();
         $this->search = $alumno->matricula
@@ -551,8 +628,8 @@ class Matricula extends Component
 
         $bitacoraAlumno = $this->alumnoBitacoraId
             ? Inscripcion::withTrashed()
-                ->with(['cambiosAcademicos.usuario', 'generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
-                ->find($this->alumnoBitacoraId)
+            ->with(['cambiosAcademicos.usuario', 'generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
+            ->find($this->alumnoBitacoraId)
             : null;
 
         return view('livewire.accion.matricula', compact('alumnos', 'resumen', 'bitacoraAlumno'));
