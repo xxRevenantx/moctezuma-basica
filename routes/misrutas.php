@@ -46,6 +46,7 @@ use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
 use App\Http\Controllers\PromediosMateriasPdfController;
 use App\Http\Controllers\RespaldoAcademicoController;
+use App\Http\Controllers\ReanudacionesLaboralesController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
@@ -111,6 +112,14 @@ Route::middleware('admin')->group(function () {
     Route::get('/plantilla/liberacion-sueldos/descargar/{formato}', [LiberacionSueldosController::class, 'descargar'])
         ->whereIn('formato', ['pdf', 'word', 'zip'])
         ->name('misrutas.liberacion-sueldos.descargar');
+
+    Route::get('/plantilla/reanudaciones/vista-previa/{token}', [ReanudacionesLaboralesController::class, 'preview'])
+        ->name('misrutas.reanudaciones.preview');
+    Route::get('/plantilla/reanudaciones/oficio/{reanudacion}', [ReanudacionesLaboralesController::class, 'individual'])
+        ->name('misrutas.reanudaciones.individual');
+    Route::get('/plantilla/reanudaciones/lote/{formato}', [ReanudacionesLaboralesController::class, 'lote'])
+        ->whereIn('formato', ['zip', 'word'])
+        ->name('misrutas.reanudaciones.lote');
 });
 
 // Ruta profesores
@@ -265,8 +274,6 @@ Route::get('/lugares-preescolar/documentos/{tipo}/zip', [DocumentosAcademicosZip
     ->name('misrutas.lugares-preescolar.documentos.zip');
 
 // PDF
-Route::get('/reanudaciones', [PDFController::class, 'reanudaciones'])->name('misrutas.reanudaciones');
-
 Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
 
 Route::get('/generales/horarios/pdf', HorariosGeneralesPdfController::class)

@@ -363,6 +363,153 @@ class LiberacionSueldos extends Component
         $this->dispatch('notificar', tipo: 'success', mensaje: 'La franja inferior y sus medidas fueron actualizadas.');
     }
 
+    /**
+     * Restaura únicamente campos seguros enviados desde localStorage.
+     * Los archivos temporales y el modo de edición no se conservan.
+     *
+     * @param array<string, mixed> $estado
+     */
+    public function restaurarEstadoLocal(array $estado): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $this->search = mb_substr(trim((string) ($estado['search'] ?? '')), 0, 180);
+        $this->historialSearch = mb_substr(trim((string) ($estado['historialSearch'] ?? '')), 0, 180);
+
+        $nivelId = $this->idExistente(Nivel::class, $estado['nivelFiltro'] ?? null);
+        $this->nivelFiltro = $nivelId ? (string) $nivelId : '';
+
+        $gradoId = $this->idExistente(Grado::class, $estado['gradoFiltro'] ?? null);
+        if ($gradoId && $nivelId && ! Grado::query()->whereKey($gradoId)->where('nivel_id', $nivelId)->exists()) {
+            $gradoId = null;
+        }
+        $this->gradoFiltro = $gradoId ? (string) $gradoId : '';
+
+        $grupoId = $this->idExistente(Grupo::class, $estado['grupoFiltro'] ?? null);
+        if ($grupoId && $gradoId && ! Grupo::query()->whereKey($grupoId)->where('grado_id', $gradoId)->exists()) {
+            $grupoId = null;
+        }
+        $this->grupoFiltro = $grupoId ? (string) $grupoId : '';
+
+        $rolId = $this->idExistente(RolePersona::class, $estado['rolFiltro'] ?? null);
+        $this->rolFiltro = $rolId ? (string) $rolId : '';
+
+        $historialNivelId = $this->idExistente(Nivel::class, $estado['historialNivel'] ?? null);
+        $this->historialNivel = $historialNivelId ? (string) $historialNivelId : '';
+        $this->historialCiclo = mb_substr(trim((string) ($estado['historialCiclo'] ?? '')), 0, 30);
+
+        $this->fechaDocumento = $this->fechaLocal($estado['fechaDocumento'] ?? null, $this->fechaDocumento);
+        $this->fechaReanudacion = $this->fechaLocal($estado['fechaReanudacion'] ?? null, $this->fechaReanudacion, true);
+        $this->quincenaInicio = $this->enteroLocal($estado['quincenaInicio'] ?? null, 1, 24, $this->quincenaInicio);
+        $this->quincenaFin = $this->enteroLocal($estado['quincenaFin'] ?? null, 1, 24, $this->quincenaFin);
+        $this->anio = $this->enteroLocal($estado['anio'] ?? null, 2000, 2100, $this->anio);
+
+        $ciclo = trim((string) ($estado['cicloEscolar'] ?? ''));
+        if (preg_match('/^\d{4}-\d{4}$/', $ciclo)) {
+            $this->cicloEscolar = $ciclo;
+        }
+
+        $this->franjaAnchoMm = $this->decimalLocal($estado['franjaAnchoMm'] ?? null, 50, 210, $this->franjaAnchoMm);
+        $this->franjaAltoMm = $this->decimalLocal($estado['franjaAltoMm'] ?? null, 2, 30, $this->franjaAltoMm);
+        $this->franjaInferiorMm = $this->decimalLocal($estado['franjaInferiorMm'] ?? null, 0, 30, $this->franjaInferiorMm);
+
+        $ids = collect(is_array($estado['seleccionados'] ?? null) ? $estado['seleccionados'] : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $this->seleccionados = PersonaNivel::query()
+            ->whereIn('id', $ids)
+            ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sortBy(fn (int $id) => $ids->search($id))
+            ->values()
+            ->all();
+
+        $this->firmantes = $this->firmantesLocales($estado['firmantes'] ?? []);
+        $this->sincronizarFirmantes();
+        $this->resetValidation();
+    }
+
+    private function idExistente(string $modelo, mixed $valor): ?int
+    {
+        $id = filter_var($valor, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        return $id && $modelo::query()->whereKey((int) $id)->exists() ? (int) $id : null;
+    }
+
+    private function fechaLocal(mixed $valor, string $predeterminada = '', bool $permitirVacia = false): string
+    {
+        $fecha = trim((string) $valor);
+        if ($permitirVacia && $fecha === '') {
+            return '';
+        }
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) && strtotime($fecha) !== false
+            ? $fecha
+            : $predeterminada;
+    }
+
+    private function enteroLocal(mixed $valor, int $minimo, int $maximo, int $predeterminado): int
+    {
+        $entero = filter_var($valor, FILTER_VALIDATE_INT);
+
+        return $entero !== false && $entero >= $minimo && $entero <= $maximo
+            ? (int) $entero
+            : $predeterminado;
+    }
+
+    private function decimalLocal(mixed $valor, float $minimo, float $maximo, float $predeterminado): float
+    {
+        $numero = filter_var($valor, FILTER_VALIDATE_FLOAT);
+
+        return $numero !== false && $numero >= $minimo && $numero <= $maximo
+            ? (float) $numero
+            : $predeterminado;
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function firmantesLocales(mixed $firmantes): array
+    {
+        if (! is_array($firmantes)) {
+            return [];
+        }
+
+        $campos = [
+            'director_persona_id',
+            'director_nombre',
+            'director_cargo',
+            'supervisor_director_id',
+            'supervisor_nombre',
+            'supervisor_cargo',
+            'jefe_sector_director_id',
+            'jefe_sector_nombre',
+            'jefe_sector_cargo',
+        ];
+
+        $resultado = [];
+        foreach ($firmantes as $nivelId => $datos) {
+            $nivel = filter_var($nivelId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if (! $nivel || ! is_array($datos) || ! Nivel::query()->whereKey((int) $nivel)->exists()) {
+                continue;
+            }
+
+            $resultado[(string) $nivel] = [];
+            foreach ($campos as $campo) {
+                $valor = $datos[$campo] ?? '';
+                if (str_ends_with($campo, '_id')) {
+                    $resultado[(string) $nivel][$campo] = is_numeric($valor) && (int) $valor > 0 ? (int) $valor : '';
+                } else {
+                    $resultado[(string) $nivel][$campo] = mb_substr(trim((string) $valor), 0, 255);
+                }
+            }
+        }
+
+        return $resultado;
+    }
+
     private function sincronizarFirmantes(): void
     {
         $service = app(LiberacionSueldosService::class);

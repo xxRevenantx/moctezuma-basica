@@ -1,4 +1,51 @@
-<div class="space-y-6" x-data="{ tab: @entangle('tab').live, gestionModal: false }"
+@php
+    $tabsPersonaNivel = [
+        'plantilla' => ['Plantilla actual', 'users'],
+        'carga' => ['Carga laboral', 'clock'],
+        'expedientes' => ['Expedientes', 'folder-open'],
+        'historial' => ['Movimientos e historial', 'clock'],
+    ];
+
+    if (auth()->user()?->is_admin) {
+        $tabsPersonaNivel['liberacion'] = ['Liberación de sueldos', 'banknotes'];
+        $tabsPersonaNivel['reanudaciones'] = ['Reanudaciones', 'arrow-path'];
+    }
+
+    $tabsPersonaNivel['reportes'] = ['Reportes', 'document-chart-bar'];
+    $clavePestanaPersonaNivel = 'moctezuma:persona-nivel:pestana:v1:usuario:' . (auth()->id() ?: 'invitado');
+@endphp
+
+<div class="space-y-6"
+    x-data="{
+        tab: @entangle('tab').live,
+        gestionModal: false,
+        clavePestana: @js($clavePestanaPersonaNivel),
+        pestanasPermitidas: @js(array_keys($tabsPersonaNivel)),
+        init() {
+            try {
+                const guardada = localStorage.getItem(this.clavePestana);
+
+                if (guardada && this.pestanasPermitidas.includes(guardada)) {
+                    this.tab = guardada;
+                }
+            } catch (error) {
+                console.warn('No fue posible restaurar la pestaña de Plantilla.', error);
+            }
+
+            this.$watch('tab', (valor) => {
+                if (!this.pestanasPermitidas.includes(valor)) {
+                    valor = 'plantilla';
+                    this.tab = valor;
+                }
+
+                try {
+                    localStorage.setItem(this.clavePestana, valor);
+                } catch (error) {
+                    console.warn('No fue posible guardar la pestaña de Plantilla.', error);
+                }
+            });
+        },
+    }"
     x-on:abrir-modal-gestion-persona-nivel.window="gestionModal = true"
     x-on:cerrar-modal-gestion-persona-nivel.window="gestionModal = false">
 
@@ -10,7 +57,7 @@
                     <p class="text-xs font-black uppercase tracking-[.2em] text-[#006492] dark:text-sky-300">Gestión integral</p>
                     <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Plantilla de personal por nivel</h1>
                     <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-                        Asignaciones generales, carga laboral, titulares, expedientes, liberación de sueldos, movimientos y reportes. Los PDF existentes no fueron modificados.
+                        Asignaciones generales, carga laboral, titulares, expedientes, liberación de sueldos, reanudaciones, movimientos y reportes.
                     </p>
                 </div>
 
@@ -55,18 +102,6 @@
         </div>
     </section>
 
-    @php
-        $tabsPersonaNivel = [
-            'plantilla' => ['Plantilla actual', 'users'],
-            'carga' => ['Carga laboral', 'clock'],
-            'expedientes' => ['Expedientes', 'folder-open'],
-            'historial' => ['Movimientos e historial', 'clock'],
-        ];
-        if (auth()->user()?->is_admin) {
-            $tabsPersonaNivel['liberacion'] = ['Liberación de sueldos', 'banknotes'];
-        }
-        $tabsPersonaNivel['reportes'] = ['Reportes', 'document-chart-bar'];
-    @endphp
     <nav class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         @foreach ($tabsPersonaNivel as $key => [$label, $icon])
             <button type="button" @click="tab = '{{ $key }}'"
@@ -332,6 +367,10 @@
     @if (auth()->user()?->is_admin)
         <section x-show="tab === 'liberacion'" x-cloak>
             <livewire:persona-nivel.liberacion-sueldos />
+        </section>
+
+        <section x-show="tab === 'reanudaciones'" x-cloak>
+            <livewire:persona-nivel.reanudaciones />
         </section>
     @endif
 

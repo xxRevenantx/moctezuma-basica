@@ -1,4 +1,96 @@
 <div id="liberacion-sueldos-formulario" class="space-y-5"
+    x-data="{
+        claveEstado: @js('moctezuma:persona-nivel:liberacion-sueldos:v1:usuario:' . (auth()->id() ?: 'invitado')),
+        temporizadorEstado: null,
+        search: @entangle('search').live,
+        nivelFiltro: @entangle('nivelFiltro').live,
+        gradoFiltro: @entangle('gradoFiltro').live,
+        grupoFiltro: @entangle('grupoFiltro').live,
+        rolFiltro: @entangle('rolFiltro').live,
+        historialSearch: @entangle('historialSearch').live,
+        historialNivel: @entangle('historialNivel').live,
+        historialCiclo: @entangle('historialCiclo').live,
+        seleccionados: @entangle('seleccionados').live,
+        firmantes: @entangle('firmantes').live,
+        fechaDocumento: @entangle('fechaDocumento').live,
+        quincenaInicio: @entangle('quincenaInicio').live,
+        quincenaFin: @entangle('quincenaFin').live,
+        anio: @entangle('anio').live,
+        cicloEscolar: @entangle('cicloEscolar').live,
+        fechaReanudacion: @entangle('fechaReanudacion').live,
+        franjaAnchoMm: @entangle('franjaAnchoMm').live,
+        franjaAltoMm: @entangle('franjaAltoMm').live,
+        franjaInferiorMm: @entangle('franjaInferiorMm').live,
+        async init() {
+            let guardado = null;
+
+            try {
+                const contenido = localStorage.getItem(this.claveEstado);
+                guardado = contenido ? JSON.parse(contenido) : null;
+            } catch (error) {
+                localStorage.removeItem(this.claveEstado);
+                console.warn('No fue posible leer el estado de Liberación de sueldos.', error);
+            }
+
+            if (guardado && typeof guardado === 'object') {
+                try {
+                    await this.$wire.restaurarEstadoLocal(guardado);
+                } catch (error) {
+                    console.warn('No fue posible restaurar Liberación de sueldos.', error);
+                }
+            }
+
+            [
+                'search', 'nivelFiltro', 'gradoFiltro', 'grupoFiltro', 'rolFiltro',
+                'historialSearch', 'historialNivel', 'historialCiclo', 'seleccionados',
+                'firmantes', 'fechaDocumento', 'quincenaInicio', 'quincenaFin', 'anio',
+                'cicloEscolar', 'fechaReanudacion', 'franjaAnchoMm', 'franjaAltoMm',
+                'franjaInferiorMm',
+            ].forEach((propiedad) => this.$watch(propiedad, () => this.programarGuardado()));
+
+            this.guardarEstado();
+        },
+        programarGuardado() {
+            clearTimeout(this.temporizadorEstado);
+            this.temporizadorEstado = setTimeout(() => this.guardarEstado(), 250);
+        },
+        guardarEstado() {
+            const estado = {
+                search: this.search,
+                nivelFiltro: this.nivelFiltro,
+                gradoFiltro: this.gradoFiltro,
+                grupoFiltro: this.grupoFiltro,
+                rolFiltro: this.rolFiltro,
+                historialSearch: this.historialSearch,
+                historialNivel: this.historialNivel,
+                historialCiclo: this.historialCiclo,
+                seleccionados: this.copiar(this.seleccionados, []),
+                firmantes: this.copiar(this.firmantes, {}),
+                fechaDocumento: this.fechaDocumento,
+                quincenaInicio: this.quincenaInicio,
+                quincenaFin: this.quincenaFin,
+                anio: this.anio,
+                cicloEscolar: this.cicloEscolar,
+                fechaReanudacion: this.fechaReanudacion,
+                franjaAnchoMm: this.franjaAnchoMm,
+                franjaAltoMm: this.franjaAltoMm,
+                franjaInferiorMm: this.franjaInferiorMm,
+            };
+
+            try {
+                localStorage.setItem(this.claveEstado, JSON.stringify(estado));
+            } catch (error) {
+                console.warn('No fue posible guardar Liberación de sueldos.', error);
+            }
+        },
+        copiar(valor, predeterminado) {
+            try {
+                return JSON.parse(JSON.stringify(valor ?? predeterminado));
+            } catch (error) {
+                return predeterminado;
+            }
+        },
+    }"
     x-on:abrir-url-liberacion.window="window.open($event.detail.url, '_blank')"
     x-on:desplazar-liberacion-formulario.window="document.getElementById('liberacion-sueldos-formulario')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
 
