@@ -51,6 +51,7 @@ class Inscripcion extends Model
         'semestre_id',
 
         'ciclo_id',
+        'ciclo_escolar_id',
 
         // Foto
         'foto_path',
@@ -83,6 +84,7 @@ class Inscripcion extends Model
         'fecha_ultimo_ingreso' => 'date',
         'documentacion_reingreso_pendiente' => 'boolean',
         'usuario_acceso_activo' => 'boolean',
+        'ciclo_escolar_id' => 'integer',
     ];
 
     /* =========================
@@ -206,7 +208,12 @@ class Inscripcion extends Model
 
 
 
-    //Relación con ciclo
+    public function cicloEscolar()
+    {
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
+    }
+
+    //Relación con momento de ingreso
     public function ciclo()
     {
         return $this->belongsTo(Ciclo::class);

@@ -30,6 +30,10 @@ class MatriculaHistorialPdfController extends Controller
         ])
             ->where('nivel_id', $nivel->id)
             ->when(
+                $request->integer('ciclo_escolar_id'),
+                fn($q, $id) => $q->where('ciclo_escolar_id', $id)
+            )
+            ->when(
                 $request->integer('generacion_id'),
                 fn($q, $id) => $q->where('generacion_id', $id),
                 fn($q) => $q->whereHas(
@@ -102,6 +106,7 @@ class MatriculaHistorialPdfController extends Controller
         ];
 
         $filtros = [
+            'ciclo_escolar_id' => $request->integer('ciclo_escolar_id'),
             'estatus' => $request->input('estatus', 'todos'),
             'mostrar_archivados' => $request->boolean('mostrar_archivados'),
             'busqueda' => trim((string) $request->input('search')),

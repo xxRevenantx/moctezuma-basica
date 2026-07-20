@@ -15,6 +15,7 @@
         const pagina = Number(parametros.get('page') || 1);
 
         const filtros = {
+            ciclo_escolar_id: this.$wire.get('ciclo_escolar_id'),
             generacion_id: this.$wire.get('generacion_id'),
             grado_id: this.$wire.get('grado_id'),
             semestre_id: this.$wire.get('semestre_id'),
@@ -164,7 +165,7 @@
 
     {{-- Loader general de Livewire --}}
     <div wire:loading.delay.longer
-        wire:target="generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados,limpiarFiltros,cambiarGeneracionSeleccionados,exportarExcel,archivar,restaurar"
+        wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados,limpiarFiltros,cambiarGeneracionSeleccionados,exportarExcel,archivar,restaurar"
         class="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]">
         <div class="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-2xl dark:bg-neutral-900">
             <div class="h-7 w-7 animate-spin rounded-full border-4 border-sky-100 border-t-sky-600"></div>
@@ -217,6 +218,7 @@
                     <a target="_blank"
                         href="{{ route('misrutas.matricula.historial.pdf', array_filter([
                             'slug_nivel' => $slug_nivel,
+                            'ciclo_escolar_id' => $ciclo_escolar_id,
                             'generacion_id' => $generacion_id,
                             'grado_id' => $grado_id,
                             'semestre_id' => $semestre_id,
@@ -279,7 +281,18 @@
             </button>
         </div>
 
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <flux:field>
+                <flux:label>Ciclo escolar</flux:label>
+                <flux:select wire:model.live="ciclo_escolar_id">
+                    @foreach ($ciclosEscolares as $cicloEscolar)
+                        <flux:select.option value="{{ $cicloEscolar->id }}">
+                            {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · Actual' : '' }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+
             <flux:field>
                 <flux:label>Generación</flux:label>
                 <flux:select wire:model.live="generacion_id">
@@ -356,7 +369,7 @@
                 <div>
                     <h2 class="font-black text-amber-950 dark:text-amber-100">Cambiar asignación seleccionada</h2>
                     <p class="text-sm text-amber-800/80 dark:text-amber-200/70">
-                        Reemplaza generación, grado, semestre y grupo actuales; el cambio queda registrado en la bitácora.
+                        Reemplaza ciclo escolar, generación, grado, semestre y grupo; el cambio queda registrado en la bitácora.
                     </p>
                 </div>
             </div>
@@ -365,10 +378,19 @@
             </span>
         </div>
 
-        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <flux:select wire:model.live="destino_ciclo_escolar_id">
+                <flux:select.option value="">Ciclo escolar destino</flux:select.option>
+                @foreach ($ciclosEscolares as $cicloEscolar)
+                    <flux:select.option value="{{ $cicloEscolar->id }}">
+                        {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · Actual' : '' }}
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+
             <flux:select wire:model.live="destino_generacion_id">
                 <flux:select.option value="">Nueva generación</flux:select.option>
-                @foreach ($generaciones->where('status', true) as $item)
+                @foreach ($generacionesDestino->where('status', true) as $item)
                     <flux:select.option value="{{ $item->id }}">{{ $item->etiqueta }}</flux:select.option>
                 @endforeach
             </flux:select>
@@ -406,6 +428,7 @@
             </button>
         </div>
 
+        @error('destino_ciclo_escolar_id') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
         @error('selected') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
         @error('destino_generacion_id') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
         @error('destino_grupo_id') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -422,7 +445,7 @@
                     {{ $generacion_id ? ($generaciones->firstWhere('id', $generacion_id)?->etiqueta ?? 'Generación') : 'Generaciones activas' }}
                 </p>
             </div>
-            <div wire:loading.delay wire:target="generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados"
+            <div wire:loading.delay wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados"
                 class="text-sm font-semibold text-sky-600">
                 Actualizando información…
             </div>

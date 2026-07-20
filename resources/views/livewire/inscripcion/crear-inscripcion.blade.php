@@ -450,7 +450,7 @@
 
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
-                                    <flux:label>Fecha de inscripción</flux:label>
+                                    <flux:label>Fecha real de ingreso</flux:label>
                                     <span
                                         class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
                                         Obligatorio
@@ -470,11 +470,16 @@
                                         Obligatorio
                                     </span>
                                 </div>
-                                <flux:select wire:model="ciclo_escolar_id">
+                                <flux:select wire:model.live="ciclo_escolar_id">
                                     <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
                                     @foreach ($cicloEscolares as $cicloEscolar)
                                         <flux:select.option value="{{ $cicloEscolar->id }}">
                                             {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
+                                            @if ($cicloEscolar->cerrado_at)
+                                                · Cerrado
+                                            @elseif ($cicloEscolar->es_actual)
+                                                · Actual
+                                            @endif
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
@@ -485,14 +490,14 @@
 
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
-                                    <flux:label>Periodo de inscripción</flux:label>
+                                    <flux:label>Momento de ingreso</flux:label>
                                     <span
                                         class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
                                         Obligatorio
                                     </span>
                                 </div>
-                                <flux:select wire:model="ciclo_id">
-                                    <flux:select.option value="">Selecciona un ciclo</flux:select.option>
+                                <flux:select wire:model.live="ciclo_id">
+                                    <flux:select.option value="">Selecciona el momento de ingreso</flux:select.option>
                                     @foreach ($ciclos as $ciclo)
                                         <flux:select.option value="{{ $ciclo->id }}">
                                             {{ $ciclo->ciclo }}
@@ -500,6 +505,58 @@
                                     @endforeach
                                 </flux:select>
                                 @error('ciclo_id')
+                                    <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <div class="mb-1 flex items-center gap-2">
+                                    <flux:label>Tipo de ingreso</flux:label>
+                                    <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                        Obligatorio
+                                    </span>
+                                </div>
+                                <flux:select wire:model.live="tipo_ingreso">
+                                    <flux:select.option value="nuevo_ingreso">Nuevo ingreso</flux:select.option>
+                                    <flux:select.option value="traslado">Traslado de otra institución</flux:select.option>
+                                    <flux:select.option value="captura_historica">Captura histórica</flux:select.option>
+                                </flux:select>
+                                @error('tipo_ingreso')
+                                    <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            @if ($tipo_ingreso === 'captura_historica')
+                                <div class="md:col-span-2">
+                                    <div class="mb-1 flex items-center gap-2">
+                                        <flux:label>Motivo de captura histórica</flux:label>
+                                        <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                            Obligatorio
+                                        </span>
+                                    </div>
+                                    <flux:textarea wire:model="motivo_captura_historica" rows="3"
+                                        placeholder="Explica la razón administrativa y la documentación que respalda la captura..." />
+                                    <p class="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                                        La captura histórica requiere permiso de edición académica y quedará registrada como motivo de estatus.
+                                    </p>
+                                    @error('motivo_captura_historica')
+                                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            <div>
+                                <div class="mb-1 flex items-center gap-2">
+                                    <flux:label>Estado inicial</flux:label>
+                                    <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                        Obligatorio
+                                    </span>
+                                </div>
+                                <flux:select wire:model="estado_inscripcion">
+                                    <flux:select.option value="inscrito">Inscrito y activo</flux:select.option>
+                                    <flux:select.option value="preinscrito">Preinscrito, pendiente de activación</flux:select.option>
+                                </flux:select>
+                                @error('estado_inscripcion')
                                     <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -512,37 +569,46 @@
 
                     {{-- ASIGNACIÓN ESCOLAR --}}
                     <section class="space-y-5">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
-                                <flux:icon.academic-cap class="h-5 w-5" />
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                                    <flux:icon.academic-cap class="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-bold text-slate-800 dark:text-white">Asignación escolar</h2>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        El sistema calcula la generación y solo muestra grupos compatibles con el ciclo seleccionado.
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 class="text-lg font-bold text-slate-800 dark:text-white">
-                                    Asignación escolar
-                                </h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">
-                                    {{ $esBachillerato ? 'En bachillerato el grado se obtiene automáticamente desde el semestre y grupo.' : 'Selecciona nivel, grado, generación y grupo.' }}
-                                </p>
-                            </div>
+
+                            <span class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                <flux:icon.users class="h-4 w-4" />
+                                Cupo ilimitado
+                            </span>
                         </div>
 
-                        <div
-                            class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $esBachillerato ? 'xl:grid-cols-4' : 'xl:grid-cols-5' }}">
+                        <div class="relative grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div wire:loading.flex wire:target="ciclo_escolar_id,ciclo_id,tipo_ingreso,nivel_id,grado_id,semestre_id"
+                                class="absolute inset-0 z-20 items-center justify-center rounded-2xl bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
+                                <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                                    <svg class="h-5 w-5 animate-spin text-violet-600" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                                    </svg>
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Validando asignación...</span>
+                                </div>
+                            </div>
+
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
                                     <flux:label>Nivel</flux:label>
-                                    <span
-                                        class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                        Obligatorio
-                                    </span>
+                                    <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">Obligatorio</span>
                                 </div>
-                                <flux:select wire:model.live="nivel_id">
+                                <flux:select wire:model.live="nivel_id" :disabled="!$ciclo_escolar_id">
                                     <flux:select.option value="">Selecciona un nivel</flux:select.option>
                                     @foreach ($niveles as $nivel)
-                                        <flux:select.option value="{{ $nivel->id }}">
-                                            {{ $nivel->nombre }}
-                                        </flux:select.option>
+                                        <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
                                 @error('nivel_id')
@@ -554,66 +620,36 @@
                                 <div>
                                     <div class="mb-1 flex items-center gap-2">
                                         <flux:label>Grado</flux:label>
-                                        <span
-                                            class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                            Obligatorio
-                                        </span>
+                                        <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">Obligatorio</span>
                                     </div>
-                                    <flux:select wire:model.live="grado_id"
-                                        :disabled="!$nivel_id || $grados->isEmpty()">
+                                    <flux:select wire:model.live="grado_id" :disabled="!$nivel_id || $grados->isEmpty()">
                                         <flux:select.option value="">Selecciona un grado</flux:select.option>
                                         @foreach ($grados as $grado)
-                                            <flux:select.option value="{{ $grado->id }}">
-                                                {{ $grado->nombre }}
-                                            </flux:select.option>
+                                            <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}°</flux:select.option>
                                         @endforeach
                                     </flux:select>
                                     @error('grado_id')
                                         <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                     @enderror
                                 </div>
-                            @endif
-
-                            <div>
-                                <div class="mb-1 flex items-center gap-2">
-                                    <flux:label>Generación</flux:label>
-                                    <span
-                                        class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                        Obligatorio
-                                    </span>
-                                </div>
-                                <flux:select wire:model.live="generacion_id"
-                                    :disabled="!$nivel_id || (!$esBachillerato && !$grado_id) || $generaciones->isEmpty()">
-                                    <flux:select.option value="">Selecciona una generación</flux:select.option>
-                                    @foreach ($generaciones as $generacion)
-                                        <flux:select.option value="{{ $generacion->id }}">
-                                            {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
-                                        </flux:select.option>
-                                    @endforeach
-                                </flux:select>
-                                @error('generacion_id')
-                                    <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            @if ($esBachillerato)
+                            @else
                                 <div>
                                     <div class="mb-1 flex items-center gap-2">
                                         <flux:label>Semestre</flux:label>
-                                        <span
-                                            class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                            Obligatorio
-                                        </span>
+                                        <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">Obligatorio</span>
                                     </div>
                                     <flux:select wire:model.live="semestre_id"
-                                        :disabled="!$generacion_id || $semestres->isEmpty()">
+                                        :disabled="!$nivel_id || $semestres->isEmpty() || $tipo_ingreso === 'nuevo_ingreso'">
                                         <flux:select.option value="">Selecciona un semestre</flux:select.option>
                                         @foreach ($semestres as $semestre)
                                             <flux:select.option value="{{ $semestre->id }}">
-                                                Semestre {{ $semestre->numero }}
+                                                {{ $semestre->numero }}° semestre · {{ $semestre->grado?->nombre }}° grado
                                             </flux:select.option>
                                         @endforeach
                                     </flux:select>
+                                    @if ($tipo_ingreso === 'nuevo_ingreso')
+                                        <p class="mt-1 text-xs text-violet-600">Se calcula desde el momento de ingreso.</p>
+                                    @endif
                                     @error('semestre_id')
                                         <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                     @enderror
@@ -622,20 +658,24 @@
 
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
-                                    <flux:label>Grupo</flux:label>
-                                    <span
-                                        class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                        Obligatorio
-                                    </span>
+                                    <flux:label>Generación</flux:label>
+                                    <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">Automática</span>
                                 </div>
-                                <flux:select wire:model.live="grupo_id"
-                                    :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || (!$esBachillerato && !
-                                        $grado_id) || empty($grupos)">
+                                <flux:input value="{{ $generacionAutomaticaLabel ?: 'Se calculará automáticamente' }}" readonly disabled />
+                                @error('generacion_id')
+                                    <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <div class="mb-1 flex items-center gap-2">
+                                    <flux:label>Grupo</flux:label>
+                                    <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">Obligatorio</span>
+                                </div>
+                                <flux:select wire:model.live="grupo_id" :disabled="!$generacion_id || empty($grupos)">
                                     <flux:select.option value="">Selecciona un grupo</flux:select.option>
                                     @foreach ($grupos as $grupo)
-                                        <flux:select.option value="{{ $grupo['id'] }}">
-                                            {{ $grupo['label'] }}
-                                        </flux:select.option>
+                                        <flux:select.option value="{{ $grupo['id'] }}">{{ $grupo['label'] }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
                                 @error('grupo_id')
@@ -644,27 +684,47 @@
                             </div>
                         </div>
 
-                        @if ($esBachillerato)
-                            <div
-                                class="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                                En bachillerato selecciona <b>generación</b>, después <b>semestre</b> y al final
-                                <b>grupo</b>.
-                                El <b>grado</b> se toma automáticamente desde el grupo para respetar la estructura de la
-                                base de datos.
+                        @if ($asignacionAdvertencia)
+                            <div class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex items-start gap-3">
+                                    <flux:icon.exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0" />
+                                    <span>{{ $asignacionAdvertencia }}</span>
+                                </div>
+                                @if (auth()->user()?->canAccess('academico.crear'))
+                                    <flux:button type="button" size="sm" variant="primary" href="{{ route('misrutas.grupos') }}">
+                                        Administrar grupos
+                                    </flux:button>
+                                @endif
                             </div>
-                        @else
-                            <div
-                                class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                                Para preescolar, primaria y secundaria la inscripción queda ligada a <b>nivel</b>,
-                                <b>grado</b>,
-                                <b>generación</b> y <b>grupo</b>.
+                        @endif
+
+                        @php
+                            $cicloAsignacion = $cicloEscolares->firstWhere('id', (int) $ciclo_escolar_id);
+                            $nivelAsignacion = $niveles->firstWhere('id', (int) $nivel_id);
+                            $gradoAsignacion = $grados->firstWhere('id', (int) $grado_id);
+                            $semestreAsignacion = $semestres->firstWhere('id', (int) $semestre_id);
+                            $grupoAsignacion = collect($grupos)->firstWhere('id', (int) $grupo_id);
+                        @endphp
+
+                        @if ($generacion_id && $grupo_id && !$asignacionAdvertencia)
+                            <div class="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-sky-50 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-neutral-900 dark:to-sky-950/30">
+                                <div class="flex items-center gap-2 border-b border-emerald-100 px-4 py-3 text-sm font-black text-emerald-700 dark:border-emerald-900/40 dark:text-emerald-300">
+                                    <flux:icon.check-circle class="h-5 w-5" />
+                                    Asignación escolar válida
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 p-4 text-sm md:grid-cols-3 xl:grid-cols-6">
+                                    <div><p class="text-xs text-slate-500">Ciclo</p><p class="font-bold">{{ $cicloAsignacion?->inicio_anio }}-{{ $cicloAsignacion?->fin_anio }}</p></div>
+                                    <div><p class="text-xs text-slate-500">Nivel</p><p class="font-bold">{{ $nivelAsignacion?->nombre }}</p></div>
+                                    <div><p class="text-xs text-slate-500">{{ $esBachillerato ? 'Semestre' : 'Grado' }}</p><p class="font-bold">{{ $esBachillerato ? ($semestreAsignacion?->numero . '°') : ($gradoAsignacion?->nombre . '°') }}</p></div>
+                                    <div><p class="text-xs text-slate-500">Generación</p><p class="font-bold">{{ $generacionAutomaticaLabel }}</p></div>
+                                    <div><p class="text-xs text-slate-500">Grupo</p><p class="font-bold">{{ $grupoAsignacion['label'] ?? '—' }}</p></div>
+                                    <div><p class="text-xs text-slate-500">Fecha de captura</p><p class="font-bold">{{ now()->format('d/m/Y') }}</p></div>
+                                </div>
                             </div>
                         @endif
                     </section>
 
-                    <div
-                        class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
-                    </div>
+                    <div class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700"></div>
 
                     {{-- OBSERVACIONES Y SEGUIMIENTO --}}
                     <section class="space-y-5">

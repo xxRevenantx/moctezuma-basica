@@ -55,7 +55,7 @@
                 @endforeach
             </flux:select>
 
-            <flux:select wire:model.live="ciclo_id" label="Corte">
+            <flux:select wire:model.live="ciclo_id" label="Momento de ingreso">
                 <option value="">Selecciona</option>
                 @foreach ($ciclos as $item)
                     <option value="{{ $item->id }}">{{ $item->ciclo }}</option>
@@ -76,21 +76,44 @@
                 @endforeach
             </flux:select>
 
-            <flux:select wire:model.live="generacion_destino_id" label="Generación activa">
-                <option value="">Selecciona</option>
-                @foreach ($this->generaciones as $item)
-                    <option value="{{ $item->id }}">{{ $item->anio_ingreso }}-{{ $item->anio_egreso }}</option>
-                @endforeach
-            </flux:select>
+            <div>
+                <flux:select wire:model.live="generacion_destino_id" label="Generación propuesta">
+                    <option value="">Selecciona</option>
+                    @foreach ($this->generaciones as $item)
+                        <option value="{{ $item->id }}">
+                            {{ $item->anio_ingreso }}-{{ $item->anio_egreso }}
+                            {{ (int) $item->id === (int) $generacion_sugerida_id ? ' · Recomendada' : ' · Excepción' }}
+                        </option>
+                    @endforeach
+                </flux:select>
+
+                @if ($generacion_sugerida_label)
+                    <p class="mt-1 text-xs font-semibold {{ $generacion_excepcional ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300' }}">
+                        @if ($generacion_excepcional)
+                            Selección excepcional. La esperada para el ciclo y grado es {{ $generacion_sugerida_label }}; escribe una justificación.
+                        @else
+                            Generación calculada automáticamente: {{ $generacion_sugerida_label }}.
+                        @endif
+                    </p>
+                @endif
+            </div>
 
             @includeWhen((bool) $this->esBachillerato, 'livewire.accion.partials.reingreso-semestre-select')
 
-            <flux:select wire:model.live="grupo_destino_id" label="Grupo">
-                <option value="">Selecciona</option>
-                @foreach ($this->grupos as $item)
-                    <option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}</option>
-                @endforeach
-            </flux:select>
+            <div>
+                <flux:select wire:model.live="grupo_destino_id" label="Grupo compatible">
+                    <option value="">Selecciona</option>
+                    @foreach ($this->grupos as $item)
+                        <option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}</option>
+                    @endforeach
+                </flux:select>
+
+                @if ($generacion_destino_id && $this->grupos->isEmpty())
+                    <p class="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-300">
+                        No existe un grupo activo para este ciclo, nivel, grado, generación y semestre.
+                    </p>
+                @endif
+            </div>
 
             <flux:input
                 wire:model="matricula"
@@ -110,7 +133,7 @@
                 wire:model="justificacion"
                 label="Justificación"
                 rows="2"
-                placeholder="Opcional; necesaria cuando el reingreso no sigue la secuencia esperada"
+                placeholder="Obligatoria cuando se elige una generación diferente a la propuesta"
             />
         </div>
     </section>

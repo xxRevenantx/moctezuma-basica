@@ -11,6 +11,7 @@ use App\Models\Parcial;
 use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
+use App\Services\AsignacionEscolarService;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -35,6 +36,18 @@ class EditarPeriodo extends Component
 
     public string $periodo_nombre = '';
     public bool $tiene_calificaciones = false;
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->semestre_id = null;
+        $this->resetValidation(['ciclo_escolar_id', 'generacion_id', 'semestre_id']);
+    }
+
+    public function updatedGeneracionId(): void
+    {
+        $this->semestre_id = null;
+        $this->resetValidation(['generacion_id', 'semestre_id']);
+    }
 
     public function getEsBachilleratoProperty(): bool
     {
@@ -234,6 +247,10 @@ class EditarPeriodo extends Component
                 return;
             }
 
+            if (!$this->validarCompatibilidadBachillerato()) {
+                return;
+            }
+
             $existe = Periodos::query()
                 ->where('id', '!=', $this->periodo_id)
                 ->where('nivel_id', $this->nivel_id)
@@ -403,20 +420,73 @@ class EditarPeriodo extends Component
         return $mes . ' - ' . $periodoBasica;
     }
 
+    private function validarCompatibilidadBachillerato(): bool
+    {
+        if (!$this->esBachillerato) {
+            return true;
+        }
+
+        $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
+        $generacion = Generacion::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->find($this->generacion_id);
+
+        if (!$ciclo || !$generacion) {
+            return false;
+        }
+
+        $semestresPermitidos = app(AsignacionEscolarService::class)
+            ->semestresPermitidos($ciclo, $generacion)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        if (!$semestresPermitidos->contains((int) $this->semestre_id)) {
+            $this->addError(
+                'semestre_id',
+                "El semestre no corresponde a la generación {$generacion->anio_ingreso}-{$generacion->anio_egreso} durante el ciclo {$ciclo->inicio_anio}-{$ciclo->fin_anio}."
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function render()
     {
+        $cicloSeleccionado = $this->ciclo_escolar_id
+            ? CicloEscolar::query()->find($this->ciclo_escolar_id)
+            : null;
+
         $generaciones = Generacion::query()
-            ->where(function ($query) {
+            ->where(function ($query): void {
                 $query->where('status', true)
-                    ->when($this->generacion_id, fn ($sub) => $sub->orWhere('generaciones.id', $this->generacion_id));
+                    ->when(
+                        $this->generacion_id,
+                        fn ($sub) => $sub->orWhere('generaciones.id', $this->generacion_id)
+                    );
             })
-            ->when($this->esBachillerato, function ($query) {
+            ->when($this->esBachillerato, function ($query) use ($cicloSeleccionado): void {
                 $query->where('nivel_id', $this->nivel_id);
-            }, function ($query) {
+
+                if ($cicloSeleccionado) {
+                    $query->where('anio_ingreso', '<=', $cicloSeleccionado->inicio_anio)
+                        ->where('anio_egreso', '>', $cicloSeleccionado->inicio_anio);
+                }
+            }, function ($query): void {
                 $query->whereRaw('1 = 0');
             })
-            ->orderBy('anio_ingreso', 'desc')
+            ->orderByDesc('anio_ingreso')
             ->get();
+
+        $generacionSeleccionada = $this->generacion_id
+            ? $generaciones->firstWhere('id', (int) $this->generacion_id)
+            : null;
+
+        $semestres = $cicloSeleccionado && $generacionSeleccionada
+            ? app(AsignacionEscolarService::class)
+                ->semestresPermitidos($cicloSeleccionado, $generacionSeleccionada)
+            : collect();
 
         return view('livewire.periodo.editar-periodo', [
             'niveles' => Nivel::query()
@@ -425,9 +495,7 @@ class EditarPeriodo extends Component
 
             'generaciones' => $generaciones,
 
-            'semestres' => Semestre::query()
-                ->orderBy('numero')
-                ->get(),
+            'semestres' => $semestres,
 
             'ciclosEscolares' => CicloEscolar::query()
                 ->orderBy('inicio_anio', 'desc')

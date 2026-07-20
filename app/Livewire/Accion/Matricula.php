@@ -3,6 +3,7 @@
 namespace App\Livewire\Accion;
 
 use App\Exports\MatriculaExport;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -24,13 +25,16 @@ class Matricula extends Component
     public ?Nivel $nivel = null;
 
     public Collection $niveles;
+    public Collection $ciclosEscolares;
     public Collection $generaciones;
+    public Collection $generacionesDestino;
     public Collection $grados;
     public Collection $semestres;
     public Collection $semestresDestino;
     public Collection $grupos;
     public Collection $gruposDestino;
 
+    public ?int $ciclo_escolar_id = null;
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
     public ?int $semestre_id = null;
@@ -42,6 +46,7 @@ class Matricula extends Component
 
     public array $selected = [];
     public bool $selectPage = false;
+    public ?int $destino_ciclo_escolar_id = null;
     public ?int $destino_generacion_id = null;
     public ?int $destino_grado_id = null;
     public ?int $destino_semestre_id = null;
@@ -60,7 +65,15 @@ class Matricula extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
         $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
-        $this->generaciones = $this->cargarGeneraciones();
+        $this->ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
+        $this->ciclo_escolar_id = $this->ciclosEscolares->firstWhere('es_actual', true)?->id
+            ?? $this->ciclosEscolares->first()?->id;
+        $this->destino_ciclo_escolar_id = $this->ciclo_escolar_id;
+        $this->generaciones = $this->cargarGeneraciones($this->ciclo_escolar_id);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
             ->orderBy('orden')
@@ -80,10 +93,16 @@ class Matricula extends Component
         );
     }
 
-    private function cargarGeneraciones(): Collection
+    private function cargarGeneraciones(?int $cicloEscolarId = null): Collection
     {
         return Generacion::query()
             ->where('nivel_id', $this->nivel->id)
+            ->when($cicloEscolarId, fn (Builder $query) => $query->whereHas(
+                'grupos',
+                fn (Builder $grupos) => $grupos
+                    ->where('ciclo_escolar_id', $cicloEscolarId)
+                    ->where('estado', 'activo')
+            ))
             ->orderByDesc('status')
             ->orderByDesc('anio_ingreso')
             ->get();
@@ -96,14 +115,21 @@ class Matricula extends Component
             : collect();
     }
 
-    private function cargarGrupos(?int $generacionId, ?int $gradoId, ?int $semestreId): Collection
+    private function cargarGrupos(?int $generacionId, ?int $gradoId, ?int $semestreId, ?int $cicloEscolarId = null): Collection
     {
         if (! $generacionId || ! $gradoId) {
             return collect();
         }
 
+        $cicloEscolarId ??= $this->ciclo_escolar_id;
+
         return Grupo::query()
             ->with('asignacionGrupo')
+            ->withCount(['inscripciones as alumnos_activos_count' => fn (Builder $alumnos) => $alumnos
+                ->where('activo', true)
+                ->whereNull('deleted_at')])
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('estado', 'activo')
             ->where('nivel_id', $this->nivel->id)
             ->where('generacion_id', $generacionId)
             ->where('grado_id', $gradoId)
@@ -115,6 +141,41 @@ class Matricula extends Component
             ->get()
             ->sortBy(fn ($grupo) => $grupo->asignacionGrupo?->nombre ?? $grupo->id)
             ->values();
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->reset([
+            'generacion_id',
+            'grado_id',
+            'semestre_id',
+            'grupo_id',
+            'destino_generacion_id',
+            'destino_grado_id',
+            'destino_semestre_id',
+            'destino_grupo_id',
+        ]);
+        $this->destino_ciclo_escolar_id = $this->ciclo_escolar_id;
+        $this->generaciones = $this->cargarGeneraciones($this->ciclo_escolar_id);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
+        $this->semestres = collect();
+        $this->semestresDestino = collect();
+        $this->grupos = collect();
+        $this->gruposDestino = collect();
+        $this->filtrosCambiaron();
+    }
+
+    public function updatedDestinoCicloEscolarId(): void
+    {
+        $this->reset([
+            'destino_generacion_id',
+            'destino_grado_id',
+            'destino_semestre_id',
+            'destino_grupo_id',
+        ]);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
+        $this->semestresDestino = collect();
+        $this->gruposDestino = collect();
     }
 
     public function updatedGeneracionId(): void
@@ -168,7 +229,8 @@ class Matricula extends Component
         $this->gruposDestino = $this->cargarGrupos(
             $this->destino_generacion_id,
             $this->destino_grado_id,
-            $this->destino_semestre_id
+            $this->destino_semestre_id,
+            $this->destino_ciclo_escolar_id
         );
     }
 
@@ -179,7 +241,7 @@ class Matricula extends Component
         $this->semestresDestino = $this->cargarSemestres($this->destino_grado_id);
         $this->gruposDestino = $this->esBachillerato()
             ? collect()
-            : $this->cargarGrupos($this->destino_generacion_id, $this->destino_grado_id, null);
+            : $this->cargarGrupos($this->destino_generacion_id, $this->destino_grado_id, null, $this->destino_ciclo_escolar_id);
     }
 
     public function updatedDestinoSemestreId(): void
@@ -188,7 +250,8 @@ class Matricula extends Component
         $this->gruposDestino = $this->cargarGrupos(
             $this->destino_generacion_id,
             $this->destino_grado_id,
-            $this->destino_semestre_id
+            $this->destino_semestre_id,
+            $this->destino_ciclo_escolar_id
         );
     }
 
@@ -225,6 +288,7 @@ class Matricula extends Component
         return $query
             ->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo', 'nivel'])
             ->where('nivel_id', $this->nivel->id)
+            ->when($this->ciclo_escolar_id, fn (Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when(
                 $this->generacion_id,
                 fn (Builder $q) => $q->where('generacion_id', $this->generacion_id),
@@ -253,6 +317,7 @@ class Matricula extends Component
     public function cambiarGeneracionSeleccionados(GestionAcademicaService $service): void
     {
         $rules = [
+            'destino_ciclo_escolar_id' => ['required', 'exists:ciclo_escolares,id'],
             'selected' => ['required', 'array', 'min:1'],
             'destino_generacion_id' => ['required', 'exists:generaciones,id'],
             'destino_grado_id' => ['required', 'exists:grados,id'],
@@ -269,6 +334,7 @@ class Matricula extends Component
         $total = 0;
         foreach (Inscripcion::withTrashed()->whereIn('id', $this->selected)->get() as $alumno) {
             $service->cambiarAsignacion($alumno, [
+                'ciclo_escolar_id' => $this->destino_ciclo_escolar_id,
                 'nivel_id' => $this->nivel->id,
                 'generacion_id' => $this->destino_generacion_id,
                 'grado_id' => $this->destino_grado_id,
@@ -345,6 +411,13 @@ class Matricula extends Component
     {
         $pagina = max(1, (int) ($filtros['page'] ?? 1));
 
+        $this->ciclo_escolar_id = filled($filtros['ciclo_escolar_id'] ?? null)
+            ? (int) $filtros['ciclo_escolar_id']
+            : ($this->ciclosEscolares->firstWhere('es_actual', true)?->id ?? $this->ciclosEscolares->first()?->id);
+        $this->destino_ciclo_escolar_id = $this->ciclo_escolar_id;
+        $this->generaciones = $this->cargarGeneraciones($this->ciclo_escolar_id);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
+
         foreach (['generacion_id', 'grado_id', 'semestre_id', 'grupo_id'] as $campo) {
             $this->{$campo} = filled($filtros[$campo] ?? null) ? (int) $filtros[$campo] : null;
         }
@@ -373,6 +446,10 @@ class Matricula extends Component
     {
         $alumno = Inscripcion::withTrashed()->findOrFail($inscripcionId);
 
+        $this->ciclo_escolar_id = $alumno->ciclo_escolar_id ? (int) $alumno->ciclo_escolar_id : $this->ciclo_escolar_id;
+        $this->destino_ciclo_escolar_id = $this->ciclo_escolar_id;
+        $this->generaciones = $this->cargarGeneraciones($this->ciclo_escolar_id);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
         $this->generacion_id = $alumno->generacion_id ? (int) $alumno->generacion_id : null;
         $this->grado_id = $alumno->grado_id ? (int) $alumno->grado_id : null;
         $this->semestre_id = $alumno->semestre_id ? (int) $alumno->semestre_id : null;
@@ -414,6 +491,11 @@ class Matricula extends Component
             'selected',
             'selectPage',
         ]);
+        $this->ciclo_escolar_id = $this->ciclosEscolares->firstWhere('es_actual', true)?->id
+            ?? $this->ciclosEscolares->first()?->id;
+        $this->destino_ciclo_escolar_id = $this->ciclo_escolar_id;
+        $this->generaciones = $this->cargarGeneraciones($this->ciclo_escolar_id);
+        $this->generacionesDestino = $this->cargarGeneraciones($this->destino_ciclo_escolar_id);
         $this->estatus = 'todos';
         $this->semestres = collect();
         $this->grupos = collect();
@@ -426,15 +508,22 @@ class Matricula extends Component
             return '—';
         }
 
-        return $grupo->asignacionGrupo?->nombre
+        $nombre = $grupo->asignacionGrupo?->nombre
             ?? $grupo->grupo
             ?? $grupo->nombre
             ?? 'Sin grupo';
+
+        if (isset($grupo->alumnos_activos_count)) {
+            return $nombre . ' · ' . number_format((int) $grupo->alumnos_activos_count) . ' alumnos · cupo ilimitado';
+        }
+
+        return $nombre;
     }
 
     public function etiquetaEstatus(?string $estatus): string
     {
         return match ($estatus) {
+            'preinscrito' => 'Preinscrito',
             'baja_temporal' => 'Baja temporal',
             'baja_definitiva' => 'Baja definitiva',
             'trasladado' => 'Trasladado',

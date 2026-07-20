@@ -24,6 +24,22 @@ class CicloEscolar extends Model
         'cerrado_at' => 'datetime',
     ];
 
+
+    public function grupos()
+    {
+        return $this->hasMany(Grupo::class, 'ciclo_escolar_id');
+    }
+
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class, 'ciclo_escolar_id');
+    }
+
+    public function nivelesPreparacion()
+    {
+        return $this->hasMany(CicloEscolarNivel::class, 'ciclo_escolar_id');
+    }
+
     public function periodosBasicos()
     {
         return $this->hasMany(Periodos::class, 'ciclo_escolar_id');

@@ -14,6 +14,7 @@ use App\Models\Nivel;
 use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Models\TipoDocumento;
+use App\Services\AsignacionEscolarService;
 use App\Services\CierreNivelReingresoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -35,6 +36,9 @@ class ReingresoAlumno extends Component
     public ?int $nivel_destino_id = null;
     public ?int $grado_destino_id = null;
     public ?int $generacion_destino_id = null;
+    public ?int $generacion_sugerida_id = null;
+    public ?string $generacion_sugerida_label = null;
+    public bool $generacion_excepcional = false;
     public ?int $semestre_destino_id = null;
     public ?int $grupo_destino_id = null;
     public string $fecha_ingreso = '';
@@ -85,10 +89,23 @@ class ReingresoAlumno extends Component
         }
     }
 
+    public function updatedCicloEscolarId(): void
+    {
+        $this->generacion_destino_id = null;
+        $this->generacion_sugerida_id = null;
+        $this->generacion_sugerida_label = null;
+        $this->generacion_excepcional = false;
+        $this->grupo_destino_id = null;
+        $this->proponerGeneracionDestino();
+    }
+
     public function updatedNivelDestinoId(): void
     {
         $this->grado_destino_id = null;
         $this->generacion_destino_id = null;
+        $this->generacion_sugerida_id = null;
+        $this->generacion_sugerida_label = null;
+        $this->generacion_excepcional = false;
         $this->semestre_destino_id = null;
         $this->grupo_destino_id = null;
     }
@@ -96,17 +113,41 @@ class ReingresoAlumno extends Component
     public function updatedGradoDestinoId(): void
     {
         $this->semestre_destino_id = null;
+        $this->generacion_destino_id = null;
+        $this->generacion_sugerida_id = null;
+        $this->generacion_sugerida_label = null;
+        $this->generacion_excepcional = false;
         $this->grupo_destino_id = null;
+
+        if (! $this->esBachillerato) {
+            $this->proponerGeneracionDestino();
+        }
     }
 
     public function updatedGeneracionDestinoId(): void
     {
+        $this->generacion_excepcional = (bool) $this->generacion_destino_id
+            && (! $this->generacion_sugerida_id
+                || (int) $this->generacion_destino_id !== (int) $this->generacion_sugerida_id);
         $this->grupo_destino_id = null;
     }
 
     public function updatedSemestreDestinoId(): void
     {
+        $semestre = $this->semestre_destino_id
+            ? Semestre::query()->find($this->semestre_destino_id)
+            : null;
+
+        if ($semestre?->grado_id) {
+            $this->grado_destino_id = (int) $semestre->grado_id;
+        }
+
+        $this->generacion_destino_id = null;
+        $this->generacion_sugerida_id = null;
+        $this->generacion_sugerida_label = null;
+        $this->generacion_excepcional = false;
         $this->grupo_destino_id = null;
+        $this->proponerGeneracionDestino();
     }
 
     public function seleccionarAlumno(int $id): void
@@ -216,6 +257,46 @@ class ReingresoAlumno extends Component
             : 'Sin generación';
     }
 
+    private function proponerGeneracionDestino(): void
+    {
+        if (! $this->ciclo_escolar_id || ! $this->nivel_destino_id || ! $this->grado_destino_id) {
+            return;
+        }
+
+        $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
+        $nivel = Nivel::query()->find($this->nivel_destino_id);
+        $grado = Grado::query()->find($this->grado_destino_id);
+        $semestre = $this->semestre_destino_id
+            ? Semestre::query()->find($this->semestre_destino_id)
+            : null;
+
+        if (! $ciclo || ! $nivel || ! $grado || ($nivel->slug === 'bachillerato' && ! $semestre)) {
+            return;
+        }
+
+        $servicio = app(AsignacionEscolarService::class);
+        $this->generacion_sugerida_label = $servicio->etiquetaGeneracionEsperada(
+            $ciclo,
+            $nivel,
+            $grado,
+            $semestre,
+        );
+
+        $generacion = $servicio->resolverGeneracion(
+            $ciclo,
+            $nivel,
+            $grado,
+            $semestre,
+        );
+
+        $this->generacion_sugerida_id = $generacion?->id ? (int) $generacion->id : null;
+
+        if ($this->generacion_sugerida_id) {
+            $this->generacion_destino_id = $this->generacion_sugerida_id;
+            $this->generacion_excepcional = false;
+        }
+    }
+
     public function getGradosProperty(): Collection
     {
         return $this->nivel_destino_id
@@ -225,9 +306,19 @@ class ReingresoAlumno extends Component
 
     public function getGeneracionesProperty(): Collection
     {
-        return $this->nivel_destino_id
-            ? Generacion::query()->where('nivel_id', $this->nivel_destino_id)->where('status', true)->orderByDesc('anio_ingreso')->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso'])
-            : collect();
+        if (! $this->nivel_destino_id || ! $this->ciclo_escolar_id || ! $this->grado_destino_id) {
+            return collect();
+        }
+
+        return Generacion::query()
+            ->where('nivel_id', $this->nivel_destino_id)
+            ->where('status', true)
+            ->when(
+                $this->generacion_sugerida_id,
+                fn (Builder $query) => $query->orderByRaw('id = ? desc', [$this->generacion_sugerida_id])
+            )
+            ->orderByDesc('anio_ingreso')
+            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
     }
 
     public function getSemestresProperty(): Collection
@@ -245,6 +336,13 @@ class ReingresoAlumno extends Component
 
         return Grupo::query()
             ->with('asignacionGrupo:id,nombre')
+            ->withCount([
+                'inscripciones as alumnos_activos_count' => fn (Builder $query) => $query
+                    ->where('activo', true)
+                    ->whereNull('deleted_at'),
+            ])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->where('nivel_id', $this->nivel_destino_id)
             ->where('grado_id', $this->grado_destino_id)
             ->where('generacion_id', $this->generacion_destino_id)
@@ -315,6 +413,7 @@ class ReingresoAlumno extends Component
             'generacion_destino_id' => ['required', 'exists:generaciones,id'],
             'semestre_destino_id' => [$this->esBachillerato ? 'required' : 'nullable', 'exists:semestres,id'],
             'grupo_destino_id' => ['required', 'exists:grupos,id'],
+            'justificacion' => [$this->generacion_excepcional ? 'required' : 'nullable', 'string', 'min:10', 'max:1000'],
             'fecha_ingreso' => ['required', 'date'],
             'matricula' => ['nullable', 'string', 'max:50'],
             'constancia_traslado_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
@@ -423,7 +522,10 @@ class ReingresoAlumno extends Component
 
     public function textoGrupo($grupo): string
     {
-        return $grupo?->asignacionGrupo?->nombre ?? $grupo?->grupo ?? $grupo?->nombre ?? '—';
+        $nombre = $grupo?->asignacionGrupo?->nombre ?? $grupo?->grupo ?? $grupo?->nombre ?? '—';
+        $alumnos = (int) ($grupo?->alumnos_activos_count ?? 0);
+
+        return "{$nombre} · {$alumnos} alumnos · cupo ilimitado";
     }
 
     public function etiquetaPeriodo($periodo): string

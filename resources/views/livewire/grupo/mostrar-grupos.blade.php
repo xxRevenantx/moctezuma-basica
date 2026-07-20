@@ -50,7 +50,30 @@
                 </div>
 
                 {{-- Filtros --}}
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
+                    {{-- Ciclo escolar --}}
+                    <div>
+                        <label
+                            class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Ciclo escolar
+                        </label>
+
+                        <flux:select wire:model.live="ciclo_escolar_id" placeholder="Todos los ciclos">
+                            <flux:select.option value="">
+                                Todos los ciclos
+                            </flux:select.option>
+
+                            @foreach ($ciclosEscolares as $cicloEscolar)
+                                <flux:select.option value="{{ $cicloEscolar->id }}">
+                                    {{ $cicloEscolar->inicio_anio }} - {{ $cicloEscolar->fin_anio }}
+                                    @if ($cicloEscolar->es_actual)
+                                        · Actual
+                                    @endif
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
 
                     {{-- Nivel --}}
                     <div>
@@ -147,10 +170,10 @@
                         <flux:button type="button" variant="ghost" wire:click="limpiarFiltros"
                             class="w-full cursor-pointer border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-gray-200 dark:hover:bg-neutral-800">
 
-                            <div class="flex justify-between gap-2">
-                                <flux:icon.x-mark class=" h-4 w-4" />
-
+                            <span class="flex items-center justify-center gap-2">
+                                <flux:icon.x-mark class="h-4 w-4" />
                                 Limpiar
+                            </span>
                         </flux:button>
                     </div>
 
@@ -177,6 +200,17 @@
                 <span
                     class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900/60">
                     Búsqueda: {{ $search }}
+                </span>
+            @endif
+
+            @if ($ciclo_escolar_id)
+                @php
+                    $cicloActivo = $ciclosEscolares->firstWhere('id', $ciclo_escolar_id);
+                @endphp
+
+                <span
+                    class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60">
+                    Ciclo: {{ $cicloActivo?->inicio_anio }} - {{ $cicloActivo?->fin_anio }}
                 </span>
             @endif
 
@@ -233,7 +267,7 @@
 
             {{-- Loader --}}
             <div wire:loading.delay
-                wire:target="search,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar"
+                wire:target="search,ciclo_escolar_id,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar"
                 class="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-white/70 backdrop-blur dark:bg-neutral-900/70"
                 aria-live="polite" aria-busy="true">
                 <div
@@ -253,7 +287,7 @@
 
             {{-- Contenido --}}
             <div class="transition filter duration-200" wire:loading.class="blur-sm"
-                wire:target="search,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar">
+                wire:target="search,ciclo_escolar_id,nivel_id,generacion_id,grado_id,semestre_id,limpiarFiltros,eliminar">
 
                 @if ($groupedByNivel->isEmpty())
                     {{-- Estado vacío --}}
@@ -388,6 +422,10 @@
                                         </th>
 
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                                            Ciclo
+                                        </th>
+
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                                             Nivel
                                         </th>
 
@@ -418,7 +456,7 @@
 
                                         {{-- Header nivel --}}
                                         <tr class="bg-slate-50/80 dark:bg-neutral-900/70">
-                                            <td colspan="6" class="px-4 py-3">
+                                            <td colspan="7" class="px-4 py-3">
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                                     <div class="flex items-center gap-2">
                                                         <span
@@ -451,7 +489,7 @@
 
                                             {{-- Subheader generación --}}
                                             <tr class="bg-white dark:bg-neutral-950">
-                                                <td colspan="6" class="px-4 py-2">
+                                                <td colspan="7" class="px-4 py-2">
                                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                                         <div class="flex items-center gap-2">
                                                             <span
@@ -538,13 +576,36 @@
                                                             class="font-medium {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
                                                             {{ $rowGenLabel }}
                                                         </span>
+                                                        @if ($grupo->motivo_generacion_excepcional)
+                                                            <span class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-700 dark:bg-amber-950/50 dark:text-amber-200" title="{{ $grupo->motivo_generacion_excepcional }}">
+                                                                Excepcional
+                                                            </span>
+                                                        @endif
                                                     </td>
 
                                                     <td class="px-4 py-3">
-                                                        <span
-                                                            class="font-medium {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
-                                                            {{ $nivelLabel }}
-                                                        </span>
+                                                        @if ($grupo->cicloEscolar)
+                                                            <span
+                                                                class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60">
+                                                                {{ $grupo->cicloEscolar->inicio_anio }} - {{ $grupo->cicloEscolar->fin_anio }}
+                                                            </span>
+                                                        @else
+                                                            <span class="text-xs font-semibold text-amber-600 dark:text-amber-300">
+                                                                Sin ciclo asignado
+                                                            </span>
+                                                        @endif
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex flex-col gap-1">
+                                                            <span
+                                                                class="font-medium {{ $rowInactive ? 'text-rose-700 dark:text-rose-300' : 'text-gray-700 dark:text-gray-200' }}">
+                                                                {{ $nivelLabel }}
+                                                            </span>
+                                                            <span class="text-[10px] font-semibold uppercase tracking-wide {{ $grupo->estado === 'activo' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300' }}">
+                                                                {{ $grupo->estado === 'activo' ? 'Activo' : 'Inactivo' }} · cupo ilimitado
+                                                            </span>
+                                                        </div>
                                                     </td>
 
                                                     <td class="px-4 py-3">

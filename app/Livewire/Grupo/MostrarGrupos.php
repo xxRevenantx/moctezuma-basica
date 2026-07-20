@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Grupo;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -18,6 +19,7 @@ class MostrarGrupos extends Component
 
     public string $search = '';
 
+    public $ciclo_escolar_id = '';
     public $nivel_id = '';
     public $generacion_id = '';
     public $grado_id = '';
@@ -33,6 +35,7 @@ class MostrarGrupos extends Component
 
     protected $queryString = [
         'search' => ['as' => 'buscar', 'except' => ''],
+        'ciclo_escolar_id' => ['as' => 'ciclo', 'except' => ''],
         'nivel_id' => ['as' => 'nivel', 'except' => ''],
         'generacion_id' => ['as' => 'generacion', 'except' => ''],
         'grado_id' => ['as' => 'grado', 'except' => ''],
@@ -42,11 +45,12 @@ class MostrarGrupos extends Component
     public function mount()
     {
         $this->grados = collect();
+        $this->ciclo_escolar_id = $this->ciclo_escolar_id ?: (CicloEscolar::query()->where('es_actual', true)->value('id') ?: '');
         $this->generaciones = collect();
         $this->semestres = collect();
 
         if (filled($this->nivel_id)) {
-            $this->esBachillerato = (int) $this->nivel_id === 4;
+            $this->esBachillerato = Nivel::query()->whereKey($this->nivel_id)->value('slug') === 'bachillerato';
             $this->cargarFiltrosPorNivel();
         }
     }
@@ -54,6 +58,13 @@ class MostrarGrupos extends Component
     public function updatingSearch()
     {
         $this->resetPage();
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->resetPage();
+        $this->generacion_id = '';
+        $this->cargarFiltrosPorNivel();
     }
 
     public function updatedNivelId()
@@ -64,7 +75,7 @@ class MostrarGrupos extends Component
         $this->generacion_id = '';
         $this->semestre_id = '';
 
-        $this->esBachillerato = (int) $this->nivel_id === 4;
+        $this->esBachillerato = Nivel::query()->whereKey($this->nivel_id)->value('slug') === 'bachillerato';
 
         $this->cargarFiltrosPorNivel();
     }
@@ -102,6 +113,10 @@ class MostrarGrupos extends Component
 
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel_id)
+            ->when($this->ciclo_escolar_id, fn ($query) => $query->whereHas(
+                'grupos',
+                fn ($grupo) => $grupo->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ))
             ->orderByDesc('anio_ingreso')
             ->get();
 
@@ -116,6 +131,7 @@ class MostrarGrupos extends Component
     {
         $this->reset([
             'search',
+            'ciclo_escolar_id',
             'nivel_id',
             'generacion_id',
             'grado_id',
@@ -127,6 +143,7 @@ class MostrarGrupos extends Component
         $this->generaciones = collect();
         $this->semestres = collect();
 
+        $this->ciclo_escolar_id = CicloEscolar::query()->where('es_actual', true)->value('id') ?: '';
         $this->resetPage();
     }
 
@@ -141,6 +158,16 @@ class MostrarGrupos extends Component
                 'position' => 'top-end',
             ]);
 
+            return;
+        }
+
+        if ($grupo->inscripciones()->withTrashed()->exists()) {
+            $this->dispatch('swal', [
+                'title' => 'No se puede eliminar',
+                'text' => 'El grupo tiene alumnos relacionados. Cámbialo a inactivo desde Editar grupo.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
             return;
         }
 
@@ -173,13 +200,14 @@ class MostrarGrupos extends Component
             ->get();
 
         if ($this->nivel_id && $this->grados->isEmpty() && $this->generaciones->isEmpty()) {
-            $this->esBachillerato = (int) $this->nivel_id === 4;
+            $this->esBachillerato = Nivel::query()->whereKey($this->nivel_id)->value('slug') === 'bachillerato';
             $this->cargarFiltrosPorNivel();
         }
 
         $query = Grupo::query()
             ->with([
                 'asignacionGrupo',
+                'cicloEscolar',
                 'nivel',
                 'grado',
                 'generacion',
@@ -187,6 +215,9 @@ class MostrarGrupos extends Component
             ])
             ->leftJoin('asignacion_grupos', 'grupos.asignacion_grupo_id', '=', 'asignacion_grupos.id')
             ->select('grupos.*')
+            ->when($this->ciclo_escolar_id, function ($query) {
+                $query->where('grupos.ciclo_escolar_id', $this->ciclo_escolar_id);
+            })
             ->when(trim($this->search) !== '', function ($query) {
                 $buscar = trim($this->search);
 
@@ -229,6 +260,7 @@ class MostrarGrupos extends Component
             });
 
         return view('livewire.grupo.mostrar-grupos', [
+            'ciclosEscolares' => CicloEscolar::query()->orderByDesc('inicio_anio')->get(),
             'niveles' => $niveles,
             'grupos' => $grupos,
             'groupedByNivel' => $groupedByNivel,

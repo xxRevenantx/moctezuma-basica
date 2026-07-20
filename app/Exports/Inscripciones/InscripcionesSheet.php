@@ -25,11 +25,11 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
     {
         return Inscripcion::query()
             ->with([
-                'nivel',
-                'grado',
+                'cicloEscolar',
+                'nivel',                'grado',
                 'generacion',
-                'grupo.asignacionGrupo',
-                'grupo.nivel',
+                'grupo.cicloEscolar',
+                'grupo.asignacionGrupo',                'grupo.nivel',
                 'grupo.grado',
                 'grupo.generacion',
                 'grupo.semestre',
@@ -54,6 +54,10 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
             'fecha_nacimiento',
             'genero',
             'fecha_inscripcion',
+            'ciclo_escolar_id',
+            'ciclo_escolar',
+            'tipo_ingreso',
+            'estatus',
             'nivel_id',
             'nivel',
             'grado_id',
@@ -61,6 +65,7 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
             'generacion_id',
             'generacion',
             'grupo_id',
+            'clave_grupo',
             'grupo',
             'semestre_id',
             'semestre',
@@ -90,6 +95,13 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 ? date('Y-m-d', strtotime($alumno->fecha_inscripcion))
                 : '',
 
+            $alumno->ciclo_escolar_id,
+            $alumno->cicloEscolar
+                ? "{$alumno->cicloEscolar->inicio_anio} - {$alumno->cicloEscolar->fin_anio}"
+                : '',
+            $alumno->tipo_ultimo_ingreso,
+            $alumno->estatus,
+
             $alumno->nivel_id,
             $alumno->nivel?->nombre,
 
@@ -102,6 +114,7 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 : '',
 
             $alumno->grupo_id,
+            $alumno->grupo?->clave,
             $alumno->grupo ? $this->textoGrupo($alumno->grupo) : '',
 
             $alumno->semestre_id,
@@ -141,9 +154,9 @@ class InscripcionesSheet implements FromQuery, WithMapping, WithHeadings, Should
                 $hoja = $event->sheet->getDelegate();
 
                 $hoja->freezePane('A2');
-                $hoja->setAutoFilter('A1:W1');
+                $hoja->setAutoFilter('A1:AB1');
 
-                $hoja->getStyle('A1:W1')->applyFromArray([
+                $hoja->getStyle('A1:AB1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],

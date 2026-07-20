@@ -114,6 +114,7 @@ class CierreNivelReingresoService
                     ? (int) $destino['semestre_id']
                     : null,
                 'ciclo_id' => (int) $destino['ciclo_id'],
+                'ciclo_escolar_id' => (int) $destino['ciclo_escolar_id'],
                 'activo' => true,
                 'estatus' => $tipo === 'reingreso' ? 'reingreso' : 'activo',
                 'fecha_estatus' => $fecha,
@@ -322,14 +323,43 @@ class CierreNivelReingresoService
             }
         }
 
-        $grupo = Grupo::query()->findOrFail((int) $destino['grupo_id']);
-        $grupoValido = (int) $grupo->nivel_id === (int) $destino['nivel_id']
-            && (int) $grupo->grado_id === (int) $destino['grado_id']
-            && (int) $grupo->generacion_id === (int) $destino['generacion_id']
-            && (int) ($grupo->semestre_id ?? 0) === (int) ($semestreId ?? 0);
+        $cicloEscolar = CicloEscolar::query()->findOrFail((int) $destino['ciclo_escolar_id']);
+        $nivel = Nivel::query()->findOrFail((int) $destino['nivel_id']);
+        $semestre = $semestreId ? Semestre::query()->findOrFail($semestreId) : null;
+        $justificacion = trim((string) ($destino['justificacion'] ?? ''));
 
-        if (! $grupoValido) {
-            throw ValidationException::withMessages(['grupo_destino_id' => 'El grupo no corresponde al nivel, grado, generación y semestre seleccionados.']);
+        $esGeneracionEsperada = app(AsignacionEscolarService::class)->esGeneracionEsperada(
+            $cicloEscolar,
+            $nivel,
+            $generacion,
+            $grado,
+            $semestre,
+        );
+
+        if (! $esGeneracionEsperada && mb_strlen($justificacion) < 10) {
+            throw ValidationException::withMessages([
+                'justificacion' => 'La generación seleccionada es excepcional para el ciclo y grado. Escribe una justificación de al menos 10 caracteres.',
+            ]);
+        }
+
+        try {
+            app(AsignacionEscolarService::class)->validarAsignacion([
+                'grupo_id' => (int) $destino['grupo_id'],
+                'ciclo_escolar_id' => (int) $destino['ciclo_escolar_id'],
+                'nivel_id' => (int) $destino['nivel_id'],
+                'grado_id' => (int) $destino['grado_id'],
+                'generacion_id' => (int) $destino['generacion_id'],
+                'semestre_id' => $semestreId,
+            ], permitirGeneracionExcepcional: ! $esGeneracionEsperada);
+        } catch (ValidationException $exception) {
+            $errores = [];
+            foreach ($exception->errors() as $mensajes) {
+                $errores = array_merge($errores, $mensajes);
+            }
+
+            throw ValidationException::withMessages([
+                'grupo_destino_id' => $errores ?: ['El grupo no corresponde al ciclo escolar y ubicación seleccionados.'],
+            ]);
         }
     }
 
@@ -446,6 +476,7 @@ class CierreNivelReingresoService
             'grupo_id',
             'semestre_id',
             'ciclo_id',
+            'ciclo_escolar_id',
             'estatus',
             'activo',
             'fecha_estatus',

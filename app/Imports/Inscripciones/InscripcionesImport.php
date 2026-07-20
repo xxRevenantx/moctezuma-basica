@@ -4,6 +4,7 @@ namespace App\Imports\Inscripciones;
 
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Services\AsignacionEscolarService;
 use App\Services\ObservacionInscripcionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,21 +26,44 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
 
     public function collection(Collection $rows): void
     {
-        DB::transaction(function () use ($rows) {
+        DB::transaction(function () use ($rows): void {
             $observacionesService = app(ObservacionInscripcionService::class);
+            $asignacionService = app(AsignacionEscolarService::class);
 
             foreach ($rows as $row) {
+                $claveGrupo = mb_strtoupper(trim((string) $row['clave_grupo']));
+
                 $grupo = Grupo::query()
-                    ->with(['nivel', 'grado', 'generacion', 'semestre'])
-                    ->findOrFail((int) $row['grupo_id']);
+                    ->with(['nivel', 'grado', 'generacion', 'semestre', 'cicloEscolar'])
+                    ->where('clave', $claveGrupo)
+                    ->where('estado', 'activo')
+                    ->firstOrFail();
+
+                $asignacionService->validarAsignacion([
+                    'grupo_id' => $grupo->id,
+                    'ciclo_escolar_id' => $grupo->ciclo_escolar_id,
+                    'nivel_id' => $grupo->nivel_id,
+                    'grado_id' => $grupo->grado_id,
+                    'generacion_id' => $grupo->generacion_id,
+                    'semestre_id' => $grupo->semestre_id,
+                ]);
 
                 $matricula = mb_strtoupper(trim((string) $row['matricula']));
+                $curp = mb_strtoupper(trim((string) $row['curp']));
+                $fechaInscripcion = $this->normalizarFecha(
+                    $row['fecha_inscripcion'] ?? now()->toDateString()
+                );
+                $estadoInscripcion = strtolower(trim((string) ($row['estado_inscripcion'] ?? 'inscrito')));
+                $tipoIngreso = strtolower(trim((string) ($row['tipo_ingreso'] ?? 'nuevo_ingreso')));
+                $motivoCapturaHistorica = $this->limpiarTexto($row['motivo_captura_historica'] ?? null);
+                $estaInscrito = $estadoInscripcion === 'inscrito';
+
                 $observacionImportada = $observacionesService->desdeTextoPlano(
                     $row['observaciones'] ?? null
                 );
 
                 $datosInscripcion = [
-                    'curp' => mb_strtoupper(trim((string) $row['curp'])),
+                    'curp' => $curp,
                     'matricula' => $matricula,
                     'folio' => $this->limpiarTexto($row['folio'] ?? null),
 
@@ -49,60 +73,55 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                     'fecha_nacimiento' => $this->normalizarFecha($row['fecha_nacimiento'] ?? null),
                     'genero' => mb_strtoupper(trim((string) $row['genero'])),
 
-                    'fecha_inscripcion' => $this->normalizarFecha($row['fecha_inscripcion'] ?? now()->toDateString()),
+                    'fecha_inscripcion' => $fechaInscripcion,
+                    'ciclo_escolar_id' => (int) $grupo->ciclo_escolar_id,
+                    'ciclo_id' => (int) $row['momento_ingreso_id'],
 
-                    'nivel_id' => (int) $row['nivel_id'],
-                    'grado_id' => (int) $row['grado_id'],
-                    'generacion_id' => (int) $row['generacion_id'],
-                    'grupo_id' => (int) $row['grupo_id'],
-                    'semestre_id' => !empty($row['semestre_id']) ? (int) $row['semestre_id'] : null,
-                    'ciclo_id' => (int) $row['ciclo_id'],
+                    // Toda la ubicación académica se deriva de una única clave de grupo.
+                    'nivel_id' => (int) $grupo->nivel_id,
+                    'grado_id' => (int) $grupo->grado_id,
+                    'generacion_id' => (int) $grupo->generacion_id,
+                    'grupo_id' => (int) $grupo->id,
+                    'semestre_id' => $grupo->semestre_id ? (int) $grupo->semestre_id : null,
 
-                    'activo' => true,
-                    'estatus' => 'activo',
-                    'fecha_estatus' => $this->normalizarFecha($row['fecha_inscripcion'] ?? now()->toDateString()),
-
-                    'pais_nacimiento' => null,
-                    'estado_nacimiento' => null,
-                    'lugar_nacimiento' => null,
-
-                    'calle' => null,
-                    'numero_exterior' => null,
-                    'numero_interior' => null,
-                    'colonia' => null,
-                    'codigo_postal' => null,
-                    'municipio' => null,
-                    'estado_residencia' => null,
-                    'ciudad_residencia' => null,
-
-                    'foto_path' => null,
-                    'tutor_id' => null,
-                    'fecha_baja' => null,
-                    'motivo_baja' => null,
-                    'observaciones_baja' => null,
+                    'activo' => $estaInscrito,
+                    'estatus' => $estaInscrito ? 'activo' : 'preinscrito',
+                    'fecha_estatus' => $fechaInscripcion,
+                    'motivo_estatus' => $tipoIngreso === 'captura_historica' ? $motivoCapturaHistorica : null,
+                    'tipo_ultimo_ingreso' => $tipoIngreso,
+                    'fecha_ultimo_ingreso' => $fechaInscripcion,
+                    'usuario_acceso_activo' => $estaInscrito,
                 ];
 
                 $inscripcion = Inscripcion::withTrashed()
-                    ->where(function ($query) use ($matricula, $datosInscripcion) {
+                    ->where(function ($query) use ($matricula, $curp): void {
                         $query->where('matricula', $matricula)
-                            ->orWhere('curp', $datosInscripcion['curp']);
+                            ->orWhere('curp', $curp);
                     })
                     ->first();
 
                 if ($inscripcion) {
                     $inscripcion->restore();
-                    $inscripcion->update($datosInscripcion);
+
+                    $datosActualizacion = $datosInscripcion;
+                    foreach (['folio', 'apellido_materno'] as $campoOpcional) {
+                        if ($datosActualizacion[$campoOpcional] === null) {
+                            unset($datosActualizacion[$campoOpcional]);
+                        }
+                    }
+
+                    $inscripcion->update($datosActualizacion);
                     $this->actualizados++;
                 } else {
                     $inscripcion = Inscripcion::query()->create($datosInscripcion);
                     $this->creados++;
                 }
 
-                // Una celda vacía no elimina observaciones existentes durante importaciones masivas.
+                // Una celda vacía no borra observaciones previamente registradas.
                 if ($observacionImportada !== null) {
                     $observacionesService->guardar(
                         inscripcion: $inscripcion,
-                        cicloEscolarId: (int) $row['ciclo_escolar_id'],
+                        cicloEscolarId: (int) $grupo->ciclo_escolar_id,
                         contenido: $observacionImportada,
                         origen: 'importacion',
                         usuarioId: auth()->id(),
@@ -115,84 +134,36 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
     public function rules(): array
     {
         return [
-            '*.curp' => [
-                'required',
-                'string',
-                'max:18',
-                'regex:/^[A-Z0-9]+$/i',
-            ],
-            '*.matricula' => [
-                'required',
-                'string',
-                'max:50',
-                'regex:/^[A-Z0-9\-]+$/i',
-            ],
-            '*.folio' => [
-                'nullable',
-                'string',
-                'max:50',
-            ],
-            '*.nombre' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            '*.apellido_paterno' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            '*.apellido_materno' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+            '*.curp' => ['required', 'string', 'max:18', 'regex:/^[A-Z0-9]+$/i'],
+            '*.matricula' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9\-]+$/i'],
+            '*.folio' => ['nullable', 'string', 'max:50'],
+            '*.nombre' => ['required', 'string', 'max:255'],
+            '*.apellido_paterno' => ['required', 'string', 'max:255'],
+            '*.apellido_materno' => ['nullable', 'string', 'max:255'],
             '*.fecha_nacimiento' => [
                 'required',
-                'date',
+                fn (string $attribute, mixed $value, \Closure $fail) => $this->validarFechaImportada($attribute, $value, $fail),
             ],
-            '*.genero' => [
-                'required',
-                Rule::in(['H', 'M', 'h', 'm']),
-            ],
+            '*.genero' => ['required', Rule::in(['H', 'M', 'h', 'm'])],
             '*.fecha_inscripcion' => [
                 'required',
-                'date',
+                fn (string $attribute, mixed $value, \Closure $fail) => $this->validarFechaImportada($attribute, $value, $fail),
             ],
-            '*.ciclo_escolar_id' => [
+            '*.clave_grupo' => [
                 'required',
-                'integer',
-                Rule::exists('ciclo_escolares', 'id'),
+                'string',
+                'max:120',
+                Rule::exists('grupos', 'clave')->where(fn ($query) => $query->where('estado', 'activo')),
             ],
-            '*.nivel_id' => [
+            '*.momento_ingreso_id' => ['required', 'integer', Rule::exists('ciclos', 'id')],
+            '*.tipo_ingreso' => [
                 'required',
-                'integer',
-                Rule::exists('niveles', 'id'),
+                Rule::in(['nuevo_ingreso', 'traslado', 'captura_historica']),
             ],
-            '*.grado_id' => [
+            '*.motivo_captura_historica' => ['nullable', 'string', 'max:500'],
+            '*.estado_inscripcion' => [
                 'required',
-                'integer',
-                Rule::exists('grados', 'id'),
-            ],
-            '*.generacion_id' => [
-                'required',
-                'integer',
-                Rule::exists('generaciones', 'id'),
-            ],
-            '*.grupo_id' => [
-                'required',
-                'integer',
-                Rule::exists('grupos', 'id'),
-            ],
-            '*.semestre_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('semestres', 'id'),
-            ],
-            '*.ciclo_id' => [
-                'required',
-                'integer',
-                Rule::exists('ciclos', 'id'),
+                Rule::in(['preinscrito', 'inscrito']),
             ],
             '*.observaciones' => [
                 'nullable',
@@ -208,65 +179,88 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (Validator $validator) {
-            $filas = $validator->getData();
-
-            foreach ($filas as $indice => $fila) {
-                $this->validarRelacionGrupo($validator, $indice, $fila);
+        $validator->after(function (Validator $validator): void {
+            foreach ($validator->getData() as $indice => $fila) {
+                $this->validarGrupoImportable($validator, $indice, $fila);
                 $this->validarCurpUnicaPorMatricula($validator, $indice, $fila);
             }
         });
     }
 
-    private function validarRelacionGrupo(Validator $validator, int|string $indice, array $fila): void
+    private function validarGrupoImportable(Validator $validator, int|string $indice, array $fila): void
     {
-        if (empty($fila['grupo_id'])) {
+        $claveGrupo = mb_strtoupper(trim((string) ($fila['clave_grupo'] ?? '')));
+
+        if ($claveGrupo === '') {
             return;
         }
 
-        $grupo = Grupo::query()->find((int) $fila['grupo_id']);
+        $grupo = Grupo::query()
+            ->where('clave', $claveGrupo)
+            ->first();
 
         if (!$grupo) {
             return;
         }
 
-        $nivelId = (int) ($fila['nivel_id'] ?? 0);
-        $gradoId = (int) ($fila['grado_id'] ?? 0);
-        $generacionId = (int) ($fila['generacion_id'] ?? 0);
-        $semestreId = !empty($fila['semestre_id']) ? (int) $fila['semestre_id'] : null;
-
-        if ((int) $grupo->nivel_id !== $nivelId) {
+        if (!$grupo->ciclo_escolar_id) {
             $validator->errors()->add(
-                "{$indice}.nivel_id",
-                'El nivel no coincide con el grupo seleccionado.'
+                "{$indice}.clave_grupo",
+                'El grupo no tiene un ciclo escolar asignado. Corrígelo en Estructura → Grupos.'
             );
         }
 
-        if ((int) $grupo->grado_id !== $gradoId) {
+        if ($grupo->estado !== 'activo') {
             $validator->errors()->add(
-                "{$indice}.grado_id",
-                'El grado no coincide con el grupo seleccionado.'
+                "{$indice}.clave_grupo",
+                'El grupo seleccionado está inactivo.'
             );
         }
 
-        if ((int) $grupo->generacion_id !== $generacionId) {
+        $tipoIngreso = strtolower(trim((string) ($fila['tipo_ingreso'] ?? 'nuevo_ingreso')));
+        $motivoHistorico = trim((string) ($fila['motivo_captura_historica'] ?? ''));
+        $grupo->loadMissing('cicloEscolar');
+
+        if ($grupo->cicloEscolar?->cerrado_at && $tipoIngreso !== 'captura_historica') {
             $validator->errors()->add(
-                "{$indice}.generacion_id",
-                'La generación no coincide con el grupo seleccionado.'
+                "{$indice}.tipo_ingreso",
+                'El ciclo escolar del grupo está cerrado. Usa captura_historica y registra el motivo.'
             );
         }
 
-        if ($semestreId !== null && (int) $grupo->semestre_id !== $semestreId) {
-            $validator->errors()->add(
-                "{$indice}.semestre_id",
-                'El semestre no coincide con el grupo seleccionado.'
-            );
+        if ($tipoIngreso === 'captura_historica') {
+            if (mb_strlen($motivoHistorico) < 10) {
+                $validator->errors()->add(
+                    "{$indice}.motivo_captura_historica",
+                    'La captura histórica requiere un motivo de al menos 10 caracteres.'
+                );
+            }
+
+            if (! auth()->user()?->canAccess('academico.editar')) {
+                $validator->errors()->add(
+                    "{$indice}.tipo_ingreso",
+                    'No tienes permiso para importar capturas históricas.'
+                );
+            }
         }
 
-        if ($semestreId === null && $grupo->semestre_id !== null) {
+        $matricula = mb_strtoupper(trim((string) ($fila['matricula'] ?? '')));
+        $curp = mb_strtoupper(trim((string) ($fila['curp'] ?? '')));
+
+        if ($matricula === '' || $curp === '') {
+            return;
+        }
+
+        $existente = Inscripcion::withTrashed()
+            ->where(fn ($query) => $query
+                ->where('matricula', $matricula)
+                ->orWhere('curp', $curp))
+            ->first();
+
+        if ($existente && $existente->grupo_id && (int) $existente->grupo_id !== (int) $grupo->id) {
             $validator->errors()->add(
-                "{$indice}.semestre_id",
-                'Este grupo pertenece a bachillerato y requiere semestre_id.'
+                "{$indice}.clave_grupo",
+                'El alumno ya pertenece a otro grupo. Utiliza la acción “Cambiar asignación escolar” para conservar el historial.'
             );
         }
     }
@@ -280,7 +274,7 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
             return;
         }
 
-        $curpUsada = Inscripcion::query()
+        $curpUsada = Inscripcion::withTrashed()
             ->where('curp', $curp)
             ->where('matricula', '!=', $matricula)
             ->exists();
@@ -299,61 +293,61 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
             '*.curp.required' => 'La CURP es obligatoria.',
             '*.curp.regex' => 'La CURP solo debe contener letras y números.',
             '*.curp.max' => 'La CURP no debe superar 18 caracteres.',
-
             '*.matricula.required' => 'La matrícula es obligatoria.',
             '*.matricula.regex' => 'La matrícula solo debe contener letras, números y guiones.',
-
             '*.nombre.required' => 'El nombre es obligatorio.',
             '*.apellido_paterno.required' => 'El apellido paterno es obligatorio.',
-
             '*.fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             '*.fecha_nacimiento.date' => 'La fecha de nacimiento debe tener formato válido.',
-
             '*.genero.required' => 'El género es obligatorio.',
             '*.genero.in' => 'El género debe ser H o M.',
-
             '*.fecha_inscripcion.required' => 'La fecha de inscripción es obligatoria.',
             '*.fecha_inscripcion.date' => 'La fecha de inscripción debe tener formato válido.',
-
-            '*.ciclo_escolar_id.required' => 'El ciclo escolar es obligatorio.',
-            '*.ciclo_escolar_id.exists' => 'El ciclo escolar seleccionado no existe.',
-
-            '*.nivel_id.required' => 'El nivel es obligatorio.',
-            '*.nivel_id.exists' => 'El nivel seleccionado no existe.',
-
-            '*.grado_id.required' => 'El grado es obligatorio.',
-            '*.grado_id.exists' => 'El grado seleccionado no existe.',
-
-            '*.generacion_id.required' => 'La generación es obligatoria.',
-            '*.generacion_id.exists' => 'La generación seleccionada no existe.',
-
-            '*.grupo_id.required' => 'El grupo es obligatorio.',
-            '*.grupo_id.exists' => 'El grupo seleccionado no existe.',
-
-            '*.semestre_id.exists' => 'El semestre seleccionado no existe.',
-
-            '*.ciclo_id.required' => 'El periodo de inscripción es obligatorio.',
-            '*.ciclo_id.exists' => 'El periodo de inscripción seleccionado no existe.',
-
+            '*.clave_grupo.required' => 'La clave del grupo es obligatoria.',
+            '*.clave_grupo.exists' => 'La clave del grupo no existe o el grupo está inactivo.',
+            '*.momento_ingreso_id.required' => 'El momento de ingreso es obligatorio.',
+            '*.momento_ingreso_id.exists' => 'El momento de ingreso seleccionado no existe.',
+            '*.tipo_ingreso.required' => 'El tipo de ingreso es obligatorio.',
+            '*.tipo_ingreso.in' => 'El tipo de ingreso no es válido.',
+            '*.motivo_captura_historica.max' => 'El motivo de captura histórica no debe superar 500 caracteres.',
+            '*.estado_inscripcion.required' => 'El estado inicial es obligatorio.',
+            '*.estado_inscripcion.in' => 'El estado inicial debe ser preinscrito o inscrito.',
             '*.observaciones.string' => 'Las observaciones deben ser texto.',
         ];
     }
 
-    private function limpiarTexto($valor): ?string
+    private function validarFechaImportada(string $attribute, mixed $value, \Closure $fail): void
+    {
+        if (is_numeric($value)) {
+            try {
+                ExcelDate::excelToDateTimeObject($value);
+                return;
+            } catch (\Throwable) {
+                $fail('La fecha no es válida.');
+                return;
+            }
+        }
+
+        if (strtotime((string) $value) === false) {
+            $fail('La fecha no es válida. Usa el formato yyyy-mm-dd.');
+        }
+    }
+
+    private function limpiarTexto(mixed $valor): ?string
     {
         $texto = trim((string) $valor);
 
         return $texto === '' ? null : $texto;
     }
 
-    private function limpiarTextoMayuscula($valor): ?string
+    private function limpiarTextoMayuscula(mixed $valor): ?string
     {
         $texto = $this->limpiarTexto($valor);
 
         return $texto ? mb_strtoupper($texto) : null;
     }
 
-    private function normalizarFecha($valor): ?string
+    private function normalizarFecha(mixed $valor): ?string
     {
         if (empty($valor)) {
             return null;
@@ -363,6 +357,8 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
             return ExcelDate::excelToDateTimeObject($valor)->format('Y-m-d');
         }
 
-        return date('Y-m-d', strtotime((string) $valor));
+        $timestamp = strtotime((string) $valor);
+
+        return $timestamp === false ? null : date('Y-m-d', $timestamp);
     }
 }

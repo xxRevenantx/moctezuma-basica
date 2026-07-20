@@ -42,6 +42,7 @@ class EditarMatricula extends Component
     public ?string $genero = null;
     public ?string $fecha_ingreso_plantel = null;
     public ?int $ciclo_id = null;
+    public ?int $ciclo_escolar_id = null;
 
     public ?string $pais_nacimiento = null;
     public ?string $estado_nacimiento = null;
@@ -148,11 +149,20 @@ class EditarMatricula extends Component
             'generacion_id',
             'semestre_id',
             'grupo_id',
+            'ciclo_escolar_id',
             'ciclo_id',
             'estatus',
         ] as $campo) {
             $this->{$campo} = $alumno->{$campo};
         }
+
+        if (! $this->ciclo_escolar_id && $alumno->grupo_id) {
+            $this->ciclo_escolar_id = Grupo::query()->whereKey($alumno->grupo_id)->value('ciclo_escolar_id');
+        }
+
+        $this->ciclo_escolar_id ??= $this->ciclosEscolaresObservacion
+            ->firstWhere('es_actual', true)?->id
+            ?? $this->ciclosEscolaresObservacion->first()?->id;
 
         $this->fecha_nacimiento = optional($alumno->fecha_nacimiento)->format('Y-m-d');
         $this->fecha_ingreso_plantel = optional($alumno->fecha_inscripcion)->format('Y-m-d');
@@ -227,6 +237,20 @@ class EditarMatricula extends Component
 
         if (Schema::hasColumn('grupos', 'deleted_at')) {
             $query->whereNull('grupos.deleted_at');
+        }
+
+        if ($this->ciclo_escolar_id) {
+            $query->where('grupos.ciclo_escolar_id', $this->ciclo_escolar_id);
+        }
+
+        if (Schema::hasColumn('grupos', 'estado')) {
+            $query->where(function ($estado): void {
+                $estado->where('grupos.estado', 'activo');
+
+                if ($this->grupo_id) {
+                    $estado->orWhere('grupos.id', $this->grupo_id);
+                }
+            });
         }
 
         return $query;
@@ -372,6 +396,11 @@ class EditarMatricula extends Component
                 'grado:id,nombre',
                 'semestre:id,numero',
             ])
+            ->withCount([
+                'inscripciones as alumnos_activos_count' => fn ($alumnos) => $alumnos
+                    ->where('activo', true)
+                    ->whereNull('deleted_at'),
+            ])
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select('grupos.*')
             ->orderBy('grupos.grado_id')
@@ -392,6 +421,12 @@ class EditarMatricula extends Component
                 }
 
                 $partes[] = $generacion;
+                $partes[] = number_format((int) $grupo->alumnos_activos_count) . ' alumnos';
+                $partes[] = 'cupo ilimitado';
+
+                if (($grupo->estado ?? 'activo') !== 'activo') {
+                    $partes[] = 'inactivo';
+                }
 
                 return [
                     'id' => (int) $grupo->id,
@@ -437,6 +472,26 @@ class EditarMatricula extends Component
         if ($this->grado_id && $this->generacion_id) {
             $this->gruposOptions = $this->loadGruposOptionsFromGrupos();
         }
+    }
+
+    public function updatedCicloEscolarId($value): void
+    {
+        $this->ciclo_escolar_id = $value ? (int) $value : null;
+        $this->nivel_id = null;
+        $this->grado_id = null;
+        $this->generacion_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->resetValidation([
+            'ciclo_escolar_id',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'semestre_id',
+            'grupo_id',
+        ]);
+        $this->niveles = $this->loadNivelesFromGrupos();
+        $this->recargarOpcionesAsignacionEscolar();
     }
 
     public function updatedNivelId($value): void
@@ -637,6 +692,7 @@ class EditarMatricula extends Component
             'genero' => ['required', Rule::in(['H', 'M'])],
             'fecha_ingreso_plantel' => ['required', 'date'],
             'ciclo_id' => ['required', 'integer', Rule::exists('ciclos', 'id')],
+            'ciclo_escolar_id' => ['required', 'integer', Rule::exists('ciclo_escolares', 'id')],
             'observacion_ciclo_escolar_id' => [
                 'required',
                 'integer',
@@ -698,16 +754,22 @@ class EditarMatricula extends Component
 
         $grupoQuery = $this->baseGrupoQuery()
             ->whereKey((int) $data['grupo_id'])
+            ->where('ciclo_escolar_id', (int) $data['ciclo_escolar_id'])
             ->where('nivel_id', (int) $data['nivel_id'])
             ->where('generacion_id', (int) $data['generacion_id']);
 
         if ($esBachillerato) {
             $grupo = $grupoQuery
                 ->where('semestre_id', (int) $data['semestre_id'])
-                ->first(['id', 'grado_id', 'semestre_id']);
+                ->first(['id', 'ciclo_escolar_id', 'grado_id', 'semestre_id', 'estado']);
 
             if (! $grupo) {
-                $this->addError('grupo_id', 'El grupo no corresponde al nivel, generación y semestre seleccionados.');
+                $this->addError('grupo_id', 'El grupo no corresponde al ciclo escolar, nivel, generación y semestre seleccionados.');
+                return false;
+            }
+
+            if (($grupo->estado ?? 'activo') !== 'activo' && (int) $alumno->grupo_id !== (int) $grupo->id) {
+                $this->addError('grupo_id', 'No puedes reasignar al alumno a un grupo inactivo.');
                 return false;
             }
 
@@ -730,10 +792,15 @@ class EditarMatricula extends Component
         $grupo = $grupoQuery
             ->where('grado_id', (int) $data['grado_id'])
             ->whereNull('semestre_id')
-            ->first(['id']);
+            ->first(['id', 'ciclo_escolar_id', 'estado']);
 
         if (! $grupo) {
-            $this->addError('grupo_id', 'El grupo no corresponde al nivel, grado y generación seleccionados.');
+            $this->addError('grupo_id', 'El grupo no corresponde al ciclo escolar, nivel, grado y generación seleccionados.');
+            return false;
+        }
+
+        if (($grupo->estado ?? 'activo') !== 'activo' && (int) $alumno->grupo_id !== (int) $grupo->id) {
+            $this->addError('grupo_id', 'No puedes reasignar al alumno a un grupo inactivo.');
             return false;
         }
 
@@ -787,7 +854,8 @@ class EditarMatricula extends Component
             return null;
         }
 
-        $cambioAcademico = (int) $alumno->nivel_id !== (int) $data['nivel_id']
+        $cambioAcademico = (int) $alumno->ciclo_escolar_id !== (int) $data['ciclo_escolar_id']
+            || (int) $alumno->nivel_id !== (int) $data['nivel_id']
             || (int) $alumno->grado_id !== (int) $data['grado_id']
             || (int) $alumno->generacion_id !== (int) $data['generacion_id']
             || (int) $alumno->grupo_id !== (int) $data['grupo_id']
@@ -851,6 +919,7 @@ class EditarMatricula extends Component
 
             if ($cambioAcademico) {
                 $service->cambiarAsignacion($alumno, [
+                    'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
                     'nivel_id' => (int) $data['nivel_id'],
                     'grado_id' => (int) $data['grado_id'],
                     'generacion_id' => (int) $data['generacion_id'],

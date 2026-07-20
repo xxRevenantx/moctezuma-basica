@@ -11,6 +11,10 @@ class Grupo extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'ciclo_escolar_id',
+        'clave',
+        'estado',
+        'motivo_generacion_excepcional',
         'asignacion_grupo_id',
         'nivel_id',
         'grado_id',
@@ -18,7 +22,16 @@ class Grupo extends Model
         'semestre_id',
     ];
 
+    protected $casts = [
+        'ciclo_escolar_id' => 'integer',
+    ];
+
     // RELACIONES
+    public function cicloEscolar()
+    {
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
+    }
+
     public function nivel()
     {
         return $this->belongsTo(Nivel::class);

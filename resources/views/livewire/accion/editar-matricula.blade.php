@@ -411,13 +411,34 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 dark:text-white">Asignación escolar</h2>
                             <p class="text-sm text-slate-500 dark:text-slate-400">
-                                {{ $esBachillerato ? 'En bachillerato el grado se obtiene automáticamente desde el semestre y grupo.' : 'Selecciona nivel, grado, generación y grupo.' }}
+                                {{ $esBachillerato ? 'Selecciona primero el ciclo escolar; el grado se obtiene desde el semestre y el grupo.' : 'Selecciona primero el ciclo escolar y después la ubicación académica.' }}
                             </p>
                         </div>
                     </div>
 
                     <div
-                        class="grid grid-cols-1 gap-4 md:grid-cols-2 {{ $esBachillerato ? 'xl:grid-cols-4' : 'xl:grid-cols-4' }}">
+                        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                            <div class="mb-1 flex items-center gap-2">
+                                <flux:label>Ciclo escolar</flux:label>
+                                <span
+                                    class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    Obligatorio
+                                </span>
+                            </div>
+                            <flux:select wire:model.live="ciclo_escolar_id">
+                                <flux:select.option value="">Selecciona un ciclo escolar</flux:select.option>
+                                @foreach ($ciclosEscolaresObservacion as $cicloEscolar)
+                                    <flux:select.option value="{{ $cicloEscolar->id }}">
+                                        {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · Actual' : '' }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            @error('ciclo_escolar_id')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div>
                             <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Nivel</flux:label>
@@ -426,7 +447,7 @@
                                     Obligatorio
                                 </span>
                             </div>
-                            <flux:select wire:model.live="nivel_id">
+                            <flux:select wire:model.live="nivel_id" :disabled="!$ciclo_escolar_id">
                                 <flux:select.option value="">Selecciona un nivel</flux:select.option>
                                 @foreach ($niveles as $nivel)
                                     <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
@@ -528,16 +549,18 @@
                     @if ($esBachillerato)
                         <div
                             class="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                            En bachillerato selecciona <b>generación</b>, después <b>semestre</b> y al final
-                            <b>grupo</b>. El <b>grado</b> se toma automáticamente desde el grupo.
+                            Los grupos se filtran por <b>ciclo escolar</b>, <b>generación</b> y <b>semestre</b>. El <b>grado</b> se obtiene automáticamente desde el grupo y el cupo es ilimitado.
                         </div>
                     @else
                         <div
                             class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                            Para preescolar, primaria y secundaria la matrícula queda ligada a <b>nivel</b>,
-                            <b>grado</b>, <b>generación</b> y <b>grupo</b>.
+                            La asignación queda ligada al <b>ciclo escolar</b>, <b>nivel</b>, <b>grado</b>, <b>generación</b> y <b>grupo</b>. Los grupos tienen cupo ilimitado.
                         </div>
                     @endif
+
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                        Cambiar cualquiera de estos campos reemplaza la asignación académica actual. El sistema solicitará un <b>motivo</b>, una <b>confirmación</b> y registrará el movimiento en el historial del alumno.
+                    </div>
                 </section>
 
                 <div

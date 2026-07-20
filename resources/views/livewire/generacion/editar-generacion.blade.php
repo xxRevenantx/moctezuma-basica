@@ -208,7 +208,7 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <flux:select wire:model="nivel_id" label="Nivel educativo"
+                        <flux:select wire:model.live="nivel_id" label="Nivel educativo" :disabled="$tieneGrupos"
                             description="Nivel al que pertenece la generación.">
                             <flux:select.option value="">
                                 Selecciona un nivel
@@ -222,14 +222,28 @@
                         </flux:select>
 
                         <flux:input wire:model="nombre" label="Nombre de la generación"
-                            placeholder="Ejemplo: 2025-2028" icon="tag" />
+                            placeholder="Ejemplo: 2025-2028" icon="tag" readonly />
 
-                        <flux:input wire:model="anio_ingreso" type="number" min="1900" max="2200"
-                            step="1" label="Año de ingreso" placeholder="2025" icon="calendar-days" />
+                        <flux:input wire:model.live="anio_ingreso" type="number" min="1900" max="2200"
+                            step="1" label="Año de ingreso" placeholder="2025" icon="calendar-days" :disabled="$tieneGrupos" />
 
                         <flux:input wire:model="anio_egreso" type="number" min="1900" max="2200"
-                            step="1" label="Año de egreso" placeholder="2028" icon="calendar-days" />
+                            step="1" label="Año de egreso" placeholder="2028" icon="calendar-days" readonly />
                     </div>
+
+                    @if ($detalleDuracion || $tieneGrupos)
+                        <div class="mt-4 rounded-xl border px-4 py-3 text-sm
+                            {{ $tieneGrupos
+                                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200'
+                                : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200' }}">
+                            @if ($detalleDuracion)
+                                <span class="font-semibold">{{ $detalleDuracion }}</span>
+                            @endif
+                            @if ($tieneGrupos)
+                                Esta generación ya tiene grupos relacionados; el nivel y los años están protegidos para no alterar sus asignaciones.
+                            @endif
+                        </div>
+                    @endif
                 </section>
 
                 <div class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700">
@@ -259,7 +273,7 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <flux:select wire:model="ciclo_escolar_inicio_id" label="Ciclo escolar inicial">
+                        <flux:select wire:model="ciclo_escolar_inicio_id" label="Ciclo escolar inicial" disabled>
                             <flux:select.option value="">
                                 Sin asignar
                             </flux:select.option>
@@ -271,7 +285,7 @@
                             @endforeach
                         </flux:select>
 
-                        <flux:select wire:model="ciclo_escolar_fin_id" label="Ciclo escolar final">
+                        <flux:select wire:model="ciclo_escolar_fin_id" label="Ciclo escolar final" disabled>
                             <flux:select.option value="">
                                 Sin asignar
                             </flux:select.option>
@@ -312,9 +326,9 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <flux:input wire:model="fecha_inicio" type="date" label="Fecha de inicio" />
+                        <flux:input wire:model="fecha_inicio" type="date" label="Fecha de inicio" readonly />
 
-                        <flux:input wire:model="fecha_termino" type="date" label="Fecha de término" />
+                        <flux:input wire:model="fecha_termino" type="date" label="Fecha de término" readonly />
                     </div>
                 </section>
             </fieldset>

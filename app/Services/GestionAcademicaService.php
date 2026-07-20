@@ -15,6 +15,7 @@ class GestionAcademicaService
 {
     public const ESTATUS = [
         'activo',
+        'preinscrito',
         'baja_temporal',
         'baja_definitiva',
         'trasladado',
@@ -41,18 +42,24 @@ class GestionAcademicaService
             }
 
             $grupo = Grupo::query()->findOrFail((int) $destino['grupo_id']);
-            $valido = (int) $grupo->nivel_id === (int) $destino['nivel_id']
+            $cicloDestinoId = (int) ($destino['ciclo_escolar_id'] ?? $grupo->ciclo_escolar_id ?? $alumno->ciclo_escolar_id);
+            $destino['ciclo_escolar_id'] = $cicloDestinoId ?: null;
+
+            $valido = $cicloDestinoId > 0
+                && (int) $grupo->ciclo_escolar_id === $cicloDestinoId
+                && $grupo->estado === 'activo'
+                && (int) $grupo->nivel_id === (int) $destino['nivel_id']
                 && (int) $grupo->generacion_id === (int) $destino['generacion_id']
                 && (int) $grupo->grado_id === (int) $destino['grado_id']
                 && (int) ($grupo->semestre_id ?? 0) === (int) ($destino['semestre_id'] ?? 0);
 
             if (!$valido) {
-                throw ValidationException::withMessages(['grupo_id' => 'El grupo no corresponde a la generación, grado y semestre seleccionados.']);
+                throw ValidationException::withMessages(['grupo_id' => 'El grupo no corresponde al ciclo escolar, generación, grado y semestre seleccionados, o está inactivo.']);
             }
 
             $alumno->update(Arr::only($destino, [
-                'nivel_id',
-                'grado_id',
+                'ciclo_escolar_id',
+                'nivel_id',                'grado_id',
                 'generacion_id',
                 'grupo_id',
                 'semestre_id',
@@ -222,6 +229,7 @@ class GestionAcademicaService
     {
         return Arr::only($alumno->getAttributes(), [
             'matricula',
+            'ciclo_escolar_id',
             'nivel_id',
             'grado_id',
             'generacion_id',
