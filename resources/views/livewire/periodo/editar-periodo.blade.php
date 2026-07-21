@@ -144,19 +144,45 @@
                             <flux:error name="ciclo_escolar_id" />
                         </div>
 
-                        {{-- Fecha inicio --}}
                         <div>
-                            <flux:input wire:model="fecha_inicio" type="date" label="Fecha inicio" />
-                            <flux:error name="fecha_inicio" />
+                            <flux:input wire:model="fecha_evaluacion_inicio" type="date" label="Inicio de evaluación" />
+                            <flux:error name="fecha_evaluacion_inicio" />
                         </div>
 
-                        {{-- Fecha fin --}}
                         <div>
-                            <flux:input wire:model="fecha_fin" type="date" label="Fecha fin" />
-                            <flux:error name="fecha_fin" />
+                            <flux:input wire:model="fecha_evaluacion_fin" type="date" label="Fin de evaluación" />
+                            <flux:error name="fecha_evaluacion_fin" />
                         </div>
                     </div>
+
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <flux:input wire:model="fecha_captura_inicio" type="date" label="Inicio de captura" />
+                        <flux:input wire:model="fecha_captura_fin" type="date" label="Fin de captura" />
+                    </div>
+                    <div class="mt-1 grid gap-1 sm:grid-cols-2">
+                        <flux:error name="fecha_captura_inicio" />
+                        <flux:error name="fecha_captura_fin" />
+                    </div>
                 </div>
+
+                @if (!empty($traslapesDetectados))
+                    <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                        <h3 class="font-black text-amber-900 dark:text-amber-100">Traslape detectado</h3>
+                        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800 dark:text-amber-200">
+                            @foreach ($traslapesDetectados as $traslape)
+                                <li>{{ $traslape }}</li>
+                            @endforeach
+                        </ul>
+                        <div class="mt-4 space-y-3">
+                            <flux:checkbox wire:model.live="confirmar_traslape" label="Permitir el traslape después de revisarlo" />
+                            @if ($confirmar_traslape)
+                                <flux:textarea wire:model="motivo_traslape" label="Motivo del traslape" />
+                            @endif
+                            <flux:error name="confirmar_traslape" />
+                            <flux:error name="motivo_traslape" />
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Periodo básica --}}
                 <div

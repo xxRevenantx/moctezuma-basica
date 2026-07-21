@@ -50,8 +50,12 @@ class EjemplosPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
                 'periodo_basica_id',
                 'mes_bachillerato_id',
                 'parcial_bachillerato_id',
-                'fecha_inicio',
-                'fecha_fin',
+                'fecha_evaluacion_inicio',
+                'fecha_evaluacion_fin',
+                'fecha_captura_inicio',
+                'fecha_captura_fin',
+                'permitir_traslape',
+                'motivo_traslape',
             ],
             [
                 'BASICA',
@@ -65,6 +69,10 @@ class EjemplosPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
                 '',
                 $ciclo ? "{$ciclo->inicio_anio}-09-01" : '',
                 $ciclo ? "{$ciclo->inicio_anio}-11-30" : '',
+                $ciclo ? "{$ciclo->inicio_anio}-11-15" : '',
+                $ciclo ? "{$ciclo->inicio_anio}-12-05" : '',
+                'NO',
+                '',
             ],
             [
                 'BACHILLERATO',
@@ -82,6 +90,10 @@ class EjemplosPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
                 $parcial ? "{$parcial->id} | {$parcial->descripcion}" : '',
                 $ciclo ? "{$ciclo->inicio_anio}-08-15" : '',
                 $ciclo ? "{$ciclo->fin_anio}-01-31" : '',
+                $ciclo ? "{$ciclo->fin_anio}-01-20" : '',
+                $ciclo ? "{$ciclo->fin_anio}-02-05" : '',
+                'SI',
+                'Ventana administrativa compartida con otro corte.',
             ],
         ];
     }
@@ -91,8 +103,8 @@ class EjemplosPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
         return [
             AfterSheet::class => function (AfterSheet $event): void {
                 $hoja = $event->sheet->getDelegate();
-                $hoja->mergeCells('A1:K1');
-                $hoja->getStyle('A1:K1')->applyFromArray([
+                $hoja->mergeCells('A1:O1');
+                $hoja->getStyle('A1:O1')->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => '7C2D12']],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
@@ -104,14 +116,14 @@ class EjemplosPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, Wi
                     ],
                 ]);
                 $hoja->getRowDimension(1)->setRowHeight(30);
-                $hoja->getStyle('A3:K3')->applyFromArray([
+                $hoja->getStyle('A3:O3')->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
                         'startColor' => ['rgb' => '006492'],
                     ],
                 ]);
-                $hoja->getStyle('J4:K5')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+                $hoja->getStyle('J4:M5')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
             },
         ];
     }

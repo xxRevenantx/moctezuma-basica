@@ -209,21 +209,49 @@
                     </div>
 
                     <div>
-                        <flux:input wire:model="fecha_inicio" type="date" label="Fecha inicio" />
-
-                        @error('fecha_inicio')
-                            <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
-                        @enderror
+                        <flux:input wire:model="fecha_evaluacion_inicio" type="date" label="Inicio de evaluación" />
+                        <flux:error name="fecha_evaluacion_inicio" />
                     </div>
 
                     <div>
-                        <flux:input wire:model="fecha_fin" type="date" label="Fecha fin" />
-
-                        @error('fecha_fin')
-                            <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
-                        @enderror
+                        <flux:input wire:model="fecha_evaluacion_fin" type="date" label="Fin de evaluación" />
+                        <flux:error name="fecha_evaluacion_fin" />
                     </div>
                 </div>
+
+                <div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+                    <div class="mb-3">
+                        <h3 class="text-sm font-black text-violet-900 dark:text-violet-100">Ventana de captura de calificaciones</h3>
+                        <p class="text-xs text-violet-700/80 dark:text-violet-300">Puede coincidir parcialmente con la evaluación; se guarda por separado para no confundir ambos conceptos.</p>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <flux:input wire:model="fecha_captura_inicio" type="date" label="Inicio de captura" />
+                        <flux:input wire:model="fecha_captura_fin" type="date" label="Fin de captura" />
+                    </div>
+                    <div class="mt-1 grid gap-1 sm:grid-cols-2">
+                        <flux:error name="fecha_captura_inicio" />
+                        <flux:error name="fecha_captura_fin" />
+                    </div>
+                </div>
+
+                @if (!empty($traslapesDetectados))
+                    <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                        <h3 class="font-black text-amber-900 dark:text-amber-100">Se detectó un traslape de evaluación</h3>
+                        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800 dark:text-amber-200">
+                            @foreach ($traslapesDetectados as $traslape)
+                                <li>{{ $traslape }}</li>
+                            @endforeach
+                        </ul>
+                        <div class="mt-4 space-y-3">
+                            <flux:checkbox wire:model.live="confirmar_traslape" label="Revisé las fechas y deseo conservar este traslape" />
+                            @if ($confirmar_traslape)
+                                <flux:textarea wire:model="motivo_traslape" label="Motivo del traslape" placeholder="Ejemplo: la evaluación y la captura se realizan de manera escalonada..." />
+                            @endif
+                            <flux:error name="confirmar_traslape" />
+                            <flux:error name="motivo_traslape" />
+                        </div>
+                    </div>
+                @endif
 
                 <div
                     class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">

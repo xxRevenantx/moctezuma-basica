@@ -70,8 +70,12 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'periodo_basica_id' => $this->extraerId($filaOriginal['periodo_basica_id'] ?? null),
                 'mes_bachillerato_id' => $this->extraerId($filaOriginal['mes_bachillerato_id'] ?? null),
                 'parcial_bachillerato_id' => $this->extraerId($filaOriginal['parcial_bachillerato_id'] ?? null),
-                'fecha_inicio' => $this->normalizarFecha($filaOriginal['fecha_inicio'] ?? null),
-                'fecha_fin' => $this->normalizarFecha($filaOriginal['fecha_fin'] ?? null),
+                'fecha_evaluacion_inicio' => $this->normalizarFecha($filaOriginal['fecha_evaluacion_inicio'] ?? $filaOriginal['fecha_inicio'] ?? null),
+                'fecha_evaluacion_fin' => $this->normalizarFecha($filaOriginal['fecha_evaluacion_fin'] ?? $filaOriginal['fecha_fin'] ?? null),
+                'fecha_captura_inicio' => $this->normalizarFecha($filaOriginal['fecha_captura_inicio'] ?? null),
+                'fecha_captura_fin' => $this->normalizarFecha($filaOriginal['fecha_captura_fin'] ?? null),
+                'traslape_confirmado' => in_array(mb_strtoupper(trim((string) ($filaOriginal['permitir_traslape'] ?? 'NO'))), ['SI', 'SÍ', '1', 'TRUE'], true),
+                'motivo_traslape' => trim((string) ($filaOriginal['motivo_traslape'] ?? '')) ?: null,
             ];
 
             $validator = Validator::make($fila, [
@@ -84,8 +88,12 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'periodo_basica_id' => ['nullable', 'integer'],
                 'mes_bachillerato_id' => ['nullable', 'integer'],
                 'parcial_bachillerato_id' => ['nullable', 'integer'],
-                'fecha_inicio' => ['nullable', 'required_with:fecha_fin', 'date_format:Y-m-d'],
-                'fecha_fin' => ['nullable', 'required_with:fecha_inicio', 'date_format:Y-m-d', 'after_or_equal:fecha_inicio'],
+                'fecha_evaluacion_inicio' => ['nullable', 'required_with:fecha_evaluacion_fin', 'date_format:Y-m-d'],
+                'fecha_evaluacion_fin' => ['nullable', 'required_with:fecha_evaluacion_inicio', 'date_format:Y-m-d', 'after_or_equal:fecha_evaluacion_inicio'],
+                'fecha_captura_inicio' => ['nullable', 'required_with:fecha_captura_fin', 'date_format:Y-m-d'],
+                'fecha_captura_fin' => ['nullable', 'required_with:fecha_captura_inicio', 'date_format:Y-m-d', 'after_or_equal:fecha_captura_inicio'],
+                'traslape_confirmado' => ['boolean'],
+                'motivo_traslape' => ['nullable', 'string', 'max:1000'],
             ], [
                 'tipo.required' => 'el tipo es obligatorio',
                 'tipo.in' => 'el tipo debe ser BASICA o BACHILLERATO',
@@ -99,11 +107,11 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'periodo_basica_id.integer' => 'el periodo de básica no contiene un ID válido',
                 'mes_bachillerato_id.integer' => 'el mes de bachillerato no contiene un ID válido',
                 'parcial_bachillerato_id.integer' => 'el parcial no contiene un ID válido',
-                'fecha_inicio.required_with' => 'debes capturar también la fecha de inicio',
-                'fecha_fin.required_with' => 'debes capturar también la fecha de fin',
-                'fecha_inicio.date_format' => 'la fecha de inicio debe usar el formato AAAA-MM-DD',
-                'fecha_fin.date_format' => 'la fecha de fin debe usar el formato AAAA-MM-DD',
-                'fecha_fin.after_or_equal' => 'la fecha de fin debe ser igual o posterior a la fecha de inicio',
+                'fecha_evaluacion_inicio.required_with' => 'debes capturar también el inicio de evaluación',
+                'fecha_evaluacion_fin.required_with' => 'debes capturar también el fin de evaluación',
+                'fecha_evaluacion_inicio.date_format' => 'el inicio de evaluación debe usar AAAA-MM-DD',
+                'fecha_evaluacion_fin.date_format' => 'el fin de evaluación debe usar AAAA-MM-DD',
+                'fecha_evaluacion_fin.after_or_equal' => 'el fin de evaluación debe ser igual o posterior al inicio',
             ]);
 
             if ($validator->fails()) {
@@ -158,6 +166,11 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
             if ($erroresFila !== []) {
                 $this->agregarErrores($numeroFila, $erroresFila);
+                continue;
+            }
+
+            if ($fila['traslape_confirmado'] && mb_strlen((string) $fila['motivo_traslape']) < 10) {
+                $this->errores[] = "Fila {$numeroFila}: si permites traslape debes escribir un motivo de al menos 10 caracteres.";
                 continue;
             }
 
@@ -295,15 +308,21 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
 
         // Las celdas vacías no borran fechas existentes accidentalmente.
-        if ($fila['fecha_inicio'] !== null) {
-            $periodo->fecha_inicio = $fila['fecha_inicio'];
+        foreach (['fecha_evaluacion_inicio', 'fecha_evaluacion_fin', 'fecha_captura_inicio', 'fecha_captura_fin'] as $campo) {
+            if ($fila[$campo] !== null) {
+                $periodo->{$campo} = $fila[$campo];
+            }
         }
-
-        if ($fila['fecha_fin'] !== null) {
-            $periodo->fecha_fin = $fila['fecha_fin'];
+        if ($fila['fecha_evaluacion_inicio'] !== null) {
+            $periodo->fecha_inicio = $fila['fecha_evaluacion_inicio'];
         }
+        if ($fila['fecha_evaluacion_fin'] !== null) {
+            $periodo->fecha_fin = $fila['fecha_evaluacion_fin'];
+        }
+        $periodo->traslape_confirmado = $fila['traslape_confirmado'];
+        $periodo->motivo_traslape = $fila['traslape_confirmado'] ? $fila['motivo_traslape'] : null;
 
-        if ($periodo->isDirty(['fecha_inicio', 'fecha_fin'])) {
+        if ($periodo->isDirty()) {
             $periodo->save();
             $this->actualizados++;
         } else {
@@ -322,8 +341,14 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             'parcial_bachillerato_id' => $fila['es_bachillerato'] ? $fila['parcial_bachillerato_id'] : null,
             'mes_basica_id' => $fila['es_bachillerato'] ? null : $fila['mes_basica_id'],
             'periodo_basica_id' => $fila['es_bachillerato'] ? null : $fila['periodo_basica_id'],
-            'fecha_inicio' => $fila['fecha_inicio'],
-            'fecha_fin' => $fila['fecha_fin'],
+            'fecha_inicio' => $fila['fecha_evaluacion_inicio'],
+            'fecha_fin' => $fila['fecha_evaluacion_fin'],
+            'fecha_evaluacion_inicio' => $fila['fecha_evaluacion_inicio'],
+            'fecha_evaluacion_fin' => $fila['fecha_evaluacion_fin'],
+            'fecha_captura_inicio' => $fila['fecha_captura_inicio'],
+            'fecha_captura_fin' => $fila['fecha_captura_fin'],
+            'traslape_confirmado' => $fila['traslape_confirmado'],
+            'motivo_traslape' => $fila['traslape_confirmado'] ? $fila['motivo_traslape'] : null,
         ];
     }
 
@@ -352,7 +377,7 @@ class PeriodosImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
     private function fechasDentroDelCiclo(array $fila, CicloEscolar $ciclo): bool
     {
-        foreach (['fecha_inicio', 'fecha_fin'] as $campo) {
+        foreach (['fecha_evaluacion_inicio', 'fecha_evaluacion_fin', 'fecha_captura_inicio', 'fecha_captura_fin'] as $campo) {
             if (!$fila[$campo]) {
                 continue;
             }

@@ -11,8 +11,12 @@ use App\Models\Horario;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
+use App\Models\PersonaNivelDetalle;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\Semestre;
 use App\Models\Inscripcion;
+use App\Services\CicloNivelGateService;
+use App\Services\PlantillaDocenteService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -116,6 +120,8 @@ class AsignacionMateria extends Component
                 'semestre:id,numero,orden_global',
             ])
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->get()
             ->sortBy(fn($grupo) => sprintf(
                 '%04d|%03d|%03d|%s',
@@ -188,23 +194,43 @@ class AsignacionMateria extends Component
 
     public function getProfesoresProperty(): Collection
     {
-        return PersonaNivel::query()
-            ->with('persona')
+        if (!$this->ciclo_escolar_id || !$this->nivel?->id) {
+            return collect();
+        }
+
+        $plantillaIds = PlantillaPersonalNivel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('nivel_id', $this->nivel->id)
-            ->whereHas('persona', fn($q) => $q->where('status', true))
+            ->whereIn('estado', [PlantillaPersonalNivel::ESTADO_PUBLICADA, PlantillaPersonalNivel::ESTADO_CERRADA])
+            ->pluck('id');
+
+        return PersonaNivelDetalle::query()
+            ->with('cabecera.persona')
+            ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+            ->where('confirmado', true)
+            ->whereNull('archivado_at')
+            ->whereHas('cicloAsignacion', fn (Builder $q) => $q
+                ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                ->where('estado', 'activo'))
+            ->whereHas('personaRole.rolePersona', fn (Builder $q) => $q
+                ->where('status', true)
+                ->where('es_docente', true))
+            ->whereHas('cabecera', fn (Builder $q) => $q
+                ->where('nivel_id', $this->nivel->id)
+                ->whereHas('persona', fn (Builder $p) => $p->where('status', true)))
             ->get()
-            ->map(function ($registro) {
-                $persona = $registro->persona;
+            ->map(function (PersonaNivelDetalle $detalle) {
+                $persona = $detalle->cabecera?->persona;
                 $nombre = trim(($persona->titulo ?? '') . ' ' . ($persona->nombre ?? '') . ' '
                     . ($persona->apellido_paterno ?? '') . ' ' . ($persona->apellido_materno ?? ''));
 
                 return [
-                    'id' => (int) $persona->id,
+                    'id' => (int) ($persona?->id ?? 0),
                     'nombre' => $nombre,
                     'buscar' => mb_strtolower($nombre),
                 ];
             })
-            ->filter(fn($item) => filled($item['nombre']))
+            ->filter(fn ($item) => $item['id'] > 0 && filled($item['nombre']))
             ->unique('id')
             ->sortBy('nombre')
             ->values();
@@ -557,6 +583,12 @@ class AsignacionMateria extends Component
     {
         $this->validate();
 
+        app(CicloNivelGateService::class)->asegurar(
+            (int) $this->ciclo_escolar_id,
+            (int) $this->nivel->id,
+            'asignacion_materias'
+        );
+
         $grupo = Grupo::query()->whereKey($this->grupo_id)->where('nivel_id', $this->nivel->id)->first();
         $materia = Materia::query()->find($this->materia_id);
 
@@ -586,6 +618,7 @@ class AsignacionMateria extends Component
         }
 
         $profesorId = $materia->receso ? null : (filled($this->profesor_id) ? (int) $this->profesor_id : null);
+        app(PlantillaDocenteService::class)->validar($profesorId, (int) $this->ciclo_escolar_id, (int) $this->nivel->id);
 
         DB::transaction(function () use ($grupo, $materia, $profesorId) {
             $asignacion = AsignacionMateriaModel::query()->create([
@@ -708,6 +741,8 @@ class AsignacionMateria extends Component
         $profesorId = $materia->receso
             ? null
             : (filled($this->editar_profesor_id) ? (int) $this->editar_profesor_id : null);
+
+        app(PlantillaDocenteService::class)->validar($profesorId, (int) $this->ciclo_escolar_id, (int) $this->nivel->id);
 
         DB::transaction(function () use ($asignacion, $grupo, $materia, $profesorId) {
             $asignacion->update([

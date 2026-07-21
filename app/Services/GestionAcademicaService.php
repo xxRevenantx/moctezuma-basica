@@ -13,6 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class GestionAcademicaService
 {
+    public function __construct(
+        private readonly MatriculaAlumnoService $matriculas,
+    ) {}
+
     public const ESTATUS = [
         'activo',
         'preinscrito',
@@ -66,7 +70,9 @@ class GestionAcademicaService
                 'matricula',
             ]));
 
-            $despues = $this->snapshot($alumno->fresh());
+            $alumno = $alumno->fresh();
+            $despues = $this->snapshot($alumno);
+            $this->matriculas->sincronizarCambioAsignacion($alumno, $antes, $despues, $usuarioId);
             $this->registrarCambio($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId);
             $this->registrarMovimiento($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId);
 
@@ -156,7 +162,9 @@ class GestionAcademicaService
                 'usuario_acceso_activo' => true,
             ]);
 
-            $despues = $this->snapshot($alumno->fresh());
+            $alumno = $alumno->fresh();
+            $this->matriculas->asegurarVigente($alumno, 'activacion_preinscripcion', $usuarioId, $fechaMovimiento);
+            $despues = $this->snapshot($alumno);
 
             $this->registrarCambio(
                 $alumno,
@@ -205,7 +213,9 @@ class GestionAcademicaService
                 'fecha_ultimo_ingreso' => $estatus === 'reingreso' ? $fechaMovimiento : $alumno->fecha_ultimo_ingreso,
             ]);
 
-            $despues = $this->snapshot($alumno->fresh());
+            $alumno = $alumno->fresh();
+            $this->matriculas->aplicarEstatus($alumno, $estatus, $usuarioId, $fechaMovimiento);
+            $despues = $this->snapshot($alumno);
             $this->registrarCambio($alumno, 'cambio_estatus', $motivo, $antes, $despues, $usuarioId);
             $this->registrarMovimiento($alumno, $estatus, $motivo, $antes, $despues, $usuarioId, $fechaMovimiento);
 
@@ -316,6 +326,35 @@ class GestionAcademicaService
 
             return $afectados;
         });
+    }
+
+    public function registrarInscripcionInicial(
+        Inscripcion $alumno,
+        string $motivo,
+        ?int $usuarioId,
+        ?string $fecha = null
+    ): void {
+        $alumno = $alumno->fresh();
+        $despues = $this->snapshot($alumno);
+
+        $this->registrarCambio(
+            $alumno,
+            'inscripcion_inicial',
+            $motivo,
+            null,
+            $despues,
+            $usuarioId
+        );
+
+        $this->registrarMovimiento(
+            $alumno,
+            'inscripcion_inicial',
+            $motivo,
+            [],
+            $despues,
+            $usuarioId,
+            $fecha ?: now()->toDateString()
+        );
     }
 
     public function registrarCambio(Inscripcion $alumno, string $tipo, string $motivo, ?array $antes, ?array $despues, ?int $usuarioId): CambioAcademico

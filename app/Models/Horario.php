@@ -22,6 +22,13 @@ class Horario extends Model
         'asignacion_materia_id',
         'taller_sesion_id',
         'ciclo_escolar_id',
+        'sesion_compartida',
+        'clave_sesion_compartida',
+        'motivo_sesion_compartida',
+    ];
+
+    protected $casts = [
+        'sesion_compartida' => 'boolean',
     ];
 
     public function asignacionMateria()

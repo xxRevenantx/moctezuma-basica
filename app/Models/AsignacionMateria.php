@@ -41,6 +41,10 @@ class AsignacionMateria extends Model
         'asignacion_origen_id',
         'confirmada_at',
         'confirmada_por',
+        'revision_ciclo_estado',
+        'revision_ciclo_observacion',
+        'revision_ciclo_at',
+        'revision_ciclo_por',
     ];
 
     protected $casts = [
@@ -57,6 +61,8 @@ class AsignacionMateria extends Model
         'fecha_fin' => 'date',
         'confirmada_at' => 'datetime',
         'confirmada_por' => 'integer',
+        'revision_ciclo_at' => 'datetime',
+        'revision_ciclo_por' => 'integer',
     ];
 
     public function materia()
@@ -180,4 +186,10 @@ class AsignacionMateria extends Model
         $this->generacion_id = $grupo->generacion_id;
         $this->semestre_id = $grupo->semestre_id;
     }
+
+    public function usuarioRevisionCiclo()
+    {
+        return $this->belongsTo(User::class, 'revision_ciclo_por');
+    }
+
 }

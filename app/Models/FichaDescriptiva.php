@@ -15,6 +15,7 @@ class FichaDescriptiva extends Model
         'grupo_id',
         'generacion_id',
         'ciclo_escolar_id',
+        'periodo_id',
         'periodo',
         'campo',
         'descripcion',
@@ -23,6 +24,7 @@ class FichaDescriptiva extends Model
     ];
 
     protected $casts = [
+        'periodo_id' => 'integer',
         'periodo' => 'integer',
         'fecha_captura' => 'datetime',
     ];
@@ -55,6 +57,11 @@ class FichaDescriptiva extends Model
     public function cicloEscolar()
     {
         return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
+    }
+
+    public function periodoOficial()
+    {
+        return $this->belongsTo(Periodos::class, 'periodo_id');
     }
 
     public function capturador()

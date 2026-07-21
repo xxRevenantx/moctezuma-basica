@@ -144,6 +144,16 @@
                         <span class="flex items-center gap-3"><flux:icon name="clipboard-document-check" class="size-5 text-sky-600" /><span><strong class="block text-slate-900 dark:text-white">Preparar cierre</strong><small class="text-slate-500">Valida riesgos antes de usar el cierre existente</small></span></span>
                         <flux:icon name="chevron-right" class="size-4" />
                     </button>
+                    <a href="{{ route('misrutas.revision-ciclos') }}"
+                        class="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-neutral-700 dark:hover:border-amber-800 dark:hover:bg-amber-950/20">
+                        <span class="flex items-center gap-3"><flux:icon name="arrows-right-left" class="size-5 text-amber-600" /><span><strong class="block text-slate-900 dark:text-white">Revisar ciclos inconsistentes</strong><small class="text-slate-500">Asignaciones 283–288 y grupos archivados o sin ciclo</small></span></span>
+                        <flux:icon name="chevron-right" class="size-4" />
+                    </a>
+                    <a href="{{ route('misrutas.correcciones-calificaciones') }}"
+                        class="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:border-violet-300 hover:bg-violet-50 dark:border-neutral-700 dark:hover:border-violet-800 dark:hover:bg-violet-950/20">
+                        <span class="flex items-center gap-3"><flux:icon name="pencil-square" class="size-5 text-violet-600" /><span><strong class="block text-slate-900 dark:text-white">Autorizar correcciones históricas</strong><small class="text-slate-500">Solicitudes de calificaciones para ciclos cerrados</small></span></span>
+                        <flux:icon name="chevron-right" class="size-4" />
+                    </a>
                 </div>
             </article>
         </section>

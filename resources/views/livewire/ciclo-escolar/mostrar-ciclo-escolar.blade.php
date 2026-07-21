@@ -134,9 +134,23 @@
                                     </div>
                                 @else
                                     <div class="mt-3 text-xs font-semibold text-emerald-800 dark:text-emerald-200">
-                                        La estructura de inscripción está disponible.
+                                        La estructura académica y la plantilla publicada están disponibles.
                                     </div>
                                 @endif
+
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <flux:button
+                                        size="sm"
+                                        variant="primary"
+                                        wire:click="prepararNivel({{ $diagnostico['nivel_id'] }})"
+                                        spinner="prepararNivel({{ $diagnostico['nivel_id'] }})"
+                                    >
+                                        Preparar solo {{ $diagnostico['nivel'] }}
+                                    </flux:button>
+                                    <span class="self-center text-[11px] text-slate-500">
+                                        No mueve alumnos ni modifica otros niveles.
+                                    </span>
+                                </div>
                             </article>
                         @endforeach
                     </div>
@@ -149,7 +163,7 @@
                 <div class="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
                     <flux:button variant="ghost" wire:click="cerrarPreparacion">Cerrar</flux:button>
                     <flux:button variant="primary" wire:click="confirmarPreparacion" spinner="confirmarPreparacion">
-                        Preparar estructura faltante
+                        Preparar todos los niveles faltantes
                     </flux:button>
                 </div>
             </div>

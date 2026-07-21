@@ -23,8 +23,24 @@ class Periodos extends Model
         "periodo_basica_id",
         "fecha_inicio",
         "fecha_fin",
+        "fecha_evaluacion_inicio",
+        "fecha_evaluacion_fin",
+        "fecha_captura_inicio",
+        "fecha_captura_fin",
+        "traslape_confirmado",
+        "motivo_traslape",
     ];
 
+
+    protected $casts = [
+        'fecha_inicio' => 'date',
+        'fecha_fin' => 'date',
+        'fecha_evaluacion_inicio' => 'date',
+        'fecha_evaluacion_fin' => 'date',
+        'fecha_captura_inicio' => 'date',
+        'fecha_captura_fin' => 'date',
+        'traslape_confirmado' => 'boolean',
+    ];
 
     // RELACIONES CON NIVELES
     public function nivel()
@@ -78,6 +94,11 @@ class Periodos extends Model
     public function calificaciones()
     {
         return $this->hasMany(Calificacion::class, 'periodo_id');
+    }
+
+    public function fichasDescriptivas()
+    {
+        return $this->hasMany(FichaDescriptiva::class, 'periodo_id');
     }
 
     public function calificacionesCamposFormativos()

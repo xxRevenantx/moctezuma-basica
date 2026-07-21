@@ -15,6 +15,8 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\AsignacionEscolarService;
+use App\Services\PeriodoCalendarioService;
+use App\Livewire\Periodo\Concerns\GestionaCalendarioPeriodo;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -25,6 +27,7 @@ use Throwable;
 class CrearPeriodo extends Component
 {
     use WithFileUploads;
+    use GestionaCalendarioPeriodo;
 
     public $nivel_id = null;
     public $generacion_id = null;
@@ -112,8 +115,7 @@ class CrearPeriodo extends Component
         $rules = [
             'nivel_id' => 'required|exists:niveles,id',
             'ciclo_escolar_id' => 'required|exists:ciclo_escolares,id',
-            'fecha_inicio' => 'nullable|required_with:fecha_fin|date',
-            'fecha_fin' => 'nullable|required_with:fecha_inicio|date|after_or_equal:fecha_inicio',
+            ...$this->reglasCalendario(),
         ];
 
         if ($this->esBachillerato) {
@@ -142,6 +144,7 @@ class CrearPeriodo extends Component
     protected function messages(): array
     {
         return [
+            ...$this->mensajesCalendario(),
             'nivel_id.required' => 'El nivel es obligatorio.',
             'nivel_id.exists' => 'El nivel seleccionado no es válido.',
 
@@ -174,11 +177,11 @@ class CrearPeriodo extends Component
         ];
     }
 
-    public function guardarPeriodo(): void
+    public function guardarPeriodo(PeriodoCalendarioService $calendario): void
     {
         $this->validate();
 
-        if (!$this->validarFechasDelCiclo()) {
+        if (!$this->validarCalendarioPeriodo($calendario)) {
             return;
         }
 
@@ -248,8 +251,7 @@ class CrearPeriodo extends Component
             'mes_basica_id' => $this->esBasica ? $this->mes_basica_id : null,
             'periodo_basica_id' => $this->esBasica ? $this->periodo_basica_id : null,
 
-            'fecha_inicio' => $this->fecha_inicio ?: null,
-            'fecha_fin' => $this->fecha_fin ?: null,
+            ...$this->datosCalendarioPeriodo(),
         ]);
 
         $this->dispatch('swal', [
@@ -270,6 +272,8 @@ class CrearPeriodo extends Component
             'fecha_inicio',
             'fecha_fin',
         ]);
+
+        $this->limpiarCalendarioPeriodo();
 
         $this->dispatch('refreshPeriodos');
     }

@@ -14,6 +14,7 @@ use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\TallerSesion;
+use App\Services\CicloNivelGateService;
 use App\Services\GroqHorarioService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -54,6 +55,7 @@ class Horario extends Component
     public array $seleccionesHorario = [];
 
     public bool $mostrarModalTraslapeProfesor = false;
+    public string $motivoSesionCompartida = 'Sesión compartida entre varios grados o grupos.';
 
     public array $pendienteHorario = [
         'hora_id' => null,
@@ -265,6 +267,12 @@ class Horario extends Component
         string $claveCelda,
         bool $forzar = false
     ): void {
+        app(CicloNivelGateService::class)->asegurar(
+            (int) $this->ciclo_escolar_id,
+            (int) $this->nivel->id,
+            'horarios'
+        );
+
         $grupo = $this->obtenerGrupoSeleccionado();
 
         if (!$grupo) {
@@ -419,7 +427,10 @@ class Horario extends Component
         int $horaId,
         int $diaId,
         int $asignacionMateriaId,
-        ?HorarioModel $horarioExistente = null
+        ?HorarioModel $horarioExistente = null,
+        bool $sesionCompartida = false,
+        ?string $claveSesionCompartida = null,
+        ?string $motivoSesionCompartida = null,
     ): void {
         $datosBusqueda = [
             'nivel_id' => $this->nivel->id,
@@ -437,11 +448,17 @@ class Horario extends Component
                 'asignacion_materia_id' => $asignacionMateriaId,
                 'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'sesion_compartida' => $sesionCompartida,
+                'clave_sesion_compartida' => $sesionCompartida ? $claveSesionCompartida : null,
+                'motivo_sesion_compartida' => $sesionCompartida ? $motivoSesionCompartida : null,
             ]);
         } else {
             HorarioModel::query()->create([
                 ...$datosBusqueda,
                 'asignacion_materia_id' => $asignacionMateriaId,
+                'sesion_compartida' => $sesionCompartida,
+                'clave_sesion_compartida' => $sesionCompartida ? $claveSesionCompartida : null,
+                'motivo_sesion_compartida' => $sesionCompartida ? $motivoSesionCompartida : null,
             ]);
         }
 
@@ -856,11 +873,39 @@ class Horario extends Component
 
         $horarioExistente = $consulta->first();
 
+        $asignacion = AsignacionMateria::query()
+            ->find((int) $this->pendienteHorario['asignacion_materia_id']);
+
+        $claveCompartida = sprintf(
+            'shared-%d-%d-%d-%d',
+            (int) $this->ciclo_escolar_id,
+            (int) ($asignacion?->profesor_id ?? 0),
+            (int) $this->pendienteHorario['dia_id'],
+            (int) $this->pendienteHorario['hora_id'],
+        );
+
+        if ($asignacion?->profesor_id) {
+            HorarioModel::query()
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->where('dia_id', (int) $this->pendienteHorario['dia_id'])
+                ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
+                ->whereHas('asignacionMateria', fn (Builder $q) => $q
+                    ->where('profesor_id', $asignacion->profesor_id))
+                ->update([
+                    'sesion_compartida' => true,
+                    'clave_sesion_compartida' => $claveCompartida,
+                    'motivo_sesion_compartida' => trim($this->motivoSesionCompartida),
+                ]);
+        }
+
         $this->guardarHorarioDirecto(
             horaId: (int) $this->pendienteHorario['hora_id'],
             diaId: (int) $this->pendienteHorario['dia_id'],
             asignacionMateriaId: (int) $this->pendienteHorario['asignacion_materia_id'],
-            horarioExistente: $horarioExistente
+            horarioExistente: $horarioExistente,
+            sesionCompartida: true,
+            claveSesionCompartida: $claveCompartida,
+            motivoSesionCompartida: trim($this->motivoSesionCompartida),
         );
     }
 
@@ -892,6 +937,7 @@ class Horario extends Component
         $this->conflictosProfesor = [];
         $this->alternativasConflicto = [];
         $this->analisisConflictoIa = null;
+        $this->motivoSesionCompartida = 'Sesión compartida entre varios grados o grupos.';
     }
 
     protected function sincronizarSeleccionesHorario(): void

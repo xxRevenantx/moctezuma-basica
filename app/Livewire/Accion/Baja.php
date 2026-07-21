@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Accion;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
+use App\Models\MovimientoAlumno;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Services\GestionAcademicaService;
@@ -21,8 +23,10 @@ class Baja extends Component
     public ?Nivel $nivel = null;
     public Collection $niveles;
     public Collection $generaciones;
+    public Collection $ciclosEscolares;
 
     public ?int $generacion_id = null;
+    public ?int $ciclo_escolar_id = null;
     public string $search = '';
     public string $filtro_estatus = '';
 
@@ -46,9 +50,13 @@ class Baja extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
         $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
+        $this->ciclosEscolares = CicloEscolar::query()->orderByDesc('es_actual')->orderByDesc('inicio_anio')->get();
+        $this->ciclo_escolar_id = (int) ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
+            ?? $this->ciclosEscolares->first()?->id);
 
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel->id)
+            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->orderByDesc('status')
             ->orderByDesc('anio_ingreso')
             ->orderByDesc('anio_egreso')
@@ -63,11 +71,12 @@ class Baja extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['generacion_id', 'search', 'filtro_estatus'], true)) {
+        if (in_array($property, ['ciclo_escolar_id', 'generacion_id', 'search', 'filtro_estatus'], true)) {
             $this->selected = [];
             $this->selectPage = false;
             $this->resetPage();
             $this->resetPage('inactivosPage');
+            $this->resetPage('historialPage');
         }
     }
 
@@ -347,6 +356,29 @@ class Baja extends Component
             ->paginate(15, ['*'], 'inactivosPage');
     }
 
+    private function historialMovimientos(): LengthAwarePaginator
+    {
+        return MovimientoAlumno::query()
+            ->with(['inscripcion.generacion', 'cicloEscolar', 'usuario'])
+            ->whereHas('inscripcion', fn (Builder $query) => $query->where('nivel_id', $this->nivel->id))
+            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->when($this->generacion_id, function (Builder $query): void {
+                $query->whereHas('inscripcion', fn (Builder $alumno) => $alumno->where('generacion_id', $this->generacion_id));
+            })
+            ->when(trim($this->search) !== '', function (Builder $query): void {
+                $term = '%' . trim($this->search) . '%';
+                $query->whereHas('inscripcion', function (Builder $alumno) use ($term): void {
+                    $alumno->where('matricula', 'like', $term)
+                        ->orWhere('nombre', 'like', $term)
+                        ->orWhere('apellido_paterno', 'like', $term)
+                        ->orWhere('apellido_materno', 'like', $term);
+                });
+            })
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->paginate(12, ['*'], 'historialPage');
+    }
+
     public function render()
     {
         $activosQuery = $this->activosQuery();
@@ -360,6 +392,7 @@ class Baja extends Component
             'hombres' => (clone $activosQuery)->whereIn('genero', ['H', 'Hombre'])->count(),
             'mujeres' => (clone $activosQuery)->whereIn('genero', ['M', 'Mujer'])->count(),
             'totalBajas' => (clone $inactivosQuery)->count(),
+            'historialMovimientos' => $this->historialMovimientos(),
         ]);
     }
 }

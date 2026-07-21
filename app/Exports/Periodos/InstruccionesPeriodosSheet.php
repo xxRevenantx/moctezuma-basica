@@ -29,14 +29,15 @@ class InstruccionesPeriodosSheet implements FromArray, ShouldAutoSize, WithEvent
             ['4', 'Usa las listas desplegables. El número ubicado antes de “|” es el ID utilizado por el sistema.'],
             ['5', 'Básica requiere: nivel, ciclo escolar, mes básica y periodo básica. Deja vacíos los campos de bachillerato.'],
             ['6', 'Bachillerato requiere: nivel, ciclo, generación, semestre, mes bachillerato y parcial. Deja vacíos los campos de básica.'],
-            ['7', 'Las fechas deben escribirse como AAAA-MM-DD. Si capturas una fecha, debes capturar también la otra.'],
-            ['8', 'Si un periodo ya existe, la importación actualizará sus fechas; no creará un duplicado.'],
-            ['9', 'La importación es transaccional: si una fila tiene errores, no se guardará ninguna fila.'],
-            ['10', 'La hoja “Ejemplos” es solo informativa y no se importa.'],
+            ['7', 'Las fechas deben escribirse como AAAA-MM-DD. La evaluación y la ventana de captura se administran por separado.'],
+            ['8', 'Si existe traslape con otro periodo del mismo contexto, escribe SI en permitir_traslape y captura un motivo. El sistema advertirá, pero permitirá continuar.'],
+            ['9', 'Si un periodo ya existe, la importación actualizará sus fechas; no creará un duplicado.'],
+            ['10', 'La importación es transaccional: si una fila tiene errores, no se guardará ninguna fila.'],
+            ['11', 'La hoja “Ejemplos” es solo informativa y no se importa.'],
             [],
             ['Campos por tipo'],
-            ['BASICA', 'tipo, nivel_id, ciclo_escolar_id, mes_basica_id, periodo_basica_id, fecha_inicio, fecha_fin'],
-            ['BACHILLERATO', 'tipo, nivel_id, ciclo_escolar_id, generacion_id, semestre_id, mes_bachillerato_id, parcial_bachillerato_id, fecha_inicio, fecha_fin'],
+            ['BASICA', 'tipo, nivel_id, ciclo_escolar_id, mes_basica_id, periodo_basica_id, fechas de evaluación, fechas de captura y confirmación de traslape'],
+            ['BACHILLERATO', 'tipo, nivel_id, ciclo_escolar_id, generacion_id, semestre_id, mes_bachillerato_id, parcial_bachillerato_id, fechas de evaluación, fechas de captura y confirmación de traslape'],
         ];
     }
 
@@ -63,7 +64,7 @@ class InstruccionesPeriodosSheet implements FromArray, ShouldAutoSize, WithEvent
                         'startColor' => ['rgb' => '88AC2E'],
                     ],
                 ]);
-                $hoja->getStyle('A4:B17')->getAlignment()->setWrapText(true);
+                $hoja->getStyle('A4:B18')->getAlignment()->setWrapText(true);
                 $hoja->getColumnDimension('A')->setWidth(20);
                 $hoja->getColumnDimension('B')->setWidth(110);
             },

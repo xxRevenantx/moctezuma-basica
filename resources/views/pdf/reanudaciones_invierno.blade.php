@@ -98,9 +98,13 @@
 <body>
 
     @php
-        // ✅ Asegurar el orden para el PDF (por persona_nivel.orden)
+        // El servicio ya entrega el orden exacto de la Plantilla de personal por ciclo.
+        // orden_pdf_plantilla es temporal; `orden` queda como respaldo para el flujo legado.
         $asignacionesNivel = collect($asignacionesNivel ?? [])
-            ->sortBy(fn($p) => [(int) ($p->orden ?? 999999), (int) ($p->id ?? 0)])
+            ->sortBy(fn($personal) => [
+                (int) ($personal->orden_pdf_plantilla ?? $personal->orden ?? 999999),
+                (int) ($personal->id ?? 0),
+            ])
             ->values();
 
         $formatearNombreCompleto = function ($persona) {

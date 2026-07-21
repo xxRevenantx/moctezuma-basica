@@ -16,7 +16,9 @@ use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\AsignacionEscolarService;
 use App\Services\CurpService;
+use App\Services\GestionAcademicaService;
 use App\Services\ImagenPersonalService;
+use App\Services\MatriculaAlumnoService;
 use App\Services\ObservacionInscripcionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1208,7 +1210,12 @@ class CrearInscripcion extends Component
         }
     }
 
-    public function guardar(ImagenPersonalService $imagenes, ObservacionInscripcionService $observacionesService): void
+    public function guardar(
+        ImagenPersonalService $imagenes,
+        ObservacionInscripcionService $observacionesService,
+        MatriculaAlumnoService $matriculas,
+        GestionAcademicaService $gestionAcademica,
+    ): void
     {
         $this->sanitizeStrings();
         $this->observaciones = $observacionesService->sanitizar($this->observaciones);
@@ -1238,7 +1245,7 @@ class CrearInscripcion extends Component
             $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
         }
 
-        DB::transaction(function () use ($data, $fotoPath, $observacionesService) {
+        DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica) {
             $inscripcion = Inscripcion::query()->create([
                 'curp' => $data['curp'],
                 'matricula' => $data['matricula'],
@@ -1297,6 +1304,23 @@ class CrearInscripcion extends Component
                 origen: 'registro',
                 usuarioId: auth()->id(),
             );
+
+
+            if ($data['estado_inscripcion'] === 'inscrito') {
+                $matriculas->asegurarVigente(
+                    $inscripcion,
+                    'inscripcion',
+                    auth()->id(),
+                    $data['fecha_inscripcion'],
+                );
+
+                $gestionAcademica->registrarInscripcionInicial(
+                    $inscripcion,
+                    'Inscripción activa registrada en el ciclo ' . (string) $data['ciclo_escolar_id'] . '.',
+                    auth()->id(),
+                    $data['fecha_inscripcion'],
+                );
+            }
         });
 
         $this->dispatch('swal', [

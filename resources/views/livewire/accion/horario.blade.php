@@ -799,6 +799,12 @@
                                     </div>
                                 </div>
 
+                                <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+                                    <flux:textarea wire:model="motivoSesionCompartida" rows="2"
+                                        label="Motivo de la sesión compartida"
+                                        description="El traslape se guardará como una sesión compartida válida entre varios grados o grupos." />
+                                </div>
+
                                 <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                     <flux:button type="button" variant="ghost"
                                         wire:click="cancelarGuardarConTraslape">
@@ -806,7 +812,7 @@
                                     </flux:button>
 
                                     <flux:button type="button" wire:click="confirmarGuardarConTraslape">
-                                        Sí, guardar de todos modos
+                                        Guardar como sesión compartida
                                     </flux:button>
                                 </div>
                             </div>

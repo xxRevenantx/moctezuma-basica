@@ -85,8 +85,14 @@ class ReanudacionesLaboralesController extends Controller
         $registros = ReanudacionLaboral::query()
             ->where('lote_uuid', $lote)
             ->orderBy('nivel_id')
-            ->orderBy('persona_nombre')
-            ->get();
+            ->orderBy('id')
+            ->get()
+            ->sortBy(fn (ReanudacionLaboral $registro) => [
+                (int) $registro->nivel_id,
+                (int) data_get($registro->snapshot, 'orden_plantilla', PHP_INT_MAX),
+                (int) $registro->id,
+            ])
+            ->values();
         abort_if($registros->isEmpty(), 404, 'No se encontró el lote solicitado.');
 
         if ($formato === 'zip') {

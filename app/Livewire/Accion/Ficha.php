@@ -10,9 +10,11 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\CicloEscolar;
+use App\Models\Periodos;
 use App\Services\GroqFichaService;
 use App\Services\GroqFichaGrupoService;
 use App\Services\HtmlSanitizerService;
+use App\Services\CicloNivelGateService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -334,7 +336,7 @@ class Ficha extends Component
         }
     }
 
-    public function guardar(): void
+    public function guardar(CicloNivelGateService $gate): void
     {
         $this->validate([
             'inscripcion_id' => ['required', 'integer', 'exists:inscripciones,id'],
@@ -345,6 +347,13 @@ class Ficha extends Component
         ]);
 
         $alumno = Inscripcion::query()->findOrFail($this->inscripcion_id);
+        $gate->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
+        $periodoOficialId = $this->resolverPeriodoOficialId((int) $alumno->nivel_id);
+
+        if (!$periodoOficialId) {
+            $this->addError('periodo', 'No existe un periodo oficial compatible con el ciclo, nivel y número de periodo seleccionados.');
+            return;
+        }
 
         $descripcionLimpia = app(HtmlSanitizerService::class)->sanitize($this->descripcion);
 
@@ -353,6 +362,7 @@ class Ficha extends Component
                 'inscripcion_id' => $alumno->id,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
                 'periodo' => $this->periodo,
+                'periodo_id' => $periodoOficialId,
                 'campo' => $this->campo,
             ],
             [
@@ -741,6 +751,15 @@ class Ficha extends Component
         }
 
         return trim($alumno->nombre . ' ' . $alumno->apellido_paterno . ' ' . $alumno->apellido_materno);
+    }
+
+    private function resolverPeriodoOficialId(int $nivelId): ?int
+    {
+        return Periodos::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $nivelId)
+            ->whereHas('periodoBasica', fn ($query) => $query->where('periodo', $this->periodo))
+            ->value('id');
     }
 
     public function periodoNombre(?int $periodo = null): string

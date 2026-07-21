@@ -67,6 +67,31 @@ class MostrarCicloEscolar extends Component
         $this->diagnosticoPreparacion = [];
     }
 
+    public function prepararNivel(int $nivelId, PreparacionEstructuraCicloService $service): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $ciclo = CicloEscolar::query()->findOrFail((int) $this->cicloPrepararId);
+        $resumen = $service->preparar($ciclo, auth()->id(), [$nivelId]);
+        $this->diagnosticoPreparacion = $service->diagnostico($ciclo)->values()->all();
+
+        $nivel = collect($this->diagnosticoPreparacion)->firstWhere('nivel_id', $nivelId);
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Nivel preparado',
+            'text' => sprintf(
+                '%s: %d generaciones y %d grupos creados o confirmados. Revisa los módulos pendientes antes de marcarlo como listo.',
+                $nivel['nivel'] ?? 'Nivel',
+                $resumen['generaciones_creadas'],
+                $resumen['grupos_nuevo_ingreso'] + $resumen['grupos_continuidad'] + $resumen['grupos_no_promovidos'],
+            ),
+            'position' => 'top-end',
+        ]);
+
+        $this->dispatch('refreshCiclos');
+    }
+
     public function confirmarPreparacion(PreparacionEstructuraCicloService $service): void
     {
         abort_unless(auth()->user()?->is_admin, 403);

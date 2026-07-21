@@ -10,6 +10,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\Semestre;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -29,9 +30,9 @@ class PreparacionEstructuraCicloService
             ->map(fn (Nivel $nivel): array => $this->diagnosticoNivel($cicloEscolar, $nivel));
     }
 
-    public function preparar(CicloEscolar $cicloEscolar, ?int $usuarioId): array
+    public function preparar(CicloEscolar $cicloEscolar, ?int $usuarioId, ?array $nivelIds = null): array
     {
-        return DB::transaction(function () use ($cicloEscolar, $usuarioId): array {
+        return DB::transaction(function () use ($cicloEscolar, $usuarioId, $nivelIds): array {
             $cicloAnterior = CicloEscolar::query()
                 ->where('inicio_anio', (int) $cicloEscolar->inicio_anio - 1)
                 ->first();
@@ -45,7 +46,12 @@ class PreparacionEstructuraCicloService
                 'advertencias' => [],
             ];
 
-            foreach (Nivel::query()->orderBy('id')->get() as $nivel) {
+            $niveles = Nivel::query()
+                ->when($nivelIds, fn (Builder $q) => $q->whereIn('id', array_map('intval', $nivelIds)))
+                ->orderBy('id')
+                ->get();
+
+            foreach ($niveles as $nivel) {
                 $antesGeneracion = Generacion::query()
                     ->where('nivel_id', $nivel->id)
                     ->where('anio_ingreso', $cicloEscolar->inicio_anio)
@@ -173,6 +179,12 @@ class PreparacionEstructuraCicloService
             ->where('nivel_id', $nivel->id)
             ->count();
 
+        $plantilla = PlantillaPersonalNivel::query()
+            ->where('ciclo_escolar_id', $cicloEscolar->id)
+            ->where('nivel_id', $nivel->id)
+            ->first();
+        $plantillaPublicada = $plantilla?->disponibleParaDocumentos() ?? false;
+
         $faltantes = [];
 
         if (! $generacion) {
@@ -187,17 +199,14 @@ class PreparacionEstructuraCicloService
             $faltantes[] = 'Periodos académicos';
         }
 
-        if ($cargas < 1) {
-            $faltantes[] = 'Asignaciones de materias';
+        if (!$plantillaPublicada) {
+            $faltantes[] = 'Plantilla de personal publicada';
         }
 
-        if ($horarios < 1) {
-            $faltantes[] = 'Horarios';
-        }
-
-        $estado = $generacion && $gruposIngreso > 0
+        $estructuraDisponible = (bool) $generacion && $gruposIngreso > 0;
+        $estado = $estructuraDisponible && $periodos > 0 && $plantillaPublicada
             ? 'listo'
-            : (($generacion || $grupos > 0) ? 'en_preparacion' : 'pendiente');
+            : (($generacion || $grupos > 0 || $periodos > 0 || $plantilla) ? 'en_preparacion' : 'pendiente');
 
         return [
             'nivel_id' => (int) $nivel->id,
@@ -210,8 +219,14 @@ class PreparacionEstructuraCicloService
             'periodos' => $periodos,
             'asignaciones' => $cargas,
             'horarios' => $horarios,
+            'plantilla_estado' => $plantilla?->estado,
+            'plantilla_publicada' => $plantillaPublicada,
             'faltantes' => $faltantes,
-            'inscripcion_habilitada' => $generacion && $gruposIngreso > 0,
+            'inscripcion_habilitada' => $estructuraDisponible,
+            'asignacion_materias_habilitada' => $estructuraDisponible && $plantillaPublicada,
+            'horarios_habilitados' => $estructuraDisponible && $plantillaPublicada && $cargas > 0,
+            'calificaciones_habilitadas' => $estructuraDisponible && $plantillaPublicada && $periodos > 0 && $cargas > 0,
+            'fichas_habilitadas' => $estructuraDisponible && $plantillaPublicada && $periodos > 0,
         ];
     }
 

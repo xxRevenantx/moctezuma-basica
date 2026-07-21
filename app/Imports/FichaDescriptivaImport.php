@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\FichaDescriptiva;
 use App\Models\Inscripcion;
+use App\Models\Periodos;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class FichaDescriptivaImport implements ToCollection, WithHeadingRow
 {
+    private ?int $periodoOficialId = null;
     public function __construct(
         private readonly int $nivelId,
         private readonly int $gradoId,
@@ -20,10 +22,21 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
         private readonly int $cicloEscolarId,
         private readonly int $periodo
     ) {
+        $this->periodoOficialId = Periodos::query()
+            ->where('ciclo_escolar_id', $this->cicloEscolarId)
+            ->where('nivel_id', $this->nivelId)
+            ->whereHas('periodoBasica', fn ($query) => $query->where('periodo', $this->periodo))
+            ->value('id');
     }
 
     public function collection(Collection $rows): void
     {
+        if (!$this->periodoOficialId) {
+            throw ValidationException::withMessages([
+                'archivo_fichas' => 'No existe un periodo oficial compatible con el ciclo y nivel seleccionados.',
+            ]);
+        }
+
         $errores = [];
 
         foreach ($rows as $index => $row) {
@@ -38,6 +51,7 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
 
             $alumno = Inscripcion::query()
                 ->where('id', $inscripcionId)
+                ->where('ciclo_escolar_id', $this->cicloEscolarId)
                 ->where('nivel_id', $this->nivelId)
                 ->where('grado_id', $this->gradoId)
                 ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
@@ -114,6 +128,7 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
                         'inscripcion_id' => $alumno->id,
                         'ciclo_escolar_id' => $this->cicloEscolarId,
                         'periodo' => $this->periodo,
+                        'periodo_id' => $this->periodoOficialId,
                         'campo' => $campo,
                     ],
                     [

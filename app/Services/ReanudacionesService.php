@@ -329,6 +329,7 @@ class ReanudacionesService
                 'roles_slugs' => $detalles->map(fn(PersonaNivelDetalle $d) => $d->personaRole?->rolePersona?->slug)->filter()->unique()->values()->all(),
                 'grados' => $detalles->pluck('grado.nombre')->filter()->unique()->values()->all(),
                 'grupos' => $detalles->map(fn(PersonaNivelDetalle $d) => $d->grupo?->asignacionGrupo?->nombre)->filter()->unique()->values()->all(),
+                'orden_plantilla' => (int) ($fila['orden_plantilla'] ?? PHP_INT_MAX),
                 'nivel' => [
                     'id' => $nivel?->id,
                     'nombre' => $nivel?->nombre,
@@ -355,6 +356,7 @@ class ReanudacionesService
                 'fecha_documento' => $fechaDocumento,
                 'copias' => trim((string) $copias) ?: null,
                 'persona_nombre' => $this->nombrePersona($asignacion->persona),
+                'orden_plantilla' => (int) ($fila['orden_plantilla'] ?? PHP_INT_MAX),
                 'cargos' => $cargos->all(),
                 'es_directivo' => $esDirectivo,
                 'grado_resumen' => implode(', ', $snapshot['grados']),
@@ -375,6 +377,25 @@ class ReanudacionesService
 
         $niveles = collect($documentos)->pluck('nivel.id')->filter()->unique();
         abort_if($niveles->count() !== 1, 422, 'La vista PDF debe contener un solo nivel.');
+
+        $documentos = collect($documentos)
+            ->sortBy(fn (array $documento) => [
+                (int) data_get($documento, 'nivel.id', PHP_INT_MAX),
+                (int) ($documento['orden_plantilla'] ?? data_get($documento, 'snapshot.orden_plantilla', PHP_INT_MAX)),
+                (int) data_get($documento, 'asignacion.id', PHP_INT_MAX),
+            ])
+            ->values()
+            ->all();
+
+        foreach ($documentos as &$documento) {
+            if (($documento['asignacion'] ?? null) instanceof PersonaNivel) {
+                $documento['asignacion']->setAttribute(
+                    'orden_pdf_plantilla',
+                    (int) ($documento['orden_plantilla'] ?? data_get($documento, 'snapshot.orden_plantilla', PHP_INT_MAX))
+                );
+            }
+        }
+        unset($documento);
 
         $primero = $documentos[0];
         /** @var Nivel $nivel */

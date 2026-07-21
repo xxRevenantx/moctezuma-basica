@@ -60,12 +60,12 @@ class ReanudacionesArchivoService
             throw new RuntimeException('No fue posible crear el archivo ZIP.');
         }
 
-        foreach ($registros as $registro) {
+        foreach ($registros->values() as $indice => $registro) {
             $pdf = $this->asegurarPdf($registro);
             $nombre = sprintf(
                 '%s/%s-%s.pdf',
                 Str::slug($registro->nivel_nombre ?: 'nivel'),
-                str_pad((string) $registro->id, 5, '0', STR_PAD_LEFT),
+                str_pad((string) ($indice + 1), 3, '0', STR_PAD_LEFT),
                 Str::slug($registro->persona_nombre)
             );
             $zip->addFile($pdf, $nombre);

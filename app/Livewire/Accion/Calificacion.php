@@ -20,6 +20,8 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
+use App\Services\CalificacionCorreccionService;
+use App\Services\CicloNivelGateService;
 use App\Services\ListaAcademicaService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
@@ -1477,7 +1479,7 @@ class Calificacion extends Component
         $this->mostrarModalRevision = false;
     }
 
-    public function guardarCalificaciones(): void
+    public function guardarCalificaciones(CalificacionCorreccionService $correcciones, CicloNivelGateService $gate): void
     {
         $this->resetErrorBag('calificaciones');
 
@@ -1492,13 +1494,14 @@ class Calificacion extends Component
         }
 
         $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
-
-        if ($ciclo?->cerrado_at && !auth()->user()?->is_admin) {
-            $this->addError('calificaciones', 'El ciclo está cerrado. Solo administración puede realizar correcciones históricas.');
-            return;
-        }
+        $gate->asegurar((int) $this->ciclo_escolar_id, (int) $this->nivel_id, 'calificaciones');
 
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
+
+        if ($ciclo?->cerrado_at) {
+            $this->solicitarCorreccionesHistoricas($correcciones);
+            return;
+        }
 
         DB::transaction(function () {
             foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
@@ -1593,6 +1596,79 @@ class Calificacion extends Component
         $this->dispatch('swal', [
             'title' => '¡Calificaciones guardadas correctamente!',
             'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    private function solicitarCorreccionesHistoricas(CalificacionCorreccionService $service): void
+    {
+        if (mb_strlen(trim($this->motivo_guardado)) < 10) {
+            $this->addError('calificaciones', 'Para un ciclo cerrado debes escribir un motivo de corrección de al menos 10 caracteres.');
+            return;
+        }
+
+        $periodo = Periodos::query()->findOrFail((int) $this->periodo_id);
+        $solicitadas = 0;
+
+        DB::transaction(function () use ($service, $periodo, &$solicitadas): void {
+            foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
+                foreach ($materiasAlumno as $asignacionMateriaId => $valorNuevo) {
+                    $valorNuevo = $this->normalizarCalificacion($valorNuevo);
+                    $valorAnterior = $this->normalizarCalificacion(
+                        $this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? null
+                    );
+                    $observacionNueva = trim((string) ($this->observaciones[$inscripcionId][$asignacionMateriaId] ?? ''));
+                    $observacionAnterior = trim((string) ($this->observacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? ''));
+
+                    if ($valorNuevo === $valorAnterior && $observacionNueva === $observacionAnterior) {
+                        continue;
+                    }
+
+                    $alumno = Inscripcion::query()->findOrFail((int) $inscripcionId);
+                    $calificacion = ModelsCalificacion::query()
+                        ->where('periodo_id', $periodo->id)
+                        ->where('inscripcion_id', $alumno->id)
+                        ->where('asignacion_materia_id', (int) $asignacionMateriaId)
+                        ->first();
+
+                    $propuesto = [
+                        'accion' => $valorNuevo === null ? 'eliminar' : ($calificacion ? 'actualizar' : 'crear'),
+                        'asignacion_materia_id' => (int) $asignacionMateriaId,
+                        'nivel_id' => (int) $this->nivel_id,
+                        'grado_id' => (int) $this->grado_id,
+                        'grupo_id' => (int) $this->grupo_id,
+                        'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
+                        'generacion_id' => (int) $this->generacion_id,
+                        'semestre_id' => $this->esBachillerato ? (int) $this->semestre_id : null,
+                        'calificacion' => $valorNuevo,
+                        'valor_numerico' => $this->obtenerValorNumerico($valorNuevo),
+                        'es_numerica' => $this->esCalificacionNumerica($valorNuevo),
+                        'clave_especial' => $this->esCalificacionEspecial($valorNuevo) ? $valorNuevo : null,
+                        'observacion' => $observacionNueva !== '' ? $observacionNueva : null,
+                        'capturado_por' => Auth::id(),
+                        'fecha_captura' => now()->toDateTimeString(),
+                        'ip_captura' => request()->ip(),
+                    ];
+
+                    $service->solicitar(
+                        $alumno,
+                        $periodo,
+                        $calificacion,
+                        $propuesto,
+                        trim($this->motivo_guardado),
+                        Auth::id(),
+                    );
+                    $solicitadas++;
+                }
+            }
+        });
+
+        $this->mostrarModalRevision = false;
+        $this->motivo_guardado = '';
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Correcciones enviadas a autorización',
+            'text' => "Se registraron {$solicitadas} solicitud(es). Las calificaciones del ciclo cerrado no fueron modificadas todavía.",
             'position' => 'top-end',
         ]);
     }

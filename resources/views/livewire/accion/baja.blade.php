@@ -259,7 +259,20 @@
             @endif
         </div>
 
-        <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-5">
+            <div>
+                <div class="mb-1.5 flex items-center gap-2">
+                    <flux:label>Ciclo escolar</flux:label>
+                </div>
+                <flux:select wire:model.live="ciclo_escolar_id">
+                    @foreach ($ciclosEscolares as $cicloEscolar)
+                        <flux:select.option value="{{ $cicloEscolar->id }}">
+                            {{ $cicloEscolar->nombre }}{{ $cicloEscolar->es_actual ? ' · actual' : '' }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+
             <div>
                 <div class="mb-1.5 flex items-center gap-2">
                     <flux:label>Generación</flux:label>
@@ -761,4 +774,49 @@
             </div>
         @endif
     </section>
+
+    <section class="overflow-hidden rounded-[28px] border border-sky-200 bg-white shadow-sm dark:border-sky-900/50 dark:bg-neutral-900">
+        <div class="flex items-center justify-between border-b border-slate-100 p-5 dark:border-neutral-800">
+            <div>
+                <h2 class="font-black text-slate-900 dark:text-white">Historial de movimientos del ciclo</h2>
+                <p class="text-sm text-slate-500">Consulta bajas, traslados, suspensiones y reingresos sin depender del estado actual del alumno.</p>
+            </div>
+            <span class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                {{ $historialMovimientos->total() }} movimiento(s)
+            </span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-neutral-950/50 dark:text-slate-400">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Fecha</th>
+                        <th class="px-4 py-3 text-left">Alumno</th>
+                        <th class="px-4 py-3 text-left">Movimiento</th>
+                        <th class="px-4 py-3 text-left">Motivo</th>
+                        <th class="px-4 py-3 text-left">Registró</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                    @forelse ($historialMovimientos as $movimiento)
+                        <tr wire:key="movimiento-historial-{{ $movimiento->id }}">
+                            <td class="px-4 py-3 font-semibold">{{ optional($movimiento->fecha)->format('d/m/Y') ?: '—' }}</td>
+                            <td class="px-4 py-3">
+                                <p class="font-black text-slate-900 dark:text-white">{{ $movimiento->inscripcion ? $this->nombreCompleto($movimiento->inscripcion) : 'Alumno no disponible' }}</p>
+                                <p class="text-xs text-slate-500">{{ $movimiento->inscripcion?->matricula ?: 'Sin matrícula' }}</p>
+                            </td>
+                            <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black dark:bg-neutral-800">{{ $this->etiquetaEstatus($movimiento->tipo) }}</span></td>
+                            <td class="max-w-md px-4 py-3 text-slate-600 dark:text-slate-300">{{ $movimiento->motivo ?: 'Sin motivo' }}</td>
+                            <td class="px-4 py-3 text-slate-500">{{ $movimiento->usuario?->name ?: 'Sistema' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No existen movimientos para los filtros seleccionados.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($historialMovimientos->hasPages())
+            <div class="border-t border-slate-100 p-4 dark:border-neutral-800">{{ $historialMovimientos->links(data: ['scrollTo' => false]) }}</div>
+        @endif
+    </section>
+
 </div>

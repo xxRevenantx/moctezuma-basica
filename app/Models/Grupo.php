@@ -15,6 +15,9 @@ class Grupo extends Model
         'clave',
         'estado',
         'motivo_generacion_excepcional',
+        'archivado_at',
+        'archivado_por',
+        'motivo_archivo',
         'asignacion_grupo_id',
         'nivel_id',
         'grado_id',
@@ -24,7 +27,13 @@ class Grupo extends Model
 
     protected $casts = [
         'ciclo_escolar_id' => 'integer',
+        'archivado_at' => 'datetime',
     ];
+
+    public function usuarioArchivo()
+    {
+        return $this->belongsTo(User::class, 'archivado_por');
+    }
 
     // RELACIONES
     public function cicloEscolar()

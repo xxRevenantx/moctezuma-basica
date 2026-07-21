@@ -26,6 +26,11 @@ class AcademicIntegrityService
         $this->guarded($issues, fn () => $this->studentsWithoutDocuments());
         $this->guarded($issues, fn () => $this->currentCycleProblems());
         $this->guarded($issues, fn () => $this->orphanedAcademicReferences());
+        $this->guarded($issues, fn () => $this->studentsWithoutMatriculaHistory());
+        $this->guarded($issues, fn () => $this->assignmentCycleMismatches());
+        $this->guarded($issues, fn () => $this->groupsWithoutCycle());
+        $this->guarded($issues, fn () => $this->periodOverlaps());
+        $this->guarded($issues, fn () => $this->levelsNotReady());
 
         return collect($issues)
             ->filter(fn (?array $issue): bool => is_array($issue) && ($issue['count'] ?? 0) > 0)
@@ -215,6 +220,7 @@ class AcademicIntegrityService
         $conflicts = DB::table('horarios as h')
             ->join('asignacion_materias as am', 'am.id', '=', 'h.asignacion_materia_id')
             ->whereNotNull('am.profesor_id')
+            ->when(Schema::hasColumn('horarios', 'sesion_compartida'), fn (Builder $q) => $q->where('h.sesion_compartida', false))
             ->select([...$groupColumns, DB::raw('COUNT(*) as total')])
             ->groupBy($groupColumns)
             ->having('total', '>', 1)
@@ -322,6 +328,146 @@ class AcademicIntegrityService
             'critical',
             $query->count(),
             $this->route('misrutas.alumnos')
+        );
+    }
+
+    private function studentsWithoutMatriculaHistory(): ?array
+    {
+        if (!Schema::hasTable('matriculas_alumnos')) {
+            return null;
+        }
+
+        $query = $this->activeStudents()
+            ->leftJoin('matriculas_alumnos', function ($join): void {
+                $join->on('matriculas_alumnos.inscripcion_id', '=', 'inscripciones.id')
+                    ->where('matriculas_alumnos.vigente', true);
+            })
+            ->whereNull('matriculas_alumnos.id');
+
+        return $this->issue(
+            'alumnos_sin_historial_matricula',
+            'Alumnos activos sin matrícula histórica vigente',
+            'La matrícula aparece en la inscripción, pero no existe un registro vigente en matriculas_alumnos.',
+            'critical',
+            $query->distinct('inscripciones.id')->count('inscripciones.id'),
+            $this->route('misrutas.alumnos')
+        );
+    }
+
+    private function assignmentCycleMismatches(): ?array
+    {
+        if (!Schema::hasTable('asignacion_materias') || !Schema::hasTable('grupos')) {
+            return null;
+        }
+
+        $query = DB::table('asignacion_materias as am')
+            ->join('grupos as g', 'g.id', '=', 'am.grupo_id')
+            ->whereNotNull('am.ciclo_escolar_id')
+            ->whereNotNull('g.ciclo_escolar_id')
+            ->whereColumn('am.ciclo_escolar_id', '!=', 'g.ciclo_escolar_id')
+            ->where(function ($review): void {
+                $review->whereNull('am.revision_ciclo_estado')
+                    ->orWhereNotIn('am.revision_ciclo_estado', ['justificada', 'corregida']);
+            });
+
+        return $this->issue(
+            'cargas_ciclo_inconsistente',
+            'Asignaciones de materias pendientes de revisar por ciclo',
+            'La carga académica y su grupo pertenecen a ciclos diferentes. Revísalas antes de modificar o copiar.',
+            'warning',
+            $query->count(),
+            $this->route('misrutas.revision-ciclos'),
+            $query->limit(8)->pluck('am.id')->map(fn ($id) => '#'.$id)->all()
+        );
+    }
+
+    private function groupsWithoutCycle(): ?array
+    {
+        if (!Schema::hasTable('grupos') || !Schema::hasColumn('grupos', 'ciclo_escolar_id')) {
+            return null;
+        }
+
+        $query = DB::table('grupos')->whereNull('ciclo_escolar_id');
+        if (Schema::hasColumn('grupos', 'estado')) {
+            $query->where('estado', '!=', 'archivado');
+        }
+
+        return $this->issue(
+            'grupos_sin_ciclo',
+            'Grupos activos sin ciclo escolar',
+            'Los grupos sin ciclo no deben aparecer en inscripciones, personal, materias ni horarios.',
+            'critical',
+            $query->count(),
+            $this->route('misrutas.revision-ciclos'),
+            $query->limit(8)->pluck('id')->map(fn ($id) => '#'.$id)->all()
+        );
+    }
+
+    private function periodOverlaps(): ?array
+    {
+        if (!Schema::hasTable('periodos')) {
+            return null;
+        }
+
+        $inicio = Schema::hasColumn('periodos', 'fecha_evaluacion_inicio')
+            ? 'fecha_evaluacion_inicio'
+            : 'fecha_inicio';
+        $fin = Schema::hasColumn('periodos', 'fecha_evaluacion_fin')
+            ? 'fecha_evaluacion_fin'
+            : 'fecha_fin';
+
+        $periodos = DB::table('periodos')
+            ->whereNotNull($inicio)
+            ->whereNotNull($fin)
+            ->get(['id', 'ciclo_escolar_id', 'nivel_id', 'generacion_id', 'semestre_id', $inicio, $fin]);
+
+        $conflictos = 0;
+        foreach ($periodos->groupBy(fn ($p) => implode(':', [
+            $p->ciclo_escolar_id, $p->nivel_id, $p->generacion_id ?: 0, $p->semestre_id ?: 0,
+        ])) as $grupo) {
+            $items = $grupo->values();
+            for ($i = 0; $i < $items->count(); $i++) {
+                for ($j = $i + 1; $j < $items->count(); $j++) {
+                    if ($items[$i]->{$inicio} <= $items[$j]->{$fin}
+                        && $items[$i]->{$fin} >= $items[$j]->{$inicio}) {
+                        $conflictos++;
+                    }
+                }
+            }
+        }
+
+        return $this->issue(
+            'periodos_traslapados',
+            'Periodos con fechas de evaluación sobrepuestas',
+            'El sistema permite confirmarlos con motivo porque las ventanas académicas y de captura pueden combinarse.',
+            'warning',
+            $conflictos,
+            $this->route('misrutas.periodos')
+        );
+    }
+
+    private function levelsNotReady(): ?array
+    {
+        if (!Schema::hasTable('ciclo_escolar_niveles')) {
+            return null;
+        }
+
+        $actual = DB::table('ciclo_escolares')->where('es_actual', true)->value('id');
+        if (!$actual) {
+            return null;
+        }
+
+        $query = DB::table('ciclo_escolar_niveles')
+            ->where('ciclo_escolar_id', $actual)
+            ->where('estado', '!=', 'listo');
+
+        return $this->issue(
+            'niveles_ciclo_no_listos',
+            'Niveles pendientes de preparar en el ciclo actual',
+            'Los módulos académicos se bloquean hasta completar grupos, periodos y plantilla de personal publicada.',
+            'warning',
+            $query->count(),
+            $this->route('misrutas.ciclos')
         );
     }
 

@@ -31,8 +31,12 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
             'periodo_basica_id',
             'mes_bachillerato_id',
             'parcial_bachillerato_id',
-            'fecha_inicio',
-            'fecha_fin',
+            'fecha_evaluacion_inicio',
+            'fecha_evaluacion_fin',
+            'fecha_captura_inicio',
+            'fecha_captura_fin',
+            'permitir_traslape',
+            'motivo_traslape',
         ]];
     }
 
@@ -43,10 +47,10 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $hoja = $event->sheet->getDelegate();
 
                 $hoja->freezePane('A2');
-                $hoja->setAutoFilter('A1:K1');
+                $hoja->setAutoFilter('A1:O1');
                 $hoja->getRowDimension(1)->setRowHeight(28);
 
-                $hoja->getStyle('A1:K1')->applyFromArray([
+                $hoja->getStyle('A1:O1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],
@@ -67,7 +71,7 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
                     ],
                 ]);
 
-                $hoja->getStyle('A2:K500')->applyFromArray([
+                $hoja->getStyle('A2:O500')->applyFromArray([
                     'alignment' => [
                         'vertical' => Alignment::VERTICAL_CENTER,
                     ],
@@ -83,7 +87,7 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $hoja->getStyle('A2:C500')->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setRGB('EEF7FB');
-                $hoja->getStyle('J2:K500')->getFill()
+                $hoja->getStyle('J2:M500')->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setRGB('EEF7FB');
 
@@ -110,9 +114,10 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
                     $this->agregarLista($hoja, "G{$fila}", "'Catálogos'!\$F\$2:\$F\$200");
                     $this->agregarLista($hoja, "H{$fila}", "'Catálogos'!\$G\$2:\$G\$200");
                     $this->agregarLista($hoja, "I{$fila}", "'Catálogos'!\$H\$2:\$H\$200");
+                    $this->agregarLista($hoja, "N{$fila}", '"NO,SI"');
                 }
 
-                $hoja->getStyle('J2:K500')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+                $hoja->getStyle('J2:M500')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
 
                 $hoja->getColumnDimension('A')->setWidth(18);
                 $hoja->getColumnDimension('B')->setWidth(24);
@@ -124,7 +129,11 @@ class PlantillaPeriodosSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $hoja->getColumnDimension('H')->setWidth(25);
                 $hoja->getColumnDimension('I')->setWidth(25);
                 $hoja->getColumnDimension('J')->setWidth(16);
-                $hoja->getColumnDimension('K')->setWidth(16);
+                $hoja->getColumnDimension('K')->setWidth(18);
+                $hoja->getColumnDimension('L')->setWidth(18);
+                $hoja->getColumnDimension('M')->setWidth(18);
+                $hoja->getColumnDimension('N')->setWidth(18);
+                $hoja->getColumnDimension('O')->setWidth(42);
             },
         ];
     }

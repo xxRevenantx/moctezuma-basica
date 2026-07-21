@@ -12,12 +12,15 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\AsignacionEscolarService;
+use App\Services\PeriodoCalendarioService;
+use App\Livewire\Periodo\Concerns\GestionaCalendarioPeriodo;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class EditarPeriodo extends Component
 {
+    use GestionaCalendarioPeriodo;
     public $periodo_id = null;
 
     public $nivel_id = null;
@@ -108,8 +111,7 @@ class EditarPeriodo extends Component
         $this->mes_bachillerato_id = $periodo->mes_bachillerato_id;
         $this->parcial_bachillerato_id = $periodo->parcial_bachillerato_id;
 
-        $this->fecha_inicio = $periodo->fecha_inicio;
-        $this->fecha_fin = $periodo->fecha_fin;
+        $this->cargarCalendarioPeriodo($periodo);
 
         $this->periodo_nombre = $this->obtenerNombrePeriodo($periodo);
         $this->tiene_calificaciones = $periodo->calificaciones()->exists();
@@ -143,8 +145,7 @@ class EditarPeriodo extends Component
         $rules = [
             'nivel_id' => 'required|exists:niveles,id',
             'ciclo_escolar_id' => 'required|exists:ciclo_escolares,id',
-            'fecha_inicio' => 'nullable|required_with:fecha_fin|date',
-            'fecha_fin' => 'nullable|required_with:fecha_inicio|date|after_or_equal:fecha_inicio',
+            ...$this->reglasCalendario(),
         ];
 
         if ($this->esBachillerato) {
@@ -173,6 +174,7 @@ class EditarPeriodo extends Component
     protected function messages(): array
     {
         return [
+            ...$this->mensajesCalendario(),
             'nivel_id.required' => 'El nivel es obligatorio.',
             'nivel_id.exists' => 'El nivel seleccionado no es válido.',
 
@@ -205,11 +207,11 @@ class EditarPeriodo extends Component
         ];
     }
 
-    public function actualizarPeriodo(): void
+    public function actualizarPeriodo(PeriodoCalendarioService $calendario): void
     {
         $this->validate();
 
-        if (!$this->validarFechasDelCiclo()) {
+        if (!$this->validarCalendarioPeriodo($calendario, (int) $this->periodo_id)) {
             return;
         }
 
@@ -304,8 +306,7 @@ class EditarPeriodo extends Component
             'mes_basica_id' => $this->esBasica ? $this->mes_basica_id : null,
             'periodo_basica_id' => $this->esBasica ? $this->periodo_basica_id : null,
 
-            'fecha_inicio' => $this->fecha_inicio ?: null,
-            'fecha_fin' => $this->fecha_fin ?: null,
+            ...$this->datosCalendarioPeriodo(),
         ]);
 
         $this->dispatch('swal', [
@@ -338,6 +339,7 @@ class EditarPeriodo extends Component
             'tiene_calificaciones',
         ]);
 
+        $this->limpiarCalendarioPeriodo();
         $this->resetValidation();
     }
 

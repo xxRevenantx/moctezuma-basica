@@ -52,12 +52,20 @@ use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
 use App\Http\Controllers\TutorController;
 use App\Models\PersonaNivel;
+use App\Livewire\Admin\RevisionCiclosAcademicos;
+use App\Livewire\Admin\CorreccionesCalificaciones;
 
 
 // CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS
 Route::get('/centro-control', [SystemControlCenterController::class, 'index'])
     ->middleware('permission:administracion.acceder')
     ->name('misrutas.centro-control');
+Route::get('/centro-control/revision-ciclos', RevisionCiclosAcademicos::class)
+    ->middleware('admin')
+    ->name('misrutas.revision-ciclos');
+Route::get('/centro-control/correcciones-calificaciones', CorreccionesCalificaciones::class)
+    ->middleware('admin')
+    ->name('misrutas.correcciones-calificaciones');
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');
