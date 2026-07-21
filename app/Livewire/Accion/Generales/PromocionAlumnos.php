@@ -41,6 +41,12 @@ class PromocionAlumnos extends Component
     public string $motivo = '';
     public array $seleccionados = [];
     public bool $seleccionarPagina = false;
+    public bool $mostrarVistaPrevia = false;
+    public array $vistaPrevia = [];
+    public string $hashVistaPrevia = '';
+    public string $confirmacion = '';
+    public string $fecha_efectiva = '';
+    public string $tipoResultado = 'promovido';
 
     protected $paginationTheme = 'tailwind';
 
@@ -62,6 +68,7 @@ class PromocionAlumnos extends Component
         $this->gruposOrigen = collect();
         $this->semestresDestino = collect();
         $this->gruposDestino = collect();
+        $this->fecha_efectiva = now()->toDateString();
     }
 
     private function cargarGeneraciones(): Collection
@@ -167,7 +174,88 @@ class PromocionAlumnos extends Component
             : [];
     }
 
-    public function promoverSeleccionados(GestionAcademicaService $service): void
+    public function promoverSeleccionados(): void
+    {
+        $this->prepararPromocion();
+    }
+
+    public function prepararPromocion(): void
+    {
+        $this->tipoResultado = 'promovido';
+        $this->validarPromocion();
+        $this->vistaPrevia = $this->construirVistaPrevia();
+        $this->hashVistaPrevia = $this->calcularHashVistaPrevia($this->vistaPrevia);
+        $this->confirmacion = '';
+        $this->mostrarVistaPrevia = true;
+    }
+
+    public function confirmarPromocion(GestionAcademicaService $service): void
+    {
+        $this->validarPromocion();
+        $this->validate([
+            'fecha_efectiva' => ['required', 'date'],
+            'confirmacion' => ['required', 'in:'.($this->tipoResultado === 'no_promovido' ? 'NO PROMOVER' : 'PROMOVER')],
+        ]);
+
+        $vistaActual = $this->construirVistaPrevia();
+        if (! hash_equals($this->hashVistaPrevia, $this->calcularHashVistaPrevia($vistaActual))) {
+            $this->addError('confirmacion', 'La información cambió después de generar la vista previa. Revísala nuevamente.');
+            $this->vistaPrevia = $vistaActual;
+            $this->hashVistaPrevia = $this->calcularHashVistaPrevia($vistaActual);
+            return;
+        }
+
+        $alumnos = $this->alumnosQuery()
+            ->whereIn('id', array_map('intval', $this->seleccionados))
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($alumnos as $alumno) {
+            $destino = [
+                'ciclo_escolar_id' => $this->ciclo_destino_id,
+                'nivel_id' => $this->nivel->id,
+                'generacion_id' => $this->generacion_id,
+                'grado_id' => $this->grado_destino_id,
+                'semestre_id' => $this->esBachillerato() ? $this->semestre_destino_id : null,
+                'grupo_id' => $this->grupo_destino_id,
+                'matricula' => $alumno->matricula,
+            ];
+
+            if ($this->tipoResultado === 'no_promovido') {
+                $service->continuarNoPromovido($alumno, $destino, trim($this->motivo), auth()->id(), $this->fecha_efectiva);
+            } else {
+                $service->promoverAlumno($alumno, $destino, trim($this->motivo), auth()->id(), $this->fecha_efectiva);
+            }
+        }
+
+        $total = $alumnos->count();
+        $this->seleccionados = [];
+        $this->seleccionarPagina = false;
+        $this->motivo = '';
+        $this->confirmacion = '';
+        $this->vistaPrevia = [];
+        $this->hashVistaPrevia = '';
+        $this->mostrarVistaPrevia = false;
+        $this->resetPage();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => $this->tipoResultado === 'no_promovido' ? 'Continuidad aplicada' : 'Promoción aplicada',
+            'text' => $this->tipoResultado === 'no_promovido'
+                ? "{$total} alumno(s) continuarán en el mismo grado o semestre. El ciclo anterior quedó conservado como evidencia."
+                : "Se promovieron {$total} alumno(s). El ciclo anterior quedó conservado como evidencia y se creó el registro del ciclo destino.",
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function cancelarVistaPrevia(): void
+    {
+        $this->mostrarVistaPrevia = false;
+        $this->vistaPrevia = [];
+        $this->hashVistaPrevia = '';
+        $this->confirmacion = '';
+    }
+
+    private function validarPromocion(): void
     {
         $reglas = [
             'ciclo_origen_id' => ['required', 'exists:ciclo_escolares,id'],
@@ -186,48 +274,83 @@ class PromocionAlumnos extends Component
             $reglas['semestre_destino_id'] = ['required', 'exists:semestres,id'];
         }
         $this->validate($reglas);
-
-        $alumnos = $this->alumnosQuery()->whereIn('id', array_map('intval', $this->seleccionados))->get();
-        foreach ($alumnos as $alumno) {
-            $service->cambiarAsignacion($alumno, [
-                'ciclo_escolar_id' => $this->ciclo_destino_id,
-                'nivel_id' => $this->nivel->id,
-                'generacion_id' => $this->generacion_id,
-                'grado_id' => $this->grado_destino_id,
-                'semestre_id' => $this->esBachillerato() ? $this->semestre_destino_id : null,
-                'grupo_id' => $this->grupo_destino_id,
-                'matricula' => $alumno->matricula,
-            ], trim($this->motivo), auth()->id());
-            if ($alumno->estatus === 'no_promovido') {
-                $service->cambiarEstatus($alumno->fresh(), 'activo', 'Regularización por promoción. ' . trim($this->motivo), auth()->id());
-            }
-        }
-
-        $total = $alumnos->count();
-        $this->seleccionados = [];
-        $this->seleccionarPagina = false;
-        $this->motivo = '';
-        $this->resetPage();
-        $this->dispatch('swal', ['icon' => 'success', 'title' => 'Promoción aplicada', 'text' => "Se promovieron {$total} alumno(s) dentro de la misma generación.", 'position' => 'top-end']);
     }
 
-    public function marcarNoPromovidos(GestionAcademicaService $service): void
+    private function construirVistaPrevia(): array
+    {
+        $grupoDestino = Grupo::query()->with(['asignacionGrupo', 'grado', 'semestre', 'generacion', 'cicloEscolar'])->findOrFail($this->grupo_destino_id);
+
+        return $this->alumnosQuery()
+            ->whereIn('id', array_map('intval', $this->seleccionados))
+            ->get()
+            ->map(fn (Inscripcion $alumno): array => [
+                'id' => $alumno->id,
+                'alumno' => trim($alumno->apellido_paterno . ' ' . $alumno->apellido_materno . ' ' . $alumno->nombre),
+                'matricula' => $alumno->matricula,
+                'origen' => [
+                    'ciclo_id' => (int) $alumno->ciclo_escolar_id,
+                    'grado_id' => (int) $alumno->grado_id,
+                    'semestre_id' => (int) ($alumno->semestre_id ?? 0),
+                    'grupo_id' => (int) $alumno->grupo_id,
+                    'texto' => trim(($alumno->grado?->nombre ?? '—') . ($alumno->semestre ? ' · Sem. ' . $alumno->semestre->numero : '') . ' · ' . ($alumno->grupo?->asignacionGrupo?->nombre ?? '—')),
+                ],
+                'destino' => [
+                    'ciclo_id' => (int) $this->ciclo_destino_id,
+                    'grado_id' => (int) $grupoDestino->grado_id,
+                    'semestre_id' => (int) ($grupoDestino->semestre_id ?? 0),
+                    'grupo_id' => (int) $grupoDestino->id,
+                    'texto' => trim(($grupoDestino->grado?->nombre ?? '—') . ($grupoDestino->semestre ? ' · Sem. ' . $grupoDestino->semestre->numero : '') . ' · ' . ($grupoDestino->asignacionGrupo?->nombre ?? '—')),
+                ],
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function calcularHashVistaPrevia(array $vista): string
+    {
+        return hash('sha256', json_encode([
+            'ciclo_origen_id' => $this->ciclo_origen_id,
+            'ciclo_destino_id' => $this->ciclo_destino_id,
+            'generacion_id' => $this->generacion_id,
+            'grupo_destino_id' => $this->grupo_destino_id,
+            'fecha_efectiva' => $this->fecha_efectiva,
+            'tipo_resultado' => $this->tipoResultado,
+            'filas' => $vista,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    public function marcarNoPromovidos(): void
     {
         $this->validate([
+            'ciclo_origen_id' => ['required', 'exists:ciclo_escolares,id'],
+            'ciclo_destino_id' => ['required', 'different:ciclo_origen_id', 'exists:ciclo_escolares,id'],
+            'generacion_id' => ['required', 'exists:generaciones,id'],
+            'grado_origen_id' => ['required', 'exists:grados,id'],
+            'grupo_origen_id' => ['required', 'exists:grupos,id'],
             'seleccionados' => ['required', 'array', 'min:1'],
             'seleccionados.*' => ['integer', 'exists:inscripciones,id'],
             'motivo' => ['required', 'string', 'min:5', 'max:1000'],
         ]);
 
-        $alumnos = $this->alumnosQuery()->whereIn('id', array_map('intval', $this->seleccionados))->get();
-        foreach ($alumnos as $alumno) {
-            $service->cambiarEstatus($alumno, 'no_promovido', trim($this->motivo), auth()->id());
+        $this->tipoResultado = 'no_promovido';
+        $this->grado_destino_id = $this->grado_origen_id;
+        $this->semestre_destino_id = $this->esBachillerato() ? $this->semestre_origen_id : null;
+        $this->gruposDestino = $this->cargarGrupos($this->grado_destino_id, $this->semestre_destino_id, $this->ciclo_destino_id);
+
+        $grupoOrigen = Grupo::query()->find($this->grupo_origen_id);
+        $coincidente = $this->gruposDestino->first(fn (Grupo $grupo) => (int) $grupo->asignacion_grupo_id === (int) $grupoOrigen?->asignacion_grupo_id);
+        $this->grupo_destino_id = $coincidente?->id ?? $this->gruposDestino->first()?->id;
+
+        if (! $this->grupo_destino_id) {
+            $this->addError('grupo_destino_id', 'No existe un grupo del mismo grado o semestre en el ciclo destino. Créalo antes de continuar.');
+            return;
         }
-        $total = $alumnos->count();
-        $this->seleccionados = [];
-        $this->seleccionarPagina = false;
-        $this->motivo = '';
-        $this->dispatch('swal', ['icon' => 'success', 'title' => 'Resultado guardado', 'text' => "{$total} alumno(s) permanecen en el mismo grado o semestre y conservan su generación.", 'position' => 'top-end']);
+
+        $this->validarPromocion();
+        $this->vistaPrevia = $this->construirVistaPrevia();
+        $this->hashVistaPrevia = $this->calcularHashVistaPrevia($this->vistaPrevia);
+        $this->confirmacion = '';
+        $this->mostrarVistaPrevia = true;
     }
 
     private function prepararDestinoAutomatico(): void

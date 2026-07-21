@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Accion\Generales;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -16,11 +17,13 @@ class DistribucionHistorial extends Component
 {
     public string $slug_nivel = '';
     public ?Nivel $nivel = null;
+    public Collection $ciclos;
     public Collection $generaciones;
     public Collection $grados;
     public Collection $semestres;
     public Collection $grupos;
 
+    public string $ciclo_escolar_id = '';
     public string $generacion_id = '';
     public string $grado_id = '';
     public string $semestre_id = '';
@@ -39,9 +42,11 @@ class DistribucionHistorial extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
+        $this->ciclos = CicloEscolar::query()->orderByDesc('inicio_anio')->get();
+        $this->ciclo_escolar_id = (string) ($this->ciclos->firstWhere('es_actual', true)?->id ?? $this->ciclos->first()?->id ?? '');
+
         $this->generaciones = Generacion::query()
             ->where('nivel_id', $this->nivel->id)
-            ->where('status', true)
             ->orderByDesc('anio_ingreso')
             ->get();
 
@@ -52,6 +57,15 @@ class DistribucionHistorial extends Component
 
         $this->semestres = collect();
         $this->grupos = collect();
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->generacion_id = '';
+        $this->grado_id = '';
+        $this->semestre_id = '';
+        $this->grupo_id = '';
+        $this->cargarGrupos();
     }
 
     public function updatedGeneracionId(): void
@@ -85,7 +99,7 @@ class DistribucionHistorial extends Component
         $this->grupos = Grupo::query()
             ->with('asignacionGrupo')
             ->where('nivel_id', $this->nivel->id)
-            ->whereHas('generacion', fn($query) => $query->where('status', true))
+            ->when($this->ciclo_escolar_id !== '', fn($query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when($this->generacion_id !== '', fn($query) => $query->where('generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
             ->when($this->semestre_id !== '', fn($query) => $query->where('semestre_id', $this->semestre_id))
@@ -173,6 +187,7 @@ class DistribucionHistorial extends Component
     public function limpiarFiltros(): void
     {
         $this->reset([
+            'ciclo_escolar_id',
             'generacion_id',
             'grado_id',
             'semestre_id',
@@ -222,6 +237,7 @@ class DistribucionHistorial extends Component
     private function filtros(): array
     {
         return [
+            'ciclo_escolar_id' => $this->ciclo_escolar_id !== '' ? (int) $this->ciclo_escolar_id : null,
             'generacion_id' => $this->generacion_id !== '' ? (int) $this->generacion_id : null,
             'grado_id' => $this->grado_id !== '' ? (int) $this->grado_id : null,
             'semestre_id' => $this->semestre_id !== '' ? (int) $this->semestre_id : null,

@@ -303,6 +303,25 @@ class Inscripcion extends Model
         return $this->hasMany(MovimientoAlumno::class, 'inscripcion_id');
     }
 
+    public function preinscripcionesCiclos()
+    {
+        return $this->hasMany(PreinscripcionCiclo::class, 'inscripcion_id')
+            ->orderByDesc('fecha_preinscripcion');
+    }
+
+    public function ciclosEscolaresHistorial()
+    {
+        return $this->hasMany(InscripcionCiclo::class, 'inscripcion_id')
+            ->orderByDesc('ciclo_escolar_id');
+    }
+
+    public function cicloEscolarActualHistorial()
+    {
+        return $this->hasOne(InscripcionCiclo::class, 'inscripcion_id')
+            ->where('estado', 'en_curso')
+            ->latestOfMany();
+    }
+
     public function ultimoMovimiento()
     {
         return $this->hasOne(MovimientoAlumno::class, 'inscripcion_id')->latestOfMany();
@@ -341,7 +360,9 @@ class Inscripcion extends Model
             $tieneHistorial = $inscripcion->cambiosAcademicos()->exists()
                 || $inscripcion->movimientos()->exists()
                 || $inscripcion->calificaciones()->exists()
-                || $inscripcion->documentos()->exists();
+                || $inscripcion->documentos()->exists()
+                || $inscripcion->ciclosEscolaresHistorial()->exists()
+                || $inscripcion->preinscripcionesCiclos()->exists();
 
             if ($tieneHistorial) {
                 throw new \RuntimeException(

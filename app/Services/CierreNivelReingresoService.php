@@ -135,7 +135,18 @@ class CierreNivelReingresoService
             $despues['ciclo_escolar_id'] = (int) $destino['ciclo_escolar_id'];
             $despues['procedencia'] = $this->procedenciaLimpia($procedencia);
 
+            $cicloHistorial = app(HistorialCicloEscolarService::class)->registrarCambioAsignacion(
+                $alumno,
+                $antes,
+                $despues,
+                $motivo,
+                $usuarioId,
+                $fecha->toDateString(),
+                'continuidad'
+            );
+
             CambioAcademico::query()->create([
+                'inscripcion_ciclo_id' => $cicloHistorial->id,
                 'inscripcion_id' => $alumno->id,
                 'generacion_id' => $alumno->generacion_id,
                 'tipo' => $tipo,
@@ -148,6 +159,7 @@ class CierreNivelReingresoService
 
             MovimientoAlumno::query()->create([
                 'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $cicloHistorial->id,
                 'ciclo_escolar_id' => (int) $destino['ciclo_escolar_id'],
                 'ciclo_id' => (int) $destino['ciclo_id'],
                 'nivel_anterior_id' => $antes['nivel_id'] ?? null,

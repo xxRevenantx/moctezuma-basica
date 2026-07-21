@@ -152,10 +152,60 @@
 
     <div class="flex flex-wrap justify-end gap-3">
         <flux:button wire:click="marcarNoPromovidos" variant="ghost" spinner="marcarNoPromovidos">
-            Marcar no promovidos
+            Revisar no promovidos
         </flux:button>
-        <flux:button wire:click="promoverSeleccionados" variant="primary" spinner="promoverSeleccionados">
-            Promover seleccionados
+        <flux:button wire:click="prepararPromocion" variant="primary" spinner="prepararPromocion">
+            Revisar y promover seleccionados
         </flux:button>
     </div>
+
+    @if ($mostrarVistaPrevia)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4" wire:key="vista-previa-promocion">
+            <div class="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-neutral-900">
+                <div class="sticky top-0 z-10 flex items-start justify-between border-b bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">Vista previa obligatoria</p>
+                        <h3 class="text-xl font-black text-slate-900 dark:text-white">{{ $tipoResultado === 'no_promovido' ? 'Continuidad sin promoción' : 'Promoción' }} de {{ count($vistaPrevia) }} alumno(s)</h3>
+                        <p class="text-sm text-slate-500">El ciclo de origen permanecerá como evidencia y se abrirá una estancia independiente en el ciclo destino.</p>
+                    </div>
+                    <button type="button" wire:click="cancelarVistaPrevia" class="rounded-xl px-3 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-neutral-800">✕</button>
+                </div>
+
+                <div class="space-y-5 p-5">
+                    <div class="overflow-x-auto rounded-2xl border dark:border-neutral-800">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-slate-50 dark:bg-neutral-950">
+                                <tr>
+                                    <th class="p-3 text-left">Alumno</th>
+                                    <th class="p-3 text-left">Ubicación que se conserva</th>
+                                    <th class="p-3 text-left">{{ $tipoResultado === 'no_promovido' ? 'Ubicación del siguiente ciclo' : 'Nueva ubicación' }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y dark:divide-neutral-800">
+                                @foreach ($vistaPrevia as $fila)
+                                    <tr>
+                                        <td class="p-3"><b>{{ $fila['alumno'] }}</b><div class="text-xs text-slate-500">{{ $fila['matricula'] }}</div></td>
+                                        <td class="p-3">{{ $fila['origen']['texto'] }}</td>
+                                        <td class="p-3 font-semibold text-emerald-700 dark:text-emerald-300">{{ $fila['destino']['texto'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <flux:input type="date" wire:model="fecha_efectiva" :label="$tipoResultado === 'no_promovido' ? 'Fecha efectiva de continuidad' : 'Fecha efectiva de la promoción'" />
+                        <flux:input wire:model="confirmacion" :label="$tipoResultado === 'no_promovido' ? 'Escribe NO PROMOVER para confirmar' : 'Escribe PROMOVER para confirmar'" :placeholder="$tipoResultado === 'no_promovido' ? 'NO PROMOVER' : 'PROMOVER'" />
+                    </div>
+                    @error('confirmacion') <p class="text-sm font-bold text-rose-600">{{ $message }}</p> @enderror
+                    @error('fecha_efectiva') <p class="text-sm font-bold text-rose-600">{{ $message }}</p> @enderror
+
+                    <div class="flex justify-end gap-3">
+                        <flux:button wire:click="cancelarVistaPrevia" variant="ghost">Cancelar</flux:button>
+                        <flux:button wire:click="confirmarPromocion" variant="primary" spinner="confirmarPromocion">{{ $tipoResultado === 'no_promovido' ? 'Confirmar continuidad' : 'Confirmar promoción' }}</flux:button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

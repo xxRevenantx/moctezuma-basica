@@ -12,6 +12,7 @@ class Calificacion extends Model
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'asignacion_materia_id',
         'nivel_id',
         'grado_id',
@@ -48,6 +49,8 @@ class Calificacion extends Model
     protected static function booted(): void
     {
         static::saving(function (Calificacion $calificacion): void {
+            app(\App\Services\HistorialCicloEscolarService::class)->vincularRegistroAcademico($calificacion);
+
             if (
                 ! ReglasMateriaBachillerato::esBachillerato($calificacion->nivel_id)
                 || ! (bool) $calificacion->es_numerica
@@ -71,6 +74,11 @@ class Calificacion extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id');
+    }
+
+    public function inscripcionCiclo()
+    {
+        return $this->belongsTo(InscripcionCiclo::class, 'inscripcion_ciclo_id');
     }
 
     public function asignacionMateria()

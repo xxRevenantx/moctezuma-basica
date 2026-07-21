@@ -30,6 +30,7 @@ class ListaGeneracionesHistoricasController extends Controller
             ->firstOrFail();
 
         $validados = $request->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'generacion_ids' => ['required', 'array', 'min:1'],
             'generacion_ids.*' => ['required', 'integer', 'distinct', 'exists:generaciones,id'],
             'estatus' => ['required', 'string', 'in:' . implode(',', ListaGeneracionesHistoricasService::ESTATUS)],
@@ -45,6 +46,7 @@ class ListaGeneracionesHistoricasController extends Controller
             ->values()
             ->all();
 
+        $cicloEscolarId = (int) $validados['ciclo_escolar_id'];
         $estatus = (string) $validados['estatus'];
         $grupoId = isset($validados['grupo_id']) ? (int) $validados['grupo_id'] : null;
         $incluirArchivados = $request->boolean('incluir_archivados');
@@ -58,6 +60,7 @@ class ListaGeneracionesHistoricasController extends Controller
                 estatus: $estatus,
                 grupoId: $grupoId,
                 incluirArchivados: $incluirArchivados,
+                cicloEscolarId: $cicloEscolarId,
             );
         }
 
@@ -67,6 +70,7 @@ class ListaGeneracionesHistoricasController extends Controller
             estatus: $estatus,
             grupoId: $grupoId,
             incluirArchivados: $incluirArchivados,
+            cicloEscolarId: $cicloEscolarId,
         );
 
         return $formato === 'pdf'
@@ -109,6 +113,7 @@ class ListaGeneracionesHistoricasController extends Controller
         string $estatus,
         ?int $grupoId,
         bool $incluirArchivados,
+        int $cicloEscolarId,
     ): BinaryFileResponse {
         $baseTemp = $this->directorioTemporal();
         $identificador = (string) Str::uuid();
@@ -132,6 +137,7 @@ class ListaGeneracionesHistoricasController extends Controller
                 estatus: $estatus,
                 grupoId: $grupoId,
                 incluirArchivados: $incluirArchivados,
+                cicloEscolarId: $cicloEscolarId,
             );
 
             $nombreBase = $this->service->nombreBase($datos);

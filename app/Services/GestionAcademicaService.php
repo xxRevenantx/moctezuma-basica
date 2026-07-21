@@ -15,6 +15,7 @@ class GestionAcademicaService
 {
     public function __construct(
         private readonly MatriculaAlumnoService $matriculas,
+        private readonly HistorialCicloEscolarService $historialCiclos,
     ) {}
 
     public const ESTATUS = [
@@ -30,9 +31,9 @@ class GestionAcademicaService
         'no_promovido',
     ];
 
-    public function cambiarAsignacion(Inscripcion $alumno, array $destino, string $motivo, ?int $usuarioId): Inscripcion
+    public function cambiarAsignacion(Inscripcion $alumno, array $destino, string $motivo, ?int $usuarioId, ?string $resultadoCambioCiclo = null, ?string $fecha = null): Inscripcion
     {
-        return DB::transaction(function () use ($alumno, $destino, $motivo, $usuarioId): Inscripcion {
+        return DB::transaction(function () use ($alumno, $destino, $motivo, $usuarioId, $resultadoCambioCiclo, $fecha): Inscripcion {
             $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($alumno->id);
             $antes = $this->snapshot($alumno);
 
@@ -72,12 +73,73 @@ class GestionAcademicaService
 
             $alumno = $alumno->fresh();
             $despues = $this->snapshot($alumno);
-            $this->matriculas->sincronizarCambioAsignacion($alumno, $antes, $despues, $usuarioId);
+            $this->matriculas->sincronizarCambioAsignacion($alumno, $antes, $despues, $usuarioId, $fecha);
+            $this->historialCiclos->registrarCambioAsignacion($alumno, $antes, $despues, $motivo, $usuarioId, $fecha, $resultadoCambioCiclo);
             $this->registrarCambio($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId);
-            $this->registrarMovimiento($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId);
+            $this->registrarMovimiento($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId, $fecha);
 
             return $alumno->fresh();
         });
+    }
+
+    public function promoverAlumno(
+        Inscripcion $alumno,
+        array $destino,
+        string $motivo,
+        ?int $usuarioId,
+        ?string $fecha = null
+    ): Inscripcion {
+        $resultado = (int) $alumno->nivel_id === (int) ($destino['nivel_id'] ?? $alumno->nivel_id)
+            ? 'promovido'
+            : 'promovido_nivel';
+
+        $destino['estatus'] = 'activo';
+
+        $actualizado = $this->cambiarAsignacion(
+            $alumno,
+            $destino,
+            $motivo,
+            $usuarioId,
+            $resultado,
+            $fecha
+        );
+
+        if (($actualizado->estatus ?? 'activo') !== 'activo') {
+            $actualizado = $this->cambiarEstatus(
+                $actualizado,
+                'activo',
+                'Activación en el ciclo destino. ' . $motivo,
+                $usuarioId,
+                $fecha
+            );
+        }
+
+        return $actualizado;
+    }
+
+    public function continuarNoPromovido(
+        Inscripcion $alumno,
+        array $destino,
+        string $motivo,
+        ?int $usuarioId,
+        ?string $fecha = null
+    ): Inscripcion {
+        $actualizado = $this->cambiarAsignacion(
+            $alumno,
+            $destino,
+            $motivo,
+            $usuarioId,
+            'no_promovido',
+            $fecha
+        );
+
+        return $this->cambiarEstatus(
+            $actualizado,
+            'no_promovido',
+            'Continuidad en el mismo grado o semestre. '.$motivo,
+            $usuarioId,
+            $fecha
+        );
     }
 
     public function activarPreinscripcion(
@@ -164,6 +226,7 @@ class GestionAcademicaService
 
             $alumno = $alumno->fresh();
             $this->matriculas->asegurarVigente($alumno, 'activacion_preinscripcion', $usuarioId, $fechaMovimiento);
+            $this->historialCiclos->formalizarPreinscripcion($alumno, $usuarioId, $fechaMovimiento, $motivo);
             $despues = $this->snapshot($alumno);
 
             $this->registrarCambio(
@@ -215,6 +278,11 @@ class GestionAcademicaService
 
             $alumno = $alumno->fresh();
             $this->matriculas->aplicarEstatus($alumno, $estatus, $usuarioId, $fechaMovimiento);
+            if (($antes['estatus'] ?? null) === 'preinscrito' && ! in_array($estatus, ['activo', 'reingreso', 'no_promovido'], true)) {
+                $this->historialCiclos->cancelarPreinscripcion($alumno, $motivo, $usuarioId, $fechaMovimiento);
+            } else {
+                $this->historialCiclos->registrarEstatus($alumno, $estatus, $motivo, $usuarioId, $fechaMovimiento);
+            }
             $despues = $this->snapshot($alumno);
             $this->registrarCambio($alumno, 'cambio_estatus', $motivo, $antes, $despues, $usuarioId);
             $this->registrarMovimiento($alumno, $estatus, $motivo, $antes, $despues, $usuarioId, $fechaMovimiento);
@@ -335,6 +403,7 @@ class GestionAcademicaService
         ?string $fecha = null
     ): void {
         $alumno = $alumno->fresh();
+        $this->historialCiclos->asegurarCicloFormal($alumno, 'inscripcion_inicial', $usuarioId, $fecha);
         $despues = $this->snapshot($alumno);
 
         $this->registrarCambio(
@@ -361,6 +430,7 @@ class GestionAcademicaService
     {
         return CambioAcademico::query()->create([
             'inscripcion_id' => $alumno->id,
+            'inscripcion_ciclo_id' => $this->historialCiclos->resolverId($alumno, (int) ($despues['ciclo_escolar_id'] ?? $antes['ciclo_escolar_id'] ?? $alumno->ciclo_escolar_id)),
             'generacion_id' => $alumno->generacion_id,
             'tipo' => $tipo,
             'motivo' => $motivo,
@@ -421,6 +491,7 @@ class GestionAcademicaService
 
         MovimientoAlumno::query()->create([
             'inscripcion_id' => $alumno->id,
+            'inscripcion_ciclo_id' => $this->historialCiclos->resolverId($alumno, (int) ($despues['ciclo_escolar_id'] ?? $antes['ciclo_escolar_id'] ?? $alumno->ciclo_escolar_id)),
             'ciclo_escolar_id' => $despues['ciclo_escolar_id'] ?? $antes['ciclo_escolar_id'] ?? null,
             'ciclo_id' => $alumno->ciclo_id,
             'nivel_anterior_id' => $antes['nivel_id'] ?? null,

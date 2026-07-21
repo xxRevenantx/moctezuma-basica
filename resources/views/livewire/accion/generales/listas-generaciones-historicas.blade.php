@@ -23,7 +23,7 @@
                         Listas históricas de generaciones
                     </h3>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        Selecciona una o varias generaciones de {{ $nivel->nombre }}, filtra por estatus o grupo y genera un padrón institucional en PDF o Word editable.
+                        Selecciona el ciclo y una o varias generaciones de {{ $nivel->nombre }}. El padrón conserva grado, grupo, bajas, traslados y egresos tal como existieron en ese ciclo.
                     </p>
                 </div>
             </div>
@@ -144,6 +144,14 @@
             </div>
 
             <div class="mt-4 space-y-4">
+                <flux:select wire:model.live="ciclo_escolar_id" label="Ciclo escolar histórico" description="La lista utiliza la fotografía formal del alumno en este ciclo; no su ubicación actual.">
+                    @foreach ($ciclosEscolares as $ciclo)
+                        <flux:select.option value="{{ $ciclo->id }}">
+                            {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}{{ $ciclo->es_actual ? ' · Actual' : '' }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+
                 <label class="block">
                     <span class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Estatus de alumnos</span>
                     <select wire:model.live="estatus"

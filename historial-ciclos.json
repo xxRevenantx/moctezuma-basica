@@ -1,0 +1,4931 @@
+{
+    "total_eventos": 439,
+    "total_ciclos_detectados": 158,
+    "ya_existentes": 132,
+    "aplicables": 26,
+    "requieren_revision": 0,
+    "candidatos": [
+        {
+            "inscripcion_id": 138,
+            "alumno": "Bustamante Rosenberg Donni Nelson",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 138,
+            "alumno": "Bustamante Rosenberg Donni Nelson",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-06-30",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 20,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 139,
+            "alumno": "Campusano Molina Stacey Lissette",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 139,
+            "alumno": "Campusano Molina Stacey Lissette",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 140,
+            "alumno": "Flores Leon Maria Guadalupe",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 140,
+            "alumno": "Flores Leon Maria Guadalupe",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 135,
+            "alumno": "Hernandez Benitez Yanelly",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2020-08-24",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 11,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 135,
+            "alumno": "Hernandez Benitez Yanelly",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 141,
+            "alumno": "Hernández Castillo Luis Addiel Rey",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 141,
+            "alumno": "Hernández Castillo Luis Addiel Rey",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 136,
+            "alumno": "Lara Salgado Silvia Edith",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 136,
+            "alumno": "Lara Salgado Silvia Edith",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 142,
+            "alumno": "Maldonado Medrano Omar Alexander",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 142,
+            "alumno": "Maldonado Medrano Omar Alexander",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 134,
+            "alumno": "Montalva Barrera Jazmin",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 5,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 134,
+            "alumno": "Montalva Barrera Jazmin",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 143,
+            "alumno": "Nájera Nájera Yearim Emmanuel",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2019-08-26",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 143,
+            "alumno": "Nájera Nájera Yearim Emmanuel",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 137,
+            "alumno": "Sánchez Lara Margarita",
+            "ciclo_escolar_id": 5,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2019-08-26",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 137,
+            "alumno": "Sánchez Lara Margarita",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2021-2022",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-06",
+            "asignaciones": 12,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos",
+                "movimiento:activo:estado_anterior",
+                "movimiento:activo:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 18,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 18
+            }
+        },
+        {
+            "inscripcion_id": 127,
+            "alumno": "Navarro Mariano Eyvy Alain",
+            "ciclo_escolar_id": 6,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-06-25",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 11,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 127,
+            "alumno": "Navarro Mariano Eyvy Alain",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-06-25",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 9,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo",
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 130,
+            "alumno": "Perez Brugada Camila",
+            "ciclo_escolar_id": 6,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2020-08-31",
+            "fecha_fin": "2026-06-26",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 130,
+            "alumno": "Perez Brugada Camila",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 129,
+            "alumno": "Perez Garcia Julio Cesar",
+            "ciclo_escolar_id": 6,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-06-25",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 5,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 129,
+            "alumno": "Perez Garcia Julio Cesar",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 128,
+            "alumno": "Portillo Alonso Ingrid Monserrat",
+            "ciclo_escolar_id": 6,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2020-08-24",
+            "fecha_fin": "2026-06-26",
+            "asignaciones": 5,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 128,
+            "alumno": "Portillo Alonso Ingrid Monserrat",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2022-2023",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 19,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 13
+            }
+        },
+        {
+            "inscripcion_id": 132,
+            "alumno": "Cervantes Gutierrez Christopher Brian",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2021-08-30",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 132,
+            "alumno": "Cervantes Gutierrez Christopher Brian",
+            "ciclo_escolar_id": 9,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 131,
+            "alumno": "Garzon Aguilar Christian Sebastian",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2021-08-30",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 131,
+            "alumno": "Garzon Aguilar Christian Sebastian",
+            "ciclo_escolar_id": 9,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 145,
+            "alumno": "Gonzalez Contreras Luis Rodrigo",
+            "ciclo_escolar_id": 9,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2023-08-28",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 13,
+            "resultado": "baja_definitiva",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:baja_definitiva:estado_anterior",
+                "movimiento:baja_definitiva:estado_nuevo",
+                "movimiento:reingreso:estado_anterior",
+                "movimiento:reingreso:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 21,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 15
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 21,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 15
+            }
+        },
+        {
+            "inscripcion_id": 144,
+            "alumno": "Robles Vazquez Dillan Yazid",
+            "ciclo_escolar_id": 9,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2023-08-28",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 5,
+            "resultado": "baja_definitiva",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:baja_definitiva:estado_anterior",
+                "movimiento:baja_definitiva:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 21,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 15
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 21,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 15
+            }
+        },
+        {
+            "inscripcion_id": 133,
+            "alumno": "Torres Baza Breyrhi Guadalupe",
+            "ciclo_escolar_id": 7,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2021-08-30",
+            "fecha_fin": "2026-06-30",
+            "asignaciones": 3,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo",
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 133,
+            "alumno": "Torres Baza Breyrhi Guadalupe",
+            "ciclo_escolar_id": 9,
+            "ciclo": "2023-2024",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 20,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 19
+            }
+        },
+        {
+            "inscripcion_id": 123,
+            "alumno": "Hilario Matilde Sebastian",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2022-08-29",
+            "fecha_fin": "2022-08-29",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 123,
+            "alumno": "Hilario Matilde Sebastian",
+            "ciclo_escolar_id": 10,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 124,
+            "alumno": "Pineda  Bryan Alexander",
+            "ciclo_escolar_id": 10,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 125,
+            "alumno": "Sanchez Vargas Andrea Lizet",
+            "ciclo_escolar_id": 10,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 126,
+            "alumno": "Varela Mondragon Vanessa",
+            "ciclo_escolar_id": 8,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2022-08-29",
+            "fecha_fin": "2022-08-29",
+            "asignaciones": 1,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:inscripcion:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 126,
+            "alumno": "Varela Mondragon Vanessa",
+            "ciclo_escolar_id": 10,
+            "ciclo": "2024-2025",
+            "fecha_inicio": "2026-07-02",
+            "fecha_fin": "2026-07-02",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            },
+            "ultima_ubicacion": {
+                "grado_id": 15,
+                "grupo_id": 17,
+                "nivel_id": 4,
+                "semestre_id": 6,
+                "generacion_id": 14
+            }
+        },
+        {
+            "inscripcion_id": 88,
+            "alumno": "Aguilar Gutierrez Yosgart Itzae",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 103,
+            "alumno": "Aguirre Rodriguez Santiago",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 1,
+            "alumno": "Alfaro Luviano Zabdiel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 104,
+            "alumno": "Alonso  Isaiah",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 32,
+            "alumno": "Alonso  Suly",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 89,
+            "alumno": "Alonso Arellano Cesar Benjamin",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 105,
+            "alumno": "Alvarez Arroyo Joel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 58,
+            "alumno": "Arrocena Diaz Regina",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 90,
+            "alumno": "Avellaneda Perez Santiago",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 91,
+            "alumno": "Ballesteros Dominguez Elias",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 2,
+            "alumno": "Bernal Rodriguez Keisy Aylin",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 79,
+            "alumno": "Betancourt Carreto Jose Karim",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 3,
+            "alumno": "Betancourt Carreto Remy Karina",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 22,
+            "alumno": "Bustos Garcia Isaac",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 16,
+            "alumno": "Canseco Garcia Alvaro Dariel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 1,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            },
+            "ultima_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 1,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            }
+        },
+        {
+            "inscripcion_id": 7,
+            "alumno": "Cardenas  Jace Danilo",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 56,
+            "alumno": "Cardenas  Jayden",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 4,
+            "alumno": "Carranza Marcelo Gabriela",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 33,
+            "alumno": "Carranza Marcelo Rosmery",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 15,
+            "alumno": "Castro Pineda Raul",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 99,
+            "alumno": "Catalan Jaramillo Paola Yarumi",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            },
+            "ultima_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            }
+        },
+        {
+            "inscripcion_id": 23,
+            "alumno": "Clavijo Avelino Luis Angel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 106,
+            "alumno": "Colarte Flores Gilberto Adrian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 17,
+            "alumno": "Cruz Benitez Cristopher Andres",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 24,
+            "alumno": "Cuevas Benitez Axel Sebastian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 92,
+            "alumno": "Cuevas Benitez Diego Alexander",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 59,
+            "alumno": "Duque Cruz Alisson Yazlin",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 34,
+            "alumno": "Echeverria Olea Alan Jesus",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 5,
+            "alumno": "Eriza Salinas Diego",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 80,
+            "alumno": "Flores Real Farid",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 100,
+            "alumno": "Fombona Pineda Amado Dylan",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            },
+            "ultima_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            }
+        },
+        {
+            "inscripcion_id": 72,
+            "alumno": "Garcia Perez Luis Tadeo",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 93,
+            "alumno": "Garcia Vargas Jose Oscar",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 6,
+            "alumno": "Gomez Avelino Christian Hosmar",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 35,
+            "alumno": "Gomez Martinez Carlos Daniel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 63,
+            "alumno": "Gutierrez Mariano Jorge",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-29",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 6,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:correccion_administrativa:estado_anterior",
+                "movimiento:correccion_administrativa:estado_nuevo",
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 94,
+            "alumno": "Gutierrez Mariano Kendra Coral",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 36,
+            "alumno": "Gutierrez Nuñez Daniela",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 2,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 37,
+            "alumno": "Hernandez Bravo Roberto Carlos",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 60,
+            "alumno": "Hernandez Lorenzo Dylan",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 8,
+            "alumno": "Hernandez Ochoa Keily Guadalupe",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 9,
+            "alumno": "Hernandez Rodriguez Abisai",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 25,
+            "alumno": "Hernandez Rodriguez Aridai",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 64,
+            "alumno": "Hernandez Rodriguez Isai",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 73,
+            "alumno": "Hilario Mariano Gretel Scarlett",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 107,
+            "alumno": "Joachin Mojica María Isabel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 108,
+            "alumno": "Juan Jaramillo Ximena Coral",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 95,
+            "alumno": "Juarez Rojas Isabella",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 109,
+            "alumno": "Lopez Diaz Jade Alinay",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 65,
+            "alumno": "Lopez Rebollar Jorge Luis",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 81,
+            "alumno": "Macedo Patiño Hilario Manuel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 26,
+            "alumno": "Macedonio Gamiño Salvador",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 82,
+            "alumno": "Marcelo Ocampo Angel Gael",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 55,
+            "alumno": "Marcelo Ocampo Mariano",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 38,
+            "alumno": "Mariano Nuñez Camila",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 74,
+            "alumno": "Martinez Mojica Yuma Noel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 66,
+            "alumno": "Mayo Flores Ixchel Monzerrat",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 67,
+            "alumno": "Medina Alonso Jesus Rey",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 68,
+            "alumno": "Mendoza Manrique Juan Felipe",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 27,
+            "alumno": "Mojica Fabian Evoleth",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 18,
+            "alumno": "Mojica Jaimes Maria de los Angeles",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 83,
+            "alumno": "Mojica Saucedo Gareth",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 61,
+            "alumno": "Montufar Jaimes Monserrat",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 39,
+            "alumno": "Morales Clavijo Adrian de Jesus",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 96,
+            "alumno": "Morales Clavijo Alexander David",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 110,
+            "alumno": "Mundo Gomez Victor Jose",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 40,
+            "alumno": "Najera Gutierrez Julio Cesar",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 10,
+            "alumno": "Ordoñez Gomez Caleb de Jesus",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 11,
+            "alumno": "Oregon Hernandez Sebastian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 41,
+            "alumno": "Ortiz Martinez Angel Everardo",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 84,
+            "alumno": "Pablo Solano Santiago David",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 111,
+            "alumno": "Palacios Aispuro Emir Edison",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 42,
+            "alumno": "Pedroza Pedroza Annie Desiree",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 85,
+            "alumno": "Perez Brugada Cesar",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 86,
+            "alumno": "Perez Espinoza Aldo Farid",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 69,
+            "alumno": "Perez Garcia Evelyn Marian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 43,
+            "alumno": "Perez Juarez Alexis Ivan",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 101,
+            "alumno": "Perez Leyva Danae",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            },
+            "ultima_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            }
+        },
+        {
+            "inscripcion_id": 14,
+            "alumno": "Perez Mercado Mia Yuridia",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 75,
+            "alumno": "Pineda Hernandez Arley",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 13,
+            "alumno": "Ramirez Ascencio Layla Brigitte",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 70,
+            "alumno": "Reyes Arce Julietta Mariel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 19,
+            "alumno": "Reyes Eligio Eder Nectali",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 71,
+            "alumno": "Reyes Rojas Giovanni Ethan",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 4,
+            "resultado": "egresado",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:egresado:estado_anterior",
+                "movimiento:egresado:estado_nuevo",
+                "cambio:cambio_estatus:datos_anteriores",
+                "cambio:cambio_estatus:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 10,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 1
+            }
+        },
+        {
+            "inscripcion_id": 28,
+            "alumno": "Reyes Rojas Irlanda",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 76,
+            "alumno": "Rios Garcia Litzy Paloma",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 97,
+            "alumno": "Rodriguez Hernandez Ethan",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 87,
+            "alumno": "Roman Burgos Renata",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            },
+            "ultima_ubicacion": {
+                "grado_id": 6,
+                "grupo_id": 12,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 7
+            }
+        },
+        {
+            "inscripcion_id": 112,
+            "alumno": "Ríos García Sharis Makenssy",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            },
+            "ultima_ubicacion": {
+                "grado_id": 9,
+                "grupo_id": 8,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 4
+            }
+        },
+        {
+            "inscripcion_id": 98,
+            "alumno": "Salgado Benitez Hector",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            },
+            "ultima_ubicacion": {
+                "grado_id": 7,
+                "grupo_id": 13,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 6
+            }
+        },
+        {
+            "inscripcion_id": 20,
+            "alumno": "Salgado Velazquez Itzayana",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 44,
+            "alumno": "Sanchez Urbina Sebastian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 45,
+            "alumno": "Santana Osorio Ashley",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            },
+            "ultima_ubicacion": {
+                "grado_id": 11,
+                "grupo_id": 6,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 11
+            }
+        },
+        {
+            "inscripcion_id": 57,
+            "alumno": "Saucedo Rivera Gael",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 1,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            },
+            "ultima_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 1,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            }
+        },
+        {
+            "inscripcion_id": 12,
+            "alumno": "Solis Chavez Lia Renata",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            },
+            "ultima_ubicacion": {
+                "grado_id": 4,
+                "grupo_id": 2,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 9
+            }
+        },
+        {
+            "inscripcion_id": 102,
+            "alumno": "Tellez Guillermo Yulian",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            },
+            "ultima_ubicacion": {
+                "grado_id": 8,
+                "grupo_id": 14,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 5
+            }
+        },
+        {
+            "inscripcion_id": 77,
+            "alumno": "Toribio Peñaloza Matias Alfredo",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 62,
+            "alumno": "Urbina Ascencio Matias Rodrigo",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": false,
+            "aplicable": true,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_anterior",
+                "cambio:cambio_asignacion:datos_anteriores"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 9,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 29,
+            "alumno": "Vargas Gaona Axel",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 30,
+            "alumno": "Vazquez Reyes Aylin",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 31,
+            "alumno": "Verduzco Avellaneda Gemma Brillit",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            },
+            "ultima_ubicacion": {
+                "grado_id": 10,
+                "grupo_id": 3,
+                "nivel_id": 3,
+                "semestre_id": null,
+                "generacion_id": 12
+            }
+        },
+        {
+            "inscripcion_id": 21,
+            "alumno": "Vicente Arevalo Gael",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            },
+            "ultima_ubicacion": {
+                "grado_id": 13,
+                "grupo_id": 4,
+                "nivel_id": 4,
+                "semestre_id": 1,
+                "generacion_id": 17
+            }
+        },
+        {
+            "inscripcion_id": 78,
+            "alumno": "Zavaleta Morales Alma Yanelli",
+            "ciclo_escolar_id": 11,
+            "ciclo": "2025-2026",
+            "fecha_inicio": "2026-06-26",
+            "fecha_fin": null,
+            "asignaciones": 1,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:reconstruccion_historica:estado_nuevo"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            },
+            "ultima_ubicacion": {
+                "grado_id": 5,
+                "grupo_id": 11,
+                "nivel_id": 2,
+                "semestre_id": null,
+                "generacion_id": 8
+            }
+        },
+        {
+            "inscripcion_id": 58,
+            "alumno": "Arrocena Diaz Regina",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 16,
+            "alumno": "Canseco Garcia Alvaro Dariel",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 27,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 27,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            }
+        },
+        {
+            "inscripcion_id": 59,
+            "alumno": "Duque Cruz Alisson Yazlin",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 156,
+            "alumno": "Flores Carachure Regina",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 24,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 20
+            },
+            "ultima_ubicacion": {
+                "grado_id": 1,
+                "grupo_id": 24,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 20
+            }
+        },
+        {
+            "inscripcion_id": 153,
+            "alumno": "Gonzalez Santiago Eliel Mateo",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 151,
+            "alumno": "Guzman Santamaria Emily Jatzibe",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 152,
+            "alumno": "Guzman Santamaria Ricardo Isael",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 154,
+            "alumno": "Hernandez Delgado Bernardo Farid",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 60,
+            "alumno": "Hernandez Lorenzo Dylan",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 61,
+            "alumno": "Montufar Jaimes Monserrat",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 155,
+            "alumno": "Ramos Perez Mauricio",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-20",
+            "fecha_fin": null,
+            "asignaciones": 4,
+            "resultado": null,
+            "nivel_confianza": "exacto",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:activacion_preinscripcion:estado_anterior",
+                "movimiento:activacion_preinscripcion:estado_nuevo",
+                "cambio:activacion_preinscripcion:datos_anteriores",
+                "cambio:activacion_preinscripcion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        },
+        {
+            "inscripcion_id": 57,
+            "alumno": "Saucedo Rivera Gael",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 27,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            },
+            "ultima_ubicacion": {
+                "grado_id": 2,
+                "grupo_id": 27,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 3
+            }
+        },
+        {
+            "inscripcion_id": 62,
+            "alumno": "Urbina Ascencio Matias Rodrigo",
+            "ciclo_escolar_id": 12,
+            "ciclo": "2026-2027",
+            "fecha_inicio": "2026-07-18",
+            "fecha_fin": "2026-07-18",
+            "asignaciones": 2,
+            "resultado": "promovido",
+            "nivel_confianza": "alta",
+            "ya_existe": true,
+            "aplicable": false,
+            "origenes": [
+                "movimiento:cambio_asignacion:estado_nuevo",
+                "cambio:cambio_asignacion:datos_nuevos"
+            ],
+            "primera_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            },
+            "ultima_ubicacion": {
+                "grado_id": 3,
+                "grupo_id": 25,
+                "nivel_id": 1,
+                "semestre_id": null,
+                "generacion_id": 2
+            }
+        }
+    ]
+}

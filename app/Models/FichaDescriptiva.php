@@ -10,6 +10,7 @@ class FichaDescriptiva extends Model
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'nivel_id',
         'grado_id',
         'grupo_id',
@@ -23,6 +24,13 @@ class FichaDescriptiva extends Model
         'fecha_captura',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (FichaDescriptiva $ficha): void {
+            app(\App\Services\HistorialCicloEscolarService::class)->vincularRegistroAcademico($ficha);
+        });
+    }
+
     protected $casts = [
         'periodo_id' => 'integer',
         'periodo' => 'integer',
@@ -32,6 +40,11 @@ class FichaDescriptiva extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class);
+    }
+
+    public function inscripcionCiclo()
+    {
+        return $this->belongsTo(InscripcionCiclo::class, 'inscripcion_ciclo_id');
     }
 
     public function nivel()

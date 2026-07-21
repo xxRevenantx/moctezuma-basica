@@ -172,6 +172,7 @@ class DistribucionEscolarController extends Controller
         $categorias = implode(',', array_keys($service->categorias()));
 
         $datos = $request->validate([
+            'ciclo_escolar_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
             'grado_id' => ['nullable', 'integer', 'exists:grados,id'],
             'grupo_id' => ['nullable', 'integer', 'exists:grupos,id'],
@@ -183,6 +184,7 @@ class DistribucionEscolarController extends Controller
         $nivel = Nivel::query()->with('director')->where('slug', $slugNivel)->firstOrFail();
 
         return [$nivel, [
+            'ciclo_escolar_id' => $datos['ciclo_escolar_id'] ?? null,
             'generacion_id' => $datos['generacion_id'] ?? null,
             'grado_id' => $datos['grado_id'] ?? null,
             'grupo_id' => $datos['grupo_id'] ?? null,

@@ -31,6 +31,7 @@
                     ['Egresados existentes', $this->diagnostico['egresados'], 'sky'],
                     ['Generaciones vencidas', $this->diagnostico['generacionesVencidas'], 'red'],
                     ['Documentos faltantes', $this->diagnostico['documentosPendientes'], 'emerald'],
+                    ['Preinscripciones no formalizadas', $this->diagnostico['preinscripcionesNoFormalizadas'] ?? 0, 'amber'],
                 ];
             @endphp
             @foreach ($tarjetas as [$label, $valor, $color])

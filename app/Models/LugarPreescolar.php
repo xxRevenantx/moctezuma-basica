@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
+
 use Illuminate\Database\Eloquent\Model;
 
 class LugarPreescolar extends Model
 {
+    use LinksInscripcionCiclo;
+
     protected $table = 'lugares_preescolar';
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'nivel_id',
         'grado_id',
         'grupo_id',

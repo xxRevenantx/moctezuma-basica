@@ -13,6 +13,7 @@ class MovimientoAlumno extends Model
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'ciclo_escolar_id',
         'ciclo_id',
         'nivel_anterior_id',
@@ -39,6 +40,11 @@ class MovimientoAlumno extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id')->withTrashed();
+    }
+
+    public function inscripcionCiclo()
+    {
+        return $this->belongsTo(InscripcionCiclo::class, 'inscripcion_ciclo_id');
     }
 
     public function nivelAnterior()

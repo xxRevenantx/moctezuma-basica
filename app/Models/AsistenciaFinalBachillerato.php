@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
+
 use Illuminate\Database\Eloquent\Model;
 
 class AsistenciaFinalBachillerato extends Model
 {
+    use LinksInscripcionCiclo;
+
     protected $table = 'asistencias_finales_bachillerato';
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'asignacion_materia_id',
         'ciclo_escolar_id',
         'porcentaje',

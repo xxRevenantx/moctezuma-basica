@@ -1215,6 +1215,7 @@ class CrearInscripcion extends Component
         ObservacionInscripcionService $observacionesService,
         MatriculaAlumnoService $matriculas,
         GestionAcademicaService $gestionAcademica,
+        \App\Services\HistorialCicloEscolarService $historialCiclos,
     ): void
     {
         $this->sanitizeStrings();
@@ -1245,7 +1246,7 @@ class CrearInscripcion extends Component
             $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
         }
 
-        DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica) {
+        DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $historialCiclos) {
             $inscripcion = Inscripcion::query()->create([
                 'curp' => $data['curp'],
                 'matricula' => $data['matricula'],
@@ -1305,6 +1306,14 @@ class CrearInscripcion extends Component
                 usuarioId: auth()->id(),
             );
 
+
+            if ($data['estado_inscripcion'] === 'preinscrito') {
+                $historialCiclos->registrarPreinscripcion(
+                    $inscripcion,
+                    auth()->id(),
+                    $data['fecha_inscripcion'],
+                );
+            }
 
             if ($data['estado_inscripcion'] === 'inscrito') {
                 $matriculas->asegurarVigente(

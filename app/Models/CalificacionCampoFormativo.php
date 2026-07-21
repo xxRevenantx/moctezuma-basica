@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
+
 use Illuminate\Database\Eloquent\Model;
 
 class CalificacionCampoFormativo extends Model
 {
+    use LinksInscripcionCiclo;
+
     protected $table = 'calificaciones_campos_formativos';
 
     protected $fillable = [
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'campo_formativo_id',
         'periodo_id',
         'ciclo_escolar_id',

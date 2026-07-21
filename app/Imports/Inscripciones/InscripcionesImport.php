@@ -29,6 +29,9 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
         DB::transaction(function () use ($rows): void {
             $observacionesService = app(ObservacionInscripcionService::class);
             $asignacionService = app(AsignacionEscolarService::class);
+            $historialCiclos = app(\App\Services\HistorialCicloEscolarService::class);
+            $matriculas = app(\App\Services\MatriculaAlumnoService::class);
+            $gestionAcademica = app(\App\Services\GestionAcademicaService::class);
 
             foreach ($rows as $row) {
                 $claveGrupo = mb_strtoupper(trim((string) $row['clave_grupo']));
@@ -126,6 +129,13 @@ class InscripcionesImport implements ToCollection, WithHeadingRow, WithValidatio
                         origen: 'importacion',
                         usuarioId: auth()->id(),
                     );
+                }
+
+                if ($estaInscrito) {
+                    $matriculas->asegurarVigente($inscripcion, 'importacion', auth()->id(), $fechaInscripcion);
+                    $historialCiclos->asegurarCicloFormal($inscripcion, 'importacion', auth()->id(), $fechaInscripcion);
+                } else {
+                    $historialCiclos->registrarPreinscripcion($inscripcion, auth()->id(), $fechaInscripcion);
                 }
             }
         });

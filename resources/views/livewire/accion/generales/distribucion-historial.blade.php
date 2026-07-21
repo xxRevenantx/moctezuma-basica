@@ -28,11 +28,11 @@
                         <span
                             class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-inset ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                            Solo generaciones activas
+                            Historial por ciclo escolar
                         </span>
                     </div>
                     <p class="mt-1 text-sm text-slate-500 dark:text-neutral-400">
-                        Combina los filtros para consultar generaciones, grupos y alumnos del nivel seleccionado.
+                        Selecciona el ciclo para consultar a todos los alumnos que existieron en ese nivel, incluidos egresados, bajas y traslados.
                     </p>
                 </div>
             </div>
@@ -71,9 +71,16 @@
             </div>
         </div>
 
-        <div class="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-6">
+        <div class="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-7">
+            <flux:select wire:model.live="ciclo_escolar_id" label="Ciclo escolar">
+                <flux:select.option value="">Todos los ciclos</flux:select.option>
+                @foreach ($ciclos as $ciclo)
+                    <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->nombre }}{{ $ciclo->es_actual ? ' · Actual' : '' }}</flux:select.option>
+                @endforeach
+            </flux:select>
+
             <flux:select wire:model.live="generacion_id" label="Generación">
-                <flux:select.option value="">Todas las activas</flux:select.option>
+                <flux:select.option value="">Todas</flux:select.option>
                 @foreach ($generaciones as $generacion)
                     <flux:select.option value="{{ $generacion->id }}">
                         {{ $generacion->etiqueta }}
@@ -139,14 +146,14 @@
 
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-black">Generaciones activas</h2>
+                        <h2 class="text-lg font-black">Generaciones del ciclo</h2>
                         <span
                             class="rounded-full bg-white/15 px-2.5 py-1 text-xs font-black ring-1 ring-inset ring-white/20">
                             {{ $totalGeneraciones }} {{ $totalGeneraciones === 1 ? 'generación' : 'generaciones' }}
                         </span>
                     </div>
                     <p class="mt-1 text-sm text-blue-100">
-                        Distribución por grado, semestre y grupo. Las generaciones desactivadas quedan ocultas.
+                        Distribución histórica por grado, semestre y grupo. La ubicación queda congelada por ciclo.
                     </p>
                 </div>
             </div>
