@@ -471,16 +471,31 @@ class CuadroHonorPromediosService
         if (
             Schema::hasTable('persona_nivel_detalles')
             && Schema::hasTable('persona_nivel')
+            && Schema::hasTable('persona_nivel_ciclos')
+            && Schema::hasTable('plantillas_personal_nivel')
             && Schema::hasTable('persona_role')
             && Schema::hasTable('role_personas')
             && Schema::hasTable('personas')
         ) {
+            $esCicloActual = (bool) DB::table('ciclo_escolares')
+                ->where('id', $cicloEscolarId)
+                ->value('es_actual');
+            $estadosPlantilla = $esCicloActual ? ['activo'] : ['activo', 'baja'];
+
             $persona = DB::table('persona_nivel_detalles as pnd')
                 ->join('persona_nivel as pn', 'pn.id', '=', 'pnd.persona_nivel_id')
+                ->join('persona_nivel_ciclos as pnc', 'pnc.id', '=', 'pnd.persona_nivel_ciclo_id')
+                ->join('plantillas_personal_nivel as ppn', 'ppn.id', '=', 'pnc.plantilla_personal_nivel_id')
                 ->join('persona_role as pr', 'pr.id', '=', 'pnd.persona_role_id')
                 ->join('role_personas as rp', 'rp.id', '=', 'pr.role_persona_id')
                 ->join('personas as p', 'p.id', '=', 'pr.persona_id')
                 ->where('pn.nivel_id', $nivelId)
+                ->where('ppn.ciclo_escolar_id', $cicloEscolarId)
+                ->whereIn('ppn.estado', ['publicada', 'cerrada'])
+                ->whereIn('pnc.estado', $estadosPlantilla)
+                ->whereIn('pnd.estado', $estadosPlantilla)
+                ->where('pnd.confirmado', true)
+                ->whereNull('pnd.archivado_at')
                 ->whereColumn('pn.persona_id', 'pr.persona_id')
                 ->where(function ($query): void {
                     $query->whereIn('rp.slug', [
@@ -492,8 +507,10 @@ class CuadroHonorPromediosService
                         ->orWhere('rp.slug', 'like', 'maestro%')
                         ->orWhere('rp.slug', 'like', 'docente%');
                 })
-                ->where(function ($query): void {
-                    $query->whereNull('p.status')->orWhere('p.status', true);
+                ->when($esCicloActual, function ($query): void {
+                    $query->where(function ($persona): void {
+                        $persona->whereNull('p.status')->orWhere('p.status', true);
+                    });
                 })
                 ->where(function ($query) use ($gradoId): void {
                     $query->where('pnd.grado_id', $gradoId)->orWhereNull('pnd.grado_id');

@@ -13,24 +13,35 @@
 
     $tabsPersonaNivel['reportes'] = ['Reportes', 'document-chart-bar'];
     $clavePestanaPersonaNivel = 'moctezuma:persona-nivel:pestana:v1:usuario:' . (auth()->id() ?: 'invitado');
+    $claveCicloPersonaNivel = 'moctezuma:persona-nivel:ciclo:v1:usuario:' . (auth()->id() ?: 'invitado');
 @endphp
 
 <div class="space-y-6"
     x-data="{
         tab: @entangle('tab').live,
+        cicloEscolarId: @entangle('cicloEscolarId').live,
         gestionModal: false,
         clavePestana: @js($clavePestanaPersonaNivel),
+        claveCiclo: @js($claveCicloPersonaNivel),
         pestanasPermitidas: @js(array_keys($tabsPersonaNivel)),
         init() {
             try {
                 const guardada = localStorage.getItem(this.clavePestana);
+                const cicloGuardado = Number(localStorage.getItem(this.claveCiclo) || 0);
 
                 if (guardada && this.pestanasPermitidas.includes(guardada)) {
                     this.tab = guardada;
                 }
+                if (cicloGuardado > 0) {
+                    this.cicloEscolarId = cicloGuardado;
+                }
             } catch (error) {
-                console.warn('No fue posible restaurar la pestaña de Plantilla.', error);
+                console.warn('No fue posible restaurar la configuración de Plantilla.', error);
             }
+
+            this.$watch('cicloEscolarId', (valor) => {
+                try { localStorage.setItem(this.claveCiclo, String(valor || '')); } catch (error) {}
+            });
 
             this.$watch('tab', (valor) => {
                 if (!this.pestanasPermitidas.includes(valor)) {
@@ -62,12 +73,12 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('misrutas.plantilla-personal.reporte', ['tipo' => 'plantilla', 'formato' => 'pdf']) }}"
+                    <a href="{{ route('misrutas.plantilla-personal.reporte', ['tipo' => 'plantilla', 'formato' => 'pdf', 'ciclo_escolar_id' => $cicloEscolarId]) }}"
                         target="_blank"
                         class="inline-flex items-center gap-2 rounded-2xl bg-[#006492] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-800">
                         <flux:icon.document-arrow-down class="h-4 w-4" /> Nueva plantilla PDF
                     </a>
-                    <a href="{{ route('misrutas.plantilla-personal.reporte', ['tipo' => 'carga', 'formato' => 'excel']) }}"
+                    <a href="{{ route('misrutas.plantilla-personal.reporte', ['tipo' => 'carga', 'formato' => 'excel', 'ciclo_escolar_id' => $cicloEscolarId]) }}"
                         class="inline-flex items-center gap-2 rounded-2xl border border-[#88AC2E]/40 bg-[#88AC2E]/10 px-4 py-2.5 text-sm font-bold text-[#557015] transition hover:bg-[#88AC2E]/20 dark:text-lime-300">
                         <flux:icon.table-cells class="h-4 w-4" /> Carga Excel
                     </a>
@@ -98,6 +109,90 @@
                         </div>
                     </div>
                 @endforeach
+            </div>
+        </div>
+    </section>
+
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="grid gap-5 p-5 xl:grid-cols-12 xl:items-start">
+            <div class="xl:col-span-4">
+                <flux:select wire:model.live="cicloEscolarId" label="Plantilla del ciclo escolar">
+                    @foreach ($ciclosEscolares as $ciclo)
+                        <flux:select.option value="{{ $ciclo->id }}">
+                            {{ $ciclo->nombre }}{{ $ciclo->es_actual ? ' · actual' : '' }}{{ $ciclo->cerrado_at ? ' · cerrado' : '' }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+                <p class="mt-2 text-xs text-slate-500">
+                    Las asignaciones, el orden y los documentos se consultan dentro del ciclo seleccionado. SEG, SEP y C.T. permanecen por persona y nivel.
+                </p>
+                @if (auth()->user()?->is_admin)
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <flux:button type="button" icon="document-duplicate" wire:click="prepararPlantillaCiclo" wire:loading.attr="disabled">
+                            Preparar / copiar ciclo
+                        </flux:button>
+                        <flux:button type="button" variant="ghost" icon="arrow-path" wire:click="recalcularDiagnosticoPlantilla">Recalcular diagnóstico</flux:button>
+                    </div>
+                @endif
+            </div>
+
+            <div class="xl:col-span-8">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-black text-slate-950 dark:text-white">Estado por nivel</h3>
+                        <p class="text-xs text-slate-500">Solo las plantillas publicadas o cerradas alimentan Reanudaciones y Liberación de sueldos.</p>
+                    </div>
+                    <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{{ $cicloSeleccionado?->nombre }}</span>
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                    @foreach ($plantillasCiclo as $plantilla)
+                        @php
+                            $diag = $plantilla->diagnostico ?? [];
+                            $estadoClases = match($plantilla->estado) {
+                                'publicada' => 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20',
+                                'en_revision' => 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20',
+                                'cerrada' => 'border-slate-300 bg-slate-100 dark:border-neutral-700 dark:bg-neutral-800',
+                                default => 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20',
+                            };
+                        @endphp
+                        <article class="rounded-2xl border p-4 {{ $estadoClases }}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <h4 class="font-black text-slate-900 dark:text-white">{{ $plantilla->nivel?->nombre }}</h4>
+                                    <p class="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{{ $plantilla->etiqueta_estado }}</p>
+                                </div>
+                                <div class="text-right text-xs">
+                                    <b class="block text-rose-600">{{ $diag['criticos'] ?? 0 }} críticos</b>
+                                    <span class="text-amber-600">{{ $diag['advertencias'] ?? 0 }} avisos</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+                                <div class="rounded-xl bg-white/70 p-2 dark:bg-neutral-900/50"><b class="block text-base">{{ $diag['personas'] ?? 0 }}</b>Personas</div>
+                                <div class="rounded-xl bg-white/70 p-2 dark:bg-neutral-900/50"><b class="block text-base">{{ $diag['asignaciones'] ?? 0 }}</b>Funciones</div>
+                                <div class="rounded-xl bg-white/70 p-2 dark:bg-neutral-900/50"><b class="block text-base">{{ $diag['pendientes'] ?? 0 }}</b>Pendientes</div>
+                            </div>
+                            @if (auth()->user()?->is_admin)
+                                <div class="mt-3 flex flex-wrap gap-1.5">
+                                    @if ($plantilla->estado === 'cerrada')
+                                        <flux:button size="xs" type="button" wire:click="cambiarEstadoPlantilla({{ $plantilla->nivel_id }}, 'borrador')">Reabrir</flux:button>
+                                    @else
+                                        <flux:button size="xs" type="button" variant="ghost" wire:click="cambiarEstadoPlantilla({{ $plantilla->nivel_id }}, 'borrador')">Borrador</flux:button>
+                                        <flux:button size="xs" type="button" variant="ghost" wire:click="cambiarEstadoPlantilla({{ $plantilla->nivel_id }}, 'en_revision')">Revisión</flux:button>
+                                        <flux:button size="xs" type="button" wire:click="cambiarEstadoPlantilla({{ $plantilla->nivel_id }}, 'publicada')">Publicar</flux:button>
+                                        <flux:button size="xs" type="button" variant="danger" wire:click="cambiarEstadoPlantilla({{ $plantilla->nivel_id }}, 'cerrada')">Cerrar</flux:button>
+                                    @endif
+                                </div>
+                            @endif
+                        </article>
+                    @endforeach
+                </div>
+
+                @if ($plantillasCiclo->contains(fn($p) => $p->estado === 'cerrada'))
+                    <div class="mt-4">
+                        <flux:textarea wire:model="motivoReapertura" label="Motivo para reabrir una plantilla cerrada" rows="2" placeholder="Obligatorio al reabrir ciclos cerrados; mínimo 10 caracteres." />
+                        <flux:error name="motivoReapertura" />
+                    </div>
+                @endif
             </div>
         </div>
     </section>
@@ -407,6 +502,7 @@
     <section x-show="tab === 'reportes'" x-cloak class="space-y-4">
         @php
             $filtrosReporte = array_filter([
+                'ciclo_escolar_id' => $cicloEscolarId,
                 'nivel_id' => $reporteNivelId,
                 'grado_id' => $reporteGradoId,
                 'grupo_id' => $reporteGrupoId,
@@ -457,13 +553,13 @@
             <form wire:submit="guardarGestion" class="space-y-5 p-5">
                 <section class="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
                     <div class="mb-4">
-                        <h4 class="font-black text-sky-900 dark:text-sky-200">Asignación general de la persona al nivel</h4>
-                        <p class="text-xs text-sky-700/80 dark:text-sky-300/80">Esta vigencia y carga administrativa se aplican a la cabecera persona-nivel.</p>
+                        <h4 class="font-black text-sky-900 dark:text-sky-200">Participación de la persona en el ciclo</h4>
+                        <p class="text-xs text-sky-700/80 dark:text-sky-300/80">La vigencia y el estado pertenecen al ciclo seleccionado. Las fechas SEG, SEP y C.T. permanecen en la relación persona-nivel.</p>
                     </div>
                     <div class="grid gap-4 md:grid-cols-3">
-                        <div><label class="mb-1 block text-xs font-bold">Inicio general *</label><input type="date" wire:model="editCabFechaInicio" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" />@error('editCabFechaInicio')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
-                        <div><label class="mb-1 block text-xs font-bold">Término general</label><input type="date" wire:model="editCabFechaFin" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" />@error('editCabFechaFin')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
-                        <div><label class="mb-1 block text-xs font-bold">Estado general</label><select wire:model="editCabEstado" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" @disabled($editCabEstadoOriginal === 'baja')><option value="activo">Activo</option><option value="baja">Baja</option></select>@error('editCabEstado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
+                        <div><label class="mb-1 block text-xs font-bold">Inicio en el ciclo *</label><input type="date" wire:model="editCabFechaInicio" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" />@error('editCabFechaInicio')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
+                        <div><label class="mb-1 block text-xs font-bold">Término en el ciclo</label><input type="date" wire:model="editCabFechaFin" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" />@error('editCabFechaFin')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
+                        <div><label class="mb-1 block text-xs font-bold">Estado en el ciclo</label><select wire:model="editCabEstado" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" @disabled($editCabEstadoOriginal === 'baja')><option value="activo">Activo</option><option value="baja">Baja</option></select>@error('editCabEstado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
                     </div>
                     <div class="mt-4 grid gap-4 md:grid-cols-3">
                         <div><label class="mb-1 block text-xs font-bold">Horas administrativas generales</label><input type="number" min="0" step="0.25" wire:model="editCabHorasAdministrativas" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950" /></div>
@@ -472,11 +568,11 @@
                     </div>
                     @if ($editCabEstado === 'baja')
                         <div class="mt-4 grid gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/20 md:grid-cols-3">
-                            <div><label class="mb-1 block text-xs font-bold">Fecha de baja general</label><input type="date" wire:model="editCabFechaBaja" class="w-full rounded-xl border-rose-200 dark:border-rose-900 dark:bg-neutral-950" /></div>
-                            <div class="md:col-span-2"><label class="mb-1 block text-xs font-bold">Motivo de baja general</label><input wire:model="editCabMotivoBaja" class="w-full rounded-xl border-rose-200 dark:border-rose-900 dark:bg-neutral-950" placeholder="Motivo de conclusión de la asignación al nivel" /></div>
+                            <div><label class="mb-1 block text-xs font-bold">Fecha de baja en el ciclo</label><input type="date" wire:model="editCabFechaBaja" class="w-full rounded-xl border-rose-200 dark:border-rose-900 dark:bg-neutral-950" /></div>
+                            <div class="md:col-span-2"><label class="mb-1 block text-xs font-bold">Motivo de baja en el ciclo</label><input wire:model="editCabMotivoBaja" class="w-full rounded-xl border-rose-200 dark:border-rose-900 dark:bg-neutral-950" placeholder="Motivo de conclusión de la asignación al nivel" /></div>
                         </div>
                     @endif
-                    <div class="mt-4"><label class="mb-1 block text-xs font-bold">Observaciones generales</label><textarea wire:model="editCabObservaciones" rows="2" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950"></textarea></div>
+                    <div class="mt-4"><label class="mb-1 block text-xs font-bold">Observaciones de la relación persona-nivel</label><textarea wire:model="editCabObservaciones" rows="2" class="w-full rounded-xl border-sky-200 dark:border-sky-900 dark:bg-neutral-950"></textarea></div>
                 </section>
 
                 <div>

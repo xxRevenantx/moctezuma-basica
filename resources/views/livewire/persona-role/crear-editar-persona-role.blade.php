@@ -168,6 +168,75 @@
 
                 </div>
 
+                <flux:field>
+                    <flux:label>Descripción</flux:label>
+                    <flux:textarea wire:model.defer="descripcion" rows="2"
+                        placeholder="Describe brevemente cuándo debe utilizarse esta función." />
+                    <flux:error name="descripcion" />
+                </flux:field>
+
+                <section class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/40">
+                    <div class="mb-4 flex items-start gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                            <flux:icon.adjustments-horizontal class="size-5" />
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 dark:text-white">Reglas de asignación escolar</h3>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">Estas reglas evitan asignar niveles, grados o grupos incompatibles desde Plantilla de personal.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model.live="requiere_grupo" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Requiere grado y grupo</span>
+                                <span class="block text-xs text-slate-500">No se podrá guardar la función sin una ubicación académica.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model.live="permite_grupo" :disabled="$requiere_grupo" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Permite asignación a grupo</span>
+                                <span class="block text-xs text-slate-500">La función puede ser general o relacionarse con un grupo.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model="permite_varios_grupos" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Permite varios grupos</span>
+                                <span class="block text-xs text-slate-500">Útil para especialistas y docentes de Secundaria o Bachillerato.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model="aplica_bachillerato" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Aplica a Bachillerato</span>
+                                <span class="block text-xs text-slate-500">Habilita semestre y grupo cuando corresponda.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model="es_directivo" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Personal directivo</span>
+                                <span class="block text-xs text-slate-500">Se utilizará para fechas y firmantes directivos.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                            <flux:checkbox wire:model="es_docente" />
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">Personal docente</span>
+                                <span class="block text-xs text-slate-500">Participa en carga laboral y reportes docentes.</span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
                 {{-- Botones --}}
                 <div class="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
 

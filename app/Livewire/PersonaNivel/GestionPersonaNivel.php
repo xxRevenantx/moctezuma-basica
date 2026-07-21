@@ -3,6 +3,7 @@
 namespace App\Livewire\PersonaNivel;
 
 use App\Models\ActividadAdministrativa;
+use App\Models\CicloEscolar;
 use App\Models\AsignacionMateria;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -11,9 +12,11 @@ use App\Models\Persona;
 use App\Models\PersonaNivel;
 use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaNivelHistorial;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\TipoDocumentoPersonal;
 use App\Services\CargaLaboralPersonaNivelService;
 use App\Services\ExpedientePersonalResumenService;
+use App\Services\PlantillaPersonalCicloService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +26,9 @@ use Livewire\Component;
 class GestionPersonaNivel extends Component
 {
     public string $tab = 'plantilla';
+    public ?int $cicloEscolarId = null;
+    public string $motivoReapertura = '';
+    public bool $mostrarDiagnosticoPlantilla = false;
     public string $search = '';
     public string $nivelFiltro = '';
     public string $estadoFiltro = 'todos';
@@ -73,6 +79,50 @@ class GestionPersonaNivel extends Component
     public function mount(): void
     {
         $this->asignacionesMateriaDisponibles = collect();
+        $this->cicloEscolarId = app(PlantillaPersonalCicloService::class)->cicloActual()?->id;
+    }
+
+    public function updatedCicloEscolarId($value): void
+    {
+        $cicloId = (int) $value;
+        if ($cicloId <= 0 || !CicloEscolar::query()->whereKey($cicloId)->exists()) {
+            $this->cicloEscolarId = app(PlantillaPersonalCicloService::class)->cicloActual()?->id;
+            return;
+        }
+
+        $this->seleccionados = [];
+        $this->nivelFiltro = '';
+        $this->reporteNivelId = null;
+        $this->dispatch('ciclo-plantilla-cambiado', cicloId: $cicloId);
+    }
+
+    public function recalcularDiagnosticoPlantilla(PlantillaPersonalCicloService $service): void
+    {
+        $service->recalcularCiclo((int) $this->cicloEscolarId);
+        $this->dispatch('plantilla-personal-actualizada');
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Diagnóstico de plantilla actualizado.']);
+    }
+
+    public function prepararPlantillaCiclo(PlantillaPersonalCicloService $service): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+        $resultado = $service->prepararCiclo((int) $this->cicloEscolarId);
+        $this->dispatch('plantilla-personal-actualizada');
+        $this->dispatch('refreshPersonaNivelList');
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "Plantilla preparada: {$resultado['copiadas']} asignaciones, {$resultado['pendientes']} pendientes de confirmar.",
+        ]);
+    }
+
+    public function cambiarEstadoPlantilla(int $nivelId, string $estado, PlantillaPersonalCicloService $service): void
+    {
+        $plantilla = $service->plantilla((int) $this->cicloEscolarId, $nivelId);
+        $service->cambiarEstado($plantilla, $estado, $this->motivoReapertura);
+        $this->motivoReapertura = '';
+        $this->dispatch('plantilla-personal-actualizada');
+        $this->dispatch('refreshPersonaNivelList');
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Estado de plantilla actualizado.']);
     }
 
     #[On('refreshPersonaNivelList')]
@@ -116,20 +166,21 @@ class GestionPersonaNivel extends Component
     public function editarGestion(int $detalleId): void
     {
         $detalle = PersonaNivelDetalle::query()
-            ->with(['cabecera.persona', 'cabecera.nivel'])
+            ->with(['cabecera.persona', 'cabecera.nivel', 'cicloAsignacion.plantilla'])
             ->findOrFail($detalleId);
 
         $this->detalleEditId = $detalle->id;
-        $this->editCabFechaInicio = optional($detalle->cabecera?->fecha_inicio)->format('Y-m-d');
-        $this->editCabFechaFin = optional($detalle->cabecera?->fecha_fin)->format('Y-m-d');
-        $this->editCabEstado = $detalle->cabecera?->estado ?: PersonaNivel::ESTADO_ACTIVO;
+        $this->editCabFechaInicio = optional($detalle->cicloAsignacion?->fecha_inicio)->format('Y-m-d')
+            ?: optional($detalle->cabecera?->fecha_inicio)->format('Y-m-d');
+        $this->editCabFechaFin = optional($detalle->cicloAsignacion?->fecha_fin)->format('Y-m-d');
+        $this->editCabEstado = $detalle->cicloAsignacion?->estado ?: PersonaNivel::ESTADO_ACTIVO;
         $this->editCabEstadoOriginal = $this->editCabEstado;
         $this->editCabHorasAdministrativas = (float) ($detalle->cabecera?->horas_administrativas ?? 0);
         $this->editCabLimiteHoras = (float) ($detalle->cabecera?->limite_horas_semanales ?? 40);
         $this->editCabActividadAdministrativa = (string) ($detalle->cabecera?->actividad_administrativa ?? '');
         $this->editCabObservaciones = (string) ($detalle->cabecera?->observaciones ?? '');
-        $this->editCabFechaBaja = optional($detalle->cabecera?->fecha_baja)->format('Y-m-d');
-        $this->editCabMotivoBaja = (string) ($detalle->cabecera?->motivo_baja ?? '');
+        $this->editCabFechaBaja = optional($detalle->cicloAsignacion?->fecha_baja)->format('Y-m-d');
+        $this->editCabMotivoBaja = (string) ($detalle->cicloAsignacion?->motivo_baja ?? '');
         $this->editFechaInicio = optional($detalle->fecha_inicio)->format('Y-m-d');
         $this->editFechaFin = optional($detalle->fecha_fin)->format('Y-m-d');
         $this->editEstado = $detalle->estado ?: PersonaNivelDetalle::ESTADO_ACTIVO;
@@ -213,9 +264,11 @@ class GestionPersonaNivel extends Component
 
         DB::transaction(function () use (&$advertenciaTitular) {
             $detalle = PersonaNivelDetalle::query()
-                ->with('cabecera')
+                ->with(['cabecera', 'cicloAsignacion.plantilla'])
                 ->lockForUpdate()
                 ->findOrFail($this->detalleEditId);
+
+            app(PlantillaPersonalCicloService::class)->asegurarEditable($detalle->cicloAsignacion?->plantilla ?? abort(422, 'La asignación no pertenece a una plantilla de ciclo.'));
 
             if ($this->editAsignacionMateriaId) {
                 $asignacionValida = AsignacionMateria::query()
@@ -240,16 +293,24 @@ class GestionPersonaNivel extends Component
 
             $esBaja = $this->editEstado === PersonaNivelDetalle::ESTADO_BAJA;
 
-            $detalle->cabecera->update([
+            $detalle->cicloAsignacion->update([
                 'fecha_inicio' => $this->editCabFechaInicio,
-                'fecha_fin' => $this->editCabFechaFin,
+                'fecha_fin' => $this->editCabFechaFin ?: ($this->editCabEstado === PersonaNivel::ESTADO_BAJA ? now()->toDateString() : null),
                 'estado' => $this->editCabEstado,
+                'fecha_baja' => $this->editCabEstado === PersonaNivel::ESTADO_BAJA
+                    ? ($this->editCabFechaBaja ?: now()->toDateString())
+                    : null,
+                'motivo_baja' => $this->editCabEstado === PersonaNivel::ESTADO_BAJA
+                    ? (trim($this->editCabMotivoBaja) ?: null)
+                    : null,
+            ]);
+
+            // Estos datos pertenecen a la relación permanente persona + nivel.
+            $detalle->cabecera->update([
                 'horas_administrativas' => $this->editCabHorasAdministrativas,
                 'limite_horas_semanales' => $this->editCabLimiteHoras,
                 'actividad_administrativa' => trim($this->editCabActividadAdministrativa) ?: null,
                 'observaciones' => trim($this->editCabObservaciones) ?: null,
-                'fecha_baja' => $this->editCabEstado === PersonaNivel::ESTADO_BAJA ? ($this->editCabFechaBaja ?: now()->toDateString()) : null,
-                'motivo_baja' => $this->editCabEstado === PersonaNivel::ESTADO_BAJA ? (trim($this->editCabMotivoBaja) ?: 'Baja general desde Plantilla') : null,
             ]);
 
             $detalle->update([
@@ -340,26 +401,37 @@ class GestionPersonaNivel extends Component
 
     private function cambiarEstadoMasivo(Collection $ids, string $estado): void
     {
-        DB::transaction(function () use ($ids, $estado) {
+        if ($estado === PersonaNivelDetalle::ESTADO_BAJA) {
+            $this->validate([
+                'motivoMasivo' => ['required', 'string', 'min:5', 'max:1000'],
+            ], ['motivoMasivo.required' => 'Indica el motivo de la baja.']);
+        }
+
+        $service = app(PlantillaPersonalCicloService::class);
+        DB::transaction(function () use ($ids, $estado, $service) {
             $detalles = PersonaNivelDetalle::query()
+                ->with('cicloAsignacion.plantilla')
                 ->whereIn('id', $ids)
+                ->whereNull('archivado_at')
                 ->lockForUpdate()
                 ->get();
 
             foreach ($detalles as $detalle) {
+                $service->asegurarEditable($detalle->cicloAsignacion?->plantilla ?? abort(422, 'Una asignación no pertenece a una plantilla de ciclo.'));
                 $esBaja = $estado === PersonaNivelDetalle::ESTADO_BAJA;
                 $detalle->update([
                     'estado' => $estado,
                     'fecha_fin' => $esBaja ? ($detalle->fecha_fin ?: now()->toDateString()) : null,
                     'fecha_baja' => $esBaja ? now()->toDateString() : null,
-                    'motivo_baja' => $esBaja ? (trim($this->motivoMasivo) ?: 'Baja masiva desde Plantilla') : null,
+                    'motivo_baja' => $esBaja ? trim($this->motivoMasivo) : null,
                 ]);
             }
 
-            $detalles->pluck('persona_nivel_id')->unique()->each(fn ($id) => $this->sincronizarEstadoCabecera((int) $id));
+            $detalles->pluck('persona_nivel_ciclo_id')->filter()->unique()
+                ->each(fn ($id) => $this->sincronizarEstadoMembresia((int) $id));
         });
 
-        $this->finalizarMasivo($estado === 'baja' ? 'Asignaciones dadas de baja.' : 'Asignaciones activadas.');
+        $this->finalizarMasivo($estado === 'baja' ? 'Asignaciones dadas de baja en el ciclo seleccionado.' : 'Asignaciones activadas.');
     }
 
     private function moverMasivo(Collection $ids): void
@@ -368,94 +440,69 @@ class GestionPersonaNivel extends Component
             'nivelDestinoId' => ['required', 'integer', 'exists:niveles,id'],
             'gradoDestinoId' => ['nullable', 'integer', 'exists:grados,id'],
             'grupoDestinoId' => ['nullable', 'integer', 'exists:grupos,id'],
-        ], ['nivelDestinoId.required' => 'Selecciona el nivel de destino.']);
+            'motivoMasivo' => ['required', 'string', 'min:5', 'max:1000'],
+        ], [
+            'nivelDestinoId.required' => 'Selecciona el nivel de destino.',
+            'motivoMasivo.required' => 'Escribe el motivo del movimiento.',
+        ]);
 
-        if ($this->grupoDestinoId) {
-            $grupo = Grupo::query()->findOrFail($this->grupoDestinoId);
-            if ((int) $grupo->nivel_id !== (int) $this->nivelDestinoId) {
-                $this->dispatch('notify', ['type' => 'error', 'message' => 'El grupo no pertenece al nivel seleccionado.']);
-                return;
-            }
-            if ($this->gradoDestinoId && (int) $grupo->grado_id !== (int) $this->gradoDestinoId) {
-                $this->dispatch('notify', ['type' => 'error', 'message' => 'El grupo no pertenece al grado seleccionado.']);
-                return;
-            }
-        }
+        $service = app(PlantillaPersonalCicloService::class);
+        $plantillaDestino = $service->plantilla((int) $this->cicloEscolarId, (int) $this->nivelDestinoId);
+        $service->asegurarEditable($plantillaDestino);
 
-        if ($this->gradoDestinoId) {
-            $gradoValido = Grado::query()
-                ->whereKey($this->gradoDestinoId)
-                ->where('nivel_id', $this->nivelDestinoId)
-                ->exists();
-
-            if (!$gradoValido) {
-                $this->dispatch('notify', ['type' => 'error', 'message' => 'El grado no pertenece al nivel seleccionado.']);
-                return;
-            }
-        }
-
-        $duplicados = 0;
-
-        DB::transaction(function () use ($ids, &$duplicados) {
-            $detalles = PersonaNivelDetalle::query()->with('cabecera')->whereIn('id', $ids)->lockForUpdate()->get();
-            $cabecerasOrigen = $detalles->pluck('persona_nivel_id')->unique();
+        DB::transaction(function () use ($ids, $service, $plantillaDestino) {
+            $detalles = PersonaNivelDetalle::query()
+                ->with(['cabecera', 'personaRole.rolePersona', 'cicloAsignacion.plantilla'])
+                ->whereIn('id', $ids)
+                ->whereNull('archivado_at')
+                ->lockForUpdate()
+                ->get();
 
             foreach ($detalles as $detalle) {
-                $origen = $detalle->cabecera;
-                $cabeceraDestino = PersonaNivel::query()
-                    ->where('persona_id', $origen->persona_id)
-                    ->where('nivel_id', $this->nivelDestinoId)
-                    ->where('estado', PersonaNivel::ESTADO_ACTIVO)
-                    ->latest('id')
-                    ->first();
+                $service->asegurarEditable($detalle->cicloAsignacion?->plantilla ?? abort(422, 'Una asignación no pertenece a una plantilla de ciclo.'));
+                $rol = $detalle->personaRole?->rolePersona ?? abort(422, 'Una asignación no tiene función válida.');
+                $grupo = $service->validarAsignacion(
+                    $plantillaDestino,
+                    $rol,
+                    $this->gradoDestinoId,
+                    $this->grupoDestinoId,
+                    $detalle->id
+                );
 
-                if (!$cabeceraDestino) {
-                    $cabeceraDestino = PersonaNivel::create([
-                        'persona_id' => $origen->persona_id,
-                        'nivel_id' => $this->nivelDestinoId,
-                        'ingreso_seg' => $origen->ingreso_seg,
-                        'ingreso_sep' => $origen->ingreso_sep,
-                        'ingreso_ct' => $origen->ingreso_ct,
-                        'fecha_inicio' => now()->toDateString(),
-                        'estado' => PersonaNivel::ESTADO_ACTIVO,
-                        'limite_horas_semanales' => $origen->limite_horas_semanales ?: 40,
-                    ]);
-                }
-
-                $grado = $this->gradoDestinoId;
-                $grupo = $this->grupoDestinoId;
-
-                $duplicados += PersonaNivelDetalle::query()
-                    ->where('persona_nivel_id', $cabeceraDestino->id)
-                    ->where('persona_role_id', $detalle->persona_role_id)
-                    ->where('grado_id', $grado)
-                    ->where('grupo_id', $grupo)
-                    ->where('id', '!=', $detalle->id)
-                    ->exists() ? 1 : 0;
-
-                $cambioNivel = (int) $origen->nivel_id !== (int) $this->nivelDestinoId;
-
-                $detalle->update([
-                    'persona_nivel_id' => $cabeceraDestino->id,
-                    'grado_id' => $grado,
-                    'grupo_id' => $grupo,
-                    'asignacion_materia_id' => $cambioNivel ? null : $detalle->asignacion_materia_id,
+                $cabeceraDestino = PersonaNivel::query()->firstOrCreate([
+                    'persona_id' => $detalle->cabecera->persona_id,
+                    'nivel_id' => (int) $this->nivelDestinoId,
+                ], [
+                    'fecha_inicio' => now()->toDateString(),
+                    'estado' => PersonaNivel::ESTADO_ACTIVO,
+                    'limite_horas_semanales' => 40,
+                    // SEG, SEP y C.T. se capturan por persona y nivel; no se copian desde otro nivel.
                 ]);
+
+                $membresiaDestino = $service->membresia($plantillaDestino, $cabeceraDestino);
+                $service->bloquearDuplicado(
+                    $membresiaDestino,
+                    (int) $detalle->persona_role_id,
+                    $this->gradoDestinoId,
+                    $this->grupoDestinoId
+                );
+
+                $service->cerrarYCrearCambio($detalle, [
+                    'persona_nivel_id' => $cabeceraDestino->id,
+                    'persona_nivel_ciclo_id' => $membresiaDestino->id,
+                    'grado_id' => $grupo?->grado_id,
+                    'grupo_id' => $grupo?->id,
+                    'asignacion_materia_id' => (int) $detalle->cabecera->nivel_id === (int) $this->nivelDestinoId
+                        ? $detalle->asignacion_materia_id
+                        : null,
+                    'orden' => ((int) $membresiaDestino->detalles()->max('orden')) + 1,
+                ], trim($this->motivoMasivo));
             }
 
-            foreach ($cabecerasOrigen as $cabeceraId) {
-                if (!PersonaNivelDetalle::query()->where('persona_nivel_id', $cabeceraId)->exists()) {
-                    PersonaNivel::query()->whereKey($cabeceraId)->delete();
-                }
-            }
+            $service->actualizarDiagnostico($plantillaDestino);
         });
 
-        $mensaje = 'Asignaciones movidas correctamente.';
-        if ($duplicados > 0) {
-            $mensaje .= " Se detectaron {$duplicados} posibles duplicados; se conservaron como solicitaste.";
-        }
-
-        $this->finalizarMasivo($mensaje, $duplicados > 0 ? 'warning' : 'success');
+        $this->finalizarMasivo('Las asignaciones se movieron conservando el historial anterior.');
     }
 
     private function duplicarMasivo(Collection $ids): void
@@ -464,93 +511,94 @@ class GestionPersonaNivel extends Component
             'nivelDestinoId' => ['required', 'integer', 'exists:niveles,id'],
             'gradoDestinoId' => ['nullable', 'integer', 'exists:grados,id'],
             'grupoDestinoId' => ['nullable', 'integer', 'exists:grupos,id'],
-        ], ['nivelDestinoId.required' => 'Selecciona el nivel de destino.']);
+            'motivoMasivo' => ['required', 'string', 'min:5', 'max:1000'],
+        ], [
+            'nivelDestinoId.required' => 'Selecciona el nivel de destino.',
+            'motivoMasivo.required' => 'Escribe el motivo de la duplicación.',
+        ]);
 
-        $duplicados = 0;
+        $service = app(PlantillaPersonalCicloService::class);
+        $plantillaDestino = $service->plantilla((int) $this->cicloEscolarId, (int) $this->nivelDestinoId);
+        $service->asegurarEditable($plantillaDestino);
         $creados = 0;
 
-        DB::transaction(function () use ($ids, &$duplicados, &$creados) {
-            $detalles = PersonaNivelDetalle::query()->with('cabecera')->whereIn('id', $ids)->lockForUpdate()->get();
+        DB::transaction(function () use ($ids, $service, $plantillaDestino, &$creados) {
+            $detalles = PersonaNivelDetalle::query()
+                ->with(['cabecera', 'personaRole.rolePersona'])
+                ->whereIn('id', $ids)
+                ->whereNull('archivado_at')
+                ->lockForUpdate()
+                ->get();
 
             foreach ($detalles as $detalle) {
-                $origen = $detalle->cabecera;
-                $cabecera = PersonaNivel::query()
-                    ->where('persona_id', $origen->persona_id)
-                    ->where('nivel_id', $this->nivelDestinoId)
-                    ->where('estado', PersonaNivel::ESTADO_ACTIVO)
-                    ->latest('id')
-                    ->first();
+                $rol = $detalle->personaRole?->rolePersona ?? abort(422, 'Una asignación no tiene función válida.');
+                $grupo = $service->validarAsignacion($plantillaDestino, $rol, $this->gradoDestinoId, $this->grupoDestinoId);
 
-                if (!$cabecera) {
-                    $cabecera = PersonaNivel::create([
-                        'persona_id' => $origen->persona_id,
-                        'nivel_id' => $this->nivelDestinoId,
-                        'ingreso_seg' => $origen->ingreso_seg,
-                        'ingreso_sep' => $origen->ingreso_sep,
-                        'ingreso_ct' => $origen->ingreso_ct,
-                        'fecha_inicio' => now()->toDateString(),
-                        'estado' => PersonaNivel::ESTADO_ACTIVO,
-                        'limite_horas_semanales' => $origen->limite_horas_semanales ?: 40,
-                    ]);
-                }
-
-                $grado = $this->gradoDestinoId;
-                $grupo = $this->grupoDestinoId;
-
-                $existe = PersonaNivelDetalle::query()
-                    ->where('persona_nivel_id', $cabecera->id)
-                    ->where('persona_role_id', $detalle->persona_role_id)
-                    ->where('grado_id', $grado)
-                    ->where('grupo_id', $grupo)
-                    ->exists();
-
-                $duplicados += $existe ? 1 : 0;
+                $cabecera = PersonaNivel::query()->firstOrCreate([
+                    'persona_id' => $detalle->cabecera->persona_id,
+                    'nivel_id' => (int) $this->nivelDestinoId,
+                ], [
+                    'fecha_inicio' => now()->toDateString(),
+                    'estado' => PersonaNivel::ESTADO_ACTIVO,
+                    'limite_horas_semanales' => 40,
+                ]);
+                $membresia = $service->membresia($plantillaDestino, $cabecera);
+                $service->bloquearDuplicado($membresia, (int) $detalle->persona_role_id, $this->gradoDestinoId, $this->grupoDestinoId);
 
                 $nuevo = $detalle->replicate([
-                    'persona_nivel_id', 'grado_id', 'grupo_id', 'asignacion_materia_id',
-                    'fecha_inicio', 'fecha_fin', 'estado', 'fecha_baja', 'motivo_baja', 'orden',
+                    'persona_nivel_id', 'persona_nivel_ciclo_id', 'grado_id', 'grupo_id',
+                    'asignacion_materia_id', 'fecha_inicio', 'fecha_fin', 'estado',
+                    'fecha_baja', 'motivo_baja', 'archivado_at', 'archivado_por',
+                    'motivo_archivo', 'orden',
                 ]);
-                $nuevo->persona_nivel_id = $cabecera->id;
-                $nuevo->grado_id = $grado;
-                $nuevo->grupo_id = $grupo;
-                $nuevo->asignacion_materia_id = null;
-                $nuevo->fecha_inicio = now()->toDateString();
-                $nuevo->fecha_fin = null;
-                $nuevo->estado = PersonaNivelDetalle::ESTADO_ACTIVO;
-                $nuevo->fecha_baja = null;
-                $nuevo->motivo_baja = null;
-                $nuevo->orden = ((int) PersonaNivelDetalle::query()->where('persona_nivel_id', $cabecera->id)->max('orden')) + 1;
+                $nuevo->fill([
+                    'persona_nivel_id' => $cabecera->id,
+                    'persona_nivel_ciclo_id' => $membresia->id,
+                    'grado_id' => $grupo?->grado_id,
+                    'grupo_id' => $grupo?->id,
+                    'asignacion_materia_id' => null,
+                    'fecha_inicio' => now()->toDateString(),
+                    'fecha_fin' => null,
+                    'estado' => PersonaNivelDetalle::ESTADO_ACTIVO,
+                    'confirmado' => true,
+                    'pendiente_motivo' => null,
+                    'fecha_baja' => null,
+                    'motivo_baja' => null,
+                    'orden' => ((int) $membresia->detalles()->max('orden')) + 1,
+                    'observaciones' => trim(collect([$detalle->observaciones, 'Duplicada: ' . trim($this->motivoMasivo)])->filter()->implode("\n")),
+                ]);
                 $nuevo->save();
                 $creados++;
             }
+
+            $service->actualizarDiagnostico($plantillaDestino);
         });
 
-        $mensaje = "Se duplicaron {$creados} asignaciones.";
-        if ($duplicados > 0) {
-            $mensaje .= " {$duplicados} coinciden con asignaciones existentes y se conservaron.";
-        }
-
-        $this->finalizarMasivo($mensaje, $duplicados > 0 ? 'warning' : 'success');
+        $this->finalizarMasivo("Se duplicaron {$creados} asignaciones sin crear duplicados incompatibles.");
     }
 
     private function eliminarMasivo(Collection $ids): void
     {
-        DB::transaction(function () use ($ids) {
-            $detalles = PersonaNivelDetalle::query()->whereIn('id', $ids)->lockForUpdate()->get();
-            $cabeceras = $detalles->pluck('persona_nivel_id')->unique();
+        $this->validate([
+            'motivoMasivo' => ['required', 'string', 'min:5', 'max:1000'],
+        ], ['motivoMasivo.required' => 'Indica por qué se archivarán las asignaciones.']);
+
+        $service = app(PlantillaPersonalCicloService::class);
+        DB::transaction(function () use ($ids, $service) {
+            $detalles = PersonaNivelDetalle::query()
+                ->with('cicloAsignacion.plantilla')
+                ->whereIn('id', $ids)
+                ->whereNull('archivado_at')
+                ->lockForUpdate()
+                ->get();
 
             foreach ($detalles as $detalle) {
-                $detalle->delete();
-            }
-
-            foreach ($cabeceras as $cabeceraId) {
-                if (!PersonaNivelDetalle::query()->where('persona_nivel_id', $cabeceraId)->exists()) {
-                    PersonaNivel::query()->whereKey($cabeceraId)->delete();
-                }
+                $service->asegurarEditable($detalle->cicloAsignacion?->plantilla ?? abort(422, 'Una asignación no pertenece a una plantilla de ciclo.'));
+                $service->archivarDetalle($detalle, trim($this->motivoMasivo));
             }
         });
 
-        $this->finalizarMasivo('Asignaciones eliminadas definitivamente.');
+        $this->finalizarMasivo('Las asignaciones fueron archivadas; el historial permanece disponible.');
     }
 
     private function finalizarMasivo(string $mensaje, string $tipo = 'success'): void
@@ -560,6 +608,27 @@ class GestionPersonaNivel extends Component
         $this->motivoMasivo = '';
         $this->dispatch('refreshPersonaNivelList');
         $this->dispatch('notify', ['type' => $tipo, 'message' => $mensaje]);
+    }
+
+    private function sincronizarEstadoMembresia(int $membresiaId): void
+    {
+        $membresia = \App\Models\PersonaNivelCiclo::query()->find($membresiaId);
+        if (!$membresia) {
+            return;
+        }
+
+        $tieneActivas = PersonaNivelDetalle::query()
+            ->where('persona_nivel_ciclo_id', $membresiaId)
+            ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+            ->whereNull('archivado_at')
+            ->exists();
+
+        $membresia->update([
+            'estado' => $tieneActivas ? \App\Models\PersonaNivelCiclo::ESTADO_ACTIVO : \App\Models\PersonaNivelCiclo::ESTADO_BAJA,
+            'fecha_fin' => $tieneActivas ? null : ($membresia->fecha_fin ?: now()->toDateString()),
+            'fecha_baja' => $tieneActivas ? null : ($membresia->fecha_baja ?: now()->toDateString()),
+            'motivo_baja' => $tieneActivas ? null : ($membresia->motivo_baja ?: 'Todas las asignaciones del ciclo están dadas de baja.'),
+        ]);
     }
 
     private function sincronizarEstadoCabecera(int $cabeceraId): void
@@ -585,6 +654,11 @@ class GestionPersonaNivel extends Component
     private function queryDetalles(): Builder
     {
         return PersonaNivelDetalle::query()
+            ->whereNull('archivado_at')
+            ->when($this->cicloEscolarId, fn (Builder $query) => $query->whereHas(
+                'cicloAsignacion.plantilla',
+                fn (Builder $plantilla) => $plantilla->where('ciclo_escolar_id', $this->cicloEscolarId)
+            ))
             ->with([
                 'cabecera.persona.documentosPersonal.tipoDocumento',
                 'cabecera.nivel',
@@ -670,15 +744,22 @@ class GestionPersonaNivel extends Component
             ->count();
 
         $duplicados = PersonaNivelDetalle::query()
-            ->selectRaw('persona_nivel_id, persona_role_id, COALESCE(grado_id, 0) grado_key, COALESCE(grupo_id, 0) grupo_key, COUNT(*) total')
-            ->groupByRaw('persona_nivel_id, persona_role_id, COALESCE(grado_id, 0), COALESCE(grupo_id, 0)')
+            ->whereNull('archivado_at')
+            ->when($this->cicloEscolarId, fn (Builder $query) => $query->whereHas('cicloAsignacion.plantilla', fn (Builder $p) => $p->where('ciclo_escolar_id', $this->cicloEscolarId)))
+            ->selectRaw('persona_nivel_ciclo_id, persona_role_id, COALESCE(grado_id, 0) grado_key, COALESCE(grupo_id, 0) grupo_key, COUNT(*) total')
+            ->groupByRaw('persona_nivel_ciclo_id, persona_role_id, COALESCE(grado_id, 0), COALESCE(grupo_id, 0)')
             ->havingRaw('COUNT(*) > 1')
             ->get()
             ->sum(fn ($row) => (int) $row->total - 1);
 
         $gruposSinTitular = Grupo::query()
+            ->when($this->cicloEscolarId, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->cicloEscolarId))
+            ->where('estado', 'activo')
             ->whereDoesntHave('personaNivelDetalles', function (Builder $query) {
                 $query->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at')
+                    ->whereHas('cicloAsignacion.plantilla', fn (Builder $plantilla) => $plantilla->where('ciclo_escolar_id', (int) $this->cicloEscolarId))
                     ->where('es_titular_principal', true);
             })
             ->count();
@@ -704,14 +785,14 @@ class GestionPersonaNivel extends Component
             ? Grado::query()->where('nivel_id', $this->nivelDestinoId)->orderBy('nombre')->get()
             : Grado::query()->orderBy('nivel_id')->orderBy('nombre')->get();
         $gruposDestino = $this->gradoDestinoId
-            ? Grupo::query()->with('asignacionGrupo')->where('grado_id', $this->gradoDestinoId)->get()
+            ? Grupo::query()->with('asignacionGrupo')->where('ciclo_escolar_id', $this->cicloEscolarId)->where('estado', 'activo')->where('grado_id', $this->gradoDestinoId)->get()
             : collect();
         $actividades = ActividadAdministrativa::query()->where('activo', true)->orderBy('orden')->get();
         $gradosReporte = $this->reporteNivelId
             ? Grado::query()->where('nivel_id', $this->reporteNivelId)->orderBy('nombre')->get()
             : collect();
         $gruposReporte = $this->reporteGradoId
-            ? Grupo::query()->with('asignacionGrupo')->where('grado_id', $this->reporteGradoId)->get()
+            ? Grupo::query()->with('asignacionGrupo')->where('ciclo_escolar_id', $this->cicloEscolarId)->where('estado', 'activo')->where('grado_id', $this->reporteGradoId)->get()
             : collect();
         $personasReporte = Persona::query()
             ->whereHas('personaNiveles')
@@ -720,9 +801,15 @@ class GestionPersonaNivel extends Component
             ->orderBy('nombre')
             ->get(['id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno']);
 
+        $ciclosEscolares = CicloEscolar::query()->orderByDesc('inicio_anio')->get();
+        $plantillasCiclo = $this->cicloEscolarId
+            ? app(PlantillaPersonalCicloService::class)->plantillasDelCiclo((int) $this->cicloEscolarId)->load('nivel')
+            : collect();
+        $cicloSeleccionado = $ciclosEscolares->firstWhere('id', (int) $this->cicloEscolarId);
+
         return view('livewire.persona-nivel.gestion-persona-nivel', compact(
             'filas', 'resumen', 'historial', 'niveles', 'gradosDestino', 'gruposDestino', 'actividades',
-            'gradosReporte', 'gruposReporte', 'personasReporte'
+            'gradosReporte', 'gruposReporte', 'personasReporte', 'ciclosEscolares', 'plantillasCiclo', 'cicloSeleccionado'
         ));
     }
 }

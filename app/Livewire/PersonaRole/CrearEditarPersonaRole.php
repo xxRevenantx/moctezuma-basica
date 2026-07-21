@@ -18,7 +18,14 @@ class CrearEditarPersonaRole extends Component
     public string $slug = '';
     public ?string $descripcion = null;
 
-    public bool $slugManual = false; // ✅ NUEVO
+    public bool $slugManual = false;
+
+    public bool $requiere_grupo = false;
+    public bool $permite_grupo = false;
+    public bool $permite_varios_grupos = false;
+    public bool $es_directivo = false;
+    public bool $es_docente = false;
+    public bool $aplica_bachillerato = true;
 
     public $roles = [];
 
@@ -27,7 +34,7 @@ class CrearEditarPersonaRole extends Component
     {
         $this->roles = RolePersona::orderBy('nombre')->get();
 
-        $this->reset(['roleId', 'nombre', 'slug', 'descripcion', 'slugManual']);
+        $this->resetFormulario();
         $this->resetValidation();
 
         $this->open = true;
@@ -54,6 +61,12 @@ class CrearEditarPersonaRole extends Component
         $this->nombre = $rol->nombre ?? '';
         $this->slug = $rol->slug ?? '';
         $this->descripcion = $rol->descripcion ?? null;
+        $this->requiere_grupo = (bool) $rol->requiere_grupo;
+        $this->permite_grupo = (bool) $rol->permite_grupo;
+        $this->permite_varios_grupos = (bool) $rol->permite_varios_grupos;
+        $this->es_directivo = (bool) $rol->es_directivo;
+        $this->es_docente = (bool) $rol->es_docente;
+        $this->aplica_bachillerato = (bool) $rol->aplica_bachillerato;
 
         // ✅ al cargar un rol, asumimos que slug no fue editado manualmente aún
         $this->slugManual = false;
@@ -80,6 +93,12 @@ class CrearEditarPersonaRole extends Component
         $this->nombre = '';
         $this->slug = '';
         $this->descripcion = null;
+        $this->requiere_grupo = false;
+        $this->permite_grupo = false;
+        $this->permite_varios_grupos = false;
+        $this->es_directivo = false;
+        $this->es_docente = false;
+        $this->aplica_bachillerato = true;
 
         $this->slugManual = false;
     }
@@ -100,6 +119,12 @@ class CrearEditarPersonaRole extends Component
                 Rule::unique('role_personas', 'slug')->ignore($this->roleId),
             ],
             'descripcion' => ['nullable', 'string', 'max:255'],
+            'requiere_grupo' => ['boolean'],
+            'permite_grupo' => ['boolean'],
+            'permite_varios_grupos' => ['boolean'],
+            'es_directivo' => ['boolean'],
+            'es_docente' => ['boolean'],
+            'aplica_bachillerato' => ['boolean'],
         ]);
 
         $rol = RolePersona::updateOrCreate(
@@ -108,6 +133,12 @@ class CrearEditarPersonaRole extends Component
                 'nombre' => trim($this->nombre),
                 'slug' => trim($this->slug),
                 'descripcion' => $this->descripcion ? trim($this->descripcion) : null,
+                'requiere_grupo' => $this->requiere_grupo,
+                'permite_grupo' => $this->requiere_grupo || $this->permite_grupo,
+                'permite_varios_grupos' => $this->permite_varios_grupos,
+                'es_directivo' => $this->es_directivo,
+                'es_docente' => $this->es_docente,
+                'aplica_bachillerato' => $this->aplica_bachillerato,
             ]
         );
 
@@ -174,9 +205,27 @@ $this->dispatch('rolCargadoEliminado');
 
 
 
+    public function updatedRequiereGrupo(bool $value): void
+    {
+        if ($value) {
+            $this->permite_grupo = true;
+            $this->es_docente = true;
+        }
+    }
+
+    private function resetFormulario(): void
+    {
+        $this->reset([
+            'roleId', 'nombre', 'slug', 'descripcion', 'slugManual',
+            'requiere_grupo', 'permite_grupo', 'permite_varios_grupos',
+            'es_directivo', 'es_docente',
+        ]);
+        $this->aplica_bachillerato = true;
+    }
+
     public function cerrarModal(): void
     {
-        $this->reset(['roleId', 'nombre', 'slug', 'descripcion', 'slugManual']);
+        $this->resetFormulario();
         $this->resetValidation();
     }
 

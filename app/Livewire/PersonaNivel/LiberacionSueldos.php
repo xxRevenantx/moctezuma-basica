@@ -10,6 +10,7 @@ use App\Models\LiberacionSueldoConfiguracion;
 use App\Models\Nivel;
 use App\Models\Persona;
 use App\Models\PersonaNivel;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\RolePersona;
 use App\Services\LiberacionSueldosArchivoService;
 use App\Services\LiberacionSueldosService;
@@ -45,6 +46,7 @@ class LiberacionSueldos extends Component
     public int $quincenaInicio = 13;
     public int $quincenaFin = 14;
     public int $anio = 2026;
+    public string $cicloEscolarId = '';
     public string $cicloEscolar = '';
     public string $fechaReanudacion = '';
     public ?int $editandoId = null;
@@ -63,6 +65,7 @@ class LiberacionSueldos extends Component
         $this->anio = (int) now()->year;
         $ciclo = CicloEscolar::query()->where('es_actual', true)->first()
             ?: CicloEscolar::query()->latest('id')->first();
+        $this->cicloEscolarId = (string) ($ciclo?->id ?? '');
         $this->cicloEscolar = (string) ($ciclo?->nombre ?: (now()->year - 1) . '-' . now()->year);
 
         $reanudacion = now()->copy()->month(8)->day(24);
@@ -81,6 +84,17 @@ class LiberacionSueldos extends Component
     {
         $this->gradoFiltro = '';
         $this->grupoFiltro = '';
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $ciclo = CicloEscolar::query()->find((int) $this->cicloEscolarId);
+        $this->cicloEscolar = (string) ($ciclo?->nombre ?? '');
+        $this->nivelFiltro = '';
+        $this->gradoFiltro = '';
+        $this->grupoFiltro = '';
+        $this->seleccionados = [];
+        $this->firmantes = [];
     }
 
     public function updatedGradoFiltro(): void
@@ -223,6 +237,10 @@ class LiberacionSueldos extends Component
         $this->quincenaInicio = $liberacion->quincena_inicio;
         $this->quincenaFin = $liberacion->quincena_fin;
         $this->anio = $liberacion->anio;
+        $this->cicloEscolarId = (string) ($liberacion->ciclo_escolar_id ?: CicloEscolar::query()
+            ->where('inicio_anio', (int) substr((string) $liberacion->ciclo_escolar, 0, 4))
+            ->where('fin_anio', (int) substr((string) $liberacion->ciclo_escolar, 5, 4))
+            ->value('id'));
         $this->cicloEscolar = (string) ($liberacion->ciclo_escolar ?: $this->cicloEscolar);
         $this->fechaReanudacion = $liberacion->fecha_reanudacion?->format('Y-m-d') ?? '';
         $this->firmantes = [
@@ -404,9 +422,10 @@ class LiberacionSueldos extends Component
         $this->quincenaFin = $this->enteroLocal($estado['quincenaFin'] ?? null, 1, 24, $this->quincenaFin);
         $this->anio = $this->enteroLocal($estado['anio'] ?? null, 2000, 2100, $this->anio);
 
-        $ciclo = trim((string) ($estado['cicloEscolar'] ?? ''));
-        if (preg_match('/^\d{4}-\d{4}$/', $ciclo)) {
-            $this->cicloEscolar = $ciclo;
+        $cicloId = $this->idExistente(CicloEscolar::class, $estado['cicloEscolarId'] ?? null);
+        if ($cicloId) {
+            $this->cicloEscolarId = (string) $cicloId;
+            $this->cicloEscolar = (string) CicloEscolar::query()->find($cicloId)?->nombre;
         }
 
         $this->franjaAnchoMm = $this->decimalLocal($estado['franjaAnchoMm'] ?? null, 50, 210, $this->franjaAnchoMm);
@@ -419,10 +438,10 @@ class LiberacionSueldos extends Component
             ->unique()
             ->values();
 
-        $this->seleccionados = PersonaNivel::query()
-            ->whereIn('id', $ids)
-            ->where('estado', PersonaNivel::ESTADO_ACTIVO)
-            ->pluck('id')
+        $this->seleccionados = app(LiberacionSueldosService::class)
+            ->personalActivoQuery((int) $this->cicloEscolarId)
+            ->whereIn('persona_nivel.id', $ids)
+            ->pluck('persona_nivel.id')
             ->map(fn ($id) => (int) $id)
             ->sortBy(fn (int $id) => $ids->search($id))
             ->values()
@@ -513,9 +532,8 @@ class LiberacionSueldos extends Component
     private function sincronizarFirmantes(): void
     {
         $service = app(LiberacionSueldosService::class);
-        $niveles = PersonaNivel::query()
-            ->with(['nivel.director', 'nivel.supervisor'])
-            ->whereIn('id', $this->seleccionados)
+        $niveles = $service->personalActivoQuery((int) $this->cicloEscolarId)
+            ->whereIn('persona_nivel.id', $this->seleccionados)
             ->get()
             ->pluck('nivel')
             ->filter()
@@ -529,7 +547,7 @@ class LiberacionSueldos extends Component
                 continue;
             }
 
-            $directores = $service->directoresPlantilla((int) $nivel->id);
+            $directores = $service->directoresPlantilla((int) $nivel->id, (int) $this->cicloEscolarId);
             $directorSeleccionado = $directores->count() === 1 ? $directores->first() : null;
 
             $supervisores = $service->supervisoresNivel($nivel);
@@ -569,6 +587,7 @@ class LiberacionSueldos extends Component
             'quincenaInicio' => ['required', 'integer', 'between:1,24'],
             'quincenaFin' => ['required', 'integer', 'between:1,24', 'gte:quincenaInicio'],
             'anio' => ['required', 'integer', 'between:2000,2100'],
+            'cicloEscolarId' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'cicloEscolar' => ['required', 'regex:/^\d{4}-\d{4}$/'],
             'fechaReanudacion' => ['nullable', 'date'],
             'firmantes.*.director_nombre' => ['required', 'string', 'max:255'],
@@ -584,17 +603,13 @@ class LiberacionSueldos extends Component
             'firmantes.*.supervisor_nombre.required' => 'Captura o selecciona el nombre de supervisión.',
         ]);
 
-        $personasNivelQuery = PersonaNivel::query()
-            ->with([
-                'persona',
-                'nivel.director',
-                'nivel.supervisor',
-                'detalles.personaRole.rolePersona',
-            ])
-            ->whereIn('id', $this->seleccionados);
+        $personasNivelQuery = app(LiberacionSueldosService::class)
+            ->personalActivoQuery((int) $this->cicloEscolarId)
+            ->whereIn('persona_nivel.id', $this->seleccionados);
 
-        if (! $permitirInactivo) {
-            $personasNivelQuery->where('estado', PersonaNivel::ESTADO_ACTIVO);
+        if ($permitirInactivo) {
+            // Los historiales se editan contra la plantilla publicada/cerrada del ciclo,
+            // pero se conserva esta bandera para compatibilidad con el flujo existente.
         }
 
         $personasNivel = $personasNivelQuery->get()
@@ -633,6 +648,7 @@ class LiberacionSueldos extends Component
             'quincena_inicio' => $this->quincenaInicio,
             'quincena_fin' => $this->quincenaFin,
             'anio' => $this->anio,
+            'ciclo_escolar_id' => (int) $this->cicloEscolarId,
             'ciclo_escolar' => $this->cicloEscolar,
             'fecha_reanudacion' => $this->fechaReanudacion ?: null,
         ];
@@ -649,24 +665,45 @@ class LiberacionSueldos extends Component
 
     private function queryPersonal(): Builder
     {
+        $esCicloActual = (bool) CicloEscolar::query()
+            ->whereKey((int) $this->cicloEscolarId)
+            ->value('es_actual');
+        $estados = $esCicloActual ? ['activo'] : ['activo', 'baja'];
+
+        $detalleDelCiclo = function (Builder $detalle) use ($estados): Builder {
+            return $detalle
+                ->whereIn('estado', $estados)
+                ->where('confirmado', true)
+                ->whereNull('archivado_at')
+                ->whereHas('cicloAsignacion.plantilla', fn (Builder $plantilla) => $plantilla
+                    ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
+                    ->whereIn('estado', ['publicada', 'cerrada']));
+        };
+
         return app(LiberacionSueldosService::class)
-            ->personalActivoQuery()
-            ->when($this->nivelFiltro !== '', fn (Builder $query) => $query->where('nivel_id', $this->nivelFiltro))
-            ->when($this->gradoFiltro !== '', fn (Builder $query) => $query->whereHas('detalles', fn (Builder $detalle) => $detalle->where('estado', 'activo')->where('grado_id', $this->gradoFiltro)))
-            ->when($this->grupoFiltro !== '', fn (Builder $query) => $query->whereHas('detalles', fn (Builder $detalle) => $detalle->where('estado', 'activo')->where('grupo_id', $this->grupoFiltro)))
-            ->when($this->rolFiltro !== '', function (Builder $query) {
-                $query->whereHas('detalles', fn (Builder $detalle) => $detalle
-                    ->where('estado', 'activo')
-                    ->whereHas('personaRole', fn (Builder $personaRole) => $personaRole->where('role_persona_id', $this->rolFiltro)));
-            })
-            ->when(trim($this->search) !== '', function (Builder $query) {
+            ->personalActivoQuery((int) $this->cicloEscolarId)
+            ->when($this->nivelFiltro !== '', fn (Builder $query) => $query
+                ->where('nivel_id', $this->nivelFiltro))
+            ->when($this->gradoFiltro !== '', fn (Builder $query) => $query
+                ->whereHas('detalles', fn (Builder $detalle) => $detalleDelCiclo($detalle)
+                    ->where('grado_id', $this->gradoFiltro)))
+            ->when($this->grupoFiltro !== '', fn (Builder $query) => $query
+                ->whereHas('detalles', fn (Builder $detalle) => $detalleDelCiclo($detalle)
+                    ->where('grupo_id', $this->grupoFiltro)))
+            ->when($this->rolFiltro !== '', fn (Builder $query) => $query
+                ->whereHas('detalles', fn (Builder $detalle) => $detalleDelCiclo($detalle)
+                    ->whereHas('personaRole', fn (Builder $personaRole) => $personaRole
+                        ->where('role_persona_id', $this->rolFiltro))))
+            ->when(trim($this->search) !== '', function (Builder $query) use ($detalleDelCiclo) {
                 $buscar = trim($this->search);
-                $query->where(function (Builder $sub) use ($buscar) {
+                $query->where(function (Builder $sub) use ($buscar, $detalleDelCiclo) {
                     $sub->whereHas('persona', function (Builder $persona) use ($buscar) {
                         $persona->where('nombre', 'like', "%{$buscar}%")
                             ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
                             ->orWhere('apellido_materno', 'like', "%{$buscar}%");
-                    })->orWhereHas('detalles.personaRole.rolePersona', fn (Builder $rol) => $rol->where('nombre', 'like', "%{$buscar}%"));
+                    })->orWhereHas('detalles', fn (Builder $detalle) => $detalleDelCiclo($detalle)
+                        ->whereHas('personaRole.rolePersona', fn (Builder $rol) => $rol
+                            ->where('nombre', 'like', "%{$buscar}%")));
                 });
             })
             ->orderBy('nivel_id')
@@ -684,12 +721,11 @@ class LiberacionSueldos extends Component
             ? Grado::query()->where('nivel_id', $this->nivelFiltro)->orderBy('nombre')->get()
             : collect();
         $grupos = $this->gradoFiltro !== ''
-            ? Grupo::query()->with('asignacionGrupo')->where('grado_id', $this->gradoFiltro)->get()
+            ? Grupo::query()->with('asignacionGrupo')->where('ciclo_escolar_id', (int) $this->cicloEscolarId)->where('estado', 'activo')->where('grado_id', $this->gradoFiltro)->get()
             : collect();
 
-        $seleccionadas = PersonaNivel::query()
-            ->with(['nivel.supervisor', 'detalles.personaRole.rolePersona'])
-            ->whereIn('id', $this->seleccionados)
+        $seleccionadas = $service->personalActivoQuery((int) $this->cicloEscolarId)
+            ->whereIn('persona_nivel.id', $this->seleccionados)
             ->get();
 
         $nivelesSeleccionados = $seleccionadas
@@ -698,7 +734,7 @@ class LiberacionSueldos extends Component
             ->unique('id');
 
         $directoresPorNivel = $nivelesSeleccionados->mapWithKeys(fn (Nivel $nivel) => [
-            $nivel->id => $service->directoresPlantilla($nivel->id),
+            $nivel->id => $service->directoresPlantilla($nivel->id, (int) $this->cicloEscolarId),
         ]);
         $supervisoresPorNivel = $nivelesSeleccionados->mapWithKeys(fn (Nivel $nivel) => [
             $nivel->id => $service->supervisoresNivel($nivel),
@@ -734,6 +770,20 @@ class LiberacionSueldos extends Component
             ->orderByDesc('ciclo_escolar')
             ->pluck('ciclo_escolar');
         $config = LiberacionSueldoConfiguracion::query()->first();
+        $ciclos = CicloEscolar::query()->orderByDesc('inicio_anio')->get();
+        $plantillasDocumento = PlantillaPersonalNivel::query()
+            ->with('nivel:id,nombre')
+            ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
+            ->get()
+            ->keyBy('nivel_id');
+        $nivelesSinPlantillaPublicada = $niveles->filter(function (Nivel $nivel) use ($plantillasDocumento) {
+            $plantilla = $plantillasDocumento->get($nivel->id);
+
+            return !$plantilla || !in_array($plantilla->estado, [
+                PlantillaPersonalNivel::ESTADO_PUBLICADA,
+                PlantillaPersonalNivel::ESTADO_CERRADA,
+            ], true);
+        })->pluck('nombre')->values();
 
         return view('livewire.persona-nivel.liberacion-sueldos', compact(
             'personal',
@@ -748,7 +798,10 @@ class LiberacionSueldos extends Component
             'directivosSeleccionadosPorNivel',
             'historial',
             'ciclosHistorial',
-            'config'
+            'config',
+            'ciclos',
+            'plantillasDocumento',
+            'nivelesSinPlantillaPublicada'
         ));
     }
 }

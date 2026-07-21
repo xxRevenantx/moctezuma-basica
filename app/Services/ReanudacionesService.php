@@ -9,6 +9,7 @@ use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaNivelHistorial;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\ReanudacionLaboral;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -46,12 +47,37 @@ class ReanudacionesService
         $fecha = Carbon::parse($fechaReferencia)->toDateString();
         $niveles = collect($niveles)->map(fn($id) => (int) $id)->filter()->unique()->values();
 
+        $plantillas = PlantillaPersonalNivel::query()
+            ->where('ciclo_escolar_id', $ciclo->id)
+            ->when($niveles->isNotEmpty(), fn (Builder $q) => $q->whereIn('nivel_id', $niveles))
+            ->whereIn('estado', [PlantillaPersonalNivel::ESTADO_PUBLICADA, PlantillaPersonalNivel::ESTADO_CERRADA])
+            ->get(['id', 'nivel_id']);
+
+        $plantillaIds = $plantillas->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if ($plantillaIds === []) {
+            return ['listos' => collect(), 'advertencias' => collect(), 'excluidos' => collect()];
+        }
+
         $query = PersonaNivel::query()
             ->with([
                 'persona.personaRoles.rolePersona',
                 'nivel.director',
                 'nivel.supervisor',
+                'ciclos' => fn (Relation $membresia) => $membresia
+                    ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                    ->whereDate('fecha_inicio', '<=', $fecha)
+                    ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha))
+                    ->orderBy('orden'),
                 'detalles' => fn(Relation $detalle) => $this->aplicarFechaDetalle($detalle, $fecha)
+                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $fecha) {
+                        $sub->select('id')
+                            ->from('persona_nivel_ciclos')
+                            ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                            ->whereDate('fecha_inicio', '<=', $fecha)
+                            ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
+                    })
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at')
                     ->with([
                         'personaRole.rolePersona',
                         'grado:id,nombre,nivel_id,orden',
@@ -62,6 +88,11 @@ class ReanudacionesService
                     ->orderBy('orden')
                     ->orderBy('id'),
             ])
+            ->whereHas('ciclos', function (Builder $membresia) use ($plantillaIds, $fecha) {
+                $membresia->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                    ->whereDate('fecha_inicio', '<=', $fecha)
+                    ->where(fn (Builder $q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
+            })
             ->whereHas('persona', function (Builder $persona) use ($ciclo) {
                 if ($ciclo->es_actual) {
                     $persona->where('status', true);
@@ -72,8 +103,17 @@ class ReanudacionesService
                 $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha);
             })
             ->when($niveles->isNotEmpty(), fn(Builder $q) => $q->whereIn('nivel_id', $niveles))
-            ->whereHas('detalles', function (Builder $detalle) use ($fecha, $gradoId, $grupoId, $rolId) {
+            ->whereHas('detalles', function (Builder $detalle) use ($fecha, $gradoId, $grupoId, $rolId, $plantillaIds) {
                 $this->aplicarFechaDetalle($detalle, $fecha)
+                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $fecha) {
+                        $sub->select('id')
+                            ->from('persona_nivel_ciclos')
+                            ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                            ->whereDate('fecha_inicio', '<=', $fecha)
+                            ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
+                    })
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at')
                     ->when($gradoId, fn(Builder $q) => $q->where('grado_id', $gradoId))
                     ->when($grupoId, fn(Builder $q) => $q->where('grupo_id', $grupoId))
                     ->when($rolId, fn(Builder $q) => $q->where('persona_role_id', $rolId));
@@ -169,9 +209,12 @@ class ReanudacionesService
     private function ordenPlantilla(PersonaNivel $asignacion): int
     {
         $nivelSlug = Str::lower((string) ($asignacion->nivel?->slug ?? ''));
-        $ordenCabecera = is_null($asignacion->orden)
-            ? PHP_INT_MAX
-            : (int) $asignacion->orden;
+        $ordenCiclo = $asignacion->relationLoaded('ciclos')
+            ? $asignacion->ciclos->first()?->orden
+            : null;
+        $ordenCabecera = !is_null($ordenCiclo)
+            ? (int) $ordenCiclo
+            : (is_null($asignacion->orden) ? PHP_INT_MAX : (int) $asignacion->orden);
 
         if ($nivelSlug === 'secundaria' || str_contains($nivelSlug, 'secund')) {
             return $ordenCabecera;

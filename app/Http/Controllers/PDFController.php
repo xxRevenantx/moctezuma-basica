@@ -1207,14 +1207,16 @@ class PDFController extends Controller
                     'persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero,status',
                 ])
                 ->where('nivel_id', $nivel->id)
-                ->whereHas('persona', function ($query) {
-                    $query->where(function ($query) {
-                        $query->whereNull('status')
-                            ->orWhere('status', true);
+                ->when($cicloEscolar->es_actual, function ($query) {
+                    $query->whereHas('persona', function ($persona) {
+                        $persona->where(function ($estado) {
+                            $estado->whereNull('status')->orWhere('status', true);
+                        });
                     });
                 })
-                ->whereHas('detalles', function ($query) use ($grado, $grupo) {
+                ->whereHas('detalles', function ($query) use ($grado, $grupo, $cicloEscolar) {
                     $query
+                        ->vigenteEnCiclo((int) $cicloEscolar->id)
                         ->where('grado_id', $grado->id)
                         ->where('grupo_id', $grupo->id)
                         ->whereHas('personaRole.rolePersona', function ($query) {
@@ -2061,8 +2063,9 @@ class PDFController extends Controller
                     },
                 ])
                 ->where('nivel_id', $nivel->id)
-                ->whereHas('detalles', function ($query) use ($grado, $grupo) {
+                ->whereHas('detalles', function ($query) use ($grado, $grupo, $cicloEscolar) {
                     $query
+                        ->vigenteEnCiclo((int) $cicloEscolar->id)
                         ->where('grado_id', $grado->id)
                         ->where('grupo_id', $grupo->id);
                 })
@@ -5860,7 +5863,7 @@ class PDFController extends Controller
         $esSecundaria = $this->esSecundaria($nivel);
         $esPreescolar = (int) $nivel->id === 1 || $nivel->slug === 'preescolar';
         $esPrimaria = (int) $nivel->id === 2 || $nivel->slug === 'primaria';
-        $cicloEscolarId = $request->integer('ciclo_escolar_id');
+        $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: (int) $grupo->ciclo_escolar_id;
 
         /*
     |--------------------------------------------------------------------------
@@ -6007,8 +6010,9 @@ class PDFController extends Controller
                     },
                 ])
                 ->where('nivel_id', $nivel->id)
-                ->whereHas('detalles', function ($query) use ($grado, $grupo) {
-                    $query->where('grado_id', $grado->id)
+                ->whereHas('detalles', function ($query) use ($grado, $grupo, $cicloEscolarId) {
+                    $query->vigenteEnCiclo((int) $cicloEscolarId)
+                        ->where('grado_id', $grado->id)
                         ->where('grupo_id', $grupo->id);
                 })
                 ->first();

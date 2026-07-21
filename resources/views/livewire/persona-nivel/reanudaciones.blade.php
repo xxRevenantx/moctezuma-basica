@@ -178,6 +178,18 @@
         </div>
     </section>
 
+    @if ($nivelesSinPlantillaPublicada->isNotEmpty())
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <div class="flex items-start gap-3">
+                <flux:icon.exclamation-triangle class="mt-0.5 size-5 shrink-0" />
+                <div>
+                    <p class="font-black">Hay niveles sin plantilla disponible para documentos</p>
+                    <p class="mt-1">{{ $nivelesSinPlantillaPublicada->implode(', ') }}. Publica la plantilla del ciclo seleccionado o consulta un ciclo cerrado para generar reanudaciones.</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-end">
             <div class="flex-1">

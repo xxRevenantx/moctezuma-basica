@@ -38,6 +38,7 @@ class LiberacionSueldo extends Model
         'quincena_inicio',
         'quincena_fin',
         'anio',
+        'ciclo_escolar_id',
         'ciclo_escolar',
         'fecha_reanudacion',
         'clave_presupuestal',
@@ -58,6 +59,7 @@ class LiberacionSueldo extends Model
         'quincena_inicio' => 'integer',
         'quincena_fin' => 'integer',
         'anio' => 'integer',
+        'ciclo_escolar_id' => 'integer',
         'director_persona_id' => 'integer',
         'supervisor_director_id' => 'integer',
         'jefe_sector_director_id' => 'integer',
@@ -80,6 +82,11 @@ class LiberacionSueldo extends Model
     public function nivel()
     {
         return $this->belongsTo(Nivel::class);
+    }
+
+    public function cicloEscolar()
+    {
+        return $this->belongsTo(CicloEscolar::class, 'ciclo_escolar_id');
     }
 
     public function creador()

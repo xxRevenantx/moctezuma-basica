@@ -59,6 +59,18 @@ class PersonaNivel extends Model
         return $this->hasMany(PersonaNivelDetalle::class, 'persona_nivel_id');
     }
 
+    public function ciclos()
+    {
+        return $this->hasMany(PersonaNivelCiclo::class, 'persona_nivel_id');
+    }
+
+    public function ciclo(int $cicloEscolarId): ?PersonaNivelCiclo
+    {
+        return $this->ciclos()
+            ->whereHas('plantilla', fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
+            ->first();
+    }
+
     public function historial()
     {
         return $this->hasMany(PersonaNivelHistorial::class, 'persona_nivel_id');

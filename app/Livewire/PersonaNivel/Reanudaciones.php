@@ -7,6 +7,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\PersonaNivelHistorial;
+use App\Models\PlantillaPersonalNivel;
 use App\Models\ReanudacionCcpPlantilla;
 use App\Models\ReanudacionLaboral;
 use App\Models\RolePersona;
@@ -525,6 +526,25 @@ class Reanudaciones extends Component
 
         $ccpPlantillas = ReanudacionCcpPlantilla::query()->where('activo', true)->orderBy('orden')->orderBy('nombre')->get();
 
+        $plantillasDocumento = PlantillaPersonalNivel::query()
+            ->with('nivel:id,nombre')
+            ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
+            ->whereIn('nivel_id', array_map('intval', $this->nivelesSeleccionados))
+            ->get()
+            ->keyBy('nivel_id');
+        $nivelesSinPlantillaPublicada = $niveles
+            ->whereIn('id', array_map('intval', $this->nivelesSeleccionados))
+            ->filter(function (Nivel $nivel) use ($plantillasDocumento) {
+                $plantilla = $plantillasDocumento->get($nivel->id);
+
+                return !$plantilla || !in_array($plantilla->estado, [
+                    PlantillaPersonalNivel::ESTADO_PUBLICADA,
+                    PlantillaPersonalNivel::ESTADO_CERRADA,
+                ], true);
+            })
+            ->pluck('nombre')
+            ->values();
+
         return view('livewire.persona-nivel.reanudaciones', [
             'ciclos' => $ciclos,
             'niveles' => $niveles,
@@ -538,6 +558,8 @@ class Reanudaciones extends Component
             'historial' => $historial,
             'ccpPlantillas' => $ccpPlantillas,
             'tipos' => ReanudacionesService::TIPOS,
+            'plantillasDocumento' => $plantillasDocumento,
+            'nivelesSinPlantillaPublicada' => $nivelesSinPlantillaPublicada,
         ]);
     }
 }

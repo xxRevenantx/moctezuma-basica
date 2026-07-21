@@ -35,6 +35,11 @@ class CicloEscolar extends Model
         return $this->hasMany(Inscripcion::class, 'ciclo_escolar_id');
     }
 
+    public function plantillasPersonal()
+    {
+        return $this->hasMany(PlantillaPersonalNivel::class, 'ciclo_escolar_id');
+    }
+
     public function nivelesPreparacion()
     {
         return $this->hasMany(CicloEscolarNivel::class, 'ciclo_escolar_id');

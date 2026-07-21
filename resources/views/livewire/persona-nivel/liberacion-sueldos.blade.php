@@ -16,6 +16,7 @@
         quincenaInicio: @entangle('quincenaInicio').live,
         quincenaFin: @entangle('quincenaFin').live,
         anio: @entangle('anio').live,
+        cicloEscolarId: @entangle('cicloEscolarId').live,
         cicloEscolar: @entangle('cicloEscolar').live,
         fechaReanudacion: @entangle('fechaReanudacion').live,
         franjaAnchoMm: @entangle('franjaAnchoMm').live,
@@ -44,7 +45,7 @@
                 'search', 'nivelFiltro', 'gradoFiltro', 'grupoFiltro', 'rolFiltro',
                 'historialSearch', 'historialNivel', 'historialCiclo', 'seleccionados',
                 'firmantes', 'fechaDocumento', 'quincenaInicio', 'quincenaFin', 'anio',
-                'cicloEscolar', 'fechaReanudacion', 'franjaAnchoMm', 'franjaAltoMm',
+                'cicloEscolarId', 'cicloEscolar', 'fechaReanudacion', 'franjaAnchoMm', 'franjaAltoMm',
                 'franjaInferiorMm',
             ].forEach((propiedad) => this.$watch(propiedad, () => this.programarGuardado()));
 
@@ -70,6 +71,7 @@
                 quincenaInicio: this.quincenaInicio,
                 quincenaFin: this.quincenaFin,
                 anio: this.anio,
+                cicloEscolarId: this.cicloEscolarId,
                 cicloEscolar: this.cicloEscolar,
                 fechaReanudacion: this.fechaReanudacion,
                 franjaAnchoMm: this.franjaAnchoMm,
@@ -125,6 +127,18 @@
             @endif
         </div>
     </section>
+
+    @if ($nivelesSinPlantillaPublicada->isNotEmpty())
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <div class="flex items-start gap-3">
+                <flux:icon.exclamation-triangle class="mt-0.5 size-5 shrink-0" />
+                <div>
+                    <p class="font-black">Plantillas no disponibles para liberación de sueldos</p>
+                    <p class="mt-1">{{ $nivelesSinPlantillaPublicada->implode(', ') }}. Solo se muestra personal de plantillas publicadas o cerradas del ciclo seleccionado.</p>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="grid gap-5 2xl:grid-cols-[1.45fr_.9fr]">
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -234,12 +248,16 @@
                     <flux:input type="number" min="2000" max="2100" wire:model="anio" label="Año de pago" />
 
                     <div class="sm:col-span-2">
-                        <flux:input
-                            type="text"
-                            wire:model="cicloEscolar"
-                            label="Ciclo escolar"
-                            placeholder="2025-2026"
-                        />
+                        <flux:select wire:model.live="cicloEscolarId" label="Ciclo escolar">
+                            <flux:select.option value="">Selecciona un ciclo publicado</flux:select.option>
+                            @foreach ($ciclos as $ciclo)
+                                <flux:select.option value="{{ $ciclo->id }}">
+                                    {{ $ciclo->nombre }}{{ $ciclo->es_actual ? ' · actual' : '' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="cicloEscolarId" />
+                        <p class="mt-1 text-xs text-slate-500">Solo se mostrará personal de plantillas publicadas o cerradas en este ciclo.</p>
                     </div>
 
                     <flux:input type="number" min="1" max="24" wire:model="quincenaInicio" label="Quincena inicial" />

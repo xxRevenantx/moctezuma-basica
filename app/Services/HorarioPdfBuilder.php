@@ -175,8 +175,9 @@ class HorarioPdfBuilder
             $personalAsignado = PersonaNivel::query()
                 ->with('persona:id,titulo,nombre,apellido_paterno,apellido_materno,genero')
                 ->where('nivel_id', $nivel->id)
-                ->whereHas('detalles', function ($query) use ($grupo) {
+                ->whereHas('detalles', function ($query) use ($grupo, $cicloEscolar) {
                     $query
+                        ->vigenteEnCiclo((int) $cicloEscolar->id)
                         ->where('grado_id', $grupo->grado_id)
                         ->where('grupo_id', $grupo->id);
                 })

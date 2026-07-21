@@ -1,794 +1,292 @@
-@php
-    // ✅ Ordenar por nivel_id (desde cabecera)
-    $porNivelSorted = ($porNivel ?? collect())->sortBy(function ($itemsNivel, $nivelNombre) {
-        $first = $itemsNivel?->first();
-        $nivelId = (int) ($first?->cabecera?->nivel_id ?? ($first?->nivel_id ?? 999999));
-        return $nivelId;
-    });
-@endphp
+<div x-data="{
+        abiertos: {},
+        archivoModal: false,
+        init() {
+            @foreach ($niveles as $nivel)
+                this.abiertos[{{ $nivel->id }}] = true;
+            @endforeach
+        },
+        abrirTodos() { Object.keys(this.abiertos).forEach(k => this.abiertos[k] = true) },
+        cerrarTodos() { Object.keys(this.abiertos).forEach(k => this.abiertos[k] = false) },
+    }"
+    x-on:abrir-modal-archivar-persona-nivel.window="archivoModal = true"
+    x-on:cerrar-modal-archivar-persona-nivel.window="archivoModal = false"
+    class="space-y-5">
 
-<div class="space-y-5" x-data="{
-    openLevels: {},
-    toggleLevel(key) { this.openLevels[key] = !this.openLevels[key] },
-    isLevelOpen(key) { return !!this.openLevels[key] },
-    openAllLevels() {
-        document.querySelectorAll('[data-nivel-key]').forEach(el => {
-            this.openLevels[el.dataset.nivelKey] = true
-        })
-    },
-    closeAllLevels() { this.openLevels = {} },
-
-    openProfe: {},
-    toggleProfe(id) { this.openProfe[id] = !this.openProfe[id] },
-    isProfeOpen(id) { return !!this.openProfe[id] },
-    openAllProfe() {
-        document.querySelectorAll('[data-profe]').forEach(el => {
-            const id = parseInt(el.dataset.profe || '0', 10);
-            if (id) this.openProfe[id] = true
-        })
-    },
-    closeAllProfe() { this.openProfe = {} },
-
-    eliminarAsignacion(id) {
-        Swal.fire({
-            title: '¿Eliminar?',
-            text: `Esta fila se eliminará de forma permanente`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#2563EB',
-            cancelButtonColor: '#EF4444',
-            cancelButtonText: 'Cancelar',
-            confirmButtonText: 'Sí, eliminar'
-        }).then((r) => r.isConfirmed && @this.call('eliminar', id))
-    }
-}">
-    <!-- Header -->
-    <div class="flex flex-col gap-1">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Personal asignado por nivel
-        </h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-            Cards por profesor (drag & drop de cards + drag interno por asignaciones).
-            Los demás niveles: tabla + drag & drop.
-        </p>
-    </div>
-
-    <!-- Toolbar -->
-    <div
-        class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden">
-        <div class="h-1.5 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
-
-        <div class="p-4 sm:p-5 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-2xl bg-blue-50 dark:bg-blue-900/30 grid place-items-center">
-                    <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
-                            d="M16 7a4 4 0 01.88 7.903A5 5 0 1115 7h1z" />
-                    </svg>
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="h-1.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600"></div>
+        <div class="flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex items-start gap-3">
+                <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-900">
+                    <flux:icon.user-group class="h-5 w-5" />
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Listado</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Reordenamiento por nivel (y secundaria con cards).
+                    <h2 class="text-xl font-black text-slate-950 dark:text-white">Personal asignado por nivel</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Plantilla del ciclo <b class="text-slate-700 dark:text-slate-200">{{ $ciclo?->nombre ?? 'sin ciclo' }}</b>. El orden es independiente por ciclo y nivel.
                     </p>
                 </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <!-- Search -->
-                <div class="w-full sm:w-[380px]">
-                    <div class="relative">
-                        <span
-                            class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-gray-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24"
-                                fill="currentColor">
-                                <path
-                                    d="M10 4a6 6 0 104.472 10.03l4.249 4.249 1.414-1.414-4.249-4.249A6 6 0 0010 4zm-4 6a4 4 0 118 0 4 4 0 01-8 0z" />
-                            </svg>
-                        </span>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <flux:input wire:model.live.debounce.350ms="search" icon="magnifying-glass"
+                    placeholder="Buscar nombre, función, grado o grupo..." class="min-w-72" />
+                <flux:button type="button" variant="outline" wire:click="$refresh">Actualizar</flux:button>
+                <flux:button type="button" variant="outline" @click="abrirTodos()">Abrir todo</flux:button>
+                <flux:button type="button" variant="outline" @click="cerrarTodos()">Cerrar todo</flux:button>
+            </div>
+        </div>
+    </section>
 
-                        <input type="text" wire:model.live.debounce.300ms="search"
-                            placeholder="Buscar por nombre, especialidad, grado, grupo o nivel…"
-                            class="w-full rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
-                                   pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+    @forelse ($niveles as $nivel)
+        @php
+            $plantilla = $plantillas->get($nivel->id);
+            $diagnostico = $plantilla?->diagnostico ?? [];
+            $esSecundaria = $secundaria && (int) $nivel->id === (int) $secundaria->id;
+            $items = $porNivel->get($nivel->nombre, collect());
+            $personasNivel = $items->pluck('cabecera.persona_id')->filter()->unique()->count();
+            $pendientes = $items->where('confirmado', false)->count();
+            $editable = $plantilla?->esEditable() ?? false;
+            $estadoClass = match($plantilla?->estado) {
+                'publicada' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900',
+                'en_revision' => 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900',
+                'cerrada' => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700',
+                default => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900',
+            };
+        @endphp
+
+        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <button type="button" @click="abiertos[{{ $nivel->id }}] = !abiertos[{{ $nivel->id }}]"
+                class="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                <div class="flex min-w-0 items-center gap-4">
+                    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-50 to-violet-50 text-blue-700 ring-1 ring-blue-100 dark:from-blue-950/30 dark:to-violet-950/30 dark:text-blue-300 dark:ring-blue-900">
+                        <flux:icon.academic-cap class="h-5 w-5" />
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-base font-black text-slate-950 dark:text-white">{{ $nivel->nombre }}</h3>
+                            <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $estadoClass }}">
+                                {{ $plantilla?->etiqueta_estado ?? 'Sin preparar' }}
+                            </span>
+                            @if ($pendientes)
+                                <span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900">
+                                    {{ $pendientes }} pendiente(s)
+                                </span>
+                            @endif
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">
+                            {{ $personasNivel }} persona(s) · {{ $items->count() }} asignación(es) ·
+                            {{ $diagnostico['criticos'] ?? 0 }} error(es) crítico(s) · {{ $diagnostico['advertencias'] ?? 0 }} advertencia(s)
+                        </p>
                     </div>
                 </div>
-
-                <!-- Open/close all niveles -->
-                <div class="flex gap-2">
-                    <button type="button" @click="openAllLevels()"
-                        class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-emerald-200 dark:border-emerald-800
-                               bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950
-                               text-emerald-700 dark:text-emerald-300 font-medium
-                               hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900 dark:hover:to-teal-900
-                               shadow-sm hover:shadow-md hover:shadow-emerald-500/10
-                               transition-all duration-200
-                               focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
-                        Abrir todo
-                    </button>
-
-                    <button type="button" @click="closeAllLevels()"
-                        class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5
-                               border border-slate-200 dark:border-slate-800
-                               bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950 dark:to-gray-950
-                               text-slate-700 dark:text-slate-300 font-medium
-                               hover:from-slate-100 hover:to-gray-100 dark:hover:from-slate-900 dark:hover:to-gray-900
-                               shadow-sm hover:shadow-md hover:shadow-slate-500/10
-                               transition-all duration-200
-                               focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:ring-offset-2 dark:focus:ring-offset-neutral-900">
-                        Cerrar todo
-                    </button>
+                <div class="flex items-center gap-3">
+                    <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{{ $items->count() }}</span>
+                    <flux:icon.chevron-down class="h-4 w-4 text-slate-400 transition" ::class="abiertos[{{ $nivel->id }}] ? 'rotate-180' : ''" />
                 </div>
+            </button>
+
+            <div x-show="abiertos[{{ $nivel->id }}]" x-collapse class="border-t border-slate-200 dark:border-neutral-800">
+                <div class="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3 dark:border-neutral-800 dark:bg-neutral-950/30 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span class="rounded-full bg-white px-3 py-1 font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-neutral-900 dark:text-slate-300 dark:ring-neutral-700">
+                            Grupos del ciclo: {{ $diagnostico['grupos_activos'] ?? 0 }}
+                        </span>
+                        @if (!$editable)
+                            <span class="rounded-full bg-rose-50 px-3 py-1 font-bold text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900">
+                                Solo consulta
+                            </span>
+                        @endif
+                    </div>
+                    <flux:button type="button" size="sm" icon="arrow-down-tray" wire:click="exportarPlantilla({{ $nivel->id }})">
+                        Exportar Excel
+                    </flux:button>
+                </div>
+
+                @if (($diagnostico['criticos'] ?? 0) > 0 || ($diagnostico['advertencias'] ?? 0) > 0)
+                    <div class="grid gap-3 border-b border-slate-100 p-4 dark:border-neutral-800 lg:grid-cols-2">
+                        @if (($diagnostico['criticos'] ?? 0) > 0)
+                            <details class="rounded-2xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900 dark:bg-rose-950/20">
+                                <summary class="cursor-pointer text-xs font-black text-rose-700 dark:text-rose-300">Errores críticos ({{ $diagnostico['criticos'] }})</summary>
+                                <ul class="mt-2 space-y-1 text-xs text-rose-700 dark:text-rose-200">
+                                    @foreach (array_slice($diagnostico['errores'] ?? [], 0, 12) as $error)
+                                        <li>• {{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
+                        @if (($diagnostico['advertencias'] ?? 0) > 0)
+                            <details class="rounded-2xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                                <summary class="cursor-pointer text-xs font-black text-amber-700 dark:text-amber-300">Advertencias ({{ $diagnostico['advertencias'] }})</summary>
+                                <ul class="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-200">
+                                    @foreach (array_slice($diagnostico['avisos'] ?? [], 0, 12) as $aviso)
+                                        <li>• {{ $aviso }}</li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
+                    </div>
+                @endif
+
+                @if ($esSecundaria)
+                    <div data-sortable="personas" data-nivel-id="{{ $nivel->id }}" class="grid gap-4 p-4 xl:grid-cols-2">
+                        @forelse ($profesoresSec as $profesor)
+                            <article data-id="{{ $profesor['membresia_id'] }}" class="persona-card overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                                <div class="flex items-start justify-between gap-3 border-b border-slate-100 p-4 dark:border-neutral-800">
+                                    <div class="flex items-start gap-3">
+                                        <button type="button" data-handle-card @disabled(!$editable)
+                                            class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-800">
+                                            <flux:icon.bars-3 class="h-4 w-4" />
+                                        </button>
+                                        <div>
+                                            <h4 class="font-black text-slate-950 dark:text-white">{{ $profesor['nombre'] }}</h4>
+                                            <p class="mt-1 text-xs text-slate-500">{{ $profesor['especialidad'] ?: 'Sin especialidad registrada' }}</p>
+                                        </div>
+                                    </div>
+                                    @if ($profesor['pendientes'])
+                                        <span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700 ring-1 ring-rose-200">{{ $profesor['pendientes'] }} pendiente(s)</span>
+                                    @endif
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-neutral-950/40">
+                                            <tr><th class="px-3 py-2 text-left">Orden</th><th class="px-3 py-2 text-left">Función</th><th class="px-3 py-2 text-left">Grupo</th><th class="px-3 py-2 text-right">Acciones</th></tr>
+                                        </thead>
+                                        <tbody data-sortable="sec" data-nivel-id="{{ $nivel->id }}" data-cabecera-id="{{ $profesor['membresia_id'] }}" class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                            @foreach ($profesor['detalles'] as $detalle)
+                                                <tr data-id="{{ $detalle->id }}" class="{{ !$detalle->confirmado ? 'bg-rose-50/60 dark:bg-rose-950/10' : '' }}">
+                                                    <td class="px-3 py-3"><button data-handle type="button" @disabled(!$editable) class="inline-flex items-center gap-2 text-xs font-bold text-slate-500 disabled:opacity-40"><flux:icon.bars-3 class="h-4 w-4" />{{ $detalle->orden }}</button></td>
+                                                    <td class="px-3 py-3"><b class="text-slate-800 dark:text-slate-200">{{ $detalle->personaRole?->rolePersona?->nombre }}</b>@if(!$detalle->confirmado)<span class="mt-1 block text-[10px] font-black uppercase text-rose-600">Pendiente de confirmar</span>@endif</td>
+                                                    <td class="px-3 py-3 text-xs text-slate-600 dark:text-slate-300">{{ $detalle->grado?->nombre ?: 'General' }} · {{ $detalle->grupo?->asignacionGrupo?->nombre ?: 'Sin grupo' }}</td>
+                                                    <td class="px-3 py-3"><div class="flex justify-end gap-1"><button type="button" wire:click="$dispatch('editarPersonaNivel', { id: {{ $detalle->id }} })" @disabled(!$editable) class="rounded-xl bg-amber-500 p-2 text-white disabled:opacity-40"><flux:icon.pencil-square class="h-4 w-4" /></button><button type="button" wire:click="solicitarArchivar({{ $detalle->id }})" @disabled(!$editable) class="rounded-xl bg-rose-600 p-2 text-white disabled:opacity-40"><flux:icon.archive-box class="h-4 w-4" /></button></div></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </article>
+                        @empty
+                            <div class="col-span-full rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-neutral-700">No hay personal de Secundaria en este ciclo.</div>
+                        @endforelse
+                    </div>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:bg-neutral-950/40">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Orden</th>
+                                    <th class="px-4 py-3 text-left">Personal</th>
+                                    <th class="px-4 py-3 text-left">Función</th>
+                                    <th class="px-4 py-3 text-left">Grado / grupo</th>
+                                    <th class="px-4 py-3 text-left">Generación</th>
+                                    <th class="px-4 py-3 text-left">SEG · SEP · C.T.</th>
+                                    <th class="px-4 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody data-sortable="nivel" data-nivel-id="{{ $nivel->id }}" class="divide-y divide-slate-100 dark:divide-neutral-800">
+                                @forelse ($items as $detalle)
+                                    @php($persona = $detalle->cabecera?->persona)
+                                    <tr data-id="{{ $detalle->id }}" class="transition hover:bg-slate-50/70 dark:hover:bg-neutral-800/40 {{ !$detalle->confirmado ? 'bg-rose-50/60 dark:bg-rose-950/10' : '' }}">
+                                        <td class="px-4 py-3">
+                                            <button type="button" data-handle @disabled(!$editable) class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-black text-slate-500 disabled:opacity-40 dark:border-neutral-700">
+                                                <flux:icon.bars-3 class="h-4 w-4" /> {{ $detalle->orden }}
+                                            </button>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <b class="block text-slate-950 dark:text-white">{{ trim(collect([$persona?->titulo, $persona?->nombre, $persona?->apellido_paterno, $persona?->apellido_materno])->filter()->implode(' ')) }}</b>
+                                            <span class="text-[11px] text-slate-500">{{ $persona?->especialidad ?: 'Sin especialidad' }}</span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">{{ $detalle->personaRole?->rolePersona?->nombre }}</span>
+                                            @if (!$detalle->confirmado)
+                                                <span class="mt-1 block text-[10px] font-black uppercase text-rose-600">Pendiente de confirmar</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
+                                            <b>{{ $detalle->grado?->nombre ?: 'General' }}</b>
+                                            <span class="block text-xs text-slate-500">{{ $detalle->grupo?->asignacionGrupo?->nombre ?: 'Sin grupo específico' }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">{{ $detalle->grupo?->generacion?->etiqueta ?: 'Automática al elegir grupo' }}</td>
+                                        <td class="px-4 py-3 text-[11px] text-slate-500">
+                                            <div>SEG: {{ optional($detalle->cabecera?->ingreso_seg)->format('d/m/Y') ?: '—' }}</div>
+                                            <div>SEP: {{ optional($detalle->cabecera?->ingreso_sep)->format('d/m/Y') ?: '—' }}</div>
+                                            <div>C.T.: {{ optional($detalle->cabecera?->ingreso_ct)->format('d/m/Y') ?: '—' }}</div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex justify-end gap-2">
+                                                <button type="button" wire:click="$dispatch('editarPersonaNivel', { id: {{ $detalle->id }} })" @disabled(!$editable)
+                                                    class="rounded-xl bg-amber-500 p-2.5 text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"><flux:icon.pencil-square class="h-4 w-4" /></button>
+                                                <button type="button" wire:click="solicitarArchivar({{ $detalle->id }})" @disabled(!$editable)
+                                                    class="rounded-xl bg-rose-600 p-2.5 text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"><flux:icon.archive-box class="h-4 w-4" /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-slate-500">No hay asignaciones para {{ $nivel->nombre }} en este ciclo.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </div>
+        </section>
+    @empty
+        <div class="rounded-3xl border border-dashed border-slate-300 p-10 text-center text-slate-500 dark:border-neutral-700">No hay niveles configurados.</div>
+    @endforelse
+
+    <div x-show="archivoModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+        <div @click.outside="archivoModal = false" class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
+            <div class="flex items-start gap-3">
+                <div class="grid h-11 w-11 place-items-center rounded-2xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"><flux:icon.archive-box class="h-5 w-5" /></div>
+                <div><h3 class="text-lg font-black text-slate-950 dark:text-white">Archivar asignación</h3><p class="mt-1 text-sm text-slate-500">No se eliminará el historial. El motivo quedará registrado.</p></div>
+            </div>
+            <div class="mt-5"><flux:textarea wire:model="motivoArchivo" label="Motivo obligatorio" rows="4" placeholder="Describe por qué concluye o se corrige esta asignación..." /><flux:error name="motivoArchivo" /></div>
+            <div class="mt-5 flex justify-end gap-2"><flux:button type="button" variant="ghost" @click="archivoModal=false">Cancelar</flux:button><flux:button type="button" variant="danger" wire:click="confirmarArchivo">Archivar y conservar historial</flux:button></div>
         </div>
     </div>
 
-    {{-- =========================
-       NIVELES (ordenados por nivel_id)
-       ========================= --}}
-    <div class="space-y-4">
-        @forelse($porNivelSorted as $nivelNombre => $itemsNivel)
-            @php
-                $nivelKey = \Illuminate\Support\Str::slug($nivelNombre) . '-' . crc32($nivelNombre);
+    <livewire:persona-nivel.editar-persona-nivel />
+    <livewire:persona-nivel.editar-persona-nivel-cabecera />
 
-                $totalPersonasNivel = $itemsNivel->pluck('cabecera.persona_id')->filter()->unique()->count();
-                $totalAsignacionesNivel = $itemsNivel->count();
-
-                $first = $itemsNivel->first();
-                $nivelId = (int) ($first?->cabecera?->nivel_id ?? 0);
-
-                $isSecundaria = str_contains(mb_strtolower((string) $nivelNombre), 'secund');
-                $isBachillerato =
-                    (int) $nivelId === 4 || str_contains(mb_strtolower((string) $nivelNombre), 'bachiller');
-
-                // ✅ si existe el modelo "secundaria" lo usamos
-                $secundariaId = (int) ($secundaria?->id ?? 0);
-            @endphp
-
-            <div class="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
-                data-nivel-key="{{ $nivelKey }}">
-
-                <!-- Header nivel -->
-                <button type="button" @click="toggleLevel('{{ $nivelKey }}')"
-                    :aria-expanded="isLevelOpen('{{ $nivelKey }}')"
-                    class="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-neutral-800/60 transition">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div
-                            class="h-11 w-11 rounded-2xl bg-indigo-50 dark:bg-indigo-900/25 grid place-items-center shrink-0">
-                            <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
-                                    d="M3 7h18M6 7v14h12V7M9 7V4h6v3" />
-                            </svg>
-                        </div>
-
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                                {{ $nivelNombre }}
-                            </p>
-
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ $totalPersonasNivel }} persona(s)
-                                <span class="text-gray-400">· {{ $totalAsignacionesNivel }} asignación(es)</span>
-                                @if ($isSecundaria)
-                                    · vista por profesor
-                                @else
-                                    · tabla + drag & drop
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 shrink-0">
-
-
-
-                        <span
-                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                     bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
-                            {{ $totalPersonasNivel }}
-                        </span>
-
-                        <span class="transition-transform duration-200"
-                            :class="isLevelOpen('{{ $nivelKey }}') ? 'rotate-180' : 'rotate-0'">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 dark:text-gray-300"
-                                viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 15.5l-6-6h12l-6 6z" />
-                            </svg>
-                        </span>
-                    </div>
-                </button>
-
-                <!-- Contenido -->
-                <div x-show="isLevelOpen('{{ $nivelKey }}')" x-cloak
-                    class="border-t border-gray-200 dark:border-neutral-800">
-
-                    <flux:button variant="primary"
-                        class="cursor-pointer bg-green-700 my-2 flex items-center gap-2 text-white mx-4 px-3 py-2 rounded-2xl"
-                        wire:click="exportarPlantilla({{ $nivelId }})">
-                        <div class="flex justify-between gap-2">
-                            <flux:icon.download class="w-4 h-4" />
-                            Exportar Excel
-                        </div>
-                    </flux:button>
-
-                    {{-- ============ SECUNDARIA ============ --}}
-                    @if ($isSecundaria)
-                        @php
-                            $nivelSecId = $nivelId ?: $secundariaId;
-                        @endphp
-
-
-
-                        <div class="p-4 sm:p-5 space-y-4">
-                            <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                                <div class="flex items-center gap-2">
-                                    <span
-                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                        bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-                                        Cards por profesor
-                                    </span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                                        Arrastra las cards para reordenar profesores · Arrastra filas internas para
-                                        reordenar asignaciones
-                                    </span>
-                                </div>
-
-                                <div class="flex gap-2">
-                                    <button type="button" @click="openAllProfe()"
-                                        class="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold
-                                            border border-emerald-200 dark:border-emerald-800
-                                            bg-emerald-50/70 dark:bg-emerald-950/40
-                                            text-emerald-700 dark:text-emerald-300
-                                            hover:bg-emerald-100 dark:hover:bg-emerald-900/40">
-                                        Abrir profesores
-                                    </button>
-                                    <button type="button" @click="closeAllProfe()"
-                                        class="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold
-                                            border border-slate-200 dark:border-slate-800
-                                            bg-slate-50/70 dark:bg-slate-950/40
-                                            text-slate-700 dark:text-slate-300
-                                            hover:bg-slate-100 dark:hover:bg-slate-900/40">
-                                        Cerrar profesores
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" data-sortable="personas"
-                                data-nivel-id="{{ $nivelSecId }}">
-
-                                @forelse($profesoresSec as $profe)
-                                    @php
-                                        $pid = (int) ($profe['persona_id'] ?? 0);
-                                        $cabId = (int) ($profe['cabecera_id'] ?? 0);
-
-                                        $nombre = $profe['nombre'] ?? 'Sin nombre';
-                                        $esp = $profe['especialidad'] ?? null;
-
-                                        $ingSep = $profe['ingreso_sep'] ?? null;
-                                        $ingSeg = $profe['ingreso_seg'] ?? null;
-                                        $ingCt = $profe['ingreso_ct'] ?? null;
-
-                                        $totalAsig = (int) ($profe['total_asignaciones'] ?? 0);
-                                        $totalMat = (int) ($profe['total_materias'] ?? 0);
-
-                                        $materias = $profe['materias'] ?? collect();
-                                        $detalles = $profe['detalles'] ?? collect();
-
-                                        if (is_array($materias)) {
-                                            $materias = collect($materias);
-                                        }
-                                        if (is_array($detalles)) {
-                                            $detalles = collect($detalles);
-                                        }
-                                    @endphp
-
-                                    <div class="persona-card rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow overflow-hidden"
-                                        data-id="{{ $cabId }}" wire:key="sec-card-{{ $cabId }}"
-                                        data-profe="{{ $cabId }}">
-                                        <div
-                                            class="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-blue-600 to-sky-500">
-                                        </div>
-
-                                        <div class="p-4 sm:p-5 flex items-start justify-between gap-3">
-                                            <div class="min-w-0">
-                                                <div class="flex items-center gap-2">
-                                                    <button type="button" data-handle-card
-                                                        class="inline-flex items-center justify-center h-9 w-9 rounded-2xl
-                                                            border border-gray-200 dark:border-neutral-700
-                                                            hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                                                            focus:outline-none focus:ring-2 focus:ring-blue-500/20
-                                                            cursor-grab active:cursor-grabbing"
-                                                        title="Arrastra la card para reordenar profesores">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-4 w-4 text-gray-500 dark:text-gray-300"
-                                                            viewBox="0 0 24 24" fill="currentColor">
-                                                            <path
-                                                                d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
-                                                        </svg>
-                                                    </button>
-
-                                                    <div class="min-w-0">
-                                                        <p
-                                                            class="truncate text-sm font-bold text-gray-900 dark:text-white">
-                                                            {{ $nombre }}
-                                                        </p>
-                                                        @if ($esp)
-                                                            <p
-                                                                class="truncate text-xs text-gray-500 dark:text-gray-400">
-                                                                {{ $esp }}
-                                                            </p>
-                                                        @endif
-                                                    </div>
-                                                </div>
-
-                                                <div class="mt-3 flex flex-wrap gap-2">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold
-                                                        bg-slate-50 text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
-                                                        SEP:
-                                                        <span class="ml-1 font-bold">
-                                                            @if ($ingSep)
-                                                                {{ \Carbon\Carbon::parse($ingSep)->format('d/m/Y') }}
-                                                            @else
-                                                                —
-                                                            @endif
-                                                        </span>
-                                                    </span>
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold
-                                                        bg-slate-50 text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
-                                                        SEG:
-                                                        <span class="ml-1 font-bold">
-                                                            @if ($ingSeg)
-                                                                {{ \Carbon\Carbon::parse($ingSeg)->format('d/m/Y') }}
-                                                            @else
-                                                                —
-                                                            @endif
-                                                        </span>
-                                                    </span>
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold
-                                                        bg-slate-50 text-slate-700 dark:bg-neutral-800 dark:text-slate-200">
-                                                        CT:
-                                                        <span class="ml-1 font-bold">
-                                                            @if ($ingCt)
-                                                                {{ \Carbon\Carbon::parse($ingCt)->format('d/m/Y') }}
-                                                            @else
-                                                                —
-                                                            @endif
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div class="flex flex-col items-end gap-2 shrink-0">
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                    bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
-                                                    {{ $totalAsig }} asign.
-                                                </span>
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                    bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-                                                    {{ $totalMat }} mat.
-                                                </span>
-
-                                                <div class="flex gap-3">
-                                                    <button type="button"
-                                                        class="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold
-                                                border border-amber-200 dark:border-amber-800
-                                                bg-amber-50/70 dark:bg-amber-950/40
-                                                text-amber-700 dark:text-amber-300
-                                                hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                                                        @click="$dispatch('abrir-modal-editar-cabecera');
-                                                    Livewire.dispatch('editarCabeceraModal', { id: {{ $cabId }} });">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                                            viewBox="0 0 24 24" fill="currentColor">
-                                                            <path
-                                                                d="M16.862 3.487a1.5 1.5 0 0 1 2.121 2.121l-10.5 10.5a1.5 1.5 0 0 1-.636.379l-3.5 1a1.5 1.5 0 0 1-1.858-1.858l1-3.5a1.5 1.5 0 0 1 .38-.636l10.493-10.006z" />
-                                                        </svg>
-                                                        Editar Persona
-                                                    </button>
-
-                                                    <button type="button" @click="toggleProfe({{ $cabId }})"
-                                                        class="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold
-                                                        border border-gray-200 dark:border-neutral-700
-                                                        hover:bg-gray-50 dark:hover:bg-neutral-800/60">
-                                                        Detalles
-                                                        <span class="transition-transform duration-200"
-                                                            :class="isProfeOpen({{ $cabId }}) ? 'rotate-180' :
-                                                                'rotate-0'">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                                                viewBox="0 0 24 24" fill="currentColor">
-                                                                <path d="M12 15.5l-6-6h12l-6 6z" />
-                                                            </svg>
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div x-show="isProfeOpen({{ $cabId }})" x-cloak
-                                            class="border-t border-gray-200 dark:border-neutral-800">
-                                            <div class="p-4 sm:p-5">
-                                                <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                                                    Materias
-                                                </p>
-                                                <div class="mt-2 flex flex-wrap gap-2">
-                                                    @forelse($materias as $m)
-                                                        <span
-                                                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                            bg-gray-100 text-indigo-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                            {{ $m }}
-                                                        </span>
-                                                    @empty
-                                                        <span class="text-xs text-gray-400">—</span>
-                                                    @endforelse
-                                                </div>
-                                            </div>
-
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full text-sm">
-                                                    <thead class="bg-gray-50 dark:bg-neutral-800/70">
-                                                        <tr class="text-left text-gray-600 dark:text-gray-200">
-                                                            <th class="px-4 py-3 font-semibold w-14">Orden</th>
-                                                            <th class="px-4 py-3 font-semibold">Materia</th>
-                                                            <th class="px-4 py-3 font-semibold">Grado</th>
-                                                            <th class="px-4 py-3 font-semibold">Grupo</th>
-                                                            <th class="px-4 py-3 font-semibold text-right">Acciones
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-
-                                                    <tbody wire:ignore.self data-sortable="sec"
-                                                        data-nivel-id="{{ $nivelSecId }}"
-                                                        data-cabecera-id="{{ $cabId }}"
-                                                        class="divide-y divide-gray-100 dark:divide-neutral-800">
-                                                        @forelse($detalles as $d)
-                                                            @php
-                                                                $did = (int) ($d['id'] ?? 0);
-                                                            @endphp
-
-                                                            <tr data-id="{{ $did }}"
-                                                                wire:key="sec-det-{{ $did }}"
-                                                                class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
-                                                                <td class="px-4 py-3">
-                                                                    <div class="flex items-center gap-2">
-                                                                        <button type="button" data-handle
-                                                                            class="inline-flex items-center justify-center h-8 w-8 rounded-xl
-                                                                                border border-gray-200 dark:border-neutral-700
-                                                                                hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                                                                                focus:outline-none focus:ring-2 focus:ring-blue-500/20
-                                                                                cursor-grab active:cursor-grabbing"
-                                                                            title="Arrastra para reordenar">
-                                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                class="h-4 w-4 text-gray-500 dark:text-gray-300"
-                                                                                viewBox="0 0 24 24"
-                                                                                fill="currentColor">
-                                                                                <path
-                                                                                    d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
-                                                                            </svg>
-                                                                        </button>
-                                                                        <span
-                                                                            class="text-xs font-semibold text-gray-500 dark:text-gray-300">
-                                                                            {{ $loop->iteration }}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-
-                                                                <td
-                                                                    class="px-4 py-3 font-semibold text-gray-900 dark:text-white">
-                                                                    {{ $d['materia'] ?? '—' }}
-                                                                </td>
-
-                                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                                    {{ $d['grado'] ?? '—' }}
-                                                                </td>
-
-                                                                <td class="px-4 py-3">
-                                                                    <span
-                                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                                        bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                                        {{ $d['grupo'] ?? '—' }}
-                                                                    </span>
-                                                                </td>
-
-                                                                <td class="px-4 py-3 text-right">
-                                                                    <flux:button variant="primary"
-                                                                        class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                                        @click="$dispatch('abrir-modal-editar');
-                                                                          Livewire.dispatch('editarModal', { id: {{ $did }} });">
-                                                                        <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                                    </flux:button>
-
-                                                                    <flux:button variant="danger"
-                                                                        class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white"
-                                                                        @click="eliminarAsignacion({{ $did }})">
-                                                                        <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                                                    </flux:button>
-                                                                </td>
-                                                            </tr>
-                                                        @empty
-                                                            <tr>
-                                                                <td colspan="5" class="px-6 py-8 text-center">
-                                                                    <p
-                                                                        class="text-sm font-semibold text-gray-900 dark:text-white">
-                                                                        Sin asignaciones</p>
-                                                                    <p
-                                                                        class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                        Este profesor no tiene asignaciones.
-                                                                    </p>
-                                                                </td>
-                                                            </tr>
-                                                        @endforelse
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @empty
-                                    <div
-                                        class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
-                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin profesores
-                                        </p>
-                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            No hay asignaciones en secundaria.
-                                        </p>
-                                    </div>
-                                @endforelse
-                            </div>
-                        </div>
-                    @else
-                        @php
-                            $colspanVacio = $isBachillerato ? 6 : 10;
-                        @endphp
-
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead class="bg-gray-50 dark:bg-neutral-800/70">
-                                    <tr class="text-left text-gray-600 dark:text-gray-200">
-                                        <th class="px-4 py-3 font-semibold">#</th>
-                                        <th class="px-4 py-3 font-semibold">Orden</th>
-                                        <th class="px-4 py-3 font-semibold">Personal</th>
-                                        <th class="px-4 py-3 font-semibold">Función</th>
-                                        @if (!$isBachillerato)
-                                            <th class="px-4 py-3 font-semibold">Grado</th>
-                                            <th class="px-4 py-3 font-semibold">Grupo</th>
-                                            <th class="px-4 py-3 font-semibold text-center">SEP</th>
-                                            <th class="px-4 py-3 font-semibold text-center">SEG</th>
-                                        @endif
-                                        <th class="px-4 py-3 font-semibold text-center">CT</th>
-                                        <th class="px-4 py-3 font-semibold text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody wire:ignore.self data-sortable="nivel" data-nivel-id="{{ $nivelId }}"
-                                    class="divide-y divide-gray-100 dark:divide-neutral-800">
-                                    @forelse($itemsNivel as $idx => $row)
-                                        @php
-                                            $p = $row->cabecera?->persona;
-                                            $nombreCompleto = trim(
-                                                ($p->nombre ?? '') .
-                                                    ' ' .
-                                                    ($p->apellido_paterno ?? '') .
-                                                    ' ' .
-                                                    ($p->apellido_materno ?? ''),
-                                            );
-                                            $funcion = $row->personaRole?->rolePersona?->nombre;
-                                        @endphp
-
-                                        <tr wire:key="pn-{{ $row->id }}" data-id="{{ $row->id }}"
-                                            class="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $idx + 1 }}
-                                            </td>
-
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center gap-2">
-                                                    <button type="button" data-handle
-                                                        class="inline-flex items-center justify-center h-8 w-8 rounded-xl
-                                                            border border-gray-200 dark:border-neutral-700
-                                                            hover:bg-gray-50 dark:hover:bg-neutral-800/60
-                                                            focus:outline-none focus:ring-2 focus:ring-blue-500/20
-                                                            cursor-grab active:cursor-grabbing"
-                                                        title="Arrastra para reordenar">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-4 w-4 text-gray-500 dark:text-gray-300"
-                                                            viewBox="0 0 24 24" fill="currentColor">
-                                                            <path
-                                                                d="M10 4H6v4h4V4zm8 0h-4v4h4V4zM10 10H6v4h4v-4zm8 0h-4v4h4v-4zM10 16H6v4h4v-4zm8 0h-4v4h4v-4z" />
-                                                        </svg>
-                                                    </button>
-
-                                                    <span
-                                                        class="text-xs font-semibold text-gray-500 dark:text-gray-300">
-                                                        {{ (int) ($row->orden ?? 0) }}
-                                                    </span>
-                                                </div>
-                                            </td>
-
-                                            <td class="px-4 py-3">
-                                                <div class="font-semibold text-gray-900 dark:text-white">
-                                                    {{ $nombreCompleto ?: 'Sin nombre' }}
-                                                </div>
-                                            </td>
-
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                @if ($funcion)
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                        bg-gray-100 text-indigo-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                        {{ $funcion }}
-                                                    </span>
-                                                @else
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                @endif
-                                            </td>
-
-                                            @if (!$isBachillerato)
-                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
-                                                    {{ $row->grado?->nombre ?? '—' }}
-                                                </td>
-
-                                                <td class="px-4 py-3">
-                                                    <span
-                                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold
-                                                        bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-200">
-                                                        {{ $row->grupo?->asignacionGrupo?->nombre ?? '—' }}
-                                                    </span>
-                                                </td>
-
-                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
-                                                    @if ($row->cabecera->ingreso_sep)
-                                                        {{ \Carbon\Carbon::parse($row->cabecera->ingreso_sep)->format('d/m/Y') }}
-                                                    @else
-                                                        <span class="text-xs text-gray-400">—</span>
-                                                    @endif
-                                                </td>
-
-                                                <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
-                                                    @if ($row->cabecera->ingreso_seg)
-                                                        {{ \Carbon\Carbon::parse($row->cabecera->ingreso_seg)->format('d/m/Y') }}
-                                                    @else
-                                                        <span class="text-xs text-gray-400">—</span>
-                                                    @endif
-                                                </td>
-                                            @endif
-
-                                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200 text-center">
-                                                @if ($row->cabecera->ingreso_ct)
-                                                    {{ \Carbon\Carbon::parse($row->cabecera->ingreso_ct)->format('d/m/Y') }}
-                                                @else
-                                                    <span class="text-xs text-gray-400">—</span>
-                                                @endif
-                                            </td>
-
-                                            <td class="px-4 py-3 text-right space-x-2">
-                                                <flux:button variant="primary"
-                                                    class="cursor-pointer bg-amber-500 hover:bg-amber-600 text-white"
-                                                    @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $row->id }} });">
-                                                    <flux:icon.square-pen class="w-3.5 h-3.5" />
-                                                </flux:button>
-
-                                                <flux:button variant="danger"
-                                                    class="cursor-pointer bg-rose-600 hover:bg-rose-700 text-white"
-                                                    @click="eliminarAsignacion({{ $row->id }})">
-                                                    <flux:icon.trash-2 class="w-3.5 h-3.5" />
-                                                </flux:button>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="{{ $colspanVacio }}" class="px-6 py-10 text-center">
-                                                <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin
-                                                    asignaciones</p>
-                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                    Este nivel no tiene personal asignado.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        @empty
-            <div
-                class="rounded-2xl border border-dashed border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 text-center">
-                <p class="text-sm font-semibold text-gray-900 dark:text-white">Sin resultados</p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    No hay personal asignado o tu búsqueda no coincide.
-                </p>
-            </div>
-        @endforelse
-
-        <livewire:persona-nivel.editar-persona-nivel />
-        <livewire:persona-nivel.editar-persona-nivel-cabecera />
-
-    </div>
-
-    {{-- ✅ Sortable --}}
     @once
         <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
         <script>
-            (function() {
-
-                function getLivewireComponentFrom(el) {
+            (() => {
+                const componentFrom = el => {
                     const root = el.closest('[wire\\:id]');
-                    if (!root) return null;
-                    const componentId = root.getAttribute('wire:id');
-                    return componentId ? Livewire.find(componentId) : null;
-                }
-
-                function initSortableForAll() {
+                    return root ? Livewire.find(root.getAttribute('wire:id')) : null;
+                };
+                const init = () => {
                     if (typeof Sortable === 'undefined') return;
-
-                    document.querySelectorAll(
-                        'tbody[data-sortable="nivel"], tbody[data-sortable="sec"], [data-sortable="personas"]'
-                    ).forEach((el) => {
+                    document.querySelectorAll('tbody[data-sortable="nivel"], tbody[data-sortable="sec"], [data-sortable="personas"]').forEach(el => {
                         if (el._sortable) return;
-
                         const tipo = el.dataset.sortable;
-                        const nivelId = parseInt(el.dataset.nivelId || '0', 10);
+                        const nivelId = parseInt(el.dataset.nivelId || '0');
                         if (!nivelId) return;
-
-                        const isCards = (tipo === 'personas');
-
                         el._sortable = new Sortable(el, {
-                            animation: 150,
-                            handle: isCards ? '[data-handle-card]' : '[data-handle]',
-                            draggable: isCards ? '.persona-card' : 'tr[data-id]',
+                            animation: 160,
+                            handle: tipo === 'personas' ? '[data-handle-card]' : '[data-handle]',
+                            draggable: tipo === 'personas' ? '.persona-card' : 'tr[data-id]',
                             dataIdAttr: 'data-id',
                             forceFallback: true,
-                            fallbackOnBody: true,
-                            fallbackTolerance: 5,
-
                             onEnd: () => {
-                                const ids = el._sortable.toArray().map(v => parseInt(v, 10)).filter(
-                                    Boolean);
-                                if (!ids.length) return;
-
-                                const component = getLivewireComponentFrom(el);
-                                if (!component) return;
-
-                                if (tipo === 'personas') {
-                                    component.call('ordenarPersonasJs', nivelId, ids);
-                                    return;
-                                }
-
-                                if (tipo === 'sec') {
-                                    const cabeceraId = parseInt(el.dataset.cabeceraId || '0', 10);
-                                    if (!cabeceraId) return;
-                                    component.call('ordenarSecJs', nivelId, cabeceraId, ids);
-                                    return;
-                                }
-
+                                const ids = el._sortable.toArray().map(Number).filter(Boolean);
+                                const component = componentFrom(el);
+                                if (!component || !ids.length) return;
+                                if (tipo === 'personas') return component.call('ordenarPersonasJs', nivelId, ids);
+                                if (tipo === 'sec') return component.call('ordenarSecJs', nivelId, parseInt(el.dataset.cabeceraId || '0'), ids);
                                 component.call('ordenarJs', nivelId, ids);
-                            },
+                            }
                         });
                     });
-                }
-
-                document.addEventListener('DOMContentLoaded', () => initSortableForAll());
-
+                };
+                document.addEventListener('DOMContentLoaded', init);
                 document.addEventListener('livewire:init', () => {
-                    initSortableForAll();
-                    Livewire.hook('message.processed', () => initSortableForAll());
+                    init();
+                    Livewire.hook('message.processed', init);
                 });
-
-                const t = setInterval(() => {
-                    if (typeof Sortable !== 'undefined') {
-                        clearInterval(t);
-                        initSortableForAll();
-                    }
-                }, 120);
-            })
-            ();
+                setInterval(init, 500);
+            })();
         </script>
     @endonce
 </div>

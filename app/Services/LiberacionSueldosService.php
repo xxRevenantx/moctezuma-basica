@@ -10,6 +10,7 @@ use App\Models\LiberacionSueldoConfiguracion;
 use App\Models\Nivel;
 use App\Models\Persona;
 use App\Models\PersonaNivel;
+use App\Models\PlantillaPersonalNivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -17,43 +18,98 @@ use Illuminate\Support\Str;
 
 class LiberacionSueldosService
 {
-    public function personalActivoQuery(): Builder
+    public function personalActivoQuery(?int $cicloEscolarId = null): Builder
     {
-        return PersonaNivel::query()
+        $plantillaIds = $cicloEscolarId ? $this->plantillaIdsPublicadas($cicloEscolarId) : collect();
+        $ciclo = $cicloEscolarId ? CicloEscolar::query()->find($cicloEscolarId) : null;
+        $esCicloActual = (bool) $ciclo?->es_actual;
+        $estadosPlantilla = $esCicloActual ? ['activo'] : ['activo', 'baja'];
+
+        $query = PersonaNivel::query()
             ->with([
                 'persona',
                 'nivel.director',
                 'nivel.supervisor',
-                'detalles.personaRole.rolePersona',
+                'ciclos' => fn ($membresia) => $membresia
+                    ->when($plantillaIds->isNotEmpty(), fn ($q) => $q->whereIn('plantilla_personal_nivel_id', $plantillaIds))
+                    ->whereIn('estado', $estadosPlantilla)
+                    ->orderBy('orden'),
+                'detalles' => fn ($detalle) => $detalle
+                    ->when($plantillaIds->isNotEmpty(), fn ($q) => $q->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $estadosPlantilla) {
+                        $sub->select('id')->from('persona_nivel_ciclos')
+                            ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                            ->whereIn('estado', $estadosPlantilla);
+                    }))
+                    ->whereIn('estado', $estadosPlantilla)
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at')
+                    ->with('personaRole.rolePersona')
+                    ->orderBy('orden'),
             ])
-            ->where('estado', PersonaNivel::ESTADO_ACTIVO)
-            ->whereHas('persona', fn(Builder $query) => $query
-                ->where('status', true)
-                ->where(function (Builder $estado) {
-                    $estado->whereNull('estado_laboral')->orWhere('estado_laboral', 'activo');
-                }))
-            ->whereHas('detalles', fn(Builder $query) => $query->where('estado', 'activo'));
+            ->when($esCicloActual, fn (Builder $query) => $query
+                ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                ->whereHas('persona', fn (Builder $persona) => $persona
+                    ->where('status', true)
+                    ->where(function (Builder $estado) {
+                        $estado->whereNull('estado_laboral')->orWhere('estado_laboral', 'activo');
+                    })), fn (Builder $query) => $query->whereHas('persona'));
+
+        if ($cicloEscolarId) {
+            if ($plantillaIds->isEmpty()) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->whereHas('ciclos', fn (Builder $membresia) => $membresia
+                ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                ->whereIn('estado', $estadosPlantilla))
+                ->whereHas('detalles', fn (Builder $detalle) => $detalle
+                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $estadosPlantilla) {
+                        $sub->select('id')->from('persona_nivel_ciclos')
+                            ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                            ->whereIn('estado', $estadosPlantilla);
+                    })
+                    ->whereIn('estado', $estadosPlantilla)
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at'));
+        } else {
+            $query->whereHas('detalles', fn(Builder $detalle) => $detalle->where('estado', 'activo'));
+        }
+
+        return $query;
     }
 
     /** @return Collection<int, Persona> */
-    public function directoresPlantilla(int $nivelId): Collection
+    public function directoresPlantilla(int $nivelId, ?int $cicloEscolarId = null): Collection
     {
-        return Persona::query()
-            ->whereHas('personaNiveles', function (Builder $cabecera) use ($nivelId) {
-                $cabecera->where('nivel_id', $nivelId)
-                    ->where('estado', PersonaNivel::ESTADO_ACTIVO)
-                    ->whereHas('detalles', function (Builder $detalle) {
-                        $detalle->where('estado', 'activo')
-                            ->whereHas('personaRole.rolePersona', function (Builder $rol) {
-                                $rol->where('slug', 'like', '%director%')
-                                    ->orWhere('nombre', 'like', '%Director%');
-                            });
-                    });
+        return $this->personalActivoQuery($cicloEscolarId)
+            ->where('nivel_id', $nivelId)
+            ->whereHas('detalles', function (Builder $detalle) use ($cicloEscolarId) {
+                if ($cicloEscolarId) {
+                    $detalle->vigenteEnCiclo($cicloEscolarId);
+                }
+
+                $detalle->whereHas('personaRole.rolePersona', function (Builder $rol) {
+                    $rol->where('es_directivo', true)
+                        ->orWhere('slug', 'like', '%director%')
+                        ->orWhere('nombre', 'like', '%Director%');
+                });
             })
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+            ->get()
+            ->pluck('persona')
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn (Persona $persona) => Str::lower(trim("{$persona->apellido_paterno} {$persona->apellido_materno} {$persona->nombre}")))
+            ->values();
+    }
+
+    /** @return Collection<int, int> */
+    private function plantillaIdsPublicadas(int $cicloEscolarId): Collection
+    {
+        return PlantillaPersonalNivel::query()
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->whereIn('estado', [PlantillaPersonalNivel::ESTADO_PUBLICADA, PlantillaPersonalNivel::ESTADO_CERRADA])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
     }
 
     /** @return Collection<int, Director> */
@@ -165,7 +221,7 @@ class LiberacionSueldosService
                 $texto = Str::slug(trim(($rol?->slug ?? '') . ' ' . ($rol?->nombre ?? '')));
 
                 // Incluye director(a), director(a) encargado(a), subdirector(a) y demás variantes disponibles.
-                return str_contains($texto, 'director');
+                return (bool) $rol?->es_directivo || str_contains($texto, 'director');
             });
     }
 
@@ -224,7 +280,10 @@ class LiberacionSueldosService
         $nivel = $personaNivel->nivel;
         $persona = $personaNivel->persona;
         $escuela = Escuela::query()->first();
-        $ciclo = CicloEscolar::query()->where('es_actual', true)->first() ?: CicloEscolar::query()->latest('id')->first();
+        $cicloId = (int) Arr::get($formulario, 'ciclo_escolar_id', 0);
+        $ciclo = ($cicloId ? CicloEscolar::query()->find($cicloId) : null)
+            ?: CicloEscolar::query()->where('es_actual', true)->first()
+            ?: CicloEscolar::query()->latest('id')->first();
         $config = $this->configuracion();
 
         $directorPersona = null;
@@ -307,6 +366,7 @@ class LiberacionSueldosService
             'quincena_inicio' => (int) Arr::get($formulario, 'quincena_inicio', 13),
             'quincena_fin' => (int) Arr::get($formulario, 'quincena_fin', 14),
             'anio' => (int) Arr::get($formulario, 'anio', now()->year),
+            'ciclo_escolar_id' => $ciclo?->id,
             'ciclo_escolar' => (string) Arr::get($formulario, 'ciclo_escolar', $ciclo?->nombre),
             'fecha_reanudacion' => Arr::get($formulario, 'fecha_reanudacion'),
             'clave_presupuestal' => 'S/C',
