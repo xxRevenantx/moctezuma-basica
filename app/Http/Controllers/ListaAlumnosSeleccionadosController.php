@@ -86,7 +86,7 @@ class ListaAlumnosSeleccionadosController extends Controller
             ->values()
             ->all();
 
-        $alumnos = Inscripcion::query()
+        $alumnos = Inscripcion::withTrashed()
             ->with([
                 'nivel:id,nombre,slug,color,cct',
                 'grado:id,nombre,slug,orden',
@@ -188,9 +188,16 @@ class ListaAlumnosSeleccionadosController extends Controller
             'total' => $alumnos->count(),
             'hombres' => $alumnos->where('genero', 'H')->count(),
             'mujeres' => $alumnos->where('genero', 'M')->count(),
-            'activos' => $alumnos->where('activo', true)->count(),
-            'bajas' => $alumnos->filter(fn (Inscripcion $alumno) => ! $alumno->activo && ! $this->esEgresado($alumno))->count(),
-            'egresados' => $alumnos->filter(fn (Inscripcion $alumno) => $this->esEgresado($alumno))->count(),
+            'activos' => $alumnos
+                ->filter(fn (Inscripcion $alumno) => ! $alumno->trashed()
+                    && in_array($alumno->estatusNormalizado(), Inscripcion::ESTATUS_ACTIVOS, true))
+                ->count(),
+            'bajas' => $alumnos
+                ->filter(fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esBajaAdministrativa())
+                ->count(),
+            'egresados' => $alumnos
+                ->filter(fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esEgresado())
+                ->count(),
         ];
     }
 
@@ -401,20 +408,7 @@ class ListaAlumnosSeleccionadosController extends Controller
 
     private function textoEstatus(Inscripcion $alumno): string
     {
-        if ($this->esEgresado($alumno)) {
-            return 'Egresado';
-        }
-
-        if (filled($alumno->estatus)) {
-            return Str::headline((string) $alumno->estatus);
-        }
-
-        return $alumno->activo ? 'Activo' : 'Baja';
-    }
-
-    private function esEgresado(Inscripcion $alumno): bool
-    {
-        return Str::contains(Str::lower((string) $alumno->estatus), 'egres');
+        return $alumno->trashed() ? 'Archivado' : $alumno->etiqueta_estatus;
     }
 
     private function direccionEscuela(?Escuela $escuela): string

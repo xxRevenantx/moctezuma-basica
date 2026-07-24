@@ -69,6 +69,18 @@
         }
     </style>
 
+    {{-- Paleta estática para que Tailwind compile todas las insignias de estatus. --}}
+    <div aria-hidden="true"
+        class="hidden bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300
+        bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300
+        bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300
+        bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300
+        bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300
+        bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300
+        bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300
+        bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200
+        bg-slate-100 bg-slate-200 text-slate-600 text-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:text-slate-300"></div>
+
     {{-- Loader de edición --}}
     <div x-cloak x-show="editando" x-transition.opacity
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-md dark:bg-neutral-950/80">
@@ -325,7 +337,7 @@
                                         class="mt-0.5 h-5 w-5 rounded border-slate-300 text-[#88AC2E] focus:ring-[#88AC2E]">
                                     <span>
                                         <span class="block text-sm font-black text-slate-800 dark:text-white">Incluir estadísticas</span>
-                                        <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Total, hombres, mujeres, activos y bajas.</span>
+                                        <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Total, hombres, mujeres, activos, egresados y bajas.</span>
                                     </span>
                                 </label>
                             </div>
@@ -424,7 +436,7 @@
                     </p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:min-w-[620px]">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:min-w-[760px] xl:grid-cols-6">
                     <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
                         <p class="text-xs font-bold uppercase text-white/70">Total</p>
                         <p class="mt-1 text-2xl font-black">{{ $total }}</p>
@@ -443,6 +455,11 @@
                     <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
                         <p class="text-xs font-bold uppercase text-white/70">Activos</p>
                         <p class="mt-1 text-2xl font-black">{{ $activos }}</p>
+                    </div>
+
+                    <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
+                        <p class="text-xs font-bold uppercase text-white/70">Egresados</p>
+                        <p class="mt-1 text-2xl font-black">{{ $egresados }}</p>
                     </div>
 
                     <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
@@ -564,8 +581,11 @@
                     <flux:label>Estatus</flux:label>
                     <flux:select wire:model.live="estatus">
                         <flux:select.option value="todos">Todos</flux:select.option>
-                        <flux:select.option value="activos">Activos</flux:select.option>
-                        <flux:select.option value="bajas">Bajas</flux:select.option>
+                        <flux:select.option value="activos">Activos, reingresos y no promovidos</flux:select.option>
+                        <flux:select.option value="preinscritos">Preinscritos</flux:select.option>
+                        <flux:select.option value="egresados">Egresados</flux:select.option>
+                        <flux:select.option value="bajas">Bajas y movimientos</flux:select.option>
+                        <flux:select.option value="archivados">Archivados</flux:select.option>
                     </flux:select>
                 </flux:field>
 
@@ -754,11 +774,8 @@
 
                             <td class="px-4 py-4 text-center">
                                 <span
-                                    class="inline-flex rounded-full px-3 py-1 text-xs font-black
-                                    {{ $alumno->activo
-                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                        : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' }}">
-                                    {{ $alumno->activo ? 'Activo' : 'Baja' }}
+                                    class="inline-flex rounded-full px-3 py-1 text-xs font-black {{ $this->claseEstatus($alumno) }}">
+                                    {{ $this->etiquetaEstatus($alumno) }}
                                 </span>
                             </td>
 
@@ -783,7 +800,7 @@
                                         </button>
                                     @endif
 
-                                    @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
+                                    @if (auth()->user()?->canAccess('alumnos.editar') && ! $alumno->trashed() && $alumno->nivel?->slug)
                                         <button type="button"
                                             x-on:click="abrirEdicion('{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}')"
                                             class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-white shadow-sm transition hover:bg-blue-700"
@@ -792,13 +809,31 @@
                                         </button>
                                     @endif
 
-                                    @if (auth()->user()?->canAccess('alumnos.eliminar'))
-                                        <button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
-                                            wire:confirm="¿Seguro que deseas eliminar este alumno?"
-                                            class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-white shadow-sm transition hover:bg-rose-700"
-                                            title="Eliminar">
-                                            <flux:icon.trash class="h-4 w-4" />
-                                        </button>
+                                    @if ($alumno->trashed())
+                                        @if (auth()->user()?->canAccess('alumnos.editar') || auth()->user()?->canAccess('alumnos.eliminar'))
+                                            <button type="button" wire:click="restaurarAlumno({{ $alumno->id }})"
+                                                wire:confirm="¿Deseas restaurar este alumno archivado?"
+                                                class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-white shadow-sm transition hover:bg-emerald-700"
+                                                title="Restaurar">
+                                                <flux:icon.arrow-path class="h-4 w-4" />
+                                            </button>
+                                        @endif
+                                    @elseif (auth()->user()?->canAccess('alumnos.eliminar'))
+                                        @if ($this->esEgresado($alumno))
+                                            <button type="button" wire:click="archivarAlumno({{ $alumno->id }})"
+                                                wire:confirm="¿Deseas archivar el expediente histórico de este egresado? Podrás restaurarlo desde el filtro Archivados."
+                                                class="inline-flex items-center justify-center rounded-xl bg-slate-700 px-3 py-2 text-white shadow-sm transition hover:bg-slate-800"
+                                                title="Archivar expediente histórico">
+                                                <flux:icon.archive-box class="h-4 w-4" />
+                                            </button>
+                                        @else
+                                            <button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
+                                                wire:confirm="¿Seguro que deseas eliminar este alumno? El registro se conservará en Archivados."
+                                                class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-white shadow-sm transition hover:bg-rose-700"
+                                                title="Eliminar">
+                                                <flux:icon.trash class="h-4 w-4" />
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -839,7 +874,7 @@
 
                                                 <span
                                                     class="rounded-full bg-white/15 px-3 py-1 text-xs font-black ring-1 ring-white/20">
-                                                    {{ $alumno->activo ? 'Activo' : 'Baja' }}
+                                                    {{ $this->etiquetaEstatus($alumno) }}
                                                 </span>
                                             </div>
                                         </div>
@@ -889,14 +924,14 @@
                                             </div>
 
                                             <div class="mt-4 flex flex-wrap gap-2">
-                                                @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
+                                                @if (auth()->user()?->canAccess('alumnos.editar') && ! $alumno->trashed() && $alumno->nivel?->slug)
                                                     <a href="{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}"
                                                         class="inline-flex items-center rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-xs font-black text-white transition hover:from-sky-600 hover:to-indigo-700">
                                                         Ver expediente completo
                                                     </a>
                                                 @endif
 
-                                                @if (auth()->user()?->is_admin)
+                                                @if (auth()->user()?->is_admin && ! $alumno->trashed())
                                                     <a href="{{ route('misrutas.expedientes.show', $alumno) }}"
                                                         class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-xs font-black text-white transition hover:from-emerald-600 hover:to-teal-700"
                                                         wire:navigate>
@@ -1022,32 +1057,52 @@
                                                 <div class="flex items-center justify-between gap-4">
                                                     <span class="text-slate-500 dark:text-slate-400">Estatus</span>
                                                     <span
-                                                        class="rounded-full px-3 py-1 text-xs font-black
-                                                        {{ $alumno->activo
-                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                                            : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' }}">
-                                                        {{ $alumno->activo ? 'Activo' : 'Baja' }}
+                                                        class="rounded-full px-3 py-1 text-xs font-black {{ $this->claseEstatus($alumno) }}">
+                                                        {{ $this->etiquetaEstatus($alumno) }}
                                                     </span>
                                                 </div>
 
-                                                @if (!$alumno->activo && $alumno->fecha_baja)
+                                                @if ($alumno->fecha_estatus)
                                                     <div class="flex items-center justify-between gap-4">
-                                                        <span class="text-slate-500 dark:text-slate-400">Fecha
-                                                            baja</span>
-                                                        <span
-                                                            class="text-right font-black text-rose-600 dark:text-rose-300">
+                                                        <span class="text-slate-500 dark:text-slate-400">Fecha de estatus</span>
+                                                        <span class="text-right font-black text-slate-800 dark:text-white">
+                                                            {{ $alumno->fecha_estatus->format('d/m/Y') }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+
+                                                @if ($alumno->motivo_estatus)
+                                                    <div class="flex items-start justify-between gap-4">
+                                                        <span class="text-slate-500 dark:text-slate-400">Motivo del estatus</span>
+                                                        <span class="max-w-[220px] text-right font-black text-slate-800 dark:text-white">
+                                                            {{ $alumno->motivo_estatus }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+
+                                                @if ($this->esBajaAdministrativa($alumno) && $alumno->fecha_baja)
+                                                    <div class="flex items-center justify-between gap-4">
+                                                        <span class="text-slate-500 dark:text-slate-400">Fecha de baja</span>
+                                                        <span class="text-right font-black text-rose-600 dark:text-rose-300">
                                                             {{ \Carbon\Carbon::parse($alumno->fecha_baja)->format('d/m/Y') }}
                                                         </span>
                                                     </div>
                                                 @endif
 
-                                                @if ($alumno->motivo_baja)
+                                                @if ($this->esBajaAdministrativa($alumno) && $alumno->motivo_baja)
                                                     <div class="flex items-start justify-between gap-4">
-                                                        <span class="text-slate-500 dark:text-slate-400">Motivo
-                                                            baja</span>
-                                                        <span
-                                                            class="text-right font-black text-rose-600 dark:text-rose-300">
+                                                        <span class="text-slate-500 dark:text-slate-400">Motivo de baja</span>
+                                                        <span class="max-w-[220px] text-right font-black text-rose-600 dark:text-rose-300">
                                                             {{ $alumno->motivo_baja }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+
+                                                @if ($alumno->trashed() && $alumno->deleted_at)
+                                                    <div class="flex items-center justify-between gap-4">
+                                                        <span class="text-slate-500 dark:text-slate-400">Archivado el</span>
+                                                        <span class="text-right font-black text-slate-700 dark:text-slate-200">
+                                                            {{ $alumno->deleted_at->format('d/m/Y H:i') }}
                                                         </span>
                                                     </div>
                                                 @endif
@@ -1130,11 +1185,8 @@
 
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <span
-                                        class="rounded-full px-2.5 py-1 text-xs font-bold
-                                        {{ $alumno->activo
-                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                            : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' }}">
-                                        {{ $alumno->activo ? 'Activo' : 'Baja' }}
+                                        class="rounded-full px-2.5 py-1 text-xs font-bold {{ $this->claseEstatus($alumno) }}">
+                                        {{ $this->etiquetaEstatus($alumno) }}
                                     </span>
 
                                     <span
@@ -1162,12 +1214,40 @@
                                 </button>
                             @endif
 
-                            @if (auth()->user()?->canAccess('alumnos.editar') && $alumno->nivel?->slug)
+                            @if (auth()->user()?->canAccess('alumnos.editar') && ! $alumno->trashed() && $alumno->nivel?->slug)
                                 <button type="button"
                                     x-on:click="abrirEdicion('{{ route('misrutas.matricula.editar', ['slug_nivel' => $alumno->nivel->slug, 'inscripcion' => $alumno->id]) }}')"
-                                    class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-white">
+                                    class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-white"
+                                    title="Editar">
                                     <flux:icon.square-pen class="h-4 w-4" />
                                 </button>
+                            @endif
+
+                            @if ($alumno->trashed())
+                                @if (auth()->user()?->canAccess('alumnos.editar') || auth()->user()?->canAccess('alumnos.eliminar'))
+                                    <button type="button" wire:click="restaurarAlumno({{ $alumno->id }})"
+                                        wire:confirm="¿Deseas restaurar este alumno archivado?"
+                                        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-white"
+                                        title="Restaurar">
+                                        <flux:icon.arrow-path class="h-4 w-4" />
+                                    </button>
+                                @endif
+                            @elseif (auth()->user()?->canAccess('alumnos.eliminar'))
+                                @if ($this->esEgresado($alumno))
+                                    <button type="button" wire:click="archivarAlumno({{ $alumno->id }})"
+                                        wire:confirm="¿Deseas archivar el expediente histórico de este egresado?"
+                                        class="inline-flex items-center justify-center rounded-xl bg-slate-700 px-3 py-2 text-white"
+                                        title="Archivar expediente histórico">
+                                        <flux:icon.archive-box class="h-4 w-4" />
+                                    </button>
+                                @else
+                                    <button type="button" wire:click="eliminarAlumno({{ $alumno->id }})"
+                                        wire:confirm="¿Seguro que deseas eliminar este alumno? El registro se conservará en Archivados."
+                                        class="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-white"
+                                        title="Eliminar">
+                                        <flux:icon.trash class="h-4 w-4" />
+                                    </button>
+                                @endif
                             @endif
                         </div>
                     </div>

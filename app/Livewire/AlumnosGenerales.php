@@ -38,7 +38,7 @@ class AlumnosGenerales extends Component
 
     public string $buscar = '';
     public string $genero = '';
-    public string $estatus = 'activos';
+    public string $estatus = 'todos';
     public string $orden = 'apellidos';
 
     public int $perPage = 25;
@@ -53,6 +53,7 @@ class AlumnosGenerales extends Component
     public int $hombres = 0;
     public int $mujeres = 0;
     public int $activos = 0;
+    public int $egresados = 0;
     public int $bajas = 0;
 
     protected $paginationTheme = 'tailwind';
@@ -178,7 +179,7 @@ class AlumnosGenerales extends Component
 
         $this->buscar = '';
         $this->genero = '';
-        $this->estatus = 'activos';
+        $this->estatus = 'todos';
         $this->orden = 'apellidos';
         $this->perPage = 25;
 
@@ -195,7 +196,7 @@ class AlumnosGenerales extends Component
     {
         abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
 
-        $alumno = Inscripcion::query()
+        $alumno = Inscripcion::withTrashed()
             ->select(['id', 'matricula', 'nombre', 'apellido_paterno', 'apellido_materno'])
             ->with([
                 'observacionesInscripcion' => fn ($query) => $query
@@ -261,7 +262,7 @@ class AlumnosGenerales extends Component
         $alumno = Inscripcion::query()->find($alumnoId);
 
         if (!$alumno) {
-            $this->dispatch('notify', type: 'error', message: 'El alumno no existe o ya fue eliminado.');
+            $this->dispatch('notify', type: 'error', message: 'El alumno no existe o ya está archivado.');
             return;
         }
 
@@ -271,8 +272,54 @@ class AlumnosGenerales extends Component
             fn ($id) => (int) $id !== $alumnoId,
         ));
 
-        $this->dispatch('notify', type: 'success', message: 'Alumno eliminado correctamente.');
+        $this->dispatch('notify', type: 'success', message: 'Alumno enviado a Archivados correctamente.');
 
+        $this->actualizarVista();
+    }
+
+    public function archivarAlumno(int $alumnoId): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.eliminar'), 403);
+
+        $alumno = Inscripcion::query()->find($alumnoId);
+
+        if (! $alumno) {
+            $this->dispatch('notify', type: 'error', message: 'El alumno no existe o ya está archivado.');
+            return;
+        }
+
+        $alumno->delete();
+        $this->seleccionados = array_values(array_filter(
+            $this->seleccionados,
+            fn ($id) => (int) $id !== $alumnoId,
+        ));
+
+        $this->dispatch('notify', type: 'success', message: 'Expediente histórico archivado correctamente.');
+        $this->actualizarVista();
+    }
+
+    public function restaurarAlumno(int $alumnoId): void
+    {
+        abort_unless(
+            auth()->user()?->canAccess('alumnos.editar')
+                || auth()->user()?->canAccess('alumnos.eliminar'),
+            403
+        );
+
+        $alumno = Inscripcion::onlyTrashed()->find($alumnoId);
+
+        if (! $alumno) {
+            $this->dispatch('notify', type: 'error', message: 'El registro archivado no existe o ya fue restaurado.');
+            return;
+        }
+
+        $alumno->restore();
+        $this->seleccionados = array_values(array_filter(
+            $this->seleccionados,
+            fn ($id) => (int) $id !== $alumnoId,
+        ));
+
+        $this->dispatch('notify', type: 'success', message: 'Alumno restaurado correctamente.');
         $this->actualizarVista();
     }
 
@@ -469,10 +516,14 @@ class AlumnosGenerales extends Component
                 'ciclo_id',
                 'foto_path',
                 'activo',
+                'estatus',
+                'fecha_estatus',
+                'motivo_estatus',
                 'fecha_baja',
                 'motivo_baja',
                 'observaciones_baja',
                 'fecha_inscripcion',
+                'deleted_at',
                 'created_at',
             ]);
 
@@ -531,13 +582,14 @@ class AlumnosGenerales extends Component
             $consulta->where('genero', $this->genero);
         }
 
-        if ($this->estatus === 'activos') {
-            $consulta->where('activo', true);
-        }
-
-        if ($this->estatus === 'bajas') {
-            $consulta->where('activo', false);
-        }
+        match ($this->estatus) {
+            'activos' => $this->aplicarActivos($consulta),
+            'preinscritos' => $consulta->where('estatus', 'preinscrito'),
+            'egresados' => $consulta->where('estatus', Inscripcion::ESTATUS_EGRESADO),
+            'bajas' => $this->aplicarBajasAdministrativas($consulta),
+            'archivados' => $consulta->onlyTrashed(),
+            default => null,
+        };
 
         if (trim($this->buscar) !== '') {
             $buscar = trim($this->buscar);
@@ -595,8 +647,83 @@ class AlumnosGenerales extends Component
         $this->total = (clone $base)->count();
         $this->hombres = (clone $base)->where('genero', 'H')->count();
         $this->mujeres = (clone $base)->where('genero', 'M')->count();
-        $this->activos = (clone $base)->where('activo', true)->count();
-        $this->bajas = (clone $base)->where('activo', false)->count();
+
+        $activos = clone $base;
+        $this->aplicarActivos($activos);
+        $this->activos = $activos->count();
+
+        $this->egresados = (clone $base)
+            ->where('estatus', Inscripcion::ESTATUS_EGRESADO)
+            ->count();
+
+        $bajas = clone $base;
+        $this->aplicarBajasAdministrativas($bajas);
+        $this->bajas = $bajas->count();
+    }
+
+    private function aplicarActivos(Builder $consulta): Builder
+    {
+        return $consulta->where(function (Builder $query): void {
+            $query->whereIn('estatus', Inscripcion::ESTATUS_ACTIVOS)
+                ->orWhere(function (Builder $legacy): void {
+                    $legacy->where(function (Builder $sinEstatus): void {
+                        $sinEstatus->whereNull('estatus')->orWhere('estatus', '');
+                    })->where('activo', true);
+                });
+        });
+    }
+
+    private function aplicarBajasAdministrativas(Builder $consulta): Builder
+    {
+        return $consulta->where(function (Builder $query): void {
+            $query->whereIn('estatus', Inscripcion::ESTATUS_BAJA_ADMINISTRATIVA)
+                ->orWhere(function (Builder $legacy): void {
+                    $legacy->where(function (Builder $sinEstatus): void {
+                        $sinEstatus->whereNull('estatus')->orWhere('estatus', '');
+                    })->where('activo', false);
+                });
+        });
+    }
+
+    public function etiquetaEstatus(Inscripcion $alumno): string
+    {
+        return $alumno->trashed() ? 'Archivado' : $alumno->etiqueta_estatus;
+    }
+
+    public function claseEstatus(Inscripcion $alumno): string
+    {
+        if ($alumno->trashed()) {
+            return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+        }
+
+        return match ($alumno->estatusNormalizado()) {
+            'activo' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+            'reingreso' => 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300',
+            'no_promovido' => 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
+            'preinscrito' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+            'egresado' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
+            'baja_temporal' => 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
+            'baja_definitiva' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+            'traslado', 'trasladado' => 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
+            'suspendido' => 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200',
+            'inactivo' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+            default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+        };
+    }
+
+    public function esEgresado(Inscripcion $alumno): bool
+    {
+        return ! $alumno->trashed() && $alumno->esEgresado();
+    }
+
+    public function esBajaAdministrativa(Inscripcion $alumno): bool
+    {
+        return ! $alumno->trashed() && $alumno->esBajaAdministrativa();
+    }
+
+    public function esArchivado(Inscripcion $alumno): bool
+    {
+        return $alumno->trashed();
     }
 
     public function esBachillerato(): bool

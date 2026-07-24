@@ -200,8 +200,7 @@
                                             {{ $alumno->ciclo?->ciclo ?? '—' }}
                                             @break
                                         @case('estatus')
-                                            @php($estatusTexto = \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower((string) $alumno->estatus), 'egres') ? 'Egresado' : (filled($alumno->estatus) ? \Illuminate\Support\Str::headline((string) $alumno->estatus) : ($alumno->activo ? 'Activo' : 'Baja')))
-                                            {{ $estatusTexto }}
+                                            {{ $alumno->trashed() ? 'Archivado' : $alumno->etiqueta_estatus }}
                                             @break
                                         @case('firma')
                                             &nbsp;
