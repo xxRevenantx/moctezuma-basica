@@ -32,6 +32,7 @@ use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GeneracionController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\HorariosGeneralesPdfController;
+use App\Http\Controllers\HorariosVaciosPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\ListaGeneracionesHistoricasController;
 use App\Http\Controllers\ListaAlumnosSeleccionadosController;
@@ -300,6 +301,10 @@ Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrut
 
 Route::get('/generales/horarios/pdf', HorariosGeneralesPdfController::class)
     ->name('generales.horarios.pdf');
+
+Route::get('/generales/horarios-vacios/pdf', HorariosVaciosPdfController::class)
+    ->middleware('admin')
+    ->name('generales.horarios-vacios.pdf');
 
 
 Route::get('/generales/{slug_nivel}/promedios-materias/pdf', PromediosMateriasPdfController::class)
