@@ -4,18 +4,21 @@ namespace App\Livewire\Documentacion;
 
 use App\Models\CicloEscolar;
 use App\Models\DocumentoAlumno;
+use App\Models\DocumentoAlumnoFuente;
+use App\Models\DocumentoAlumnoNoAplica;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
-use App\Models\MovimientoAlumno;
 use App\Models\TipoDocumento;
 use App\Services\ExpedienteDigitalService;
+use App\Services\Expedientes\OrganizadorExpedienteService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -47,6 +50,16 @@ class ExpedientesDigitales extends Component
     public string $motivo_documento = '';
     public string $observaciones = '';
     public $archivo = null;
+    public string $modo_integracion = 'agregar';
+    public string $contenido_archivo = 'un_documento';
+    public bool $permitir_archivo_duplicado = false;
+
+    public bool $mostrarNoAplica = false;
+    public ?int $no_aplica_tipo_id = null;
+    public ?int $no_aplica_nivel_id = null;
+    public ?int $no_aplica_grado_id = null;
+    public ?int $no_aplica_ciclo_id = null;
+    public string $no_aplica_motivo = '';
 
     public array $tiposDocumentos = [];
     public array $niveles = [];
@@ -168,6 +181,19 @@ class ExpedientesDigitales extends Component
         $this->cerrarCarga();
     }
 
+    public function abrirOrganizador(?int $fuenteId = null): void
+    {
+        $this->autorizarAdmin();
+        abort_unless($this->alumnoSeleccionadoId, 422, 'Selecciona un alumno.');
+        $this->asegurarAlumnoModificable();
+
+        $this->dispatch(
+            'abrir-organizador-expediente',
+            inscripcionId: $this->alumnoSeleccionadoId,
+            fuenteId: $fuenteId
+        );
+    }
+
     public function abrirCarga(int $tipoId, ?int $nivelId = null, ?int $gradoId = null, ?int $cicloId = null): void
     {
         $this->autorizarAdmin();
@@ -191,6 +217,8 @@ class ExpedientesDigitales extends Component
         $this->tipo_movimiento_documento = 'baja_definitiva';
         $this->motivo_documento = '';
         $this->observaciones = '';
+        $this->contenido_archivo = 'un_documento';
+        $this->permitir_archivo_duplicado = false;
 
         if (!$tipo->requiere_nivel) {
             $this->nivel_certificado_id = null;
@@ -199,6 +227,7 @@ class ExpedientesDigitales extends Component
         }
 
         $this->actualizarIndicadorReemplazo();
+        $this->modo_integracion = $this->reemplazaDocumentoActual ? 'reemplazar' : 'agregar';
         $this->mostrarCarga = true;
     }
 
@@ -218,6 +247,9 @@ class ExpedientesDigitales extends Component
         $this->tipo_movimiento_documento = 'baja_definitiva';
         $this->motivo_documento = '';
         $this->observaciones = '';
+        $this->modo_integracion = 'agregar';
+        $this->contenido_archivo = 'un_documento';
+        $this->permitir_archivo_duplicado = false;
         $this->resetValidation();
     }
 
@@ -272,7 +304,6 @@ class ExpedientesDigitales extends Component
             'tipo_documento_id' => ['required', 'integer', 'exists:tipos_documentos,id'],
         ], [
             'tipo_documento_id.required' => 'Selecciona el tipo de documento.',
-            'tipo_documento_id.exists' => 'El tipo de documento seleccionado no es válido.',
         ]);
 
         $tipo = TipoDocumento::query()
@@ -283,15 +314,24 @@ class ExpedientesDigitales extends Component
             'boleta-final-grado',
             'constancia-estudios',
             'constancia-baja-traslado',
+            'constancia-traslado-calificaciones',
         ], true);
+        $maxKb = max((int) config('expedientes_organizador.max_upload_mb', 30), 1) * 1024;
 
         $reglas = [
             'tipo_documento_id' => ['required', 'integer', 'exists:tipos_documentos,id'],
-            'archivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png,image/webp', 'max:10240'],
+            'archivo' => [
+                'required', 'file', 'mimes:pdf,jpg,jpeg,png,webp',
+                'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png,image/webp',
+                'max:' . $maxKb,
+            ],
             'fecha_documento' => ['nullable', 'date'],
             'folio_documento' => ['nullable', 'string', 'max:100'],
             'origen_documento' => ['required', 'in:externo,subido,digitalizado'],
             'observaciones' => ['nullable', 'string', 'max:2000'],
+            'modo_integracion' => ['required', 'in:agregar,reemplazar'],
+            'contenido_archivo' => ['required', 'in:un_documento,varios_documentos'],
+            'permitir_archivo_duplicado' => ['boolean'],
         ];
 
         if ($tipo->requiere_nivel) {
@@ -313,11 +353,13 @@ class ExpedientesDigitales extends Component
             'archivo.required' => 'Selecciona un archivo.',
             'archivo.mimes' => 'El documento debe ser PDF, JPG, JPEG, PNG o WEBP.',
             'archivo.mimetypes' => 'El archivo seleccionado no tiene un formato permitido.',
-            'archivo.max' => 'El archivo no debe superar los 10 MB.',
+            'archivo.max' => 'El archivo no debe superar los ' . config('expedientes_organizador.max_upload_mb', 30) . ' MB.',
             'nivel_certificado_id.required' => 'Selecciona el nivel relacionado con el documento.',
             'grado_documento_id.required' => 'Selecciona el grado relacionado con el documento.',
             'ciclo_escolar_documento_id.required' => 'Selecciona el ciclo escolar del documento.',
             'motivo_documento.required' => 'Escribe el motivo de la baja, traslado o movimiento.',
+            'modo_integracion.required' => 'Selecciona si deseas agregar o reemplazar páginas.',
+            'contenido_archivo.required' => 'Indica si el archivo contiene uno o varios documentos.',
         ]);
 
         $nivelId = $tipo->requiere_nivel ? $this->nivel_certificado_id : null;
@@ -326,117 +368,33 @@ class ExpedientesDigitales extends Component
         $cicloEscolarId = $esAcademico ? $this->ciclo_escolar_documento_id : null;
 
         if ($esAcademico) {
-            $gradoValido = Grado::query()
-                ->whereKey($gradoId)
-                ->where('nivel_id', $nivelId)
-                ->exists();
-
-            if (!$gradoValido) {
+            $gradoValido = Grado::query()->whereKey($gradoId)->where('nivel_id', $nivelId)->exists();
+            if (! $gradoValido) {
                 $this->addError('grado_documento_id', 'El grado no pertenece al nivel seleccionado.');
                 return;
             }
 
-            if ($grupoId) {
-                $grupoValido = Grupo::query()
-                    ->whereKey($grupoId)
-                    ->where('nivel_id', $nivelId)
-                    ->where('grado_id', $gradoId)
-                    ->exists();
-
-                if (!$grupoValido) {
-                    $this->addError('grupo_documento_id', 'El grupo no pertenece al nivel y grado seleccionados.');
-                    return;
-                }
+            if ($grupoId && ! Grupo::query()->whereKey($grupoId)->where('nivel_id', $nivelId)->where('grado_id', $gradoId)->exists()) {
+                $this->addError('grupo_documento_id', 'El grupo no pertenece al nivel y grado seleccionados.');
+                return;
             }
         }
 
         if ($tipo->slug === 'boleta-final-grado') {
             $nivel = collect($this->niveles)->firstWhere('id', $nivelId);
             $textoNivel = Str::lower(trim(($nivel['slug'] ?? '') . ' ' . ($nivel['nombre'] ?? '')));
-
-            if (!Str::contains($textoNivel, ['primaria', 'secundaria'])) {
+            if (! Str::contains($textoNivel, ['primaria', 'secundaria'])) {
                 $this->addError('nivel_certificado_id', 'Las boletas finales solo se manejan para primaria y secundaria.');
                 return;
             }
         }
 
-        $rutaGuardada = null;
-        $discoExpedientes = config('filesystems.expedientes_disk', 'local');
-        $nombreOriginal = Str::limit($this->archivo->getClientOriginalName(), 250, '');
-        $tamanoBytes = (int) $this->archivo->getSize();
-        $hashSha256 = hash_file('sha256', $this->archivo->getRealPath()) ?: null;
-        $mimeType = strtolower((string) $this->archivo->getMimeType());
-        $extension = match ($mimeType) {
-            'application/pdf', 'application/x-pdf' => 'pdf',
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => strtolower($this->archivo->getClientOriginalExtension() ?: 'bin'),
-        };
-        $reemplazaAnterior = !in_array($tipo->slug, ['constancia-estudios', 'constancia-baja-traslado'], true);
-
         try {
-            DB::transaction(function () use ($tipo, $nivelId, $gradoId, $grupoId, $cicloEscolarId, $nombreOriginal, $tamanoBytes, $hashSha256, $mimeType, $extension, $reemplazaAnterior, $discoExpedientes, &$rutaGuardada) {
-                $consultaVersiones = DocumentoAlumno::query()
-                    ->where('inscripcion_id', $this->alumnoSeleccionadoId)
-                    ->where('tipo_documento_id', $tipo->id)
-                    ->when($nivelId, fn(Builder $query) => $query->where('nivel_id', $nivelId), fn(Builder $query) => $query->whereNull('nivel_id'))
-                    ->when($gradoId, fn(Builder $query) => $query->where('grado_id', $gradoId), fn(Builder $query) => $query->whereNull('grado_id'))
-                    ->when($cicloEscolarId, fn(Builder $query) => $query->where('ciclo_escolar_id', $cicloEscolarId), fn(Builder $query) => $query->whereNull('ciclo_escolar_id'))
-                    ->lockForUpdate();
-
-                $version = ((int) (clone $consultaVersiones)->max('version')) + 1;
-
-                if ($reemplazaAnterior) {
-                    (clone $consultaVersiones)
-                        ->where('es_actual', true)
-                        ->update([
-                            'es_actual' => false,
-                            'estado' => 'reemplazado',
-                            'updated_at' => now(),
-                        ]);
-                }
-
-                $segmentos = [
-                    'expedientes',
-                    $this->alumnoSeleccionadoId,
-                    $tipo->slug,
-                    $nivelId ? 'nivel-' . $nivelId : 'general',
-                ];
-
-                if ($gradoId) {
-                    $segmentos[] = 'grado-' . $gradoId;
-                }
-
-                if ($cicloEscolarId) {
-                    $segmentos[] = 'ciclo-' . $cicloEscolarId;
-                }
-
-                $directorio = implode('/', $segmentos);
-                $nombreInterno = Str::uuid() . '.' . $extension;
-                $rutaGuardada = $this->archivo->storeAs($directorio, $nombreInterno, $discoExpedientes);
-
-                if (!$rutaGuardada) {
-                    throw new \RuntimeException('No fue posible almacenar el archivo.');
-                }
-
-                try {
-                    $archivoConfirmado = Storage::disk($discoExpedientes)->exists($rutaGuardada);
-                } catch (Throwable $e) {
-                    throw new \RuntimeException(
-                        'El archivo se intentó guardar, pero no fue posible comprobarlo en el disco "' . $discoExpedientes . '".',
-                        previous: $e
-                    );
-                }
-
-                if (! $archivoConfirmado) {
-                    throw new \RuntimeException(
-                        'El almacenamiento no confirmó la existencia del archivo después de guardarlo.'
-                    );
-                }
-
-                $documento = DocumentoAlumno::query()->create([
-                    'inscripcion_id' => $this->alumnoSeleccionadoId,
+            $alumno = Inscripcion::withTrashed()->findOrFail($this->alumnoSeleccionadoId);
+            $resultado = app(OrganizadorExpedienteService::class)->registrarFuenteDesdeUpload(
+                $this->archivo,
+                $alumno,
+                [
                     'tipo_documento_id' => $tipo->id,
                     'nivel_id' => $nivelId,
                     'grado_id' => $gradoId,
@@ -447,68 +405,151 @@ class ExpedientesDigitales extends Component
                     'origen' => $this->origen_documento,
                     'tipo_movimiento' => $tipo->slug === 'constancia-baja-traslado' ? $this->tipo_movimiento_documento : null,
                     'motivo' => $tipo->slug === 'constancia-baja-traslado' ? trim($this->motivo_documento) : null,
-                    'disco' => $discoExpedientes,
-                    'ruta' => $rutaGuardada,
-                    'nombre_original' => $nombreOriginal,
-                    'mime_type' => $mimeType,
-                    'tamano_bytes' => $tamanoBytes,
-                    'hash_sha256' => $hashSha256,
-                    'version' => $version,
-                    'es_actual' => true,
-                    'estado' => 'recibido',
                     'observaciones' => trim($this->observaciones) ?: null,
-                    'subido_por' => auth()->id(),
-                ]);
-
-                if ($tipo->slug === 'constancia-baja-traslado') {
-                    MovimientoAlumno::query()->create([
-                        'inscripcion_id' => $this->alumnoSeleccionadoId,
-                            'documento_alumno_id' => $documento->id,
-                        'tipo' => $this->tipo_movimiento_documento,
-                        'fecha' => $this->fecha_documento ?: now()->toDateString(),
-                        'motivo' => trim($this->motivo_documento),
-                        'observaciones' => trim($this->observaciones) ?: 'Documento externo registrado sin modificar el estado de la inscripción.',
-                        'registrado_por' => auth()->id(),
-                    ]);
-                }
-            });
-
-            $tipoGuardadoId = $tipo->id;
-            $nivelGuardadoId = $nivelId;
-            $gradoGuardadoId = $gradoId;
-            $cicloGuardadoId = $cicloEscolarId;
-
-            $this->cerrarCarga();
-
-            $mensaje = $reemplazaAnterior
-                ? 'Documento guardado. La versión anterior se conservó en el historial.'
-                : 'Documento académico agregado al historial del alumno.';
-
-            $this->dispatch(
-                'documento-guardado',
-                tipoId: $tipoGuardadoId,
-                nivelId: $nivelGuardadoId,
-                gradoId: $gradoGuardadoId,
-                cicloId: $cicloGuardadoId,
+                ],
+                $this->modo_integracion,
+                $this->contenido_archivo,
+                auth()->id(),
+                $this->permitir_archivo_duplicado
             );
-            $this->dispatch('notify', type: 'success', message: $mensaje);
+
+            $fuenteId = $resultado['fuente']->id;
+            $paginas = $resultado['paginas'];
+            $this->cerrarCarga();
+            $this->dispatch('abrir-organizador-expediente', inscripcionId: $alumno->id, fuenteId: $fuenteId);
+            $this->dispatch(
+                'notify',
+                type: 'success',
+                message: "Archivo fuente guardado con {$paginas} página(s). Confirma su organización para marcar los documentos como entregados."
+            );
+        } catch (ValidationException $e) {
+            $this->addError('archivo', $e->validator->errors()->first());
         } catch (Throwable $e) {
-            if ($rutaGuardada) {
-                try {
-                    Storage::disk($discoExpedientes)->delete($rutaGuardada);
-                } catch (Throwable $limpiezaError) {
-                    report($limpiezaError);
-                }
+            report($e);
+            $this->addError('archivo', app()->environment('local')
+                ? 'No fue posible preparar el archivo: ' . $e->getMessage()
+                : 'No fue posible preparar el archivo. Inténtalo nuevamente.');
+        }
+    }
+
+    public function abrirNoAplica(int $tipoId, ?int $nivelId = null, ?int $gradoId = null, ?int $cicloId = null): void
+    {
+        $this->autorizarAdmin();
+        abort_unless($this->alumnoSeleccionadoId, 422);
+        $this->asegurarAlumnoModificable();
+        TipoDocumento::query()->where('activo', true)->findOrFail($tipoId);
+        $this->no_aplica_tipo_id = $tipoId;
+        $this->no_aplica_nivel_id = $nivelId;
+        $this->no_aplica_grado_id = $gradoId;
+        $this->no_aplica_ciclo_id = $cicloId;
+        $this->no_aplica_motivo = '';
+        $this->mostrarNoAplica = true;
+        $this->resetValidation();
+    }
+
+    public function cerrarNoAplica(): void
+    {
+        $this->mostrarNoAplica = false;
+        $this->no_aplica_tipo_id = null;
+        $this->no_aplica_nivel_id = null;
+        $this->no_aplica_grado_id = null;
+        $this->no_aplica_ciclo_id = null;
+        $this->no_aplica_motivo = '';
+        $this->resetValidation();
+    }
+
+    public function guardarNoAplica(): void
+    {
+        $this->autorizarAdmin();
+        $this->asegurarAlumnoModificable();
+        $this->validate([
+            'no_aplica_tipo_id' => ['required', 'integer', 'exists:tipos_documentos,id'],
+            'no_aplica_motivo' => ['required', 'string', 'min:5', 'max:1000'],
+        ], [
+            'no_aplica_motivo.required' => 'Escribe el motivo por el que el documento no aplica.',
+            'no_aplica_motivo.min' => 'El motivo debe tener al menos 5 caracteres.',
+        ]);
+
+        $documentoDisponible = DocumentoAlumno::query()
+            ->where('inscripcion_id', $this->alumnoSeleccionadoId)
+            ->where('tipo_documento_id', $this->no_aplica_tipo_id)
+            ->where('es_actual', true)
+            ->where('es_fuente', false)
+            ->whereNotIn('estado', ['rechazado', 'reemplazado', 'cancelada'])
+            ->whereNotNull('ruta')
+            ->when(
+                $this->no_aplica_nivel_id,
+                fn (Builder $query) => $query->where('nivel_id', $this->no_aplica_nivel_id),
+                fn (Builder $query) => $query->whereNull('nivel_id')
+            )
+            ->when(
+                $this->no_aplica_grado_id,
+                fn (Builder $query) => $query->where('grado_id', $this->no_aplica_grado_id),
+                fn (Builder $query) => $query->whereNull('grado_id')
+            )
+            ->when(
+                $this->no_aplica_ciclo_id,
+                fn (Builder $query) => $query->where('ciclo_escolar_id', $this->no_aplica_ciclo_id),
+                fn (Builder $query) => $query->whereNull('ciclo_escolar_id')
+            )
+            ->exists();
+
+        if ($documentoDisponible) {
+            $this->addError('no_aplica_motivo', 'No puedes marcar como “No aplica” un documento que ya está entregado. Primero conserva o reemplaza su versión actual.');
+            return;
+        }
+
+        DB::transaction(function (): void {
+            $query = DocumentoAlumnoNoAplica::query()
+                ->where('inscripcion_id', $this->alumnoSeleccionadoId)
+                ->where('tipo_documento_id', $this->no_aplica_tipo_id)
+                ->where('activo', true);
+
+            foreach ([
+                'nivel_id' => $this->no_aplica_nivel_id,
+                'grado_id' => $this->no_aplica_grado_id,
+                'ciclo_escolar_id' => $this->no_aplica_ciclo_id,
+            ] as $campo => $valor) {
+                $valor ? $query->where($campo, $valor) : $query->whereNull($campo);
             }
 
-            report($e);
+            $query->update(['activo' => false, 'updated_at' => now()]);
 
-            $mensaje = app()->environment('local')
-                ? 'No fue posible guardar el documento: ' . $e->getMessage()
-                : 'No fue posible guardar el documento. Inténtalo nuevamente.';
+            DocumentoAlumnoNoAplica::query()->create([
+                'inscripcion_id' => $this->alumnoSeleccionadoId,
+                'tipo_documento_id' => $this->no_aplica_tipo_id,
+                'nivel_id' => $this->no_aplica_nivel_id,
+                'grado_id' => $this->no_aplica_grado_id,
+                'ciclo_escolar_id' => $this->no_aplica_ciclo_id,
+                'motivo' => trim($this->no_aplica_motivo),
+                'activo' => true,
+                'registrado_por' => auth()->id(),
+            ]);
+        });
 
-            $this->addError('archivo', $mensaje);
+        $this->cerrarNoAplica();
+        $this->dispatch('notify', type: 'success', message: 'El documento fue marcado como “No aplica” con su justificación.');
+    }
+
+    public function quitarNoAplica(int $registroId): void
+    {
+        $this->autorizarAdmin();
+        $this->asegurarAlumnoModificable();
+        DocumentoAlumnoNoAplica::query()
+            ->where('inscripcion_id', $this->alumnoSeleccionadoId)
+            ->whereKey($registroId)
+            ->update(['activo' => false, 'updated_at' => now()]);
+        $this->dispatch('notify', type: 'success', message: 'La marca “No aplica” fue retirada.');
+    }
+
+    #[On('organizacion-expediente-confirmada')]
+    public function organizacionConfirmada(int $inscripcionId): void
+    {
+        if ($inscripcionId !== $this->alumnoSeleccionadoId) {
+            return;
         }
+
+        // El evento de Livewire provoca el renderizado del componente padre.
     }
 
     public function actualizarEstado(int $documentoId, string $estado): void
@@ -634,6 +675,7 @@ class ExpedientesDigitales extends Component
                 'documentos.cicloEscolar:id,inicio_anio,fin_anio',
                 'documentos.usuarioQueSubio:id,name',
                 'documentos.usuarioQueValido:id,name',
+                'documentos.organizacion:id,fuentes_ids',
             ])
             ->when($this->nivel_id, fn(Builder $query) => $query->where('nivel_id', $this->nivel_id))
             ->when(trim($this->buscar) !== '', function (Builder $query) {
@@ -731,6 +773,7 @@ class ExpedientesDigitales extends Component
 
         $this->reemplazaDocumentoActual = DocumentoAlumno::query()
             ->where('inscripcion_id', $this->alumnoSeleccionadoId)
+            ->where('es_fuente', false)
             ->where('tipo_documento_id', $tipo->id)
             ->where('es_actual', true)
             ->when(
@@ -765,7 +808,7 @@ class ExpedientesDigitales extends Component
 
     private function autorizarAdmin(): void
     {
-        abort_unless(auth()->check() && auth()->user()->is_admin, 403, 'No tienes permiso para administrar expedientes digitales.');
+        abort_unless(auth()->check() && (auth()->user()->is_admin || auth()->user()->canAccess('documentos.organizar')), 403, 'No tienes permiso para administrar expedientes digitales.');
     }
 
     public function render()
@@ -805,6 +848,7 @@ class ExpedientesDigitales extends Component
         $alumnoSeleccionado = null;
         $resumenSeleccionado = null;
         $documentosSeleccionados = collect();
+        $fuentesSeleccionadas = collect();
 
         if ($this->alumnoSeleccionadoId) {
             $alumnoSeleccionado = Inscripcion::withTrashed()
@@ -842,12 +886,18 @@ class ExpedientesDigitales extends Component
                     'documentos.cicloEscolar:id,inicio_anio,fin_anio',
                     'documentos.usuarioQueSubio:id,name',
                     'documentos.usuarioQueValido:id,name',
+                'documentos.organizacion:id,fuentes_ids',
                 ])
                 ->find($this->alumnoSeleccionadoId);
 
             if ($alumnoSeleccionado) {
                 $resumenSeleccionado = $servicio->resumen($alumnoSeleccionado);
                 $documentosSeleccionados = $servicio->documentosOrdenados($alumnoSeleccionado);
+                $fuentesSeleccionadas = DocumentoAlumnoFuente::query()
+                    ->where('inscripcion_id', $alumnoSeleccionado->id)
+                    ->with(['documentoAlumno.tipoDocumento:id,nombre,slug', 'usuario:id,name'])
+                    ->orderByDesc('created_at')
+                    ->get();
             }
         }
 
@@ -857,6 +907,7 @@ class ExpedientesDigitales extends Component
             'alumnoSeleccionado' => $alumnoSeleccionado,
             'resumenSeleccionado' => $resumenSeleccionado,
             'documentosSeleccionados' => $documentosSeleccionados,
+            'fuentesSeleccionadas' => $fuentesSeleccionadas,
         ]);
     }
 }

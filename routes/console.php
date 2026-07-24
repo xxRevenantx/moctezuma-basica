@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('system:backup')->dailyAt((string) config('system.backup_schedule', '02:00'))->withoutOverlapping();
 Schedule::command('system:integrity')->dailyAt((string) config('system.integrity_schedule', '06:00'))->withoutOverlapping();
+
+Schedule::command('expedientes:limpiar-temporales-organizador')->dailyAt('03:30')->withoutOverlapping();

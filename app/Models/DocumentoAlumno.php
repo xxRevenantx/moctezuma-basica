@@ -26,6 +26,7 @@ class DocumentoAlumno extends Model
 
     protected $fillable = [
         'inscripcion_id',
+        'organizacion_id',
         'tipo_documento_id',
         'nivel_id',
         'grado_id',
@@ -41,9 +42,12 @@ class DocumentoAlumno extends Model
         'nombre_original',
         'mime_type',
         'tamano_bytes',
+        'paginas_total',
         'hash_sha256',
         'version',
         'es_actual',
+        'es_fuente',
+        'es_organizado',
         'estado',
         'observaciones',
         'subido_por',
@@ -53,11 +57,30 @@ class DocumentoAlumno extends Model
 
     protected $casts = [
         'tamano_bytes' => 'integer',
+        'paginas_total' => 'integer',
         'version' => 'integer',
         'es_actual' => 'boolean',
+        'es_fuente' => 'boolean',
+        'es_organizado' => 'boolean',
         'validado_at' => 'datetime',
         'fecha_documento' => 'date',
     ];
+
+
+    public function organizacion()
+    {
+        return $this->belongsTo(OrganizacionDocumentoAlumno::class, 'organizacion_id');
+    }
+
+    public function fuente()
+    {
+        return $this->hasOne(DocumentoAlumnoFuente::class, 'documento_alumno_id');
+    }
+
+    public function getEsOrganizableAttribute(): bool
+    {
+        return ! in_array((string) $this->origen, config('expedientes_organizador.protected_origins', ['generado']), true);
+    }
 
     public function inscripcion()
     {
@@ -107,6 +130,7 @@ class DocumentoAlumno extends Model
     public function scopeDisponibles($query)
     {
         return $query->where('es_actual', true)
+            ->where('es_fuente', false)
             ->whereNotIn('estado', ['pendiente', 'rechazado', 'reemplazado', 'cancelada']);
     }
 

@@ -416,4 +416,20 @@ class Inscripcion extends Model
         });
     }
 
+
+    public function fuentesDocumentales()
+    {
+        return $this->hasMany(DocumentoAlumnoFuente::class, 'inscripcion_id');
+    }
+
+    public function organizacionesDocumentales()
+    {
+        return $this->hasMany(OrganizacionDocumentoAlumno::class, 'inscripcion_id');
+    }
+
+    public function documentosNoAplican()
+    {
+        return $this->hasMany(DocumentoAlumnoNoAplica::class, 'inscripcion_id');
+    }
+
 }

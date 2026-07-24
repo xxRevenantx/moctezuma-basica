@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DocumentoAlumno;
+use App\Models\DocumentoAlumnoNoAplica;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\TipoDocumento;
@@ -32,9 +33,11 @@ class ExpedienteDigitalService
             'documentos.nivel:id,nombre,slug,color',
             'documentos.grado:id,nombre,orden',
             'documentos.cicloEscolar:id,inicio_anio,fin_anio',
+            'documentosNoAplican' => fn ($query) => $query->where('activo', true),
         ]);
 
-        $actuales = $alumno->documentos->where('es_actual', true);
+        $actuales = $alumno->documentos->where('es_actual', true)->where('es_fuente', false);
+        $noAplican = $alumno->documentosNoAplican->where('activo', true);
         $disponibles = $actuales
             ->reject(fn (DocumentoAlumno $d) => in_array($d->estado, ['pendiente', 'rechazado', 'reemplazado', 'cancelada'], true))
             ->filter(fn (DocumentoAlumno $d) => $d->archivo_existe);
@@ -43,14 +46,19 @@ class ExpedienteDigitalService
         foreach ($this->tiposActivos()->where('es_general', true) as $tipo) {
             $actual = $actuales->where('tipo_documento_id', $tipo->id)->sortByDesc('version')->first();
             $disponible = $disponibles->where('tipo_documento_id', $tipo->id)->sortByDesc('version')->first();
+            $noAplica = $noAplican->where('tipo_documento_id', $tipo->id)
+                ->whereNull('nivel_id')->whereNull('grado_id')->whereNull('ciclo_escolar_id')->sortByDesc('id')->first();
             $items->push([
                 'tipo_id' => $tipo->id,
                 'nivel_id' => null,
                 'clave' => $tipo->slug,
                 'nombre' => $tipo->nombre,
                 'etiqueta' => $tipo->nombre,
-                'presente' => (bool) $disponible,
-                'estado' => $actual?->estado ?? 'pendiente',
+                'presente' => (bool) $disponible || (bool) $noAplica,
+                'estado' => $noAplica ? 'no_aplica' : ($actual?->estado ?? 'pendiente'),
+                'no_aplica' => (bool) $noAplica,
+                'no_aplica_id' => $noAplica?->id,
+                'motivo_no_aplica' => $noAplica?->motivo,
                 'documento_id' => $actual?->id,
                 'archivo_faltante' => (bool) $actual && ! $actual->archivo_existe,
             ]);
@@ -61,14 +69,19 @@ class ExpedienteDigitalService
         if ($nivelCertificado && $tipoCertificado) {
             $actual = $actuales->where('tipo_documento_id', $tipoCertificado->id)->where('nivel_id', $nivelCertificado->id)->sortByDesc('version')->first();
             $disponible = $disponibles->where('tipo_documento_id', $tipoCertificado->id)->where('nivel_id', $nivelCertificado->id)->sortByDesc('version')->first();
+            $noAplica = $noAplican->where('tipo_documento_id', $tipoCertificado->id)
+                ->where('nivel_id', $nivelCertificado->id)->whereNull('grado_id')->whereNull('ciclo_escolar_id')->sortByDesc('id')->first();
             $items->push([
                 'tipo_id' => $tipoCertificado->id,
                 'nivel_id' => $nivelCertificado->id,
                 'clave' => 'certificado-estudios',
                 'nombre' => $tipoCertificado->nombre,
                 'etiqueta' => 'Certificado de ' . Str::lower($nivelCertificado->nombre),
-                'presente' => (bool) $disponible,
-                'estado' => $actual?->estado ?? 'pendiente',
+                'presente' => (bool) $disponible || (bool) $noAplica,
+                'estado' => $noAplica ? 'no_aplica' : ($actual?->estado ?? 'pendiente'),
+                'no_aplica' => (bool) $noAplica,
+                'no_aplica_id' => $noAplica?->id,
+                'motivo_no_aplica' => $noAplica?->motivo,
                 'documento_id' => $actual?->id,
                 'archivo_faltante' => (bool) $actual && ! $actual->archivo_existe,
             ]);
@@ -140,7 +153,7 @@ class ExpedienteDigitalService
             'documentos.grupo.asignacionGrupo:id,nombre', 'documentos.cicloEscolar:id,inicio_anio,fin_anio',
             'documentos.usuarioQueSubio:id,name', 'documentos.usuarioQueValido:id,name',
         ]);
-        return $alumno->documentos->sort(function (DocumentoAlumno $a, DocumentoAlumno $b) {
+        return $alumno->documentos->where('es_fuente', false)->sort(function (DocumentoAlumno $a, DocumentoAlumno $b) {
             return (($a->tipoDocumento?->orden ?? 999) <=> ($b->tipoDocumento?->orden ?? 999))
                 ?: (($a->nivel_id ?? 0) <=> ($b->nivel_id ?? 0))
                 ?: (($a->grado_id ?? 0) <=> ($b->grado_id ?? 0))

@@ -13,6 +13,7 @@ class ExpedienteDigitalController extends Controller
 {
     public function index()
     {
+        $this->autorizar();
         return view('documentos.expedientes-digitales', [
             'inscripcionId' => null,
         ]);
@@ -20,6 +21,7 @@ class ExpedienteDigitalController extends Controller
 
     public function show(Inscripcion $inscripcion)
     {
+        $this->autorizar();
         return view('documentos.expedientes-digitales', [
             'inscripcionId' => $inscripcion->id,
         ]);
@@ -27,6 +29,8 @@ class ExpedienteDigitalController extends Controller
 
     public function preview(DocumentoAlumno $documento)
     {
+        $this->autorizar();
+        abort_if($documento->es_fuente, 404);
         $this->asegurarArchivoExiste($documento);
 
         return Storage::disk($documento->disco)->response(
@@ -42,6 +46,8 @@ class ExpedienteDigitalController extends Controller
 
     public function download(DocumentoAlumno $documento)
     {
+        $this->autorizar();
+        abort_if($documento->es_fuente, 404);
         $this->asegurarArchivoExiste($documento);
 
         return Storage::disk($documento->disco)->download(
@@ -53,6 +59,7 @@ class ExpedienteDigitalController extends Controller
 
     public function zip(Inscripcion $inscripcion)
     {
+        $this->autorizar();
         abort_unless(class_exists(ZipArchive::class), 500, 'La extensión ZIP de PHP no está habilitada.');
 
         $inscripcion->load([
@@ -87,7 +94,7 @@ class ExpedienteDigitalController extends Controller
         ]);
 
         $documentos = $inscripcion->documentos
-            ->filter(fn (DocumentoAlumno $documento) => $documento->archivo_existe);
+            ->filter(fn (DocumentoAlumno $documento) => ! $documento->es_fuente && $documento->archivo_existe);
 
         abort_if(
             $documentos->isEmpty()
@@ -296,6 +303,15 @@ class ExpedienteDigitalController extends Controller
         }
 
         return filled($valor) ? (string) $valor : '—';
+    }
+
+    private function autorizar(): void
+    {
+        abort_unless(
+            auth()->check() && (auth()->user()->is_admin || auth()->user()->canAccess('documentos.organizar')),
+            403,
+            'No tienes permiso para administrar expedientes digitales.'
+        );
     }
 
     private function asegurarArchivoExiste(DocumentoAlumno $documento): void

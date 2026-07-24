@@ -71,6 +71,7 @@ return [
         'documentos.consultar' => 'Consultar documentos',
         'documentos.crear' => 'Crear documentos',
         'documentos.autorizar' => 'Autorizar documentos',
+        'documentos.organizar' => 'Organizar páginas y administrar expedientes digitales',
         'documentos.eliminar' => 'Eliminar documentos',
         'horarios.consultar' => 'Consultar horarios',
         'horarios.editar' => 'Editar horarios',

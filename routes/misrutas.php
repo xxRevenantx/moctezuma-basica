@@ -14,6 +14,7 @@ use App\Http\Controllers\DocumentosAcademicosZipController;
 use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\ExpedienteDigitalController;
+use App\Http\Controllers\DocumentoAlumnoFuenteController;
 use App\Http\Controllers\ExpedientePersonalController;
 use App\Http\Controllers\InscripcionController;
 use App\Http\Controllers\MatriculaController;
@@ -134,7 +135,7 @@ Route::middleware('admin')->group(function () {
 Route::get('/profesores', [PersonaNivelController::class, 'profesores'])->name('misrutas.profesores');
 
 // Documentación
-Route::middleware('admin')->group(function () {
+Route::middleware('permission:documentos.organizar')->group(function () {
     Route::get('/expedientes-digitales', [ExpedienteDigitalController::class, 'index'])
         ->name('misrutas.expedientes');
 
@@ -147,6 +148,19 @@ Route::middleware('admin')->group(function () {
 
     Route::get('/expedientes-digitales/documento/{documento}/descargar', [ExpedienteDigitalController::class, 'download'])
         ->name('misrutas.expedientes.download');
+
+    Route::get('/expedientes-digitales/documento/{documento}/originales', [DocumentoAlumnoFuenteController::class, 'originals'])
+        ->name('misrutas.expedientes.originals');
+
+    Route::get('/expedientes-digitales/fuente/{fuente}/ver', [DocumentoAlumnoFuenteController::class, 'preview'])
+        ->name('misrutas.expedientes.fuentes.preview');
+
+    Route::get('/expedientes-digitales/fuente/{fuente}/descargar', [DocumentoAlumnoFuenteController::class, 'download'])
+        ->name('misrutas.expedientes.fuentes.download');
+
+    Route::get('/expedientes-digitales/fuente/{fuente}/pagina/{pagina}', [DocumentoAlumnoFuenteController::class, 'page'])
+        ->whereNumber('pagina')
+        ->name('misrutas.expedientes.fuentes.page');
 
     Route::get('/expedientes-digitales/alumno/{inscripcion}/zip', [ExpedienteDigitalController::class, 'zip'])
         ->withTrashed()
