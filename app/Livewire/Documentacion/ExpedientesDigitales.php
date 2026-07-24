@@ -554,6 +554,43 @@ class ExpedientesDigitales extends Component
         );
     }
 
+    public function etiquetaEstadoExpediente(Inscripcion $alumno): ?string
+    {
+        if ($alumno->trashed() && ! $alumno->esBajaAdministrativa()) {
+            return 'Registro archivado — expediente histórico';
+        }
+
+        if ($alumno->esEgresado()) {
+            return 'Egresado — expediente histórico';
+        }
+
+        if ($alumno->esBajaAdministrativa()) {
+            return $alumno->etiqueta_estatus . ' — expediente histórico';
+        }
+
+        return null;
+    }
+
+    public function claseEstadoExpediente(Inscripcion $alumno): string
+    {
+        if ($alumno->trashed() && ! $alumno->esBajaAdministrativa()) {
+            return 'bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-slate-300';
+        }
+
+        if ($alumno->esEgresado()) {
+            return 'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300';
+        }
+
+        return 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300';
+    }
+
+    private function esAlumnoVigente(Inscripcion $alumno): bool
+    {
+        return ! $alumno->trashed()
+            && ! $alumno->esEgresado()
+            && ! $alumno->esBajaAdministrativa();
+    }
+
     private function consultaAlumnos(): Builder
     {
         return Inscripcion::withTrashed()
@@ -571,9 +608,16 @@ class ExpedientesDigitales extends Component
                 'generacion_id',
                 'semestre_id',
                 'tutor_id',
+                'ciclo_escolar_id',
                 'foto_path',
                 'activo',
+                'estatus',
+                'fecha_estatus',
+                'motivo_estatus',
                 'fecha_baja',
+                'motivo_baja',
+                'observaciones_baja',
+                'fecha_inscripcion',
                 'deleted_at',
             ])
             ->with([
@@ -614,9 +658,20 @@ class ExpedientesDigitales extends Component
     private function aplicarFiltroEstado(Collection $alumnos): Collection
     {
         return match ($this->estado_expediente) {
-            'completos' => $alumnos->filter(fn(Inscripcion $alumno) => !$alumno->trashed() && $alumno->activo && $alumno->resumen_documental['completo']),
-            'incompletos' => $alumnos->filter(fn(Inscripcion $alumno) => !$alumno->trashed() && $alumno->activo && !$alumno->resumen_documental['completo']),
-            'bajas' => $alumnos->filter(fn(Inscripcion $alumno) => $alumno->trashed() || !$alumno->activo),
+            'completos' => $alumnos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+                    && $alumno->resumen_documental['completo']
+            ),
+            'incompletos' => $alumnos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+                    && ! $alumno->resumen_documental['completo']
+            ),
+            'egresados' => $alumnos->filter(
+                fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esEgresado()
+            ),
+            'bajas' => $alumnos->filter(
+                fn (Inscripcion $alumno) => $alumno->trashed() || $alumno->esBajaAdministrativa()
+            ),
             default => $alumnos,
         };
     }
@@ -702,9 +757,9 @@ class ExpedientesDigitales extends Component
 
         abort_unless($alumno, 404, 'El alumno no existe.');
         abort_if(
-            $alumno->trashed() || !$alumno->activo,
+            $alumno->expedienteSoloLectura(),
             422,
-            'El expediente de un alumno dado de baja es únicamente histórico.'
+            'El expediente de un alumno con baja, traslado, suspensión o archivo es únicamente histórico.'
         );
     }
 
@@ -729,9 +784,20 @@ class ExpedientesDigitales extends Component
 
         $metricas = [
             'total' => $todos->count(),
-            'completos' => $todos->filter(fn(Inscripcion $alumno) => !$alumno->trashed() && $alumno->activo && $alumno->resumen_documental['completo'])->count(),
-            'incompletos' => $todos->filter(fn(Inscripcion $alumno) => !$alumno->trashed() && $alumno->activo && !$alumno->resumen_documental['completo'])->count(),
-            'bajas' => $todos->filter(fn(Inscripcion $alumno) => $alumno->trashed() || !$alumno->activo)->count(),
+            'completos' => $todos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+                    && $alumno->resumen_documental['completo']
+            )->count(),
+            'incompletos' => $todos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+                    && ! $alumno->resumen_documental['completo']
+            )->count(),
+            'egresados' => $todos->filter(
+                fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esEgresado()
+            )->count(),
+            'bajas' => $todos->filter(
+                fn (Inscripcion $alumno) => $alumno->trashed() || $alumno->esBajaAdministrativa()
+            )->count(),
         ];
 
         $alumnos = $this->paginar($this->aplicarFiltroEstado($todos)->values());

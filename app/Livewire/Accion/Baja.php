@@ -4,8 +4,8 @@ namespace App\Livewire\Accion;
 
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
-use App\Models\MovimientoAlumno;
 use App\Models\Inscripcion;
+use App\Models\MovimientoAlumno;
 use App\Models\Nivel;
 use App\Services\GestionAcademicaService;
 use Carbon\Carbon;
@@ -50,20 +50,17 @@ class Baja extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
         $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
-        $this->ciclosEscolares = CicloEscolar::query()->orderByDesc('es_actual')->orderByDesc('inicio_anio')->get();
-        $this->ciclo_escolar_id = (int) ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->ciclosEscolares->first()?->id);
+        $this->ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->orderByDesc('status')
-            ->orderByDesc('anio_ingreso')
-            ->orderByDesc('anio_egreso')
-            ->get();
+        $cicloPredeterminado = $this->ciclosEscolares->firstWhere('es_actual', true)
+            ?? $this->ciclosEscolares->first();
 
-        $this->generacion_id = $this->generaciones->firstWhere('status', true)?->id
-            ?: $this->generaciones->first()?->id;
+        $this->ciclo_escolar_id = $cicloPredeterminado?->id;
+        $this->generaciones = collect();
+        $this->cargarGeneraciones(false);
 
         $this->fecha_movimiento = now()->toDateString();
         $this->fecha_reingreso = now()->toDateString();
@@ -71,19 +68,22 @@ class Baja extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['ciclo_escolar_id', 'generacion_id', 'search', 'filtro_estatus'], true)) {
-            $this->selected = [];
-            $this->selectPage = false;
-            $this->resetPage();
-            $this->resetPage('inactivosPage');
-            $this->resetPage('historialPage');
+        if (in_array($property, ['generacion_id', 'search', 'filtro_estatus'], true)) {
+            $this->reiniciarSeleccionYPaginacion();
         }
+    }
+
+    public function updatedCicloEscolarId($value): void
+    {
+        $this->ciclo_escolar_id = filled($value) ? (int) $value : null;
+        $this->cargarGeneraciones(false);
+        $this->reiniciarSeleccionYPaginacion();
     }
 
     public function updatedSelectPage(bool $value): void
     {
         $this->selected = $value
-            ? $this->activos()->getCollection()->pluck('id')->map(fn($id) => (string) $id)->all()
+            ? $this->activos()->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all()
             : [];
     }
 
@@ -95,20 +95,14 @@ class Baja extends Component
     public function clearSearch(): void
     {
         $this->search = '';
-        $this->selected = [];
-        $this->selectPage = false;
-        $this->resetPage();
-        $this->resetPage('inactivosPage');
+        $this->reiniciarSeleccionYPaginacion();
     }
 
     public function limpiarFiltros(): void
     {
         $this->search = '';
         $this->filtro_estatus = '';
-        $this->selected = [];
-        $this->selectPage = false;
-        $this->resetPage();
-        $this->resetPage('inactivosPage');
+        $this->reiniciarSeleccionYPaginacion();
     }
 
     public function aplicarMovimiento(): void
@@ -169,11 +163,12 @@ class Baja extends Component
         $this->fecha_movimiento = now()->toDateString();
         $this->resetPage();
         $this->resetPage('inactivosPage');
+        $this->resetPage('historialPage');
 
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => $cantidad === 1 ? 'Movimiento registrado' : "{$cantidad} movimientos registrados",
-            'text' => 'Los alumnos conservan su generación y ahora aparecen en estados no activos.',
+            'text' => 'Los alumnos conservan su generación y ahora aparecen en bajas o movimientos administrativos.',
             'position' => 'top-end',
         ]);
     }
@@ -191,12 +186,6 @@ class Baja extends Component
 
         $alumno = $this->inactivosQuery()->whereKey($inscripcionId)->firstOrFail();
 
-        if ($alumno->estatus === 'egresado') {
-            $this->addError('motivo_reingreso', 'Un alumno egresado no puede reincorporarse desde este módulo.');
-
-            return;
-        }
-
         $actualizado = app(GestionAcademicaService::class)->cambiarEstatus(
             $alumno,
             'reingreso',
@@ -213,6 +202,7 @@ class Baja extends Component
         $this->fecha_reingreso = now()->toDateString();
         $this->resetPage();
         $this->resetPage('inactivosPage');
+        $this->resetPage('historialPage');
 
         $this->dispatch('swal', [
             'icon' => 'success',
@@ -227,12 +217,13 @@ class Baja extends Component
         return match ($estatus) {
             'baja_temporal' => 'Baja temporal',
             'baja_definitiva' => 'Baja definitiva',
-            'trasladado' => 'Traslado',
+            'traslado', 'trasladado' => 'Traslado',
             'suspendido' => 'Suspendido',
             'inactivo' => 'Inactivo',
             'egresado' => 'Egresado',
             'reingreso' => 'Reingreso',
             'no_promovido' => 'No promovido',
+            'preinscrito' => 'Preinscrito',
             default => 'Activo',
         };
     }
@@ -250,7 +241,7 @@ class Baja extends Component
             $alumno->apellido_paterno,
             $alumno->apellido_materno,
             $alumno->nombre,
-        ], fn($valor) => filled($valor)))) ?: '—';
+        ], fn ($valor) => filled($valor)))) ?: '—';
     }
 
     public function iniciales(Inscripcion $alumno): string
@@ -258,10 +249,10 @@ class Baja extends Component
         $partes = array_values(array_filter([
             $alumno->nombre,
             $alumno->apellido_paterno,
-        ], fn($valor) => filled($valor)));
+        ], fn ($valor) => filled($valor)));
 
         return collect($partes)
-            ->map(fn($valor) => mb_strtoupper(mb_substr(trim((string) $valor), 0, 1)))
+            ->map(fn ($valor) => mb_strtoupper(mb_substr(trim((string) $valor), 0, 1)))
             ->take(2)
             ->implode('') ?: 'A';
     }
@@ -270,9 +261,10 @@ class Baja extends Component
     {
         return match ($estatus) {
             'activo' => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'preinscrito' => 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300',
             'reingreso' => 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300',
             'no_promovido' => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
-            'trasladado' => 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300',
+            'traslado', 'trasladado' => 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-300',
             'suspendido' => 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/30 dark:text-orange-300',
             'egresado' => 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300',
             'inactivo' => 'border-slate-200 bg-slate-100 text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300',
@@ -295,12 +287,61 @@ class Baja extends Component
         }
     }
 
+    private function cargarGeneraciones(bool $conservarSeleccion = true): void
+    {
+        $seleccionAnterior = $conservarSeleccion ? $this->generacion_id : null;
+        $ciclo = $this->ciclo_escolar_id
+            ? $this->ciclosEscolares->firstWhere('id', (int) $this->ciclo_escolar_id)
+            : null;
+
+        $consulta = Generacion::query()
+            ->whereNull('deleted_at')
+            ->where('nivel_id', $this->nivel?->id);
+
+        if ($ciclo) {
+            $consulta->where(function (Builder $query) use ($ciclo): void {
+                $query->where(function (Builder $porRango) use ($ciclo): void {
+                    $porRango
+                        ->where('anio_ingreso', '<=', (int) $ciclo->inicio_anio)
+                        ->where('anio_egreso', '>=', (int) $ciclo->fin_anio);
+                })->orWhereHas('inscripciones', function (Builder $inscripciones) use ($ciclo): void {
+                    $inscripciones->where('ciclo_escolar_id', (int) $ciclo->id);
+                });
+            });
+        }
+
+        $this->generaciones = $consulta
+            ->orderByDesc('status')
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
+            ->get();
+
+        if ($seleccionAnterior && $this->generaciones->contains('id', (int) $seleccionAnterior)) {
+            $this->generacion_id = (int) $seleccionAnterior;
+
+            return;
+        }
+
+        $this->generacion_id = $this->generaciones->firstWhere('status', true)?->id
+            ?: $this->generaciones->first()?->id;
+    }
+
+    private function reiniciarSeleccionYPaginacion(): void
+    {
+        $this->selected = [];
+        $this->selectPage = false;
+        $this->resetPage();
+        $this->resetPage('inactivosPage');
+        $this->resetPage('historialPage');
+    }
+
     private function baseQuery(): Builder
     {
         return Inscripcion::query()
             ->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id, fn(Builder $query) => $query->where('generacion_id', $this->generacion_id))
+            ->where('nivel_id', $this->nivel?->id)
+            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->when($this->generacion_id, fn (Builder $query) => $query->where('generacion_id', $this->generacion_id))
             ->when(trim($this->search) !== '', function (Builder $query): void {
                 $term = '%' . trim($this->search) . '%';
 
@@ -318,22 +359,20 @@ class Baja extends Component
     {
         return $this->baseQuery()
             ->where('activo', true)
-            ->when($this->filtro_estatus !== '', fn(Builder $query) => $query->where('estatus', $this->filtro_estatus));
+            ->when($this->filtro_estatus !== '', fn (Builder $query) => $query->where('estatus', $this->filtro_estatus));
     }
 
     private function inactivosQuery(): Builder
     {
         return $this->baseQuery()
             ->where(function (Builder $query): void {
-                $query->where('activo', false)
-                    ->orWhereIn('estatus', [
-                        'baja_temporal',
-                        'baja_definitiva',
-                        'trasladado',
-                        'suspendido',
-                        'inactivo',
-                        'egresado',
-                    ]);
+                $query->whereIn('estatus', Inscripcion::ESTATUS_BAJA_ADMINISTRATIVA)
+                    ->orWhere(function (Builder $legado): void {
+                        $legado->where('activo', false)
+                            ->where(function (Builder $sinEstatus): void {
+                                $sinEstatus->whereNull('estatus')->orWhere('estatus', '');
+                            });
+                    });
             });
     }
 
@@ -360,7 +399,7 @@ class Baja extends Component
     {
         return MovimientoAlumno::query()
             ->with(['inscripcion.generacion', 'cicloEscolar', 'usuario'])
-            ->whereHas('inscripcion', fn (Builder $query) => $query->where('nivel_id', $this->nivel->id))
+            ->whereHas('inscripcion', fn (Builder $query) => $query->where('nivel_id', $this->nivel?->id))
             ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when($this->generacion_id, function (Builder $query): void {
                 $query->whereHas('inscripcion', fn (Builder $alumno) => $alumno->where('generacion_id', $this->generacion_id));

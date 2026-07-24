@@ -78,7 +78,7 @@
 }" class="space-y-6">
     {{-- Loader general --}}
     <div wire:loading.flex
-        wire:target="generacion_id,filtro_estatus,search,clearSearch,limpiarFiltros,aplicarMovimiento,reactivarAlumno,gotoPage,nextPage,previousPage"
+        wire:target="ciclo_escolar_id,generacion_id,filtro_estatus,search,clearSearch,limpiarFiltros,aplicarMovimiento,reactivarAlumno,gotoPage,nextPage,previousPage"
         class="fixed inset-0 z-[9998] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
         <div
             class="w-full max-w-sm overflow-hidden rounded-[30px] border border-white/20 bg-white/95 shadow-2xl shadow-rose-950/20 dark:bg-neutral-900/95">
@@ -220,7 +220,7 @@
             <div class="bg-white p-4 sm:p-5 dark:bg-neutral-900">
                 <div class="flex items-center justify-between gap-3">
                     <div>
-                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500">No activos</p>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500">Bajas / movimientos</p>
                         <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
                             {{ number_format($totalBajas) }}</p>
                     </div>
@@ -625,7 +625,7 @@
                     <flux:icon.user-minus class="h-5 w-5" />
                 </div>
                 <div>
-                    <h2 class="font-black text-slate-900 dark:text-white">Bajas y estados no activos</h2>
+                    <h2 class="font-black text-slate-900 dark:text-white">Bajas y movimientos administrativos</h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Los alumnos permanecen vinculados a su
                         generación original.</p>
                 </div>
@@ -719,33 +719,25 @@
 
                                 <td class="px-4 py-4">
                                     <div class="flex justify-end">
-                                        @if ($alumnoInactivo->estatus !== 'egresado')
-                                            <button type="button"
-                                                x-on:click.prevent="confirmarReincorporacion(
-                                                    {{ $alumnoInactivo->id }},
-                                                    @js($this->nombreCompleto($alumnoInactivo))
-                                                )"
-                                                wire:loading.attr="disabled"
+                                        <button type="button"
+                                            x-on:click.prevent="confirmarReincorporacion(
+                                                {{ $alumnoInactivo->id }},
+                                                @js($this->nombreCompleto($alumnoInactivo))
+                                            )"
+                                            wire:loading.attr="disabled"
+                                            wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
+                                            class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-neutral-900">
+                                            <flux:icon.arrow-path wire:loading.remove
                                                 wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                                class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-neutral-900">
-                                                <flux:icon.arrow-path wire:loading.remove
-                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                                    class="h-4 w-4" />
-                                                <flux:icon.arrow-path wire:loading
-                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                                    class="h-4 w-4 animate-spin" />
-                                                <span wire:loading.remove
-                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Reincorporar</span>
-                                                <span wire:loading
-                                                    wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Procesando…</span>
-                                            </button>
-                                        @else
-                                            <span
-                                                class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                                                <flux:icon.check-circle class="h-4 w-4" />
-                                                Egreso confirmado
-                                            </span>
-                                        @endif
+                                                class="h-4 w-4" />
+                                            <flux:icon.arrow-path wire:loading
+                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
+                                                class="h-4 w-4 animate-spin" />
+                                            <span wire:loading.remove
+                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Reincorporar</span>
+                                            <span wire:loading
+                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Procesando…</span>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -759,8 +751,7 @@
                                 </div>
                                 <p class="mt-3 font-black text-slate-700 dark:text-slate-200">No hay movimientos
                                     registrados</p>
-                                <p class="mt-1 text-sm text-slate-500">Esta generación no tiene bajas, traslados ni
-                                    alumnos inactivos.</p>
+                                <p class="mt-1 text-sm text-slate-500">Esta generación no tiene bajas, traslados, suspensiones ni alumnos inactivos.</p>
                             </td>
                         </tr>
                     @endif

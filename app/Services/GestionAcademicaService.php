@@ -261,7 +261,8 @@ class GestionAcademicaService
         return DB::transaction(function () use ($alumno, $estatus, $motivo, $usuarioId, $fecha): Inscripcion {
             $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($alumno->id);
             $antes = $this->snapshot($alumno);
-            $esActivo = in_array($estatus, ['activo', 'reingreso', 'no_promovido'], true);
+            $esActivo = in_array($estatus, Inscripcion::ESTATUS_ACTIVOS, true);
+            $esBajaAdministrativa = in_array($estatus, Inscripcion::ESTATUS_BAJA_ADMINISTRATIVA, true);
             $fechaMovimiento = $fecha ?: now()->toDateString();
 
             $alumno->update([
@@ -269,8 +270,9 @@ class GestionAcademicaService
                 'activo' => $esActivo,
                 'fecha_estatus' => $fechaMovimiento,
                 'motivo_estatus' => $motivo,
-                'fecha_baja' => $esActivo ? null : $fechaMovimiento,
-                'motivo_baja' => $esActivo ? null : $motivo,
+                // Egreso, preinscripción u otros estados no activos no son una baja.
+                'fecha_baja' => $esBajaAdministrativa ? $fechaMovimiento : null,
+                'motivo_baja' => $esBajaAdministrativa ? $motivo : null,
                 'indicador_reingreso' => $estatus === 'reingreso',
                 'tipo_ultimo_ingreso' => $estatus === 'reingreso' ? 'reingreso' : $alumno->tipo_ultimo_ingreso,
                 'fecha_ultimo_ingreso' => $estatus === 'reingreso' ? $fechaMovimiento : $alumno->fecha_ultimo_ingreso,

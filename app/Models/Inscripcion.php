@@ -10,6 +10,23 @@ use Throwable;
 
 class Inscripcion extends Model
 {
+    public const ESTATUS_ACTIVOS = [
+        'activo',
+        'reingreso',
+        'no_promovido',
+    ];
+
+    public const ESTATUS_BAJA_ADMINISTRATIVA = [
+        'baja_temporal',
+        'baja_definitiva',
+        'traslado',
+        'trasladado',
+        'suspendido',
+        'inactivo',
+    ];
+
+    public const ESTATUS_EGRESADO = 'egresado';
+
     /** @use HasFactory<\Database\Factories\InscripcionFactory> */
     use HasFactory, SoftDeletes;
 
@@ -158,10 +175,37 @@ class Inscripcion extends Model
         }
     }
 
+    public function estatusNormalizado(): string
+    {
+        $estatus = mb_strtolower(trim((string) $this->estatus));
+
+        if ($estatus !== '') {
+            return $estatus;
+        }
+
+        return $this->activo ? 'activo' : 'inactivo';
+    }
+
+    public function esEgresado(): bool
+    {
+        return $this->estatusNormalizado() === self::ESTATUS_EGRESADO;
+    }
+
+    public function esBajaAdministrativa(): bool
+    {
+        return in_array($this->estatusNormalizado(), self::ESTATUS_BAJA_ADMINISTRATIVA, true);
+    }
+
+    public function expedienteSoloLectura(): bool
+    {
+        return $this->trashed() || $this->esBajaAdministrativa();
+    }
+
     public function getEtiquetaEstatusAttribute(): string
     {
-        return match (mb_strtolower((string) $this->estatus)) {
+        return match ($this->estatusNormalizado()) {
             'activo' => 'Activo',
+            'preinscrito' => 'Preinscrito',
             'reingreso' => 'Reingreso',
             'no_promovido' => 'No promovido',
             'egresado' => 'Egresado',
@@ -170,7 +214,7 @@ class Inscripcion extends Model
             'baja_definitiva' => 'Baja definitiva',
             'suspendido' => 'Suspendido',
             'inactivo' => 'Inactivo',
-            default => ucfirst(str_replace('_', ' ', (string) $this->estatus)),
+            default => ucfirst(str_replace('_', ' ', $this->estatusNormalizado())),
         };
     }
 

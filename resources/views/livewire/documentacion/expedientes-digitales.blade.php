@@ -61,7 +61,7 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[520px]">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:min-w-[650px] xl:grid-cols-5">
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
                     <p class="text-xs font-semibold text-slate-300">Alumnos</p>
                     <p class="mt-1 text-2xl font-black">{{ number_format($metricas['total']) }}</p>
@@ -73,6 +73,10 @@
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
                     <p class="text-xs font-semibold text-amber-200">Incompletos</p>
                     <p class="mt-1 text-2xl font-black">{{ number_format($metricas['incompletos']) }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                    <p class="text-xs font-semibold text-violet-200">Egresados</p>
+                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['egresados']) }}</p>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
                     <p class="text-xs font-semibold text-rose-200">Bajas</p>
@@ -120,7 +124,8 @@
                     <option value="todos">Todos</option>
                     <option value="completos">Completos</option>
                     <option value="incompletos">Incompletos</option>
-                    <option value="bajas">Alumnos de baja</option>
+                    <option value="egresados">Egresados</option>
+                    <option value="bajas">Bajas, traslados y archivados</option>
                 </select>
             </div>
 
@@ -218,10 +223,10 @@
                                     {{ $alumno->grado?->nombre ?? 'Sin grado' }} ·
                                     Grupo {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}
                                 </p>
-                                @if (!$alumno->activo || $alumno->trashed())
+                                @if ($etiquetaEstado = $this->etiquetaEstadoExpediente($alumno))
                                     <span
-                                        class="mt-2 inline-flex rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-                                        Baja — expediente histórico
+                                        class="mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase {{ $this->claseEstadoExpediente($alumno) }}">
+                                        {{ $etiquetaEstado }}
                                     </span>
                                 @endif
                             </td>
@@ -285,6 +290,11 @@
                             </h3>
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $alumno->matricula }} ·
                                 {{ $alumno->nivel?->nombre ?? 'Sin nivel' }}</p>
+                            @if ($etiquetaEstado = $this->etiquetaEstadoExpediente($alumno))
+                                <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase {{ $this->claseEstadoExpediente($alumno) }}">
+                                    {{ $etiquetaEstado }}
+                                </span>
+                            @endif
                         </div>
                         <span
                             class="rounded-full px-2.5 py-1 text-xs font-black {{ $resumen['completo'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' }}">
@@ -330,7 +340,8 @@
                 fn($documento) => in_array($documento->tipoDocumento?->slug, $slugsCertificados, true) ||
                     in_array($documento->tipoDocumento?->slug, $slugsAcademicos, true),
             );
-            $soloHistorico = $alumnoSeleccionado->trashed() || !$alumnoSeleccionado->activo;
+            $soloHistorico = $alumnoSeleccionado->expedienteSoloLectura();
+            $esEgresado = $alumnoSeleccionado->esEgresado();
 
             $tipoConstanciaEstudios = collect($tiposDocumentos)->firstWhere('slug', 'constancia-estudios');
             $tipoConstanciaBaja = collect($tiposDocumentos)->firstWhere('slug', 'constancia-baja-traslado');
@@ -338,9 +349,7 @@
             $gradoContextoId = $alumnoSeleccionado->grado_id;
             $cicloContextoId = data_get($ciclosEscolares, '0.id');
             $slugReingreso = $alumnoSeleccionado->nivel?->slug;
-            $estatusRetornable = in_array($alumnoSeleccionado->estatus, [
-                'egresado', 'traslado', 'baja_temporal', 'baja_definitiva', 'inactivo', 'suspendido',
-            ], true);
+            $estatusRetornable = ! $alumnoSeleccionado->trashed() && $alumnoSeleccionado->esBajaAdministrativa();
         @endphp
 
         <section id="expediente-seleccionado"
@@ -356,9 +365,14 @@
                                 class="rounded-full bg-white/15 px-3 py-1 text-xs font-black uppercase tracking-wider">
                                 Expediente del alumno
                             </span>
-                            @if (!$alumnoSeleccionado->activo || $alumnoSeleccionado->trashed())
-                                <span class="rounded-full bg-rose-500/80 px-3 py-1 text-xs font-black uppercase">Baja ·
-                                    solo histórico</span>
+                            @if ($esEgresado)
+                                <span class="rounded-full bg-violet-500/85 px-3 py-1 text-xs font-black uppercase">
+                                    Egresado · histórico editable
+                                </span>
+                            @elseif ($soloHistorico)
+                                <span class="rounded-full bg-rose-500/80 px-3 py-1 text-xs font-black uppercase">
+                                    {{ $alumnoSeleccionado->etiqueta_estatus }} · solo histórico
+                                </span>
                             @endif
                         </div>
                         <h2 class="mt-3 text-2xl font-black sm:text-3xl">
