@@ -359,6 +359,12 @@ class Inscripcion extends Model
             ->orderByDesc('ciclo_escolar_id');
     }
 
+    public function proyeccionesContinuidad()
+    {
+        return $this->hasMany(ProyeccionContinuidad::class, 'inscripcion_id')
+            ->latest('id');
+    }
+
     public function cicloEscolarActualHistorial()
     {
         return $this->hasOne(InscripcionCiclo::class, 'inscripcion_id')
