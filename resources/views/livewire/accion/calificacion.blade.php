@@ -41,6 +41,7 @@
             await this.restaurarFiltros();
         }
 
+        this.$watch('$wire.ciclo_escolar_id', () => this.guardarFiltros());
         this.$watch('$wire.generacion_id', () => this.guardarFiltros());
         this.$watch('$wire.grado_id', () => this.guardarFiltros());
         this.$watch('$wire.semestre_id', () => this.guardarFiltros());
@@ -49,6 +50,8 @@
         this.$watch('$wire.periodo_basica_id', () => this.guardarFiltros());
         this.$watch('$wire.busqueda', () => this.guardarFiltros());
         this.$watch('$wire.filtro_estado', () => this.guardarFiltros());
+        this.$watch('$wire.filtro_registros', () => this.guardarFiltros());
+        this.$watch('$wire.filtro_estatus_historico', () => this.guardarFiltros());
         this.$watch('$wire.orden_promedio', () => this.guardarFiltros());
         this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
         this.$watch('$wire.reconocimiento_inscripcion_id', () => this.guardarFiltros());
@@ -71,6 +74,17 @@
         }
 
         this.restaurandoFiltros = true;
+
+        if (filtros.ciclo_escolar_id) {
+            await this.$wire.set('ciclo_escolar_id', filtros.ciclo_escolar_id);
+            await this.esperar(300);
+
+            if (String(this.$wire.ciclo_escolar_id || '') !== String(filtros.ciclo_escolar_id)) {
+                localStorage.removeItem(this.storageKey);
+                this.restaurandoFiltros = false;
+                return;
+            }
+        }
 
         if (filtros.generacion_id) {
             await this.$wire.set('generacion_id', filtros.generacion_id);
@@ -140,6 +154,14 @@
             await this.$wire.set('filtro_estado', filtros.filtro_estado);
         }
 
+        if (filtros.filtro_registros !== undefined) {
+            await this.$wire.set('filtro_registros', filtros.filtro_registros || 'todos');
+        }
+
+        if (filtros.filtro_estatus_historico !== undefined) {
+            await this.$wire.set('filtro_estatus_historico', filtros.filtro_estatus_historico);
+        }
+
         if (filtros.orden_promedio !== undefined) {
             await this.$wire.set('orden_promedio', filtros.orden_promedio);
         }
@@ -170,6 +192,7 @@
         this.guardandoFiltros = true;
 
         const filtros = {
+            ciclo_escolar_id: this.$wire.ciclo_escolar_id || '',
             generacion_id: this.$wire.generacion_id || '',
             grado_id: this.$wire.grado_id || '',
             semestre_id: this.$wire.semestre_id || '',
@@ -178,6 +201,8 @@
             periodo_basica_id: this.$wire.periodo_basica_id || '',
             busqueda: this.$wire.busqueda || '',
             filtro_estado: this.$wire.filtro_estado || '',
+            filtro_registros: this.$wire.filtro_registros || 'todos',
+            filtro_estatus_historico: this.$wire.filtro_estatus_historico || '',
             orden_promedio: this.$wire.orden_promedio || '',
             boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
             reconocimiento_inscripcion_id: this.$wire.reconocimiento_inscripcion_id || '',
@@ -267,16 +292,38 @@ iniciarHerramientasAcademicas()" class="w-full">
 
     {{-- Filtros principales --}}
     <div
-        class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
+        class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-7' : 'xl:grid-cols-6' }}">
+
+        <div>
+            <flux:select label="Ciclo escolar" wire:model.live="ciclo_escolar_id"
+                wire:key="ciclo-calificaciones-{{ $slug_nivel }}-{{ $ciclosEscolares->pluck('id')->implode('-') ?: 'sin-ciclos' }}">
+                <flux:select.option value="">-- Selecciona un ciclo --</flux:select.option>
+
+                @foreach ($ciclosEscolares as $ciclo)
+                    <flux:select.option value="{{ $ciclo->id }}">
+                        {{ $ciclo->inicio_anio }} - {{ $ciclo->fin_anio }}
+                        @if ($ciclo->es_actual)
+                            · Actual
+                        @elseif ($ciclo->cerrado_at)
+                            · Cerrado
+                        @else
+                            · Histórico
+                        @endif
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
 
         <div>
             <flux:select label="Generación" wire:model.live="generacion_id"
-                wire:key="generacion-{{ $slug_nivel }}-{{ $generaciones->count() }}">
+                wire:key="generacion-{{ $slug_nivel }}-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generaciones->count() }}"
+                :disabled="!$ciclo_escolar_id || $generaciones->isEmpty()">
                 <flux:select.option value="">-- Selecciona una generación --</flux:select.option>
 
                 @foreach ($generaciones as $generacion)
                     <flux:select.option value="{{ $generacion->id }}">
                         {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                        {{ $generacion->status ? '' : '· Histórica' }}
                     </flux:select.option>
                 @endforeach
             </flux:select>
@@ -284,7 +331,8 @@ iniciarHerramientasAcademicas()" class="w-full">
 
         <div>
             <flux:select label="Grado" wire:model.live="grado_id"
-                wire:key="grado-{{ $generacion_id ?: 'null' }}-{{ $grados->count() }}" :disabled="!$generacion_id">
+                wire:key="grado-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grados->count() }}"
+                :disabled="!$ciclo_escolar_id || !$generacion_id || $grados->isEmpty()">
                 <flux:select.option value="">-- Selecciona un grado --</flux:select.option>
 
                 @foreach ($grados as $g)
@@ -298,8 +346,8 @@ iniciarHerramientasAcademicas()" class="w-full">
         @if ($this->esBachillerato)
             <div>
                 <flux:select label="Semestre" wire:model.live="semestre_id"
-                    wire:key="semestre-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestres->pluck('id')->implode('-') ?: 'sin-semestres' }}"
-                    :disabled="!$generacion_id || !$grado_id || $semestres->isEmpty()">
+                    wire:key="semestre-bachillerato-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestres->pluck('id')->implode('-') ?: 'sin-semestres' }}"
+                    :disabled="!$ciclo_escolar_id || !$generacion_id || !$grado_id || $semestres->isEmpty()">
                     <flux:select.option value="">-- Selecciona un semestre --</flux:select.option>
 
                     @foreach ($semestres as $sem)
@@ -312,13 +360,13 @@ iniciarHerramientasAcademicas()" class="w-full">
 
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
-                    wire:key="grupo-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupos->count() }}"
-                    :disabled="!$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty()">
+                    wire:key="grupo-bachillerato-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupos->count() }}"
+                    :disabled="!$ciclo_escolar_id || !$generacion_id || !$grado_id || !$semestre_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
 
                     @foreach ($grupos as $gpo)
                         <flux:select.option value="{{ $gpo->id }}">
-                            {{ $this->textoGrupo($gpo) }}
+                            {{ $this->textoGrupo($gpo) }}{{ $gpo->trashed() ? ' · Archivado' : '' }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -326,8 +374,8 @@ iniciarHerramientasAcademicas()" class="w-full">
 
             <div>
                 <flux:select label="Parcial" wire:model.live="parcial_bachillerato_id"
-                    wire:key="parcial-bachillerato-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}-{{ $parciales->pluck('id')->implode('-') ?: 'sin-parciales' }}"
-                    :disabled="!$generacion_id || !$grado_id || !$semestre_id || !$grupo_id || $parciales->isEmpty()">
+                    wire:key="parcial-bachillerato-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $semestre_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}-{{ $parciales->pluck('id')->implode('-') ?: 'sin-parciales' }}"
+                    :disabled="!$ciclo_escolar_id || !$generacion_id || !$grado_id || !$semestre_id || !$grupo_id || $parciales->isEmpty()">
                     <flux:select.option value="">-- Selecciona un parcial --</flux:select.option>
 
                     @foreach ($parciales as $parcial)
@@ -340,13 +388,13 @@ iniciarHerramientasAcademicas()" class="w-full">
         @else
             <div>
                 <flux:select label="Grupo" wire:model.live="grupo_id"
-                    wire:key="grupo-basica-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupos->count() }}"
-                    :disabled="!$generacion_id || !$grado_id || $grupos->isEmpty()">
+                    wire:key="grupo-basica-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupos->count() }}"
+                    :disabled="!$ciclo_escolar_id || !$generacion_id || !$grado_id || $grupos->isEmpty()">
                     <flux:select.option value="">-- Selecciona un grupo --</flux:select.option>
 
                     @foreach ($grupos as $gpo)
                         <flux:select.option value="{{ $gpo->id }}">
-                            {{ $this->textoGrupo($gpo) }}
+                            {{ $this->textoGrupo($gpo) }}{{ $gpo->trashed() ? ' · Archivado' : '' }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -354,8 +402,8 @@ iniciarHerramientasAcademicas()" class="w-full">
 
             <div>
                 <flux:select label="Periodo" wire:model.live="periodo_basica_id"
-                    wire:key="periodo-basica-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}"
-                    :disabled="!$generacion_id || !$grado_id || !$grupo_id">
+                    wire:key="periodo-basica-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'null' }}-{{ $grado_id ?: 'null' }}-{{ $grupo_id ?: 'null' }}-{{ $periodosBasica->pluck('id')->implode('-') ?: 'sin-periodos' }}"
+                    :disabled="!$ciclo_escolar_id || !$generacion_id || !$grado_id || !$grupo_id || $periodosBasica->isEmpty()">
                     <flux:select.option value="">-- Selecciona un periodo --</flux:select.option>
 
                     @foreach ($periodosBasica as $periodoBasica)
@@ -425,6 +473,16 @@ iniciarHerramientasAcademicas()" class="w-full">
                         {{ $this->estadoPeriodo }}
                     </span>
                 </div>
+
+                @if (!empty($this->periodoSeleccionado['ciclo_cerrado']))
+                    <div class="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                        <flux:icon.lock-closed class="mt-0.5 h-5 w-5 shrink-0" />
+                        <div>
+                            <p class="font-black">Ciclo escolar cerrado: consulta histórica protegida.</p>
+                            <p class="mt-1 text-xs leading-5">Puedes revisar y exportar la evidencia del ciclo. Los cambios deben seguir el flujo de corrección histórica con motivo y autorización.</p>
+                        </div>
+                    </div>
+                @endif
 
                 <div
                     class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
@@ -630,8 +688,14 @@ iniciarHerramientasAcademicas()" class="w-full">
                             <div
                                 class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
                                 Primero selecciona todos los filtros requeridos y asegúrate de que existan alumnos y
-                                materias
-                                cargadas.
+                                materias cargadas.
+                            </div>
+                        @elseif (!$this->puedeImportarPlantilla)
+                            <div
+                                class="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300">
+                                La plantilla se puede descargar como evidencia, pero la importación masiva está desactivada
+                                en ciclos históricos. Los cambios deben registrarse desde la tabla para generar solicitudes
+                                de corrección autorizables.
                             </div>
                         @endif
 
@@ -642,7 +706,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 </label>
 
                                 <input type="file" wire:model="archivo_calificaciones" accept=".xlsx,.xls"
-                                    @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
+                                    @if (!$this->puedeImportarPlantilla) disabled @endif
                                     class="block w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-sky-700 hover:file:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-sky-950/40 dark:file:text-sky-300">
 
                                 <div wire:loading wire:target="archivo_calificaciones"
@@ -660,7 +724,7 @@ iniciarHerramientasAcademicas()" class="w-full">
 
                             <button type="button" wire:click="importarPlantillaCalificaciones"
                                 wire:loading.attr="disabled" wire:target="importarPlantillaCalificaciones"
-                                @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
+                                @if (!$this->puedeImportarPlantilla) disabled @endif
                                 class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
                                 <span wire:loading.remove wire:target="importarPlantillaCalificaciones">
                                     Importar calificaciones
@@ -1456,7 +1520,7 @@ iniciarHerramientasAcademicas()" class="w-full">
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="relative">
             <div wire:loading.flex
-                wire:target="nivel_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,periodo_basica_id,busqueda,filtro_estado,limpiarFiltros,guardarCalificaciones,abrirRevisionGuardado"
+                wire:target="nivel_id,ciclo_escolar_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,periodo_basica_id,busqueda,filtro_estado,filtro_registros,filtro_estatus_historico,orden_promedio,limpiarFiltros,guardarCalificaciones,abrirRevisionGuardado"
                 class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-950/60">
                 <div
                     class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-950">
@@ -1468,19 +1532,56 @@ iniciarHerramientasAcademicas()" class="w-full">
             </div>
 
             <div class="border-b border-neutral-200 p-4 dark:border-neutral-800">
-                <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
-                    <div>
+                <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-2 xl:grid-cols-6">
+                    <div class="xl:col-span-2">
                         <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                            Buscar alumno o matrícula
+                            Buscar alumno o matrícula en este contexto
                         </label>
 
                         <input type="text" wire:model.live.debounce.300ms="busqueda"
                             placeholder="Escribe nombre o matrícula..."
                             class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
+
+                        @if (filled($busqueda))
+                            <a href="{{ route('misrutas.matricula.historial.pdf', [
+                                'slug_nivel' => $slug_nivel,
+                                'historial_completo' => 1,
+                                'mostrar_archivados' => 1,
+                                'search' => $busqueda,
+                            ]) }}" target="_blank" rel="noopener"
+                                class="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:underline dark:text-sky-300">
+                                <flux:icon.clock class="h-3.5 w-3.5" />
+                                Consultar historial del alumno en todos los ciclos
+                            </a>
+                        @endif
                     </div>
 
                     <div>
-                        <flux:select label="Vista rápida" wire:model.live="filtro_estado">
+                        <flux:select label="Estado en el ciclo" wire:model.live="filtro_estatus_historico">
+                            <flux:select.option value="">Todos los estados</flux:select.option>
+                            <flux:select.option value="activo">Activos en el ciclo</flux:select.option>
+                            <flux:select.option value="reingreso">Reingresos</flux:select.option>
+                            <flux:select.option value="promovido">Promovidos</flux:select.option>
+                            <flux:select.option value="no_promovido">No promovidos</flux:select.option>
+                            <flux:select.option value="egresado">Egresados</flux:select.option>
+                            <flux:select.option value="baja_temporal">Baja temporal</flux:select.option>
+                            <flux:select.option value="baja_definitiva">Baja definitiva</flux:select.option>
+                            <flux:select.option value="trasladado">Trasladados</flux:select.option>
+                            <flux:select.option value="suspendido">Suspendidos</flux:select.option>
+                            <flux:select.option value="inactivo">Inactivos</flux:select.option>
+                        </flux:select>
+                    </div>
+
+                    <div>
+                        <flux:select label="Registros" wire:model.live="filtro_registros">
+                            <flux:select.option value="todos">Todos los alumnos</flux:select.option>
+                            <flux:select.option value="con_calificaciones">Con calificaciones</flux:select.option>
+                            <flux:select.option value="sin_calificaciones">Sin calificaciones</flux:select.option>
+                        </flux:select>
+                    </div>
+
+                    <div>
+                        <flux:select label="Vista académica" wire:model.live="filtro_estado">
                             <flux:select.option value="">Todos</flux:select.option>
                             <flux:select.option value="pendientes">Pendientes</flux:select.option>
                             <flux:select.option value="aprobados">Aprobados</flux:select.option>
@@ -1493,8 +1594,8 @@ iniciarHerramientasAcademicas()" class="w-full">
                     <div>
                         <flux:select label="Ordenar promedios" wire:model.live="orden_promedio">
                             <flux:select.option value="">Normal</flux:select.option>
-                            <flux:select.option value="mayor_menor">Promedio mayor a menor</flux:select.option>
-                            <flux:select.option value="menor_mayor">Promedio menor a mayor</flux:select.option>
+                            <flux:select.option value="mayor_menor">Mayor a menor</flux:select.option>
+                            <flux:select.option value="menor_mayor">Menor a mayor</flux:select.option>
                         </flux:select>
                     </div>
                 </div>
@@ -1555,6 +1656,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                                         'misrutas.boleta.calificaciones.pdf',
                                                         array_filter([
                                                             'slug_nivel' => $slug_nivel,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
                                                             'generacion_id' => $generacion_id,
                                                             'grado_id' => $grado_id,
                                                             'grupo_id' => $grupo_id,
@@ -1640,6 +1742,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                                         'misrutas.reconocimiento.calificaciones.pdf',
                                                         array_filter([
                                                             'slug_nivel' => $slug_nivel,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
                                                             'generacion_id' => $generacion_id,
                                                             'grado_id' => $grado_id,
                                                             'grupo_id' => $grupo_id,
@@ -1741,6 +1844,11 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 ])>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span>{{ $fila['alumno'] }}</span>
+
+                                        @php($estatusHistorico = $fila['estatus_historico'] ?? 'activo')
+                                        <span class="rounded-full border px-2 py-0.5 text-[9px] font-black normal-case tracking-wide {{ $this->claseEstatusHistorico($estatusHistorico) }}">
+                                            {{ $this->etiquetaEstatusHistorico($estatusHistorico) }}
+                                        </span>
 
                                         @if ($esResultadoBusqueda)
                                             <span class="rounded-full bg-[#006492]/10 px-2 py-0.5 text-[9px] font-black normal-case tracking-wide text-[#006492] ring-1 ring-[#006492]/20 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
@@ -1891,6 +1999,9 @@ iniciarHerramientasAcademicas()" class="w-full">
                                     'misrutas.calificaciones.pdf',
                                     array_filter([
                                         'slug_nivel' => $slug_nivel,
+                                        'ciclo_escolar_id' => $ciclo_escolar_id,
+                                        'filtro_estatus_historico' => $filtro_estatus_historico ?: null,
+                                        'filtro_registros' => $filtro_registros !== 'todos' ? $filtro_registros : null,
                                         'generacion_id' => $generacion_id,
                                         'grado_id' => $grado_id,
                                         'grupo_id' => $grupo_id,
@@ -1922,6 +2033,7 @@ iniciarHerramientasAcademicas()" class="w-full">
         <div wire:key="graficas-calificaciones-wrapper-{{ md5(
             json_encode([
                 'nivel' => $nivel_id,
+                'ciclo' => $ciclo_escolar_id,
                 'generacion' => $generacion_id,
                 'grado' => $grado_id,
                 'grupo' => $grupo_id,
@@ -1931,6 +2043,8 @@ iniciarHerramientasAcademicas()" class="w-full">
                 'periodo_basica' => $periodo_basica_id,
                 'busqueda' => $busqueda,
                 'filtro_estado' => $filtro_estado,
+                'filtro_registros' => $filtro_registros,
+                'filtro_estatus_historico' => $filtro_estatus_historico,
                 'orden_promedio' => $orden_promedio ?? '',
                 'datos' => $graficasCalificaciones,
             ]),

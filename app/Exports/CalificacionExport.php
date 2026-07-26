@@ -47,6 +47,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected ?string $fecha_corte = null;
     protected bool $esBachillerato;
     protected string $busqueda;
+    protected string $filtroEstatusHistorico;
+    protected string $filtroRegistros;
 
     protected string $nivelNombre = '—';
     protected string $gradoNombre = '—';
@@ -101,7 +103,9 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         ?int $semestre_id = null,
         ?int $generacion_id = null,
         bool $esBachillerato = false,
-        string $busqueda = ''
+        string $busqueda = '',
+        string $filtroEstatusHistorico = '',
+        string $filtroRegistros = 'todos',
     ) {
         $this->nivel_id = $nivel_id;
         $this->grado_id = $grado_id;
@@ -111,6 +115,10 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->generacion_id = $generacion_id;
         $this->esBachillerato = $esBachillerato;
         $this->busqueda = trim($busqueda);
+        $this->filtroEstatusHistorico = trim($filtroEstatusHistorico);
+        $this->filtroRegistros = in_array($filtroRegistros, ['todos', 'con_calificaciones', 'sin_calificaciones'], true)
+            ? $filtroRegistros
+            : 'todos';
 
         $this->resolverNombresFiltros();
     }
@@ -155,6 +163,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->materiasExtra = $this->obtenerMateriasExtra($this->materias);
         $this->inscripciones = $this->obtenerInscripciones();
         $this->calificaciones = $this->obtenerCalificaciones($this->inscripciones, $this->materias);
+        $this->aplicarFiltroRegistros();
         $this->promediosPrecisos = $this->calcularPromediosAlumnosPrecisos($this->inscripciones, $this->materias, $this->calificaciones);
         $this->promedios = collect($this->promediosPrecisos)
             ->map(fn ($valor) => is_numeric($valor) ? PromedioExcel::formatear($valor, 1, 'Pendiente') : $valor)
@@ -163,6 +172,29 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->periodosPorMateria = $this->obtenerPeriodosPorMateria($this->materiasOficiales);
         $this->filas = $this->construirFilas();
         $this->preparado = true;
+    }
+
+    protected function aplicarFiltroRegistros(): void
+    {
+        if ($this->filtroRegistros === 'todos') {
+            return;
+        }
+
+        $idsConCalificacion = collect($this->calificaciones)
+            ->filter(fn ($valor) => $valor !== null && trim((string) $valor) !== '')
+            ->keys()
+            ->map(fn ($clave) => (int) explode('-', (string) $clave)[0])
+            ->unique()
+            ->all();
+
+        $this->inscripciones = collect($this->inscripciones)
+            ->filter(function (array $alumno) use ($idsConCalificacion): bool {
+                $tiene = in_array((int) $alumno['inscripcion_id'], $idsConCalificacion, true);
+
+                return $this->filtroRegistros === 'con_calificaciones' ? $tiene : ! $tiene;
+            })
+            ->values()
+            ->all();
     }
 
     protected function construirFilas(): array
@@ -1122,7 +1154,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->nivelNombre = Nivel::query()->where('id', $this->nivel_id)->value('nombre') ?? '—';
         $this->gradoNombre = Grado::query()->where('id', $this->grado_id)->value('nombre') ?? '—';
 
-        $grupo = Grupo::query()
+        $grupo = Grupo::withTrashed()
             ->with('asignacionGrupo:id,nombre')
             ->where('id', $this->grupo_id)
             ->first();
@@ -1178,6 +1210,19 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         }
     }
 
+    protected function cicloSeleccionadoEsActual(): bool
+    {
+        if (! $this->ciclo_escolar_id) {
+            return true;
+        }
+
+        $ciclo = \App\Models\CicloEscolar::query()
+            ->select(['id', 'es_actual', 'cerrado_at'])
+            ->find($this->ciclo_escolar_id);
+
+        return (bool) ($ciclo?->es_actual) && blank($ciclo?->cerrado_at);
+    }
+
     protected function obtenerMaterias(): array
     {
         if (!$this->nivel_id || !$this->grado_id || !$this->grupo_id) {
@@ -1200,8 +1245,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             ->where('materias.nivel_id', $this->nivel_id)
             ->where('materias.grado_id', $this->grado_id)
             ->where('asignacion_materias.grupo_id', $this->grupo_id)
-            ->when($this->ciclo_escolar_id, fn ($q) => $q->where('asignacion_materias.ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            ->when($this->ciclo_escolar_id, fn ($q) => $q->where('asignacion_materias.ciclo_escolar_id', $this->ciclo_escolar_id));
+
+        // Las asignaciones archivadas siguen siendo evidencia válida en ciclos cerrados.
+        if ($this->ciclo_escolar_id && $this->cicloSeleccionadoEsActual()) {
+            $query->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+        }
 
         /*
          * Bachillerato: se exportan también las materias extra para conservar
@@ -1262,6 +1311,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 gradoId: $this->grado_id,
                 generacionId: $this->generacion_id,
                 semestreId: $this->esBachillerato ? $this->semestre_id : null,
+                usarHistorialCiclo: true,
+                incluirNoActivos: true,
             );
         } else {
             // Compatibilidad con exportaciones antiguas sin periodo relacionado.
@@ -1290,6 +1341,12 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
             })->values();
         }
 
+        if ($this->filtroEstatusHistorico !== '') {
+            $alumnos = $alumnos->filter(
+                fn ($alumno): bool => (string) $alumno->getAttribute('estatus_historico') === $this->filtroEstatusHistorico
+            )->values();
+        }
+
         $alumnos->each(fn ($alumno) => $alumno->loadMissing([
             'grado:id,nombre',
             'grupo.asignacionGrupo:id,nombre',
@@ -1311,9 +1368,10 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                         ($item->apellido_paterno ?? '') . ' ' .
                         ($item->apellido_materno ?? '')
                     ) ?: '—',
-                    'grado' => $item->grado?->nombre ?? '—',
-                    'grupo' => $this->nombreGrupo($item->grupo),
-                    'semestre' => $item->semestre?->numero ?? '—',
+                    'grado' => $this->gradoNombre,
+                    'grupo' => $this->grupoNombre,
+                    'semestre' => $this->semestreNombre,
+                    'estatus_historico' => $item->getAttribute('estatus_historico') ?: 'activo',
                 ];
             })
             ->values()

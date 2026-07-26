@@ -74,6 +74,8 @@ class CalificacionOficialPrimariaService
             nivelId: $nivelId,
             gradoId: $gradoId,
             generacionId: $generacionId,
+            usarHistorialCiclo: true,
+            incluirNoActivos: true,
         );
 
         $campos = $this->campos();

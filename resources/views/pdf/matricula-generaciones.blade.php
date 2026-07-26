@@ -257,6 +257,20 @@
             color: #55751a;
         }
 
+        .status-promovido {
+            border: 1px solid #b9d8f0;
+            background: #eff8ff;
+            color: #006492;
+        }
+
+        .status-trasladado,
+        .status-suspendido,
+        .status-inactivo {
+            border: 1px solid #d8dee5;
+            background: #f4f6f8;
+            color: #52616f;
+        }
+
         .status-egresado {
             border: 1px solid #d8c8f6;
             background: #f6f1ff;
@@ -291,6 +305,10 @@
 
         .w-curp {
             width: 14%;
+        }
+
+        .w-cycle {
+            width: 9%;
         }
 
         .w-generacion {
@@ -340,7 +358,7 @@
 
                 <td class="title-cell">
                     <div class="document-label">Control escolar</div>
-                    <h1>Matrícula escolar por generación</h1>
+                    <h1>{{ !empty($filtros['historial_completo']) ? 'Historial escolar por ciclo' : 'Matrícula escolar por generación' }}</h1>
                     <div class="subtitle">Nivel {{ $nivel->nombre }}</div>
                 </td>
 
@@ -399,6 +417,9 @@
                     <th class="w-matricula">Matrícula</th>
                     <th class="w-alumno">Alumno</th>
                     <th class="w-curp">CURP</th>
+                    @if (!empty($filtros['historial_completo']))
+                        <th class="w-cycle">Ciclo escolar</th>
+                    @endif
                     <th class="w-generacion">Generación</th>
                     <th class="w-grade">Grado</th>
                     @if ($nivel->slug === 'bachillerato')
@@ -427,6 +448,11 @@
                         <td><strong>{{ $alumno->matricula ?: '—' }}</strong></td>
                         <td class="student-name">{{ $nombreCompleto ?: 'Sin nombre' }}</td>
                         <td class="muted">{{ $alumno->curp ?: '—' }}</td>
+                        @if (!empty($filtros['historial_completo']))
+                            <td>
+                                {{ $alumno->ciclo_escolar ? $alumno->ciclo_escolar->inicio_anio . '-' . $alumno->ciclo_escolar->fin_anio : '—' }}
+                            </td>
+                        @endif
                         <td>{{ $alumno->generacion?->etiqueta ?: '—' }}</td>
                         <td>{{ $alumno->grado?->nombre ?: '—' }}</td>
 
@@ -446,7 +472,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td class="empty" colspan="{{ $nivel->slug === 'bachillerato' ? 10 : 9 }}">
+                        <td class="empty" colspan="{{ ($nivel->slug === 'bachillerato' ? 10 : 9) + (!empty($filtros['historial_completo']) ? 1 : 0) }}">
                             No se encontraron alumnos con los filtros seleccionados.
                         </td>
                     </tr>

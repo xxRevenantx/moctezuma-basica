@@ -21,22 +21,24 @@ class MatriculaHistorialPdfController extends Controller
             ->firstOrFail();
 
         $cicloEscolarId = $request->integer('ciclo_escolar_id');
+        $historialCompleto = $request->boolean('historial_completo');
 
-        if ($cicloEscolarId) {
+        if ($cicloEscolarId || $historialCompleto) {
             $historico = InscripcionCiclo::query()
                 ->with([
                     'inscripcion' => fn ($q) => $q->withTrashed(),
+                    'cicloEscolar',
                     'generacion',
                     'grado',
                     'semestre',
-                    'grupo.asignacionGrupo',
+                    'grupo' => fn ($q) => $q->withTrashed()->with('asignacionGrupo'),
                 ])
-                ->where('ciclo_escolar_id', $cicloEscolarId)
                 ->where('nivel_id', $nivel->id)
-                ->when($request->integer('generacion_id'), fn ($q, $id) => $q->where('generacion_id', $id))
-                ->when($request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
-                ->when($request->integer('semestre_id'), fn ($q, $id) => $q->where('semestre_id', $id))
-                ->when($request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
+                ->when(! $historialCompleto && $cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
+                ->when(! $historialCompleto && $request->integer('generacion_id'), fn ($q, $id) => $q->where('generacion_id', $id))
+                ->when(! $historialCompleto && $request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
+                ->when(! $historialCompleto && $request->integer('semestre_id'), fn ($q, $id) => $q->where('semestre_id', $id))
+                ->when(! $historialCompleto && $request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
                 ->when($request->input('estatus', 'todos') !== 'todos', function ($q) use ($request): void {
                     $estatus = (string) $request->input('estatus');
                     $q->where(function ($sub) use ($estatus): void {
@@ -44,12 +46,16 @@ class MatriculaHistorialPdfController extends Controller
                             ->orWhere('estatus_actual_ciclo', $estatus);
                     });
                 })
+                ->orderBy('ciclo_escolar_id')
                 ->orderBy('id')
                 ->get()
                 ->filter(fn (InscripcionCiclo $ciclo) => $request->boolean('mostrar_archivados') || ! $ciclo->inscripcion?->trashed())
                 ->filter(function (InscripcionCiclo $ciclo) use ($request): bool {
                     $termino = mb_strtolower(trim((string) $request->input('search')));
-                    if ($termino === '') return true;
+                    if ($termino === '') {
+                        return true;
+                    }
+
                     $alumno = $ciclo->inscripcion;
                     $texto = mb_strtolower(implode(' ', [
                         $ciclo->matricula,
@@ -58,11 +64,13 @@ class MatriculaHistorialPdfController extends Controller
                         $alumno?->apellido_paterno,
                         $alumno?->apellido_materno,
                     ]));
+
                     return str_contains($texto, $termino);
                 });
 
             $rows = $historico->map(function (InscripcionCiclo $ciclo): Fluent {
                 $alumno = $ciclo->inscripcion;
+
                 return new Fluent([
                     'id' => $ciclo->inscripcion_id,
                     'matricula' => $ciclo->matricula ?: $alumno?->matricula,
@@ -71,15 +79,20 @@ class MatriculaHistorialPdfController extends Controller
                     'apellido_paterno' => $alumno?->apellido_paterno,
                     'apellido_materno' => $alumno?->apellido_materno,
                     'genero' => $alumno?->genero,
-                    'estatus' => $ciclo->resultado_final ?: $ciclo->estatus_actual_ciclo,
+                    'estatus' => $this->normalizarEstatus((string) ($ciclo->resultado_final ?: $ciclo->estatus_actual_ciclo)),
                     'fecha_inscripcion' => $ciclo->fecha_ingreso,
+                    'ciclo_escolar' => $ciclo->cicloEscolar,
                     'generacion' => $ciclo->generacion,
                     'grado' => $ciclo->grado,
                     'semestre' => $ciclo->semestre,
                     'grupo' => $ciclo->grupo,
                     'archivado' => (bool) $alumno?->trashed(),
                 ]);
-            })->sortBy(fn (Fluent $fila) => mb_strtolower(trim($fila->apellido_paterno.' '.$fila->apellido_materno.' '.$fila->nombre)))->values();
+            })->sortBy(fn (Fluent $fila) => sprintf(
+                '%08d|%s',
+                (int) ($fila->ciclo_escolar?->inicio_anio ?? 0),
+                mb_strtolower(trim($fila->apellido_paterno . ' ' . $fila->apellido_materno . ' ' . $fila->nombre))
+            ))->values();
         } else {
             $query = $request->boolean('mostrar_archivados')
                 ? Inscripcion::withTrashed()
@@ -93,7 +106,7 @@ class MatriculaHistorialPdfController extends Controller
                 ->when($request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
                 ->when($request->input('estatus', 'todos') !== 'todos', fn ($q) => $q->where('estatus', $request->input('estatus')))
                 ->when(trim((string) $request->input('search')) !== '', function ($q) use ($request): void {
-                    $termino = '%'.trim((string) $request->input('search')).'%';
+                    $termino = '%' . trim((string) $request->input('search')) . '%';
                     $q->where(function ($subquery) use ($termino): void {
                         $subquery->where('matricula', 'like', $termino)
                             ->orWhere('curp', 'like', $termino)
@@ -118,35 +131,40 @@ class MatriculaHistorialPdfController extends Controller
             ->values();
 
         $etiquetasGeneracion = $generaciones
-            ->map(fn($generacion) => $generacion->etiqueta)
+            ->map(fn ($generacion) => $generacion->etiqueta)
             ->filter()
             ->values();
 
-        $tituloDocumento = 'Matrícula - ' . (
-            $etiquetasGeneracion->isNotEmpty()
-            ? $etiquetasGeneracion->map(fn($etiqueta) => 'Gen: ' . $etiqueta)->implode(' | ')
-            : 'Sin generación'
-        );
+        $tituloDocumento = $historialCompleto
+            ? 'Historial escolar del alumno por ciclo'
+            : 'Matrícula - ' . (
+                $etiquetasGeneracion->isNotEmpty()
+                    ? $etiquetasGeneracion->map(fn ($etiqueta) => 'Gen: ' . $etiqueta)->implode(' | ')
+                    : 'Sin generación'
+            );
 
         $resumen = [
             'total' => $rows->count(),
             'hombres' => $rows->where('genero', 'H')->count(),
             'mujeres' => $rows->where('genero', 'M')->count(),
-            'activos' => $rows->whereIn('estatus', ['activo', 'reingreso', 'no_promovido'])->count(),
+            'activos' => $rows->whereIn('estatus', ['activo', 'reingreso', 'no_promovido', 'promovido'])->count(),
             'egresados' => $rows->where('estatus', 'egresado')->count(),
             'bajas' => $rows->whereIn('estatus', ['baja', 'baja_temporal', 'baja_definitiva'])->count(),
         ];
 
         $filtros = [
             'ciclo_escolar_id' => $request->integer('ciclo_escolar_id'),
+            'historial_completo' => $historialCompleto,
             'estatus' => $request->input('estatus', 'todos'),
             'mostrar_archivados' => $request->boolean('mostrar_archivados'),
             'busqueda' => trim((string) $request->input('search')),
         ];
 
-        $nombreGeneracion = $etiquetasGeneracion->count() === 1
-            ? Str::slug($etiquetasGeneracion->first())
-            : 'varias-generaciones';
+        $nombreGeneracion = $historialCompleto
+            ? 'historial-completo'
+            : ($etiquetasGeneracion->count() === 1
+                ? Str::slug($etiquetasGeneracion->first())
+                : 'varias-generaciones');
 
         $nombreArchivo = sprintf(
             'matricula-%s-%s.pdf',
@@ -165,5 +183,16 @@ class MatriculaHistorialPdfController extends Controller
         ))
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
+    }
+
+    private function normalizarEstatus(string $estatus): string
+    {
+        return match (mb_strtolower(trim($estatus))) {
+            'promovido_nivel' => 'promovido',
+            'baja_temporal_al_cierre' => 'baja_temporal',
+            'traslado' => 'trasladado',
+            'finalizado', '' => 'activo',
+            default => mb_strtolower(trim($estatus)),
+        };
     }
 }

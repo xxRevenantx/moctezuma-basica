@@ -57,6 +57,8 @@ class Calificacion extends Component
 
     public string $busqueda = '';
     public string $filtro_estado = '';
+    public string $filtro_registros = 'todos';
+    public string $filtro_estatus_historico = '';
     public string $orden_promedio = '';
     public string $mensajeContexto = '';
 
@@ -91,6 +93,7 @@ class Calificacion extends Component
     public $reconocimiento_inscripcion_id = '';
 
     public Collection $niveles;
+    public Collection $ciclosEscolares;
     public Collection $generaciones;
     public Collection $grados;
     public Collection $grupos;
@@ -114,6 +117,7 @@ class Calificacion extends Component
             ->orderBy('id')
             ->get();
 
+        $this->ciclosEscolares = collect();
         $this->generaciones = collect();
         $this->grados = collect();
         $this->grupos = collect();
@@ -135,10 +139,32 @@ class Calificacion extends Component
         $this->alumnoBusquedaId = request()->integer('alumno') ?: null;
         $this->periodoBusquedaGlobalId = request()->integer('periodo') ?: null;
 
-        $generacionId = request()->integer('generacion');
+        $periodo = $this->periodoBusquedaGlobalId
+            ? Periodos::query()
+                ->whereKey($this->periodoBusquedaGlobalId)
+                ->where('nivel_id', $this->nivel_id)
+                ->first()
+            : null;
+
+        $cicloId = request()->integer('ciclo_escolar_id')
+            ?: (int) ($periodo?->ciclo_escolar_id ?? 0);
+
+        if ($cicloId > 0) {
+            $ciclo = CicloEscolar::query()->find($cicloId);
+
+            if ($ciclo && ! $this->ciclosEscolares->contains('id', $ciclo->id)) {
+                $this->ciclosEscolares->prepend($ciclo);
+            }
+
+            $this->ciclo_escolar_id = $ciclo?->id;
+            $this->cargarGeneraciones();
+            $this->cargarPeriodosBasicaDisponibles();
+        }
+
+        $generacionId = request()->integer('generacion') ?: (int) ($periodo?->generacion_id ?? 0);
         $gradoId = request()->integer('grado');
         $grupoId = request()->integer('grupo');
-        $semestreId = request()->integer('semestre');
+        $semestreId = request()->integer('semestre') ?: (int) ($periodo?->semestre_id ?? 0);
 
         $generacion = Generacion::query()
             ->whereKey($generacionId)
@@ -158,7 +184,7 @@ class Calificacion extends Component
         $this->cargarGrados();
 
         if (! $this->grados->contains(fn ($grado) => (int) $grado->id === $gradoId)) {
-            $this->mensajeContexto = 'El grado guardado en la calificación ya no pertenece al contexto académico actual.';
+            $this->mensajeContexto = 'El grado guardado en la calificación no pertenece al ciclo escolar seleccionado.';
             return;
         }
 
@@ -168,7 +194,7 @@ class Calificacion extends Component
             $this->cargarSemestres();
 
             if (! $this->semestres->contains(fn ($semestre) => (int) $semestre->id === $semestreId)) {
-                $this->mensajeContexto = 'El semestre de la calificación ya no está disponible.';
+                $this->mensajeContexto = 'El semestre de la calificación ya no está disponible en ese ciclo.';
                 return;
             }
 
@@ -178,15 +204,11 @@ class Calificacion extends Component
         $this->cargarGrupos();
 
         if (! $this->grupos->contains(fn ($grupo) => (int) $grupo->id === $grupoId)) {
-            $this->mensajeContexto = 'El grupo de la calificación ya no está disponible.';
+            $this->mensajeContexto = 'El grupo de la calificación no está disponible en el ciclo escolar guardado.';
             return;
         }
 
         $this->grupo_id = $grupoId;
-
-        $periodo = $this->periodoBusquedaGlobalId
-            ? Periodos::query()->find($this->periodoBusquedaGlobalId)
-            : null;
 
         if ($this->esBachillerato) {
             $this->cargarParcialesDisponibles();
@@ -217,25 +239,209 @@ class Calificacion extends Component
         return $this->slug_nivel === 'bachillerato';
     }
 
+    private function cicloSeleccionadoEsActual(): bool
+    {
+        if (blank($this->ciclo_escolar_id)) {
+            return false;
+        }
+
+        $ciclo = $this->ciclosEscolares
+            ->first(fn ($item) => (int) $item->id === (int) $this->ciclo_escolar_id)
+            ?? CicloEscolar::query()->find($this->ciclo_escolar_id);
+
+        return (bool) ($ciclo?->es_actual) && blank($ciclo?->cerrado_at);
+    }
+
+    public function etiquetaEstatusHistorico(?string $estatus): string
+    {
+        return match ($estatus ?: 'activo') {
+            'activo' => 'Activo en el ciclo',
+            'reingreso' => 'Reingreso',
+            'promovido' => 'Promovido',
+            'no_promovido' => 'No promovido',
+            'egresado' => 'Egresado',
+            'baja_temporal' => 'Baja temporal',
+            'baja_definitiva' => 'Baja definitiva',
+            'trasladado' => 'Trasladado',
+            'suspendido' => 'Suspendido',
+            'inactivo' => 'Inactivo',
+            default => Str::headline((string) $estatus),
+        };
+    }
+
+    public function claseEstatusHistorico(?string $estatus): string
+    {
+        return match ($estatus ?: 'activo') {
+            'activo', 'reingreso' => 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+            'promovido' => 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300',
+            'no_promovido' => 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+            'egresado' => 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300',
+            'baja_temporal', 'baja_definitiva' => 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+            'trasladado' => 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300',
+            'suspendido', 'inactivo' => 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300',
+            default => 'border-slate-200 bg-slate-50 text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300',
+        };
+    }
+
     public function cargarCatalogos(): void
     {
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->where('status', 1)
-            ->orderByDesc('anio_ingreso')
-            ->get();
+        $this->cargarCiclosEscolares();
+        $this->seleccionarCicloInicial();
+        $this->cargarGeneraciones();
+        $this->cargarPeriodosBasicaDisponibles();
 
         $this->grados = collect();
         $this->grupos = collect();
         $this->semestres = collect();
-
-        // En bachillerato los parciales se cargan de forma dinámica,
-        // únicamente cuando existe un periodo para la generación y semestre elegidos.
         $this->parciales = collect();
+    }
+
+    private function cargarCiclosEscolares(): void
+    {
+        $this->ciclosEscolares = CicloEscolar::query()
+            ->where(function ($query): void {
+                $query
+                    ->whereExists(function ($subquery): void {
+                        $subquery->selectRaw('1')
+                            ->from('periodos')
+                            ->whereColumn('periodos.ciclo_escolar_id', 'ciclo_escolares.id')
+                            ->where('periodos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery): void {
+                        $subquery->selectRaw('1')
+                            ->from('grupos')
+                            ->whereColumn('grupos.ciclo_escolar_id', 'ciclo_escolares.id')
+                            ->where('grupos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclos')
+                            ->whereColumn('inscripcion_ciclos.ciclo_escolar_id', 'ciclo_escolares.id')
+                            ->where('inscripcion_ciclos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery): void {
+                        $subquery->selectRaw('1')
+                            ->from('calificaciones')
+                            ->whereColumn('calificaciones.ciclo_escolar_id', 'ciclo_escolares.id')
+                            ->where('calificaciones.nivel_id', $this->nivel_id);
+                    });
+            })
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->get();
+    }
+
+    private function seleccionarCicloInicial(): void
+    {
+        if (filled($this->ciclo_escolar_id)) {
+            return;
+        }
+
+        $actual = $this->ciclosEscolares->firstWhere('es_actual', true)
+            ?? $this->ciclosEscolares->first();
+
+        $this->ciclo_escolar_id = $actual?->id;
+    }
+
+    private function cargarGeneraciones(): void
+    {
+        if (blank($this->ciclo_escolar_id)) {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $cicloId = (int) $this->ciclo_escolar_id;
+
+        $this->generaciones = Generacion::query()
+            ->where('nivel_id', $this->nivel_id)
+            ->where(function ($query) use ($cicloId): void {
+                $query
+                    ->whereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('periodos')
+                            ->whereColumn('periodos.generacion_id', 'generaciones.id')
+                            ->where('periodos.ciclo_escolar_id', $cicloId)
+                            ->where('periodos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('grupos')
+                            ->whereColumn('grupos.generacion_id', 'generaciones.id')
+                            ->where('grupos.ciclo_escolar_id', $cicloId)
+                            ->where('grupos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclos')
+                            ->whereColumn('inscripcion_ciclos.generacion_id', 'generaciones.id')
+                            ->where('inscripcion_ciclos.ciclo_escolar_id', $cicloId)
+                            ->where('inscripcion_ciclos.nivel_id', $this->nivel_id);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('calificaciones')
+                            ->whereColumn('calificaciones.generacion_id', 'generaciones.id')
+                            ->where('calificaciones.ciclo_escolar_id', $cicloId)
+                            ->where('calificaciones.nivel_id', $this->nivel_id);
+                    });
+            })
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    private function cargarPeriodosBasicaDisponibles(): void
+    {
+        if ($this->esBachillerato || blank($this->ciclo_escolar_id)) {
+            $this->periodosBasica = collect();
+            return;
+        }
 
         $this->periodosBasica = PeriodosBasica::query()
+            ->whereHas('periodos', function ($query): void {
+                $query->where('nivel_id', $this->nivel_id)
+                    ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
+            })
             ->orderBy('periodo')
             ->get();
+    }
+
+    public function updatedCicloEscolarId($value = null): void
+    {
+        $this->resetEstadoAcademico([
+            'generacion_id',
+            'grado_id',
+            'grupo_id',
+            'semestre_id',
+            'parcial_bachillerato_id',
+            'periodo_basica_id',
+            'boleta_inscripcion_id',
+            'reconocimiento_inscripcion_id',
+        ]);
+
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->parciales = collect();
+        $this->periodosBasica = collect();
+
+        if (blank($value)) {
+            return;
+        }
+
+        if (! $this->ciclosEscolares->contains(fn ($ciclo) => (int) $ciclo->id === (int) $value)) {
+            $this->ciclo_escolar_id = null;
+            $this->mensajeContexto = 'El ciclo escolar seleccionado no tiene información académica para este nivel.';
+            return;
+        }
+
+        $this->cargarGeneraciones();
+        $this->cargarPeriodosBasicaDisponibles();
+
+        if ($this->generaciones->isEmpty()) {
+            $this->mensajeContexto = 'El ciclo escolar seleccionado no tiene generaciones con grupos, alumnos o calificaciones para este nivel.';
+        }
     }
 
     public function updatedGeneracionId($value = null): void
@@ -259,15 +465,12 @@ class Calificacion extends Component
             return;
         }
 
-        $esValida = Generacion::query()
-            ->whereKey($value)
-            ->where('nivel_id', $this->nivel_id)
-            ->where('status', 1)
-            ->exists();
+        $esValida = $this->generaciones
+            ->contains(fn ($generacion) => (int) $generacion->id === (int) $value);
 
-        if (!$esValida) {
+        if (! $esValida) {
             $this->generacion_id = null;
-            $this->mensajeContexto = 'La generación seleccionada no pertenece al nivel actual o ya no está activa.';
+            $this->mensajeContexto = 'La generación seleccionada no pertenece al nivel y ciclo escolar actuales.';
             return;
         }
 
@@ -416,6 +619,16 @@ class Calificacion extends Component
         $this->aplicarFiltroEstado();
     }
 
+    public function updatedFiltroRegistros(): void
+    {
+        $this->aplicarFiltroEstado();
+    }
+
+    public function updatedFiltroEstatusHistorico(): void
+    {
+        $this->aplicarFiltroEstado();
+    }
+
     public function updatedOrdenPromedio(): void
     {
         $this->aplicarFiltroEstado();
@@ -436,7 +649,12 @@ class Calificacion extends Component
          * Solo se reaplica el filtro si realmente hay un filtro activo.
          * Esto evita recorrer toda la tabla innecesariamente.
          */
-        if ($this->filtro_estado !== '' || $this->orden_promedio !== '') {
+        if (
+            $this->filtro_estado !== ''
+            || $this->filtro_registros !== 'todos'
+            || $this->filtro_estatus_historico !== ''
+            || $this->orden_promedio !== ''
+        ) {
             $this->aplicarFiltroEstado();
         }
     }
@@ -445,9 +663,10 @@ class Calificacion extends Component
     {
         $campos = array_merge($camposExtra, [
             'periodo_id',
-            'ciclo_escolar_id',
             'periodoSeleccionado',
             'filtro_estado',
+            'filtro_registros',
+            'filtro_estatus_historico',
             'orden_promedio',
             'inscripciones',
             'inscripcionesTabla',
@@ -474,14 +693,16 @@ class Calificacion extends Component
     private function puedeCargarDatos(): bool
     {
         if ($this->esBachillerato) {
-            return filled($this->generacion_id)
+            return filled($this->ciclo_escolar_id)
+                && filled($this->generacion_id)
                 && filled($this->grado_id)
                 && filled($this->semestre_id)
                 && filled($this->grupo_id)
                 && filled($this->parcial_bachillerato_id);
         }
 
-        return filled($this->generacion_id)
+        return filled($this->ciclo_escolar_id)
+            && filled($this->generacion_id)
             && filled($this->grado_id)
             && filled($this->grupo_id)
             && filled($this->periodo_basica_id);
@@ -489,30 +710,57 @@ class Calificacion extends Component
 
     private function cargarGrados(): void
     {
-        if (blank($this->generacion_id)) {
+        if (blank($this->ciclo_escolar_id) || blank($this->generacion_id)) {
             $this->grados = collect();
             return;
         }
 
+        $cicloId = (int) $this->ciclo_escolar_id;
+        $generacionId = (int) $this->generacion_id;
+
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel_id)
-            ->whereHas('grupos', function ($query) {
-                $query->where('nivel_id', $this->nivel_id)
-                    ->where('generacion_id', $this->generacion_id);
+            ->where(function ($query) use ($cicloId, $generacionId): void {
+                $query
+                    ->whereExists(function ($subquery) use ($cicloId, $generacionId): void {
+                        $subquery->selectRaw('1')
+                            ->from('grupos')
+                            ->whereColumn('grupos.grado_id', 'grados.id')
+                            ->where('grupos.ciclo_escolar_id', $cicloId)
+                            ->where('grupos.nivel_id', $this->nivel_id)
+                            ->where('grupos.generacion_id', $generacionId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId, $generacionId): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclos')
+                            ->whereColumn('inscripcion_ciclos.grado_id', 'grados.id')
+                            ->where('inscripcion_ciclos.ciclo_escolar_id', $cicloId)
+                            ->where('inscripcion_ciclos.nivel_id', $this->nivel_id)
+                            ->where('inscripcion_ciclos.generacion_id', $generacionId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId, $generacionId): void {
+                        $subquery->selectRaw('1')
+                            ->from('calificaciones')
+                            ->whereColumn('calificaciones.grado_id', 'grados.id')
+                            ->where('calificaciones.ciclo_escolar_id', $cicloId)
+                            ->where('calificaciones.nivel_id', $this->nivel_id)
+                            ->where('calificaciones.generacion_id', $generacionId);
+                    });
             })
             ->orderBy('orden')
             ->orderBy('id')
             ->get();
 
         if ($this->grados->isEmpty()) {
-            $this->mensajeContexto = 'La generación seleccionada no tiene grados o grupos configurados.';
+            $this->mensajeContexto = 'La generación seleccionada no tiene grados con grupos, alumnos o calificaciones en este ciclo escolar.';
         }
     }
 
     private function cargarSemestres(): void
     {
         if (
-            !$this->esBachillerato
+            ! $this->esBachillerato
+            || blank($this->ciclo_escolar_id)
             || blank($this->generacion_id)
             || blank($this->grado_id)
         ) {
@@ -520,22 +768,55 @@ class Calificacion extends Component
             return;
         }
 
+        $cicloId = (int) $this->ciclo_escolar_id;
+        $generacionId = (int) $this->generacion_id;
+        $gradoId = (int) $this->grado_id;
+
         $this->semestres = Semestre::query()
-            ->where('grado_id', $this->grado_id)
-            ->whereHas('grupos', function ($query) {
-                $query->where('nivel_id', $this->nivel_id)
-                    ->where('generacion_id', $this->generacion_id)
-                    ->where('grado_id', $this->grado_id);
-            })
-            ->whereHas('periodosBachillerato', function ($query) {
-                $query->where('nivel_id', $this->nivel_id)
-                    ->where('generacion_id', $this->generacion_id);
+            ->where('grado_id', $gradoId)
+            ->where(function ($query) use ($cicloId, $generacionId, $gradoId): void {
+                $query
+                    ->whereExists(function ($subquery) use ($cicloId, $generacionId, $gradoId): void {
+                        $subquery->selectRaw('1')
+                            ->from('periodos')
+                            ->whereColumn('periodos.semestre_id', 'semestres.id')
+                            ->where('periodos.ciclo_escolar_id', $cicloId)
+                            ->where('periodos.nivel_id', $this->nivel_id)
+                            ->where('periodos.generacion_id', $generacionId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId, $generacionId, $gradoId): void {
+                        $subquery->selectRaw('1')
+                            ->from('grupos')
+                            ->whereColumn('grupos.semestre_id', 'semestres.id')
+                            ->where('grupos.ciclo_escolar_id', $cicloId)
+                            ->where('grupos.nivel_id', $this->nivel_id)
+                            ->where('grupos.generacion_id', $generacionId)
+                            ->where('grupos.grado_id', $gradoId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId, $generacionId, $gradoId): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclos')
+                            ->whereColumn('inscripcion_ciclos.semestre_id', 'semestres.id')
+                            ->where('inscripcion_ciclos.ciclo_escolar_id', $cicloId)
+                            ->where('inscripcion_ciclos.nivel_id', $this->nivel_id)
+                            ->where('inscripcion_ciclos.generacion_id', $generacionId)
+                            ->where('inscripcion_ciclos.grado_id', $gradoId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId, $generacionId, $gradoId): void {
+                        $subquery->selectRaw('1')
+                            ->from('calificaciones')
+                            ->whereColumn('calificaciones.semestre_id', 'semestres.id')
+                            ->where('calificaciones.ciclo_escolar_id', $cicloId)
+                            ->where('calificaciones.nivel_id', $this->nivel_id)
+                            ->where('calificaciones.generacion_id', $generacionId)
+                            ->where('calificaciones.grado_id', $gradoId);
+                    });
             })
             ->orderBy('numero')
             ->get();
 
         if ($this->semestres->isEmpty()) {
-            $this->mensajeContexto = 'No existen periodos de bachillerato configurados para esta generación y grado.';
+            $this->mensajeContexto = 'No existen semestres con periodos, grupos o historial para esta generación dentro del ciclo seleccionado.';
         }
     }
 
@@ -544,7 +825,8 @@ class Calificacion extends Component
         $this->parciales = collect();
 
         if (
-            !$this->esBachillerato
+            ! $this->esBachillerato
+            || blank($this->ciclo_escolar_id)
             || blank($this->generacion_id)
             || blank($this->semestre_id)
         ) {
@@ -552,8 +834,9 @@ class Calificacion extends Component
         }
 
         $this->parciales = Parcial::query()
-            ->whereHas('periodos', function ($query) {
+            ->whereHas('periodos', function ($query): void {
                 $query->where('nivel_id', $this->nivel_id)
+                    ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
                     ->where('generacion_id', $this->generacion_id)
                     ->where('semestre_id', $this->semestre_id);
             })
@@ -561,7 +844,7 @@ class Calificacion extends Component
             ->get();
 
         if ($this->parciales->isEmpty()) {
-            $this->mensajeContexto = 'El semestre seleccionado no tiene parciales registrados en Periodos.';
+            $this->mensajeContexto = 'El semestre seleccionado no tiene parciales registrados en este ciclo escolar.';
         }
     }
 
@@ -569,7 +852,11 @@ class Calificacion extends Component
     {
         $this->grupos = collect();
 
-        if (blank($this->generacion_id) || blank($this->grado_id)) {
+        if (
+            blank($this->ciclo_escolar_id)
+            || blank($this->generacion_id)
+            || blank($this->grado_id)
+        ) {
             return;
         }
 
@@ -577,7 +864,9 @@ class Calificacion extends Component
             return;
         }
 
-        $this->grupos = Grupo::query()
+        $cicloId = (int) $this->ciclo_escolar_id;
+
+        $this->grupos = Grupo::withTrashed()
             ->with('asignacionGrupo:id,nombre')
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select('grupos.*')
@@ -586,15 +875,43 @@ class Calificacion extends Component
             ->where('grupos.grado_id', $this->grado_id)
             ->when(
                 $this->esBachillerato,
-                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('grupos.semestre_id')
+                fn ($query) => $query->where('grupos.semestre_id', $this->semestre_id),
+                fn ($query) => $query->whereNull('grupos.semestre_id')
             )
+            ->where(function ($query) use ($cicloId): void {
+                $query
+                    ->where('grupos.ciclo_escolar_id', $cicloId)
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclos')
+                            ->whereColumn('inscripcion_ciclos.grupo_id', 'grupos.id')
+                            ->where('inscripcion_ciclos.ciclo_escolar_id', $cicloId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('inscripcion_ciclo_asignaciones')
+                            ->join(
+                                'inscripcion_ciclos',
+                                'inscripcion_ciclos.id',
+                                '=',
+                                'inscripcion_ciclo_asignaciones.inscripcion_ciclo_id'
+                            )
+                            ->whereColumn('inscripcion_ciclo_asignaciones.grupo_id', 'grupos.id')
+                            ->where('inscripcion_ciclos.ciclo_escolar_id', $cicloId);
+                    })
+                    ->orWhereExists(function ($subquery) use ($cicloId): void {
+                        $subquery->selectRaw('1')
+                            ->from('calificaciones')
+                            ->whereColumn('calificaciones.grupo_id', 'grupos.id')
+                            ->where('calificaciones.ciclo_escolar_id', $cicloId);
+                    });
+            })
             ->orderBy('asignacion_grupos.nombre')
             ->orderBy('grupos.id')
             ->get();
 
         if ($this->grupos->isEmpty()) {
-            $this->mensajeContexto = 'No existen grupos configurados para la generación, grado y semestre seleccionados.';
+            $this->mensajeContexto = 'No existen grupos configurados o históricos para el ciclo, generación, grado y semestre seleccionados.';
         }
     }
 
@@ -612,6 +929,8 @@ class Calificacion extends Component
             'periodoSeleccionado',
             'busqueda',
             'filtro_estado',
+            'filtro_registros',
+            'filtro_estatus_historico',
             'orden_promedio',
             'inscripciones',
             'inscripcionesTabla',
@@ -634,17 +953,22 @@ class Calificacion extends Component
             'mensajeContexto',
         ]);
 
+        $this->generaciones = collect();
         $this->grados = collect();
         $this->grupos = collect();
         $this->semestres = collect();
         $this->parciales = collect();
+        $this->periodosBasica = collect();
+
+        $this->seleccionarCicloInicial();
+        $this->cargarGeneraciones();
+        $this->cargarPeriodosBasicaDisponibles();
     }
 
     public function cargarDatos(): void
     {
         $this->reset([
             'periodo_id',
-            'ciclo_escolar_id',
             'periodoSeleccionado',
             'inscripciones',
             'inscripcionesTabla',
@@ -683,7 +1007,7 @@ class Calificacion extends Component
         $this->cargarMaterias();
 
         if (empty($this->inscripciones)) {
-            $this->mensajeContexto = 'El contexto seleccionado no tiene alumnos activos asignados.';
+            $this->mensajeContexto = 'El contexto seleccionado no tiene alumnos pertenecientes a ese ciclo y grupo.';
         } elseif (empty($this->materias)) {
             $this->mensajeContexto = 'El grupo seleccionado no tiene materias calificables asignadas para el ciclo escolar del periodo.';
         }
@@ -697,7 +1021,8 @@ class Calificacion extends Component
     {
         $query = Periodos::query()
             ->with(['cicloEscolar', 'mesesBasica', 'periodoBasica', 'mesesBachillerato', 'parcialBachillerato'])
-            ->where('nivel_id', $this->nivel_id);
+            ->where('nivel_id', $this->nivel_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
 
         if ($this->contextoBusquedaGlobal && $this->periodoBusquedaGlobalId) {
             $query->whereKey($this->periodoBusquedaGlobalId);
@@ -711,9 +1036,8 @@ class Calificacion extends Component
 
         $periodo = $query->latest('id')->first();
 
-        if (!$periodo) {
+        if (! $periodo) {
             $this->periodo_id = null;
-            $this->ciclo_escolar_id = null;
             $this->periodoSeleccionado = null;
             return;
         }
@@ -727,6 +1051,9 @@ class Calificacion extends Component
             'ciclo_escolar' => $periodo->cicloEscolar
                 ? trim(($periodo->cicloEscolar->inicio_anio ?? '') . ' - ' . ($periodo->cicloEscolar->fin_anio ?? ''))
                 : 'Global',
+            'ciclo_actual' => (bool) ($periodo->cicloEscolar?->es_actual),
+            'ciclo_cerrado' => filled($periodo->cicloEscolar?->cerrado_at)
+                || ! (bool) ($periodo->cicloEscolar?->es_actual),
             'periodo' => $this->esBachillerato
                 ? ($periodo->mesesBachillerato->meses ?? 'Sin periodo')
                 : 'Periodo global',
@@ -740,81 +1067,27 @@ class Calificacion extends Component
 
     private function obtenerCicloEscolarId($periodo): ?int
     {
-        if (!blank($periodo->ciclo_escolar_id)) {
+        if (filled($periodo->ciclo_escolar_id)) {
             return (int) $periodo->ciclo_escolar_id;
         }
 
-        return CicloEscolar::query()
-            ->orderByDesc('inicio_anio')
-            ->value('id');
+        return filled($this->ciclo_escolar_id)
+            ? (int) $this->ciclo_escolar_id
+            : null;
     }
 
-    private function obtenerGrupoIdsEquivalentes(): array
-    {
-        if (blank($this->grupo_id)) {
-            return [];
-        }
-
-        $grupoSeleccionado = Grupo::query()
-            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'asignacion_grupo_id')
-            ->find($this->grupo_id);
-
-        if (!$grupoSeleccionado) {
-            return [(int) $this->grupo_id];
-        }
-
-        /*
-         * En bachillerato se buscan todos los grupos equivalentes.
-         * Esto permite cargar alumnos del mismo grupo lógico, aunque estén
-         * registrados en otro semestre.
-         */
-        if ($this->esBachillerato) {
-            return Grupo::query()
-                ->where('nivel_id', $this->nivel_id)
-                ->where('generacion_id', $this->generacion_id)
-                ->where('grado_id', $this->grado_id)
-                ->where('asignacion_grupo_id', $grupoSeleccionado->asignacion_grupo_id)
-                ->pluck('id')
-                ->map(fn($id) => (int) $id)
-                ->values()
-                ->toArray();
-        }
-
-        return [(int) $this->grupo_id];
-    }
     private function obtenerGrupoIdsParaAlumnos(): array
     {
-        if (blank($this->grupo_id)) {
-            return [];
-        }
-
-        $grupoSeleccionado = Grupo::query()
-            ->select('id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'asignacion_grupo_id')
-            ->find($this->grupo_id);
-
-        if (!$grupoSeleccionado) {
-            return [(int) $this->grupo_id];
-        }
-
         /*
-         * En bachillerato se toman todos los grupos equivalentes de la
-         * generación, incluso si el alumno ya avanzó de grado o semestre.
-         * La inscripción guarda la ubicación actual del alumno; por eso,
-         * limitar por grado/semestre impediría consultar periodos históricos.
+         * El historial por ciclo ya conserva el grupo exacto vigente en la
+         * fecha del periodo. No se mezclan grupos lógicos de otros semestres,
+         * porque eso podría incorporar alumnos fuera del contexto consultado.
          */
-        if ($this->esBachillerato) {
-            return Grupo::query()
-                ->where('nivel_id', $this->nivel_id)
-                ->where('generacion_id', $this->generacion_id)
-                ->where('asignacion_grupo_id', $grupoSeleccionado->asignacion_grupo_id)
-                ->pluck('id')
-                ->map(fn($id) => (int) $id)
-                ->values()
-                ->toArray();
-        }
-
-        return [(int) $this->grupo_id];
+        return filled($this->grupo_id)
+            ? [(int) $this->grupo_id]
+            : [];
     }
+
     private function cargarInscripciones(): void
     {
         $grupoIds = $this->obtenerGrupoIdsParaAlumnos();
@@ -837,6 +1110,8 @@ class Calificacion extends Component
             gradoId: $this->esBachillerato ? null : (int) $this->grado_id,
             generacionId: (int) $this->generacion_id,
             semestreId: null,
+            usarHistorialCiclo: true,
+            incluirNoActivos: true,
         );
 
         if (filled($this->busqueda)) {
@@ -857,6 +1132,9 @@ class Calificacion extends Component
             ->map(function ($inscripcion) {
                 return [
                     'inscripcion_id' => (int) $inscripcion->id,
+                    'inscripcion_ciclo_id' => $inscripcion->getAttribute('inscripcion_ciclo_id')
+                        ? (int) $inscripcion->getAttribute('inscripcion_ciclo_id')
+                        : null,
                     'matricula' => $inscripcion->matricula ?? 'SIN MATRÍCULA',
                     'alumno' => trim(
                         ($inscripcion->apellido_paterno ?? '') . ' ' .
@@ -886,7 +1164,10 @@ class Calificacion extends Component
             ])
             ->where('grupo_id', $this->grupo_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->when(
+                $this->cicloSeleccionadoEsActual(),
+                fn ($query) => $query->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            )
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel_id)
                     ->where('grado_id', $this->grado_id);
@@ -1318,6 +1599,26 @@ class Calificacion extends Component
                 ->all()
             : [];
 
+        if ($this->filtro_estatus_historico !== '') {
+            $filas = $filas->filter(
+                fn ($fila) => ($fila['estatus_historico'] ?? 'activo') === $this->filtro_estatus_historico
+            );
+        }
+
+        if ($this->filtro_registros !== 'todos') {
+            $filas = $filas->filter(function ($fila): bool {
+                $inscripcionId = (int) ($fila['inscripcion_id'] ?? 0);
+                $tieneCalificaciones = collect($this->calificaciones[$inscripcionId] ?? [])
+                    ->contains(fn ($valor) => $this->normalizarCalificacion($valor) !== null);
+
+                return match ($this->filtro_registros) {
+                    'con_calificaciones' => $tieneCalificaciones,
+                    'sin_calificaciones' => ! $tieneCalificaciones,
+                    default => true,
+                };
+            });
+        }
+
         if ($this->filtro_estado !== '') {
             $filas = $filas->filter(function ($fila) use ($idsMateriasAcademicas) {
                 $inscripcionId = (int) $fila['inscripcion_id'];
@@ -1494,14 +1795,15 @@ class Calificacion extends Component
         }
 
         $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
-        $gate->asegurar((int) $this->ciclo_escolar_id, (int) $this->nivel_id, 'calificaciones');
 
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
-        if ($ciclo?->cerrado_at) {
+        if ($ciclo?->cerrado_at || ! (bool) $ciclo?->es_actual) {
             $this->solicitarCorreccionesHistoricas($correcciones);
             return;
         }
+
+        $gate->asegurar((int) $this->ciclo_escolar_id, (int) $this->nivel_id, 'calificaciones');
 
         DB::transaction(function () {
             foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
@@ -1554,6 +1856,7 @@ class Calificacion extends Component
                     ModelsCalificacion::query()->updateOrCreate(
                         $condiciones,
                         [
+                            'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId),
                             'nivel_id' => $this->nivel_id,
                             'grado_id' => $this->grado_id,
                             'grupo_id' => $this->grupo_id,
@@ -1624,7 +1927,7 @@ class Calificacion extends Component
                         continue;
                     }
 
-                    $alumno = Inscripcion::query()->findOrFail((int) $inscripcionId);
+                    $alumno = Inscripcion::withTrashed()->findOrFail((int) $inscripcionId);
                     $calificacion = ModelsCalificacion::query()
                         ->where('periodo_id', $periodo->id)
                         ->where('inscripcion_id', $alumno->id)
@@ -1633,6 +1936,7 @@ class Calificacion extends Component
 
                     $propuesto = [
                         'accion' => $valorNuevo === null ? 'eliminar' : ($calificacion ? 'actualizar' : 'crear'),
+                        'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId),
                         'asignacion_materia_id' => (int) $asignacionMateriaId,
                         'nivel_id' => (int) $this->nivel_id,
                         'grado_id' => (int) $this->grado_id,
@@ -1671,6 +1975,16 @@ class Calificacion extends Component
             'text' => "Se registraron {$solicitadas} solicitud(es). Las calificaciones del ciclo cerrado no fueron modificadas todavía.",
             'position' => 'top-end',
         ]);
+    }
+
+    private function inscripcionCicloIdPara(int $inscripcionId): ?int
+    {
+        $fila = collect($this->inscripciones)
+            ->firstWhere('inscripcion_id', $inscripcionId);
+
+        $id = (int) ($fila['inscripcion_ciclo_id'] ?? 0);
+
+        return $id > 0 ? $id : null;
     }
 
     private function crearBitacoraCalificacion(
@@ -1833,6 +2147,11 @@ class Calificacion extends Component
     public function getPuedeUsarPlantillaImportacionProperty(): bool
     {
         return $this->puedeGuardar;
+    }
+
+    public function getPuedeImportarPlantillaProperty(): bool
+    {
+        return $this->puedeUsarPlantillaImportacion && $this->cicloSeleccionadoEsActual();
     }
 
     public function getPuedeExportarPdfProperty(): bool
@@ -2904,7 +3223,8 @@ class Calificacion extends Component
 
         $query = Periodos::query()
             ->whereKey((int) $this->periodo_id)
-            ->where('nivel_id', (int) $this->nivel_id);
+            ->where('nivel_id', (int) $this->nivel_id)
+            ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id);
 
         if ($this->esBachillerato) {
             return $query
@@ -2982,7 +3302,7 @@ class Calificacion extends Component
 
         $nivel = Nivel::query()->find($this->nivel_id);
         $grado = Grado::query()->find($this->grado_id);
-        $grupo = Grupo::query()
+        $grupo = Grupo::withTrashed()
             ->with('asignacionGrupo:id,nombre')
             ->find($this->grupo_id);
         $generacion = Generacion::query()->find($this->generacion_id);
@@ -3042,6 +3362,14 @@ class Calificacion extends Component
             return;
         }
 
+        if (! $this->cicloSeleccionadoEsActual()) {
+            $this->addError(
+                'archivo_calificaciones',
+                'La importación masiva está protegida en ciclos históricos o cerrados. Descarga la plantilla para consulta y registra los cambios desde la tabla para generar solicitudes de corrección autorizables.'
+            );
+            return;
+        }
+
         $this->validate([
             'archivo_calificaciones' => [
                 'required',
@@ -3072,6 +3400,12 @@ class Calificacion extends Component
                     ->pluck('inscripcion_id')
                     ->map(fn($id) => (int) $id)
                     ->values()
+                    ->all(),
+                inscripcionCicloIds: collect($this->inscripciones)
+                    ->filter(fn ($fila) => ! empty($fila['inscripcion_ciclo_id']))
+                    ->mapWithKeys(fn ($fila) => [
+                        (int) $fila['inscripcion_id'] => (int) $fila['inscripcion_ciclo_id'],
+                    ])
                     ->all(),
                 materiasPermitidas: $this->materias,
                 userId: Auth::id(),
@@ -3142,7 +3476,7 @@ class Calificacion extends Component
             return null;
         }
 
-        $grupo = Grupo::query()
+        $grupo = Grupo::withTrashed()
             ->with('asignacionGrupo:id,nombre')
             ->find($this->grupo_id);
 
@@ -3166,7 +3500,9 @@ class Calificacion extends Component
                 semestre_id: $this->semestre_id ? (int) $this->semestre_id : null,
                 generacion_id: $this->generacion_id ? (int) $this->generacion_id : null,
                 esBachillerato: $this->esBachillerato,
-                busqueda: $this->busqueda ?? ''
+                busqueda: $this->busqueda ?? '',
+                filtroEstatusHistorico: $this->filtro_estatus_historico,
+                filtroRegistros: $this->filtro_registros,
             ),
             $nombreArchivo
         );

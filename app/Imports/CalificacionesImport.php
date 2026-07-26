@@ -22,6 +22,7 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
     ];
 
     private array $inscripcionIdsPermitidas;
+    private array $inscripcionCicloIds;
     private array $materiasPermitidas;
 
     public function __construct(
@@ -36,12 +37,17 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
         private string $tipoPeriodo,
         private int $periodoReferenciaId,
         array $inscripcionIdsPermitidas,
+        array $inscripcionCicloIds,
         array $materiasPermitidas,
         private ?int $userId,
         private ?string $ip,
         private ?string $motivo = null
     ) {
         $this->inscripcionIdsPermitidas = array_map('intval', $inscripcionIdsPermitidas);
+        $this->inscripcionCicloIds = collect($inscripcionCicloIds)
+            ->mapWithKeys(fn ($id, $inscripcionId) => [(int) $inscripcionId => (int) $id])
+            ->filter(fn ($id) => $id > 0)
+            ->all();
 
         $this->materiasPermitidas = collect($materiasPermitidas)
             ->map(function ($materia) {
@@ -333,6 +339,7 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
         Calificacion::query()->updateOrCreate(
             $condiciones,
             [
+                'inscripcion_ciclo_id' => $this->inscripcionCicloIds[$inscripcionId] ?? null,
                 'nivel_id' => $this->nivelId,
                 'grado_id' => $this->gradoId,
                 'grupo_id' => $this->grupoId,
