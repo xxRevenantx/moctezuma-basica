@@ -118,11 +118,11 @@
                             $esPendiente = $proyeccion->estado === 'pendiente';
                             $grupos = $gruposDisponibles[$proyeccion->id] ?? [];
                         @endphp
-                        <tr class="align-top hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
+                        <tr wire:key="proyeccion-continuidad-{{ $proyeccion->id }}"
+                            class="align-top hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
                             <td class="p-3">
-                                <input type="checkbox" wire:model="seleccionados" value="{{ $proyeccion->id }}"
-                                    @disabled(!$esPendiente)
-                                    class="rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                                <flux:checkbox wire:model.live="seleccionados" value="{{ $proyeccion->id }}"
+                                    :disabled="! $esPendiente" />
                             </td>
                             <td class="p-3">
                                 <p class="font-black text-slate-900 dark:text-white">
@@ -153,13 +153,14 @@
                             </td>
                             <td class="p-3">
                                 @if ($esPendiente)
-                                    <select wire:model="datos.{{ $proyeccion->id }}.grupo_destino_id"
-                                        class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-900">
-                                        <option value="">Selecciona grupo</option>
+                                    <flux:select wire:model="datos.{{ $proyeccion->id }}.grupo_destino_id"
+                                        size="sm" placeholder="Selecciona grupo">
                                         @foreach ($grupos as $grupo)
-                                            <option value="{{ $grupo['id'] }}">{{ $grupo['label'] }}</option>
+                                            <flux:select.option value="{{ $grupo['id'] }}">
+                                                {{ $grupo['label'] }}
+                                            </flux:select.option>
                                         @endforeach
-                                    </select>
+                                    </flux:select>
                                     @if ($grupos === [])
                                         <p class="mt-1 text-xs font-bold text-rose-600">No hay grupos compatibles
                                             activos.</p>
@@ -174,9 +175,8 @@
                             </td>
                             <td class="p-3">
                                 @if ($esPendiente)
-                                    <input type="text" wire:model="datos.{{ $proyeccion->id }}.matricula"
-                                        class="w-full rounded-xl border-slate-300 text-sm uppercase dark:border-neutral-700 dark:bg-neutral-900"
-                                        placeholder="Se generará al confirmar">
+                                    <flux:input type="text" wire:model="datos.{{ $proyeccion->id }}.matricula"
+                                        size="sm" class:input="uppercase" placeholder="Se generará al confirmar" />
                                     <p class="mt-1 text-xs text-slate-500">Puede modificarse antes de formalizar.</p>
                                 @else
                                     <span
@@ -196,10 +196,32 @@
                             <td class="p-3 text-right">
                                 @if ($esPendiente)
                                     <div class="flex justify-end gap-2">
-                                        <flux:button size="sm" variant="primary"
-                                            wire:click="confirmarUna({{ $proyeccion->id }})">Confirmar</flux:button>
-                                        <flux:button size="sm" variant="danger"
-                                            wire:click="cancelarUna({{ $proyeccion->id }})">No continuará</flux:button>
+                                        <flux:button wire:key="confirmar-proyeccion-{{ $proyeccion->id }}" size="sm"
+                                            variant="primary" :loading="false"
+                                            wire:click="confirmarUna({{ $proyeccion->id }})"
+                                            wire:target="confirmarUna({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            <span wire:loading.remove wire:target="confirmarUna({{ $proyeccion->id }})">
+                                                Confirmar
+                                            </span>
+                                            <span wire:loading wire:target="confirmarUna({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                <flux:icon name="loading" class="size-4" />
+                                                Abriendo...
+                                            </span>
+                                        </flux:button>
+                                        <flux:button wire:key="cancelar-proyeccion-{{ $proyeccion->id }}" size="sm"
+                                            variant="danger" :loading="false"
+                                            wire:click="cancelarUna({{ $proyeccion->id }})"
+                                            wire:target="cancelarUna({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            <span wire:loading.remove wire:target="cancelarUna({{ $proyeccion->id }})">
+                                                No continuará
+                                            </span>
+                                            <span wire:loading wire:target="cancelarUna({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                <flux:icon name="loading" class="size-4" />
+                                                Abriendo...
+                                            </span>
+                                        </flux:button>
                                     </div>
                                 @elseif ($proyeccion->estado === 'confirmada')
                                     <p class="text-xs font-semibold text-emerald-700">Confirmada
@@ -223,7 +245,8 @@
     </section>
 
     @if ($modalConfirmar)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div wire:key="modal-confirmar-proyecciones"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
             <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <h3 class="text-xl font-black text-slate-900 dark:text-white">Confirmar continuidad</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -246,7 +269,8 @@
     @endif
 
     @if ($modalCancelar)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div wire:key="modal-cancelar-proyecciones"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
             <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <h3 class="text-xl font-black text-slate-900 dark:text-white">Marcar que no continuarán</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -255,7 +279,7 @@
                 </p>
                 <div class="mt-5 space-y-4">
                     <flux:textarea wire:model="motivo_cancelacion" label="Motivo de cancelación" rows="4"
-                        placeholder="Ejemplo: La familia confirmó que continuará sus estudios en otra institución." />
+                        placeholder="Motivo de cancelación (obligatorio). Ejemplo: la familia confirmó que continuará sus estudios en otra institución." />
                     <flux:input type="password" wire:model="password_cancelacion_proyeccion"
                         label="Contraseña del usuario" autocomplete="current-password" />
                 </div>

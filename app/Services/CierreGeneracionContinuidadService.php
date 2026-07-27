@@ -233,6 +233,8 @@ class CierreGeneracionContinuidadService
 
     public function ejecutar(array $configuracion, array $decisiones, int $usuarioId): ProcesoCierreCiclo
     {
+        $this->asegurarEsquemaCierreDisponible();
+
         return DB::transaction(function () use ($configuracion, $decisiones, $usuarioId): ProcesoCierreCiclo {
             $generacion = Generacion::query()->lockForUpdate()->findOrFail((int) $configuracion['generacion_id']);
             $nivel = Nivel::query()->findOrFail((int) $configuracion['nivel_id']);
@@ -714,6 +716,8 @@ class CierreGeneracionContinuidadService
 
     public function revertir(ProcesoCierreCiclo $proceso, string $motivo, int $usuarioId): ProcesoCierreCiclo
     {
+        $this->asegurarEsquemaCierreDisponible();
+
         $motivo = trim($motivo);
         if (mb_strlen($motivo) < 10) {
             throw ValidationException::withMessages([
@@ -844,6 +848,65 @@ class CierreGeneracionContinuidadService
 
             return $proceso->fresh(['detalles.inscripcion', 'generacion']);
         });
+    }
+
+    private function asegurarEsquemaCierreDisponible(): void
+    {
+        $requeridas = [
+            'procesos_cierre_ciclo' => [
+                'ciclo_destino_id',
+                'grupo_origen_id',
+                'alcance',
+                'fecha_efectiva',
+                'vista_previa_hash',
+                'estado_anterior_generacion',
+                'confirmacion_at',
+                'motivo_reversion',
+            ],
+            'procesos_cierre_ciclo_detalles' => [
+                'inscripcion_ciclo_origen_id',
+                'inscripcion_ciclo_destino_id',
+                'resultado_propuesto',
+                'destino_propuesto',
+                'revertido_at',
+                'revertido_por',
+                'motivo_reversion',
+            ],
+            'proyecciones_continuidad' => [
+                'inscripcion_id',
+                'inscripcion_ciclo_origen_id',
+                'ciclo_destino_id',
+                'nivel_destino_id',
+                'generacion_destino_id',
+                'grado_destino_id',
+                'estado',
+            ],
+        ];
+
+        $faltantes = [];
+
+        foreach ($requeridas as $tabla => $columnas) {
+            if (! Schema::hasTable($tabla)) {
+                $faltantes[] = $tabla.' (tabla)';
+                continue;
+            }
+
+            foreach ($columnas as $columna) {
+                if (! Schema::hasColumn($tabla, $columna)) {
+                    $faltantes[] = $tabla.'.'.$columna;
+                }
+            }
+        }
+
+        if ($faltantes === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'confirmacion' => 'La base de datos del módulo de cierre está desactualizada. '
+                .'Ejecuta "php artisan migrate" y después "php artisan optimize:clear". '
+                .'Elementos faltantes: '.implode(', ', $faltantes).'.',
+        ]);
     }
 
     private function validarConfiguracion(array $configuracion, array $decisiones, Collection $candidatos): void

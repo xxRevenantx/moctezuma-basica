@@ -13,6 +13,9 @@ use Livewire\Component;
 
 class ProyeccionesContinuidad extends Component
 {
+    private const MOTIVO_CANCELACION_PREDETERMINADO =
+    'La familia confirmó que no continuará en la institución durante el ciclo escolar destino.';
+
     public string $slug_nivel = '';
     public ?Nivel $nivel = null;
     public Collection $ciclosDestino;
@@ -69,7 +72,7 @@ class ProyeccionesContinuidad extends Component
         $this->seleccionados = $this->proyecciones
             ->where('estado', 'pendiente')
             ->pluck('id')
-            ->map(fn ($id): string => (string) $id)
+            ->map(fn($id): string => (string) $id)
             ->all();
     }
 
@@ -156,7 +159,7 @@ class ProyeccionesContinuidad extends Component
             return;
         }
 
-        $this->motivo_cancelacion = '';
+        $this->motivo_cancelacion = self::MOTIVO_CANCELACION_PREDETERMINADO;
         $this->password_cancelacion_proyeccion = '';
         $this->modalCancelar = true;
         $this->resetValidation();
@@ -205,7 +208,7 @@ class ProyeccionesContinuidad extends Component
     public function getConteosProperty(): array
     {
         $conteos = ProyeccionContinuidad::query()
-            ->whereHas('inscripcionCicloOrigen', fn ($query) => $query->where('nivel_id', $this->nivel->id))
+            ->whereHas('inscripcionCicloOrigen', fn($query) => $query->where('nivel_id', $this->nivel->id))
             ->selectRaw('estado, COUNT(*) as total')
             ->groupBy('estado')
             ->pluck('total', 'estado');
@@ -231,7 +234,7 @@ class ProyeccionesContinuidad extends Component
 
     private function proyeccionesSeleccionadasPendientes(): Collection
     {
-        $ids = collect($this->seleccionados)->map(fn ($id): int => (int) $id)->filter()->unique();
+        $ids = collect($this->seleccionados)->map(fn($id): int => (int) $id)->filter()->unique();
 
         return ProyeccionContinuidad::query()
             ->whereIn('id', $ids)
@@ -262,7 +265,7 @@ class ProyeccionesContinuidad extends Component
     private function cargarCiclosDestino(): void
     {
         $ids = ProyeccionContinuidad::query()
-            ->whereHas('inscripcionCicloOrigen', fn ($query) => $query->where('nivel_id', $this->nivel->id))
+            ->whereHas('inscripcionCicloOrigen', fn($query) => $query->where('nivel_id', $this->nivel->id))
             ->pluck('ciclo_destino_id')
             ->unique()
             ->values();

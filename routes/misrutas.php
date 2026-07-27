@@ -4,6 +4,7 @@ use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
+use App\Http\Controllers\CierreGeneracionReporteController;
 use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
@@ -252,6 +253,17 @@ Route::get('/nivel/{slug_nivel}/matricula-historica/pdf', MatriculaHistorialPdfC
 
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])
     ->name('misrutas.promedios.boleta.pdf');
+
+
+// REPORTES DEL CIERRE DE GENERACIÓN Y CONTINUIDAD
+Route::prefix('generales/cierre-generacion')->group(function () {
+    Route::get('/{proceso}/reporte/{formato}', [CierreGeneracionReporteController::class, 'reporte'])
+        ->whereIn('formato', ['pdf', 'excel'])
+        ->name('generales.cierre-generacion.reporte');
+
+    Route::get('/{proceso}/detalle/{detalle}/comprobante', [CierreGeneracionReporteController::class, 'comprobante'])
+        ->name('generales.cierre-generacion.comprobante');
+});
 
 Route::get('/generales/{slug_nivel}/documentos-academicos/{tipo}/zip', [DocumentosAcademicosZipController::class, 'descargar'])
     ->middleware('admin')

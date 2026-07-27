@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CierreGeneracionReporteController;
 use App\Livewire\Settings\Appearance;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Profile;
@@ -39,3 +40,32 @@ Route::middleware(['auth', 'active'])->group(function () {
 });
 
 Route::middleware(['auth', 'active', 'route.permission'])->group(base_path('routes/misrutas.php'));
+
+/*
+|--------------------------------------------------------------------------
+| Rutas de respaldo para reportes del cierre de generación
+|--------------------------------------------------------------------------
+|
+| Estas rutas normalmente se registran desde routes/misrutas.php. El bloque
+| de respaldo evita un RouteNotFoundException cuando una instalación conserva
+| una copia anterior de ese archivo o cuando la caché de rutas quedó desfasada.
+|
+*/
+Route::middleware(['auth', 'active', 'route.permission'])->group(function (): void {
+    if (! Route::has('generales.cierre-generacion.reporte')) {
+        Route::get(
+            '/generales/cierre-generacion/{proceso}/reporte/{formato}',
+            [CierreGeneracionReporteController::class, 'reporte']
+        )
+            ->whereIn('formato', ['pdf', 'excel'])
+            ->name('generales.cierre-generacion.reporte');
+    }
+
+    if (! Route::has('generales.cierre-generacion.comprobante')) {
+        Route::get(
+            '/generales/cierre-generacion/{proceso}/detalle/{detalle}/comprobante',
+            [CierreGeneracionReporteController::class, 'comprobante']
+        )
+            ->name('generales.cierre-generacion.comprobante');
+    }
+});
