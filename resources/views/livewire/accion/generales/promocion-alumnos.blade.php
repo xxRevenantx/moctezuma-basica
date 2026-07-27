@@ -1,12 +1,12 @@
 <div class="space-y-5">
     <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-100">
-        La promoción conserva la generación del alumno y cambia su ciclo escolar, grado o semestre y grupo. Los grupos tienen <b>cupo ilimitado</b> y solo se muestran cuando pertenecen exactamente al ciclo seleccionado.
+        Esta sección es únicamente para promociones <b>confirmadas dentro del mismo nivel</b>: grado inmediato siguiente o semestre inmediato siguiente. Para egresar, proyectar al siguiente nivel o decidir quién continuará, utiliza <b>Cierre de nivel y continuidad</b>.
     </div>
 
     <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="mb-4">
             <h2 class="font-black text-slate-900 dark:text-white">Ubicación de origen</h2>
-            <p class="text-sm text-slate-500">Selecciona el ciclo y la ubicación actual que deseas promover.</p>
+            <p class="text-sm text-slate-500">Selecciona el ciclo y la ubicación actual. El sistema solo permitirá el grado o semestre inmediato siguiente.</p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -59,7 +59,7 @@
         <div class="mb-4">
             <h2 class="font-black text-emerald-950 dark:text-emerald-100">Ubicación de destino</h2>
             <p class="text-sm text-emerald-800/80 dark:text-emerald-200/70">
-                El sistema propone el ciclo y el siguiente grado o semestre. Puedes confirmar el grupo compatible disponible.
+                El sistema propone el ciclo y el siguiente grado o semestre dentro del mismo nivel. Elige únicamente el grupo compatible disponible.
             </p>
         </div>
 
@@ -101,7 +101,11 @@
             <flux:input wire:model="motivo" label="Motivo obligatorio" placeholder="Promoción de fin de periodo" />
         </div>
 
-        @if ($ciclo_destino_id && $grado_destino_id && $gruposDestino->isEmpty())
+        @if (($this->esBachillerato() ? $semestre_origen_id : $grado_origen_id) && ! $grado_destino_id)
+            <div class="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-100">
+                <b>Fin de etapa detectado.</b> No existe un grado o semestre inmediato siguiente dentro de este nivel. Procesa a estos alumnos en <b>Cierre de nivel y continuidad</b>.
+            </div>
+        @elseif ($ciclo_destino_id && $grado_destino_id && $gruposDestino->isEmpty())
             <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
                 No existe un grupo activo compatible en el ciclo destino. Crea primero el grupo con la misma generación y la sección correspondiente.
             </div>

@@ -12,6 +12,7 @@ use App\Models\Semestre;
 use App\Services\GestionAcademicaService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -274,6 +275,98 @@ class PromocionAlumnos extends Component
             $reglas['semestre_destino_id'] = ['required', 'exists:semestres,id'];
         }
         $this->validate($reglas);
+        $this->validarDestinoSeleccionado();
+    }
+
+    private function validarDestinoSeleccionado(): void
+    {
+        $grupoOrigen = Grupo::query()->find($this->grupo_origen_id);
+        $grupoDestino = Grupo::query()->find($this->grupo_destino_id);
+
+        if (! $grupoOrigen || ! $grupoDestino) {
+            throw ValidationException::withMessages([
+                'grupo_destino_id' => 'No fue posible validar los grupos de origen y destino.',
+            ]);
+        }
+
+        if ((int) $grupoDestino->nivel_id !== (int) $this->nivel->id
+            || (int) $grupoDestino->generacion_id !== (int) $this->generacion_id
+            || (int) $grupoDestino->ciclo_escolar_id !== (int) $this->ciclo_destino_id
+            || (int) $grupoDestino->grado_id !== (int) $this->grado_destino_id
+            || (int) ($grupoDestino->semestre_id ?? 0) !== (int) ($this->semestre_destino_id ?? 0)) {
+            throw ValidationException::withMessages([
+                'grupo_destino_id' => 'El grupo destino no corresponde exactamente al ciclo, nivel, generación, grado o semestre seleccionados.',
+            ]);
+        }
+
+        if ($this->tipoResultado === 'no_promovido') {
+            if ((int) $this->ciclo_destino_id === (int) $this->ciclo_origen_id) {
+                throw ValidationException::withMessages([
+                    'ciclo_destino_id' => 'La repetición debe registrarse en un ciclo escolar posterior.',
+                ]);
+            }
+
+            if ((int) $this->grado_destino_id !== (int) $this->grado_origen_id
+                || (int) ($this->semestre_destino_id ?? 0) !== (int) ($this->semestre_origen_id ?? 0)) {
+                throw ValidationException::withMessages([
+                    'grado_destino_id' => 'Un alumno no promovido debe continuar en el mismo grado o semestre durante el ciclo siguiente.',
+                ]);
+            }
+
+            return;
+        }
+
+        if ($this->esBachillerato()) {
+            $origen = Semestre::query()->find($this->semestre_origen_id);
+            $siguiente = $origen
+                ? Semestre::query()
+                    ->whereHas('grado', fn (Builder $query) => $query->where('nivel_id', $this->nivel->id))
+                    ->where('orden_global', '>', (int) $origen->orden_global)
+                    ->orderBy('orden_global')
+                    ->first()
+                : null;
+
+            if (! $siguiente) {
+                throw ValidationException::withMessages([
+                    'semestre_origen_id' => 'Este es el último semestre del nivel. Procesa a los alumnos desde “Cierre de nivel y continuidad”.',
+                ]);
+            }
+
+            $cicloEsperado = (int) $siguiente->numero % 2 === 0
+                ? (int) $this->ciclo_origen_id
+                : (int) ($this->resolverSiguienteCicloId($this->ciclo_origen_id) ?? 0);
+
+            if ((int) $this->semestre_destino_id !== (int) $siguiente->id
+                || (int) $this->grado_destino_id !== (int) $siguiente->grado_id
+                || (int) $this->ciclo_destino_id !== $cicloEsperado) {
+                throw ValidationException::withMessages([
+                    'semestre_destino_id' => 'La promoción ordinaria únicamente puede enviarse al semestre inmediato siguiente dentro del mismo nivel.',
+                ]);
+            }
+
+            return;
+        }
+
+        $origen = $this->grados->firstWhere('id', $this->grado_origen_id);
+        $siguiente = $this->grados
+            ->filter(fn ($grado) => (int) $grado->orden > (int) ($origen?->orden ?? 0))
+            ->sortBy('orden')
+            ->first();
+
+        if (! $siguiente) {
+            throw ValidationException::withMessages([
+                'grado_origen_id' => 'Este es el último grado del nivel. Procesa a los alumnos desde “Cierre de nivel y continuidad”.',
+            ]);
+        }
+
+        $cicloEsperado = (int) ($this->resolverSiguienteCicloId($this->ciclo_origen_id) ?? 0);
+
+        if ((int) $this->grado_destino_id !== (int) $siguiente->id
+            || (int) $this->ciclo_destino_id !== $cicloEsperado) {
+            throw ValidationException::withMessages([
+                'grado_destino_id' => 'La promoción ordinaria únicamente puede enviarse al grado inmediato siguiente y al ciclo escolar posterior.',
+            ]);
+        }
     }
 
     private function construirVistaPrevia(): array
@@ -364,9 +457,9 @@ class PromocionAlumnos extends Component
         if ($this->esBachillerato() && $this->semestre_origen_id) {
             $origen = Semestre::query()->find($this->semestre_origen_id);
             $siguiente = Semestre::query()
-                ->where('numero', '>', (int) ($origen?->numero ?? 0))
                 ->whereHas('grado', fn (Builder $q) => $q->where('nivel_id', $this->nivel->id))
-                ->orderBy('numero')
+                ->where('orden_global', '>', (int) ($origen?->orden_global ?? 0))
+                ->orderBy('orden_global')
                 ->first();
             if ($siguiente) {
                 $this->ciclo_destino_id = (int) $siguiente->numero % 2 === 0
