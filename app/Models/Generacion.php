@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Generacion extends Model
 {
@@ -61,6 +62,17 @@ class Generacion extends Model
     public function inscripciones()
     {
         return $this->hasMany(Inscripcion::class);
+    }
+
+    /**
+     * Historiales académicos de alumnos asociados a esta generación.
+     *
+     * Esta relación es utilizada por el asistente de cierre de generación
+     * para contar y filtrar alumnos dentro de un ciclo escolar específico.
+     */
+    public function inscripcionCiclos(): HasMany
+    {
+        return $this->hasMany(InscripcionCiclo::class, 'generacion_id');
     }
 
     // RELACIONES CON HORARIOS
