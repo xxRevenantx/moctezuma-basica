@@ -94,16 +94,42 @@ class EditarGrupo extends Component
 
     public function updatedGradoId(): void
     {
-        if (!$this->esBachillerato) {
-            $this->semestre_id = '';
+        $this->resetValidation(['grado_id', 'semestre_id', 'generacion_id']);
+
+        // En Bachillerato el grado se deriva del semestre seleccionado.
+        if ($this->esBachillerato) {
+            return;
         }
+
+        $this->semestre_id = '';
         $this->resolverVistaPreviaGeneracion();
     }
 
     public function updatedSemestreId(): void
     {
-        $semestre = Semestre::query()->find($this->semestre_id);
-        $this->grado_id = $semestre?->grado_id ?: '';
+        $this->resetValidation(['semestre_id', 'grado_id', 'generacion_id']);
+        $this->generacion_id = '';
+        $this->generacionCalculada = null;
+        $this->advertenciaAsignacion = null;
+
+        if (! $this->semestre_id) {
+            $this->grado_id = '';
+            return;
+        }
+
+        $semestre = Semestre::query()
+            ->with('grado:id,nivel_id,nombre,orden')
+            ->whereKey((int) $this->semestre_id)
+            ->whereHas('grado', fn ($query) => $query->where('nivel_id', (int) $this->nivel_id))
+            ->first();
+
+        if (! $semestre || ! $semestre->grado) {
+            $this->grado_id = '';
+            $this->addError('semestre_id', 'El semestre seleccionado no pertenece al nivel indicado.');
+            return;
+        }
+
+        $this->grado_id = (int) $semestre->grado_id;
         $this->resolverVistaPreviaGeneracion();
     }
 
@@ -241,17 +267,54 @@ class EditarGrupo extends Component
         $this->generacionCalculada = null;
         $this->advertenciaAsignacion = null;
 
-        if (!$this->ciclo_escolar_id || !$this->nivel_id || !$this->grado_id) {
+        if (! $this->ciclo_escolar_id || ! $this->nivel_id) {
             return;
         }
 
         $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
         $nivel = Nivel::query()->find($this->nivel_id);
-        $grado = Grado::query()->find($this->grado_id);
-        $semestre = $this->semestre_id ? Semestre::query()->find($this->semestre_id) : null;
 
-        if (!$ciclo || !$nivel || !$grado) {
+        if (! $ciclo || ! $nivel) {
             return;
+        }
+
+        $grado = null;
+        $semestre = null;
+
+        if ($nivel->slug === 'bachillerato') {
+            if (! $this->semestre_id) {
+                return;
+            }
+
+            $semestre = Semestre::query()
+                ->with('grado:id,nivel_id,nombre,orden')
+                ->whereKey((int) $this->semestre_id)
+                ->whereHas('grado', fn ($query) => $query->where('nivel_id', $nivel->id))
+                ->first();
+
+            if (! $semestre || ! $semestre->grado) {
+                $this->grado_id = '';
+                $this->addError('semestre_id', 'El semestre seleccionado no pertenece a Bachillerato.');
+                return;
+            }
+
+            $grado = $semestre->grado;
+            $this->grado_id = (int) $grado->id;
+        } else {
+            if (! $this->grado_id) {
+                return;
+            }
+
+            $grado = Grado::query()
+                ->whereKey((int) $this->grado_id)
+                ->where('nivel_id', $nivel->id)
+                ->first();
+
+            if (! $grado) {
+                $this->grado_id = '';
+                $this->addError('grado_id', 'El grado seleccionado no pertenece al nivel indicado.');
+                return;
+            }
         }
 
         $servicio = app(AsignacionEscolarService::class);
@@ -259,7 +322,7 @@ class EditarGrupo extends Component
         $generacion = $servicio->resolverGeneracion($ciclo, $nivel, $grado, $semestre);
         $this->generacion_id = $generacion?->id ?: '';
 
-        if (!$generacion) {
+        if (! $generacion) {
             $this->advertenciaAsignacion = 'La generación se creará automáticamente cuando guardes.';
         }
     }
