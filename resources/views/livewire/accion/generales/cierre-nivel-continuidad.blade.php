@@ -100,7 +100,7 @@
                     <div>
                         <h3 class="text-lg font-black text-slate-900 dark:text-white">2. Clasifica cada alumno</h3>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            Los alumnos que ya tienen un resultado histórico se muestran bloqueados y no serán modificados.
+                            Los egresados históricos del último grado pueden generar una proyección provisional sin modificar su egreso. Los alumnos con proyección vigente o ciclo posterior permanecen bloqueados.
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -178,9 +178,15 @@
                                     <td class="p-3">
                                         <p class="font-black text-slate-900 dark:text-white">{{ $alumno['nombre'] }}</p>
                                         <p class="mt-1 text-xs text-slate-500">{{ $alumno['matricula'] }} · {{ $alumno['curp'] }}</p>
-                                        <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-black {{ $alumno['procesable'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">
-                                            {{ $alumno['procesable'] ? 'Procesable' : 'Histórico sin cambios' }}
-                                        </span>
+                                        @if ($alumno['solo_proyeccion_historica'] ?? false)
+                                            <span class="mt-2 inline-flex rounded-full bg-sky-100 px-2 py-1 text-[11px] font-black text-sky-800">
+                                                Egresado histórico proyectable
+                                            </span>
+                                        @else
+                                            <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-black {{ $alumno['procesable'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">
+                                                {{ $alumno['procesable'] ? 'Procesable' : 'Histórico sin cambios' }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="p-3 text-slate-700 dark:text-slate-300">
                                         <p class="font-bold">{{ $alumno['grado'] }}{{ $alumno['semestre'] ? ' · Semestre '.$alumno['semestre'] : '' }}</p>
@@ -190,12 +196,21 @@
                                     <td class="p-3">
                                         <select wire:model.live="decisiones.{{ $alumno['id'] }}.resultado" @disabled($bloqueado)
                                             class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-900">
-                                            @foreach ($resultados as $valor => [$etiqueta])
-                                                @if (! ($nivel->slug === 'bachillerato' && $valor === 'continuidad_interna'))
-                                                    <option value="{{ $valor }}">{{ $etiqueta }}</option>
-                                                @endif
-                                            @endforeach
+                                            @if ($alumno['solo_proyeccion_historica'] ?? false)
+                                                <option value="continuidad_interna">Proyectar continuidad y conservar egreso</option>
+                                            @else
+                                                @foreach ($resultados as $valor => [$etiqueta])
+                                                    @if (! ($nivel->slug === 'bachillerato' && $valor === 'continuidad_interna'))
+                                                        <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                                                    @endif
+                                                @endforeach
+                                            @endif
                                         </select>
+                                        @if ($alumno['solo_proyeccion_historica'] ?? false)
+                                            <p class="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                                                Su egreso histórico permanecerá intacto; solo se creará la proyección pendiente.
+                                            </p>
+                                        @endif
                                         @if (($decision['resultado'] ?? '') === 'baja_definitiva' && $alumno['es_grado_final'])
                                             <p class="mt-2 text-xs font-bold text-rose-600">Terminó el grado final. Normalmente corresponde Egresado; la baja requerirá confirmación administrativa.</p>
                                         @endif

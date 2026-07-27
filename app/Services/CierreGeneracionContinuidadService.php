@@ -127,6 +127,7 @@ class CierreGeneracionContinuidadService
 
         $registros = InscripcionCiclo::query()
             ->with([
+                'cicloEscolar:id,inicio_anio,fin_anio',
                 'inscripcion' => fn ($relacion) => $relacion->withTrashed()->with([
                     'nivel:id,nombre,slug',
                     'grado:id,nombre,orden',
@@ -156,9 +157,37 @@ class CierreGeneracionContinuidadService
             ->orderBy('id')
             ->get();
 
+        $idsRegistros = $registros->pluck('id')->map(fn ($id): int => (int) $id)->values();
+        $idsInscripciones = $registros->pluck('inscripcion_id')->map(fn ($id): int => (int) $id)->unique()->values();
+
+        $proyeccionesVigentes = $idsRegistros->isEmpty()
+            ? collect()
+            : ProyeccionContinuidad::query()
+                ->whereIn('inscripcion_ciclo_origen_id', $idsRegistros)
+                ->whereIn('estado', ['pendiente', 'confirmada'])
+                ->orderByDesc('id')
+                ->get()
+                ->unique('inscripcion_ciclo_origen_id')
+                ->keyBy('inscripcion_ciclo_origen_id');
+
+        $otrosCiclos = $idsInscripciones->isEmpty()
+            ? collect()
+            : InscripcionCiclo::query()
+                ->with('cicloEscolar:id,inicio_anio,fin_anio')
+                ->whereIn('inscripcion_id', $idsInscripciones)
+                ->whereNotIn('id', $idsRegistros)
+                ->get()
+                ->groupBy('inscripcion_id');
+
         return $registros
             ->filter(fn (InscripcionCiclo $registro): bool => (bool) $registro->inscripcion)
-            ->map(function (InscripcionCiclo $registro) use ($nivel, $ultimoGradoId, $ultimoSemestreId): array {
+            ->map(function (InscripcionCiclo $registro) use (
+                $nivel,
+                $ultimoGradoId,
+                $ultimoSemestreId,
+                $proyeccionesVigentes,
+                $otrosCiclos
+            ): array {
                 $alumno = $registro->inscripcion;
                 $asignacion = $registro->asignacionActual;
                 $gradoId = (int) ($asignacion?->grado_id ?: $registro->grado_id);
@@ -168,12 +197,38 @@ class CierreGeneracionContinuidadService
                     ? $semestreId > 0 && $semestreId === (int) $ultimoSemestreId
                     : $gradoId > 0 && $gradoId === (int) $ultimoGradoId;
                 $estatusActual = mb_strtolower((string) ($alumno->estatus ?: 'inactivo'));
-                $procesable = $registro->estado === 'en_curso'
+                $resultadoExistente = $registro->resultado_final ?: null;
+
+                $procesableActivo = $registro->estado === 'en_curso'
                     && in_array($estatusActual, self::ESTATUS_PROCESABLES, true)
                     && (int) $alumno->ciclo_escolar_id === (int) $registro->ciclo_escolar_id;
 
-                $advertencias = $this->advertenciasAlumno($registro, $esGradoFinal, $procesable);
-                $resultadoExistente = $registro->resultado_final ?: null;
+                $proyeccionVigente = $proyeccionesVigentes->get($registro->id);
+                $inicioOrigen = (int) ($registro->cicloEscolar?->inicio_anio ?? 0);
+                $tieneCicloPosterior = collect($otrosCiclos->get($alumno->id, collect()))
+                    ->contains(fn (InscripcionCiclo $otro): bool =>
+                        (int) ($otro->cicloEscolar?->inicio_anio ?? 0) > $inicioOrigen
+                    );
+
+                // Compatibilidad con egresos realizados antes de existir el módulo
+                // de proyecciones. El resultado histórico no se reabre ni se altera;
+                // únicamente se permite crear la proyección provisional faltante.
+                $soloProyeccionHistorica = $registro->estado === 'cerrado'
+                    && $resultadoExistente === 'egresado'
+                    && $estatusActual === 'egresado'
+                    && $esGradoFinal
+                    && ! $proyeccionVigente
+                    && ! $tieneCicloPosterior;
+
+                $procesable = $procesableActivo || $soloProyeccionHistorica;
+                $advertencias = $this->advertenciasAlumno(
+                    $registro,
+                    $esGradoFinal,
+                    $procesable,
+                    $soloProyeccionHistorica,
+                    $proyeccionVigente?->estado,
+                    $tieneCicloPosterior,
+                );
 
                 return [
                     'id' => (int) $alumno->id,
@@ -192,6 +247,10 @@ class CierreGeneracionContinuidadService
                     'resultado_existente' => $resultadoExistente,
                     'es_grado_final' => $esGradoFinal,
                     'procesable' => $procesable,
+                    'procesable_activo' => $procesableActivo,
+                    'solo_proyeccion_historica' => $soloProyeccionHistorica,
+                    'proyeccion_existente_estado' => $proyeccionVigente?->estado,
+                    'tiene_ciclo_posterior' => $tieneCicloPosterior,
                     'advertencias' => $advertencias,
                     'advertencia_texto' => implode(' · ', $advertencias),
                 ];
@@ -323,6 +382,12 @@ class CierreGeneracionContinuidadService
                     continue;
                 }
 
+                if (($fila['solo_proyeccion_historica'] ?? false) && $resultado !== 'continuidad_interna') {
+                    throw ValidationException::withMessages([
+                        "decisiones.{$id}.resultado" => "{$fila['nombre']} ya es egresado histórico. Solo puedes crear su proyección provisional al siguiente nivel.",
+                    ]);
+                }
+
                 $motivoIndividual = $this->motivoIndividual($configuracion, $decision, $fila);
                 $destinoCiclo = null;
                 $datosProyeccion = null;
@@ -338,17 +403,20 @@ class CierreGeneracionContinuidadService
                     $this->validarDestinoProyeccion($destino);
                     $this->asegurarDestinoDisponible($alumno, (int) $destino['ciclo_escolar_id'], $fila['nombre']);
 
-                    // La continuidad masiva es una proyección, no una inscripción activa.
-                    // El alumno concluye el nivel de origen como egresado y solo será
-                    // activado en el siguiente nivel cuando control escolar confirme
-                    // que realmente regresó al iniciar el ciclo destino.
-                    $actualizado = $this->gestionAcademica->cambiarEstatus(
-                        $alumno,
-                        'egresado',
-                        $motivoIndividual,
-                        $usuarioId,
-                        $configuracion['fecha_efectiva'],
-                    );
+                    // La continuidad es una proyección, no una inscripción activa.
+                    // Si el alumno ya había sido egresado con el flujo anterior, se
+                    // conserva intacto ese resultado y únicamente se crea la proyección.
+                    if ($fila['solo_proyeccion_historica'] ?? false) {
+                        $actualizado = $alumno;
+                    } else {
+                        $actualizado = $this->gestionAcademica->cambiarEstatus(
+                            $alumno,
+                            'egresado',
+                            $motivoIndividual,
+                            $usuarioId,
+                            $configuracion['fecha_efectiva'],
+                        );
+                    }
                     $datosProyeccion = $destino;
                 } elseif ($resultado === 'no_promovido') {
                     $destino = $this->destinoRepeticion($configuracion, $decision, $fila, $alumno);
@@ -420,7 +488,9 @@ class CierreGeneracionContinuidadService
                         'fecha_efectiva' => $configuracion['fecha_efectiva'],
                         'motivo_aplicado' => $motivoIndividual,
                     ]),
-                    'observacion' => $this->textoResultado($resultado),
+                    'observacion' => ($fila['solo_proyeccion_historica'] ?? false)
+                        ? 'Se creó una proyección provisional para un egresado histórico sin modificar su resultado de origen.'
+                        : $this->textoResultado($resultado),
                     'estado_anterior' => $antes,
                     'estado_nuevo' => $despues,
                 ]);
@@ -1260,16 +1330,34 @@ class CierreGeneracionContinuidadService
             && filled($destino['grado_destino_id'] ?? null);
     }
 
-    private function advertenciasAlumno(InscripcionCiclo $registro, bool $esGradoFinal, bool $procesable): array
-    {
+    private function advertenciasAlumno(
+        InscripcionCiclo $registro,
+        bool $esGradoFinal,
+        bool $procesable,
+        bool $soloProyeccionHistorica = false,
+        ?string $estadoProyeccion = null,
+        bool $tieneCicloPosterior = false,
+    ): array {
         $advertencias = [];
+
         if (! $esGradoFinal) {
             $advertencias[] = 'No está en el último grado o semestre';
         }
-        if (! $procesable) {
-            $advertencias[] = $registro->resultado_final
-                ? 'Ya tiene resultado histórico: '.str_replace('_', ' ', $registro->resultado_final)
-                : 'No pertenece actualmente al ciclo origen';
+
+        if ($soloProyeccionHistorica) {
+            $advertencias[] = 'Egresado histórico: puede generar una proyección provisional sin modificar su egreso';
+        } elseif (! $procesable) {
+            if ($estadoProyeccion === 'pendiente') {
+                $advertencias[] = 'Ya tiene una proyección pendiente de confirmación';
+            } elseif ($estadoProyeccion === 'confirmada') {
+                $advertencias[] = 'La continuidad al siguiente nivel ya fue confirmada';
+            } elseif ($tieneCicloPosterior) {
+                $advertencias[] = 'Ya tiene un registro académico en un ciclo posterior';
+            } else {
+                $advertencias[] = $registro->resultado_final
+                    ? 'Ya tiene resultado histórico: '.str_replace('_', ' ', $registro->resultado_final)
+                    : 'No pertenece actualmente al ciclo origen';
+            }
         }
 
         $tieneRegistroAcademico = false;

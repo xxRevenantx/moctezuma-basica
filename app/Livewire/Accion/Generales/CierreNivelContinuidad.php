@@ -202,9 +202,11 @@ class CierreNivelContinuidad extends Component
 
         $this->decisiones = [];
         foreach ($this->alumnos as $alumno) {
-            $resultado = $alumno['procesable']
-                ? 'pendiente'
-                : $this->normalizarResultadoExistente($alumno['resultado_existente']);
+            $resultado = ($alumno['solo_proyeccion_historica'] ?? false)
+                ? 'continuidad_interna'
+                : ($alumno['procesable']
+                    ? 'pendiente'
+                    : $this->normalizarResultadoExistente($alumno['resultado_existente']));
             $this->decisiones[$alumno['id']] = [
                 'resultado' => $resultado,
                 'grupo_destino_id' => null,
@@ -232,13 +234,30 @@ class CierreNivelContinuidad extends Component
             return;
         }
 
+        $incluyeEgresadosHistoricos = collect($this->seleccionados)
+            ->map(fn ($id): int => (int) $id)
+            ->contains(function (int $id): bool {
+                $alumno = collect($this->alumnos)->firstWhere('id', $id);
+                return (bool) ($alumno['solo_proyeccion_historica'] ?? false);
+            });
+
+        if ($incluyeEgresadosHistoricos && $this->resultado_masivo !== 'continuidad_interna') {
+            $this->addError(
+                'resultado_masivo',
+                'Los egresados históricos seleccionados solo pueden recibir una proyección provisional de continuidad.'
+            );
+            return;
+        }
+
         foreach ($this->seleccionados as $id) {
             $id = (int) $id;
             $alumno = collect($this->alumnos)->firstWhere('id', $id);
             if (! $alumno || ! $alumno['procesable']) {
                 continue;
             }
-            $this->decisiones[$id]['resultado'] = $this->resultado_masivo;
+            $this->decisiones[$id]['resultado'] = ($alumno['solo_proyeccion_historica'] ?? false)
+                ? 'continuidad_interna'
+                : $this->resultado_masivo;
             if ($this->grupo_masivo_id) {
                 $this->decisiones[$id]['grupo_destino_id'] = (int) $this->grupo_masivo_id;
             }
