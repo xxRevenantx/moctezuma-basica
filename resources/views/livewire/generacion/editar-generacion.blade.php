@@ -224,11 +224,13 @@
                         <flux:input wire:model="nombre" label="Nombre de la generación"
                             placeholder="Ejemplo: 2025-2028" icon="tag" readonly />
 
-                        <flux:input wire:model.live="anio_ingreso" type="number" min="1900" max="2200"
-                            step="1" label="Año de ingreso" placeholder="2025" icon="calendar-days" :disabled="$tieneGrupos" />
+                        <flux:input wire:model.live.debounce.300ms="anio_ingreso" type="text" inputmode="numeric"
+                            maxlength="4" pattern="[0-9]{4}" autocomplete="off" label="Año de ingreso"
+                            placeholder="2025" description="Escribe exactamente 4 dígitos."
+                            icon="calendar-days" :disabled="$tieneGrupos" />
 
-                        <flux:input wire:model="anio_egreso" type="number" min="1900" max="2200"
-                            step="1" label="Año de egreso" placeholder="2028" icon="calendar-days" readonly />
+                        <flux:input wire:model="anio_egreso" type="text" inputmode="numeric" maxlength="4"
+                            label="Año de egreso" placeholder="2028" icon="calendar-days" readonly />
                     </div>
 
                     @if ($detalleDuracion || $tieneGrupos)
@@ -326,9 +328,11 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <flux:input wire:model="fecha_inicio" type="date" label="Fecha de inicio" readonly />
+                        <flux:input wire:model.blur="fecha_inicio" type="date" label="Fecha de inicio"
+                            description="Puedes ajustar la fecha calculada sin cambiar los años de la generación." />
 
-                        <flux:input wire:model="fecha_termino" type="date" label="Fecha de término" readonly />
+                        <flux:input wire:model.blur="fecha_termino" type="date" label="Fecha de término"
+                            description="Debe ser posterior a la fecha de inicio." />
                     </div>
                 </section>
             </fieldset>

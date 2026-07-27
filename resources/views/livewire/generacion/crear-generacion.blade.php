@@ -16,11 +16,12 @@
                 @endforeach
             </flux:select>
 
-            <flux:input wire:model.live="anio_ingreso" type="number" min="1900" max="2200"
-                label="Año de ingreso" placeholder="2026" />
+            <flux:input wire:model.live.debounce.300ms="anio_ingreso" type="text" inputmode="numeric"
+                maxlength="4" pattern="[0-9]{4}" autocomplete="off" label="Año de ingreso"
+                placeholder="2026" description="Escribe exactamente 4 dígitos." />
 
-            <flux:input wire:model="anio_egreso" type="number" label="Año de egreso" readonly
-                description="Calculado con la duración oficial del nivel." />
+            <flux:input wire:model="anio_egreso" type="text" inputmode="numeric" maxlength="4"
+                label="Año de egreso" readonly description="Calculado con la duración oficial del nivel." />
 
             <flux:input wire:model="nombre" label="Nombre" readonly />
 
@@ -42,8 +43,10 @@
                 @endforeach
             </flux:select>
 
-            <flux:input wire:model="fecha_inicio" type="date" label="Fecha de inicio" readonly />
-            <flux:input wire:model="fecha_termino" type="date" label="Fecha de término" readonly />
+            <flux:input wire:model.blur="fecha_inicio" type="date" label="Fecha de inicio"
+                description="Se calcula automáticamente, pero puedes ajustarla." />
+            <flux:input wire:model.blur="fecha_termino" type="date" label="Fecha de término"
+                description="Debe ser posterior a la fecha de inicio." />
         </div>
 
         @if ($detalleDuracion)
