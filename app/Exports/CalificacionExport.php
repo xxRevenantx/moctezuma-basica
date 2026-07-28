@@ -45,6 +45,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected ?int $generacion_id;
     protected ?int $ciclo_escolar_id = null;
     protected ?string $fecha_corte = null;
+    protected ?string $fecha_inicio = null;
+    protected ?string $fecha_fin = null;
     protected bool $esBachillerato;
     protected string $busqueda;
     protected string $filtroEstatusHistorico;
@@ -116,7 +118,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         $this->esBachillerato = $esBachillerato;
         $this->busqueda = trim($busqueda);
         $this->filtroEstatusHistorico = trim($filtroEstatusHistorico);
-        $this->filtroRegistros = in_array($filtroRegistros, ['todos', 'con_calificaciones', 'sin_calificaciones'], true)
+        $this->filtroRegistros = in_array($filtroRegistros, [
+            'todos',
+            'con_calificaciones',
+            'sin_calificaciones',
+            'incluidos_generacion',
+            'contexto_pendiente',
+        ], true)
             ? $filtroRegistros
             : 'todos';
 
@@ -177,6 +185,19 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
     protected function aplicarFiltroRegistros(): void
     {
         if ($this->filtroRegistros === 'todos') {
+            return;
+        }
+
+        if (in_array($this->filtroRegistros, ['incluidos_generacion', 'contexto_pendiente'], true)) {
+            $this->inscripciones = collect($this->inscripciones)
+                ->filter(function (array $alumno): bool {
+                    return $this->filtroRegistros === 'incluidos_generacion'
+                        ? (bool) ($alumno['incluido_por_generacion'] ?? false)
+                        : (bool) ($alumno['asignacion_contexto_pendiente'] ?? false);
+                })
+                ->values()
+                ->all();
+
             return;
         }
 
@@ -1185,6 +1206,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         if ($periodo) {
             $this->ciclo_escolar_id = $periodo->ciclo_escolar_id ? (int) $periodo->ciclo_escolar_id : null;
             $this->fecha_corte = $periodo->fecha_fin ?: $periodo->fecha_inicio;
+            $this->fecha_inicio = $periodo->fecha_inicio;
+            $this->fecha_fin = $periodo->fecha_fin;
 
             $inicio = $periodo->fecha_inicio ? date('d/m/Y', strtotime($periodo->fecha_inicio)) : 'Sin inicio';
             $fin = $periodo->fecha_fin ? date('d/m/Y', strtotime($periodo->fecha_fin)) : 'Sin fin';
@@ -1313,6 +1336,11 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 semestreId: $this->esBachillerato ? $this->semestre_id : null,
                 usarHistorialCiclo: true,
                 incluirNoActivos: true,
+                fechaInicio: $this->fecha_inicio,
+                fechaFin: $this->fecha_fin,
+                periodoId: $this->periodo_id,
+                usarActualComoRespaldo: $this->cicloSeleccionadoEsActual(),
+                incluirTodaGeneracionBachillerato: $this->esBachillerato,
             );
         } else {
             // Compatibilidad con exportaciones antiguas sin periodo relacionado.
@@ -1372,6 +1400,8 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                     'grupo' => $this->grupoNombre,
                     'semestre' => $this->semestreNombre,
                     'estatus_historico' => $item->getAttribute('estatus_historico') ?: 'activo',
+                    'incluido_por_generacion' => (bool) $item->getAttribute('incluido_por_generacion'),
+                    'asignacion_contexto_pendiente' => (bool) $item->getAttribute('asignacion_contexto_pendiente'),
                 ];
             })
             ->values()

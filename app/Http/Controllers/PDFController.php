@@ -2864,6 +2864,11 @@ class PDFController extends Controller
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
                 incluirNoActivos: true,
+                fechaInicio: $periodo->fecha_inicio,
+                fechaFin: $periodo->fecha_fin,
+                periodoId: (int) $periodo->id,
+                usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
+                incluirTodaGeneracionBachillerato: $esBachillerato,
             )
             ->sortBy(fn ($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
@@ -3452,6 +3457,11 @@ class PDFController extends Controller
             semestreId: $esBachillerato ? (int) $semestre?->id : null,
             usarHistorialCiclo: true,
             incluirNoActivos: true,
+            fechaInicio: $periodo->fecha_inicio,
+            fechaFin: $periodo->fecha_fin,
+            periodoId: (int) $periodo->id,
+            usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
+            incluirTodaGeneracionBachillerato: $esBachillerato,
         );
 
         if ($busqueda !== '') {
@@ -3492,6 +3502,8 @@ class PDFController extends Controller
                     'grupo' => $this->nombreGrupo($grupo),
                     'semestre' => $semestre?->numero ?? '—',
                     'estatus_historico' => $item->getAttribute('estatus_historico') ?: 'activo',
+                    'incluido_por_generacion' => (bool) $item->getAttribute('incluido_por_generacion'),
+                    'asignacion_contexto_pendiente' => (bool) $item->getAttribute('asignacion_contexto_pendiente'),
                 ];
             })
             ->values()
@@ -3557,7 +3569,17 @@ class PDFController extends Controller
         }
 
         $filtroRegistros = (string) $request->input('filtro_registros', 'todos');
-        if (in_array($filtroRegistros, ['con_calificaciones', 'sin_calificaciones'], true)) {
+
+        if (in_array($filtroRegistros, ['incluidos_generacion', 'contexto_pendiente'], true)) {
+            $inscripciones = collect($inscripciones)
+                ->filter(function (array $alumno) use ($filtroRegistros): bool {
+                    return $filtroRegistros === 'incluidos_generacion'
+                        ? (bool) ($alumno['incluido_por_generacion'] ?? false)
+                        : (bool) ($alumno['asignacion_contexto_pendiente'] ?? false);
+                })
+                ->values()
+                ->all();
+        } elseif (in_array($filtroRegistros, ['con_calificaciones', 'sin_calificaciones'], true)) {
             $idsConCalificacion = collect($calificaciones)
                 ->filter(fn ($valor) => $valor !== null && trim((string) $valor) !== '')
                 ->keys()
@@ -4475,6 +4497,11 @@ class PDFController extends Controller
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
                 incluirNoActivos: true,
+                fechaInicio: $periodo->fecha_inicio,
+                fechaFin: $periodo->fecha_fin,
+                periodoId: (int) $periodo->id,
+                usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
+                incluirTodaGeneracionBachillerato: $esBachillerato,
             )
             ->sortBy(fn ($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
@@ -5189,6 +5216,11 @@ class PDFController extends Controller
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
                 incluirNoActivos: true,
+                fechaInicio: $periodo->fecha_inicio,
+                fechaFin: $periodo->fecha_fin,
+                periodoId: (int) $periodo->id,
+                usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
+                incluirTodaGeneracionBachillerato: $esBachillerato,
             )
             ->sortBy(fn ($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
@@ -6244,6 +6276,11 @@ class PDFController extends Controller
             semestreId: $esBachillerato ? (int) $semestre?->id : null,
             usarHistorialCiclo: true,
             incluirNoActivos: true,
+            fechaInicio: $periodo?->fecha_inicio ?? $request->input('fecha_inicio'),
+            fechaFin: $periodo?->fecha_fin ?? $request->input('fecha_fin'),
+            periodoId: $periodo?->id ? (int) $periodo->id : null,
+            usarActualComoRespaldo: (bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
+            incluirTodaGeneracionBachillerato: $esBachillerato,
         );
 
         /*
@@ -6512,6 +6549,7 @@ class PDFController extends Controller
                     semestreId: $esBachillerato ? (int) $grupo->semestre_id : null,
                     usarHistorialCiclo: true,
                     incluirNoActivos: true,
+                    incluirTodaGeneracionBachillerato: $esBachillerato,
                 )
                 ->firstWhere('id', $inscripcionId);
         }

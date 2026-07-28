@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion;
 use App\Models\CalificacionCorreccion;
+use App\Services\HistorialCalificacionesGeneracionService;
 use App\Support\CalificacionBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,7 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
 
     private array $inscripcionIdsPermitidas;
     private array $inscripcionCicloIds;
+    private array $contextosGeneracionAsegurados = [];
     private array $materiasPermitidas;
 
     public function __construct(
@@ -351,11 +353,33 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
         $accion = $calificacionActual ? 'editar' : 'crear';
 
         $atributosAnteriores = $calificacionActual?->getAttributes();
+        $inscripcionCicloId = $this->inscripcionCicloIds[$inscripcionId] ?? null;
+
+        if ($this->esBachillerato && ! isset($this->contextosGeneracionAsegurados[$inscripcionId])) {
+            $registro = app(HistorialCalificacionesGeneracionService::class)->asegurarContexto(
+                inscripcionId: $inscripcionId,
+                cicloEscolarId: $this->cicloEscolarId,
+                nivelId: $this->nivelId,
+                gradoId: $this->gradoId,
+                generacionId: $this->generacionId,
+                grupoId: $this->grupoId,
+                semestreId: $this->semestreId,
+                periodoId: $this->periodoId,
+                usuarioId: $this->userId,
+                motivo: filled($this->motivo)
+                    ? $this->motivo
+                    : 'Confirmación del contexto académico mediante importación de calificaciones.',
+            );
+
+            $inscripcionCicloId = (int) $registro->id;
+            $this->inscripcionCicloIds[$inscripcionId] = $inscripcionCicloId;
+            $this->contextosGeneracionAsegurados[$inscripcionId] = true;
+        }
 
         $calificacionGuardada = Calificacion::query()->updateOrCreate(
             $condiciones,
             [
-                'inscripcion_ciclo_id' => $this->inscripcionCicloIds[$inscripcionId] ?? null,
+                'inscripcion_ciclo_id' => $inscripcionCicloId,
                 'nivel_id' => $this->nivelId,
                 'grado_id' => $this->gradoId,
                 'grupo_id' => $this->grupoId,

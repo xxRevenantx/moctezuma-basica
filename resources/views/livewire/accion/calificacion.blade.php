@@ -532,6 +532,41 @@ iniciarHerramientasAcademicas()" class="w-full">
                     </div>
                 @endif
 
+                @if ($this->hayAlumnosIncluidosPorGeneracion)
+                    <div class="mt-4 flex flex-col gap-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4 text-sm text-violet-800 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-200 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex items-start gap-3">
+                            <flux:icon.users class="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p class="font-black">
+                                    {{ $this->cantidadAlumnosIncluidosPorGeneracion }} alumno(s) incluidos por pertenecer a la generación.
+                                </p>
+                                <p class="mt-1 text-xs leading-5">
+                                    Aparecen aunque su fecha de inscripción sea posterior o ya hayan sido promovidos.
+                                    @if ($this->cantidadAlumnosConContextoPendiente > 0)
+                                        {{ $this->cantidadAlumnosConContextoPendiente }} todavía no tienen grupo histórico confirmado para este ciclo y semestre; el grupo se fijará al guardar su primera calificación.
+                                    @else
+                                        Todos ya tienen un contexto académico confirmado para esta selección.
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        @if (!$this->esConsultaHistorica && $this->cantidadAlumnosConContextoPendiente > 0 && $this->puedeAdministrarCorreccionHistorica)
+                            @if ($correccionHistoricaHabilitada)
+                                <button type="button" wire:click="finalizarCorreccionHistorica"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-violet-300 bg-white px-4 py-2.5 text-xs font-black text-violet-800 shadow-sm transition hover:bg-violet-100 dark:border-violet-800 dark:bg-neutral-900 dark:text-violet-200 dark:hover:bg-violet-950/40">
+                                    <flux:icon.lock-closed class="h-4 w-4" /> Finalizar confirmación
+                                </button>
+                            @else
+                                <button type="button" wire:click="abrirCorreccionHistorica"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-violet-500/20 transition hover:opacity-95">
+                                    <flux:icon.check-circle class="h-4 w-4" /> Confirmar inclusión
+                                </button>
+                            @endif
+                        @endif
+                    </div>
+                @endif
+
                 <div
                     class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-6' : 'xl:grid-cols-5' }}">
                     <div
@@ -1627,6 +1662,10 @@ iniciarHerramientasAcademicas()" class="w-full">
                             <flux:select.option value="todos">Todos los alumnos</flux:select.option>
                             <flux:select.option value="con_calificaciones">Con calificaciones</flux:select.option>
                             <flux:select.option value="sin_calificaciones">Sin calificaciones</flux:select.option>
+                            @if ($this->esBachillerato)
+                                <flux:select.option value="incluidos_generacion">Incluidos por generación</flux:select.option>
+                                <flux:select.option value="contexto_pendiente">Pendientes de confirmar grupo</flux:select.option>
+                            @endif
                         </flux:select>
                     </div>
 
@@ -1867,6 +1906,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @forelse ($inscripcionesTabla as $index => $fila)
                             @php($insId = (int) $fila['inscripcion_id'])
+                            @php($puedeEditarFila = $this->puedeEditarFilaCalificacion($insId))
 
                             @php($esResultadoBusqueda = $contextoBusquedaGlobal && (int) $alumnoBusquedaId === $insId)
 
@@ -1900,6 +1940,14 @@ iniciarHerramientasAcademicas()" class="w-full">
                                             {{ $this->etiquetaEstatusHistorico($estatusHistorico) }}
                                         </span>
 
+                                        @if (!empty($fila['incluido_por_generacion']))
+                                            <span class="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[9px] font-black normal-case tracking-wide text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+                                                {{ !empty($fila['asignacion_contexto_pendiente'])
+                                                    ? 'Incluido por generación · sin inscripción histórica'
+                                                    : 'Incluido por generación · contexto confirmado' }}
+                                            </span>
+                                        @endif
+
                                         @if ($esResultadoBusqueda)
                                             <span class="rounded-full bg-[#006492]/10 px-2 py-0.5 text-[9px] font-black normal-case tracking-wide text-[#006492] ring-1 ring-[#006492]/20 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
                                                 Resultado de búsqueda
@@ -1931,9 +1979,13 @@ iniciarHerramientasAcademicas()" class="w-full">
                                                 @keydown.arrow-up.prevent="move({{ $insId }}, {{ $asigId }}, 'up')"
                                                 @keydown.arrow-right.prevent="move({{ $insId }}, {{ $asigId }}, 'right')"
                                                 @keydown.arrow-left.prevent="move({{ $insId }}, {{ $asigId }}, 'left')"
-                                                class="{{ $this->claseInputCalificacion($insId, $asigId) }} {{ !$this->edicionCalificacionesHabilitada ? 'cursor-not-allowed opacity-70' : '' }}"
-                                                @disabled(!$this->edicionCalificacionesHabilitada)
-                                                title="{{ !$this->edicionCalificacionesHabilitada && $this->esConsultaHistorica ? 'Habilita la corrección histórica para editar.' : '' }}"
+                                                class="{{ $this->claseInputCalificacion($insId, $asigId) }} {{ !$puedeEditarFila ? 'cursor-not-allowed opacity-70' : '' }}"
+                                                @disabled(!$puedeEditarFila)
+                                                title="{{ !$puedeEditarFila
+                                                    ? (!empty($fila['asignacion_contexto_pendiente'])
+                                                        ? 'Habilita la corrección para confirmar el primer contexto académico del alumno dentro de su generación.'
+                                                        : 'Habilita la corrección histórica para editar.')
+                                                    : '' }}"
                                                 placeholder="{{ $this->esBachillerato ? 'Entero 0-10 / AC' : '0-10 / AC' }}" />
 
                                             @error('calificaciones.' . $insId . '.' . $asigId)
@@ -2263,9 +2315,14 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 <flux:icon.shield-check class="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 class="text-xl font-black text-neutral-900 dark:text-white">Habilitar corrección histórica</h3>
+                                <h3 class="text-xl font-black text-neutral-900 dark:text-white">
+                                    {{ $this->esConsultaHistorica ? 'Habilitar corrección histórica' : 'Confirmar inclusión por generación' }}
+                                </h3>
                                 <p class="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                                    La sesión permite editar e importar calificaciones del ciclo cerrado. Todos los cambios conservarán valor anterior, valor nuevo, usuario, fecha, IP y motivo.
+                                    {{ $this->esConsultaHistorica
+                                        ? 'La sesión permite editar e importar calificaciones del ciclo cerrado.'
+                                        : 'La sesión permite confirmar el primer grupo histórico de los alumnos incluidos por generación.' }}
+                                    Todos los cambios conservarán valor anterior, valor nuevo, usuario, fecha, IP y motivo.
                                 </p>
                             </div>
                         </div>
@@ -2296,7 +2353,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                     </div>
 
                     <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold leading-5 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
-                        Esta acción no mueve al alumno de su grado actual. Las calificaciones quedarán vinculadas al ciclo, generación, semestre, grupo, parcial y materia históricos seleccionados.
+                        Esta acción no mueve al alumno de su grado actual ni altera su fecha real de inscripción. Las calificaciones quedarán vinculadas al ciclo, generación, semestre, grupo, parcial y materia seleccionados.
                     </div>
 
                     <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">

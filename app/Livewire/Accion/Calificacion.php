@@ -22,6 +22,7 @@ use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
 use App\Services\CalificacionCorreccionService;
 use App\Services\CicloNivelGateService;
+use App\Services\HistorialCalificacionesGeneracionService;
 use App\Services\ListaAcademicaService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
@@ -40,6 +41,8 @@ use Maatwebsite\Excel\Facades\Excel;
 class Calificacion extends Component
 {
     use WithFileUploads;
+
+    private array $contextosGeneracionConfirmados = [];
 
     public string $slug_nivel = '';
 
@@ -274,7 +277,8 @@ class Calificacion extends Component
 
     public function getPuedeAdministrarCorreccionHistoricaProperty(): bool
     {
-        return $this->esConsultaHistorica && (bool) auth()->user()?->is_admin;
+        return ($this->esConsultaHistorica || $this->hayAlumnosConContextoPendiente)
+            && (bool) auth()->user()?->is_admin;
     }
 
     public function getEdicionCalificacionesHabilitadaProperty(): bool
@@ -332,8 +336,8 @@ class Calificacion extends Component
     {
         abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede habilitar correcciones históricas.');
 
-        if (! $this->esConsultaHistorica) {
-            $this->addError('calificaciones', 'La corrección histórica solo se habilita al consultar un ciclo cerrado.');
+        if (! $this->esConsultaHistorica && ! $this->hayAlumnosConContextoPendiente) {
+            $this->addError('calificaciones', 'No hay un ciclo histórico ni alumnos pendientes de confirmar por generación.');
             return;
         }
 
@@ -351,8 +355,8 @@ class Calificacion extends Component
     {
         abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede habilitar correcciones históricas.');
 
-        if (! $this->esConsultaHistorica) {
-            $this->addError('detalleCorreccionHistorica', 'El ciclo seleccionado no es histórico.');
+        if (! $this->esConsultaHistorica && ! $this->hayAlumnosConContextoPendiente) {
+            $this->addError('detalleCorreccionHistorica', 'No hay un contexto histórico o inferido que requiera autorización.');
             return;
         }
 
@@ -374,8 +378,8 @@ class Calificacion extends Component
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Corrección histórica habilitada',
-            'text' => 'Puedes editar o importar calificaciones del contexto seleccionado. Cada cambio quedará auditado.',
+            'title' => $this->esConsultaHistorica ? 'Corrección histórica habilitada' : 'Inclusión por generación habilitada',
+            'text' => 'Puedes editar o importar calificaciones del contexto seleccionado. Cada cambio y asignación inferida quedará auditado.',
             'position' => 'top-end',
         ]);
     }
@@ -397,10 +401,54 @@ class Calificacion extends Component
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Corrección histórica finalizada',
-            'text' => 'El ciclo volvió al modo de consulta protegida.',
+            'title' => 'Sesión de corrección finalizada',
+            'text' => $this->esConsultaHistorica
+                ? 'El ciclo volvió al modo de consulta protegida.'
+                : 'Los contextos inferidos volvieron a quedar protegidos hasta una nueva autorización.',
             'position' => 'top-end',
         ]);
+    }
+
+    public function getHayAlumnosIncluidosPorGeneracionProperty(): bool
+    {
+        return collect($this->inscripciones)
+            ->contains(fn (array $fila) => (bool) ($fila['incluido_por_generacion'] ?? false));
+    }
+
+    public function getCantidadAlumnosIncluidosPorGeneracionProperty(): int
+    {
+        return collect($this->inscripciones)
+            ->filter(fn (array $fila) => (bool) ($fila['incluido_por_generacion'] ?? false))
+            ->count();
+    }
+
+    public function getHayAlumnosConContextoPendienteProperty(): bool
+    {
+        return collect($this->inscripciones)
+            ->contains(fn (array $fila) => (bool) ($fila['asignacion_contexto_pendiente'] ?? false));
+    }
+
+    public function getCantidadAlumnosConContextoPendienteProperty(): int
+    {
+        return collect($this->inscripciones)
+            ->filter(fn (array $fila) => (bool) ($fila['asignacion_contexto_pendiente'] ?? false))
+            ->count();
+    }
+
+    public function puedeEditarFilaCalificacion(int $inscripcionId): bool
+    {
+        if (! $this->edicionCalificacionesHabilitada) {
+            return false;
+        }
+
+        $fila = collect($this->inscripciones)->firstWhere('inscripcion_id', $inscripcionId);
+
+        if (! (bool) ($fila['asignacion_contexto_pendiente'] ?? false)) {
+            return true;
+        }
+
+        return $this->correccionHistoricaHabilitada
+            && (bool) auth()->user()?->is_admin;
     }
 
     public function etiquetaEstatusHistorico(?string $estatus): string
@@ -1278,6 +1326,7 @@ class Calificacion extends Component
             fechaFin: $fechaFin,
             periodoId: (int) $this->periodo_id,
             usarActualComoRespaldo: $this->cicloSeleccionadoEsActual(),
+            incluirTodaGeneracionBachillerato: $this->esBachillerato,
         );
 
         if (filled($this->busqueda)) {
@@ -1310,6 +1359,9 @@ class Calificacion extends Component
                     'estatus_historico' => $inscripcion->getAttribute('estatus_historico') ?? 'activo',
                     'ubicacion_actual' => data_get($inscripcion->getAttribute('ubicacion_actual'), 'texto'),
                     'ubicacion_actual_distinta' => (bool) $inscripcion->getAttribute('ubicacion_actual_distinta'),
+                    'incluido_por_generacion' => (bool) $inscripcion->getAttribute('incluido_por_generacion'),
+                    'asignacion_contexto_pendiente' => (bool) $inscripcion->getAttribute('asignacion_contexto_pendiente'),
+                    'historial_inferido' => (bool) $inscripcion->getAttribute('historial_inferido'),
                 ];
             })
             ->values()
@@ -1792,6 +1844,8 @@ class Calificacion extends Component
                 return match ($this->filtro_registros) {
                     'con_calificaciones' => $tieneCalificaciones,
                     'sin_calificaciones' => ! $tieneCalificaciones,
+                    'incluidos_generacion' => (bool) ($fila['incluido_por_generacion'] ?? false),
+                    'contexto_pendiente' => (bool) ($fila['asignacion_contexto_pendiente'] ?? false),
                     default => true,
                 };
             });
@@ -1900,6 +1954,14 @@ class Calificacion extends Component
     {
         $this->resetErrorBag('calificaciones');
 
+        if ($this->hayCambiosEnAlumnosConContextoPendiente() && ! $this->correccionHistoricaHabilitada) {
+            $this->addError(
+                'calificaciones',
+                'Hay alumnos incluidos únicamente por su generación. Administración debe habilitar la corrección e indicar el motivo antes de confirmar su primer contexto académico.'
+            );
+            return;
+        }
+
         if (!$this->puedeGuardar) {
             $mensaje = $this->esConsultaHistorica && ! $this->correccionHistoricaHabilitada
                 ? 'Habilita primero la corrección histórica para editar este ciclo.'
@@ -1908,7 +1970,7 @@ class Calificacion extends Component
             return;
         }
 
-        if ($this->esConsultaHistorica) {
+        if ($this->esConsultaHistorica || $this->hayCambiosEnAlumnosConContextoPendiente()) {
             abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede modificar calificaciones históricas.');
             $this->motivo_guardado = $this->motivoCorreccionCompleto;
         }
@@ -1970,6 +2032,16 @@ class Calificacion extends Component
     {
         $this->resetErrorBag('calificaciones');
 
+        $cambiosEnContextoPendiente = $this->hayCambiosEnAlumnosConContextoPendiente();
+
+        if ($cambiosEnContextoPendiente && ! $this->correccionHistoricaHabilitada) {
+            $this->addError(
+                'calificaciones',
+                'Habilita primero la corrección para confirmar el grupo histórico de los alumnos incluidos por generación.'
+            );
+            return;
+        }
+
         if (!$this->puedeGuardar) {
             $mensaje = $this->esConsultaHistorica && ! $this->correccionHistoricaHabilitada
                 ? 'Habilita primero la corrección histórica para guardar cambios en este ciclo.'
@@ -1987,7 +2059,11 @@ class Calificacion extends Component
 
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
-        if ($ciclo?->cerrado_at || ! (bool) $ciclo?->es_actual) {
+        if (
+            $ciclo?->cerrado_at
+            || ! (bool) $ciclo?->es_actual
+            || ($cambiosEnContextoPendiente && $this->correccionHistoricaHabilitada)
+        ) {
             $this->aplicarCorreccionesHistoricas($correcciones);
             return;
         }
@@ -2045,7 +2121,7 @@ class Calificacion extends Component
                     ModelsCalificacion::query()->updateOrCreate(
                         $condiciones,
                         [
-                            'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId),
+                            'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId, true),
                             'nivel_id' => $this->nivel_id,
                             'grado_id' => $this->grado_id,
                             'grupo_id' => $this->grupo_id,
@@ -2138,7 +2214,9 @@ class Calificacion extends Component
 
                     $propuesto = [
                         'accion' => $accion,
-                        'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId),
+                        'inscripcion_ciclo_id' => $valorNuevo !== null
+                            ? $this->inscripcionCicloIdPara((int) $inscripcionId, true)
+                            : $this->inscripcionCicloIdPara((int) $inscripcionId),
                         'asignacion_materia_id' => (int) $asignacionMateriaId,
                         'nivel_id' => (int) $this->nivel_id,
                         'grado_id' => (int) $this->grado_id,
@@ -2196,14 +2274,75 @@ class Calificacion extends Component
         ]);
     }
 
-    private function inscripcionCicloIdPara(int $inscripcionId): ?int
+    private function inscripcionCicloIdPara(int $inscripcionId, bool $asegurarContexto = false): ?int
     {
         $fila = collect($this->inscripciones)
             ->firstWhere('inscripcion_id', $inscripcionId);
 
         $id = (int) ($fila['inscripcion_ciclo_id'] ?? 0);
 
+        if (! $asegurarContexto || ! $this->esBachillerato) {
+            return $id > 0 ? $id : null;
+        }
+
+        $clave = implode(':', [
+            $inscripcionId,
+            (int) $this->ciclo_escolar_id,
+            (int) $this->grado_id,
+            (int) $this->grupo_id,
+            (int) $this->semestre_id,
+        ]);
+
+        if (isset($this->contextosGeneracionConfirmados[$clave])) {
+            return $this->contextosGeneracionConfirmados[$clave];
+        }
+
+        $motivo = trim($this->motivoCorreccionCompleto);
+
+        if ($motivo === 'Corrección histórica') {
+            $motivo = 'Confirmación del contexto académico al capturar la primera calificación del alumno dentro de su generación.';
+        }
+
+        $registro = app(HistorialCalificacionesGeneracionService::class)->asegurarContexto(
+            inscripcionId: $inscripcionId,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            nivelId: (int) $this->nivel_id,
+            gradoId: (int) $this->grado_id,
+            generacionId: (int) $this->generacion_id,
+            grupoId: (int) $this->grupo_id,
+            semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
+            periodoId: filled($this->periodo_id) ? (int) $this->periodo_id : null,
+            usuarioId: Auth::id(),
+            motivo: $motivo,
+        );
+
+        $id = (int) $registro->id;
+        $this->contextosGeneracionConfirmados[$clave] = $id;
+        $this->actualizarFilaContextoConfirmado($inscripcionId, $id);
+
         return $id > 0 ? $id : null;
+    }
+
+    private function actualizarFilaContextoConfirmado(int $inscripcionId, int $inscripcionCicloId): void
+    {
+        foreach (['inscripciones', 'inscripcionesTabla'] as $propiedad) {
+            foreach ($this->{$propiedad} as $indice => $fila) {
+                if ((int) ($fila['inscripcion_id'] ?? 0) !== $inscripcionId) {
+                    continue;
+                }
+
+                $this->{$propiedad}[$indice]['inscripcion_ciclo_id'] = $inscripcionCicloId;
+                $this->{$propiedad}[$indice]['asignacion_contexto_pendiente'] = false;
+                $this->{$propiedad}[$indice]['historial_inferido'] = true;
+            }
+        }
+    }
+
+    private function hayCambiosEnAlumnosConContextoPendiente(): bool
+    {
+        return collect($this->inscripciones)
+            ->filter(fn (array $fila) => (bool) ($fila['asignacion_contexto_pendiente'] ?? false))
+            ->contains(fn (array $fila) => $this->tieneCambiosInscripcion((int) $fila['inscripcion_id']));
     }
 
     private function crearBitacoraCalificacion(
@@ -2383,6 +2522,11 @@ class Calificacion extends Component
         }
 
         if ($this->cicloSeleccionadoEsActual()) {
+            if ($this->hayAlumnosConContextoPendiente) {
+                return $this->puedeAdministrarCorreccionHistorica
+                    && $this->correccionHistoricaHabilitada;
+            }
+
             return (bool) auth()->user()?->canAccess('calificaciones.capturar');
         }
 
@@ -3603,10 +3747,12 @@ class Calificacion extends Component
             return;
         }
 
-        if ($this->esConsultaHistorica && ! $this->puedeImportarPlantilla) {
+        if (! $this->puedeImportarPlantilla) {
             $this->addError(
                 'archivo_calificaciones',
-                'Para importar en un ciclo histórico, un administrador debe habilitar primero la corrección histórica e indicar el motivo.'
+                $this->esConsultaHistorica
+                    ? 'Para importar en un ciclo histórico, un administrador debe habilitar primero la corrección e indicar el motivo.'
+                    : 'La plantilla incluye alumnos pendientes de confirmar por generación. Administración debe habilitar la corrección e indicar el motivo antes de importar.'
             );
             return;
         }
@@ -3651,10 +3797,10 @@ class Calificacion extends Component
                 materiasPermitidas: $this->materias,
                 userId: Auth::id(),
                 ip: request()->ip(),
-                motivo: $this->esConsultaHistorica
+                motivo: ($this->esConsultaHistorica || $this->hayAlumnosConContextoPendiente)
                     ? $this->motivoCorreccionCompleto
                     : 'Importación desde plantilla Excel',
-                esCorreccionHistorica: $this->esConsultaHistorica
+                esCorreccionHistorica: $this->esConsultaHistorica || $this->hayAlumnosConContextoPendiente
             );
 
             Excel::import($import, $this->archivo_calificaciones);
