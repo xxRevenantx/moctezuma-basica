@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\CicloEscolar;
+use App\Models\CicloEscolarNivel;
 use App\Models\Generacion;
 use App\Models\Inscripcion;
 use App\Models\InscripcionCiclo;
+use App\Models\Periodos;
 use App\Models\PreinscripcionCiclo;
 use App\Models\ProcesoCierreCiclo;
 use App\Models\ProcesoCierreCicloDetalle;
@@ -168,6 +170,14 @@ class CierreCicloEscolarService
                 throw ValidationException::withMessages(['ciclo_escolar_id' => 'Selecciona el ciclo que se cerrará.']);
             }
 
+            if ($datos['cerrar_ciclo'] ?? false) {
+                $this->validarCierreGlobalDelCiclo(
+                    cicloId: $cicloId,
+                    nivelId: (int) $datos['nivel_id'],
+                    fechaEfectiva: (string) $datos['fecha_egreso'],
+                );
+            }
+
             $candidatos = $this->candidatos($datos['nivel_id'], $generacion->id, $cicloId)->keyBy('id');
             $hash = hash('sha256', json_encode([
                 'ciclo' => $cicloId,
@@ -249,6 +259,21 @@ class CierreCicloEscolarService
             }
 
             if ($datos['cerrar_ciclo'] ?? false) {
+                if (Schema::hasTable('ciclo_escolar_niveles')) {
+                    CicloEscolarNivel::query()->updateOrCreate(
+                        [
+                            'ciclo_escolar_id' => $cicloId,
+                            'nivel_id' => (int) $datos['nivel_id'],
+                        ],
+                        [
+                            'estado' => 'cerrado',
+                            'preparado_at' => now(),
+                            'preparado_por' => $usuarioId,
+                            'observaciones' => $datos['motivo'],
+                        ]
+                    );
+                }
+
                 CicloEscolar::query()->whereKey($cicloId)->update([
                     'es_actual' => false,
                     'cerrado_at' => now(),
@@ -265,6 +290,40 @@ class CierreCicloEscolarService
 
             return $proceso->fresh();
         });
+    }
+
+    private function validarCierreGlobalDelCiclo(int $cicloId, int $nivelId, string $fechaEfectiva): void
+    {
+        $periodosPosteriores = Periodos::query()
+            ->where('ciclo_escolar_id', $cicloId)
+            ->where(function ($query) use ($fechaEfectiva): void {
+                $query->whereDate('fecha_fin', '>', $fechaEfectiva)
+                    ->orWhereDate('fecha_evaluacion_fin', '>', $fechaEfectiva)
+                    ->orWhereDate('fecha_captura_fin', '>', $fechaEfectiva);
+            })
+            ->count();
+
+        if ($periodosPosteriores > 0) {
+            throw ValidationException::withMessages([
+                'cerrar_ciclo' => "No se puede cerrar globalmente el ciclo: existen {$periodosPosteriores} periodo(s) cuya evaluación o captura termina después de la fecha efectiva seleccionada.",
+            ]);
+        }
+
+        if (! Schema::hasTable('ciclo_escolar_niveles')) {
+            return;
+        }
+
+        $otrosNivelesPendientes = CicloEscolarNivel::query()
+            ->where('ciclo_escolar_id', $cicloId)
+            ->where('nivel_id', '!=', $nivelId)
+            ->where('estado', '!=', 'cerrado')
+            ->count();
+
+        if ($otrosNivelesPendientes > 0) {
+            throw ValidationException::withMessages([
+                'cerrar_ciclo' => "No se puede cerrar el ciclo completo desde este nivel. Todavía hay {$otrosNivelesPendientes} nivel(es) sin cierre confirmado.",
+            ]);
+        }
     }
 
     private function snapshot(Inscripcion $alumno): array

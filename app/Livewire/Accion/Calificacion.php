@@ -82,6 +82,12 @@ class Calificacion extends Component
     public array $resumenRevision = [];
     public string $motivo_guardado = '';
 
+    public bool $correccionHistoricaHabilitada = false;
+    public bool $mostrarModalCorreccionHistorica = false;
+    public string $motivoCorreccionCatalogo = '';
+    public string $detalleCorreccionHistorica = '';
+    public ?string $correccionHistoricaIniciadaEn = null;
+
     public $archivo_calificaciones = null;
     public array $resumenImportacion = [];
 
@@ -250,6 +256,151 @@ class Calificacion extends Component
             ?? CicloEscolar::query()->find($this->ciclo_escolar_id);
 
         return (bool) ($ciclo?->es_actual) && blank($ciclo?->cerrado_at);
+    }
+
+    public function getEsConsultaHistoricaProperty(): bool
+    {
+        if ($this->periodoSeleccionado) {
+            return (bool) ($this->periodoSeleccionado['ciclo_cerrado'] ?? false);
+        }
+
+        return filled($this->ciclo_escolar_id) && ! $this->cicloSeleccionadoEsActual();
+    }
+
+    public function getModoConsultaProperty(): string
+    {
+        return $this->esConsultaHistorica ? 'historico' : 'actual';
+    }
+
+    public function getPuedeAdministrarCorreccionHistoricaProperty(): bool
+    {
+        return $this->esConsultaHistorica && (bool) auth()->user()?->is_admin;
+    }
+
+    public function getEdicionCalificacionesHabilitadaProperty(): bool
+    {
+        if ($this->esConsultaHistorica) {
+            return $this->puedeAdministrarCorreccionHistorica
+                && $this->correccionHistoricaHabilitada;
+        }
+
+        return (bool) auth()->user()?->canAccess('calificaciones.capturar');
+    }
+
+    public function getMotivosCorreccionHistoricaProperty(): array
+    {
+        return [
+            'error_captura' => 'Error de captura',
+            'calificacion_pendiente' => 'Calificación pendiente',
+            'revision_docente' => 'Revisión docente',
+            'correccion_administrativa' => 'Corrección administrativa',
+            'aclaracion_oficial' => 'Aclaración o resolución oficial',
+            'otro' => 'Otro motivo',
+        ];
+    }
+
+    public function getMotivoCorreccionCompletoProperty(): string
+    {
+        $etiqueta = $this->motivosCorreccionHistorica[$this->motivoCorreccionCatalogo] ?? 'Corrección histórica';
+        $detalle = trim($this->detalleCorreccionHistorica);
+
+        return $detalle !== '' ? $etiqueta.': '.$detalle : $etiqueta;
+    }
+
+    public function seleccionarModoConsulta(string $modo): void
+    {
+        if (! in_array($modo, ['actual', 'historico'], true)) {
+            return;
+        }
+
+        $ciclo = $modo === 'actual'
+            ? $this->ciclosEscolares->first(fn ($item) => (bool) $item->es_actual && blank($item->cerrado_at))
+            : $this->ciclosEscolares->first(fn ($item) => ! (bool) $item->es_actual || filled($item->cerrado_at));
+
+        if (! $ciclo) {
+            $this->mensajeContexto = $modo === 'actual'
+                ? 'No existe un ciclo escolar actual disponible para este nivel.'
+                : 'No existen ciclos históricos disponibles para este nivel.';
+            return;
+        }
+
+        $this->ciclo_escolar_id = (int) $ciclo->id;
+        $this->updatedCicloEscolarId($this->ciclo_escolar_id);
+    }
+
+    public function abrirCorreccionHistorica(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede habilitar correcciones históricas.');
+
+        if (! $this->esConsultaHistorica) {
+            $this->addError('calificaciones', 'La corrección histórica solo se habilita al consultar un ciclo cerrado.');
+            return;
+        }
+
+        $this->resetErrorBag(['motivoCorreccionCatalogo', 'detalleCorreccionHistorica']);
+        $this->mostrarModalCorreccionHistorica = true;
+    }
+
+    public function cancelarCorreccionHistorica(): void
+    {
+        $this->mostrarModalCorreccionHistorica = false;
+        $this->resetErrorBag(['motivoCorreccionCatalogo', 'detalleCorreccionHistorica']);
+    }
+
+    public function habilitarCorreccionHistorica(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede habilitar correcciones históricas.');
+
+        if (! $this->esConsultaHistorica) {
+            $this->addError('detalleCorreccionHistorica', 'El ciclo seleccionado no es histórico.');
+            return;
+        }
+
+        $this->validate([
+            'motivoCorreccionCatalogo' => ['required', 'string', 'in:'.implode(',', array_keys($this->motivosCorreccionHistorica))],
+            'detalleCorreccionHistorica' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'motivoCorreccionCatalogo.required' => 'Selecciona el motivo de la corrección.',
+            'motivoCorreccionCatalogo.in' => 'El motivo seleccionado no es válido.',
+            'detalleCorreccionHistorica.required' => 'Describe por qué se habilita la corrección histórica.',
+            'detalleCorreccionHistorica.min' => 'La descripción debe contener al menos 10 caracteres.',
+            'detalleCorreccionHistorica.max' => 'La descripción no debe superar 1000 caracteres.',
+        ]);
+
+        $this->correccionHistoricaHabilitada = true;
+        $this->correccionHistoricaIniciadaEn = now()->toDateTimeString();
+        $this->motivo_guardado = $this->motivoCorreccionCompleto;
+        $this->mostrarModalCorreccionHistorica = false;
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Corrección histórica habilitada',
+            'text' => 'Puedes editar o importar calificaciones del contexto seleccionado. Cada cambio quedará auditado.',
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function finalizarCorreccionHistorica(): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede finalizar correcciones históricas.');
+
+        if ($this->hayCambios) {
+            $this->addError('calificaciones', 'Guarda o descarta los cambios pendientes antes de finalizar la corrección histórica.');
+            return;
+        }
+
+        $this->correccionHistoricaHabilitada = false;
+        $this->correccionHistoricaIniciadaEn = null;
+        $this->motivoCorreccionCatalogo = '';
+        $this->detalleCorreccionHistorica = '';
+        $this->motivo_guardado = '';
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Corrección histórica finalizada',
+            'text' => 'El ciclo volvió al modo de consulta protegida.',
+            'position' => 'top-end',
+        ]);
     }
 
     public function etiquetaEstatusHistorico(?string $estatus): string
@@ -680,6 +831,11 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'correccionHistoricaHabilitada',
+            'mostrarModalCorreccionHistorica',
+            'motivoCorreccionCatalogo',
+            'detalleCorreccionHistorica',
+            'correccionHistoricaIniciadaEn',
             'archivo_calificaciones',
             'resumenImportacion',
             'diagnosticoIa',
@@ -944,6 +1100,11 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'correccionHistoricaHabilitada',
+            'mostrarModalCorreccionHistorica',
+            'motivoCorreccionCatalogo',
+            'detalleCorreccionHistorica',
+            'correccionHistoricaIniciadaEn',
             'archivo_calificaciones',
             'resumenImportacion',
             'diagnosticoIa',
@@ -1098,20 +1259,25 @@ class Calificacion extends Component
             return;
         }
 
-        $fechaCorte = $this->periodoSeleccionado['fecha_fin']
-            ?? $this->periodoSeleccionado['fecha_inicio']
+        $fechaInicio = $this->periodoSeleccionado['fecha_inicio']
             ?? now()->toDateString();
+        $fechaFin = $this->periodoSeleccionado['fecha_fin']
+            ?? $fechaInicio;
 
         $alumnos = app(ListaAcademicaService::class)->alumnosPorContexto(
             cicloEscolarId: (int) $this->ciclo_escolar_id,
             grupoIds: $grupoIds,
-            fechaCorte: $fechaCorte,
+            fechaCorte: $fechaInicio,
             nivelId: (int) $this->nivel_id,
-            gradoId: $this->esBachillerato ? null : (int) $this->grado_id,
+            gradoId: (int) $this->grado_id,
             generacionId: (int) $this->generacion_id,
-            semestreId: null,
+            semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
             usarHistorialCiclo: true,
             incluirNoActivos: true,
+            fechaInicio: $fechaInicio,
+            fechaFin: $fechaFin,
+            periodoId: (int) $this->periodo_id,
+            usarActualComoRespaldo: $this->cicloSeleccionadoEsActual(),
         );
 
         if (filled($this->busqueda)) {
@@ -1142,6 +1308,8 @@ class Calificacion extends Component
                         ($inscripcion->nombre ?? '')
                     ),
                     'estatus_historico' => $inscripcion->getAttribute('estatus_historico') ?? 'activo',
+                    'ubicacion_actual' => data_get($inscripcion->getAttribute('ubicacion_actual'), 'texto'),
+                    'ubicacion_actual_distinta' => (bool) $inscripcion->getAttribute('ubicacion_actual_distinta'),
                 ];
             })
             ->values()
@@ -1164,6 +1332,16 @@ class Calificacion extends Component
             ])
             ->where('grupo_id', $this->grupo_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->when(
+                ! auth()->user()?->is_admin && auth()->user()?->rol_sistema === 'profesor',
+                function ($query): void {
+                    $personaId = (int) (auth()->user()?->persona_id ?? 0);
+
+                    $personaId > 0
+                        ? $query->where('profesor_id', $personaId)
+                        : $query->whereRaw('1 = 0');
+                }
+            )
             ->when(
                 $this->cicloSeleccionadoEsActual(),
                 fn ($query) => $query->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
@@ -1723,8 +1901,16 @@ class Calificacion extends Component
         $this->resetErrorBag('calificaciones');
 
         if (!$this->puedeGuardar) {
-            $this->addError('calificaciones', 'Selecciona todos los filtros requeridos antes de guardar.');
+            $mensaje = $this->esConsultaHistorica && ! $this->correccionHistoricaHabilitada
+                ? 'Habilita primero la corrección histórica para editar este ciclo.'
+                : 'Selecciona todos los filtros requeridos antes de guardar.';
+            $this->addError('calificaciones', $mensaje);
             return;
+        }
+
+        if ($this->esConsultaHistorica) {
+            abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede modificar calificaciones históricas.');
+            $this->motivo_guardado = $this->motivoCorreccionCompleto;
         }
 
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
@@ -1785,7 +1971,10 @@ class Calificacion extends Component
         $this->resetErrorBag('calificaciones');
 
         if (!$this->puedeGuardar) {
-            $this->addError('calificaciones', 'Selecciona todos los filtros requeridos antes de guardar.');
+            $mensaje = $this->esConsultaHistorica && ! $this->correccionHistoricaHabilitada
+                ? 'Habilita primero la corrección histórica para guardar cambios en este ciclo.'
+                : 'Selecciona todos los filtros requeridos antes de guardar.';
+            $this->addError('calificaciones', $mensaje);
             return;
         }
 
@@ -1799,7 +1988,7 @@ class Calificacion extends Component
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
         if ($ciclo?->cerrado_at || ! (bool) $ciclo?->es_actual) {
-            $this->solicitarCorreccionesHistoricas($correcciones);
+            $this->aplicarCorreccionesHistoricas($correcciones);
             return;
         }
 
@@ -1903,17 +2092,26 @@ class Calificacion extends Component
         ]);
     }
 
-    private function solicitarCorreccionesHistoricas(CalificacionCorreccionService $service): void
+    private function aplicarCorreccionesHistoricas(CalificacionCorreccionService $service): void
     {
-        if (mb_strlen(trim($this->motivo_guardado)) < 10) {
-            $this->addError('calificaciones', 'Para un ciclo cerrado debes escribir un motivo de corrección de al menos 10 caracteres.');
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede modificar calificaciones históricas.');
+
+        if (! $this->correccionHistoricaHabilitada) {
+            $this->addError('calificaciones', 'Habilita primero la corrección histórica para este ciclo.');
+            return;
+        }
+
+        $motivo = trim($this->motivoCorreccionCompleto);
+
+        if (mb_strlen($motivo) < 10) {
+            $this->addError('calificaciones', 'La corrección histórica requiere un motivo y una descripción de al menos 10 caracteres.');
             return;
         }
 
         $periodo = Periodos::query()->findOrFail((int) $this->periodo_id);
-        $solicitadas = 0;
+        $aplicadas = 0;
 
-        DB::transaction(function () use ($service, $periodo, &$solicitadas): void {
+        DB::transaction(function () use ($service, $periodo, $motivo, &$aplicadas): void {
             foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
                 foreach ($materiasAlumno as $asignacionMateriaId => $valorNuevo) {
                     $valorNuevo = $this->normalizarCalificacion($valorNuevo);
@@ -1934,8 +2132,12 @@ class Calificacion extends Component
                         ->where('asignacion_materia_id', (int) $asignacionMateriaId)
                         ->first();
 
+                    $accion = $valorNuevo === null
+                        ? 'eliminar'
+                        : ($calificacion ? 'actualizar' : 'crear');
+
                     $propuesto = [
-                        'accion' => $valorNuevo === null ? 'eliminar' : ($calificacion ? 'actualizar' : 'crear'),
+                        'accion' => $accion,
                         'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId),
                         'asignacion_materia_id' => (int) $asignacionMateriaId,
                         'nivel_id' => (int) $this->nivel_id,
@@ -1954,25 +2156,42 @@ class Calificacion extends Component
                         'ip_captura' => request()->ip(),
                     ];
 
-                    $service->solicitar(
-                        $alumno,
-                        $periodo,
-                        $calificacion,
-                        $propuesto,
-                        trim($this->motivo_guardado),
-                        Auth::id(),
+                    $service->aplicarDirecta(
+                        alumno: $alumno,
+                        periodo: $periodo,
+                        calificacion: $calificacion,
+                        valorPropuesto: $propuesto,
+                        motivo: $motivo,
+                        usuarioId: Auth::id(),
                     );
-                    $solicitadas++;
+
+                    $this->motivo_guardado = $motivo;
+                    $this->crearBitacoraCalificacion(
+                        accion: $accion === 'actualizar' ? 'editar' : $accion,
+                        inscripcionId: (int) $inscripcionId,
+                        asignacionMateriaId: (int) $asignacionMateriaId,
+                        anterior: $valorAnterior,
+                        nuevo: $valorNuevo,
+                        observacion: $observacionNueva,
+                    );
+
+                    $aplicadas++;
                 }
             }
         });
 
+        $this->calificacionesOriginales = $this->calificaciones;
+        $this->observacionesOriginales = $this->observaciones;
         $this->mostrarModalRevision = false;
-        $this->motivo_guardado = '';
+        $this->motivo_guardado = $motivo;
+        $this->calcularPromedios();
+        $this->aplicarFiltroEstado();
+        $this->dispatch('calificaciones-internas-guardadas');
+
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Correcciones enviadas a autorización',
-            'text' => "Se registraron {$solicitadas} solicitud(es). Las calificaciones del ciclo cerrado no fueron modificadas todavía.",
+            'title' => 'Corrección histórica aplicada',
+            'text' => "Se aplicaron {$aplicadas} cambio(s). La evidencia anterior, el usuario, la fecha, la IP y el motivo quedaron registrados.",
             'position' => 'top-end',
         ]);
     }
@@ -2134,7 +2353,8 @@ class Calificacion extends Component
 
     public function getPuedeGuardarProperty(): bool
     {
-        return filled($this->periodo_id)
+        return $this->edicionCalificacionesHabilitada
+            && filled($this->periodo_id)
             && filled($this->ciclo_escolar_id)
             && filled($this->generacion_id)
             && filled($this->grado_id)
@@ -2146,12 +2366,28 @@ class Calificacion extends Component
 
     public function getPuedeUsarPlantillaImportacionProperty(): bool
     {
-        return $this->puedeGuardar;
+        return filled($this->periodo_id)
+            && filled($this->ciclo_escolar_id)
+            && filled($this->generacion_id)
+            && filled($this->grado_id)
+            && filled($this->grupo_id)
+            && (! $this->esBachillerato || filled($this->semestre_id))
+            && count($this->inscripciones) > 0
+            && count($this->materias) > 0;
     }
 
     public function getPuedeImportarPlantillaProperty(): bool
     {
-        return $this->puedeUsarPlantillaImportacion && $this->cicloSeleccionadoEsActual();
+        if (! $this->puedeUsarPlantillaImportacion) {
+            return false;
+        }
+
+        if ($this->cicloSeleccionadoEsActual()) {
+            return (bool) auth()->user()?->canAccess('calificaciones.capturar');
+        }
+
+        return $this->puedeAdministrarCorreccionHistorica
+            && $this->correccionHistoricaHabilitada;
     }
 
     public function getPuedeExportarPdfProperty(): bool
@@ -2230,6 +2466,10 @@ class Calificacion extends Component
             return 'Sin periodo';
         }
 
+        if ((bool) ($this->periodoSeleccionado['ciclo_cerrado'] ?? false)) {
+            return 'Histórico · ciclo cerrado';
+        }
+
         $inicio = !empty($this->periodoSeleccionado['fecha_inicio'])
             ? Carbon::parse($this->periodoSeleccionado['fecha_inicio'])->startOfDay()
             : null;
@@ -2279,6 +2519,7 @@ class Calificacion extends Component
     public function getClaseEstadoPeriodoProperty(): string
     {
         return match ($this->estadoPeriodo) {
+            'Histórico · ciclo cerrado' => 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:ring-amber-900/40',
             'Activo' => 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40',
             'Próximo' => 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40',
             'Finalizado' => 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/40',
@@ -3362,10 +3603,10 @@ class Calificacion extends Component
             return;
         }
 
-        if (! $this->cicloSeleccionadoEsActual()) {
+        if ($this->esConsultaHistorica && ! $this->puedeImportarPlantilla) {
             $this->addError(
                 'archivo_calificaciones',
-                'La importación masiva está protegida en ciclos históricos o cerrados. Descarga la plantilla para consulta y registra los cambios desde la tabla para generar solicitudes de corrección autorizables.'
+                'Para importar en un ciclo histórico, un administrador debe habilitar primero la corrección histórica e indicar el motivo.'
             );
             return;
         }
@@ -3410,7 +3651,10 @@ class Calificacion extends Component
                 materiasPermitidas: $this->materias,
                 userId: Auth::id(),
                 ip: request()->ip(),
-                motivo: 'Importación desde plantilla Excel'
+                motivo: $this->esConsultaHistorica
+                    ? $this->motivoCorreccionCompleto
+                    : 'Importación desde plantilla Excel',
+                esCorreccionHistorica: $this->esConsultaHistorica
             );
 
             Excel::import($import, $this->archivo_calificaciones);

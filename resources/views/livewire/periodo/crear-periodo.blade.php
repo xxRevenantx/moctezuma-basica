@@ -336,7 +336,8 @@
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <div class="{{ !$this->esBachillerato ? 'opacity-60' : '' }}">
                             <flux:select wire:model.live="generacion_id" label="Generación"
-                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id">
+                                wire:key="periodo-generacion-{{ $nivel_id ?: 'sin-nivel' }}-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}"
+                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id">
                                 <flux:select.option value="">Selecciona una generación</flux:select.option>
 
                                 @foreach ($generaciones as $generacion)
@@ -352,7 +353,9 @@
                         </div>
 
                         <div class="{{ !$this->esBachillerato ? 'opacity-60' : '' }}">
-                            <flux:select wire:model.live="semestre_id" label="Semestre" :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id">
+                            <flux:select wire:model.live="semestre_id" label="Semestre"
+                                wire:key="periodo-semestre-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'sin-generacion' }}"
+                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id">
                                 <flux:select.option value="">Selecciona un semestre</flux:select.option>
 
                                 @foreach ($semestres as $semestre)
@@ -369,7 +372,8 @@
 
                         <div class="{{ !$this->esBachillerato ? 'opacity-60' : '' }}">
                             <flux:select wire:model="mes_bachillerato_id" label="Mes bachillerato"
-                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id">
+                                wire:key="periodo-mes-bachillerato-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'sin-generacion' }}-{{ $semestre_id ?: 'sin-semestre' }}"
+                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id || !$semestre_id">
                                 <flux:select.option value="">Selecciona un mes</flux:select.option>
 
                                 @foreach ($mesesBachillerato as $mes)
@@ -386,7 +390,8 @@
 
                         <div class="{{ !$this->esBachillerato ? 'opacity-60' : '' }}">
                             <flux:select wire:model="parcial_bachillerato_id" label="Parcial"
-                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id">
+                                wire:key="periodo-parcial-bachillerato-{{ $ciclo_escolar_id ?: 'sin-ciclo' }}-{{ $generacion_id ?: 'sin-generacion' }}-{{ $semestre_id ?: 'sin-semestre' }}"
+                                :disabled="!$this->esBachillerato || !$ciclo_escolar_id || !$generacion_id || !$semestre_id">
                                 <flux:select.option value="">Selecciona un parcial</flux:select.option>
 
                                 @foreach ($parciales as $parcial)

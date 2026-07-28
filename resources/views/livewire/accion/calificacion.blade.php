@@ -290,6 +290,26 @@ iniciarHerramientasAcademicas()" class="w-full">
         </div>
     </div>
 
+    {{-- Navegación entre captura vigente e historial --}}
+    <div class="mt-4 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
+        <div class="inline-flex rounded-2xl bg-slate-100 p-1 dark:bg-neutral-800">
+            <button type="button" wire:click="seleccionarModoConsulta('actual')"
+                class="rounded-xl px-4 py-2 text-sm font-black transition {{ $this->modoConsulta === 'actual' ? 'bg-white text-sky-700 shadow-sm dark:bg-neutral-700 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white' }}">
+                Ciclo actual
+            </button>
+            <button type="button" wire:click="seleccionarModoConsulta('historico')"
+                class="rounded-xl px-4 py-2 text-sm font-black transition {{ $this->modoConsulta === 'historico' ? 'bg-white text-amber-700 shadow-sm dark:bg-neutral-700 dark:text-amber-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white' }}">
+                Histórico
+            </button>
+        </div>
+
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {{ $this->esConsultaHistorica
+                ? 'La lista se reconstruye con la inscripción y asignación que el alumno tuvo en el ciclo seleccionado, aunque ya haya sido promovido.'
+                : 'Captura ordinaria del ciclo escolar vigente.' }}
+        </p>
+    </div>
+
     {{-- Filtros principales --}}
     <div
         class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 {{ $this->esBachillerato ? 'xl:grid-cols-7' : 'xl:grid-cols-6' }}">
@@ -463,7 +483,9 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 {{ $this->esBachillerato ? 'PERIODO SEMESTRAL' : 'PERIODO ESCOLAR' }}
                             </h3>
                             <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
-                                Información vigente del periodo académico seleccionado.
+                                {{ $this->esConsultaHistorica
+                                    ? 'Evidencia académica del periodo seleccionado, conservada aun cuando los alumnos ya fueron promovidos.'
+                                    : 'Información vigente del periodo académico seleccionado.' }}
                             </p>
                         </div>
                     </div>
@@ -475,12 +497,38 @@ iniciarHerramientasAcademicas()" class="w-full">
                 </div>
 
                 @if (!empty($this->periodoSeleccionado['ciclo_cerrado']))
-                    <div class="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                        <flux:icon.lock-closed class="mt-0.5 h-5 w-5 shrink-0" />
-                        <div>
-                            <p class="font-black">Ciclo escolar cerrado: consulta histórica protegida.</p>
-                            <p class="mt-1 text-xs leading-5">Puedes revisar y exportar la evidencia del ciclo. Los cambios deben seguir el flujo de corrección histórica con motivo y autorización.</p>
+                    <div class="mt-5 flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex items-start gap-3">
+                            <flux:icon.lock-closed class="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p class="font-black">
+                                    {{ $correccionHistoricaHabilitada ? 'Corrección histórica habilitada.' : 'Ciclo escolar cerrado: consulta histórica protegida.' }}
+                                </p>
+                                <p class="mt-1 text-xs leading-5">
+                                    @if ($correccionHistoricaHabilitada)
+                                        Motivo: {{ $this->motivoCorreccionCompleto }}. Puedes editar desde la tabla o importar Excel; cada movimiento quedará en la bitácora y en el historial de correcciones.
+                                    @elseif ($this->puedeAdministrarCorreccionHistorica)
+                                        Revisa y exporta la evidencia. Para modificarla, habilita una sesión de corrección indicando el motivo.
+                                    @else
+                                        La información es de solo lectura. Únicamente administración puede habilitar una corrección histórica.
+                                    @endif
+                                </p>
+                            </div>
                         </div>
+
+                        @if ($this->puedeAdministrarCorreccionHistorica)
+                            @if ($correccionHistoricaHabilitada)
+                                <button type="button" wire:click="finalizarCorreccionHistorica"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-black text-amber-800 shadow-sm transition hover:bg-amber-100 dark:border-amber-800 dark:bg-neutral-900 dark:text-amber-200 dark:hover:bg-amber-950/40">
+                                    <flux:icon.lock-closed class="h-4 w-4" /> Finalizar corrección
+                                </button>
+                            @else
+                                <button type="button" wire:click="abrirCorreccionHistorica"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-amber-500/20 transition hover:opacity-95">
+                                    <flux:icon.pencil-square class="h-4 w-4" /> Habilitar corrección
+                                </button>
+                            @endif
+                        @endif
                     </div>
                 @endif
 
@@ -693,9 +741,11 @@ iniciarHerramientasAcademicas()" class="w-full">
                         @elseif (!$this->puedeImportarPlantilla)
                             <div
                                 class="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300">
-                                La plantilla se puede descargar como evidencia, pero la importación masiva está desactivada
-                                en ciclos históricos. Los cambios deben registrarse desde la tabla para generar solicitudes
-                                de corrección autorizables.
+                                @if ($this->esConsultaHistorica)
+                                    La plantilla histórica se puede descargar como evidencia. Para importarla, administración debe habilitar primero una corrección histórica e indicar el motivo.
+                                @else
+                                    No tienes permiso para importar calificaciones en este contexto.
+                                @endif
                             </div>
                         @endif
 
@@ -1856,6 +1906,12 @@ iniciarHerramientasAcademicas()" class="w-full">
                                             </span>
                                         @endif
                                     </div>
+
+                                    @if (!empty($fila['ubicacion_actual_distinta']) && !empty($fila['ubicacion_actual']))
+                                        <p class="mt-1 text-[10px] font-semibold normal-case text-sky-700 dark:text-sky-300">
+                                            Actualmente: {{ $fila['ubicacion_actual'] }}
+                                        </p>
+                                    @endif
                                 </td>
 
                                 @foreach ($materias as $m)
@@ -1875,7 +1931,9 @@ iniciarHerramientasAcademicas()" class="w-full">
                                                 @keydown.arrow-up.prevent="move({{ $insId }}, {{ $asigId }}, 'up')"
                                                 @keydown.arrow-right.prevent="move({{ $insId }}, {{ $asigId }}, 'right')"
                                                 @keydown.arrow-left.prevent="move({{ $insId }}, {{ $asigId }}, 'left')"
-                                                class="{{ $this->claseInputCalificacion($insId, $asigId) }}"
+                                                class="{{ $this->claseInputCalificacion($insId, $asigId) }} {{ !$this->edicionCalificacionesHabilitada ? 'cursor-not-allowed opacity-70' : '' }}"
+                                                @disabled(!$this->edicionCalificacionesHabilitada)
+                                                title="{{ !$this->edicionCalificacionesHabilitada && $this->esConsultaHistorica ? 'Habilita la corrección histórica para editar.' : '' }}"
                                                 placeholder="{{ $this->esBachillerato ? 'Entero 0-10 / AC' : '0-10 / AC' }}" />
 
                                             @error('calificaciones.' . $insId . '.' . $asigId)
@@ -2190,6 +2248,71 @@ iniciarHerramientasAcademicas()" class="w-full">
         </div>
     @endif
 
+    {{-- Modal para habilitar corrección histórica --}}
+    <div x-data="{ show: @entangle('mostrarModalCorreccionHistorica').live }" x-cloak>
+        <div x-show="show" x-transition.opacity.duration.200ms
+            class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+            @keydown.escape.window="$wire.cancelarCorreccionHistorica()" @click.self="$wire.cancelarCorreccionHistorica()">
+            <div x-show="show" x-transition
+                class="relative w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900">
+                <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+                <div class="space-y-5 p-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                <flux:icon.shield-check class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-neutral-900 dark:text-white">Habilitar corrección histórica</h3>
+                                <p class="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+                                    La sesión permite editar e importar calificaciones del ciclo cerrado. Todos los cambios conservarán valor anterior, valor nuevo, usuario, fecha, IP y motivo.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="cancelarCorreccionHistorica"
+                            class="rounded-xl p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-white">
+                            <flux:icon.x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-black text-neutral-700 dark:text-neutral-200">Motivo</label>
+                        <select wire:model="motivoCorreccionCatalogo"
+                            class="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
+                            <option value="">Selecciona un motivo</option>
+                            @foreach ($this->motivosCorreccionHistorica as $valorMotivo => $etiquetaMotivo)
+                                <option value="{{ $valorMotivo }}">{{ $etiquetaMotivo }}</option>
+                            @endforeach
+                        </select>
+                        @error('motivoCorreccionCatalogo')<p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-black text-neutral-700 dark:text-neutral-200">Descripción obligatoria</label>
+                        <textarea wire:model="detalleCorreccionHistorica" rows="5"
+                            class="w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-amber-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
+                            placeholder="Explica qué se corregirá, por qué y qué evidencia respalda el cambio."></textarea>
+                        @error('detalleCorreccionHistorica')<p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold leading-5 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+                        Esta acción no mueve al alumno de su grado actual. Las calificaciones quedarán vinculadas al ciclo, generación, semestre, grupo, parcial y materia históricos seleccionados.
+                    </div>
+
+                    <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="cancelarCorreccionHistorica"
+                            class="rounded-2xl border border-neutral-200 px-5 py-3 text-sm font-bold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">Cancelar</button>
+                        <button type="button" wire:click="habilitarCorreccionHistorica" wire:loading.attr="disabled" wire:target="habilitarCorreccionHistorica"
+                            class="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-amber-500/20 hover:opacity-95 disabled:opacity-60">
+                            <span wire:loading.remove wire:target="habilitarCorreccionHistorica">Habilitar sesión</span>
+                            <span wire:loading wire:target="habilitarCorreccionHistorica">Habilitando...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal revisión --}}
     <div x-data="{ show: @entangle('mostrarModalRevision').live }" x-cloak>
         <div x-show="show" x-transition.opacity.duration.200ms
@@ -2245,12 +2368,19 @@ iniciarHerramientasAcademicas()" class="w-full">
                     </div>
 
                     <div class="mt-5">
-                        <label
-                            class="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Motivo
-                            del guardado</label>
-                        <textarea wire:model.live="motivo_guardado" rows="3"
-                            class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
-                            placeholder="Ejemplo: Captura de calificaciones del periodo, corrección administrativa, revisión final..."></textarea>
+                        <label class="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                            {{ $this->esConsultaHistorica ? 'Motivo de la corrección histórica' : 'Motivo del guardado' }}
+                        </label>
+
+                        @if ($this->esConsultaHistorica)
+                            <div class="mt-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                {{ $this->motivoCorreccionCompleto }}
+                            </div>
+                        @else
+                            <textarea wire:model.live="motivo_guardado" rows="3"
+                                class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
+                                placeholder="Ejemplo: Captura de calificaciones del periodo, corrección administrativa, revisión final..."></textarea>
+                        @endif
                     </div>
 
                     <div

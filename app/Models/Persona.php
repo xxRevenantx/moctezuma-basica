@@ -142,6 +142,11 @@ class Persona extends Model
         return $this->hasMany(PersonaNivel::class, 'persona_id');
     }
 
+    public function usuario()
+    {
+        return $this->hasOne(User::class, 'persona_id');
+    }
+
     public function asignacionMaterias()
     {
         return $this->hasMany(AsignacionMateria::class, 'profesor_id');

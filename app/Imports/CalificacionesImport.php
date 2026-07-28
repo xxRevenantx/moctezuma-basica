@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion;
+use App\Models\CalificacionCorreccion;
 use App\Support\CalificacionBachillerato;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,8 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
         array $materiasPermitidas,
         private ?int $userId,
         private ?string $ip,
-        private ?string $motivo = null
+        private ?string $motivo = null,
+        private bool $esCorreccionHistorica = false
     ) {
         $this->inscripcionIdsPermitidas = array_map('intval', $inscripcionIdsPermitidas);
         $this->inscripcionCicloIds = collect($inscripcionCicloIds)
@@ -315,7 +317,19 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
 
         if ($valorNuevo === null) {
             if ($calificacionActual) {
+                $atributosAnteriores = $calificacionActual->getAttributes();
+                $calificacionIdAnterior = (int) $calificacionActual->id;
                 $calificacionActual->delete();
+
+                $this->registrarCorreccionHistorica(
+                    calificacionId: $calificacionIdAnterior,
+                    inscripcionId: $inscripcionId,
+                    asignacionMateriaId: $asignacionMateriaId,
+                    accion: 'eliminar',
+                    anterior: $atributosAnteriores,
+                    nuevo: null,
+                    observacion: $observacionActual
+                );
 
                 $this->crearBitacora(
                     accion: 'eliminar',
@@ -336,7 +350,9 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
 
         $accion = $calificacionActual ? 'editar' : 'crear';
 
-        Calificacion::query()->updateOrCreate(
+        $atributosAnteriores = $calificacionActual?->getAttributes();
+
+        $calificacionGuardada = Calificacion::query()->updateOrCreate(
             $condiciones,
             [
                 'inscripcion_ciclo_id' => $this->inscripcionCicloIds[$inscripcionId] ?? null,
@@ -357,6 +373,17 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
             ]
         );
 
+        $this->registrarCorreccionHistorica(
+            calificacionId: (int) $calificacionGuardada->id,
+            inscripcionId: $inscripcionId,
+            asignacionMateriaId: $asignacionMateriaId,
+            accion: $accion === 'editar' ? 'actualizar' : 'crear',
+            anterior: $atributosAnteriores,
+            nuevo: $valorNuevo,
+            observacion: $observacionActual,
+            atributosNuevos: $calificacionGuardada->getAttributes()
+        );
+
         $this->crearBitacora(
             accion: $accion,
             inscripcionId: $inscripcionId,
@@ -372,6 +399,55 @@ class CalificacionesImport implements ToCollection, SkipsEmptyRows
         }
 
         $this->resumen['editadas']++;
+    }
+
+
+    private function registrarCorreccionHistorica(
+        ?int $calificacionId,
+        int $inscripcionId,
+        int $asignacionMateriaId,
+        string $accion,
+        ?array $anterior,
+        mixed $nuevo,
+        ?string $observacion = null,
+        ?array $atributosNuevos = null
+    ): void {
+        if (! $this->esCorreccionHistorica) {
+            return;
+        }
+
+        $ahora = now();
+        $propuesto = $atributosNuevos ?? [
+            'accion' => $accion,
+            'inscripcion_ciclo_id' => $this->inscripcionCicloIds[$inscripcionId] ?? null,
+            'asignacion_materia_id' => $asignacionMateriaId,
+            'nivel_id' => $this->nivelId,
+            'grado_id' => $this->gradoId,
+            'grupo_id' => $this->grupoId,
+            'ciclo_escolar_id' => $this->cicloEscolarId,
+            'generacion_id' => $this->generacionId,
+            'semestre_id' => $this->esBachillerato ? $this->semestreId : null,
+            'calificacion' => $nuevo,
+            'observacion' => filled($observacion) ? $observacion : null,
+        ];
+        $propuesto['accion'] = $accion;
+
+        CalificacionCorreccion::query()->create([
+            'calificacion_id' => $accion === 'eliminar' ? null : $calificacionId,
+            'periodo_id' => $this->periodoId,
+            'inscripcion_id' => $inscripcionId,
+            'estado' => CalificacionCorreccion::APLICADA,
+            'motivo' => filled($this->motivo) ? trim((string) $this->motivo) : 'Corrección histórica mediante importación de Excel.',
+            'valor_anterior' => $anterior,
+            'valor_propuesto' => $propuesto,
+            'solicitada_por' => $this->userId,
+            'solicitada_at' => $ahora,
+            'autorizada_por' => $this->userId,
+            'autorizada_at' => $ahora,
+            'observacion_autorizacion' => 'Corrección histórica directa realizada por administración mediante plantilla Excel.',
+            'aplicada_por' => $this->userId,
+            'aplicada_at' => $ahora,
+        ]);
     }
 
     private function crearBitacora(

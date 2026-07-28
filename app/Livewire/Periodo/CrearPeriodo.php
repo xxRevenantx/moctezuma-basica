@@ -80,14 +80,53 @@ class CrearPeriodo extends Component
      */
     public function updatedCicloEscolarId(): void
     {
-        $this->semestre_id = null;
-        $this->resetValidation(['ciclo_escolar_id', 'generacion_id', 'semestre_id']);
+        // Al cambiar de ciclo, la generación y los datos académicos dependientes
+        // deben volver a seleccionarse para evitar conservar un contexto anterior.
+        $this->reset([
+            'generacion_id',
+            'semestre_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
+
+        $this->resetValidation([
+            'ciclo_escolar_id',
+            'generacion_id',
+            'semestre_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
     }
 
     public function updatedGeneracionId(): void
     {
-        $this->semestre_id = null;
-        $this->resetValidation(['generacion_id', 'semestre_id']);
+        // El semestre permitido depende de la combinación ciclo-generación.
+        $this->reset([
+            'semestre_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
+
+        $this->resetValidation([
+            'generacion_id',
+            'semestre_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
+    }
+
+    public function updatedSemestreId(): void
+    {
+        $this->reset([
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
+
+        $this->resetValidation([
+            'semestre_id',
+            'mes_bachillerato_id',
+            'parcial_bachillerato_id',
+        ]);
     }
 
     public function getEsBachilleratoProperty(): bool

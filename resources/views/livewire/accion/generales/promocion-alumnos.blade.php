@@ -1,4 +1,28 @@
 <div class="space-y-5">
+    @if (!empty($resultadoPromocion))
+        <div class="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Proceso concluido</p>
+                    <h3 class="mt-1 text-xl font-black text-emerald-950 dark:text-emerald-100">{{ $resultadoPromocion['total'] ?? 0 }} alumno(s) procesados</h3>
+                    <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
+                        @if (($resultadoPromocion['pendientes'] ?? 0) > 0)
+                            Quedaron {{ $resultadoPromocion['pendientes'] }} calificaciones pendientes en el ciclo de origen. Los alumnos ya promovidos seguirán disponibles en la consulta histórica.
+                        @else
+                            No se detectaron calificaciones oficiales pendientes en el contexto de origen.
+                        @endif
+                    </p>
+                </div>
+                @if (($resultadoPromocion['pendientes'] ?? 0) > 0)
+                    <a href="{{ $resultadoPromocion['url_calificaciones'] }}" wire:navigate
+                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/20 hover:opacity-95">
+                        <flux:icon name="academic-cap" class="size-5" /> Revisar calificaciones pendientes
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-100">
         Esta sección es únicamente para promociones <b>confirmadas dentro del mismo nivel</b>: grado inmediato siguiente o semestre inmediato siguiente. Para egresar, proyectar al siguiente nivel o decidir quién continuará, utiliza <b>Cierre de nivel y continuidad</b>.
     </div>
@@ -183,6 +207,9 @@
                                     <th class="p-3 text-left">Alumno</th>
                                     <th class="p-3 text-left">Ubicación que se conserva</th>
                                     <th class="p-3 text-left">{{ $tipoResultado === 'no_promovido' ? 'Ubicación del siguiente ciclo' : 'Nueva ubicación' }}</th>
+                                    @if ($this->esBachillerato())
+                                        <th class="p-3 text-center">Calificaciones pendientes</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody class="divide-y dark:divide-neutral-800">
@@ -191,11 +218,39 @@
                                         <td class="p-3"><b>{{ $fila['alumno'] }}</b><div class="text-xs text-slate-500">{{ $fila['matricula'] }}</div></td>
                                         <td class="p-3">{{ $fila['origen']['texto'] }}</td>
                                         <td class="p-3 font-semibold text-emerald-700 dark:text-emerald-300">{{ $fila['destino']['texto'] }}</td>
+                                        @if ($this->esBachillerato())
+                                            <td class="p-3 text-center">
+                                                @if (($fila['pendientes_calificaciones'] ?? 0) > 0)
+                                                    <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/50">
+                                                        {{ $fila['pendientes_calificaciones'] }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Completo</span>
+                                                @endif
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
+
+                    @if ($this->esBachillerato() && $pendientesCalificacionesTotal > 0)
+                        <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                            <div class="flex items-start gap-3">
+                                <flux:icon name="triangle-alert" class="mt-0.5 size-5 shrink-0" />
+                                <div>
+                                    <p class="font-black">Se detectaron {{ $pendientesCalificacionesTotal }} calificaciones oficiales pendientes.</p>
+                                    <p class="mt-1 text-sm leading-6">La promoción no borrará ni bloqueará el ciclo anterior. Podrás completar esas calificaciones desde <b>Calificaciones → Histórico</b>, usando una corrección administrativa con motivo y auditoría.</p>
+                                </div>
+                            </div>
+                            <label class="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-white/70 p-3 text-sm font-bold dark:border-amber-900/50 dark:bg-neutral-900/50">
+                                <input type="checkbox" wire:model="autorizarPromocionConPendientes" class="mt-0.5 size-5 rounded border-amber-400 text-amber-600">
+                                <span>Autorizo continuar aun con pendientes y me comprometo a revisarlos posteriormente en el ciclo histórico.</span>
+                            </label>
+                            @error('autorizarPromocionConPendientes') <p class="mt-2 text-sm font-black text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <flux:input type="date" wire:model="fecha_efectiva" :label="$tipoResultado === 'no_promovido' ? 'Fecha efectiva de continuidad' : 'Fecha efectiva de la promoción'" />

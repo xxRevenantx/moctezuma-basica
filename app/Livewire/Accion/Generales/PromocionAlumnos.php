@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Accion\Generales;
 
+use App\Models\AsignacionMateria;
+use App\Models\Calificacion;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
+use App\Models\Periodos;
 use App\Models\Semestre;
 use App\Services\GestionAcademicaService;
+use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -48,6 +52,9 @@ class PromocionAlumnos extends Component
     public string $confirmacion = '';
     public string $fecha_efectiva = '';
     public string $tipoResultado = 'promovido';
+    public bool $autorizarPromocionConPendientes = false;
+    public int $pendientesCalificacionesTotal = 0;
+    public array $resultadoPromocion = [];
 
     protected $paginationTheme = 'tailwind';
 
@@ -185,6 +192,8 @@ class PromocionAlumnos extends Component
         $this->tipoResultado = 'promovido';
         $this->validarPromocion();
         $this->vistaPrevia = $this->construirVistaPrevia();
+        $this->pendientesCalificacionesTotal = (int) collect($this->vistaPrevia)->sum('pendientes_calificaciones');
+        $this->autorizarPromocionConPendientes = false;
         $this->hashVistaPrevia = $this->calcularHashVistaPrevia($this->vistaPrevia);
         $this->confirmacion = '';
         $this->mostrarVistaPrevia = true;
@@ -202,7 +211,17 @@ class PromocionAlumnos extends Component
         if (! hash_equals($this->hashVistaPrevia, $this->calcularHashVistaPrevia($vistaActual))) {
             $this->addError('confirmacion', 'La información cambió después de generar la vista previa. Revísala nuevamente.');
             $this->vistaPrevia = $vistaActual;
+            $this->pendientesCalificacionesTotal = (int) collect($vistaActual)->sum('pendientes_calificaciones');
             $this->hashVistaPrevia = $this->calcularHashVistaPrevia($vistaActual);
+            return;
+        }
+
+        $pendientesActuales = (int) collect($vistaActual)->sum('pendientes_calificaciones');
+        if ($pendientesActuales > 0 && ! $this->autorizarPromocionConPendientes) {
+            $this->addError(
+                'autorizarPromocionConPendientes',
+                'Hay calificaciones pendientes. Revisa la advertencia y autoriza expresamente continuar con la promoción.'
+            );
             return;
         }
 
@@ -230,8 +249,33 @@ class PromocionAlumnos extends Component
         }
 
         $total = $alumnos->count();
+        $primerPeriodoPendienteId = collect($vistaActual)
+            ->pluck('primer_periodo_pendiente_id')
+            ->filter()
+            ->first();
+
+        $parametrosRevision = [
+            'origen' => 'busqueda-global',
+            'ciclo_escolar_id' => $this->ciclo_origen_id,
+            'generacion' => $this->generacion_id,
+            'grado' => $this->grado_origen_id,
+            'grupo' => $this->grupo_origen_id,
+            'semestre' => $this->esBachillerato() ? $this->semestre_origen_id : null,
+            'periodo' => $primerPeriodoPendienteId,
+        ];
+
+        $this->resultadoPromocion = [
+            'total' => $total,
+            'pendientes' => $pendientesActuales,
+            'url_calificaciones' => route('submodulos.accion', [
+                'slug_nivel' => $this->slug_nivel,
+                'accion' => 'calificaciones',
+            ]).'?'.http_build_query(array_filter($parametrosRevision, fn ($valor) => filled($valor))),
+        ];
+
         $this->seleccionados = [];
         $this->seleccionarPagina = false;
+        $this->autorizarPromocionConPendientes = false;
         $this->motivo = '';
         $this->confirmacion = '';
         $this->vistaPrevia = [];
@@ -243,7 +287,7 @@ class PromocionAlumnos extends Component
             'title' => $this->tipoResultado === 'no_promovido' ? 'Continuidad aplicada' : 'Promoción aplicada',
             'text' => $this->tipoResultado === 'no_promovido'
                 ? "{$total} alumno(s) continuarán en el mismo grado o semestre. El ciclo anterior quedó conservado como evidencia."
-                : "Se promovieron {$total} alumno(s). El ciclo anterior quedó conservado como evidencia y se creó el registro del ciclo destino.",
+                : "Se promovieron {$total} alumno(s). El ciclo anterior quedó conservado como evidencia y se creó el registro del ciclo destino.".($pendientesActuales > 0 ? " Permanecen {$pendientesActuales} calificaciones pendientes que pueden completarse desde el historial." : ''),
             'position' => 'top-end',
         ]);
     }
@@ -254,6 +298,8 @@ class PromocionAlumnos extends Component
         $this->vistaPrevia = [];
         $this->hashVistaPrevia = '';
         $this->confirmacion = '';
+        $this->autorizarPromocionConPendientes = false;
+        $this->pendientesCalificacionesTotal = 0;
     }
 
     private function validarPromocion(): void
@@ -372,14 +418,18 @@ class PromocionAlumnos extends Component
     private function construirVistaPrevia(): array
     {
         $grupoDestino = Grupo::query()->with(['asignacionGrupo', 'grado', 'semestre', 'generacion', 'cicloEscolar'])->findOrFail($this->grupo_destino_id);
-
-        return $this->alumnosQuery()
+        $alumnos = $this->alumnosQuery()
             ->whereIn('id', array_map('intval', $this->seleccionados))
-            ->get()
+            ->get();
+        $pendientes = $this->resumenCalificacionesPendientes($alumnos);
+
+        return $alumnos
             ->map(fn (Inscripcion $alumno): array => [
                 'id' => $alumno->id,
                 'alumno' => trim($alumno->apellido_paterno . ' ' . $alumno->apellido_materno . ' ' . $alumno->nombre),
                 'matricula' => $alumno->matricula,
+                'pendientes_calificaciones' => (int) ($pendientes['por_alumno'][$alumno->id] ?? 0),
+                'primer_periodo_pendiente_id' => $pendientes['primer_periodo_id'] ?? null,
                 'origen' => [
                     'ciclo_id' => (int) $alumno->ciclo_escolar_id,
                     'grado_id' => (int) $alumno->grado_id,
@@ -397,6 +447,84 @@ class PromocionAlumnos extends Component
             ])
             ->values()
             ->all();
+    }
+
+    private function resumenCalificacionesPendientes(Collection $alumnos): array
+    {
+        if (! $this->esBachillerato() || $alumnos->isEmpty()) {
+            return ['por_alumno' => [], 'primer_periodo_id' => null];
+        }
+
+        $asignacionIds = AsignacionMateria::query()
+            ->where('ciclo_escolar_id', $this->ciclo_origen_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->grado_origen_id)
+            ->where('semestre_id', $this->semestre_origen_id)
+            ->where('grupo_id', $this->grupo_origen_id)
+            ->whereHas('materia', function (Builder $query): void {
+                ReglasMateriaBachillerato::aplicarPromediables($query, '');
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $periodoIds = Periodos::query()
+            ->where('ciclo_escolar_id', $this->ciclo_origen_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('semestre_id', $this->semestre_origen_id)
+            ->orderBy('fecha_inicio')
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($asignacionIds->isEmpty() || $periodoIds->isEmpty()) {
+            return [
+                'por_alumno' => $alumnos->pluck('id')->mapWithKeys(fn ($id) => [(int) $id => 0])->all(),
+                'primer_periodo_id' => null,
+            ];
+        }
+
+        $inscripcionIds = $alumnos->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $capturadas = Calificacion::query()
+            ->whereIn('inscripcion_id', $inscripcionIds)
+            ->whereIn('periodo_id', $periodoIds)
+            ->whereIn('asignacion_materia_id', $asignacionIds)
+            ->whereNotNull('calificacion')
+            ->where('calificacion', '<>', '')
+            ->get(['inscripcion_id', 'periodo_id', 'asignacion_materia_id'])
+            ->mapWithKeys(fn (Calificacion $fila): array => [
+                $fila->inscripcion_id.'-'.$fila->periodo_id.'-'.$fila->asignacion_materia_id => true,
+            ]);
+
+        $porAlumno = [];
+        $primerPeriodoPendienteId = null;
+
+        foreach ($inscripcionIds as $inscripcionId) {
+            $pendientesAlumno = 0;
+
+            foreach ($periodoIds as $periodoId) {
+                foreach ($asignacionIds as $asignacionId) {
+                    $clave = $inscripcionId.'-'.$periodoId.'-'.$asignacionId;
+
+                    if ($capturadas->has($clave)) {
+                        continue;
+                    }
+
+                    $pendientesAlumno++;
+                    $primerPeriodoPendienteId ??= (int) $periodoId;
+                }
+            }
+
+            $porAlumno[(int) $inscripcionId] = $pendientesAlumno;
+        }
+
+        return [
+            'por_alumno' => $porAlumno,
+            'primer_periodo_id' => $primerPeriodoPendienteId,
+        ];
     }
 
     private function calcularHashVistaPrevia(array $vista): string
@@ -441,6 +569,8 @@ class PromocionAlumnos extends Component
 
         $this->validarPromocion();
         $this->vistaPrevia = $this->construirVistaPrevia();
+        $this->pendientesCalificacionesTotal = (int) collect($this->vistaPrevia)->sum('pendientes_calificaciones');
+        $this->autorizarPromocionConPendientes = false;
         $this->hashVistaPrevia = $this->calcularHashVistaPrevia($this->vistaPrevia);
         $this->confirmacion = '';
         $this->mostrarVistaPrevia = true;
@@ -534,6 +664,8 @@ class PromocionAlumnos extends Component
         $this->gruposDestino = collect();
         $this->seleccionados = [];
         $this->seleccionarPagina = false;
+        $this->autorizarPromocionConPendientes = false;
+        $this->pendientesCalificacionesTotal = 0;
         $this->resetPage();
     }
 

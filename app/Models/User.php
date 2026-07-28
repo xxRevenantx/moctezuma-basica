@@ -21,6 +21,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var list<string>
      */
     protected $fillable = [
+        'persona_id',
         'name',
         'email',
         'password',
@@ -107,6 +108,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'system_permissions.roles.'.($this->rol_sistema ?: 'consulta').'.label',
             'Usuario'
         );
+    }
+
+    public function persona()
+    {
+        return $this->belongsTo(Persona::class, 'persona_id');
     }
 
     // Relaciones

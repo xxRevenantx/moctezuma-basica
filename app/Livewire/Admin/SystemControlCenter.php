@@ -45,6 +45,7 @@ class SystemControlCenter extends Component
 
     public ?int $selectedUserId = null;
     public string $selectedRole = 'consulta';
+    public ?int $selectedPersonaId = null;
     public bool $selectedIsAdmin = false;
     public bool $selectedActive = true;
 
@@ -139,6 +140,7 @@ class SystemControlCenter extends Component
         $user = User::query()->findOrFail($id);
         $this->selectedUserId = $user->id;
         $this->selectedRole = $user->rol_sistema ?: 'consulta';
+        $this->selectedPersonaId = $user->persona_id ? (int) $user->persona_id : null;
         $this->selectedIsAdmin = (bool) $user->is_admin;
         $this->selectedActive = (bool) ($user->activo ?? true);
         $this->selectedPermissions = array_values($user->permisos ?? []);
@@ -151,6 +153,12 @@ class SystemControlCenter extends Component
         $this->validate([
             'selectedUserId' => ['required', 'integer', 'exists:users,id'],
             'selectedRole' => ['required', 'string', 'in:'.implode(',', array_keys(config('system_permissions.roles', [])))],
+            'selectedPersonaId' => [
+                'nullable',
+                'integer',
+                'exists:personas,id',
+                'unique:users,persona_id,'.($this->selectedUserId ?: 'NULL'),
+            ],
             'selectedIsAdmin' => ['boolean'],
             'selectedActive' => ['boolean'],
             'selectedPermissions' => ['array'],
@@ -164,8 +172,9 @@ class SystemControlCenter extends Component
             return;
         }
 
-        $before = $user->only(['is_admin', 'rol_sistema', 'permisos', 'activo']);
+        $before = $user->only(['persona_id', 'is_admin', 'rol_sistema', 'permisos', 'activo']);
         $user->forceFill([
+            'persona_id' => $this->selectedPersonaId ?: null,
             'is_admin' => $this->selectedIsAdmin,
             'rol_sistema' => $this->selectedRole,
             'permisos' => array_values(array_unique($this->selectedPermissions)),
@@ -175,7 +184,7 @@ class SystemControlCenter extends Component
         $audit->record('permissions_updated', 'usuarios', [
             'user_id' => $user->id,
             'before' => $before,
-            'after' => $user->fresh()->only(['is_admin', 'rol_sistema', 'permisos', 'activo']),
+            'after' => $user->fresh()->only(['persona_id', 'is_admin', 'rol_sistema', 'permisos', 'activo']),
         ]);
 
         $this->dispatch('swal', [
@@ -352,7 +361,13 @@ class SystemControlCenter extends Component
             ? SystemBackup::query()->with('creator:id,name')->latest()->limit(30)->get()
             : collect();
 
-        $users = User::query()->orderByDesc('is_admin')->orderBy('name')->get();
+        $users = User::query()->with('persona:id,nombre,apellido_paterno,apellido_materno')->orderByDesc('is_admin')->orderBy('name')->get();
+        $personas = Persona::query()
+            ->where('status', true)
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'apellido_paterno', 'apellido_materno']);
         $workflows = Schema::hasTable('workflow_states')
             ? collect(['calificaciones', 'documentos', 'cierre_ciclo'])->mapWithKeys(function (string $module): array {
                 $state = app(WorkflowService::class)->state($module);
@@ -365,6 +380,7 @@ class SystemControlCenter extends Component
             'audits' => $audits,
             'backups' => $backups,
             'users' => $users,
+            'personas' => $personas,
             'trash' => $this->trashRows(),
             'roles' => config('system_permissions.roles', []),
             'permissions' => config('system_permissions.permissions', []),

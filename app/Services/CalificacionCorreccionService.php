@@ -19,9 +19,7 @@ class CalificacionCorreccionService
         string $motivo,
         ?int $usuarioId
     ): CalificacionCorreccion {
-        if (mb_strlen(trim($motivo)) < 10) {
-            throw ValidationException::withMessages(['motivoCorreccion' => 'El motivo debe contener al menos 10 caracteres.']);
-        }
+        $this->validarMotivo($motivo);
 
         $asignacionMateriaId = (int) ($valorPropuesto['asignacion_materia_id'] ?? 0);
 
@@ -69,34 +67,10 @@ class CalificacionCorreccionService
         }
 
         return DB::transaction(function () use ($correccion, $usuarioId): ?Calificacion {
-            $propuesto = $correccion->valor_propuesto ?? [];
-            $accion = (string) ($propuesto['accion'] ?? 'actualizar');
-
-            if ($accion === 'eliminar') {
-                $calificacion = $correccion->calificacion;
-                $calificacion?->delete();
-                $correccion->update([
-                    'estado' => CalificacionCorreccion::APLICADA,
-                    'aplicada_por' => $usuarioId,
-                    'aplicada_at' => now(),
-                ]);
-
-                return null;
-            }
-
-            $calificacion = $correccion->calificacion ?: new Calificacion();
-            $permitidos = [
-                'asignacion_materia_id', 'nivel_id', 'grado_id', 'grupo_id', 'ciclo_escolar_id',
-                'generacion_id', 'semestre_id', 'calificacion', 'valor_numerico', 'es_numerica',
-                'clave_especial', 'observacion', 'capturado_por', 'fecha_captura', 'ip_captura',
-            ];
-            $calificacion->fill(collect($propuesto)->only($permitidos)->all());
-            $calificacion->inscripcion_id = $correccion->inscripcion_id;
-            $calificacion->periodo_id = $correccion->periodo_id;
-            $calificacion->save();
+            $calificacion = $this->aplicarValorPropuesto($correccion);
 
             $correccion->update([
-                'calificacion_id' => $calificacion->id,
+                'calificacion_id' => $calificacion?->id,
                 'estado' => CalificacionCorreccion::APLICADA,
                 'aplicada_por' => $usuarioId,
                 'aplicada_at' => now(),
@@ -104,5 +78,88 @@ class CalificacionCorreccionService
 
             return $calificacion;
         });
+    }
+
+    /**
+     * Aplica una corrección histórica realizada por administración sin requerir
+     * una segunda autorización. Se conserva el mismo registro de evidencia,
+     * marcándolo solicitado, autorizado y aplicado por el administrador.
+     */
+    public function aplicarDirecta(
+        Inscripcion $alumno,
+        Periodos $periodo,
+        ?Calificacion $calificacion,
+        array $valorPropuesto,
+        string $motivo,
+        ?int $usuarioId,
+    ): CalificacionCorreccion {
+        abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede aplicar correcciones históricas.');
+        $this->validarMotivo($motivo);
+
+        return DB::transaction(function () use ($alumno, $periodo, $calificacion, $valorPropuesto, $motivo, $usuarioId): CalificacionCorreccion {
+            $ahora = now();
+
+            $correccion = CalificacionCorreccion::query()->create([
+                'calificacion_id' => $calificacion?->id,
+                'periodo_id' => $periodo->id,
+                'inscripcion_id' => $alumno->id,
+                'estado' => CalificacionCorreccion::AUTORIZADA,
+                'motivo' => trim($motivo),
+                'valor_anterior' => $calificacion?->getAttributes(),
+                'valor_propuesto' => $valorPropuesto,
+                'solicitada_por' => $usuarioId,
+                'solicitada_at' => $ahora,
+                'autorizada_por' => $usuarioId,
+                'autorizada_at' => $ahora,
+                'observacion_autorizacion' => 'Corrección histórica directa realizada por administración.',
+            ]);
+
+            $resultado = $this->aplicarValorPropuesto($correccion);
+
+            $correccion->update([
+                'calificacion_id' => $resultado?->id,
+                'estado' => CalificacionCorreccion::APLICADA,
+                'aplicada_por' => $usuarioId,
+                'aplicada_at' => $ahora,
+            ]);
+
+            return $correccion->fresh();
+        });
+    }
+
+    private function aplicarValorPropuesto(CalificacionCorreccion $correccion): ?Calificacion
+    {
+        $propuesto = $correccion->valor_propuesto ?? [];
+        $accion = (string) ($propuesto['accion'] ?? 'actualizar');
+
+        if ($accion === 'eliminar') {
+            $calificacion = $correccion->calificacion;
+            $calificacion?->delete();
+
+            return null;
+        }
+
+        $calificacion = $correccion->calificacion ?: new Calificacion();
+        $permitidos = [
+            'inscripcion_ciclo_id', 'asignacion_materia_id', 'nivel_id', 'grado_id', 'grupo_id',
+            'ciclo_escolar_id', 'generacion_id', 'semestre_id', 'calificacion', 'valor_numerico',
+            'es_numerica', 'clave_especial', 'observacion', 'capturado_por', 'fecha_captura',
+            'ip_captura',
+        ];
+        $calificacion->fill(collect($propuesto)->only($permitidos)->all());
+        $calificacion->inscripcion_id = $correccion->inscripcion_id;
+        $calificacion->periodo_id = $correccion->periodo_id;
+        $calificacion->save();
+
+        return $calificacion;
+    }
+
+    private function validarMotivo(string $motivo): void
+    {
+        if (mb_strlen(trim($motivo)) < 10) {
+            throw ValidationException::withMessages([
+                'motivoCorreccion' => 'El motivo debe contener al menos 10 caracteres.',
+            ]);
+        }
     }
 }

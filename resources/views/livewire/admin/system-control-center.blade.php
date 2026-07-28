@@ -506,6 +506,16 @@
                             <label class="flex items-center justify-between gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>Administrador total</span><input type="checkbox" wire:model="selectedIsAdmin" class="size-5 rounded border-slate-300 text-sky-600"></label>
                             <label class="flex items-center justify-between gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>Cuenta activa</span><input type="checkbox" wire:model="selectedActive" class="size-5 rounded border-slate-300 text-sky-600"></label>
                         </div>
+                        <label class="grid gap-1.5 text-sm font-black text-slate-700 dark:text-slate-200 md:col-span-2">Persona vinculada para acceso docente
+                            <select wire:model="selectedPersonaId" class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900">
+                                <option value="">Sin vincular</option>
+                                @foreach ($personas as $persona)
+                                    <option value="{{ $persona->id }}">{{ trim($persona->apellido_paterno.' '.$persona->apellido_materno.' '.$persona->nombre) }}</option>
+                                @endforeach
+                            </select>
+                            <small class="font-medium text-slate-500">Para el rol Profesor, esta relación limita la captura a las materias asignadas a esa persona.</small>
+                            @error('selectedPersonaId')<span class="text-xs font-bold text-red-600">{{ $message }}</span>@enderror
+                        </label>
                     </div>
                     @error('selectedIsAdmin')<p class="mt-3 text-sm font-bold text-red-600">{{ $message }}</p>@enderror
 
@@ -521,7 +531,7 @@
                             @endforeach
                         </div>
                     </div>
-                    <button type="button" wire:click="arrow-down-on-squareUserAccess" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar accesos</button>
+                    <button type="button" wire:click="saveUserAccess" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar accesos</button>
                 @else
                     <div class="flex min-h-80 flex-col items-center justify-center text-center"><flux:icon name="user-circle" class="size-12 text-slate-300" /><h3 class="mt-4 text-xl font-black text-slate-900 dark:text-white">Selecciona un usuario</h3><p class="mt-2 text-sm text-slate-500">Elige una cuenta para configurar su rol y permisos.</p></div>
                 @endif
@@ -560,7 +570,7 @@
             </div>
 
             @if ($errors->any())<div class="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300">Revisa los campos marcados antes de guardar.</div>@endif
-            <button type="button" wire:click="arrow-down-on-squareConfiguration" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar configuración</button>
+            <button type="button" wire:click="saveConfiguration" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar configuración</button>
         </section>
     @endif
 

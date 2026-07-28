@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AsignacionMateria;
+use App\Models\Calificacion;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\InscripcionCiclo;
@@ -68,25 +69,54 @@ class ListaAcademicaService
         ?int $semestreId = null,
         bool $usarHistorialCiclo = false,
         bool $incluirNoActivos = false,
+        CarbonInterface|string|null $fechaInicio = null,
+        CarbonInterface|string|null $fechaFin = null,
+        ?int $periodoId = null,
+        bool $usarActualComoRespaldo = true,
     ): Collection {
         $grupoIds = array_values(array_unique(array_filter(array_map('intval', $grupoIds))));
 
-        if (
-            $usarHistorialCiclo
-            && Schema::hasTable('inscripcion_ciclos')
-            && Schema::hasTable('inscripcion_ciclo_asignaciones')
-        ) {
-            $historicos = $this->alumnosHistoricosPorContexto(
-                cicloEscolarId: $cicloEscolarId,
-                grupoIds: $grupoIds,
-                fechaCorte: $fechaCorte,
-                nivelId: $nivelId,
-                gradoId: $gradoId,
-                generacionId: $generacionId,
-                semestreId: $semestreId,
-            );
+        if ($usarHistorialCiclo) {
+            $historicos = collect();
 
-            if ($historicos->isNotEmpty()) {
+            if (
+                Schema::hasTable('inscripcion_ciclos')
+                && Schema::hasTable('inscripcion_ciclo_asignaciones')
+            ) {
+                $historicos = $this->alumnosHistoricosPorContexto(
+                    cicloEscolarId: $cicloEscolarId,
+                    grupoIds: $grupoIds,
+                    fechaCorte: $fechaCorte,
+                    fechaInicio: $fechaInicio,
+                    fechaFin: $fechaFin,
+                    nivelId: $nivelId,
+                    gradoId: $gradoId,
+                    generacionId: $generacionId,
+                    semestreId: $semestreId,
+                );
+            }
+
+            /*
+             * Una calificación ya capturada es evidencia académica suficiente
+             * para conservar al alumno en la lista, incluso si un historial
+             * antiguo quedó incompleto o fue reconstruido parcialmente.
+             */
+            if (Schema::hasTable('calificaciones')) {
+                $historicos = $historicos
+                    ->concat($this->alumnosDesdeCalificacionesPorContexto(
+                        cicloEscolarId: $cicloEscolarId,
+                        grupoIds: $grupoIds,
+                        periodoId: $periodoId,
+                        nivelId: $nivelId,
+                        gradoId: $gradoId,
+                        generacionId: $generacionId,
+                        semestreId: $semestreId,
+                    ));
+            }
+
+            $historicos = $this->ordenarAlumnos($historicos);
+
+            if ($historicos->isNotEmpty() || ! $usarActualComoRespaldo) {
                 return $historicos;
             }
         }
@@ -113,7 +143,7 @@ class ListaAcademicaService
         bool $incluirNoActivos,
     ): Collection {
         return Inscripcion::query()
-            ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion'])
+            ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion', 'cicloEscolar'])
             ->when($grupoIds !== [], fn(Builder $q) => $q->whereIn('grupo_id', $grupoIds))
             ->when($nivelId, fn(Builder $q) => $q->where('nivel_id', $nivelId))
             ->when($gradoId, fn(Builder $q) => $q->where('grado_id', $gradoId))
@@ -140,14 +170,16 @@ class ListaAcademicaService
                     $this->normalizarEstatusHistorico((string) ($inscripcion->estatus ?: 'activo'))
                 );
                 $inscripcion->setAttribute('inscripcion_ciclo_id', null);
+                $inscripcion->setAttribute('ubicacion_actual', $this->ubicacionActual($inscripcion));
+                $inscripcion->setAttribute('ubicacion_actual_distinta', false);
             });
     }
 
     /**
      * Reconstruye la lista del ciclo seleccionado sin depender de la ubicación
-     * actual guardada en inscripciones. La asignación vigente en la fecha de
-     * corte tiene prioridad; el snapshot principal de inscripcion_ciclos sirve
-     * como respaldo para bajas, egresos o registros reconstruidos.
+     * actual guardada en inscripciones. Para periodos académicos se utiliza el
+     * cruce de rangos: una asignación pertenece al contexto cuando estuvo
+     * vigente en cualquier momento entre fechaInicio y fechaFin.
      *
      * @param array<int> $grupoIds
      */
@@ -155,50 +187,65 @@ class ListaAcademicaService
         int $cicloEscolarId,
         array $grupoIds,
         CarbonInterface|string|null $fechaCorte,
+        CarbonInterface|string|null $fechaInicio,
+        CarbonInterface|string|null $fechaFin,
         ?int $nivelId,
         ?int $gradoId,
         ?int $generacionId,
         ?int $semestreId,
     ): Collection {
-        $corte = $this->fechaCorte($fechaCorte);
+        [$inicio, $fin] = $this->rangoFechas($fechaInicio, $fechaFin, $fechaCorte);
 
         $query = InscripcionCiclo::query()
             ->with([
-                // En las restricciones de eager loading Laravel entrega la
-                // instancia de la relación (BelongsTo/HasMany), no un Builder.
-                // No se tipan estos closures para mantener compatibilidad con Laravel 12.
                 'inscripcion' => fn($relacion) => $relacion->with([
                     'nivel',
                     'grado',
                     'semestre',
                     'grupo.asignacionGrupo',
                     'generacion',
+                    'cicloEscolar',
                 ]),
                 'asignaciones' => fn($relacion) => $relacion
-                    ->with(['grupo.asignacionGrupo'])
+                    ->with(['grupo.asignacionGrupo', 'grado', 'semestre'])
                     ->orderBy('fecha_inicio')
                     ->orderBy('id'),
             ])
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->whereHas('inscripcion')
-            ->where(function (Builder $contexto) use ($grupoIds, $corte, $nivelId, $gradoId, $generacionId, $semestreId): void {
+            ->where(function (Builder $contexto) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
                 $contexto
-                    ->whereHas('asignaciones', function (Builder $asignacion) use ($grupoIds, $corte, $nivelId, $gradoId, $generacionId, $semestreId): void {
+                    ->whereHas('asignaciones', function (Builder $asignacion) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
                         $this->aplicarContextoAsignacion(
                             query: $asignacion,
                             grupoIds: $grupoIds,
-                            corte: $corte,
+                            inicio: $inicio,
+                            fin: $fin,
                             nivelId: $nivelId,
                             gradoId: $gradoId,
                             generacionId: $generacionId,
                             semestreId: $semestreId,
                         );
                     })
-                    ->orWhere(function (Builder $snapshot) use ($grupoIds, $nivelId, $gradoId, $generacionId, $semestreId): void {
-                        // El snapshot solo es respaldo cuando no existe una
-                        // cronología de asignaciones. Así se evita mostrar al
-                        // alumno en dos grupos después de un cambio interno.
-                        $snapshot->whereDoesntHave('asignaciones');
+                    ->orWhere(function (Builder $snapshot) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
+                        /*
+                         * El snapshot funciona como respaldo cuando no existe
+                         * una asignación que coincida con el rango y contexto.
+                         * Esto recupera historiales reconstruidos sin mezclar al
+                         * alumno si sí existe una cronología válida.
+                         */
+                        $snapshot->whereDoesntHave('asignaciones', function (Builder $asignacion) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
+                            $this->aplicarContextoAsignacion(
+                                query: $asignacion,
+                                grupoIds: $grupoIds,
+                                inicio: $inicio,
+                                fin: $fin,
+                                nivelId: $nivelId,
+                                gradoId: $gradoId,
+                                generacionId: $generacionId,
+                                semestreId: $semestreId,
+                            );
+                        });
 
                         $this->aplicarContextoSnapshot(
                             query: $snapshot,
@@ -213,19 +260,22 @@ class ListaAcademicaService
 
         return $query
             ->get()
-            ->map(function (InscripcionCiclo $registro) use ($grupoIds, $corte, $nivelId, $gradoId, $generacionId, $semestreId): ?Inscripcion {
+            ->map(function (InscripcionCiclo $registro) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): ?Inscripcion {
                 $inscripcion = $registro->inscripcion;
 
                 if (!$inscripcion) {
                     return null;
                 }
 
+                $ubicacionActual = $this->ubicacionActual($inscripcion);
+
                 $asignacion = $registro->asignaciones
-                    ->first(function (InscripcionCicloAsignacion $item) use ($grupoIds, $corte, $nivelId, $gradoId, $generacionId, $semestreId): bool {
+                    ->first(function (InscripcionCicloAsignacion $item) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): bool {
                         return $this->asignacionCoincide(
                             asignacion: $item,
                             grupoIds: $grupoIds,
-                            corte: $corte,
+                            inicio: $inicio,
+                            fin: $fin,
                             nivelId: $nivelId,
                             gradoId: $gradoId,
                             generacionId: $generacionId,
@@ -233,14 +283,20 @@ class ListaAcademicaService
                         );
                     });
 
+                $nivelHistoricoId = (int) ($asignacion?->nivel_id ?: $registro->nivel_id);
+                $gradoHistoricoId = (int) ($asignacion?->grado_id ?: $registro->grado_id);
+                $generacionHistoricaId = (int) ($asignacion?->generacion_id ?: $registro->generacion_id);
+                $grupoHistoricoId = (int) ($asignacion?->grupo_id ?: $registro->grupo_id);
+                $semestreHistoricoId = $asignacion?->semestre_id ?: $registro->semestre_id;
+
                 $inscripcion->setAttribute('matricula', $registro->matricula ?: $inscripcion->matricula);
                 $inscripcion->setAttribute('inscripcion_ciclo_id', (int) $registro->id);
                 $inscripcion->setAttribute('ciclo_escolar_historico_id', (int) $registro->ciclo_escolar_id);
-                $inscripcion->setAttribute('nivel_id', (int) ($asignacion?->nivel_id ?: $registro->nivel_id));
-                $inscripcion->setAttribute('grado_id', (int) ($asignacion?->grado_id ?: $registro->grado_id));
-                $inscripcion->setAttribute('generacion_id', (int) ($asignacion?->generacion_id ?: $registro->generacion_id));
-                $inscripcion->setAttribute('grupo_id', (int) ($asignacion?->grupo_id ?: $registro->grupo_id));
-                $inscripcion->setAttribute('semestre_id', $asignacion?->semestre_id ?: $registro->semestre_id);
+                $inscripcion->setAttribute('nivel_id', $nivelHistoricoId);
+                $inscripcion->setAttribute('grado_id', $gradoHistoricoId);
+                $inscripcion->setAttribute('generacion_id', $generacionHistoricaId);
+                $inscripcion->setAttribute('grupo_id', $grupoHistoricoId);
+                $inscripcion->setAttribute('semestre_id', $semestreHistoricoId);
                 $inscripcion->setAttribute('fecha_ingreso_ciclo', $registro->fecha_ingreso);
                 $inscripcion->setAttribute('fecha_salida_ciclo', $registro->fecha_salida);
                 $inscripcion->setAttribute('estado_ciclo', $registro->estado);
@@ -252,17 +308,103 @@ class ListaAcademicaService
                         (string) ($registro->resultado_final ?: $registro->estatus_actual_ciclo ?: $registro->estatus_ingreso ?: 'activo')
                     )
                 );
+                $inscripcion->setAttribute('ubicacion_actual', $ubicacionActual);
+                $inscripcion->setAttribute(
+                    'ubicacion_actual_distinta',
+                    $this->ubicacionEsDistinta(
+                        $ubicacionActual,
+                        $registro->ciclo_escolar_id,
+                        $gradoHistoricoId,
+                        $grupoHistoricoId,
+                        $semestreHistoricoId,
+                    )
+                );
 
                 return $inscripcion;
             })
-            ->filter()
-            ->unique('id')
-            ->sortBy(fn(Inscripcion $alumno) => mb_strtolower(trim(
-                ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
-            )))
+            ->filter();
+    }
+
+    /**
+     * Recupera alumnos respaldados por calificaciones del propio periodo.
+     *
+     * @param array<int> $grupoIds
+     */
+    private function alumnosDesdeCalificacionesPorContexto(
+        int $cicloEscolarId,
+        array $grupoIds,
+        ?int $periodoId,
+        ?int $nivelId,
+        ?int $gradoId,
+        ?int $generacionId,
+        ?int $semestreId,
+    ): Collection {
+        $registros = Calificacion::query()
+            ->with('inscripcionCiclo')
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->when($periodoId, fn (Builder $q) => $q->where('periodo_id', $periodoId))
+            ->when($grupoIds !== [], fn (Builder $q) => $q->whereIn('grupo_id', $grupoIds))
+            ->when($nivelId, fn (Builder $q) => $q->where('nivel_id', $nivelId))
+            ->when($gradoId, fn (Builder $q) => $q->where('grado_id', $gradoId))
+            ->when($generacionId, fn (Builder $q) => $q->where('generacion_id', $generacionId))
+            ->when($semestreId, fn (Builder $q) => $q->where('semestre_id', $semestreId))
+            ->orderBy('inscripcion_id')
+            ->orderBy('id')
+            ->get()
+            ->unique('inscripcion_id')
             ->values();
+
+        if ($registros->isEmpty()) {
+            return collect();
+        }
+
+        $alumnos = Inscripcion::withTrashed()
+            ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion', 'cicloEscolar'])
+            ->whereIn('id', $registros->pluck('inscripcion_id')->all())
+            ->get()
+            ->keyBy('id');
+
+        return $registros->map(function (Calificacion $calificacion) use ($alumnos): ?Inscripcion {
+            $inscripcion = $alumnos->get((int) $calificacion->inscripcion_id);
+
+            if (!$inscripcion) {
+                return null;
+            }
+
+            $ubicacionActual = $this->ubicacionActual($inscripcion);
+            $historial = $calificacion->inscripcionCiclo;
+
+            $inscripcion->setAttribute('inscripcion_ciclo_id', $calificacion->inscripcion_ciclo_id ?: $historial?->id);
+            $inscripcion->setAttribute('ciclo_escolar_historico_id', (int) $calificacion->ciclo_escolar_id);
+            $inscripcion->setAttribute('nivel_id', (int) $calificacion->nivel_id);
+            $inscripcion->setAttribute('grado_id', (int) $calificacion->grado_id);
+            $inscripcion->setAttribute('generacion_id', (int) $calificacion->generacion_id);
+            $inscripcion->setAttribute('grupo_id', (int) $calificacion->grupo_id);
+            $inscripcion->setAttribute('semestre_id', $calificacion->semestre_id);
+            $inscripcion->setAttribute(
+                'estatus_historico',
+                $this->normalizarEstatusHistorico((string) (
+                    $historial?->resultado_final
+                    ?: $historial?->estatus_actual_ciclo
+                    ?: $historial?->estatus_ingreso
+                    ?: $inscripcion->estatus
+                    ?: 'activo'
+                ))
+            );
+            $inscripcion->setAttribute('ubicacion_actual', $ubicacionActual);
+            $inscripcion->setAttribute(
+                'ubicacion_actual_distinta',
+                $this->ubicacionEsDistinta(
+                    $ubicacionActual,
+                    $calificacion->ciclo_escolar_id,
+                    $calificacion->grado_id,
+                    $calificacion->grupo_id,
+                    $calificacion->semestre_id,
+                )
+            );
+
+            return $inscripcion;
+        })->filter();
     }
 
     /**
@@ -271,7 +413,8 @@ class ListaAcademicaService
     private function aplicarContextoAsignacion(
         Builder $query,
         array $grupoIds,
-        Carbon $corte,
+        Carbon $inicio,
+        Carbon $fin,
         ?int $nivelId,
         ?int $gradoId,
         ?int $generacionId,
@@ -283,11 +426,11 @@ class ListaAcademicaService
             ->when($gradoId, fn(Builder $q) => $q->where('grado_id', $gradoId))
             ->when($generacionId, fn(Builder $q) => $q->where('generacion_id', $generacionId))
             ->when($semestreId, fn(Builder $q) => $q->where('semestre_id', $semestreId))
-            ->whereDate('fecha_inicio', '<=', $corte->toDateString())
-            ->where(function (Builder $vigencia) use ($corte): void {
+            ->whereDate('fecha_inicio', '<=', $fin->toDateString())
+            ->where(function (Builder $vigencia) use ($inicio): void {
                 $vigencia
                     ->whereNull('fecha_fin')
-                    ->orWhereDate('fecha_fin', '>=', $corte->toDateString());
+                    ->orWhereDate('fecha_fin', '>=', $inicio->toDateString());
             });
     }
 
@@ -316,7 +459,8 @@ class ListaAcademicaService
     private function asignacionCoincide(
         InscripcionCicloAsignacion $asignacion,
         array $grupoIds,
-        Carbon $corte,
+        Carbon $inicio,
+        Carbon $fin,
         ?int $nivelId,
         ?int $gradoId,
         ?int $generacionId,
@@ -342,10 +486,80 @@ class ListaAcademicaService
             return false;
         }
 
-        $inicio = $asignacion->fecha_inicio?->copy()->startOfDay();
-        $fin = $asignacion->fecha_fin?->copy()->endOfDay();
+        $asignacionInicio = $asignacion->fecha_inicio?->copy()->startOfDay();
+        $asignacionFin = $asignacion->fecha_fin?->copy()->endOfDay();
 
-        return (!$inicio || $inicio->lte($corte)) && (!$fin || $fin->gte($corte));
+        return (!$asignacionInicio || $asignacionInicio->lte($fin))
+            && (!$asignacionFin || $asignacionFin->gte($inicio));
+    }
+
+    private function ubicacionActual(Inscripcion $inscripcion): array
+    {
+        $texto = collect([
+            $inscripcion->grado?->nombre,
+            $inscripcion->semestre ? 'Sem. '.$inscripcion->semestre->numero : null,
+            $inscripcion->grupo?->asignacionGrupo?->nombre
+                ? 'Grupo '.$inscripcion->grupo->asignacionGrupo->nombre
+                : null,
+        ])->filter()->join(' · ');
+
+        return [
+            'ciclo_escolar_id' => (int) ($inscripcion->getRawOriginal('ciclo_escolar_id') ?? $inscripcion->ciclo_escolar_id ?? 0),
+            'grado_id' => (int) ($inscripcion->getRawOriginal('grado_id') ?? $inscripcion->grado_id ?? 0),
+            'semestre_id' => (int) ($inscripcion->getRawOriginal('semestre_id') ?? $inscripcion->semestre_id ?? 0),
+            'grupo_id' => (int) ($inscripcion->getRawOriginal('grupo_id') ?? $inscripcion->grupo_id ?? 0),
+            'texto' => $texto !== '' ? $texto : 'Sin ubicación actual',
+        ];
+    }
+
+    private function ubicacionEsDistinta(
+        array $ubicacionActual,
+        mixed $cicloEscolarId,
+        mixed $gradoId,
+        mixed $grupoId,
+        mixed $semestreId,
+    ): bool {
+        return (int) ($ubicacionActual['ciclo_escolar_id'] ?? 0) !== (int) $cicloEscolarId
+            || (int) ($ubicacionActual['grado_id'] ?? 0) !== (int) $gradoId
+            || (int) ($ubicacionActual['grupo_id'] ?? 0) !== (int) $grupoId
+            || (int) ($ubicacionActual['semestre_id'] ?? 0) !== (int) $semestreId;
+    }
+
+    private function ordenarAlumnos(Collection $alumnos): Collection
+    {
+        return $alumnos
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn(Inscripcion $alumno) => mb_strtolower(trim(
+                ($alumno->apellido_paterno ?? '') . ' ' .
+                ($alumno->apellido_materno ?? '') . ' ' .
+                ($alumno->nombre ?? '')
+            )))
+            ->values();
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function rangoFechas(
+        CarbonInterface|string|null $fechaInicio,
+        CarbonInterface|string|null $fechaFin,
+        CarbonInterface|string|null $fechaCorte,
+    ): array {
+        if (filled($fechaInicio) || filled($fechaFin)) {
+            $inicio = $this->fechaCorte($fechaInicio ?: $fechaFin ?: $fechaCorte);
+            $fin = $this->fechaCorte($fechaFin ?: $fechaInicio ?: $fechaCorte)->endOfDay();
+
+            if ($inicio->gt($fin)) {
+                return [$fin->copy()->startOfDay(), $inicio->copy()->endOfDay()];
+            }
+
+            return [$inicio->startOfDay(), $fin->endOfDay()];
+        }
+
+        $corte = $this->fechaCorte($fechaCorte);
+
+        return [$corte->copy()->startOfDay(), $corte->copy()->endOfDay()];
     }
 
     public function normalizarEstatusHistorico(string $estatus): string
