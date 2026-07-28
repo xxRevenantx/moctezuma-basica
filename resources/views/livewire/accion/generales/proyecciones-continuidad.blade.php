@@ -153,14 +153,23 @@
                             </td>
                             <td class="p-3">
                                 @if ($esPendiente)
-                                    <flux:select wire:model="datos.{{ $proyeccion->id }}.grupo_destino_id"
-                                        size="sm" placeholder="Selecciona grupo">
+                                    <flux:select
+                                        wire:key="grupo-destino-proyeccion-{{ $proyeccion->id }}"
+                                        wire:model.live="datos.{{ $proyeccion->id }}.grupo_destino_id"
+                                        size="sm"
+                                        :disabled="$grupos === []">
+                                        <flux:select.option value="">Selecciona grupo</flux:select.option>
                                         @foreach ($grupos as $grupo)
                                             <flux:select.option value="{{ $grupo['id'] }}">
                                                 {{ $grupo['label'] }}
                                             </flux:select.option>
                                         @endforeach
                                     </flux:select>
+                                    @if (count($grupos) === 1)
+                                        <p class="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                            Único grupo compatible seleccionado automáticamente.
+                                        </p>
+                                    @endif
                                     @if ($grupos === [])
                                         <p class="mt-1 text-xs font-bold text-rose-600">No hay grupos compatibles
                                             activos.</p>

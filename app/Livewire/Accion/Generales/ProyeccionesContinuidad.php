@@ -60,6 +60,36 @@ class ProyeccionesContinuidad extends Component
         $this->seleccionados = [];
     }
 
+    /**
+     * Normaliza los valores editables de cada proyección.
+     *
+     * Flux envía los valores de los select como texto; convertir el grupo a entero
+     * evita que Livewire conserve un valor visual que todavía no exista en el
+     * estado del componente.
+     */
+    public function updatedDatos(mixed $value, string $key): void
+    {
+        $partes = explode('.', $key);
+        $proyeccionId = (int) ($partes[0] ?? 0);
+        $campo = $partes[1] ?? '';
+
+        if ($proyeccionId <= 0) {
+            return;
+        }
+
+        if ($campo === 'grupo_destino_id') {
+            $this->datos[$proyeccionId]['grupo_destino_id'] = filled($value)
+                ? (int) $value
+                : null;
+
+            $this->resetErrorBag("datos.{$proyeccionId}.grupo_destino_id");
+        }
+
+        if ($campo === 'matricula') {
+            $this->datos[$proyeccionId]['matricula'] = mb_strtoupper(trim((string) $value));
+        }
+    }
+
     #[On('proyecciones-actualizadas')]
     public function recargar(): void
     {
@@ -95,18 +125,39 @@ class ProyeccionesContinuidad extends Component
 
     public function prepararConfirmacion(): void
     {
+        $this->resetValidation();
+
         $pendientes = $this->proyeccionesSeleccionadasPendientes();
         if ($pendientes->isEmpty()) {
             $this->addError('seleccion_proyecciones', 'Selecciona al menos una proyección pendiente.');
             return;
         }
 
+        // Si la proyección tiene un único grupo compatible, lo asigna realmente
+        // al estado Livewire. Antes solo se mostraba la primera opción del select,
+        // pero grupo_destino_id seguía siendo null.
+        $this->sincronizarGruposPredeterminados($pendientes);
+        $service = app(CierreGeneracionContinuidadService::class);
+
         foreach ($pendientes as $proyeccion) {
-            $grupoId = (int) ($this->datos[$proyeccion->id]['grupo_destino_id'] ?? $proyeccion->grupo_destino_id ?? 0);
+            $grupoId = (int) ($this->datos[$proyeccion->id]['grupo_destino_id'] ?? 0);
+            $gruposValidos = $service->gruposParaProyeccion($proyeccion)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id);
+
             if ($grupoId <= 0) {
                 $this->addError(
                     "datos.{$proyeccion->id}.grupo_destino_id",
                     'Selecciona el grupo destino antes de confirmar.'
+                );
+                return;
+            }
+
+            if (! $gruposValidos->contains($grupoId)) {
+                $this->datos[$proyeccion->id]['grupo_destino_id'] = null;
+                $this->addError(
+                    "datos.{$proyeccion->id}.grupo_destino_id",
+                    'El grupo seleccionado ya no corresponde al ciclo, nivel, generación o grado destino.'
                 );
                 return;
             }
@@ -116,7 +167,6 @@ class ProyeccionesContinuidad extends Component
         $this->fecha_confirmacion = now()->toDateString();
         $this->password_confirmacion_proyeccion = '';
         $this->modalConfirmar = true;
-        $this->resetValidation();
     }
 
     public function confirmarSeleccionadas(CierreGeneracionContinuidadService $service): void
@@ -244,21 +294,70 @@ class ProyeccionesContinuidad extends Component
 
     private function inicializarDatos(): void
     {
-        $pendientes = app(CierreGeneracionContinuidadService::class)->proyeccionesPorNivelOrigen(
+        $service = app(CierreGeneracionContinuidadService::class);
+        $pendientes = $service->proyeccionesPorNivelOrigen(
             $this->nivel->id,
             $this->filtro_ciclo_destino_id,
             'pendiente',
             '',
         );
 
+        $datosAnteriores = $this->datos;
+        $this->datos = [];
+
         foreach ($pendientes as $proyeccion) {
+            $grupoGuardado = $datosAnteriores[$proyeccion->id]['grupo_destino_id']
+                ?? $proyeccion->grupo_destino_id;
+            $gruposCompatibles = $service->gruposParaProyeccion($proyeccion);
+            $idsCompatibles = $gruposCompatibles
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id);
+
+            $grupoId = filled($grupoGuardado) ? (int) $grupoGuardado : null;
+
+            if ($grupoId !== null && ! $idsCompatibles->contains($grupoId)) {
+                $grupoId = null;
+            }
+
+            // Cuando solo existe un grupo compatible, seleccionarlo de verdad.
+            // Esto evita que el navegador muestre “A” mientras Livewire conserva null.
+            if ($grupoId === null && $idsCompatibles->count() === 1) {
+                $grupoId = (int) $idsCompatibles->first();
+            }
+
             $this->datos[$proyeccion->id] = [
-                'grupo_destino_id' => $this->datos[$proyeccion->id]['grupo_destino_id']
-                    ?? $proyeccion->grupo_destino_id,
-                'matricula' => $this->datos[$proyeccion->id]['matricula']
+                'grupo_destino_id' => $grupoId,
+                'matricula' => $datosAnteriores[$proyeccion->id]['matricula']
                     ?? $proyeccion->matricula_sugerida
                     ?? '',
             ];
+        }
+    }
+
+    /**
+     * Selecciona automáticamente el único grupo compatible y descarta grupos que
+     * hayan dejado de corresponder al contexto académico de la proyección.
+     */
+    private function sincronizarGruposPredeterminados(Collection $pendientes): void
+    {
+        $service = app(CierreGeneracionContinuidadService::class);
+
+        foreach ($pendientes as $proyeccion) {
+            $grupos = $service->gruposParaProyeccion($proyeccion);
+            $ids = $grupos->pluck('id')->map(fn ($id): int => (int) $id);
+            $actual = filled($this->datos[$proyeccion->id]['grupo_destino_id'] ?? null)
+                ? (int) $this->datos[$proyeccion->id]['grupo_destino_id']
+                : null;
+
+            if ($actual !== null && ! $ids->contains($actual)) {
+                $actual = null;
+            }
+
+            if ($actual === null && $ids->count() === 1) {
+                $actual = (int) $ids->first();
+            }
+
+            $this->datos[$proyeccion->id]['grupo_destino_id'] = $actual;
         }
     }
 
