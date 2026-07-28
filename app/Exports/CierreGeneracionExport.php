@@ -49,6 +49,8 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             'Apellido materno',
             'Nombre(s)',
             'Resultado',
+            'Tipo de proyección',
+            'Resultado histórico de origen',
             'Grado/Semestre origen',
             'Grupo origen',
             'Nivel destino',
@@ -90,7 +92,9 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             $alumno?->apellido_paterno,
             $alumno?->apellido_materno,
             $alumno?->nombre,
-            ucfirst(str_replace('_', ' ', (string) $detalle->resultado)),
+            $this->etiquetaResultado((string) $detalle->resultado),
+            $proyeccion?->etiqueta_tipo ?? 'No aplica',
+            $proyeccion?->etiqueta_resultado_origen ?? $this->etiquetaResultado((string) ($origen?->resultado_final ?? $detalle->resultado)),
             $origenAcademico,
             $origen?->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo',
             $destino?->nivel?->nombre ?? $proyeccion?->nivelDestino?->nombre ?? 'No aplica',
@@ -98,7 +102,7 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             $destinoAcademico,
             $destino?->grupo?->asignacionGrupo?->nombre ?? $proyeccion?->grupoDestino?->asignacionGrupo?->nombre ?? 'Por asignar',
             $destino ? ($detalle->estado_nuevo['matricula'] ?? $destino?->matricula) : ($proyeccion?->matricula_sugerida ?? 'Por confirmar'),
-            $proyeccion?->etiqueta_estado ?? ($destino ? 'Continuidad formalizada' : 'No aplica'),
+            $proyeccion?->etiqueta_estado ?? ($destino ? 'Proyección formalizada' : 'No aplica'),
             $propuesto['fecha_efectiva'] ?? $this->proceso->fecha_efectiva?->format('Y-m-d'),
             $propuesto['escuela_destino'] ?? '',
             $detalle->observacion,
@@ -118,4 +122,18 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             ],
         ];
     }
+    private function etiquetaResultado(string $resultado): string
+    {
+        return match ($resultado) {
+            'continuidad_interna' => 'Proyección de promoción o continuidad',
+            'no_reinscrito' => 'Acreditó, pero no se reinscribirá',
+            'egresado' => 'Egresado sin continuidad interna',
+            'traslado' => 'Traslado a otra institución',
+            'baja_definitiva' => 'Baja definitiva',
+            'no_promovido' => 'No promovido / repetición proyectada',
+            'sin_cambio' => 'Sin cambio histórico',
+            default => ucfirst(str_replace('_', ' ', $resultado)),
+        };
+    }
+
 }

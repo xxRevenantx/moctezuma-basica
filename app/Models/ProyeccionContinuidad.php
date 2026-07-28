@@ -98,9 +98,31 @@ class ProyeccionContinuidad extends Model
     public function getEtiquetaEstadoAttribute(): string
     {
         return match ($this->estado) {
-            'confirmada' => 'Continuidad confirmada',
+            'confirmada' => 'Proyección confirmada',
             'cancelada' => 'No continuará',
             default => 'Pendiente de confirmar',
+        };
+    }
+
+    public function getEtiquetaTipoAttribute(): string
+    {
+        return match ($this->tipo_proyeccion) {
+            'siguiente_grado' => 'Siguiente grado o semestre',
+            'repeticion' => 'Repetición de grado o semestre',
+            'siguiente_nivel' => 'Siguiente nivel educativo',
+            default => 'Continuidad académica',
+        };
+    }
+
+    public function getEtiquetaResultadoOrigenAttribute(): string
+    {
+        return match ($this->resultado_origen) {
+            'promovido_grado' => 'Grado o semestre promovido',
+            'no_promovido' => 'No promovido',
+            'egresado' => 'Egresado del nivel',
+            'promovido_nivel' => 'Promovido de nivel',
+            'promovido' => 'Promovido',
+            default => ucfirst(str_replace('_', ' ', (string) $this->resultado_origen)),
         };
     }
 }

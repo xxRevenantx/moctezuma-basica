@@ -247,8 +247,8 @@
                         </span>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-blue-100">
-                        Cada alumno pertenece a una sola generación. Las bajas, traslados, inactivos y egresados
-                        conservan su generación para consultas posteriores.
+                        Cada alumno conserva una ubicación académica por ciclo escolar. Las promociones, bajas,
+                        traslados y egresos permanecen disponibles como historial aunque su ubicación actual cambie.
                     </p>
                 </div>
 
@@ -388,7 +388,7 @@
                 <flux:label>Estatus</flux:label>
                 <flux:select wire:model.live="estatus">
                     <flux:select.option value="todos">Todos</flux:select.option>
-                    @foreach (\App\Services\GestionAcademicaService::ESTATUS as $estado)
+                    @foreach ($this->opcionesEstatus as $estado)
                         <flux:select.option value="{{ $estado }}">{{ $this->etiquetaEstatus($estado) }}
                         </flux:select.option>
                     @endforeach
@@ -407,7 +407,8 @@
         </div>
     </section>
 
-    {{-- Cambio masivo de asignación --}}
+    {{-- Cambio masivo de asignación: solo para el ciclo vigente --}}
+    @if ($this->esCicloActual)
     <section
         class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -498,6 +499,22 @@
             <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
         @enderror
     </section>
+    @else
+        <section class="rounded-3xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/20">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                    <flux:icon.archive-box class="h-5 w-5" />
+                </span>
+                <div>
+                    <h2 class="font-black text-sky-950 dark:text-sky-100">Consulta histórica de solo lectura</h2>
+                    <p class="mt-1 text-sm text-sky-800/80 dark:text-sky-200/70">
+                        Se muestra la generación, grado, grupo, matrícula y resultado que el alumno tenía en el ciclo seleccionado.
+                        Su ubicación académica vigente no se modifica desde esta vista.
+                    </p>
+                </div>
+            </div>
+        </section>
+    @endif
 
     {{-- Tabla --}}
     <section
@@ -523,12 +540,16 @@
                 <thead class="bg-slate-900 text-xs uppercase tracking-wide text-white dark:bg-black">
                     <tr>
                         <th class="px-4 py-3 text-center">
-                            <flux:checkbox wire:model.live="selectPage" />
+                            @if ($this->esCicloActual)
+                                <flux:checkbox wire:model.live="selectPage" />
+                            @else
+                                <span class="text-[10px] text-slate-400">Hist.</span>
+                            @endif
                         </th>
                         <th class="px-4 py-3">Matrícula / CURP</th>
                         <th class="px-4 py-3">Alumno</th>
                         <th class="px-4 py-3">Generación</th>
-                        <th class="px-4 py-3">Ubicación actual</th>
+                        <th class="px-4 py-3">Ubicación en el ciclo</th>
                         <th class="px-4 py-3">Estatus</th>
                         <th class="px-4 py-3">Fechas / motivo</th>
                         <th class="px-4 py-3 text-right">Acciones</th>
@@ -537,25 +558,34 @@
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
                     @forelse ($alumnos as $alumno)
                         @php
+                            $contexto = $alumno->ciclosEscolaresHistorial->first();
                             $nombreCompleto = trim(
                                 "{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}",
                             );
-                            $estado = $alumno->estatus ?? 'activo';
+                            $estado = $this->estatusContexto($contexto);
                             $estadoClass = match ($estado) {
                                 'baja_temporal'
                                     => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
                                 'baja_definitiva',
+                                'traslado',
                                 'trasladado'
                                     => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
                                 'suspendido',
-                                'inactivo'
+                                'inactivo',
+                                'no_reinscrito'
                                     => 'bg-slate-200 text-slate-700 dark:bg-neutral-700 dark:text-slate-200',
                                 'reingreso'
                                     => 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200',
                                 'egresado' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
+                                'promovido',
+                                'promovido_grado',
+                                'promovido_nivel',
+                                'grado_concluido'
+                                    => 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-200',
                                 'no_promovido'
                                     => 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200',
-                                'preinscrito'
+                                'preinscrito',
+                                'pendiente_reinscripcion'
                                     => 'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-800/50',
                                 default
                                     => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200',
@@ -565,10 +595,16 @@
                             wire:key="matricula-generacion-{{ $alumno->id }}"
                             class="scroll-mt-28 align-top transition hover:bg-sky-50/50 dark:hover:bg-sky-950/10 {{ $alumno->deleted_at ? 'opacity-65' : '' }}">
                             <td class="px-4 py-4 text-center">
-                                <flux:checkbox wire:model.live="selected" value="{{ $alumno->id }}" />
+                                @if ($this->esCicloActual)
+                                    <flux:checkbox wire:model.live="selected" value="{{ $alumno->id }}" />
+                                @else
+                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-neutral-800">
+                                        <flux:icon.archive-box class="h-3.5 w-3.5" />
+                                    </span>
+                                @endif
                             </td>
                             <td class="px-4 py-4">
-                                <p class="font-black text-slate-900 dark:text-white">{{ $alumno->matricula ?: '—' }}
+                                <p class="font-black text-slate-900 dark:text-white">{{ $contexto?->matricula ?: $alumno->matricula ?: '—' }}
                                 </p>
                                 <p class="mt-1 text-xs text-slate-500">{{ $alumno->curp ?: 'Sin CURP' }}</p>
                             </td>
@@ -587,20 +623,20 @@
                             </td>
                             <td class="px-4 py-4">
                                 <p class="font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ $alumno->generacion?->etiqueta ?? 'Sin generación' }}</p>
-                                @if ($alumno->generacion && !$alumno->generacion->status)
-                                    <span
-                                        class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">Generación
-                                        inactiva</span>
+                                    {{ $contexto?->generacion?->etiqueta ?? 'Sin generación' }}</p>
+                                @if ($contexto?->generacion && !$contexto->generacion->status)
+                                    <span class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
+                                        Generación inactiva
+                                    </span>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
                                 <p class="font-bold text-slate-800 dark:text-slate-100">
-                                    {{ $alumno->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($alumno->grupo) }}
+                                    {{ $contexto?->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($contexto?->grupo) }}
                                 </p>
                                 @if ($this->esBachillerato())
                                     <p class="mt-1 text-xs text-slate-500">Semestre
-                                        {{ $alumno->semestre?->numero ?? '—' }}</p>
+                                        {{ $contexto?->semestre?->numero ?? '—' }}</p>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
@@ -609,31 +645,31 @@
                                     {{ $this->etiquetaEstatus($estado) }}
                                 </span>
                                 @if ($estado === 'preinscrito')
-                                    <p
-                                        class="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                                    <p class="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
                                         <flux:icon.clock class="h-3.5 w-3.5" /> Acceso pendiente
                                     </p>
-                                @elseif (in_array($estado, ['activo', 'reingreso', 'no_promovido'], true))
-                                    <p class="mt-2 text-[11px] font-bold text-sky-600">Ubicación actual</p>
+                                @elseif ($this->esCicloActual && $contexto?->estado === 'en_curso')
+                                    <p class="mt-2 text-[11px] font-bold text-sky-600">Ubicación vigente</p>
+                                @else
+                                    <p class="mt-2 text-[11px] font-bold text-slate-500">Registro histórico del ciclo</p>
                                 @endif
                             </td>
                             <td class="max-w-xs px-4 py-4">
-                                <p class="text-xs text-slate-500">Ingreso al plantel:
-                                    <b
-                                        class="text-slate-700 dark:text-slate-200">{{ optional($alumno->fecha_inscripcion)->format('d/m/Y') ?: '—' }}</b>
+                                <p class="text-xs text-slate-500">Ingreso al ciclo:
+                                    <b class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_ingreso)->format('d/m/Y') ?: '—' }}</b>
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">Fecha del estatus:
-                                    <b
-                                        class="text-slate-700 dark:text-slate-200">{{ optional($alumno->fecha_estatus)->format('d/m/Y') ?: '—' }}</b>
+                                <p class="mt-1 text-xs text-slate-500">Salida o cierre:
+                                    <b class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_salida)->format('d/m/Y') ?: optional($contexto?->cerrado_at)->format('d/m/Y') ?: '—' }}</b>
                                 </p>
-                                @if ($alumno->motivo_estatus)
-                                    <p class="mt-1 line-clamp-2 text-xs text-slate-500"
-                                        title="{{ $alumno->motivo_estatus }}">{{ $alumno->motivo_estatus }}</p>
+                                @if ($contexto?->motivo_cierre)
+                                    <p class="mt-1 line-clamp-2 text-xs text-slate-500" title="{{ $contexto->motivo_cierre }}">
+                                        {{ $contexto->motivo_cierre }}
+                                    </p>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
                                 <div class="flex flex-wrap justify-end gap-2">
-                                    @if ($estado === 'preinscrito' && !$alumno->deleted_at)
+                                    @if ($this->esCicloActual && $estado === 'preinscrito' && !$alumno->deleted_at)
                                         <button type="button"
                                             x-on:click="activarPreinscripcion({{ $alumno->id }}, @js($nombreCompleto))"
                                             wire:loading.attr="disabled" wire:target="activarPreinscripcion"
@@ -648,25 +684,27 @@
                                         class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-300">
                                         <flux:icon.clock class="h-4 w-4" />
                                     </button>
-                                    <button type="button"
-                                        x-on:click="abrirEdicion({{ $alumno->id }}, @js(route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $alumno->id])))"
-                                        title="Editar alumno"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
-                                        <flux:icon.pencil-square class="h-4 w-4" />
-                                    </button>
-                                    @if ($alumno->deleted_at)
-                                        <button type="button" wire:click="restaurar({{ $alumno->id }})"
-                                            title="Restaurar"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                            <flux:icon.arrow-uturn-left class="h-4 w-4" />
-                                        </button>
-                                    @else
+                                    @if ($this->esCicloActual)
                                         <button type="button"
-                                            x-on:click="archivar({{ $alumno->id }}, @js($nombreCompleto))"
-                                            title="Archivar"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300">
-                                            <flux:icon.archive-box class="h-4 w-4" />
+                                            x-on:click="abrirEdicion({{ $alumno->id }}, @js(route('misrutas.matricula.editar', ['slug_nivel' => $slug_nivel, 'inscripcion' => $alumno->id])))"
+                                            title="Editar alumno"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
+                                            <flux:icon.pencil-square class="h-4 w-4" />
                                         </button>
+                                        @if ($alumno->deleted_at)
+                                            <button type="button" wire:click="restaurar({{ $alumno->id }})"
+                                                title="Restaurar"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                <flux:icon.arrow-uturn-left class="h-4 w-4" />
+                                            </button>
+                                        @else
+                                            <button type="button"
+                                                x-on:click="archivar({{ $alumno->id }}, @js($nombreCompleto))"
+                                                title="Archivar"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300">
+                                                <flux:icon.archive-box class="h-4 w-4" />
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>

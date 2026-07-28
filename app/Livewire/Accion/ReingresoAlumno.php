@@ -210,6 +210,7 @@ class ReingresoAlumno extends Component
                         'baja_temporal',
                         'baja_definitiva',
                         'inactivo',
+                        'no_reinscrito',
                         'suspendido',
                     ]);
             })

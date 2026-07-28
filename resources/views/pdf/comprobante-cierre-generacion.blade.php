@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Comprobante individual de cierre</title>
+    <title>Comprobante individual de cierre académico</title>
     <style>
         @page { margin: 38px; }
         body { font-family: DejaVu Sans, sans-serif; color:#1e293b; font-size:11px; }
@@ -18,7 +18,7 @@
 </head>
 <body>
     @php($proyeccion = $detalle->proyeccionContinuidad)
-    <table class="header"><tr><td style="width:155px">@if($logo)<img src="{{ $logo }}" class="logo">@endif</td><td><h1>Comprobante individual de cierre y continuidad</h1><p>Proceso #{{ $proceso->id }} · {{ $proceso->fecha_efectiva?->format('d/m/Y') }}</p></td></tr></table>
+    <table class="header"><tr><td style="width:155px">@if($logo)<img src="{{ $logo }}" class="logo">@endif</td><td><h1>Comprobante individual de cierre de grado, nivel y continuidad</h1><p>Proceso #{{ $proceso->id }} · {{ $proceso->fecha_efectiva?->format('d/m/Y') }}</p></td></tr></table>
 
     <div class="card">
         <table>
@@ -29,7 +29,18 @@
         </table>
     </div>
 
-    <div class="result">Resultado: {{ strtoupper(str_replace('_', ' ', $detalle->resultado)) }}</div>
+    @php
+        $etiquetaResultado = match ($detalle->resultado) {
+            'continuidad_interna' => 'PROMOCIÓN O CONTINUIDAD PROYECTADA',
+            'no_reinscrito' => 'ACREDITÓ, PERO NO SE REINSCRIBIRÁ',
+            'egresado' => 'EGRESADO SIN CONTINUIDAD INTERNA',
+            'traslado' => 'TRASLADO',
+            'baja_definitiva' => 'BAJA DEFINITIVA',
+            'no_promovido' => 'NO PROMOVIDO / REPETICIÓN PROYECTADA',
+            default => strtoupper(str_replace('_', ' ', $detalle->resultado)),
+        };
+    @endphp
+    <div class="result">Resultado: {{ $etiquetaResultado }}</div>
 
     @if($detalle->inscripcionCicloDestino || $proyeccion)
         <div class="card" style="margin-top:16px">
@@ -39,7 +50,7 @@
                 <tr><td class="label">Grado / semestre</td><td>{{ $detalle->inscripcionCicloDestino?->semestre?->numero ? 'Semestre '.$detalle->inscripcionCicloDestino->semestre->numero : ($detalle->inscripcionCicloDestino?->grado?->nombre ?? ($proyeccion?->semestreDestino?->numero ? 'Semestre '.$proyeccion->semestreDestino->numero : $proyeccion?->gradoDestino?->nombre)) }}</td></tr>
                 <tr><td class="label">Grupo</td><td>{{ $detalle->inscripcionCicloDestino?->grupo?->asignacionGrupo?->nombre ?? $proyeccion?->grupoDestino?->asignacionGrupo?->nombre ?? 'Por confirmar' }}</td></tr>
                 <tr><td class="label">Matrícula destino</td><td>{{ $detalle->inscripcionCicloDestino ? ($detalle->estado_nuevo['matricula'] ?? $detalle->inscripcionCicloDestino?->matricula) : ($proyeccion?->matricula_sugerida ?? 'Por confirmar') }}</td></tr>
-                @if($proyeccion)<tr><td class="label">Estado de continuidad</td><td>{{ $proyeccion->etiqueta_estado }}</td></tr>@endif
+                @if($proyeccion)<tr><td class="label">Tipo de proyección</td><td>{{ $proyeccion->etiqueta_tipo }}</td></tr><tr><td class="label">Resultado histórico de origen</td><td>{{ $proyeccion->etiqueta_resultado_origen }}</td></tr><tr><td class="label">Estado de proyección</td><td>{{ $proyeccion->etiqueta_estado }}</td></tr>@endif
             </table>
         </div>
     @endif

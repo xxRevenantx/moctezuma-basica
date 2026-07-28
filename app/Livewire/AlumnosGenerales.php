@@ -701,6 +701,8 @@ class AlumnosGenerales extends Component
             'reingreso' => 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300',
             'no_promovido' => 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
             'preinscrito' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+            'pendiente_reinscripcion' => 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300',
+            'no_reinscrito' => 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
             'egresado' => 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
             'baja_temporal' => 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
             'baja_definitiva' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',

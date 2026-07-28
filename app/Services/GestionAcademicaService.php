@@ -29,6 +29,8 @@ class GestionAcademicaService
         'inactivo',
         'reingreso',
         'no_promovido',
+        'pendiente_reinscripcion',
+        'no_reinscrito',
     ];
 
     public function cambiarAsignacion(Inscripcion $alumno, array $destino, string $motivo, ?int $usuarioId, ?string $resultadoCambioCiclo = null, ?string $fecha = null): Inscripcion
@@ -87,11 +89,12 @@ class GestionAcademicaService
         array $destino,
         string $motivo,
         ?int $usuarioId,
-        ?string $fecha = null
+        ?string $fecha = null,
+        ?string $resultadoForzado = null
     ): Inscripcion {
-        $resultado = (int) $alumno->nivel_id === (int) ($destino['nivel_id'] ?? $alumno->nivel_id)
+        $resultado = $resultadoForzado ?: ((int) $alumno->nivel_id === (int) ($destino['nivel_id'] ?? $alumno->nivel_id)
             ? 'promovido'
-            : 'promovido_nivel';
+            : 'promovido_nivel');
 
         $destino['estatus'] = 'activo';
 

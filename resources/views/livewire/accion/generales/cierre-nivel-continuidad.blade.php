@@ -1,20 +1,25 @@
 <div class="space-y-6">
     @php
-        $resultados = [
-            'pendiente' => ['Pendiente', 'bg-slate-100 text-slate-700'],
-            'continuidad_interna' => ['Egresar y proyectar continuidad', 'bg-sky-100 text-sky-800'],
-            'egresado' => ['Egresado sin continuidad', 'bg-violet-100 text-violet-800'],
-            'traslado' => ['Traslado', 'bg-amber-100 text-amber-800'],
-            'baja_definitiva' => ['Baja definitiva', 'bg-rose-100 text-rose-800'],
-            'no_promovido' => ['No promovido / repetirá', 'bg-orange-100 text-orange-800'],
+        $coloresResultado = [
+            'pendiente' => 'bg-slate-100 text-slate-700',
+            'continuidad_interna' => 'bg-sky-100 text-sky-800',
+            'no_reinscrito' => 'bg-slate-200 text-slate-800',
+            'egresado' => 'bg-violet-100 text-violet-800',
+            'traslado' => 'bg-amber-100 text-amber-800',
+            'baja_definitiva' => 'bg-rose-100 text-rose-800',
+            'no_promovido' => 'bg-orange-100 text-orange-800',
         ];
+        $resultados = ['pendiente' => ['Pendiente', $coloresResultado['pendiente']]];
+        foreach ($this->resultadosDisponibles as $valor => $etiqueta) {
+            $resultados[$valor] = [$etiqueta, $coloresResultado[$valor] ?? 'bg-slate-100 text-slate-700'];
+        }
         $conteos = collect($decisiones)->countBy('resultado');
     @endphp
 
     <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-100">
-        Este asistente conserva un solo expediente por alumno. La opción <b>Egresar y proyectar continuidad</b>
-        cierra correctamente el nivel de origen como egresado y crea solamente una proyección provisional.
-        El ciclo destino, la activación y la matrícula definitiva se formalizan hasta confirmar que el alumno regresó.
+        Este asistente resuelve en un solo flujo la <b>promoción de grado o semestre</b>, el <b>cierre de nivel</b>,
+        la <b>no reinscripción</b>, la repetición, el traslado, la baja y el egreso. Las promociones se guardan
+        como proyecciones provisionales; el alumno solo queda activo en el ciclo destino cuando se confirma que regresó.
     </div>
 
     <div class="grid gap-3 md:grid-cols-5">
@@ -29,9 +34,9 @@
     @if ($paso === 1)
         <div class="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
             <div>
-                <h3 class="text-lg font-black text-slate-900 dark:text-white">1. Selecciona la generación de origen</h3>
+                <h3 class="text-lg font-black text-slate-900 dark:text-white">1. Selecciona el contexto de origen</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Puedes procesar toda la generación o un grupo. El cierre definitivo de la generación solo se permitirá cuando ningún alumno quede pendiente.
+                    Puedes procesar una generación completa cuando todos estén en el mismo grado o semestre, o elegir un grupo. El sistema detectará automáticamente si corresponde promoción ordinaria, cierre de nivel o egreso terminal.
                 </p>
             </div>
 
@@ -70,14 +75,8 @@
                     <p class="mt-1 text-lg font-black text-slate-900 dark:text-white">{{ $nivel->nombre }}</p>
                 </div>
                 <div class="rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
-                    <p class="text-xs font-black uppercase tracking-wider text-slate-500">Continuidad permitida</p>
-                    <p class="mt-1 font-black text-slate-900 dark:text-white">
-                        @if ($nivel->slug === 'preescolar') Primaria
-                        @elseif ($nivel->slug === 'primaria') Secundaria
-                        @elseif ($nivel->slug === 'secundaria') Bachillerato
-                        @else Solo egreso, baja, traslado o repetición
-                        @endif
-                    </p>
+                    <p class="text-xs font-black uppercase tracking-wider text-slate-500">Detección automática</p>
+                    <p class="mt-1 font-black text-slate-900 dark:text-white">Grado intermedio, fin de nivel o egreso terminal</p>
                 </div>
                 <div class="rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
                     <p class="text-xs font-black uppercase tracking-wider text-slate-500">Regla histórica</p>
@@ -100,8 +99,11 @@
                     <div>
                         <h3 class="text-lg font-black text-slate-900 dark:text-white">2. Clasifica cada alumno</h3>
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            Los egresados históricos del último grado pueden generar una proyección provisional sin modificar su egreso. Los alumnos con proyección vigente o ciclo posterior permanecen bloqueados.
+                            Clasifica qué alumnos se proyectan al siguiente grado o nivel, quién repetirá y quién no continuará. Los registros históricos compatibles pueden recuperar una proyección faltante sin alterar su resultado anterior.
                         </p>
+                        <div class="mt-3 inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+                            Modo detectado: {{ $this->etiquetaModo }} · Origen: {{ $contexto_origen['grado'] ?? '—' }}{{ filled($contexto_origen['semestre'] ?? null) ? ' · semestre '.$contexto_origen['semestre'] : '' }}
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <flux:button size="sm" wire:click="seleccionarTodosVisibles">Seleccionar visibles</flux:button>
@@ -132,7 +134,7 @@
                 <div class="mt-4 grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 lg:grid-cols-[1fr_1fr_auto] dark:border-sky-900/50 dark:bg-sky-950/20">
                     <flux:select wire:model="resultado_masivo" label="Resultado para seleccionados">
                         @foreach ($resultados as $valor => [$etiqueta])
-                            @if ($valor !== 'pendiente' && ! ($nivel->slug === 'bachillerato' && $valor === 'continuidad_interna'))
+                            @if ($valor !== 'pendiente')
                                 <flux:select.option value="{{ $valor }}">{{ $etiqueta }}</flux:select.option>
                             @endif
                         @endforeach
@@ -180,7 +182,7 @@
                                         <p class="mt-1 text-xs text-slate-500">{{ $alumno['matricula'] }} · {{ $alumno['curp'] }}</p>
                                         @if ($alumno['solo_proyeccion_historica'] ?? false)
                                             <span class="mt-2 inline-flex rounded-full bg-sky-100 px-2 py-1 text-[11px] font-black text-sky-800">
-                                                Egresado histórico proyectable
+                                                Histórico proyectable
                                             </span>
                                         @else
                                             <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-black {{ $alumno['procesable'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">
@@ -197,18 +199,16 @@
                                         <select wire:model.live="decisiones.{{ $alumno['id'] }}.resultado" @disabled($bloqueado)
                                             class="w-full rounded-xl border-slate-300 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-900">
                                             @if ($alumno['solo_proyeccion_historica'] ?? false)
-                                                <option value="continuidad_interna">Proyectar continuidad y conservar egreso</option>
+                                                <option value="continuidad_interna">Crear proyección y conservar resultado histórico</option>
                                             @else
                                                 @foreach ($resultados as $valor => [$etiqueta])
-                                                    @if (! ($nivel->slug === 'bachillerato' && $valor === 'continuidad_interna'))
-                                                        <option value="{{ $valor }}">{{ $etiqueta }}</option>
-                                                    @endif
+                                                    <option value="{{ $valor }}">{{ $etiqueta }}</option>
                                                 @endforeach
                                             @endif
                                         </select>
                                         @if ($alumno['solo_proyeccion_historica'] ?? false)
                                             <p class="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
-                                                Su egreso histórico permanecerá intacto; solo se creará la proyección pendiente.
+                                                Su resultado histórico permanecerá intacto; solo se creará la proyección pendiente.
                                             </p>
                                         @endif
                                         @if (($decision['resultado'] ?? '') === 'baja_definitiva' && $alumno['es_grado_final'])
@@ -257,17 +257,28 @@
             <div class="rounded-3xl border border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
                 <h3 class="text-lg font-black text-slate-900 dark:text-white">3. Configura los destinos</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    La proyección usa el siguiente nivel sin activar todavía al alumno. Los no promovidos sí permanecen en el mismo nivel, grado y generación, y abren inmediatamente el ciclo siguiente.
+                    El destino se propone según el contexto: siguiente grado o semestre, siguiente nivel, o el mismo grado para repetición. Ninguna proyección activa al alumno todavía; la inscripción del ciclo destino se formaliza al confirmar su regreso.
                 </p>
 
                 @if (($conteos['continuidad_interna'] ?? 0) > 0 || ($conteos['no_promovido'] ?? 0) > 0)
                     <div class="mt-5 grid gap-4 lg:grid-cols-3">
-                        <flux:select wire:model.live="ciclo_destino_id" label="Ciclo destino consecutivo">
-                            <flux:select.option value="">Selecciona</flux:select.option>
-                            @foreach ($ciclos as $ciclo)
-                                <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
-                            @endforeach
-                        </flux:select>
+                        <div>
+                            <flux:select wire:model.live="ciclo_destino_id" label="Ciclo destino consecutivo"
+                                :disabled="$this->ciclosDestinoPermitidos->isEmpty()">
+                                <flux:select.option value="">Selecciona</flux:select.option>
+                                @foreach ($this->ciclosDestinoPermitidos as $ciclo)
+                                    <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            @if ($this->ciclosDestinoPermitidos->isEmpty())
+                                <p class="mt-2 text-xs font-bold text-rose-600">
+                                    Primero crea el ciclo escolar {{ $this->etiquetaCicloDestinoEsperado }}. No se permite proyectar al mismo ciclo de origen.
+                                </p>
+                            @endif
+                            @error('ciclo_destino_id')
+                                <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
 
                         @if (($conteos['continuidad_interna'] ?? 0) > 0)
                             <flux:select wire:model.live="nivel_destino_id" label="Nivel destino">
@@ -277,7 +288,7 @@
                                 @endforeach
                             </flux:select>
 
-                            <flux:select wire:model.live="grado_destino_id" label="Primer grado destino">
+                            <flux:select wire:model.live="grado_destino_id" label="Grado destino propuesto">
                                 <flux:select.option value="">Selecciona</flux:select.option>
                                 @foreach ($gradosDestino as $grado)
                                     <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
@@ -333,7 +344,7 @@
                 <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
                     <div class="border-b border-slate-200 p-5 dark:border-neutral-800">
                         <h4 class="font-black text-slate-900 dark:text-white">Grupo y matrícula propuestos por alumno</h4>
-                        <p class="mt-1 text-sm text-slate-500">Para continuidad entre niveles, el grupo es opcional y puede definirse al confirmar el regreso. En no promovidos sí es obligatorio porque el ciclo destino se abre de inmediato.</p>
+                        <p class="mt-1 text-sm text-slate-500">El grupo puede dejarse pendiente al generar la proyección, pero será obligatorio al confirmar la reinscripción. La matrícula sugerida puede ajustarse antes de formalizar.</p>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-[900px] w-full text-sm">
@@ -354,23 +365,20 @@
                                         <td class="p-3">
                                             <select wire:model="decisiones.{{ $alumno['id'] }}.grupo_destino_id"
                                                 class="w-full rounded-xl border-slate-300 text-sm dark:border-neutral-700 dark:bg-neutral-900">
-                                                <option value="">{{ $resultado === 'continuidad_interna' ? 'Asignar al confirmar' : 'Selecciona grupo' }}</option>
+                                                <option value="">Asignar al confirmar</option>
                                                 @foreach ($gruposAlumno as $grupo)
                                                     <option value="{{ $grupo['id'] }}">{{ $grupo['label'] }}</option>
                                                 @endforeach
                                             </select>
                                             @if ($gruposAlumno === [])
-                                                <p class="mt-1 text-xs font-bold {{ $resultado === 'continuidad_interna' ? 'text-amber-600' : 'text-rose-600' }}">{{ $resultado === 'continuidad_interna' ? 'Podrás crear o asignar el grupo antes de confirmar la continuidad.' : 'No existen grupos compatibles. Créalo antes de continuar.' }}</p>
+                                                <p class="mt-1 text-xs font-bold text-amber-600">No existen grupos compatibles todavía. Podrás crearlo y asignarlo antes de confirmar la reinscripción.</p>
                                             @endif
                                             @error("decisiones.{$alumno['id']}.grupo_destino_id")<p class="mt-1 text-xs font-bold text-rose-600">{{ $message }}</p>@enderror
                                         </td>
                                         <td class="p-3">
-                                            @if ($resultado === 'continuidad_interna')
-                                                <input wire:model="decisiones.{{ $alumno['id'] }}.matricula" placeholder="Automática si queda vacío"
-                                                    class="w-full rounded-xl border-slate-300 text-sm uppercase dark:border-neutral-700 dark:bg-neutral-900">
-                                            @else
-                                                <span class="font-semibold text-slate-600 dark:text-slate-300">Conservar {{ $alumno['matricula'] }}</span>
-                                            @endif
+                                            <input wire:model="decisiones.{{ $alumno['id'] }}.matricula"
+                                                placeholder="{{ $resultado === 'no_promovido' ? 'Conservar '.$alumno['matricula'] : 'Automática si queda vacío' }}"
+                                                class="w-full rounded-xl border-slate-300 text-sm uppercase dark:border-neutral-700 dark:bg-neutral-900">
                                         </td>
                                     </tr>
                                     @endif
@@ -395,14 +403,8 @@
                 <p class="mt-1 text-sm text-slate-500">Los errores críticos bloquean el proceso; las advertencias quedan registradas.</p>
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                @foreach ([
-                    'continuidad_interna' => 'Egreso con proyección',
-                    'egresado' => 'Egresados',
-                    'traslado' => 'Traslados',
-                    'baja_definitiva' => 'Bajas',
-                    'no_promovido' => 'No promovidos',
-                ] as $clave => $etiqueta)
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                @foreach ($this->resultadosDisponibles as $clave => $etiqueta)
                     <div class="rounded-2xl border border-slate-200 p-4 text-center dark:border-neutral-700">
                         <p class="text-xs font-black uppercase text-slate-500">{{ $etiqueta }}</p>
                         <p class="mt-1 text-3xl font-black text-slate-900 dark:text-white">{{ $conteos[$clave] ?? 0 }}</p>
@@ -411,20 +413,26 @@
             </div>
 
             <div class="grid gap-4 lg:grid-cols-2">
-                <flux:input type="date" wire:model="fecha_efectiva" label="Fecha efectiva de cierre, egreso, baja o traslado" />
+                <flux:input type="date" wire:model="fecha_efectiva" label="Fecha efectiva del resultado académico" />
                 <flux:textarea wire:model="motivo" label="Motivo administrativo general" rows="4"
                     placeholder="Ejemplo: cierre oficial del ciclo escolar y clasificación individual revisada por Control Escolar." />
             </div>
 
-            <label class="flex cursor-pointer items-start gap-3 rounded-2xl border p-4 {{ $grupo_origen_id ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/60' }} dark:bg-transparent">
-                <input type="checkbox" wire:model="cerrar_generacion" class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
-                <span>
-                    <b class="block text-slate-900 dark:text-white">Cerrar definitivamente la generación</b>
-                    <small class="mt-1 block text-slate-600 dark:text-slate-300">
-                        Solo se aplicará si no queda ningún registro en curso. Si trabajas por grupo, procesa primero los demás grupos o desmarca esta opción.
-                    </small>
-                </span>
-            </label>
+            @if ($modo_proceso === 'promocion_grado')
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
+                    La generación permanecerá activa porque este proceso corresponde a un grado o semestre intermedio. Solo se cierra el historial del ciclo cursado por cada alumno.
+                </div>
+            @else
+                <label class="flex cursor-pointer items-start gap-3 rounded-2xl border p-4 {{ $grupo_origen_id ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/60' }} dark:bg-transparent">
+                    <input type="checkbox" wire:model="cerrar_generacion" class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                    <span>
+                        <b class="block text-slate-900 dark:text-white">Cerrar definitivamente la generación</b>
+                        <small class="mt-1 block text-slate-600 dark:text-slate-300">
+                            Solo se aplicará si no queda ningún registro en curso. Si trabajas por grupo, procesa primero los demás grupos o desmarca esta opción.
+                        </small>
+                    </span>
+                </label>
+            @endif
 
             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
                 La reversión automática solo estará disponible mientras el ciclo destino no tenga calificaciones, fichas, documentos oficiales ni movimientos posteriores.
@@ -455,7 +463,7 @@
             <div class="flex justify-between gap-3">
                 <flux:button wire:click="anterior">Anterior</flux:button>
                 <flux:button variant="danger" icon="check-badge" wire:click="ejecutar" spinner="ejecutar">
-                    Egresar y generar proyecciones
+                    {{ $modo_proceso === 'promocion_grado' ? 'Cerrar grado y generar proyecciones' : ($modo_proceso === 'egreso_terminal' ? 'Procesar egreso terminal' : 'Cerrar nivel y generar proyecciones') }}
                 </flux:button>
             </div>
         </div>
@@ -529,7 +537,7 @@
                             </tr>
                         @endif
                     @empty
-                        <tr><td colspan="6" class="p-8 text-center text-slate-500">Todavía no hay procesos de cierre de nivel.</td></tr>
+                        <tr><td colspan="6" class="p-8 text-center text-slate-500">Todavía no hay procesos de cierre académico.</td></tr>
                     @endforelse
                 </tbody>
             </table>

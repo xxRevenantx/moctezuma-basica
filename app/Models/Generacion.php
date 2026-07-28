@@ -27,14 +27,21 @@ class Generacion extends Model
         'reactivada_at',
         'reactivada_por',
         'status',
+        'estado_cierre',
+        'cierre_iniciado_at',
+        'cierre_iniciado_por',
         'cerrada_at',
         'cerrada_por',
+        'archivada_at',
+        'archivada_por',
         'observaciones',
     ];
 
     protected $casts = [
         'status' => 'boolean',
+        'cierre_iniciado_at' => 'datetime',
         'cerrada_at' => 'datetime',
+        'archivada_at' => 'datetime',
         'fecha_inicio' => 'date',
         'fecha_termino' => 'date',
         'reactivada_at' => 'datetime',
@@ -116,6 +123,38 @@ class Generacion extends Model
     public function usuarioQueReactivo()
     {
         return $this->belongsTo(User::class, 'reactivada_por');
+    }
+
+    public function usuarioQueInicioCierre()
+    {
+        return $this->belongsTo(User::class, 'cierre_iniciado_por');
+    }
+
+    public function usuarioQueArchivo()
+    {
+        return $this->belongsTo(User::class, 'archivada_por');
+    }
+
+    public function getEstadoCierreNormalizadoAttribute(): string
+    {
+        $estado = mb_strtolower(trim((string) $this->estado_cierre));
+
+        if ($estado !== '') {
+            return $estado;
+        }
+
+        return $this->status ? 'activa' : 'egresada';
+    }
+
+    public function getEtiquetaEstadoCierreAttribute(): string
+    {
+        return match ($this->estado_cierre_normalizado) {
+            'en_proceso' => 'En proceso de cierre',
+            'cerrada' => 'Cerrada',
+            'egresada' => 'Egresada',
+            'archivada' => 'Archivada',
+            default => 'Activa',
+        };
     }
 
     public function getEtiquetaAttribute(): string

@@ -15,14 +15,12 @@
             class="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-sky-50 to-white p-5 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:via-sky-950/20 dark:to-neutral-900 sm:p-6">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
-                    <p class="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Continuidad provisional</p>
-                    <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Confirmación de alumnos para el
-                        siguiente nivel</h3>
+                    <p class="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Reinscripción y continuidad provisional</p>
+                    <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Confirmación de alumnos para el ciclo destino</h3>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        Los alumnos pendientes ya quedaron como <b>egresados</b> del nivel de origen. Todavía no son
-                        alumnos activos del nivel destino.
-                        Confirma únicamente a quienes realmente regresaron; quienes no continúen conservarán su egreso y
-                        no quedarán registrados como baja.
+                        Cada alumno conserva el resultado académico del ciclo de origen: promoción de grado, repetición pendiente o egreso.
+                        Todavía no está activo en el destino. Confirma únicamente a quienes realmente regresaron; al cancelar se conserva el historial
+                        de origen y no se registra una baja en una ubicación que nunca inició.
                     </p>
                 </div>
                 <div class="grid min-w-[300px] grid-cols-3 gap-2 text-center">
@@ -55,7 +53,7 @@
                 <flux:select wire:model.live="filtro_estado" label="Estado de la proyección">
                     <flux:select.option value="">Todos</flux:select.option>
                     <flux:select.option value="pendiente">Pendiente de confirmar</flux:select.option>
-                    <flux:select.option value="confirmada">Continuidad confirmada</flux:select.option>
+                    <flux:select.option value="confirmada">Proyección confirmada</flux:select.option>
                     <flux:select.option value="cancelada">No continuará</flux:select.option>
                 </flux:select>
                 <flux:select wire:model.live="filtro_ciclo_destino_id" label="Ciclo destino">
@@ -102,7 +100,7 @@
                     <tr>
                         <th class="p-3"></th>
                         <th class="p-3 text-left">Alumno</th>
-                        <th class="p-3 text-left">Egreso de origen</th>
+                        <th class="p-3 text-left">Resultado de origen</th>
                         <th class="p-3 text-left">Destino proyectado</th>
                         <th class="p-3 text-left">Grupo para confirmar</th>
                         <th class="p-3 text-left">Matrícula sugerida</th>
@@ -140,7 +138,7 @@
                                 <p>Grupo {{ $origen?->grupo?->asignacionGrupo?->nombre ?? 'Sin grupo' }}</p>
                                 <p class="mt-1 text-xs">
                                     {{ $origen?->cicloEscolar?->inicio_anio }}-{{ $origen?->cicloEscolar?->fin_anio }}
-                                    · Egresado</p>
+                                    · {{ $proyeccion->etiqueta_resultado_origen }}</p>
                             </td>
                             <td class="p-3 text-slate-700 dark:text-slate-300">
                                 <p class="font-bold">{{ $proyeccion->nivelDestino?->nombre }}</p>
@@ -150,14 +148,12 @@
                                 <p class="mt-1 text-xs">
                                     {{ $proyeccion->cicloDestino?->inicio_anio }}-{{ $proyeccion->cicloDestino?->fin_anio }}
                                 </p>
+                                <span class="mt-2 inline-flex rounded-full bg-sky-100 px-2 py-1 text-[11px] font-black text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">{{ $proyeccion->etiqueta_tipo }}</span>
                             </td>
                             <td class="p-3">
                                 @if ($esPendiente)
-                                    <flux:select
-                                        wire:key="grupo-destino-proyeccion-{{ $proyeccion->id }}"
-                                        wire:model.live="datos.{{ $proyeccion->id }}.grupo_destino_id"
-                                        size="sm"
-                                        :disabled="$grupos === []">
+                                    <flux:select wire:model.live="datos.{{ $proyeccion->id }}.grupo_destino_id"
+                                        size="sm" placeholder="Selecciona grupo">
                                         <flux:select.option value="">Selecciona grupo</flux:select.option>
                                         @foreach ($grupos as $grupo)
                                             <flux:select.option value="{{ $grupo['id'] }}">
@@ -165,11 +161,6 @@
                                             </flux:select.option>
                                         @endforeach
                                     </flux:select>
-                                    @if (count($grupos) === 1)
-                                        <p class="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                            Único grupo compatible seleccionado automáticamente.
-                                        </p>
-                                    @endif
                                     @if ($grupos === [])
                                         <p class="mt-1 text-xs font-bold text-rose-600">No hay grupos compatibles
                                             activos.</p>
@@ -257,10 +248,10 @@
         <div wire:key="modal-confirmar-proyecciones"
             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
             <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
-                <h3 class="text-xl font-black text-slate-900 dark:text-white">Confirmar continuidad</h3>
+                <h3 class="text-xl font-black text-slate-900 dark:text-white">Confirmar continuidad o reinscripción</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Se crearán los registros del ciclo destino y los alumnos seleccionados pasarán de egresados a
-                    activos. Esta acción no modifica el egreso histórico del nivel anterior.
+                    Se crearán los registros oficiales del ciclo destino y los alumnos seleccionados quedarán activos
+                    en el grado, semestre o nivel proyectado. El resultado histórico del ciclo de origen se conserva.
                 </p>
                 <div class="mt-5 space-y-4">
                     <flux:input type="date" wire:model="fecha_confirmacion" label="Fecha efectiva de ingreso" />
@@ -283,8 +274,7 @@
             <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <h3 class="text-xl font-black text-slate-900 dark:text-white">Marcar que no continuarán</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    La proyección será cancelada. Los alumnos permanecerán como egresados del nivel y ciclo de origen;
-                    no se les registrará una baja en el nivel destino.
+                    La proyección será cancelada. Cada alumno conservará su resultado académico del ciclo de origen y no se registrará una baja en el destino, porque esa reinscripción nunca fue formalizada.
                 </p>
                 <div class="mt-5 space-y-4">
                     <flux:textarea wire:model="motivo_cancelacion" label="Motivo de cancelación" rows="4"

@@ -95,14 +95,24 @@ class Matricula extends Component
 
     private function cargarGeneraciones(?int $cicloEscolarId = null): Collection
     {
+        $esActual = $this->cicloEsActual($cicloEscolarId);
+
         return Generacion::query()
             ->where('nivel_id', $this->nivel->id)
-            ->when($cicloEscolarId, fn(Builder $query) => $query->whereHas(
-                'grupos',
-                fn(Builder $grupos) => $grupos
-                    ->where('ciclo_escolar_id', $cicloEscolarId)
-                    ->where('estado', 'activo')
-            ))
+            ->when($cicloEscolarId, function (Builder $query) use ($cicloEscolarId, $esActual): void {
+                $query->where(function (Builder $contexto) use ($cicloEscolarId, $esActual): void {
+                    $contexto
+                        ->whereHas('inscripcionCiclos', fn (Builder $historial) => $historial
+                            ->where('ciclo_escolar_id', $cicloEscolarId)
+                            ->where('nivel_id', $this->nivel->id))
+                        ->orWhereHas('grupos', function (Builder $grupos) use ($cicloEscolarId, $esActual): void {
+                            $grupos->withTrashed()
+                                ->where('ciclo_escolar_id', $cicloEscolarId)
+                                ->where('nivel_id', $this->nivel->id)
+                                ->when($esActual, fn (Builder $grupo) => $grupo->where('estado', 'activo'));
+                        });
+                });
+            })
             ->orderByDesc('status')
             ->orderByDesc('anio_ingreso')
             ->get();
@@ -122,25 +132,109 @@ class Matricula extends Component
         }
 
         $cicloEscolarId ??= $this->ciclo_escolar_id;
+        $esActual = $this->cicloEsActual($cicloEscolarId);
+        $query = $esActual ? Grupo::query() : Grupo::withTrashed();
 
-        return Grupo::query()
+        return $query
             ->with('asignacionGrupo')
-            ->withCount(['inscripciones as alumnos_activos_count' => fn(Builder $alumnos) => $alumnos
-                ->where('activo', true)
-                ->whereNull('deleted_at')])
+            ->withCount(['inscripcionCiclos as alumnos_contexto_count' => fn ($alumnos) => $alumnos
+                ->where('ciclo_escolar_id', $cicloEscolarId)])
             ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('estado', 'activo')
+            ->when($esActual, fn (Builder $grupo) => $grupo->where('estado', 'activo'))
             ->where('nivel_id', $this->nivel->id)
             ->where('generacion_id', $generacionId)
             ->where('grado_id', $gradoId)
             ->when(
                 $this->esBachillerato(),
-                fn(Builder $query) => $query->where('semestre_id', $semestreId),
-                fn(Builder $query) => $query->whereNull('semestre_id')
+                fn (Builder $grupo) => $grupo->where('semestre_id', $semestreId),
+                fn (Builder $grupo) => $grupo->whereNull('semestre_id')
             )
             ->get()
-            ->sortBy(fn($grupo) => $grupo->asignacionGrupo?->nombre ?? $grupo->id)
+            ->sortBy(fn ($grupo) => $grupo->asignacionGrupo?->nombre ?? $grupo->id)
             ->values();
+    }
+
+    private function cicloEsActual(?int $cicloEscolarId): bool
+    {
+        if (! $cicloEscolarId) {
+            return false;
+        }
+
+        return (bool) $this->ciclosEscolares
+            ->firstWhere('id', (int) $cicloEscolarId)?->es_actual;
+    }
+
+    public function getEsCicloActualProperty(): bool
+    {
+        return $this->cicloEsActual($this->ciclo_escolar_id);
+    }
+
+    public function getOpcionesEstatusProperty(): array
+    {
+        return array_values(array_unique([
+            ...GestionAcademicaService::ESTATUS,
+            'promovido',
+            'promovido_nivel',
+            'grado_concluido',
+        ]));
+    }
+
+    private function aplicarFiltroEstatusContexto(Builder $query, string $estatus): void
+    {
+        match ($estatus) {
+            'activo' => $query
+                ->where('estado', 'en_curso')
+                ->whereIn('estatus_actual_ciclo', ['activo', 'reingreso', 'no_promovido']),
+            'promovido' => $query->whereIn('resultado_final', ['promovido', 'promovido_grado']),
+            'promovido_nivel' => $query->where('resultado_final', 'promovido_nivel'),
+            'egresado' => $query->where(function (Builder $estado): void {
+                $estado->where('resultado_final', 'egresado')
+                    ->orWhere('estatus_actual_ciclo', 'egresado');
+            }),
+            'trasladado' => $query->where(function (Builder $estado): void {
+                $estado->whereIn('resultado_final', ['traslado', 'trasladado'])
+                    ->orWhereIn('estatus_actual_ciclo', ['traslado', 'trasladado']);
+            }),
+            default => $query->where(function (Builder $estado) use ($estatus): void {
+                $estado->where('resultado_final', $estatus)
+                    ->orWhere('estatus_actual_ciclo', $estatus);
+            }),
+        };
+    }
+
+    private function contarPorEstatusContexto(Builder $query, string $grupo): int
+    {
+        $cicloEscolarId = (int) $this->ciclo_escolar_id;
+
+        return $query->whereHas('ciclosEscolaresHistorial', function (Builder $historial) use ($cicloEscolarId, $grupo): void {
+            $historial
+                ->where('ciclo_escolar_id', $cicloEscolarId)
+                ->where('nivel_id', $this->nivel->id);
+
+            if ($grupo === 'bajas') {
+                $historial->where(function (Builder $estado): void {
+                    $estado->whereIn('resultado_final', ['baja_temporal', 'baja_definitiva', 'traslado', 'trasladado', 'suspendido', 'inactivo'])
+                        ->orWhereIn('estatus_actual_ciclo', ['baja_temporal', 'baja_definitiva', 'traslado', 'trasladado', 'suspendido', 'inactivo']);
+                });
+
+                return;
+            }
+
+            $this->aplicarFiltroEstatusContexto($historial, $grupo);
+        })->count();
+    }
+
+    public function estatusContexto($contexto): string
+    {
+        if (! $contexto) {
+            return 'inactivo';
+        }
+
+        if ($contexto->estado === 'en_curso') {
+            return (string) ($contexto->estatus_actual_ciclo ?: 'activo');
+        }
+
+        return (string) ($contexto->resultado_final ?: $contexto->estatus_actual_ciclo ?: 'inactivo');
     }
 
     public function updatedCicloEscolarId(): void
@@ -284,29 +378,45 @@ class Matricula extends Component
     private function query(): Builder
     {
         $query = $this->mostrar_archivados ? Inscripcion::withTrashed() : Inscripcion::query();
+        $cicloEscolarId = (int) $this->ciclo_escolar_id;
 
         return $query
-            ->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo', 'nivel'])
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->ciclo_escolar_id, fn(Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->when(
-                $this->generacion_id,
-                fn(Builder $q) => $q->where('generacion_id', $this->generacion_id),
-                fn(Builder $q) => $q->whereHas('generacion', fn(Builder $g) => $g->where('status', true))
-            )
-            ->when($this->grado_id, fn(Builder $q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->semestre_id, fn(Builder $q) => $q->where('semestre_id', $this->semestre_id))
-            ->when($this->grupo_id, fn(Builder $q) => $q->where('grupo_id', $this->grupo_id))
-            ->when($this->estatus !== 'todos', fn(Builder $q) => $q->where('estatus', $this->estatus))
-            ->when(trim($this->search) !== '', function (Builder $q): void {
+            ->with([
+                'ciclosEscolaresHistorial' => fn ($historial) => $historial
+                    ->where('ciclo_escolar_id', $cicloEscolarId)
+                    ->with([
+                        'cicloEscolar',
+                        'generacion',
+                        'grado',
+                        'semestre',
+                        'grupo' => fn ($grupo) => $grupo->withTrashed()->with('asignacionGrupo'),
+                    ]),
+            ])
+            ->whereHas('ciclosEscolaresHistorial', function (Builder $historial) use ($cicloEscolarId): void {
+                $historial
+                    ->where('ciclo_escolar_id', $cicloEscolarId)
+                    ->where('nivel_id', $this->nivel->id)
+                    ->when($this->generacion_id, fn (Builder $q) => $q->where('generacion_id', $this->generacion_id))
+                    ->when($this->grado_id, fn (Builder $q) => $q->where('grado_id', $this->grado_id))
+                    ->when($this->semestre_id, fn (Builder $q) => $q->where('semestre_id', $this->semestre_id))
+                    ->when($this->grupo_id, fn (Builder $q) => $q->where('grupo_id', $this->grupo_id));
+
+                if ($this->estatus !== 'todos') {
+                    $this->aplicarFiltroEstatusContexto($historial, $this->estatus);
+                }
+            })
+            ->when(trim($this->search) !== '', function (Builder $q) use ($cicloEscolarId): void {
                 $term = '%' . trim($this->search) . '%';
-                $q->where(function (Builder $s) use ($term): void {
-                    $s->where('matricula', 'like', $term)
+                $q->where(function (Builder $busqueda) use ($term, $cicloEscolarId): void {
+                    $busqueda->where('matricula', 'like', $term)
                         ->orWhere('curp', 'like', $term)
                         ->orWhere('folio', 'like', $term)
                         ->orWhere('nombre', 'like', $term)
                         ->orWhere('apellido_paterno', 'like', $term)
-                        ->orWhere('apellido_materno', 'like', $term);
+                        ->orWhere('apellido_materno', 'like', $term)
+                        ->orWhereHas('ciclosEscolaresHistorial', fn (Builder $historial) => $historial
+                            ->where('ciclo_escolar_id', $cicloEscolarId)
+                            ->where('matricula', 'like', $term));
                 });
             })
             ->orderBy('apellido_paterno')
@@ -316,6 +426,17 @@ class Matricula extends Component
 
     public function cambiarGeneracionSeleccionados(GestionAcademicaService $service): void
     {
+        if (! $this->esCicloActual) {
+            $this->dispatch('swal', [
+                'title' => 'Consulta histórica de solo lectura',
+                'text' => 'Para proteger el historial, cambia la asignación desde el ciclo escolar actual o mediante una corrección histórica autorizada.',
+                'icon' => 'warning',
+                'position' => 'center',
+            ]);
+
+            return;
+        }
+
         $rules = [
             'destino_ciclo_escolar_id' => ['required', 'exists:ciclo_escolares,id'],
             'selected' => ['required', 'array', 'min:1'],
@@ -590,6 +711,10 @@ class Matricula extends Component
             ?? $grupo->nombre
             ?? 'Sin grupo';
 
+        if (isset($grupo->alumnos_contexto_count)) {
+            return $nombre . ' · ' . number_format((int) $grupo->alumnos_contexto_count) . ' alumnos · cupo ilimitado';
+        }
+
         if (isset($grupo->alumnos_activos_count)) {
             return $nombre . ' · ' . number_format((int) $grupo->alumnos_activos_count) . ' alumnos · cupo ilimitado';
         }
@@ -606,10 +731,15 @@ class Matricula extends Component
             'trasladado' => 'Trasladado',
             'suspendido' => 'Suspendido',
             'egresado' => 'Egresado',
+            'promovido', 'promovido_grado' => 'Promovido de grado',
+            'promovido_nivel' => 'Promovido al siguiente nivel',
+            'grado_concluido' => 'Grado concluido',
+            'pendiente_reinscripcion' => 'Pendiente de reinscripción',
+            'no_reinscrito' => 'No reinscrito',
             'inactivo' => 'Inactivo',
             'reingreso' => 'Reingreso',
             'no_promovido' => 'No promovido',
-            default => 'Activo',
+            default => ucfirst(str_replace('_', ' ', (string) $estatus)),
         };
     }
 
@@ -621,9 +751,9 @@ class Matricula extends Component
             'total' => (clone $resumenBase)->count(),
             'hombres' => (clone $resumenBase)->where('genero', 'H')->count(),
             'mujeres' => (clone $resumenBase)->where('genero', 'M')->count(),
-            'activos' => (clone $resumenBase)->whereIn('estatus', ['activo', 'reingreso', 'no_promovido'])->count(),
-            'bajas' => (clone $resumenBase)->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'trasladado', 'suspendido', 'inactivo'])->count(),
-            'egresados' => (clone $resumenBase)->where('estatus', 'egresado')->count(),
+            'activos' => $this->contarPorEstatusContexto(clone $resumenBase, 'activo'),
+            'bajas' => $this->contarPorEstatusContexto(clone $resumenBase, 'bajas'),
+            'egresados' => $this->contarPorEstatusContexto(clone $resumenBase, 'egresado'),
         ];
 
         $bitacoraAlumno = $this->alumnoBitacoraId

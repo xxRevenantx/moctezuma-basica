@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Reporte de cierre de generación</title>
+    <title>Reporte de cierre académico</title>
     <style>
         @page { margin: 26px 28px 34px; }
         body { font-family: DejaVu Sans, sans-serif; font-size: 9px; color: #1e293b; }
@@ -32,7 +32,7 @@
         <tr>
             <td style="width:140px">@if($logo)<img src="{{ $logo }}" class="logo">@endif</td>
             <td>
-                <h1>Acta y concentrado de cierre de generación</h1>
+                <h1>Acta y concentrado de cierre de grado, nivel y continuidad</h1>
                 <h2>Centro Universitario Moctezuma - Control Escolar</h2>
             </td>
             <td style="width:150px;text-align:right"><b>Proceso #{{ $proceso->id }}</b><br>{{ $proceso->realizado_at?->format('d/m/Y H:i') }}</td>
@@ -62,11 +62,12 @@
     <table class="summary">
         <tr>
             @foreach([
-                'continuidad_interna' => 'Egreso con proyección',
+                'continuidad_interna' => 'Promoción / continuidad proyectada',
+                'no_reinscrito' => 'No reinscritos',
                 'egresado' => 'Egresados',
                 'traslado' => 'Traslados',
                 'baja_definitiva' => 'Bajas',
-                'no_promovido' => 'No promovidos',
+                'no_promovido' => 'Repetición proyectada',
                 'sin_cambio' => 'Sin cambio',
             ] as $clave => $etiqueta)
                 <td><strong>{{ $detallesPorResultado->get($clave, collect())->count() }}</strong>{{ $etiqueta }}</td>
@@ -75,7 +76,19 @@
     </table>
 
     @foreach($detallesPorResultado as $resultado => $detalles)
-        <div class="section-title">{{ strtoupper(str_replace('_', ' ', $resultado)) }} - {{ $detalles->count() }} alumno(s)</div>
+        @php
+            $etiquetaResultado = match ($resultado) {
+                'continuidad_interna' => 'PROMOCIÓN O CONTINUIDAD PROYECTADA',
+                'no_reinscrito' => 'ACREDITÓ, PERO NO SE REINSCRIBIRÁ',
+                'egresado' => 'EGRESADO SIN CONTINUIDAD INTERNA',
+                'traslado' => 'TRASLADO',
+                'baja_definitiva' => 'BAJA DEFINITIVA',
+                'no_promovido' => 'NO PROMOVIDO / REPETICIÓN PROYECTADA',
+                'sin_cambio' => 'SIN CAMBIO HISTÓRICO',
+                default => strtoupper(str_replace('_', ' ', $resultado)),
+            };
+        @endphp
+        <div class="section-title">{{ $etiquetaResultado }} - {{ $detalles->count() }} alumno(s)</div>
         <table class="detail">
             <thead>
                 <tr>
@@ -100,7 +113,7 @@
                         if ($destino) {
                             $destinoTxt = ($destino->nivel?->nombre ?? '').' · '.($destino->semestre?->numero ? 'Sem. '.$destino->semestre->numero : ($destino->grado?->nombre ?? '')).' · '.($destino->grupo?->asignacionGrupo?->nombre ?? '');
                         } elseif ($proyeccion) {
-                            $destinoTxt = ($proyeccion->nivelDestino?->nombre ?? '').' · '.($proyeccion->semestreDestino?->numero ? 'Sem. '.$proyeccion->semestreDestino->numero : ($proyeccion->gradoDestino?->nombre ?? '')).' · '.($proyeccion->grupoDestino?->asignacionGrupo?->nombre ?? 'Grupo por confirmar').' · '.$proyeccion->etiqueta_estado;
+                            $destinoTxt = ($proyeccion->nivelDestino?->nombre ?? '').' · '.($proyeccion->semestreDestino?->numero ? 'Sem. '.$proyeccion->semestreDestino->numero : ($proyeccion->gradoDestino?->nombre ?? '')).' · '.($proyeccion->grupoDestino?->asignacionGrupo?->nombre ?? 'Grupo por confirmar').' · '.$proyeccion->etiqueta_tipo.' · '.$proyeccion->etiqueta_estado;
                         }
                     @endphp
                     <tr>
@@ -126,6 +139,6 @@
         </table>
     </div>
 
-    <div class="footer">Documento generado por el sistema Moctezuma Básica. El historial académico anterior permanece conservado.</div>
+    <div class="footer">Documento generado por el sistema Moctezuma Básica. La promoción, repetición o continuidad solo se formaliza al confirmar el ingreso al ciclo destino; el historial anterior permanece conservado.</div>
 </body>
 </html>

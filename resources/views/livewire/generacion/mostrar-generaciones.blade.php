@@ -6,16 +6,89 @@
             </p>
             <h1 class="mt-1 text-2xl font-black text-slate-900 dark:text-white">Generaciones</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Consulta, cierra o reabre una generación sin perder su historial académico.
+                Consulta, filtra, cierra o reabre una generación sin perder su historial académico.
             </p>
         </div>
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <flux:input wire:model.live.debounce.350ms="search" placeholder="Buscar generación o nivel"
-                icon="magnifying-glass" />
-            <flux:checkbox wire:model.live="incluir_inactivas" label="Mostrar inactivas" />
+        <div
+            class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Resultados</p>
+            <p class="mt-1 text-xl font-black text-slate-900 dark:text-white">
+                {{ number_format($generaciones->total()) }}
+                <span class="text-sm font-semibold text-slate-500">generación(es)</span>
+            </p>
         </div>
     </div>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-[#006492] dark:text-sky-300">
+                    Filtros de consulta
+                </p>
+                <h2 class="mt-1 text-lg font-black text-slate-900 dark:text-white">Localiza una generación</h2>
+            </div>
+
+            <flux:button wire:click="limpiarFiltros" icon="arrow-path" :disabled="!$hayFiltrosActivos">
+                Limpiar filtros
+            </flux:button>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <div class="md:col-span-2 xl:col-span-2">
+                <flux:input wire:model.live.debounce.350ms="search" label="Buscar"
+                    placeholder="Generación, nivel o ciclo escolar" icon="magnifying-glass" />
+            </div>
+
+            <flux:select wire:model.live="nivel_id" label="Nivel educativo">
+                <flux:select.option value="">Todos los niveles</flux:select.option>
+                @foreach ($niveles as $nivel)
+                    <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
+                @endforeach
+            </flux:select>
+
+            <flux:select wire:model.live="estado" label="Estado">
+                <flux:select.option value="">Todos los estados</flux:select.option>
+                <flux:select.option value="activa">Activas</flux:select.option>
+                <flux:select.option value="cerrada">Cerradas / inactivas</flux:select.option>
+                <flux:select.option value="en_proceso">En proceso de cierre</flux:select.option>
+                <flux:select.option value="egresada">Egresadas</flux:select.option>
+                <flux:select.option value="archivada">Archivadas</flux:select.option>
+            </flux:select>
+
+            <flux:select wire:model.live="anio_ingreso" label="Año de ingreso">
+                <flux:select.option value="">Todos</flux:select.option>
+                @foreach ($aniosIngreso as $anio)
+                    <flux:select.option value="{{ $anio }}">{{ $anio }}</flux:select.option>
+                @endforeach
+            </flux:select>
+
+            <flux:select wire:model.live="anio_egreso" label="Año de egreso">
+                <flux:select.option value="">Todos</flux:select.option>
+                @foreach ($aniosEgreso as $anio)
+                    <flux:select.option value="{{ $anio }}">{{ $anio }}</flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <div class="xl:col-start-6">
+                <flux:select wire:model.live="orden" label="Ordenar por">
+                    <flux:select.option value="recientes">Ingreso más reciente</flux:select.option>
+                    <flux:select.option value="antiguas">Ingreso más antiguo</flux:select.option>
+                    <flux:select.option value="nivel">Nivel educativo</flux:select.option>
+                    <flux:select.option value="nombre">Nombre</flux:select.option>
+                    <flux:select.option value="alumnos">Mayor número de alumnos</flux:select.option>
+                </flux:select>
+            </div>
+        </div>
+
+        <div wire:loading.flex wire:target="search,nivel_id,estado,anio_ingreso,anio_egreso,orden,limpiarFiltros"
+            class="mt-4 items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+            <flux:icon.arrow-path class="h-4 w-4 animate-spin" />
+            Actualizando generaciones...
+        </div>
+    </section>
 
     <div
         class="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-emerald-50 p-4 dark:border-sky-900/40 dark:from-sky-950/20 dark:to-emerald-950/20">
@@ -81,11 +154,30 @@
                             </td>
 
                             <td class="px-4 py-3">
-                                @if ($g->status)
-                                    <flux:badge color="green" icon="check-circle">Activa</flux:badge>
-                                @else
-                                    <flux:badge color="zinc" icon="lock-closed">Cerrada</flux:badge>
-                                @endif
+                                @switch($g->estado_cierre_normalizado)
+                                    @case('en_proceso')
+                                        <flux:badge color="amber" icon="clock">En proceso</flux:badge>
+                                    @break
+
+                                    @case('egresada')
+                                        <flux:badge color="purple" icon="academic-cap">Egresada</flux:badge>
+                                    @break
+
+                                    @case('archivada')
+                                        <flux:badge color="blue" icon="archive-box">Archivada</flux:badge>
+                                    @break
+
+                                    @case('cerrada')
+                                        <flux:badge color="zinc" icon="lock-closed">Cerrada</flux:badge>
+                                    @break
+
+                                    @default
+                                        @if ($g->status)
+                                            <flux:badge color="green" icon="check-circle">Activa</flux:badge>
+                                        @else
+                                            <flux:badge color="zinc" icon="lock-closed">Cerrada</flux:badge>
+                                        @endif
+                                @endswitch
                             </td>
 
                             <td class="px-4 py-3">
@@ -109,141 +201,141 @@
                                 </div>
                             </td>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-4 py-12 text-center text-slate-500">
-                                No hay generaciones que coincidan con la búsqueda.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-4 py-12 text-center text-slate-500">
+                                    No hay generaciones que coincidan con los filtros seleccionados.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-t border-slate-200 p-4 dark:border-slate-800">
+                {{ $generaciones->links() }}
+            </div>
         </div>
 
-        <div class="border-t border-slate-200 p-4 dark:border-slate-800">
-            {{ $generaciones->links() }}
-        </div>
+        @if ($modalDesactivar)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
+                <div class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
+                    <div
+                        class="border-b border-slate-200 bg-gradient-to-r from-rose-50 to-amber-50 px-6 py-5 dark:border-slate-800 dark:from-rose-950/30 dark:to-amber-950/20">
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg">
+                                <flux:icon.lock-closed class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-black text-slate-900 dark:text-white">Cerrar generación</h2>
+                                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                    La generación seguirá disponible en consultas y reportes históricos.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 p-6">
+                        <flux:textarea wire:model="motivo" label="Motivo obligatorio"
+                            placeholder="Ejemplo: conclusión oficial de la generación" rows="3" />
+
+                        <label
+                            class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-rose-300 hover:bg-rose-50/60 dark:border-slate-700 dark:hover:border-rose-900/70 dark:hover:bg-rose-950/20">
+                            <input type="checkbox" wire:model="egresar_activos"
+                                class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                            <span>
+                                <b class="block text-slate-900 dark:text-white">Marcar como egresados a los alumnos
+                                    activos</b>
+                                <small class="mt-1 block leading-5 text-slate-500 dark:text-slate-400">
+                                    Úsalo también después de terminar una reapertura por correcciones.
+                                </small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div
+                        class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-950/30">
+                        <flux:button wire:click="$set('modalDesactivar', false)">Cancelar</flux:button>
+                        <flux:button variant="danger" icon="lock-closed" wire:click="desactivar" spinner="desactivar">
+                            Confirmar cierre
+                        </flux:button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if ($modalReactivar)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
+                <div class="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
+                    <div
+                        class="border-b border-slate-200 bg-gradient-to-r from-sky-50 to-emerald-50 px-6 py-5 dark:border-slate-800 dark:from-sky-950/30 dark:to-emerald-950/20">
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] text-white shadow-lg">
+                                <flux:icon.lock-open class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
+                                    Reapertura administrativa
+                                </p>
+                                <h2 class="mt-1 text-xl font-black text-slate-900 dark:text-white">
+                                    {{ $generacionReactivar?->etiqueta ?: 'Generación seleccionada' }}
+                                </h2>
+                                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                    {{ $generacionReactivar?->nivel?->nombre ?: 'Nivel educativo' }}
+                                    · {{ $generacionReactivar?->egresados_count ?? 0 }} egresado(s)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-5 p-6">
+                        <div
+                            class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                            Esta acción no crea otra inscripción ni un reingreso. Conserva la misma matrícula,
+                            generación, grupo, calificaciones e historial del alumno.
+                        </div>
+
+                        <flux:textarea wire:model="motivo_reactivacion" label="Motivo de la reapertura"
+                            placeholder="Ejemplo: corrección de calificaciones del tercer periodo" rows="3" />
+
+                        <label
+                            class="flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4 transition hover:border-sky-300 dark:border-sky-900/50 dark:bg-sky-950/20">
+                            <input type="checkbox" wire:model="reactivar_egresados"
+                                class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                            <span>
+                                <b class="block text-slate-900 dark:text-white">
+                                    Reactivar temporalmente a los alumnos egresados
+                                </b>
+                                <small class="mt-1 block leading-5 text-slate-600 dark:text-slate-400">
+                                    Los alumnos volverán a aparecer en Calificaciones y en los módulos que muestran
+                                    matrícula activa. Bajas, traslados, suspendidos e inactivos no serán modificados.
+                                </small>
+                            </span>
+                        </label>
+
+                        <div
+                            class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                            <p class="font-black text-emerald-900 dark:text-emerald-100">Cuando termines las correcciones
+                            </p>
+                            <p class="mt-1 text-sm leading-6 text-emerald-800 dark:text-emerald-200">
+                                Regresa a esta sección, cierra la generación y deja marcada la opción
+                                “Marcar como egresados a los alumnos activos”.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-950/30">
+                        <flux:button wire:click="$set('modalReactivar', false)">Cancelar</flux:button>
+                        <flux:button variant="primary" icon="lock-open" wire:click="reactivar" spinner="reactivar">
+                            Reabrir generación
+                        </flux:button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <livewire:generacion.editar-generacion />
     </div>
-
-    @if ($modalDesactivar)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
-            <div class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
-                <div
-                    class="border-b border-slate-200 bg-gradient-to-r from-rose-50 to-amber-50 px-6 py-5 dark:border-slate-800 dark:from-rose-950/30 dark:to-amber-950/20">
-                    <div class="flex items-start gap-4">
-                        <div
-                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg">
-                            <flux:icon.lock-closed class="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h2 class="text-xl font-black text-slate-900 dark:text-white">Cerrar generación</h2>
-                            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                La generación seguirá disponible en consultas y reportes históricos.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-4 p-6">
-                    <flux:textarea wire:model="motivo" label="Motivo obligatorio"
-                        placeholder="Ejemplo: conclusión oficial de la generación" rows="3" />
-
-                    <label
-                        class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-rose-300 hover:bg-rose-50/60 dark:border-slate-700 dark:hover:border-rose-900/70 dark:hover:bg-rose-950/20">
-                        <input type="checkbox" wire:model="egresar_activos"
-                            class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
-                        <span>
-                            <b class="block text-slate-900 dark:text-white">Marcar como egresados a los alumnos
-                                activos</b>
-                            <small class="mt-1 block leading-5 text-slate-500 dark:text-slate-400">
-                                Úsalo también después de terminar una reapertura por correcciones.
-                            </small>
-                        </span>
-                    </label>
-                </div>
-
-                <div
-                    class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-950/30">
-                    <flux:button wire:click="$set('modalDesactivar', false)">Cancelar</flux:button>
-                    <flux:button variant="danger" icon="lock-closed" wire:click="desactivar" spinner="desactivar">
-                        Confirmar cierre
-                    </flux:button>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if ($modalReactivar)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
-            <div class="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
-                <div
-                    class="border-b border-slate-200 bg-gradient-to-r from-sky-50 to-emerald-50 px-6 py-5 dark:border-slate-800 dark:from-sky-950/30 dark:to-emerald-950/20">
-                    <div class="flex items-start gap-4">
-                        <div
-                            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] text-white shadow-lg">
-                            <flux:icon.lock-open class="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p class="text-xs font-black uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
-                                Reapertura administrativa
-                            </p>
-                            <h2 class="mt-1 text-xl font-black text-slate-900 dark:text-white">
-                                {{ $generacionReactivar?->etiqueta ?: 'Generación seleccionada' }}
-                            </h2>
-                            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                {{ $generacionReactivar?->nivel?->nombre ?: 'Nivel educativo' }}
-                                · {{ $generacionReactivar?->egresados_count ?? 0 }} egresado(s)
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-5 p-6">
-                    <div
-                        class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
-                        Esta acción no crea otra inscripción ni un reingreso. Conserva la misma matrícula,
-                        generación, grupo, calificaciones e historial del alumno.
-                    </div>
-
-                    <flux:textarea wire:model="motivo_reactivacion" label="Motivo de la reapertura"
-                        placeholder="Ejemplo: corrección de calificaciones del tercer periodo" rows="3" />
-
-                    <label
-                        class="flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4 transition hover:border-sky-300 dark:border-sky-900/50 dark:bg-sky-950/20">
-                        <input type="checkbox" wire:model="reactivar_egresados"
-                            class="mt-1 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
-                        <span>
-                            <b class="block text-slate-900 dark:text-white">
-                                Reactivar temporalmente a los alumnos egresados
-                            </b>
-                            <small class="mt-1 block leading-5 text-slate-600 dark:text-slate-400">
-                                Los alumnos volverán a aparecer en Calificaciones y en los módulos que muestran
-                                matrícula activa. Bajas, traslados, suspendidos e inactivos no serán modificados.
-                            </small>
-                        </span>
-                    </label>
-
-                    <div
-                        class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                        <p class="font-black text-emerald-900 dark:text-emerald-100">Cuando termines las correcciones
-                        </p>
-                        <p class="mt-1 text-sm leading-6 text-emerald-800 dark:text-emerald-200">
-                            Regresa a esta sección, cierra la generación y deja marcada la opción
-                            “Marcar como egresados a los alumnos activos”.
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-950/30">
-                    <flux:button wire:click="$set('modalReactivar', false)">Cancelar</flux:button>
-                    <flux:button variant="primary" icon="lock-open" wire:click="reactivar" spinner="reactivar">
-                        Reabrir generación
-                    </flux:button>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <livewire:generacion.editar-generacion />
-</div>

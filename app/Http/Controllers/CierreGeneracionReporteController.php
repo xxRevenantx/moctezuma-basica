@@ -42,7 +42,7 @@ class CierreGeneracionReporteController extends Controller
         ]);
 
         $base = sprintf(
-            'cierre-%s-%s-proceso-%d',
+            'cierre-academico-%s-%s-proceso-%d',
             $proceso->nivel?->slug ?: 'nivel',
             $proceso->generacion?->etiqueta ?: 'generacion',
             $proceso->id,
@@ -87,7 +87,7 @@ class CierreGeneracionReporteController extends Controller
         ]);
         $proceso->load(['nivel', 'generacion', 'cicloEscolar', 'cicloDestino', 'usuarioRealizo']);
 
-        $nombre = 'comprobante-cierre-'.$detalle->inscripcion_id.'-'.$proceso->id.'.pdf';
+        $nombre = 'comprobante-cierre-academico-'.$detalle->inscripcion_id.'-'.$proceso->id.'.pdf';
 
         return Pdf::loadView('pdf.comprobante-cierre-generacion', [
             'proceso' => $proceso,

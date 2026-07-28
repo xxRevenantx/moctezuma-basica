@@ -52,7 +52,7 @@ class CierreNivelReingresoService
 
             $permitidos = $tipo === 'reingreso'
                 ? ['egresado']
-                : ['traslado', 'baja_temporal', 'baja_definitiva', 'inactivo', 'suspendido'];
+                : ['traslado', 'baja_temporal', 'baja_definitiva', 'inactivo', 'no_reinscrito', 'suspendido'];
 
             if (! in_array($estatusAnterior, $permitidos, true) || (bool) $alumno->activo) {
                 throw ValidationException::withMessages([

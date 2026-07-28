@@ -43,6 +43,9 @@ class CierreNivelContinuidad extends Component
     public ?int $semestre_destino_id = null;
     public ?int $generacion_destino_id = null;
     public string $generacion_esperada = '';
+    public string $modo_proceso = '';
+    public string $tipo_proyeccion = '';
+    public array $contexto_origen = [];
 
     public int $paso = 1;
     public array $alumnos = [];
@@ -132,8 +135,48 @@ class CierreNivelContinuidad extends Component
     public function updatedCicloDestinoId(): void
     {
         $this->ciclo_destino_id = filled($this->ciclo_destino_id) ? (int) $this->ciclo_destino_id : null;
+
+        if ($this->ciclo_destino_id && ! $this->ciclosDestinoPermitidos->contains('id', $this->ciclo_destino_id)) {
+            $this->ciclo_destino_id = null;
+            $this->addError('ciclo_destino_id', 'El ciclo destino debe ser el consecutivo inmediato del ciclo de origen.');
+        } else {
+            $this->resetValidation('ciclo_destino_id');
+        }
+
         $this->resolverGeneracionDestino();
         $this->cargarGruposDestino();
+    }
+
+    public function getCiclosDestinoPermitidosProperty(): Collection
+    {
+        if (! $this->ciclo_origen_id) {
+            return collect();
+        }
+
+        $origen = $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id);
+        if (! $origen) {
+            return collect();
+        }
+
+        return $this->ciclos
+            ->filter(fn ($ciclo): bool =>
+                (int) $ciclo->inicio_anio === (int) $origen->inicio_anio + 1
+                && (int) $ciclo->fin_anio === (int) $origen->fin_anio + 1
+            )
+            ->values();
+    }
+
+    public function getEtiquetaCicloDestinoEsperadoProperty(): string
+    {
+        $origen = $this->ciclo_origen_id
+            ? $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id)
+            : null;
+
+        if (! $origen) {
+            return 'el ciclo consecutivo';
+        }
+
+        return ((int) $origen->inicio_anio + 1) . '-' . ((int) $origen->fin_anio + 1);
     }
 
     public function updatedNivelDestinoId(): void
@@ -200,6 +243,40 @@ class CierreNivelContinuidad extends Component
             return;
         }
 
+        $procesables = collect($this->alumnos)->where('procesable', true);
+        $contextos = $procesables
+            ->map(fn (array $alumno): string => (int) $alumno['grado_id'].'-'.(int) ($alumno['semestre_id'] ?? 0))
+            ->unique();
+        if ($contextos->count() > 1) {
+            $this->addError('grupo_origen_id', 'La generación contiene alumnos en grados o semestres diferentes. Selecciona un grupo para procesar un contexto académico a la vez.');
+            return;
+        }
+
+        $referencia = $procesables->first() ?: collect($this->alumnos)->first();
+        $this->contexto_origen = [
+            'grado_id' => filled($referencia['grado_id'] ?? null) ? (int) $referencia['grado_id'] : null,
+            'grado' => (string) ($referencia['grado'] ?? ''),
+            'semestre_id' => filled($referencia['semestre_id'] ?? null) ? (int) $referencia['semestre_id'] : null,
+            'semestre' => $referencia['semestre'] ?? null,
+            'es_grado_final' => (bool) ($referencia['es_grado_final'] ?? false),
+        ];
+
+        if (! $this->contexto_origen['grado_id']) {
+            $this->addError('grupo_origen_id', 'El contexto académico no tiene un grado válido. Corrige el historial del ciclo antes de procesarlo.');
+            return;
+        }
+        if ($this->nivel->slug === 'bachillerato' && ! $this->contexto_origen['semestre_id']) {
+            $this->addError('grupo_origen_id', 'El contexto de Bachillerato no tiene un semestre válido. Corrige el historial del ciclo antes de procesarlo.');
+            return;
+        }
+
+        $this->modo_proceso = $service->modoDesdeUbicacion(
+            $this->nivel,
+            $this->contexto_origen['grado_id'],
+            $this->contexto_origen['semestre_id'],
+        );
+        $this->cerrar_generacion = $this->modo_proceso !== 'promocion_grado' && $this->grupo_origen_id === null;
+
         $this->decisiones = [];
         foreach ($this->alumnos as $alumno) {
             $resultado = ($alumno['solo_proyeccion_historica'] ?? false)
@@ -221,31 +298,28 @@ class CierreNivelContinuidad extends Component
             ->pluck('id')
             ->map(fn ($id) => (string) $id)
             ->all();
+        $this->resultado_masivo = $this->modo_proceso === 'egreso_terminal' ? 'egresado' : 'continuidad_interna';
         $this->proponerDestino($service);
         $this->paso = 2;
         $this->resetValidation();
     }
 
-    public function aplicarResultadoMasivo(): void
+    public function aplicarResultadoMasivo(CierreGeneracionContinuidadService $service): void
     {
-        if (! in_array($this->resultado_masivo, CierreGeneracionContinuidadService::RESULTADOS, true)
-            || $this->resultado_masivo === 'pendiente') {
-            $this->addError('resultado_masivo', 'Selecciona un resultado definitivo válido.');
+        $permitidos = $service->resultadosPermitidos($this->modo_proceso);
+        if (! in_array($this->resultado_masivo, $permitidos, true)) {
+            $this->addError('resultado_masivo', 'Selecciona un resultado compatible con el tipo de cierre detectado.');
             return;
         }
 
-        $incluyeEgresadosHistoricos = collect($this->seleccionados)
+        $incluyeHistoricos = collect($this->seleccionados)
             ->map(fn ($id): int => (int) $id)
             ->contains(function (int $id): bool {
                 $alumno = collect($this->alumnos)->firstWhere('id', $id);
                 return (bool) ($alumno['solo_proyeccion_historica'] ?? false);
             });
-
-        if ($incluyeEgresadosHistoricos && $this->resultado_masivo !== 'continuidad_interna') {
-            $this->addError(
-                'resultado_masivo',
-                'Los egresados históricos seleccionados solo pueden recibir una proyección provisional de continuidad.'
-            );
+        if ($incluyeHistoricos && $this->resultado_masivo !== 'continuidad_interna') {
+            $this->addError('resultado_masivo', 'Los alumnos históricos seleccionados solo pueden recibir la proyección provisional faltante.');
             return;
         }
 
@@ -262,6 +336,7 @@ class CierreNivelContinuidad extends Component
                 $this->decisiones[$id]['grupo_destino_id'] = (int) $this->grupo_masivo_id;
             }
         }
+        $this->resetValidation('resultado_masivo');
     }
 
     public function seleccionarTodosVisibles(): void
@@ -372,6 +447,8 @@ class CierreNivelContinuidad extends Component
             'grado_destino_id' => $this->grado_destino_id,
             'semestre_destino_id' => $this->semestre_destino_id,
             'generacion_destino_id' => $this->generacion_destino_id,
+            'modo_proceso' => $this->modo_proceso,
+            'tipo_proyeccion' => $this->tipo_proyeccion,
             'fecha_efectiva' => $this->fecha_efectiva,
             'motivo' => trim($this->motivo),
             'cerrar_generacion' => $this->cerrar_generacion,
@@ -386,7 +463,7 @@ class CierreNivelContinuidad extends Component
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => 'Cierre procesado',
-            'text' => "Se procesaron {$proceso->total_procesados} alumno(s). Las continuidades quedaron pendientes de confirmación y el historial anterior se conservó.",
+            'text' => "Se procesaron {$proceso->total_procesados} alumno(s). Las promociones y repeticiones proyectadas quedaron pendientes de confirmación; el historial del ciclo de origen se conservó.",
             'position' => 'top-end',
         ]);
     }
@@ -633,6 +710,34 @@ class CierreNivelContinuidad extends Component
             ->values();
     }
 
+    public function getResultadosDisponiblesProperty(): array
+    {
+        $etiquetas = [
+            'continuidad_interna' => $this->modo_proceso === 'promocion_grado'
+                ? 'Promover y proyectar al siguiente grado o semestre'
+                : 'Egresar y proyectar al siguiente nivel',
+            'no_reinscrito' => 'Acreditó, pero no se reinscribirá',
+            'egresado' => 'Egresado sin continuidad interna',
+            'traslado' => 'Traslado a otra institución',
+            'baja_definitiva' => 'Baja definitiva',
+            'no_promovido' => 'No promovido / proyectar repetición',
+        ];
+
+        return collect(app(CierreGeneracionContinuidadService::class)->resultadosPermitidos($this->modo_proceso))
+            ->mapWithKeys(fn (string $resultado): array => [$resultado => $etiquetas[$resultado]])
+            ->all();
+    }
+
+    public function getEtiquetaModoProperty(): string
+    {
+        return match ($this->modo_proceso) {
+            'promocion_grado' => 'Promoción de grado o semestre',
+            'cierre_nivel' => 'Cierre de nivel y continuidad',
+            'egreso_terminal' => 'Egreso terminal de Bachillerato',
+            default => 'Por determinar',
+        };
+    }
+
     public function getGruposMasivosProperty(): Collection
     {
         return collect($this->grupos_continuidad)
@@ -673,7 +778,15 @@ class CierreNivelContinuidad extends Component
             return;
         }
 
-        $sugerido = $service->destinoSugerido($this->nivel, $ciclo);
+        $sugerido = $service->destinoSugerido(
+            $this->nivel,
+            $ciclo,
+            $this->contexto_origen['grado_id'] ?? null,
+            $this->contexto_origen['semestre_id'] ?? null,
+            $this->generacion_id,
+        );
+        $this->modo_proceso = (string) ($sugerido['modo'] ?? $this->modo_proceso);
+        $this->tipo_proyeccion = (string) ($sugerido['tipo_proyeccion'] ?? '');
         $this->ciclo_destino_id = $sugerido['ciclo_destino_id'];
         $this->nivel_destino_id = $sugerido['nivel_destino_id'];
         $this->grado_destino_id = $sugerido['grado_destino_id'];
@@ -761,10 +874,9 @@ class CierreNivelContinuidad extends Component
 
     private function validarDestinos(): void
     {
-        $continuidad = collect($this->alumnos)->where('procesable', true)
-            ->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'continuidad_interna');
-        $repetidores = collect($this->alumnos)->where('procesable', true)
-            ->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'no_promovido');
+        $procesables = collect($this->alumnos)->where('procesable', true);
+        $continuidad = $procesables->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'continuidad_interna');
+        $repetidores = $procesables->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'no_promovido');
 
         if (($continuidad->isNotEmpty() || $repetidores->isNotEmpty()) && ! $this->ciclo_destino_id) {
             throw ValidationException::withMessages(['ciclo_destino_id' => 'Selecciona el ciclo destino consecutivo.']);
@@ -779,16 +891,8 @@ class CierreNivelContinuidad extends Component
             ]);
         }
 
-        // La continuidad entre niveles se registra como proyección provisional;
-        // el grupo puede asignarse hasta confirmar que el alumno regresó.
-        // Los no promovidos sí abren inmediatamente el ciclo siguiente y requieren grupo.
-        foreach ($repetidores as $alumno) {
-            if (blank($this->decisiones[$alumno['id']]['grupo_destino_id'] ?? null)) {
-                throw ValidationException::withMessages([
-                    "decisiones.{$alumno['id']}.grupo_destino_id" => "Selecciona el grupo destino de {$alumno['nombre']}.",
-                ]);
-            }
-        }
+        // El grupo destino puede asignarse al crear la proyección o hasta la confirmación.
+        // Esto permite cerrar el ciclo aun cuando la distribución final de grupos no esté lista.
     }
 
     private function construirVistaPrevia(): array
@@ -806,15 +910,18 @@ class CierreNivelContinuidad extends Component
             $nivel = $this->nivel_destino_id ? Nivel::query()->find($this->nivel_destino_id) : null;
             $grado = $this->grado_destino_id ? Grado::query()->find($this->grado_destino_id) : null;
             $generacion = $this->generacion_destino_id ? Generacion::query()->find($this->generacion_destino_id) : null;
+            $semestre = $this->semestre_destino_id ? Semestre::query()->find($this->semestre_destino_id) : null;
             $destino = trim(implode(' · ', array_filter([
                 $nivel?->nombre,
-                $grado?->nombre,
+                $semestre ? 'Semestre '.$semestre->numero : $grado?->nombre,
                 $generacion?->etiqueta,
             ])));
         }
 
         return [
             'total' => collect($this->alumnos)->where('procesable', true)->count(),
+            'modo' => $this->modo_proceso,
+            'modo_etiqueta' => $this->etiquetaModo,
             'conteos' => $conteos->all(),
             'destino' => $destino,
             'fecha' => $this->fecha_efectiva,
@@ -885,6 +992,9 @@ class CierreNivelContinuidad extends Component
         $this->filtro_resultado = '';
         $this->filtro_estatus = '';
         $this->resultado_masivo = 'continuidad_interna';
+        $this->modo_proceso = '';
+        $this->tipo_proyeccion = '';
+        $this->contexto_origen = [];
         $this->grupo_masivo_id = null;
         $this->cerrar_generacion = $this->grupo_origen_id === null;
         $this->motivo = '';
@@ -918,7 +1028,7 @@ class CierreNivelContinuidad extends Component
         return match ($resultado) {
             'promovido', 'promovido_nivel', 'continuidad' => 'continuidad_interna',
             'trasladado' => 'traslado',
-            'baja_definitiva', 'egresado', 'no_promovido' => $resultado,
+            'baja_definitiva', 'egresado', 'no_promovido', 'no_reinscrito', 'promovido_grado' => $resultado === 'promovido_grado' ? 'continuidad_interna' : $resultado,
             default => 'pendiente',
         };
     }

@@ -3,7 +3,9 @@
 namespace App\Livewire\Generacion;
 
 use App\Models\Generacion;
+use App\Models\Nivel;
 use App\Services\GestionAcademicaService;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -13,7 +15,11 @@ class MostrarGeneraciones extends Component
     use WithPagination;
 
     public string $search = '';
-    public bool $incluir_inactivas = true;
+    public string $nivel_id = '';
+    public string $estado = '';
+    public string $anio_ingreso = '';
+    public string $anio_egreso = '';
+    public string $orden = 'recientes';
 
     public bool $modalDesactivar = false;
     public ?int $generacionSeleccionada = null;
@@ -27,11 +33,41 @@ class MostrarGeneraciones extends Component
 
     protected $queryString = [
         'search' => ['as' => 'buscar', 'except' => ''],
-        'incluir_inactivas' => ['as' => 'inactivas', 'except' => true],
+        'nivel_id' => ['as' => 'nivel', 'except' => ''],
+        'estado' => ['as' => 'estado', 'except' => ''],
+        'anio_ingreso' => ['as' => 'ingreso', 'except' => ''],
+        'anio_egreso' => ['as' => 'egreso', 'except' => ''],
+        'orden' => ['as' => 'orden', 'except' => 'recientes'],
     ];
 
-    public function updatingSearch(): void
+    /**
+     * Regresa a la primera página cuando cambia cualquier filtro.
+     */
+    public function updated(string $property): void
     {
+        if (in_array($property, [
+            'search',
+            'nivel_id',
+            'estado',
+            'anio_ingreso',
+            'anio_egreso',
+            'orden',
+        ], true)) {
+            $this->resetPage();
+        }
+    }
+
+    public function limpiarFiltros(): void
+    {
+        $this->reset([
+            'search',
+            'nivel_id',
+            'estado',
+            'anio_ingreso',
+            'anio_egreso',
+        ]);
+
+        $this->orden = 'recientes';
         $this->resetPage();
     }
 
@@ -133,6 +169,29 @@ class MostrarGeneraciones extends Component
         ]);
     }
 
+    private function aplicarFiltroEstado(Builder $query): void
+    {
+        match ($this->estado) {
+            'activa' => $query->where('status', true),
+            'cerrada' => $query->where('status', false),
+            'en_proceso' => $query->where('estado_cierre', 'en_proceso'),
+            'egresada' => $query->where('estado_cierre', 'egresada'),
+            'archivada' => $query->where('estado_cierre', 'archivada'),
+            default => null,
+        };
+    }
+
+    private function aplicarOrden(Builder $query): void
+    {
+        match ($this->orden) {
+            'antiguas' => $query->orderBy('anio_ingreso')->orderBy('nivel_id'),
+            'nivel' => $query->orderBy('nivel_id')->orderByDesc('anio_ingreso'),
+            'nombre' => $query->orderBy('nombre')->orderByDesc('anio_ingreso'),
+            'alumnos' => $query->orderByDesc('alumnos_total_count')->orderByDesc('anio_ingreso'),
+            default => $query->orderByDesc('anio_ingreso')->orderBy('nivel_id'),
+        };
+    }
+
     #[On('refreshGeneraciones')]
     public function render()
     {
@@ -140,35 +199,76 @@ class MostrarGeneraciones extends Component
             ->with(['nivel', 'cicloEscolarInicio', 'cicloEscolarFin'])
             ->withCount([
                 'inscripciones as alumnos_total_count',
-                'inscripciones as alumnos_activos_count' => fn($q) => $q->whereIn('estatus', ['activo', 'reingreso', 'no_promovido']),
-                'inscripciones as alumnos_egresados_count' => fn($q) => $q->where('estatus', 'egresado'),
-                'inscripciones as alumnos_bajas_count' => fn($q) => $q->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'trasladado', 'suspendido', 'inactivo']),
+                'inscripciones as alumnos_activos_count' => fn ($q) => $q->whereIn('estatus', ['activo', 'reingreso', 'no_promovido']),
+                'inscripciones as alumnos_egresados_count' => fn ($q) => $q->where('estatus', 'egresado'),
+                'inscripciones as alumnos_bajas_count' => fn ($q) => $q->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'trasladado', 'suspendido', 'inactivo']),
             ])
-            ->when(!$this->incluir_inactivas, fn($q) => $q->where('status', true))
+            ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', (int) $this->nivel_id))
+            ->when($this->anio_ingreso !== '', fn ($q) => $q->where('anio_ingreso', (int) $this->anio_ingreso))
+            ->when($this->anio_egreso !== '', fn ($q) => $q->where('anio_egreso', (int) $this->anio_egreso))
             ->when($this->search !== '', function ($q) {
-                $term = '%' . $this->search . '%';
-                $q->where(fn($sub) => $sub->where('nombre', 'like', $term)
+                $term = '%' . trim($this->search) . '%';
+
+                $q->where(fn ($sub) => $sub
+                    ->where('nombre', 'like', $term)
                     ->orWhere('anio_ingreso', 'like', $term)
                     ->orWhere('anio_egreso', 'like', $term)
-                    ->orWhereHas('nivel', fn($nivel) => $nivel->where('nombre', 'like', $term)));
-            })
-            ->orderBy('nivel_id')
-            ->orderByDesc('anio_ingreso');
+                    ->orWhereHas('nivel', fn ($nivel) => $nivel->where('nombre', 'like', $term))
+                    ->orWhereHas('cicloEscolarInicio', fn ($ciclo) => $ciclo
+                        ->where('inicio_anio', 'like', $term)
+                        ->orWhere('fin_anio', 'like', $term)
+                        ->orWhereRaw("CONCAT(inicio_anio, '-', fin_anio) LIKE ?", [$term]))
+                    ->orWhereHas('cicloEscolarFin', fn ($ciclo) => $ciclo
+                        ->where('inicio_anio', 'like', $term)
+                        ->orWhere('fin_anio', 'like', $term)
+                        ->orWhereRaw("CONCAT(inicio_anio, '-', fin_anio) LIKE ?", [$term])));
+            });
+
+        $this->aplicarFiltroEstado($query);
+        $this->aplicarOrden($query);
 
         $generaciones = $query->paginate(12);
+
+        $niveles = Nivel::query()
+            ->whereHas('generaciones')
+            ->orderBy('id')
+            ->get(['id', 'nombre']);
+
+        $aniosIngreso = Generacion::query()
+            ->whereNotNull('anio_ingreso')
+            ->distinct()
+            ->orderByDesc('anio_ingreso')
+            ->pluck('anio_ingreso');
+
+        $aniosEgreso = Generacion::query()
+            ->whereNotNull('anio_egreso')
+            ->distinct()
+            ->orderByDesc('anio_egreso')
+            ->pluck('anio_egreso');
+
+        $hayFiltrosActivos = $this->search !== ''
+            || $this->nivel_id !== ''
+            || $this->estado !== ''
+            || $this->anio_ingreso !== ''
+            || $this->anio_egreso !== ''
+            || $this->orden !== 'recientes';
 
         $generacionReactivar = $this->generacionReactivarId
             ? Generacion::query()
                 ->with('nivel')
                 ->withCount([
-                    'inscripciones as egresados_count' => fn($q) => $q->where('estatus', 'egresado'),
+                    'inscripciones as egresados_count' => fn ($q) => $q->where('estatus', 'egresado'),
                 ])
                 ->find($this->generacionReactivarId)
             : null;
 
         return view('livewire.generacion.mostrar-generaciones', compact(
             'generaciones',
-            'generacionReactivar'
+            'generacionReactivar',
+            'niveles',
+            'aniosIngreso',
+            'aniosEgreso',
+            'hayFiltrosActivos'
         ));
     }
 }

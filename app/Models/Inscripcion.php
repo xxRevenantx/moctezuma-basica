@@ -208,6 +208,8 @@ class Inscripcion extends Model
             'preinscrito' => 'Preinscrito',
             'reingreso' => 'Reingreso',
             'no_promovido' => 'No promovido',
+            'pendiente_reinscripcion' => 'Pendiente de reinscripción',
+            'no_reinscrito' => 'No reinscrito',
             'egresado' => 'Egresado',
             'traslado', 'trasladado' => 'Traslado',
             'baja_temporal' => 'Baja temporal',

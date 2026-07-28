@@ -17,6 +17,7 @@ class HistorialCicloEscolarService
     public const RESULTADOS_CIERRE = [
         'promovido',
         'promovido_nivel',
+        'promovido_grado',
         'no_promovido',
         'egresado',
         'baja_definitiva',
@@ -163,7 +164,7 @@ class HistorialCicloEscolarService
                     $motivo,
                     $usuarioId,
                     $fecha,
-                    in_array($resultado, ['promovido', 'promovido_nivel'], true)
+                    in_array($resultado, ['promovido', 'promovido_nivel', 'promovido_grado'], true)
                 );
 
                 $destino = $this->asegurarCicloDesdeSnapshot(

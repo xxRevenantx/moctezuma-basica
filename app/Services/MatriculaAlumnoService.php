@@ -108,10 +108,10 @@ class MatriculaAlumnoService
             return;
         }
 
-        if (in_array($estatus, ['baja_definitiva', 'trasladado', 'traslado', 'egresado'], true)) {
+        if (in_array($estatus, ['baja_definitiva', 'trasladado', 'traslado', 'egresado', 'no_reinscrito'], true)) {
             $this->cerrarVigentes($alumno, $fecha);
         }
-        // baja_temporal, suspendido e inactivo conservan la matrícula vigente.
+        // pendiente_reinscripcion, baja_temporal, suspendido e inactivo conservan la matrícula vigente.
     }
 
     public function cerrarVigentes(Inscripcion $alumno, ?string $fecha = null): int
