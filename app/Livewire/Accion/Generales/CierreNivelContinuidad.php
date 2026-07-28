@@ -136,7 +136,7 @@ class CierreNivelContinuidad extends Component
     {
         $this->ciclo_destino_id = filled($this->ciclo_destino_id) ? (int) $this->ciclo_destino_id : null;
 
-        if ($this->ciclo_destino_id && ! $this->ciclosDestinoPermitidos->contains('id', $this->ciclo_destino_id)) {
+        if ($this->ciclo_destino_id && !$this->ciclosDestinoPermitidos->contains('id', $this->ciclo_destino_id)) {
             $this->ciclo_destino_id = null;
             $this->addError('ciclo_destino_id', 'El ciclo destino debe ser el consecutivo inmediato del ciclo de origen.');
         } else {
@@ -149,17 +149,18 @@ class CierreNivelContinuidad extends Component
 
     public function getCiclosDestinoPermitidosProperty(): Collection
     {
-        if (! $this->ciclo_origen_id) {
+        if (!$this->ciclo_origen_id) {
             return collect();
         }
 
         $origen = $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id);
-        if (! $origen) {
+        if (!$origen) {
             return collect();
         }
 
         return $this->ciclos
-            ->filter(fn ($ciclo): bool =>
+            ->filter(
+                fn($ciclo): bool =>
                 (int) $ciclo->inicio_anio === (int) $origen->inicio_anio + 1
                 && (int) $ciclo->fin_anio === (int) $origen->fin_anio + 1
             )
@@ -172,7 +173,7 @@ class CierreNivelContinuidad extends Component
             ? $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id)
             : null;
 
-        if (! $origen) {
+        if (!$origen) {
             return 'el ciclo consecutivo';
         }
 
@@ -245,7 +246,7 @@ class CierreNivelContinuidad extends Component
 
         $procesables = collect($this->alumnos)->where('procesable', true);
         $contextos = $procesables
-            ->map(fn (array $alumno): string => (int) $alumno['grado_id'].'-'.(int) ($alumno['semestre_id'] ?? 0))
+            ->map(fn(array $alumno): string => (int) $alumno['grado_id'] . '-' . (int) ($alumno['semestre_id'] ?? 0))
             ->unique();
         if ($contextos->count() > 1) {
             $this->addError('grupo_origen_id', 'La generación contiene alumnos en grados o semestres diferentes. Selecciona un grupo para procesar un contexto académico a la vez.');
@@ -261,11 +262,11 @@ class CierreNivelContinuidad extends Component
             'es_grado_final' => (bool) ($referencia['es_grado_final'] ?? false),
         ];
 
-        if (! $this->contexto_origen['grado_id']) {
+        if (!$this->contexto_origen['grado_id']) {
             $this->addError('grupo_origen_id', 'El contexto académico no tiene un grado válido. Corrige el historial del ciclo antes de procesarlo.');
             return;
         }
-        if ($this->nivel->slug === 'bachillerato' && ! $this->contexto_origen['semestre_id']) {
+        if ($this->nivel->slug === 'bachillerato' && !$this->contexto_origen['semestre_id']) {
             $this->addError('grupo_origen_id', 'El contexto de Bachillerato no tiene un semestre válido. Corrige el historial del ciclo antes de procesarlo.');
             return;
         }
@@ -296,7 +297,7 @@ class CierreNivelContinuidad extends Component
         $this->seleccionados = collect($this->alumnos)
             ->where('procesable', true)
             ->pluck('id')
-            ->map(fn ($id) => (string) $id)
+            ->map(fn($id) => (string) $id)
             ->all();
         $this->resultado_masivo = $this->modo_proceso === 'egreso_terminal' ? 'egresado' : 'continuidad_interna';
         $this->proponerDestino($service);
@@ -307,13 +308,13 @@ class CierreNivelContinuidad extends Component
     public function aplicarResultadoMasivo(CierreGeneracionContinuidadService $service): void
     {
         $permitidos = $service->resultadosPermitidos($this->modo_proceso);
-        if (! in_array($this->resultado_masivo, $permitidos, true)) {
+        if (!in_array($this->resultado_masivo, $permitidos, true)) {
             $this->addError('resultado_masivo', 'Selecciona un resultado compatible con el tipo de cierre detectado.');
             return;
         }
 
         $incluyeHistoricos = collect($this->seleccionados)
-            ->map(fn ($id): int => (int) $id)
+            ->map(fn($id): int => (int) $id)
             ->contains(function (int $id): bool {
                 $alumno = collect($this->alumnos)->firstWhere('id', $id);
                 return (bool) ($alumno['solo_proyeccion_historica'] ?? false);
@@ -326,7 +327,7 @@ class CierreNivelContinuidad extends Component
         foreach ($this->seleccionados as $id) {
             $id = (int) $id;
             $alumno = collect($this->alumnos)->firstWhere('id', $id);
-            if (! $alumno || ! $alumno['procesable']) {
+            if (!$alumno || !$alumno['procesable']) {
                 continue;
             }
             $this->decisiones[$id]['resultado'] = ($alumno['solo_proyeccion_historica'] ?? false)
@@ -344,7 +345,7 @@ class CierreNivelContinuidad extends Component
         $this->seleccionados = $this->alumnosFiltrados
             ->where('procesable', true)
             ->pluck('id')
-            ->map(fn ($id) => (string) $id)
+            ->map(fn($id) => (string) $id)
             ->all();
     }
 
@@ -355,7 +356,7 @@ class CierreNivelContinuidad extends Component
 
     public function aplicarGrupoMasivo(): void
     {
-        if (! $this->grupo_masivo_id) {
+        if (!$this->grupo_masivo_id) {
             $this->addError('grupo_masivo_id', 'Selecciona un grupo destino.');
             return;
         }
@@ -364,12 +365,12 @@ class CierreNivelContinuidad extends Component
         foreach ($this->seleccionados as $id) {
             $id = (int) $id;
             $alumno = collect($this->alumnos)->firstWhere('id', $id);
-            if (! $alumno || ! $alumno['procesable']) {
+            if (!$alumno || !$alumno['procesable']) {
                 continue;
             }
 
-            $compatibles = collect($this->gruposParaAlumno($alumno))->pluck('id')->map(fn ($valor) => (int) $valor);
-            if (! $compatibles->contains((int) $this->grupo_masivo_id)) {
+            $compatibles = collect($this->gruposParaAlumno($alumno))->pluck('id')->map(fn($valor) => (int) $valor);
+            if (!$compatibles->contains((int) $this->grupo_masivo_id)) {
                 continue;
             }
 
@@ -390,7 +391,7 @@ class CierreNivelContinuidad extends Component
         if ($this->paso === 2) {
             $pendientes = collect($this->alumnos)
                 ->where('procesable', true)
-                ->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? 'pendiente') === 'pendiente');
+                ->filter(fn(array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? 'pendiente') === 'pendiente');
             if ($pendientes->isNotEmpty()) {
                 $this->addError('decisiones', 'Asigna un resultado definitivo a todos los alumnos procesables.');
                 return;
@@ -432,7 +433,7 @@ class CierreNivelContinuidad extends Component
             'motivo' => ['required', 'string', 'min:10', 'max:1500'],
         ]);
 
-        if (! Hash::check($this->password_confirmacion, (string) auth()->user()?->password)) {
+        if (!Hash::check($this->password_confirmacion, (string) auth()->user()?->password)) {
             $this->addError('password_confirmacion', 'La contraseña no es correcta.');
             return;
         }
@@ -498,7 +499,7 @@ class CierreNivelContinuidad extends Component
             'password_confirmacion' => ['required', 'string'],
         ]);
 
-        if (! Hash::check($this->password_confirmacion, (string) auth()->user()?->password)) {
+        if (!Hash::check($this->password_confirmacion, (string) auth()->user()?->password)) {
             $this->addError('password_confirmacion', 'La contraseña no es correcta.');
             return;
         }
@@ -599,7 +600,7 @@ class CierreNivelContinuidad extends Component
             'password_archivo' => ['required', 'string'],
         ]);
 
-        if (! Hash::check($datos['password_archivo'], (string) auth()->user()?->password)) {
+        if (!Hash::check($datos['password_archivo'], (string) auth()->user()?->password)) {
             $this->addError('password_archivo', 'La contraseña no es correcta.');
             return;
         }
@@ -617,7 +618,13 @@ class CierreNivelContinuidad extends Component
             }
 
             $antes = $generacion->only([
-                'status', 'estado_cierre', 'cerrada_at', 'cerrada_por', 'archivada_at', 'archivada_por', 'observaciones',
+                'status',
+                'estado_cierre',
+                'cerrada_at',
+                'cerrada_por',
+                'archivada_at',
+                'archivada_por',
+                'observaciones',
             ]);
             $generacion->update([
                 'status' => false,
@@ -633,7 +640,13 @@ class CierreNivelContinuidad extends Component
                 'motivo' => trim($datos['motivo_archivo']),
                 'datos_anteriores' => $antes,
                 'datos_nuevos' => $generacion->fresh()->only([
-                    'status', 'estado_cierre', 'cerrada_at', 'cerrada_por', 'archivada_at', 'archivada_por', 'observaciones',
+                    'status',
+                    'estado_cierre',
+                    'cerrada_at',
+                    'cerrada_por',
+                    'archivada_at',
+                    'archivada_por',
+                    'observaciones',
                 ]),
                 'realizado_por' => auth()->id(),
                 'realizado_at' => now(),
@@ -663,7 +676,7 @@ class CierreNivelContinuidad extends Component
 
     public function getDetallesProcesoProperty(): Collection
     {
-        if (! $this->procesoExpandidoId) {
+        if (!$this->procesoExpandidoId) {
             return collect();
         }
 
@@ -673,12 +686,12 @@ class CierreNivelContinuidad extends Component
             ->whereKey($this->procesoExpandidoId)
             ->exists();
 
-        if (! $procesoValido) {
+        if (!$procesoValido) {
             return collect();
         }
 
         return \App\Models\ProcesoCierreCicloDetalle::query()
-            ->with(['inscripcion' => fn ($relacion) => $relacion->withTrashed()])
+            ->with(['inscripcion' => fn($relacion) => $relacion->withTrashed()])
             ->where('proceso_cierre_ciclo_id', $this->procesoExpandidoId)
             ->where('resultado', '!=', 'sin_cambio')
             ->orderBy('resultado')
@@ -693,16 +706,18 @@ class CierreNivelContinuidad extends Component
         return collect($this->alumnos)
             ->filter(function (array $alumno) use ($buscar): bool {
                 if ($buscar !== '') {
-                    $texto = mb_strtolower($alumno['nombre'].' '.$alumno['matricula'].' '.$alumno['curp']);
-                    if (! str_contains($texto, $buscar)) {
+                    $texto = mb_strtolower($alumno['nombre'] . ' ' . $alumno['matricula'] . ' ' . $alumno['curp']);
+                    if (!str_contains($texto, $buscar)) {
                         return false;
                     }
                 }
                 if ($this->filtro_estatus !== '' && $alumno['estatus'] !== $this->filtro_estatus) {
                     return false;
                 }
-                if ($this->filtro_resultado !== ''
-                    && ($this->decisiones[$alumno['id']]['resultado'] ?? '') !== $this->filtro_resultado) {
+                if (
+                    $this->filtro_resultado !== ''
+                    && ($this->decisiones[$alumno['id']]['resultado'] ?? '') !== $this->filtro_resultado
+                ) {
                     return false;
                 }
                 return true;
@@ -724,7 +739,7 @@ class CierreNivelContinuidad extends Component
         ];
 
         return collect(app(CierreGeneracionContinuidadService::class)->resultadosPermitidos($this->modo_proceso))
-            ->mapWithKeys(fn (string $resultado): array => [$resultado => $etiquetas[$resultado]])
+            ->mapWithKeys(fn(string $resultado): array => [$resultado => $etiquetas[$resultado]])
             ->all();
     }
 
@@ -740,9 +755,37 @@ class CierreNivelContinuidad extends Component
 
     public function getGruposMasivosProperty(): Collection
     {
-        return collect($this->grupos_continuidad)
-            ->concat(collect($this->grupos_repeticion)->flatten(1))
-            ->unique('id')
+        $seleccionados = collect($this->seleccionados)
+            ->map(fn($id): int => (int) $id)
+            ->flip();
+
+        return collect($this->alumnos)
+            ->filter(function (array $alumno) use ($seleccionados): bool {
+                return (bool) ($alumno['procesable'] ?? false)
+                    && $seleccionados->has((int) $alumno['id']);
+            })
+            ->flatMap(function (array $alumno): Collection {
+                $resultado = $this->decisiones[$alumno['id']]['resultado'] ?? 'pendiente';
+
+                $tipo = match ($resultado) {
+                    'continuidad_interna' => 'Promoción',
+                    'no_promovido' => 'Repetición',
+                    default => null,
+                };
+
+                if ($tipo === null) {
+                    return collect();
+                }
+
+                return collect($this->gruposParaAlumno($alumno))
+                    ->map(function (array $grupo) use ($resultado, $tipo): array {
+                        $grupo['clave_masiva'] = $resultado . ':' . $grupo['id'];
+                        $grupo['label'] .= ' · ' . $tipo;
+
+                        return $grupo;
+                    });
+            })
+            ->unique('clave_masiva')
             ->sortBy('label')
             ->values();
     }
@@ -774,7 +817,7 @@ class CierreNivelContinuidad extends Component
     private function proponerDestino(CierreGeneracionContinuidadService $service): void
     {
         $ciclo = $this->ciclo_origen_id ? CicloEscolar::query()->find($this->ciclo_origen_id) : null;
-        if (! $ciclo) {
+        if (!$ciclo) {
             return;
         }
 
@@ -806,7 +849,7 @@ class CierreNivelContinuidad extends Component
 
     private function resolverGeneracionDestino(): void
     {
-        if (! $this->ciclo_destino_id || ! $this->nivel_destino_id || ! $this->grado_destino_id) {
+        if (!$this->ciclo_destino_id || !$this->nivel_destino_id || !$this->grado_destino_id) {
             $this->generacion_destino_id = null;
             $this->generacion_esperada = '';
             $this->generacionesDestino = collect();
@@ -817,7 +860,7 @@ class CierreNivelContinuidad extends Component
         $nivel = Nivel::query()->find($this->nivel_destino_id);
         $grado = Grado::query()->find($this->grado_destino_id);
         $semestre = $this->semestre_destino_id ? Semestre::query()->find($this->semestre_destino_id) : null;
-        if (! $ciclo || ! $nivel || ! $grado || ($nivel->slug === 'bachillerato' && ! $semestre)) {
+        if (!$ciclo || !$nivel || !$grado || ($nivel->slug === 'bachillerato' && !$semestre)) {
             return;
         }
 
@@ -853,7 +896,7 @@ class CierreNivelContinuidad extends Component
         ])->all();
 
         $this->grupos_repeticion = [];
-        if (! $this->ciclo_destino_id || ! $this->generacion_id) {
+        if (!$this->ciclo_destino_id || !$this->generacion_id) {
             return;
         }
 
@@ -875,10 +918,10 @@ class CierreNivelContinuidad extends Component
     private function validarDestinos(): void
     {
         $procesables = collect($this->alumnos)->where('procesable', true);
-        $continuidad = $procesables->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'continuidad_interna');
-        $repetidores = $procesables->filter(fn (array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'no_promovido');
+        $continuidad = $procesables->filter(fn(array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'continuidad_interna');
+        $repetidores = $procesables->filter(fn(array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'no_promovido');
 
-        if (($continuidad->isNotEmpty() || $repetidores->isNotEmpty()) && ! $this->ciclo_destino_id) {
+        if (($continuidad->isNotEmpty() || $repetidores->isNotEmpty()) && !$this->ciclo_destino_id) {
             throw ValidationException::withMessages(['ciclo_destino_id' => 'Selecciona el ciclo destino consecutivo.']);
         }
 
@@ -900,9 +943,9 @@ class CierreNivelContinuidad extends Component
         $idsProcesables = collect($this->alumnos)
             ->where('procesable', true)
             ->pluck('id')
-            ->map(fn ($id): int => (int) $id);
+            ->map(fn($id): int => (int) $id);
         $decisionesProcesables = $idsProcesables->map(
-            fn (int $id): array => $this->decisiones[$id] ?? ['resultado' => 'pendiente']
+            fn(int $id): array => $this->decisiones[$id] ?? ['resultado' => 'pendiente']
         );
         $conteos = $decisionesProcesables->countBy('resultado');
         $destino = null;
@@ -913,7 +956,7 @@ class CierreNivelContinuidad extends Component
             $semestre = $this->semestre_destino_id ? Semestre::query()->find($this->semestre_destino_id) : null;
             $destino = trim(implode(' · ', array_filter([
                 $nivel?->nombre,
-                $semestre ? 'Semestre '.$semestre->numero : $grado?->nombre,
+                $semestre ? 'Semestre ' . $semestre->numero : $grado?->nombre,
                 $generacion?->etiqueta,
             ])));
         }
@@ -931,21 +974,21 @@ class CierreNivelContinuidad extends Component
 
     private function cargarGeneracionesOrigen(): void
     {
-        if (! $this->ciclo_origen_id) {
+        if (!$this->ciclo_origen_id) {
             $this->generaciones = collect();
             return;
         }
 
         $this->generaciones = Generacion::query()
             ->withCount([
-                'inscripcionCiclos as alumnos_ciclo_count' => fn (Builder $query) => $query
+                'inscripcionCiclos as alumnos_ciclo_count' => fn(Builder $query) => $query
                     ->where('ciclo_escolar_id', $this->ciclo_origen_id),
-                'inscripcionCiclos as pendientes_ciclo_count' => fn (Builder $query) => $query
+                'inscripcionCiclos as pendientes_ciclo_count' => fn(Builder $query) => $query
                     ->where('ciclo_escolar_id', $this->ciclo_origen_id)
                     ->where('estado', 'en_curso'),
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->whereHas('inscripcionCiclos', fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_origen_id))
+            ->whereHas('inscripcionCiclos', fn(Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_origen_id))
             ->orderByDesc('status')
             ->orderByDesc('anio_ingreso')
             ->get();
@@ -953,7 +996,7 @@ class CierreNivelContinuidad extends Component
 
     private function cargarGruposOrigen(): void
     {
-        if (! $this->ciclo_origen_id || ! $this->generacion_id) {
+        if (!$this->ciclo_origen_id || !$this->generacion_id) {
             $this->gruposOrigen = collect();
             return;
         }
@@ -1020,7 +1063,7 @@ class CierreNivelContinuidad extends Component
 
     private function llaveRepeticion(array $alumno): string
     {
-        return (int) $alumno['grado_id'].'-'.(int) ($alumno['semestre_id'] ?? 0);
+        return (int) $alumno['grado_id'] . '-' . (int) ($alumno['semestre_id'] ?? 0);
     }
 
     private function normalizarResultadoExistente(?string $resultado): string
