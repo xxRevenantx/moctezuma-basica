@@ -9,7 +9,7 @@ return [
         'control_escolar' => [
             'label' => 'Control escolar',
             'permissions' => [
-                'administracion.acceder', 'integridad.consultar', 'auditoria.consultar',
+                'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'respaldos.gestionar', 'papelera.gestionar',
                 'flujos.gestionar', 'alumnos.*', 'personal.*', 'academico.*',
                 'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*',
@@ -46,6 +46,7 @@ return [
     'permissions' => [
         'administracion.acceder' => 'Acceder al centro de control',
         'integridad.consultar' => 'Consultar integridad académica',
+        'integridad.gestionar' => 'Gestionar casos y aplicar correcciones de integridad',
         'auditoria.consultar' => 'Consultar auditoría',
         'notificaciones.gestionar' => 'Gestionar notificaciones internas',
         'respaldos.gestionar' => 'Crear y consultar respaldos',

@@ -57,6 +57,7 @@ use App\Http\Controllers\TutorController;
 use App\Models\PersonaNivel;
 use App\Livewire\Admin\RevisionCiclosAcademicos;
 use App\Livewire\Admin\CorreccionesCalificaciones;
+use App\Livewire\Admin\CentroIntegridadAcademica;
 
 
 // CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS
@@ -69,6 +70,10 @@ Route::get('/centro-control/revision-ciclos', RevisionCiclosAcademicos::class)
 Route::get('/centro-control/correcciones-calificaciones', CorreccionesCalificaciones::class)
     ->middleware('admin')
     ->name('misrutas.correcciones-calificaciones');
+
+Route::get('/integridad-academica', CentroIntegridadAcademica::class)
+    ->middleware('permission:integridad.consultar')
+    ->name('misrutas.integridad-academica');
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');

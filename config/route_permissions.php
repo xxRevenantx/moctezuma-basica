@@ -49,6 +49,7 @@ return [
         'generales.credenciales*' => 'documentos.consultar',
 
         'misrutas.centro-control' => 'administracion.acceder',
+        'misrutas.integridad-academica' => 'integridad.consultar',
         'misrutas.respaldos-academicos' => 'respaldos.gestionar',
     ],
 

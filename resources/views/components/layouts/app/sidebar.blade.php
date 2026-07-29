@@ -147,12 +147,26 @@
 
                     {{-- Académica --}}
                     <flux:sidebar.group expandable
-                        :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos')"
+                        :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos', 'misrutas.integridad-academica')"
                         heading="ACADÉMICA" class="grid gap-1 text-xs text-zinc-300">
                         <flux:navlist.item icon="graduation-cap" :href="route('misrutas.alumnos')"
                             :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
                             Alumnos
                         </flux:navlist.item>
+
+
+                        @if (auth()->user()?->canAccess('integridad.consultar'))
+                            <flux:navlist.item icon="shield-check" :href="route('misrutas.integridad-academica')"
+                                :current="request()->routeIs('misrutas.integridad-academica')" wire:navigate>
+                                <span class="flex w-full items-center justify-between gap-2">
+                                    <span>Integridad académica</span>
+                                    @php($integridadAbiertos = \Illuminate\Support\Facades\Schema::hasTable('integridad_academica_casos') ? \App\Models\IntegridadAcademicaCaso::query()->abiertos()->count() : 0)
+                                    @if ($integridadAbiertos > 0)
+                                        <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-black text-white">{{ $integridadAbiertos > 99 ? '99+' : $integridadAbiertos }}</span>
+                                    @endif
+                                </span>
+                            </flux:navlist.item>
+                        @endif
 
                         <flux:navlist.item icon="school" :href="route('misrutas.escuela')"
                             :current="request()->routeIs('misrutas.escuela')" wire:navigate>
