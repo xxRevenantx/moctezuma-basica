@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
 use App\Support\CalificacionBachillerato;
 use App\Support\ReglasMateriaBachillerato;
 use Illuminate\Database\Eloquent\Model;
 
 class Calificacion extends Model
 {
+    use LinksInscripcionCiclo;
     protected $table = 'calificaciones';
 
     protected $fillable = [
@@ -49,8 +51,6 @@ class Calificacion extends Model
     protected static function booted(): void
     {
         static::saving(function (Calificacion $calificacion): void {
-            app(\App\Services\HistorialCicloEscolarService::class)->vincularRegistroAcademico($calificacion);
-
             if (
                 ! ReglasMateriaBachillerato::esBachillerato($calificacion->nivel_id)
                 || ! (bool) $calificacion->es_numerica

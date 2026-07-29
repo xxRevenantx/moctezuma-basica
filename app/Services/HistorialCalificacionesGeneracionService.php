@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoInscripcionCiclo;
+use App\Enums\EstatusAlumnoCiclo;
 use App\Models\Calificacion;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
@@ -103,9 +105,9 @@ class HistorialCalificacionesGeneracionService
                         ? null
                         : $finContexto->toDateString(),
                     'estado' => $ciclo->es_actual && blank($ciclo->cerrado_at)
-                        ? 'en_curso'
-                        : 'finalizado',
-                    'estatus_ingreso' => $estatus,
+                        ? EstadoInscripcionCiclo::EN_CURSO->value
+                        : EstadoInscripcionCiclo::CERRADO->value,
+                    'estatus_ingreso' => EstatusAlumnoCiclo::estatusIngresoSeguro($estatus),
                     'estatus_actual_ciclo' => $estatus,
                     'resultado_final' => null,
                     'promovido' => false,

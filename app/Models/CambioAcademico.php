@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
 use Illuminate\Database\Eloquent\Model;
 
 class CambioAcademico extends Model
 {
+    use LinksInscripcionCiclo;
     protected $table = 'cambios_academicos';
 
     protected $fillable = [

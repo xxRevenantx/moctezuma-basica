@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoInscripcionCiclo;
+use App\Enums\EstatusAlumnoCiclo;
+use App\Enums\ResultadoInscripcionCiclo;
 use App\Models\Inscripcion;
 use App\Models\InscripcionCiclo;
 use App\Models\InscripcionCicloAsignacion;
@@ -250,7 +253,7 @@ class HistorialCicloEscolarService
         $ciclo->update([
             'estado' => 'cerrado',
             'fecha_salida' => $fecha,
-            'resultado_final' => $resultado,
+            'resultado_final' => ResultadoInscripcionCiclo::normalizar($resultado),
             'promovido' => $promovido,
             'cerrado_at' => now(),
             'cerrado_por' => $usuarioId,
@@ -287,23 +290,74 @@ class HistorialCicloEscolarService
         }
 
         $inscripcionId = (int) $registro->getAttribute('inscripcion_id');
-        $cicloEscolarId = (int) $registro->getAttribute('ciclo_escolar_id');
-
-        if (! $inscripcionId || ! $cicloEscolarId) {
+        if (! $inscripcionId) {
             return;
         }
 
-        $id = InscripcionCiclo::query()
-            ->where('inscripcion_id', $inscripcionId)
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->value('id');
+        $contexto = $this->contextoDesdeRegistro($registro);
+        $cicloEscolarId = (int) ($contexto['ciclo_escolar_id'] ?? 0);
 
-        if ($id) {
-            $registro->setAttribute('inscripcion_ciclo_id', $id);
+        $historial = InscripcionCiclo::query()
+            ->where('inscripcion_id', $inscripcionId)
+            ->when($cicloEscolarId, fn ($query) => $query->where('ciclo_escolar_id', $cicloEscolarId))
+            ->when(! $cicloEscolarId && filled($contexto['grupo_id'] ?? null), fn ($query) => $query->where('grupo_id', $contexto['grupo_id']))
+            ->orderByRaw("CASE WHEN estado = 'en_curso' THEN 0 ELSE 1 END")
+            ->latest('id')
+            ->first();
+
+        if (! $historial && $cicloEscolarId && $this->contextoCompleto($contexto)) {
+            $alumno = Inscripcion::withTrashed()->find($inscripcionId);
+            if ($alumno) {
+                $contexto['matricula'] ??= $alumno->matricula;
+                $contexto['estatus'] = EstatusAlumnoCiclo::estatusIngresoSeguro(
+                    $contexto['estatus'] ?? $alumno->estatus
+                );
+                $contexto['activo'] = true;
+
+                [$fechaInicio, $fechaFin] = $this->rangoCicloEscolar(
+                    $cicloEscolarId,
+                    $this->fechaRegistro($registro)
+                );
+
+                $historial = $this->asegurarCicloDesdeSnapshot(
+                    $inscripcionId,
+                    $contexto,
+                    'registro_academico_vinculado',
+                    null,
+                    (int) $alumno->ciclo_escolar_id === $cicloEscolarId
+                        ? ($alumno->fecha_inscripcion ?: $fechaInicio)
+                        : $fechaInicio,
+                    (int) $alumno->ciclo_escolar_id !== $cicloEscolarId,
+                    'exacto'
+                );
+
+                if ((int) $alumno->ciclo_escolar_id !== $cicloEscolarId) {
+                    $historial->forceFill([
+                        'estado' => EstadoInscripcionCiclo::CERRADO->value,
+                        'fecha_salida' => $fechaFin,
+                        'estatus_actual_ciclo' => $contexto['estatus'],
+                        'resultado_final' => null,
+                        'cerrado_at' => now(),
+                        'motivo_cierre' => 'Contexto histórico reconstruido al vincular un registro académico.',
+                    ])->saveQuietly();
+                    $historial->asignaciones()->update([
+                        'es_actual' => false,
+                        'fecha_fin' => $historial->fecha_salida,
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        if ($historial) {
+            $registro->setAttribute('inscripcion_ciclo_id', $historial->id);
+            if (! $registro->getAttribute('ciclo_escolar_id') && Schema::hasColumn($registro->getTable(), 'ciclo_escolar_id')) {
+                $registro->setAttribute('ciclo_escolar_id', $historial->ciclo_escolar_id);
+            }
         }
     }
 
-    private function asegurarCicloDesdeSnapshot(
+    public function asegurarCicloDesdeSnapshot(
         int $inscripcionId,
         array $snapshot,
         string $origen,
@@ -326,9 +380,9 @@ class HistorialCicloEscolarService
             ],
             $this->camposResumen($snapshot) + [
                 'fecha_ingreso' => $fecha,
-                'estado' => 'en_curso',
-                'estatus_ingreso' => $snapshot['estatus'] ?? 'activo',
-                'estatus_actual_ciclo' => $snapshot['estatus'] ?? 'activo',
+                'estado' => EstadoInscripcionCiclo::EN_CURSO->value,
+                'estatus_ingreso' => EstatusAlumnoCiclo::estatusIngresoSeguro($snapshot['estatus'] ?? null),
+                'estatus_actual_ciclo' => EstatusAlumnoCiclo::normalizar($snapshot['estatus'] ?? null),
                 'snapshot_ingreso' => $snapshot,
                 'origen' => $origen,
                 'reconstruido' => $reconstruido,
@@ -378,6 +432,81 @@ class HistorialCicloEscolarService
                 'fecha_fin' => $fecha,
                 'updated_at' => now(),
             ]);
+    }
+
+    private function contextoDesdeRegistro(Model $registro): array
+    {
+        $contexto = Arr::only($registro->getAttributes(), [
+            'ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'grupo_id', 'semestre_id', 'estatus', 'matricula',
+        ]);
+
+        foreach (['datos_nuevos', 'estado_nuevo', 'datos_anteriores', 'estado_anterior'] as $campo) {
+            $snapshot = $registro->getAttribute($campo);
+            if (is_string($snapshot)) {
+                $snapshot = json_decode($snapshot, true);
+            }
+            if (! is_array($snapshot)) {
+                continue;
+            }
+
+            foreach (['ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'grupo_id', 'semestre_id', 'estatus', 'matricula'] as $clave) {
+                if (blank($contexto[$clave] ?? null) && filled($snapshot[$clave] ?? null)) {
+                    $contexto[$clave] = $snapshot[$clave];
+                }
+            }
+        }
+
+        if (blank($contexto['ciclo_escolar_id'] ?? null) && filled($contexto['grupo_id'] ?? null) && Schema::hasTable('grupos')) {
+            $grupo = DB::table('grupos')->where('id', $contexto['grupo_id'])->first();
+            if ($grupo) {
+                foreach (['ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id'] as $clave) {
+                    if (blank($contexto[$clave] ?? null) && filled($grupo->{$clave} ?? null)) {
+                        $contexto[$clave] = $grupo->{$clave};
+                    }
+                }
+            }
+        }
+
+        return $contexto;
+    }
+
+    private function contextoCompleto(array $contexto): bool
+    {
+        foreach (['ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'grupo_id'] as $campo) {
+            if (! filled($contexto[$campo] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function rangoCicloEscolar(int $cicloEscolarId, string $fechaReferencia): array
+    {
+        if (Schema::hasTable('ciclo_escolares')) {
+            $ciclo = DB::table('ciclo_escolares')->where('id', $cicloEscolarId)->first();
+            if ($ciclo && filled($ciclo->inicio_anio ?? null) && filled($ciclo->fin_anio ?? null)) {
+                return [
+                    CarbonImmutable::create((int) $ciclo->inicio_anio, 7, 1)->toDateString(),
+                    CarbonImmutable::create((int) $ciclo->fin_anio, 6, 30)->toDateString(),
+                ];
+            }
+        }
+
+        $fecha = CarbonImmutable::parse($fechaReferencia);
+
+        return [$fecha->startOfDay()->toDateString(), $fecha->endOfDay()->toDateString()];
+    }
+
+    private function fechaRegistro(Model $registro): string
+    {
+        foreach (['fecha_captura', 'fecha', 'realizado_at', 'fecha_asignacion', 'confirmada_at', 'capturado_at', 'created_at'] as $campo) {
+            if (filled($registro->getAttribute($campo))) {
+                return $this->fecha($registro->getAttribute($campo));
+            }
+        }
+
+        return $this->fecha();
     }
 
     private function camposResumen(array $snapshot): array

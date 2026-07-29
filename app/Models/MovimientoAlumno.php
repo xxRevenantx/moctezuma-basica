@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class MovimientoAlumno extends Model
 {
-    use HasFactory;
+    use HasFactory, LinksInscripcionCiclo;
 
     protected $table = 'movimientos_alumnos';
 

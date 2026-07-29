@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoInscripcionCiclo;
+use App\Enums\EstatusAlumnoCiclo;
+use App\Enums\ResultadoInscripcionCiclo;
 use App\Models\CambioAcademico;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
@@ -106,11 +109,13 @@ class ReconstruccionHistorialCiclosService
                         'semestre_id' => $snapshotInicial['semestre_id'] ?? null,
                         'fecha_ingreso' => $primero['fecha'],
                         'fecha_salida' => $fechaFin,
-                        'estado' => $cerrado ? 'cerrado' : 'en_curso',
-                        'estatus_ingreso' => $snapshotInicial['estatus'] ?? 'activo',
+                        'estado' => $cerrado
+                            ? EstadoInscripcionCiclo::CERRADO->value
+                            : EstadoInscripcionCiclo::EN_CURSO->value,
+                        'estatus_ingreso' => EstatusAlumnoCiclo::estatusIngresoSeguro($snapshotInicial['estatus'] ?? null),
                         'estatus_actual_ciclo' => $ultimo['snapshot']['estatus'] ?? ($cerrado ? $resultado : 'activo'),
-                        'resultado_final' => $resultado,
-                        'promovido' => in_array($resultado, ['promovido', 'promovido_nivel'], true),
+                        'resultado_final' => ResultadoInscripcionCiclo::normalizar($resultado),
+                        'promovido' => ResultadoInscripcionCiclo::esPromocion($resultado),
                         'cerrado_at' => $cerrado ? ($fechaFin ? CarbonImmutable::parse($fechaFin)->endOfDay() : now()) : null,
                         'cerrado_por' => $cerrado ? $usuarioId : null,
                         'motivo_cierre' => $cerrado ? 'Reconstrucción a partir de movimientos y cambios académicos existentes.' : null,

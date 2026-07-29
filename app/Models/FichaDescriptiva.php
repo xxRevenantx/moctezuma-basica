@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LinksInscripcionCiclo;
 use Illuminate\Database\Eloquent\Model;
 
 class FichaDescriptiva extends Model
 {
+    use LinksInscripcionCiclo;
     protected $table = 'ficha_descriptivas';
 
     protected $fillable = [
@@ -23,13 +25,6 @@ class FichaDescriptiva extends Model
         'capturado_por',
         'fecha_captura',
     ];
-
-    protected static function booted(): void
-    {
-        static::saving(function (FichaDescriptiva $ficha): void {
-            app(\App\Services\HistorialCicloEscolarService::class)->vincularRegistroAcademico($ficha);
-        });
-    }
 
     protected $casts = [
         'periodo_id' => 'integer',
