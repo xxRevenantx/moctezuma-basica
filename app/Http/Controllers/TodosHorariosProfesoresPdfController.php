@@ -36,6 +36,7 @@ class TodosHorariosProfesoresPdfController extends Controller
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,materia,nivel_id,grado_id,semestre_id,extra,receso,orden',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
+                'profesorAsignado:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
                 'tallerSesion.taller:id,nivel_id,nombre,clave',
                 'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno,correo,telefono_movil',
                 'tallerSesion.grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
@@ -43,7 +44,8 @@ class TodosHorariosProfesoresPdfController extends Controller
                 'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
             ->where(function ($query) {
-                $query->whereHas('asignacionMateria', fn($subQuery) => $subQuery
+                $query->whereNotNull('profesor_id')
+                    ->orWhereHas('asignacionMateria', fn($subQuery) => $subQuery
                         ->whereNotNull('profesor_id')
                         ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
                     ->orWhereHas('tallerSesion', fn($subQuery) => $subQuery
@@ -86,6 +88,12 @@ class TodosHorariosProfesoresPdfController extends Controller
                             $grupoQuery->where('nombre', 'like', "%{$buscar}%");
                         })
                         ->orWhereHas('asignacionMateria.profesor', function ($profesorQuery) use ($buscar) {
+                            $profesorQuery
+                                ->where('nombre', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                                ->orWhere('apellido_materno', 'like', "%{$buscar}%");
+                        })
+                        ->orWhereHas('profesorAsignado', function ($profesorQuery) use ($buscar) {
                             $profesorQuery
                                 ->where('nombre', 'like', "%{$buscar}%")
                                 ->orWhere('apellido_paterno', 'like', "%{$buscar}%")

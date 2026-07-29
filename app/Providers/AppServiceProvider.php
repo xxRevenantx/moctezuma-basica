@@ -9,6 +9,9 @@ use App\Models\DocumentoAlumno;
 use App\Models\DocumentoPersonal;
 use App\Models\Grupo;
 use App\Models\Horario;
+use App\Models\HorarioVersion;
+use App\Models\HorarioDocenteConfiguracion;
+use App\Models\HorarioAsignacionRegla;
 use App\Models\Inscripcion;
 use App\Models\Materia;
 use App\Models\Oficio;
@@ -50,7 +53,8 @@ class AppServiceProvider extends ServiceProvider
 
         foreach ([
             Inscripcion::class, Tutor::class, Persona::class, Grupo::class, Materia::class,
-            AsignacionMateria::class, Horario::class, Calificacion::class,
+            AsignacionMateria::class, Horario::class, HorarioVersion::class,
+            HorarioDocenteConfiguracion::class, HorarioAsignacionRegla::class, Calificacion::class,
             DocumentoAlumno::class, DocumentoPersonal::class, Constancia::class, Oficio::class,
             User::class,
         ] as $model) {

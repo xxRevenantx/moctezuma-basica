@@ -10,6 +10,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Horario as HorarioModel;
+use App\Models\HorarioDocenteConfiguracion;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\Semestre;
@@ -432,6 +433,10 @@ class Horario extends Component
         ?string $claveSesionCompartida = null,
         ?string $motivoSesionCompartida = null,
     ): void {
+        $asignacion = AsignacionMateria::query()
+            ->select(['id', 'profesor_id'])
+            ->find($asignacionMateriaId);
+
         $datosBusqueda = [
             'nivel_id' => $this->nivel->id,
             'grado_id' => $this->grado_id,
@@ -446,6 +451,7 @@ class Horario extends Component
         if ($horarioExistente) {
             $horarioExistente->update([
                 'asignacion_materia_id' => $asignacionMateriaId,
+                'profesor_id' => $asignacion?->profesor_id,
                 'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
                 'sesion_compartida' => $sesionCompartida,
@@ -456,6 +462,7 @@ class Horario extends Component
             HorarioModel::query()->create([
                 ...$datosBusqueda,
                 'asignacion_materia_id' => $asignacionMateriaId,
+                'profesor_id' => $asignacion?->profesor_id,
                 'sesion_compartida' => $sesionCompartida,
                 'clave_sesion_compartida' => $sesionCompartida ? $claveSesionCompartida : null,
                 'motivo_sesion_compartida' => $sesionCompartida ? $motivoSesionCompartida : null,
@@ -496,6 +503,7 @@ class Horario extends Component
                 'semestre',
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
+                'profesorAsignado',
                 'tallerSesion.taller',
                 'tallerSesion.profesor',
                 'tallerSesion.grupos.asignacionGrupo',
@@ -507,13 +515,14 @@ class Horario extends Component
                 $query->where('id', '!=', $horarioActualId);
             })
             ->where(function ($query) use ($profesorId) {
-                $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
-                    $subQuery->where('profesor_id', $profesorId)
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
-                })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
-                    $subQuery->where('profesor_id', $profesorId)
-                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
-                });
+                $query->where('profesor_id', $profesorId)
+                    ->orWhereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
+                        $subQuery->where('profesor_id', $profesorId)
+                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                    })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
+                        $subQuery->where('profesor_id', $profesorId)
+                            ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
+                    });
             })
             ->whereHas('hora', function ($query) use ($horaInicio, $horaFin) {
                 $query->where('hora_inicio', '<', $horaFin)
@@ -841,6 +850,20 @@ class Horario extends Component
         }
     }
 
+    protected function maxGruposSimultaneosDocente(int $profesorId): int
+    {
+        return max(1, (int) (HorarioDocenteConfiguracion::query()
+            ->where('persona_id', $profesorId)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where(function (Builder $query): void {
+                $query->where('nivel_id', $this->nivel?->id)
+                    ->orWhereNull('nivel_id');
+            })
+            ->where('activo', true)
+            ->orderByRaw('nivel_id IS NULL')
+            ->value('max_grupos_simultaneos') ?? 2));
+    }
+
     public function confirmarGuardarConTraslape(): void
     {
         if (
@@ -876,6 +899,38 @@ class Horario extends Component
         $asignacion = AsignacionMateria::query()
             ->find((int) $this->pendienteHorario['asignacion_materia_id']);
 
+        if (! $asignacion?->profesor_id) {
+            $this->dispatch('swal', [
+                'title' => 'No se pudo identificar al docente.',
+                'text' => 'Asigna un docente a la materia antes de confirmar la sesión simultánea.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $hora = Hora::query()->find((int) $this->pendienteHorario['hora_id']);
+        $conflictosActuales = $hora
+            ? $this->buscarConflictosProfesor(
+                profesorId: (int) $asignacion->profesor_id,
+                diaId: (int) $this->pendienteHorario['dia_id'],
+                horaInicio: (string) $hora->hora_inicio,
+                horaFin: (string) $hora->hora_fin,
+                horarioActualId: $horarioExistente?->id,
+            )
+            : [];
+        $maximoSimultaneo = $this->maxGruposSimultaneosDocente((int) $asignacion->profesor_id);
+
+        if (count($conflictosActuales) + 1 > $maximoSimultaneo) {
+            $this->dispatch('swal', [
+                'title' => 'Se excede el máximo de grupos simultáneos.',
+                'text' => "El docente tiene permitido atender hasta {$maximoSimultaneo} grupos en el mismo bloque. Ajusta su configuración o elige otro horario.",
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
         $claveCompartida = sprintf(
             'shared-%d-%d-%d-%d',
             (int) $this->ciclo_escolar_id,
@@ -889,8 +944,11 @@ class Horario extends Component
                 ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
                 ->where('dia_id', (int) $this->pendienteHorario['dia_id'])
                 ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
-                ->whereHas('asignacionMateria', fn (Builder $q) => $q
-                    ->where('profesor_id', $asignacion->profesor_id))
+                ->where(function (Builder $q) use ($asignacion): void {
+                    $q->where('profesor_id', $asignacion->profesor_id)
+                        ->orWhereHas('asignacionMateria', fn (Builder $materia) => $materia
+                            ->where('profesor_id', $asignacion->profesor_id));
+                })
                 ->update([
                     'sesion_compartida' => true,
                     'clave_sesion_compartida' => $claveCompartida,
@@ -1648,6 +1706,7 @@ class Horario extends Component
             ->with([
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
+                'profesorAsignado',
             ])
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)

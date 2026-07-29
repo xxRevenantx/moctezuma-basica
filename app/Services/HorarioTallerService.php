@@ -56,6 +56,7 @@ class HorarioTallerService
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id',
                 'asignacionMateria.materia:id,materia',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'profesorAsignado:id,titulo,nombre,apellido_paterno,apellido_materno',
                 'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,estado,dia_id,hora_id',
                 'tallerSesion.taller:id,nombre',
                 'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',

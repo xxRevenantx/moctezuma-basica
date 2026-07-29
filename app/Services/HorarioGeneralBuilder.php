@@ -78,6 +78,7 @@ class HorarioGeneralBuilder
                 'asignacionMateria:id,materia_id,grupo_id,profesor_id,orden',
                 'asignacionMateria.materia:id,nivel_id,grado_id,semestre_id,materia,clave,slug,calificable,extra,receso,orden',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'profesorAsignado:id,titulo,nombre,apellido_paterno,apellido_materno',
                 'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,dia_id,hora_id,ubicacion',
                 'tallerSesion.taller:id,nivel_id,nombre,clave,slug',
                 'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
@@ -302,7 +303,7 @@ class HorarioGeneralBuilder
             }
 
             $nombre = trim((string) ($taller->nombre ?? 'Taller')) ?: 'Taller';
-            $profesor = $sesion->profesor;
+            $profesor = $horario->profesorActividad();
 
             return [
                 'tipo' => 'taller',
@@ -337,7 +338,7 @@ class HorarioGeneralBuilder
         }
 
         $nombre = trim((string) ($materia->materia ?? 'Materia')) ?: 'Materia';
-        $profesor = $asignacion->profesor;
+        $profesor = $horario->profesorActividad();
 
         return [
             'tipo' => 'materia',

@@ -39,6 +39,7 @@ class HorarioPdfBuilder
                 'hora:id,nivel_id,hora_inicio,hora_fin,orden',
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'profesorAsignado:id,titulo,nombre,apellido_paterno,apellido_materno',
                 'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,dia_id,hora_id,ubicacion,conflicto_forzado,motivo_conflicto',
                 'tallerSesion.taller:id,nivel_id,nombre,clave',
                 'tallerSesion.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
@@ -261,7 +262,7 @@ class HorarioPdfBuilder
                         return null;
                     }
 
-                    $profesor = $asignacion->profesor;
+                    $profesor = $horario->profesorActividad();
                     $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                     if ($profesorTitularId !== null && $profesorId === $profesorTitularId) {
@@ -311,7 +312,7 @@ class HorarioPdfBuilder
                     }
                 }
 
-                $profesor = $asignacion->profesor;
+                $profesor = $horario->profesorActividad();
                 $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                 $docentesHorario->push([
@@ -331,7 +332,7 @@ class HorarioPdfBuilder
                         continue;
                     }
 
-                    $profesor = $sesion->profesor;
+                    $profesor = $horarioTaller->profesorActividad();
                     $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                     $docentesHorario->push([

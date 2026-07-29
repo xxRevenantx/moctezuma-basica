@@ -78,6 +78,7 @@ return [
         'documentos.eliminar' => 'Eliminar documentos',
         'horarios.consultar' => 'Consultar horarios',
         'horarios.editar' => 'Editar horarios',
+        'horarios.publicar' => 'Publicar y programar versiones de horarios',
         'fichas.consultar' => 'Consultar fichas descriptivas',
         'fichas.capturar' => 'Capturar fichas descriptivas',
     ],

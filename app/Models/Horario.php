@@ -20,15 +20,23 @@ class Horario extends Model
         'hora_id',
         'dia_id',
         'asignacion_materia_id',
+        'profesor_id',
         'taller_sesion_id',
         'ciclo_escolar_id',
+        'horario_version_id',
         'sesion_compartida',
         'clave_sesion_compartida',
         'motivo_sesion_compartida',
+        'traslape_excepcional',
+        'motivo_traslape_excepcional',
+        'motivo_autorizacion_disponibilidad',
+        'coensenanza',
     ];
 
     protected $casts = [
         'sesion_compartida' => 'boolean',
+        'traslape_excepcional' => 'boolean',
+        'coensenanza' => 'boolean',
     ];
 
     public function asignacionMateria()
@@ -36,9 +44,19 @@ class Horario extends Model
         return $this->belongsTo(AsignacionMateria::class, 'asignacion_materia_id');
     }
 
+    public function profesorAsignado()
+    {
+        return $this->belongsTo(Persona::class, 'profesor_id');
+    }
+
     public function tallerSesion()
     {
         return $this->belongsTo(TallerSesion::class, 'taller_sesion_id');
+    }
+
+    public function version()
+    {
+        return $this->belongsTo(HorarioVersion::class, 'horario_version_id');
     }
 
     public function cicloEscolar()
@@ -62,6 +80,10 @@ class Horario extends Model
 
     public function profesorActividad(): ?Persona
     {
+        if ($this->profesorAsignado) {
+            return $this->profesorAsignado;
+        }
+
         if ($this->esTallerConjunto()) {
             return $this->tallerSesion?->profesor;
         }

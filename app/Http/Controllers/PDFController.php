@@ -1866,6 +1866,7 @@ class PDFController extends Controller
 
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'profesorAsignado:id,titulo,nombre,apellido_paterno,apellido_materno',
 
                 'tallerSesion:id,taller_id,profesor_id,ciclo_escolar_id,dia_id,hora_id,ubicacion,conflicto_forzado,motivo_conflicto',
                 'tallerSesion.taller:id,nivel_id,nombre,clave',
@@ -2116,7 +2117,7 @@ class PDFController extends Controller
                         return null;
                     }
 
-                    $profesor = $asignacion->profesor;
+                    $profesor = $horario->profesorActividad();
                     $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                     if (
@@ -2208,7 +2209,7 @@ class PDFController extends Controller
                     }
                 }
 
-                $profesor = $asignacion->profesor;
+                $profesor = $horario->profesorActividad();
                 $profesorId = $profesor?->id ? (int) $profesor->id : null;
 
                 $docentesHorario->push([
@@ -2235,7 +2236,7 @@ class PDFController extends Controller
                         continue;
                     }
 
-                    $profesor = $sesion->profesor;
+                    $profesor = $horarioTaller->profesorActividad();
                     $profesorId = $profesor?->id ? (int) $profesor->id : null;
                     $nombreTaller = trim((string) ($sesion->taller?->nombre ?? '')) ?: 'Taller';
 

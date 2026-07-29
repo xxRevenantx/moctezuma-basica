@@ -50,6 +50,12 @@
         <livewire:accion.taller-conjunto :slug_nivel="$slug_nivel" :key="'taller-conjunto-horario-' . $nivel->id" />
     @endif
 
+    <livewire:academico.planificador-horarios
+        :slug-nivel="$slug_nivel"
+        :ciclo-escolar-id="$ciclo_escolar_id"
+        :key="'planificador-horarios-' . $nivel->id . '-' . ($ciclo_escolar_id ?? 'sin-ciclo')"
+    />
+
     {{-- TABLA BASE DEL HORARIO --}}
     <section
         class="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/80 dark:shadow-black/20">
@@ -355,7 +361,7 @@
                                                         )
                                                         : null;
 
-                                                    $profesor = $asignacionGuardada?->profesor;
+                                                    $profesor = $horarioGuardado?->profesorActividad() ?? $asignacionGuardada?->profesor;
 
                                                     $nombreProfesor = $profesor
                                                         ? trim(

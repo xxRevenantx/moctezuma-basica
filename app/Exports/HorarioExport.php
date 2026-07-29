@@ -109,7 +109,7 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
 
                 if ($horario?->asignacionMateria) {
                     $materia = $horario->asignacionMateria?->materia;
-                    $profesor = $horario->asignacionMateria?->profesor;
+                    $profesor = $horario->profesorActividad();
                     $nombreProfesor = $this->nombreProfesor($profesor);
                     $texto = $materia?->materia ?? 'Sin materia';
 
@@ -139,7 +139,7 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
                         $texto .= "\nClave: " . $sesion->taller->clave;
                     }
 
-                    $texto .= "\nDocente: " . $this->nombreProfesor($sesion?->profesor);
+                    $texto .= "\nDocente: " . $this->nombreProfesor($tallerHorario->profesorActividad());
                     $texto .= "\nGrupos: " . ($grupos ?: 'Sin grupos');
                     $contenidos->push($texto);
                 }
@@ -454,6 +454,7 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
             ->with([
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
+                'profesorAsignado',
                 'tallerSesion.taller',
                 'tallerSesion.profesor',
                 'tallerSesion.grupos.grado',
