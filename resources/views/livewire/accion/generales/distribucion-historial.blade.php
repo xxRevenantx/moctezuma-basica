@@ -535,6 +535,7 @@
                                     <th class="px-4 py-4 text-center font-black">Ubicación</th>
                                     <th class="px-4 py-4 text-center font-black">Estatus</th>
                                     <th class="px-5 py-4 text-center font-black">Fecha</th>
+                                    <th class="px-5 py-4 text-center font-black">Acciones</th>
                                 </tr>
                             </thead>
 
@@ -615,10 +616,37 @@
                                                 </span>
                                             </div>
                                         </td>
+                                        <td class="px-5 py-4 text-center">
+                                            <button
+                                                type="button"
+                                                wire:click="verTrayectoria({{ (int) $fila['inscripcion_id'] }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="verTrayectoria({{ (int) $fila['inscripcion_id'] }})"
+                                                class="group/trajectory inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-3.5 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#006492]/40 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-neutral-900"
+                                                title="Ver línea del tiempo académica de {{ $fila['alumno'] }}"
+                                                aria-label="Ver línea del tiempo académica de {{ $fila['alumno'] }}">
+                                                <span
+                                                    wire:loading.remove
+                                                    wire:target="verTrayectoria({{ (int) $fila['inscripcion_id'] }})"
+                                                    class="flex h-5 w-5 items-center justify-center rounded-full bg-white/15">
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                                    </svg>
+                                                </span>
+                                                <svg
+                                                    wire:loading
+                                                    wire:target="verTrayectoria({{ (int) $fila['inscripcion_id'] }})"
+                                                    class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" />
+                                                    <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3Z" />
+                                                </svg>
+                                                <span class="hidden xl:inline">Trayectoria</span>
+                                            </button>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-6 py-16 text-center">
+                                        <td colspan="6" class="px-6 py-16 text-center">
                                             <div
                                                 class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">
                                                 <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none"
@@ -641,4 +669,6 @@
             </div>
         </div>
     </section>
+
+    <livewire:alumno.linea-tiempo-academica :key="'linea-tiempo-academica-' . $slug_nivel" />
 </div>

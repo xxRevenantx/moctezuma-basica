@@ -5,6 +5,7 @@ namespace App\Livewire\Accion\Generales;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
+use App\Models\Inscripcion;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
@@ -208,6 +209,30 @@ class DistribucionHistorial extends Component
         $this->busqueda_nominal = '';
         $this->genero_nominal = 'todos';
         $this->orden_nominal = 'nombre_asc';
+    }
+
+    public function verTrayectoria(int $inscripcionId): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
+
+        $existe = Inscripcion::withTrashed()
+            ->whereKey($inscripcionId)
+            ->exists();
+
+        if (! $existe) {
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: 'No fue posible localizar al alumno para consultar su trayectoria.'
+            );
+
+            return;
+        }
+
+        $this->dispatch(
+            'abrir-linea-tiempo-academica',
+            alumnoId: $inscripcionId
+        );
     }
 
     public function getUrlPdfProperty(): string
