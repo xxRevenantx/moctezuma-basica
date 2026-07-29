@@ -455,6 +455,39 @@
                 </p>
             </div>
 
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="font-black">Simulación verificada y lista para ejecutar</p>
+                        <p class="mt-1 text-xs leading-5">
+                            Firma: <code class="font-mono">{{ isset($vista_previa['hash']) ? substr($vista_previa['hash'], 0, 16).'…' : 'No disponible' }}</code>
+                            · Respaldo previsto: {{ $vista_previa['respaldo_items'] ?? 0 }} alumno(s).
+                        </p>
+                    </div>
+                    <span class="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                        Vigente hasta {{ isset($vista_previa['expira_at']) ? \Carbon\Carbon::parse($vista_previa['expira_at'])->format('d/m/Y H:i') : 'sin fecha' }}
+                    </span>
+                </div>
+            </div>
+
+            @if (!empty($vista_previa['advertencias']))
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <p class="font-black text-amber-900 dark:text-amber-100">Advertencias registradas en la simulación</p>
+                    <ul class="mt-2 space-y-1 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                        @foreach (array_slice($vista_previa['advertencias'], 0, 8) as $advertencia)
+                            <li>• {{ $advertencia }}</li>
+                        @endforeach
+                        @if (count($vista_previa['advertencias']) > 8)
+                            <li>• Y {{ count($vista_previa['advertencias']) - 8 }} advertencia(s) adicional(es).</li>
+                        @endif
+                    </ul>
+                </div>
+            @endif
+
+            <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-100">
+                Al confirmar, se generará un respaldo lógico firmado con el estado exacto de la inscripción, historial por ciclo, asignaciones y generación. Si la operación falla, la transacción completa se cancela.
+            </div>
+
             <div class="grid gap-4 lg:grid-cols-2">
                 <flux:input wire:model="confirmacion" label="Escribe CONFIRMAR" placeholder="CONFIRMAR" />
                 <flux:input type="password" wire:model="password_confirmacion" label="Contraseña del usuario" autocomplete="current-password" />
@@ -494,6 +527,9 @@
                             <td class="p-3 text-center">
                                 <span class="rounded-full px-2 py-1 text-xs font-black {{ $proceso->estado === 'revertido' ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-800' }}">
                                     {{ ucfirst($proceso->estado) }}
+                                </span>
+                                <span class="mt-1 block text-[10px] font-bold {{ str_starts_with((string) $proceso->integridad_estado, 'verificado') ? 'text-emerald-700' : 'text-slate-500' }}">
+                                    {{ str_starts_with((string) $proceso->integridad_estado, 'verificado') ? 'Respaldo verificado' : 'Proceso anterior / sin firma' }}
                                 </span>
                             </td>
                             <td class="p-3">
@@ -580,7 +616,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
             <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <h3 class="text-xl font-black text-slate-900 dark:text-white">Revertir proceso #{{ $procesoReversionId }}</h3>
-                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Solo procede cuando no existen calificaciones, documentos ni movimientos posteriores en el ciclo destino.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Solo procede cuando no existen calificaciones, documentos ni movimientos posteriores. Antes de restaurar, el sistema verifica la firma del respaldo general y de cada alumno.</p>
                 <div class="mt-5 space-y-4">
                     <flux:textarea wire:model="motivo_reversion" label="Motivo de reversión" rows="4" />
                     <flux:input type="password" wire:model="password_confirmacion" label="Contraseña del usuario" />

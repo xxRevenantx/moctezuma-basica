@@ -192,6 +192,20 @@ class AlumnosGenerales extends Component
         $this->actualizarVista();
     }
 
+    public function verTrayectoria(int $alumnoId): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
+
+        $existe = Inscripcion::withTrashed()->whereKey($alumnoId)->exists();
+
+        if (! $existe) {
+            $this->dispatch('notify', type: 'error', message: 'El alumno solicitado no existe.');
+            return;
+        }
+
+        $this->dispatch('abrir-linea-tiempo-academica', alumnoId: $alumnoId);
+    }
+
     public function verObservaciones(int $alumnoId): void
     {
         abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);

@@ -792,6 +792,13 @@
                                     </button>
 
                                     @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                        <button type="button" wire:click="verTrayectoria({{ $alumno->id }})"
+                                            wire:loading.attr="disabled" wire:target="verTrayectoria({{ $alumno->id }})"
+                                            class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-3 py-2 text-white shadow-sm transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+                                            title="Ver línea del tiempo académica">
+                                            <flux:icon.history class="h-4 w-4" />
+                                        </button>
+
                                         <button type="button" wire:click="verObservaciones({{ $alumno->id }})"
                                             wire:loading.attr="disabled" wire:target="verObservaciones({{ $alumno->id }})"
                                             class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-wait disabled:opacity-70"
@@ -1206,6 +1213,13 @@
                             </button>
 
                             @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                <button type="button" wire:click="verTrayectoria({{ $alumno->id }})"
+                                    wire:loading.attr="disabled" wire:target="verTrayectoria({{ $alumno->id }})"
+                                    class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-3 py-2 text-white disabled:opacity-70"
+                                    title="Ver línea del tiempo académica">
+                                    <flux:icon.history class="h-4 w-4" />
+                                </button>
+
                                 <button type="button" wire:click="verObservaciones({{ $alumno->id }})"
                                     wire:loading.attr="disabled" wire:target="verObservaciones({{ $alumno->id }})"
                                     class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-white disabled:opacity-70"
@@ -1324,4 +1338,6 @@
             </div>
         </div>
     @endif
+
+    <livewire:alumno.linea-tiempo-academica />
 </div>

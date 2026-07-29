@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\CarbonImmutable;
 use App\Models\CambioAcademico;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
@@ -15,8 +16,10 @@ use App\Models\ProcesoCierreCiclo;
 use App\Models\ProcesoCierreCicloDetalle;
 use App\Models\ProyeccionContinuidad;
 use App\Models\Semestre;
+use App\Models\SimulacionCierreCiclo;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +49,10 @@ class CierreGeneracionContinuidadService
     ];
 
     private const ESTATUS_PROCESABLES = ['activo', 'reingreso', 'no_promovido'];
+
+    private const SIMULACION_VERSION = 1;
+
+    private const SIMULACION_VIGENCIA_MINUTOS = 30;
 
     public function __construct(
         private readonly GestionAcademicaService $gestionAcademica,
@@ -423,11 +430,126 @@ class CierreGeneracionContinuidadService
         );
     }
 
-    public function ejecutar(array $configuracion, array $decisiones, int $usuarioId): ProcesoCierreCiclo
+    /**
+     * Genera una simulación firmada del cierre sin modificar datos.
+     *
+     * La firma incluye la configuración, las decisiones y el estado actual de
+     * cada alumno/historial. Si algo cambia antes de confirmar, la ejecución se
+     * bloquea y obliga a revisar nuevamente la simulación.
+     */
+    public function simular(array $configuracion, array $decisiones, int $usuarioId): array
     {
         $this->asegurarEsquemaCierreDisponible();
 
-        return DB::transaction(function () use ($configuracion, $decisiones, $usuarioId): ProcesoCierreCiclo {
+        $generacion = Generacion::query()->findOrFail((int) $configuracion['generacion_id']);
+        $nivel = Nivel::query()->findOrFail((int) $configuracion['nivel_id']);
+        $cicloOrigen = CicloEscolar::query()->findOrFail((int) $configuracion['ciclo_origen_id']);
+        $candidatos = $this->candidatos(
+            $nivel->id,
+            $cicloOrigen->id,
+            $generacion->id,
+            filled($configuracion['grupo_origen_id'] ?? null) ? (int) $configuracion['grupo_origen_id'] : null,
+        )->keyBy('id');
+
+        if ($candidatos->isEmpty()) {
+            throw ValidationException::withMessages([
+                'generacion_id' => 'No hay alumnos históricos en el contexto seleccionado.',
+            ]);
+        }
+
+        $this->validarConfiguracion($configuracion, $decisiones, $candidatos);
+        $this->prevalidarDecisionesSimulacion($configuracion, $decisiones, $candidatos);
+
+        $contenido = $this->construirContenidoSimulacion(
+            $configuracion,
+            $decisiones,
+            $candidatos,
+            $generacion,
+            $usuarioId,
+        );
+        $generadoAt = CarbonImmutable::now();
+        $expiraAt = $generadoAt->addMinutes(self::SIMULACION_VIGENCIA_MINUTOS);
+
+        $generadoAtIso = $generadoAt->toIso8601String();
+        $expiraAtIso = $expiraAt->toIso8601String();
+        $hash = $this->firmarContenido([
+            'version' => self::SIMULACION_VERSION,
+            'generado_at' => $generadoAtIso,
+            'expira_at' => $expiraAtIso,
+            'contenido' => $contenido,
+        ]);
+
+        $resumen = [
+            'total' => (int) ($contenido['totales']['procesables'] ?? 0),
+            'total_evaluados' => (int) ($contenido['totales']['evaluados'] ?? 0),
+            'sin_cambio' => (int) ($contenido['totales']['sin_cambio'] ?? 0),
+            'conteos' => $contenido['conteos'] ?? [],
+            'advertencias' => $contenido['advertencias'] ?? [],
+            'advertencias_total' => count($contenido['advertencias'] ?? []),
+            'respaldo_items' => count($contenido['alumnos'] ?? []),
+        ];
+
+        $registro = DB::transaction(function () use (
+            $usuarioId,
+            $nivel,
+            $cicloOrigen,
+            $generacion,
+            $configuracion,
+            $contenido,
+            $hash,
+            $resumen,
+            $generadoAt,
+            $expiraAt
+        ): SimulacionCierreCiclo {
+            SimulacionCierreCiclo::query()
+                ->where('usuario_id', $usuarioId)
+                ->where('nivel_id', $nivel->id)
+                ->where('ciclo_origen_id', $cicloOrigen->id)
+                ->where('generacion_id', $generacion->id)
+                ->where('estado', 'vigente')
+                ->update([
+                    'estado' => 'cancelada',
+                    'cancelada_at' => now(),
+                    'motivo_cancelacion' => 'Sustituida por una simulación más reciente.',
+                ]);
+
+            return SimulacionCierreCiclo::query()->create([
+                'uuid' => (string) Str::uuid(),
+                'usuario_id' => $usuarioId,
+                'nivel_id' => $nivel->id,
+                'ciclo_origen_id' => $cicloOrigen->id,
+                'ciclo_destino_id' => filled($configuracion['ciclo_destino_id'] ?? null)
+                    ? (int) $configuracion['ciclo_destino_id']
+                    : null,
+                'generacion_id' => $generacion->id,
+                'grupo_origen_id' => filled($configuracion['grupo_origen_id'] ?? null)
+                    ? (int) $configuracion['grupo_origen_id']
+                    : null,
+                'estado' => 'vigente',
+                'contenido' => $contenido,
+                'hash' => $hash,
+                'resumen' => $resumen,
+                'generado_at' => $generadoAt,
+                'expira_at' => $expiraAt,
+            ]);
+        });
+
+        return [
+            'id' => $registro->id,
+            'uuid' => $registro->uuid,
+            'version' => self::SIMULACION_VERSION,
+            'hash' => $registro->hash,
+            'generado_at' => $registro->generado_at?->toIso8601String(),
+            'expira_at' => $registro->expira_at?->toIso8601String(),
+            'resumen' => $registro->resumen ?? [],
+        ];
+    }
+
+    public function ejecutar(array $configuracion, array $decisiones, int $usuarioId, array $simulacion): ProcesoCierreCiclo
+    {
+        $this->asegurarEsquemaCierreDisponible();
+
+        return DB::transaction(function () use ($configuracion, $decisiones, $usuarioId, $simulacion): ProcesoCierreCiclo {
             $generacion = Generacion::query()->lockForUpdate()->findOrFail((int) $configuracion['generacion_id']);
             $nivel = Nivel::query()->findOrFail((int) $configuracion['nivel_id']);
             $cicloOrigen = CicloEscolar::query()->findOrFail((int) $configuracion['ciclo_origen_id']);
@@ -446,21 +568,34 @@ class CierreGeneracionContinuidadService
             }
 
             $this->validarConfiguracion($configuracion, $decisiones, $candidatos);
+            $this->prevalidarDecisionesSimulacion($configuracion, $decisiones, $candidatos);
+            $this->bloquearContextoSimulacion($candidatos);
+            $simulacionVerificada = $this->verificarSimulacion(
+                $simulacion,
+                $configuracion,
+                $decisiones,
+                $candidatos,
+                $generacion,
+                $usuarioId,
+            );
 
             $estadoGeneracionAnterior = $this->snapshotGeneracion($generacion);
+            $respaldoLogico = $this->construirRespaldoLogico(
+                $configuracion,
+                $decisiones,
+                $candidatos,
+                $generacion,
+                $usuarioId,
+            );
+            $respaldoHash = $this->firmarContenido($respaldoLogico);
             $generacion->update([
                 'estado_cierre' => 'en_proceso',
                 'cierre_iniciado_at' => now(),
                 'cierre_iniciado_por' => $usuarioId,
             ]);
 
-            $hash = hash('sha256', json_encode([
-                'configuracion' => $configuracion,
-                'decisiones' => collect($decisiones)->sortKeys()->all(),
-                'candidatos' => $candidatos->values()->all(),
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-
             $proceso = ProcesoCierreCiclo::query()->create([
+                'simulacion_cierre_ciclo_id' => $simulacionVerificada['id'],
                 'nivel_id' => $nivel->id,
                 'ciclo_escolar_id' => $cicloOrigen->id,
                 'ciclo_destino_id' => filled($configuracion['ciclo_destino_id'] ?? null)
@@ -479,8 +614,15 @@ class CierreGeneracionContinuidadService
                 'total_evaluados' => $candidatos->count(),
                 'generacion_cerrada' => false,
                 'ciclo_cerrado' => false,
-                'vista_previa_hash' => $hash,
+                'vista_previa_hash' => (string) $simulacionVerificada['hash'],
+                'simulacion' => $simulacionVerificada,
+                'simulado_at' => $simulacionVerificada['generado_at'],
+                'simulacion_expira_at' => $simulacionVerificada['expira_at'],
                 'estado_anterior_generacion' => $estadoGeneracionAnterior,
+                'respaldo_logico' => $respaldoLogico,
+                'respaldo_hash' => $respaldoHash,
+                'respaldo_verificado_at' => now(),
+                'integridad_estado' => 'verificado',
                 'resumen' => [
                     'configuracion' => $configuracion,
                     'modo_proceso' => $modo,
@@ -500,6 +642,8 @@ class CierreGeneracionContinuidadService
                 $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($id);
                 $origen = InscripcionCiclo::query()->lockForUpdate()->findOrFail((int) $fila['inscripcion_ciclo_id']);
                 $antes = $this->snapshotAlumno($alumno);
+                $respaldoDetalle = $this->construirRespaldoDetalle($alumno, $origen);
+                $respaldoDetalleHash = $this->firmarContenido($respaldoDetalle);
 
                 if (! $fila['procesable']) {
                     ProcesoCierreCicloDetalle::query()->create([
@@ -511,6 +655,9 @@ class CierreGeneracionContinuidadService
                         'destino_propuesto' => $decision,
                         'observacion' => 'El alumno ya tenía un resultado histórico o no pertenece actualmente al ciclo origen. No se modificó.',
                         'estado_anterior' => $antes,
+                        'respaldo_origen' => $respaldoDetalle,
+                        'respaldo_hash' => $respaldoDetalleHash,
+                        'respaldo_verificado_at' => now(),
                         'estado_nuevo' => $antes,
                     ]);
                     $sinCambio++;
@@ -660,6 +807,9 @@ class CierreGeneracionContinuidadService
                         ? 'Se creó una proyección provisional faltante sin modificar el resultado histórico del ciclo de origen.'
                         : $this->textoResultado($resultado, $modo),
                     'estado_anterior' => $antes,
+                    'respaldo_origen' => $respaldoDetalle,
+                    'respaldo_hash' => $respaldoDetalleHash,
+                    'respaldo_verificado_at' => now(),
                     'estado_nuevo' => $despues,
                 ]);
 
@@ -737,6 +887,8 @@ class CierreGeneracionContinuidadService
                 'total_procesados' => $procesados,
                 'total_excluidos' => $sinCambio,
                 'generacion_cerrada' => $cerrarGeneracion,
+                'respaldo_verificado_at' => now(),
+                'integridad_estado' => 'verificado',
                 'resumen' => array_merge($proceso->resumen ?? [], [
                     'modo_proceso' => $modo,
                     'procesados' => $procesados,
@@ -745,6 +897,13 @@ class CierreGeneracionContinuidadService
                     'generacion_despues' => $this->snapshotGeneracion($generacion->fresh()),
                 ]),
             ]);
+
+            SimulacionCierreCiclo::query()
+                ->whereKey((int) $simulacionVerificada['id'])
+                ->update([
+                    'estado' => 'consumida',
+                    'consumida_at' => now(),
+                ]);
 
             return $proceso->fresh(['detalles.inscripcion', 'generacion', 'cicloEscolar', 'cicloDestino']);
         });
@@ -936,7 +1095,14 @@ class CierreGeneracionContinuidadService
             return collect(['El proceso ya fue revertido o no está completado.']);
         }
 
+        if ($proceso->respaldo_logico && ! $this->firmaValida($proceso->respaldo_logico, $proceso->respaldo_hash)) {
+            $bloqueos->push('El respaldo general del proceso no supera la verificación de integridad.');
+        }
+
         foreach ($proceso->detalles as $detalle) {
+            if ($detalle->respaldo_origen && ! $this->firmaValida($detalle->respaldo_origen, $detalle->respaldo_hash)) {
+                $bloqueos->push(($detalle->inscripcion?->nombre ?: 'Alumno').': el respaldo individual fue alterado o está incompleto.');
+            }
             if ($detalle->resultado === 'sin_cambio') {
                 continue;
             }
@@ -999,16 +1165,33 @@ class CierreGeneracionContinuidadService
 
         return DB::transaction(function () use ($proceso, $motivo, $usuarioId): ProcesoCierreCiclo {
             $proceso = ProcesoCierreCiclo::query()->lockForUpdate()->findOrFail($proceso->id);
+
+            if ($proceso->respaldo_logico && ! $this->firmaValida($proceso->respaldo_logico, $proceso->respaldo_hash)) {
+                throw ValidationException::withMessages([
+                    'motivo_reversion' => 'El respaldo general no supera la verificación de integridad. No se realizó ningún cambio.',
+                ]);
+            }
+
             $detalles = $proceso->detalles()->with(['inscripcionCicloOrigen', 'inscripcionCicloDestino'])->orderByDesc('id')->get();
+            $restaurados = 0;
+            $omitidos = 0;
 
             foreach ($detalles as $detalle) {
                 if ($detalle->resultado === 'sin_cambio' || $detalle->revertido_at) {
+                    $omitidos++;
                     continue;
+                }
+
+                if ($detalle->respaldo_origen && ! $this->firmaValida($detalle->respaldo_origen, $detalle->respaldo_hash)) {
+                    throw ValidationException::withMessages([
+                        'motivo_reversion' => 'El respaldo individual del alumno #'.$detalle->inscripcion_id.' no supera la verificación de integridad.',
+                    ]);
                 }
 
                 $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($detalle->inscripcion_id);
                 $actual = $this->snapshotAlumno($alumno);
-                $anterior = $detalle->estado_anterior ?: [];
+                $respaldoDetalle = $detalle->respaldo_origen ?: [];
+                $anterior = $respaldoDetalle['inscripcion'] ?? $detalle->estado_anterior ?: [];
                 $destino = $detalle->inscripcionCicloDestino;
                 $origen = $detalle->inscripcionCicloOrigen;
                 $proyeccion = $detalle->proyeccionContinuidad;
@@ -1025,11 +1208,20 @@ class CierreGeneracionContinuidadService
                     $destino->delete();
                 }
 
+                if ($origen && is_array($respaldoDetalle['proyecciones_previas'] ?? null)) {
+                    $this->restaurarProyeccionesDesdeRespaldo(
+                        $origen,
+                        $respaldoDetalle['proyecciones_previas'],
+                        $proceso->id,
+                        $detalle->id,
+                    );
+                }
+
                 $alumno->forceFill(Arr::only($anterior, [
                     'matricula', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'grupo_id', 'semestre_id',
                     'ciclo_id', 'estatus', 'activo', 'fecha_estatus', 'motivo_estatus', 'fecha_baja', 'motivo_baja',
                     'observaciones_baja', 'indicador_reingreso', 'tipo_ultimo_ingreso', 'fecha_ultimo_ingreso',
-                    'documentacion_reingreso_pendiente', 'usuario_acceso_activo',
+                    'documentacion_reingreso_pendiente', 'usuario_acceso_activo', 'deleted_at',
                 ]))->save();
 
                 if ($alumno->trashed() && empty($anterior['deleted_at'])) {
@@ -1037,26 +1229,47 @@ class CierreGeneracionContinuidadService
                 }
 
                 if ($origen) {
-                    $origen->update([
-                        'estado' => 'en_curso',
-                        'fecha_salida' => null,
-                        'estatus_actual_ciclo' => $anterior['estatus'] ?? 'activo',
-                        'resultado_final' => null,
-                        'promovido' => false,
-                        'cerrado_at' => null,
-                        'cerrado_por' => null,
-                        'motivo_cierre' => null,
-                        'snapshot_cierre' => null,
-                        'inscripcion_ciclo_destino_id' => null,
-                    ]);
-                    $ultimaAsignacion = $origen->asignaciones()->latest('fecha_inicio')->latest('id')->first();
-                    if ($ultimaAsignacion) {
-                        $origen->asignaciones()->update(['es_actual' => false]);
-                        $ultimaAsignacion->update(['es_actual' => true, 'fecha_fin' => null]);
+                    $snapshotOrigen = $respaldoDetalle['inscripcion_ciclo'] ?? null;
+                    if (is_array($snapshotOrigen) && $snapshotOrigen !== []) {
+                        $origen->forceFill(Arr::except($snapshotOrigen, ['id', 'created_at', 'updated_at']))->saveQuietly();
+                        $this->restaurarAsignacionesDesdeRespaldo(
+                            $origen,
+                            is_array($respaldoDetalle['asignaciones'] ?? null) ? $respaldoDetalle['asignaciones'] : []
+                        );
+                    } else {
+                        $origen->update([
+                            'estado' => 'en_curso',
+                            'fecha_salida' => null,
+                            'estatus_actual_ciclo' => $anterior['estatus'] ?? 'activo',
+                            'resultado_final' => null,
+                            'promovido' => false,
+                            'cerrado_at' => null,
+                            'cerrado_por' => null,
+                            'motivo_cierre' => null,
+                            'snapshot_cierre' => null,
+                            'inscripcion_ciclo_destino_id' => null,
+                        ]);
+                        $ultimaAsignacion = $origen->asignaciones()->latest('fecha_inicio')->latest('id')->first();
+                        if ($ultimaAsignacion) {
+                            $origen->asignaciones()->update(['es_actual' => false]);
+                            $ultimaAsignacion->update(['es_actual' => true, 'fecha_fin' => null]);
+                        }
                     }
                 }
 
-                $this->matriculas->asegurarVigente($alumno->fresh(), 'reversion_cierre_generacion', $usuarioId, now()->toDateString());
+                if ($detalle->respaldo_origen && is_array($respaldoDetalle['matriculas'] ?? null)) {
+                    $this->restaurarMatriculasDesdeRespaldo(
+                        $alumno,
+                        $respaldoDetalle['matriculas'],
+                    );
+                } else {
+                    $this->matriculas->asegurarVigente(
+                        $alumno->fresh(),
+                        'reversion_cierre_generacion',
+                        $usuarioId,
+                        now()->toDateString(),
+                    );
+                }
                 $restaurado = $this->snapshotAlumno($alumno->fresh());
 
                 CambioAcademico::query()->create([
@@ -1090,15 +1303,21 @@ class CierreGeneracionContinuidadService
                 ]);
 
                 $detalle->update([
+                    'respaldo_verificado_at' => $detalle->respaldo_origen ? now() : $detalle->respaldo_verificado_at,
                     'revertido_at' => now(),
                     'revertido_por' => $usuarioId,
                     'motivo_reversion' => $motivo,
+                    'reversion_estado' => $detalle->respaldo_origen ? 'restaurado_desde_respaldo' : 'restaurado_legacy',
                 ]);
+                $restaurados++;
             }
 
             $generacion = Generacion::query()->lockForUpdate()->find($proceso->generacion_id);
-            if ($generacion && $proceso->estado_anterior_generacion) {
-                $generacion->forceFill(Arr::only($proceso->estado_anterior_generacion, [
+            $respaldoGeneracion = is_array($proceso->respaldo_logico['generacion'] ?? null)
+                ? $proceso->respaldo_logico['generacion']
+                : $proceso->estado_anterior_generacion;
+            if ($generacion && $respaldoGeneracion) {
+                $generacion->forceFill(Arr::only($respaldoGeneracion, [
                     'status', 'estado_cierre', 'cerrada_at', 'cerrada_por', 'motivo_desactivacion', 'observaciones',
                     'cierre_iniciado_at', 'cierre_iniciado_por', 'reactivada_at', 'reactivada_por', 'archivada_at', 'archivada_por',
                 ]))->save();
@@ -1106,13 +1325,633 @@ class CierreGeneracionContinuidadService
 
             $proceso->update([
                 'estado' => 'revertido',
+                'respaldo_verificado_at' => $proceso->respaldo_logico ? now() : $proceso->respaldo_verificado_at,
+                'integridad_estado' => $proceso->respaldo_logico ? 'verificado_reversion' : 'legacy',
                 'revertido_at' => now(),
                 'revertido_por' => $usuarioId,
                 'motivo_reversion' => $motivo,
+                'reversion_resumen' => [
+                    'restaurados' => $restaurados,
+                    'omitidos' => $omitidos,
+                    'metodo' => $proceso->respaldo_logico ? 'respaldo_logico_firmado' : 'snapshots_legacy',
+                    'revertido_at' => now()->toIso8601String(),
+                    'revertido_por' => $usuarioId,
+                ],
             ]);
 
             return $proceso->fresh(['detalles.inscripcion', 'generacion']);
         });
+    }
+
+    private function prevalidarDecisionesSimulacion(
+        array $configuracion,
+        array $decisiones,
+        Collection $candidatos
+    ): void {
+        $modo = (string) ($configuracion['modo_proceso'] ?? '');
+
+        foreach ($candidatos->where('procesable', true) as $id => $fila) {
+            $decision = $decisiones[$id] ?? $decisiones[(string) $id] ?? ['resultado' => 'pendiente'];
+            $resultado = (string) ($decision['resultado'] ?? 'pendiente');
+            $alumno = Inscripcion::withTrashed()->findOrFail((int) $fila['id']);
+
+            if (($fila['solo_proyeccion_historica'] ?? false) && $resultado !== 'continuidad_interna') {
+                throw ValidationException::withMessages([
+                    "decisiones.{$id}.resultado" => "{$fila['nombre']} ya tiene un resultado histórico. Solo puedes crear la proyección provisional faltante.",
+                ]);
+            }
+
+            if ($resultado === 'continuidad_interna') {
+                $destino = $this->destinoContinuidad($configuracion, $decision, $alumno);
+                $this->validarDestinoProyeccion($destino);
+                $this->asegurarDestinoDisponible($alumno, (int) $destino['ciclo_escolar_id'], $fila['nombre']);
+                continue;
+            }
+
+            if ($resultado === 'no_promovido') {
+                $destino = $this->destinoRepeticion($configuracion, $decision, $fila, $alumno);
+                $this->validarDestinoProyeccion($destino);
+                $this->asegurarDestinoDisponible($alumno, (int) $destino['ciclo_escolar_id'], $fila['nombre']);
+                continue;
+            }
+
+            if ($resultado === 'no_reinscrito' && $modo !== 'promocion_grado') {
+                throw ValidationException::withMessages([
+                    "decisiones.{$id}.resultado" => 'La opción no reinscrito solo corresponde a grados o semestres intermedios.',
+                ]);
+            }
+
+            if ($resultado === 'egresado' && ! ($fila['es_grado_final'] ?? false)) {
+                throw ValidationException::withMessages([
+                    "decisiones.{$id}.resultado" => "{$fila['nombre']} no está en el último grado o semestre.",
+                ]);
+            }
+        }
+    }
+
+    private function bloquearContextoSimulacion(Collection $candidatos): void
+    {
+        $idsAlumnos = $candidatos->pluck('id')->map(fn ($id): int => (int) $id)->filter()->unique()->values();
+        $idsHistoriales = $candidatos->pluck('inscripcion_ciclo_id')->map(fn ($id): int => (int) $id)->filter()->unique()->values();
+
+        Inscripcion::withTrashed()->whereIn('id', $idsAlumnos)->lockForUpdate()->get();
+        InscripcionCiclo::query()->whereIn('id', $idsHistoriales)->lockForUpdate()->get();
+
+        if (Schema::hasTable('inscripcion_ciclo_asignaciones')) {
+            DB::table('inscripcion_ciclo_asignaciones')
+                ->whereIn('inscripcion_ciclo_id', $idsHistoriales)
+                ->lockForUpdate()
+                ->get();
+        }
+
+        foreach ([
+            'calificaciones',
+            'ficha_descriptivas',
+            'calificaciones_campos_formativos',
+            'asistencias_finales_bachillerato',
+            'decisiones_promocion_oficial',
+            'lugares_preescolar',
+            'movimientos_alumnos',
+            'cambios_academicos',
+        ] as $tabla) {
+            if (Schema::hasTable($tabla) && Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
+                DB::table($tabla)
+                    ->whereIn('inscripcion_ciclo_id', $idsHistoriales)
+                    ->lockForUpdate()
+                    ->get();
+            }
+        }
+
+        if (Schema::hasTable('proyecciones_continuidad')) {
+            DB::table('proyecciones_continuidad')
+                ->whereIn('inscripcion_ciclo_origen_id', $idsHistoriales)
+                ->lockForUpdate()
+                ->get();
+        }
+
+        foreach (['documentos_alumnos', 'matriculas_alumnos'] as $tabla) {
+            if (Schema::hasTable($tabla) && Schema::hasColumn($tabla, 'inscripcion_id')) {
+                DB::table($tabla)
+                    ->whereIn('inscripcion_id', $idsAlumnos)
+                    ->lockForUpdate()
+                    ->get();
+            }
+        }
+    }
+
+    private function construirContenidoSimulacion(
+        array $configuracion,
+        array $decisiones,
+        Collection $candidatos,
+        Generacion $generacion,
+        int $usuarioId
+    ): array {
+        $idsHistoriales = $candidatos->pluck('inscripcion_ciclo_id')->map(fn ($id): int => (int) $id)->values();
+        $idsAlumnos = $candidatos->pluck('id')->map(fn ($id): int => (int) $id)->values();
+        $historiales = InscripcionCiclo::query()
+            ->with('asignaciones')
+            ->whereIn('id', $idsHistoriales)
+            ->get()
+            ->keyBy('id');
+        $alumnos = Inscripcion::withTrashed()->whereIn('id', $idsAlumnos)->get()->keyBy('id');
+        $huellasHistorial = $this->huellasDependenciasPorHistorial($idsHistoriales);
+        $huellasAlumno = $this->huellasDependenciasPorAlumno($idsAlumnos);
+
+        $filas = $candidatos
+            ->sortBy('id')
+            ->map(function (array $fila) use (
+                $decisiones,
+                $historiales,
+                $alumnos,
+                $huellasHistorial,
+                $huellasAlumno
+            ): array {
+                $id = (int) $fila['id'];
+                $historial = $historiales->get((int) $fila['inscripcion_ciclo_id']);
+                $alumno = $alumnos->get($id);
+                $decision = $this->normalizarDecision(
+                    $decisiones[$id] ?? $decisiones[(string) $id] ?? ['resultado' => 'pendiente']
+                );
+
+                return [
+                    'inscripcion_id' => $id,
+                    'inscripcion_ciclo_id' => (int) $fila['inscripcion_ciclo_id'],
+                    'nombre' => (string) $fila['nombre'],
+                    'procesable' => (bool) $fila['procesable'],
+                    'solo_proyeccion_historica' => (bool) ($fila['solo_proyeccion_historica'] ?? false),
+                    'resultado_existente' => $fila['resultado_existente'] ?? null,
+                    'decision' => $decision,
+                    'advertencias' => array_values($fila['advertencias'] ?? []),
+                    'inscripcion' => $alumno ? array_merge($this->snapshotAlumno($alumno), [
+                        'updated_at' => optional($alumno->updated_at)->toIso8601String(),
+                    ]) : [],
+                    'historial' => $historial ? $this->snapshotHistorialParaFirma($historial) : [],
+                    'asignaciones' => $historial
+                        ? $historial->asignaciones->map(fn ($asignacion): array => $asignacion->getAttributes())->values()->all()
+                        : [],
+                    'dependencias_historial' => $huellasHistorial[(int) $fila['inscripcion_ciclo_id']] ?? [],
+                    'dependencias_alumno' => $huellasAlumno[$id] ?? [],
+                ];
+            })
+            ->values();
+
+        $procesables = $filas->where('procesable', true);
+        $conteos = $procesables
+            ->map(fn (array $fila): string => (string) ($fila['decision']['resultado'] ?? 'pendiente'))
+            ->countBy()
+            ->sortKeys()
+            ->all();
+        $advertencias = $filas
+            ->flatMap(function (array $fila): array {
+                return array_map(
+                    fn (string $advertencia): string => $fila['nombre'].': '.$advertencia,
+                    $fila['advertencias'] ?? []
+                );
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'version' => self::SIMULACION_VERSION,
+            'simulado_por' => $usuarioId,
+            'configuracion' => $this->normalizarConfiguracionSimulacion($configuracion),
+            'generacion' => [
+                'id' => (int) $generacion->id,
+                'snapshot' => $this->snapshotGeneracion($generacion),
+                'updated_at' => optional($generacion->updated_at)->toIso8601String(),
+            ],
+            'totales' => [
+                'evaluados' => $filas->count(),
+                'procesables' => $procesables->count(),
+                'sin_cambio' => $filas->where('procesable', false)->count(),
+            ],
+            'conteos' => $conteos,
+            'advertencias' => $advertencias,
+            'alumnos' => $filas->all(),
+        ];
+    }
+
+    private function verificarSimulacion(
+        array $simulacion,
+        array $configuracion,
+        array $decisiones,
+        Collection $candidatos,
+        Generacion $generacion,
+        int $usuarioId
+    ): array {
+        foreach (['id', 'uuid', 'hash'] as $campo) {
+            if (blank($simulacion[$campo] ?? null)) {
+                throw ValidationException::withMessages([
+                    'confirmacion' => 'La simulación no está completa. Regresa al paso anterior y vuelve a generarla.',
+                ]);
+            }
+        }
+
+        $registro = SimulacionCierreCiclo::query()
+            ->lockForUpdate()
+            ->whereKey((int) $simulacion['id'])
+            ->where('uuid', (string) $simulacion['uuid'])
+            ->first();
+
+        if (! $registro || (int) $registro->usuario_id !== $usuarioId) {
+            throw ValidationException::withMessages([
+                'confirmacion' => 'La simulación no pertenece al usuario actual o ya no está disponible.',
+            ]);
+        }
+
+        if ($registro->estado !== 'vigente') {
+            throw ValidationException::withMessages([
+                'confirmacion' => 'La simulación ya fue utilizada, cancelada o sustituida. Vuelve a generarla.',
+            ]);
+        }
+
+        if ($registro->expira_at?->isPast()) {
+            $registro->update(['estado' => 'expirada']);
+            throw ValidationException::withMessages([
+                'confirmacion' => 'La simulación expiró. Regresa a revisión para verificar nuevamente los datos.',
+            ]);
+        }
+
+        if (! hash_equals((string) $registro->hash, (string) $simulacion['hash'])) {
+            throw ValidationException::withMessages([
+                'confirmacion' => 'La firma enviada no coincide con la simulación guardada.',
+            ]);
+        }
+
+        $firmaAlmacenada = $this->firmarContenido([
+            'version' => self::SIMULACION_VERSION,
+            'generado_at' => $registro->generado_at?->toIso8601String(),
+            'expira_at' => $registro->expira_at?->toIso8601String(),
+            'contenido' => $registro->contenido ?? [],
+        ]);
+        if (! hash_equals((string) $registro->hash, $firmaAlmacenada)) {
+            throw ValidationException::withMessages([
+                'confirmacion' => 'La simulación guardada no supera la verificación de integridad.',
+            ]);
+        }
+
+        $contenidoActual = $this->construirContenidoSimulacion(
+            $configuracion,
+            $decisiones,
+            $candidatos,
+            $generacion,
+            $usuarioId,
+        );
+        $hashActual = $this->firmarContenido([
+            'version' => self::SIMULACION_VERSION,
+            'generado_at' => $registro->generado_at?->toIso8601String(),
+            'expira_at' => $registro->expira_at?->toIso8601String(),
+            'contenido' => $contenidoActual,
+        ]);
+
+        if (! hash_equals((string) $registro->hash, $hashActual)) {
+            throw ValidationException::withMessages([
+                'confirmacion' => 'Los alumnos, decisiones o destinos cambiaron después de la simulación. Regresa a revisión antes de confirmar.',
+            ]);
+        }
+
+        return [
+            'id' => $registro->id,
+            'uuid' => $registro->uuid,
+            'version' => self::SIMULACION_VERSION,
+            'hash' => $hashActual,
+            'generado_at' => $registro->generado_at?->toIso8601String(),
+            'expira_at' => $registro->expira_at?->toIso8601String(),
+            'contenido' => $contenidoActual,
+            'resumen' => $registro->resumen ?? [],
+        ];
+    }
+
+    private function snapshotHistorialParaFirma(InscripcionCiclo $historial): array
+    {
+        return Arr::only($historial->getAttributes(), [
+            'id', 'inscripcion_id', 'ciclo_escolar_id', 'matricula', 'nivel_id', 'grado_id', 'generacion_id',
+            'grupo_id', 'semestre_id', 'fecha_ingreso', 'fecha_salida', 'estado', 'estatus_ingreso',
+            'estatus_actual_ciclo', 'resultado_final', 'promovido', 'cerrado_at', 'cerrado_por', 'motivo_cierre',
+            'inscripcion_ciclo_destino_id', 'snapshot_ingreso', 'snapshot_cierre', 'origen', 'reconstruido',
+            'nivel_confianza', 'updated_at',
+        ]);
+    }
+
+    private function huellasDependenciasPorHistorial(Collection $idsHistoriales): array
+    {
+        $ids = $idsHistoriales->map(fn ($id): int => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $tablas = [
+            'calificaciones',
+            'ficha_descriptivas',
+            'calificaciones_campos_formativos',
+            'asistencias_finales_bachillerato',
+            'decisiones_promocion_oficial',
+            'lugares_preescolar',
+            'movimientos_alumnos',
+            'cambios_academicos',
+            'proyecciones_continuidad',
+        ];
+        $huellas = [];
+
+        foreach ($tablas as $tabla) {
+            if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
+                if ($tabla !== 'proyecciones_continuidad'
+                    || ! Schema::hasTable($tabla)
+                    || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_origen_id')) {
+                    continue;
+                }
+            }
+
+            $columna = $tabla === 'proyecciones_continuidad'
+                ? 'inscripcion_ciclo_origen_id'
+                : 'inscripcion_ciclo_id';
+            $query = DB::table($tabla)
+                ->select($columna)
+                ->selectRaw('COUNT(*) AS total');
+            if (Schema::hasColumn($tabla, 'updated_at')) {
+                $query->selectRaw('MAX(updated_at) AS ultima_actualizacion');
+            } else {
+                $query->selectRaw('NULL AS ultima_actualizacion');
+            }
+
+            foreach ($query->whereIn($columna, $ids)->groupBy($columna)->get() as $fila) {
+                $historialId = (int) $fila->{$columna};
+                $huellas[$historialId][$tabla] = [
+                    'total' => (int) $fila->total,
+                    'ultima_actualizacion' => $fila->ultima_actualizacion,
+                ];
+            }
+        }
+
+        foreach ($huellas as &$dependencias) {
+            ksort($dependencias);
+        }
+        unset($dependencias);
+
+        return $huellas;
+    }
+
+    private function huellasDependenciasPorAlumno(Collection $idsAlumnos): array
+    {
+        $ids = $idsAlumnos->map(fn ($id): int => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $tablas = ['documentos_alumnos', 'matriculas_alumnos'];
+        $huellas = [];
+
+        foreach ($tablas as $tabla) {
+            if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_id')) {
+                continue;
+            }
+
+            $query = DB::table($tabla)
+                ->select('inscripcion_id')
+                ->selectRaw('COUNT(*) AS total');
+            if (Schema::hasColumn($tabla, 'updated_at')) {
+                $query->selectRaw('MAX(updated_at) AS ultima_actualizacion');
+            } else {
+                $query->selectRaw('NULL AS ultima_actualizacion');
+            }
+
+            foreach ($query->whereIn('inscripcion_id', $ids)->groupBy('inscripcion_id')->get() as $fila) {
+                $alumnoId = (int) $fila->inscripcion_id;
+                $huellas[$alumnoId][$tabla] = [
+                    'total' => (int) $fila->total,
+                    'ultima_actualizacion' => $fila->ultima_actualizacion,
+                ];
+            }
+        }
+
+        foreach ($huellas as &$dependencias) {
+            ksort($dependencias);
+        }
+        unset($dependencias);
+
+        return $huellas;
+    }
+
+    private function construirRespaldoLogico(
+        array $configuracion,
+        array $decisiones,
+        Collection $candidatos,
+        Generacion $generacion,
+        int $usuarioId
+    ): array {
+        $respaldos = [];
+
+        foreach ($candidatos->sortBy('id') as $id => $fila) {
+            $alumno = Inscripcion::withTrashed()->findOrFail((int) $fila['id']);
+            $historial = InscripcionCiclo::query()->findOrFail((int) $fila['inscripcion_ciclo_id']);
+            $respaldos[] = array_merge(
+                $this->construirRespaldoDetalle($alumno, $historial),
+                [
+                    'decision' => $this->normalizarDecision(
+                        $decisiones[$id] ?? $decisiones[(string) $id] ?? ['resultado' => 'pendiente']
+                    ),
+                    'procesable' => (bool) $fila['procesable'],
+                ]
+            );
+        }
+
+        return [
+            'version' => 1,
+            'generado_at' => now()->toIso8601String(),
+            'generado_por' => $usuarioId,
+            'configuracion' => $this->normalizarConfiguracionSimulacion($configuracion),
+            'generacion' => $generacion->getAttributes(),
+            'alumnos' => $respaldos,
+        ];
+    }
+
+    private function construirRespaldoDetalle(Inscripcion $alumno, InscripcionCiclo $historial): array
+    {
+        $historial->loadMissing('asignaciones');
+
+        return [
+            'version' => 1,
+            'inscripcion_id' => (int) $alumno->id,
+            'inscripcion_ciclo_id' => (int) $historial->id,
+            'inscripcion' => $alumno->getAttributes(),
+            'inscripcion_ciclo' => $historial->getAttributes(),
+            'asignaciones' => $historial->asignaciones
+                ->map(fn ($asignacion): array => $asignacion->getAttributes())
+                ->values()
+                ->all(),
+            'matriculas' => Schema::hasTable('matriculas_alumnos')
+                ? DB::table('matriculas_alumnos')
+                    ->where('inscripcion_id', $alumno->id)
+                    ->orderBy('id')
+                    ->get()
+                    ->map(fn ($matricula): array => (array) $matricula)
+                    ->values()
+                    ->all()
+                : [],
+            'proyecciones_previas' => ProyeccionContinuidad::query()
+                ->where('inscripcion_ciclo_origen_id', $historial->id)
+                ->orderBy('id')
+                ->get()
+                ->map(fn (ProyeccionContinuidad $proyeccion): array => $proyeccion->getAttributes())
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function normalizarConfiguracionSimulacion(array $configuracion): array
+    {
+        return [
+            'nivel_id' => (int) ($configuracion['nivel_id'] ?? 0),
+            'ciclo_origen_id' => (int) ($configuracion['ciclo_origen_id'] ?? 0),
+            'generacion_id' => (int) ($configuracion['generacion_id'] ?? 0),
+            'grupo_origen_id' => filled($configuracion['grupo_origen_id'] ?? null) ? (int) $configuracion['grupo_origen_id'] : null,
+            'ciclo_destino_id' => filled($configuracion['ciclo_destino_id'] ?? null) ? (int) $configuracion['ciclo_destino_id'] : null,
+            'nivel_destino_id' => filled($configuracion['nivel_destino_id'] ?? null) ? (int) $configuracion['nivel_destino_id'] : null,
+            'grado_destino_id' => filled($configuracion['grado_destino_id'] ?? null) ? (int) $configuracion['grado_destino_id'] : null,
+            'semestre_destino_id' => filled($configuracion['semestre_destino_id'] ?? null) ? (int) $configuracion['semestre_destino_id'] : null,
+            'generacion_destino_id' => filled($configuracion['generacion_destino_id'] ?? null) ? (int) $configuracion['generacion_destino_id'] : null,
+            'modo_proceso' => (string) ($configuracion['modo_proceso'] ?? ''),
+            'tipo_proyeccion' => (string) ($configuracion['tipo_proyeccion'] ?? ''),
+            'fecha_efectiva' => (string) ($configuracion['fecha_efectiva'] ?? ''),
+            'motivo' => trim((string) ($configuracion['motivo'] ?? '')),
+            'cerrar_generacion' => (bool) ($configuracion['cerrar_generacion'] ?? false),
+        ];
+    }
+
+    private function normalizarDecision(array $decision): array
+    {
+        return [
+            'resultado' => (string) ($decision['resultado'] ?? 'pendiente'),
+            'motivo' => trim((string) ($decision['motivo'] ?? '')),
+            'escuela_destino' => trim((string) ($decision['escuela_destino'] ?? '')),
+            'grupo_destino_id' => filled($decision['grupo_destino_id'] ?? null) ? (int) $decision['grupo_destino_id'] : null,
+            'matricula' => mb_strtoupper(trim((string) ($decision['matricula'] ?? ''))),
+        ];
+    }
+
+    private function firmarContenido(array $contenido): string
+    {
+        $normalizado = $this->normalizarParaFirma($contenido);
+        $json = json_encode(
+            $normalizado,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR
+        );
+
+        return hash_hmac('sha256', $json, (string) config('app.key'));
+    }
+
+    private function firmaValida(?array $contenido, ?string $firma): bool
+    {
+        if (! $contenido || blank($firma)) {
+            return false;
+        }
+
+        return hash_equals((string) $firma, $this->firmarContenido($contenido));
+    }
+
+    private function normalizarParaFirma(mixed $valor): mixed
+    {
+        if (! is_array($valor)) {
+            return $valor;
+        }
+
+        if (array_is_list($valor)) {
+            return array_map(fn (mixed $item): mixed => $this->normalizarParaFirma($item), $valor);
+        }
+
+        ksort($valor);
+        foreach ($valor as $clave => $item) {
+            $valor[$clave] = $this->normalizarParaFirma($item);
+        }
+
+        return $valor;
+    }
+
+    private function restaurarAsignacionesDesdeRespaldo(InscripcionCiclo $origen, array $asignaciones): void
+    {
+        $ids = collect($asignaciones)->pluck('id')->filter()->map(fn ($id): int => (int) $id)->values();
+        $query = DB::table('inscripcion_ciclo_asignaciones')->where('inscripcion_ciclo_id', $origen->id);
+
+        if ($ids->isEmpty()) {
+            $query->delete();
+        } else {
+            $query->whereNotIn('id', $ids)->delete();
+        }
+
+        foreach ($asignaciones as $asignacion) {
+            $id = (int) ($asignacion['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            DB::table('inscripcion_ciclo_asignaciones')->updateOrInsert(
+                ['id' => $id],
+                Arr::except($asignacion, ['id'])
+            );
+        }
+    }
+
+    private function restaurarMatriculasDesdeRespaldo(Inscripcion $alumno, array $matriculas): void
+    {
+        if (! Schema::hasTable('matriculas_alumnos')) {
+            return;
+        }
+
+        $ids = collect($matriculas)->pluck('id')->filter()->map(fn ($id): int => (int) $id)->values();
+        $query = DB::table('matriculas_alumnos')->where('inscripcion_id', $alumno->id);
+
+        if ($ids->isEmpty()) {
+            $query->delete();
+        } else {
+            $query->whereNotIn('id', $ids)->delete();
+        }
+
+        foreach ($matriculas as $matricula) {
+            $id = (int) ($matricula['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            DB::table('matriculas_alumnos')->updateOrInsert(
+                ['id' => $id],
+                Arr::except($matricula, ['id'])
+            );
+        }
+    }
+
+    private function restaurarProyeccionesDesdeRespaldo(
+        InscripcionCiclo $origen,
+        array $proyecciones,
+        int $procesoId,
+        int $detalleId
+    ): void {
+        if (! Schema::hasTable('proyecciones_continuidad')) {
+            return;
+        }
+
+        $idsPrevios = collect($proyecciones)->pluck('id')->filter()->map(fn ($id): int => (int) $id)->values();
+
+        DB::table('proyecciones_continuidad')
+            ->where('inscripcion_ciclo_origen_id', $origen->id)
+            ->where(function ($query) use ($procesoId, $detalleId): void {
+                $query->where('proceso_cierre_ciclo_id', $procesoId)
+                    ->orWhere('proceso_cierre_ciclo_detalle_id', $detalleId);
+            })
+            ->when($idsPrevios->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $idsPrevios))
+            ->delete();
+
+        foreach ($proyecciones as $proyeccion) {
+            $id = (int) ($proyeccion['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            DB::table('proyecciones_continuidad')->updateOrInsert(
+                ['id' => $id],
+                Arr::except($proyeccion, ['id'])
+            );
+        }
     }
 
     private function asegurarEsquemaCierreDisponible(): void
@@ -1125,24 +1964,51 @@ class CierreGeneracionContinuidadService
                 'archivada_at',
                 'archivada_por',
             ],
+            'simulaciones_cierre_ciclo' => [
+                'uuid',
+                'usuario_id',
+                'nivel_id',
+                'ciclo_origen_id',
+                'generacion_id',
+                'estado',
+                'contenido',
+                'hash',
+                'resumen',
+                'generado_at',
+                'expira_at',
+                'consumida_at',
+            ],
             'procesos_cierre_ciclo' => [
+                'simulacion_cierre_ciclo_id',
                 'ciclo_destino_id',
                 'grupo_origen_id',
                 'alcance',
                 'fecha_efectiva',
                 'vista_previa_hash',
+                'simulacion',
+                'simulado_at',
+                'simulacion_expira_at',
                 'estado_anterior_generacion',
+                'respaldo_logico',
+                'respaldo_hash',
+                'respaldo_verificado_at',
+                'integridad_estado',
                 'confirmacion_at',
                 'motivo_reversion',
+                'reversion_resumen',
             ],
             'procesos_cierre_ciclo_detalles' => [
                 'inscripcion_ciclo_origen_id',
                 'inscripcion_ciclo_destino_id',
                 'resultado_propuesto',
                 'destino_propuesto',
+                'respaldo_origen',
+                'respaldo_hash',
+                'respaldo_verificado_at',
                 'revertido_at',
                 'revertido_por',
                 'motivo_reversion',
+                'reversion_estado',
             ],
             'proyecciones_continuidad' => [
                 'inscripcion_id',

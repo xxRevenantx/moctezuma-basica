@@ -14,15 +14,22 @@ class ProcesoCierreCiclo extends Model
         'fecha_egreso' => 'date',
         'fecha_efectiva' => 'date',
         'resumen' => 'array',
+        'simulacion' => 'array',
         'estado_anterior_generacion' => 'array',
+        'respaldo_logico' => 'array',
+        'reversion_resumen' => 'array',
         'generacion_cerrada' => 'boolean',
         'ciclo_cerrado' => 'boolean',
         'realizado_at' => 'datetime',
         'confirmacion_at' => 'datetime',
+        'simulado_at' => 'datetime',
+        'simulacion_expira_at' => 'datetime',
+        'respaldo_verificado_at' => 'datetime',
         'revertido_at' => 'datetime',
     ];
 
     public function detalles() { return $this->hasMany(ProcesoCierreCicloDetalle::class); }
+    public function simulacionCierre() { return $this->belongsTo(SimulacionCierreCiclo::class, 'simulacion_cierre_ciclo_id'); }
     public function proyeccionesContinuidad() { return $this->hasMany(ProyeccionContinuidad::class, 'proceso_cierre_ciclo_id'); }
     public function generacion() { return $this->belongsTo(Generacion::class); }
     public function nivel() { return $this->belongsTo(Nivel::class); }

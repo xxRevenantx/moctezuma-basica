@@ -54,6 +54,7 @@ class CierreNivelContinuidad extends Component
     public array $grupos_continuidad = [];
     public array $grupos_repeticion = [];
     public array $vista_previa = [];
+    public array $simulacion_cierre = [];
 
     public string $buscar = '';
     public string $filtro_resultado = '';
@@ -386,7 +387,7 @@ class CierreNivelContinuidad extends Component
         $this->resetValidation('grupo_masivo_id');
     }
 
-    public function siguiente(): void
+    public function siguiente(CierreGeneracionContinuidadService $service): void
     {
         if ($this->paso === 2) {
             $pendientes = collect($this->alumnos)
@@ -403,8 +404,9 @@ class CierreNivelContinuidad extends Component
 
         if ($this->paso === 3) {
             $this->validarDestinos();
-            $this->paso = 4;
+            $this->simulacion_cierre = [];
             $this->vista_previa = $this->construirVistaPrevia();
+            $this->paso = 4;
             return;
         }
 
@@ -414,12 +416,32 @@ class CierreNivelContinuidad extends Component
                 'motivo' => ['required', 'string', 'min:10', 'max:1500'],
                 'cerrar_generacion' => ['boolean'],
             ]);
+
+            $this->simulacion_cierre = $service->simular(
+                $this->construirConfiguracion(),
+                $this->decisiones,
+                (int) auth()->id(),
+            );
+            $this->vista_previa = array_merge(
+                $this->construirVistaPrevia(),
+                $this->simulacion_cierre['resumen'] ?? [],
+                [
+                    'hash' => $this->simulacion_cierre['hash'] ?? null,
+                    'generado_at' => $this->simulacion_cierre['generado_at'] ?? null,
+                    'expira_at' => $this->simulacion_cierre['expira_at'] ?? null,
+                ]
+            );
             $this->paso = 5;
         }
     }
 
     public function anterior(): void
     {
+        if ($this->paso === 5) {
+            $this->simulacion_cierre = [];
+            $this->vista_previa = $this->construirVistaPrevia();
+        }
+
         $this->paso = max(1, $this->paso - 1);
         $this->resetValidation();
     }
@@ -438,24 +460,17 @@ class CierreNivelContinuidad extends Component
             return;
         }
 
-        $configuracion = [
-            'nivel_id' => $this->nivel->id,
-            'ciclo_origen_id' => $this->ciclo_origen_id,
-            'generacion_id' => $this->generacion_id,
-            'grupo_origen_id' => $this->grupo_origen_id,
-            'ciclo_destino_id' => $this->ciclo_destino_id,
-            'nivel_destino_id' => $this->nivel_destino_id,
-            'grado_destino_id' => $this->grado_destino_id,
-            'semestre_destino_id' => $this->semestre_destino_id,
-            'generacion_destino_id' => $this->generacion_destino_id,
-            'modo_proceso' => $this->modo_proceso,
-            'tipo_proyeccion' => $this->tipo_proyeccion,
-            'fecha_efectiva' => $this->fecha_efectiva,
-            'motivo' => trim($this->motivo),
-            'cerrar_generacion' => $this->cerrar_generacion,
-        ];
+        if ($this->simulacion_cierre === []) {
+            $this->addError('confirmacion', 'La simulación no está disponible. Regresa al paso anterior y vuelve a revisarla.');
+            return;
+        }
 
-        $proceso = $service->ejecutar($configuracion, $this->decisiones, (int) auth()->id());
+        $proceso = $service->ejecutar(
+            $this->construirConfiguracion(),
+            $this->decisiones,
+            (int) auth()->id(),
+            $this->simulacion_cierre,
+        );
         $this->reiniciarAsistente();
         $this->cargarGeneracionesOrigen();
         $this->refrescarProcesos();
@@ -938,6 +953,26 @@ class CierreNivelContinuidad extends Component
         // Esto permite cerrar el ciclo aun cuando la distribución final de grupos no esté lista.
     }
 
+    private function construirConfiguracion(): array
+    {
+        return [
+            'nivel_id' => $this->nivel->id,
+            'ciclo_origen_id' => $this->ciclo_origen_id,
+            'generacion_id' => $this->generacion_id,
+            'grupo_origen_id' => $this->grupo_origen_id,
+            'ciclo_destino_id' => $this->ciclo_destino_id,
+            'nivel_destino_id' => $this->nivel_destino_id,
+            'grado_destino_id' => $this->grado_destino_id,
+            'semestre_destino_id' => $this->semestre_destino_id,
+            'generacion_destino_id' => $this->generacion_destino_id,
+            'modo_proceso' => $this->modo_proceso,
+            'tipo_proyeccion' => $this->tipo_proyeccion,
+            'fecha_efectiva' => $this->fecha_efectiva,
+            'motivo' => trim($this->motivo),
+            'cerrar_generacion' => $this->cerrar_generacion,
+        ];
+    }
+
     private function construirVistaPrevia(): array
     {
         $idsProcesables = collect($this->alumnos)
@@ -1031,6 +1066,7 @@ class CierreNivelContinuidad extends Component
         $this->grupos_continuidad = [];
         $this->grupos_repeticion = [];
         $this->vista_previa = [];
+        $this->simulacion_cierre = [];
         $this->buscar = '';
         $this->filtro_resultado = '';
         $this->filtro_estatus = '';

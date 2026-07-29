@@ -59,6 +59,9 @@
         <p><span class="label">Motivo:</span> {{ $proceso->motivo }}</p>
         <p><span class="label">Observación:</span> {{ $detalle->observacion }}</p>
         <p><span class="label">Responsable:</span> {{ $proceso->usuarioRealizo?->name }}</p>
+        <p><span class="label">Integridad del proceso:</span> {{ str_starts_with((string) $proceso->integridad_estado, 'verificado') ? 'Respaldo verificado' : 'Proceso anterior / sin firma' }}</p>
+        <p><span class="label">Firma de simulación:</span> {{ $proceso->vista_previa_hash ? substr($proceso->vista_previa_hash, 0, 16).'…' : 'No disponible' }}</p>
+        <p><span class="label">Firma individual:</span> {{ $detalle->respaldo_hash ? substr($detalle->respaldo_hash, 0, 16).'…' : 'No disponible' }}</p>
     </div>
 
     <table style="margin-top:55px;text-align:center"><tr><td style="width:45%;border-top:1px solid #334155">Control Escolar</td><td style="width:10%;border:0"></td><td style="width:45%;border-top:1px solid #334155">Dirección</td></tr></table>

@@ -12,8 +12,10 @@ class ProcesoCierreCicloDetalle extends Model
 
     protected $casts = [
         'estado_anterior' => 'array',
+        'respaldo_origen' => 'array',
         'estado_nuevo' => 'array',
         'destino_propuesto' => 'array',
+        'respaldo_verificado_at' => 'datetime',
         'revertido_at' => 'datetime',
     ];
 

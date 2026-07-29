@@ -62,6 +62,8 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             'Fecha efectiva',
             'Escuela destino',
             'Observación',
+            'Integridad del proceso',
+            'Firma de respaldo individual',
             'Revertido',
         ];
     }
@@ -106,6 +108,8 @@ class CierreGeneracionExport implements FromCollection, WithHeadings, WithMappin
             $propuesto['fecha_efectiva'] ?? $this->proceso->fecha_efectiva?->format('Y-m-d'),
             $propuesto['escuela_destino'] ?? '',
             $detalle->observacion,
+            str_starts_with((string) $this->proceso->integridad_estado, 'verificado') ? 'Respaldo verificado' : 'Proceso anterior / sin firma',
+            $detalle->respaldo_hash ?: 'No disponible',
             $detalle->revertido_at ? 'Sí' : 'No',
         ];
     }

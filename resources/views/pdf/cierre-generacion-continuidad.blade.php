@@ -54,6 +54,11 @@
             <td colspan="2"><b>Motivo:</b> {{ $proceso->motivo }}</td>
             <td><b>Responsable:</b> {{ $proceso->usuarioRealizo?->name ?? 'Sin registro' }}</td>
         </tr>
+        <tr>
+            <td><b>Integridad:</b> {{ str_starts_with((string) $proceso->integridad_estado, 'verificado') ? 'Respaldo verificado' : 'Proceso anterior / sin firma' }}</td>
+            <td><b>Firma de simulación:</b> {{ $proceso->vista_previa_hash ? substr($proceso->vista_previa_hash, 0, 16).'…' : 'No disponible' }}</td>
+            <td><b>Firma de respaldo:</b> {{ $proceso->respaldo_hash ? substr($proceso->respaldo_hash, 0, 16).'…' : 'No disponible' }}</td>
+        </tr>
         @if($proceso->revertido_at)
             <tr><td colspan="3" class="reverted"><b>Proceso revertido:</b> {{ $proceso->revertido_at->format('d/m/Y H:i') }}. {{ $proceso->motivo_reversion }}</td></tr>
         @endif
