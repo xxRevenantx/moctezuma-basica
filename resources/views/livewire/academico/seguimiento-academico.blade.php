@@ -152,78 +152,143 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                    @forelse ($evaluaciones as $evaluacion)
-                        @php
-                            $estilo = $riesgoClases[$evaluacion->nivel_riesgo] ?? $riesgoClases['bajo'];
-                            $caso = $evaluacion->casos->first();
-                        @endphp
-                        <tr class="transition hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] font-black text-white">
-                                        {{ $evaluacion->inicial_alumno }}
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="truncate font-black text-slate-900 dark:text-white">{{ $evaluacion->nombre_alumno }}</p>
-                                        <p class="mt-1 text-xs text-slate-500">{{ $evaluacion->inscripcion?->matricula ?: 'Sin matrícula' }} · {{ $evaluacion->inscripcion?->curp ?: 'Sin CURP' }}</p>
-                                        <p class="mt-1 text-[11px] text-slate-400">Evaluado {{ $evaluacion->evaluado_at?->diffForHumans() }}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4 text-center">
-                                <div class="inline-flex min-w-24 flex-col items-center rounded-2xl border px-3 py-2 {{ $estilo['fondo'] }}">
-                                    <span class="flex items-center gap-2 text-xs font-black uppercase {{ $estilo['texto'] }}">
-                                        <span class="h-2.5 w-2.5 rounded-full {{ $estilo['punto'] }}"></span>
-                                        {{ $evaluacion->etiqueta_riesgo }}
-                                    </span>
-                                    <span class="mt-1 text-2xl font-black text-slate-900 dark:text-white">{{ $evaluacion->puntaje }}</span>
-                                    <span class="text-[10px] text-slate-500">de 100</span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4 text-center text-slate-600 dark:text-neutral-300">
-                                <p class="font-bold">{{ $evaluacion->nivel?->nombre }}</p>
-                                <p class="text-xs">{{ $evaluacion->semestre?->numero ? $evaluacion->semestre->numero.'° semestre' : $evaluacion->grado?->nombre }}</p>
-                                <p class="mt-1 text-xs">Grupo {{ $evaluacion->grupo?->asignacionGrupo?->nombre ?? '—' }}</p>
-                                <p class="mt-1 text-[11px] text-slate-400">{{ $evaluacion->cicloEscolar?->nombre }}</p>
-                            </td>
-                            <td class="max-w-md px-4 py-4">
-                                <div class="space-y-1.5">
-                                    @forelse (collect($evaluacion->factores ?? [])->sortByDesc('puntos')->take(3) as $factor)
-                                        <div class="flex items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-neutral-950/60">
-                                            <span class="text-xs font-semibold text-slate-700 dark:text-neutral-200">{{ $factor['detalle'] ?? $factor['nombre'] }}</span>
-                                            <flux:badge color="red" size="sm">+{{ (int) $factor['puntos'] }}</flux:badge>
+                    <?php if ($evaluaciones->isNotEmpty()): ?>
+                        <?php foreach ($evaluaciones as $evaluacionFila): ?>
+                            <?php
+                                $nivelRiesgoFila = (string) ($evaluacionFila->nivel_riesgo ?: 'bajo');
+                                $estiloFila = $riesgoClases[$nivelRiesgoFila] ?? $riesgoClases['bajo'];
+                                $casoFila = $evaluacionFila->casos?->first();
+                                $factoresFila = collect($evaluacionFila->factores ?? [])
+                                    ->sortByDesc('puntos')
+                                    ->take(3);
+                                $casoColor = match ($casoFila?->estado) {
+                                    'cerrado' => 'zinc',
+                                    'en_seguimiento' => 'blue',
+                                    'pausado' => 'amber',
+                                    default => 'orange',
+                                };
+                            ?>
+
+                            <tr
+                                wire:key="riesgo-evaluacion-<?php echo (int) $evaluacionFila->id; ?>"
+                                class="transition hover:bg-slate-50/70 dark:hover:bg-neutral-800/40"
+                            >
+                                <td class="px-5 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#006492] to-[#88AC2E] font-black text-white">
+                                            {{ $evaluacionFila->inicial_alumno }}
+                                        </span>
+                                        <div class="min-w-0">
+                                            <p class="truncate font-black text-slate-900 dark:text-white">
+                                                {{ $evaluacionFila->nombre_alumno }}
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{ $evaluacionFila->inscripcion?->matricula ?: 'Sin matrícula' }}
+                                                ·
+                                                {{ $evaluacionFila->inscripcion?->curp ?: 'Sin CURP' }}
+                                            </p>
+                                            <p class="mt-1 text-[11px] text-slate-400">
+                                                Evaluado {{ $evaluacionFila->evaluado_at?->diffForHumans() ?: 'sin fecha' }}
+                                            </p>
                                         </div>
-                                    @empty
-                                        <span class="text-xs font-semibold text-emerald-600">Sin factores de riesgo activos</span>
-                                    @endforelse
-                                </div>
-                            </td>
-                            <td class="px-4 py-4 text-center">
-                                @if ($caso)
-                                    <flux:badge :color="match($caso->estado) { 'cerrado' => 'zinc', 'en_seguimiento' => 'blue', 'pausado' => 'amber', default => 'orange' }">
-                                        {{ ucfirst(str_replace('_', ' ', $caso->estado)) }}
-                                    </flux:badge>
-                                    <p class="mt-2 text-xs font-bold text-slate-600 dark:text-neutral-300">{{ $caso->folio }}</p>
-                                    <p class="mt-1 text-[11px] text-slate-400">{{ $caso->responsable?->name ?? 'Sin responsable' }}</p>
-                                @else
-                                    <flux:badge color="zinc">Sin seguimiento</flux:badge>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-center">
-                                <flux:button wire:click="verEvaluacion({{ $evaluacion->id }})" size="sm" variant="primary" icon="eye">
-                                    Revisar
-                                </flux:button>
-                            </td>
-                        </tr>
-                    @empty
+                                    </div>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <div class="inline-flex min-w-24 flex-col items-center rounded-2xl border px-3 py-2 {{ $estiloFila['fondo'] }}">
+                                        <span class="flex items-center gap-2 text-xs font-black uppercase {{ $estiloFila['texto'] }}">
+                                            <span class="h-2.5 w-2.5 rounded-full {{ $estiloFila['punto'] }}"></span>
+                                            {{ $evaluacionFila->etiqueta_riesgo }}
+                                        </span>
+                                        <span class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+                                            {{ $evaluacionFila->puntaje }}
+                                        </span>
+                                        <span class="text-[10px] text-slate-500">de 100</span>
+                                    </div>
+                                </td>
+
+                                <td class="px-4 py-4 text-center text-slate-600 dark:text-neutral-300">
+                                    <p class="font-bold">{{ $evaluacionFila->nivel?->nombre ?: 'Sin nivel' }}</p>
+                                    <p class="text-xs">
+                                        {{ $evaluacionFila->semestre?->numero
+                                            ? $evaluacionFila->semestre->numero.'° semestre'
+                                            : ($evaluacionFila->grado?->nombre ?: 'Sin grado') }}
+                                    </p>
+                                    <p class="mt-1 text-xs">
+                                        Grupo {{ $evaluacionFila->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                    </p>
+                                    <p class="mt-1 text-[11px] text-slate-400">
+                                        {{ $evaluacionFila->cicloEscolar?->nombre ?: 'Sin ciclo' }}
+                                    </p>
+                                </td>
+
+                                <td class="max-w-md px-4 py-4">
+                                    <div class="space-y-1.5">
+                                        <?php if ($factoresFila->isNotEmpty()): ?>
+                                            <?php foreach ($factoresFila as $indiceFactor => $factorFila): ?>
+                                                <div
+                                                    wire:key="factor-<?php echo (int) $evaluacionFila->id; ?>-<?php echo e((string) $indiceFactor); ?>"
+                                                    class="flex items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-neutral-950/60"
+                                                >
+                                                    <span class="text-xs font-semibold text-slate-700 dark:text-neutral-200">
+                                                        {{ $factorFila['detalle'] ?? $factorFila['nombre'] ?? 'Factor detectado' }}
+                                                    </span>
+                                                    <flux:badge color="red" size="sm">
+                                                        +{{ (int) ($factorFila['puntos'] ?? 0) }}
+                                                    </flux:badge>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <span class="text-xs font-semibold text-emerald-600">
+                                                Sin factores de riesgo activos
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <?php if ($casoFila): ?>
+                                        <flux:badge color="{{ $casoColor }}">
+                                            {{ ucfirst(str_replace('_', ' ', $casoFila->estado)) }}
+                                        </flux:badge>
+                                        <p class="mt-2 text-xs font-bold text-slate-600 dark:text-neutral-300">
+                                            {{ $casoFila->folio }}
+                                        </p>
+                                        <p class="mt-1 text-[11px] text-slate-400">
+                                            {{ $casoFila->responsable?->name ?? 'Sin responsable' }}
+                                        </p>
+                                    <?php else: ?>
+                                        <flux:badge color="zinc">Sin seguimiento</flux:badge>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td class="px-5 py-4 text-center">
+                                    <flux:button
+                                        wire:click="verEvaluacion(<?php echo (int) $evaluacionFila->id; ?>)"
+                                        wire:loading.attr="disabled"
+                                        wire:target="verEvaluacion(<?php echo (int) $evaluacionFila->id; ?>)"
+                                        size="sm"
+                                        variant="primary"
+                                        icon="eye"
+                                    >
+                                        Revisar
+                                    </flux:button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
                         <tr>
                             <td colspan="6" class="px-6 py-16 text-center">
                                 <flux:icon.chart-bar-square class="mx-auto h-10 w-10 text-slate-300" />
-                                <p class="mt-4 font-black text-slate-700 dark:text-neutral-200">No hay evaluaciones para los filtros actuales</p>
-                                <p class="mt-1 text-sm text-slate-500">Ejecuta “Evaluar ahora” para generar el semáforo del ciclo seleccionado.</p>
+                                <p class="mt-4 font-black text-slate-700 dark:text-neutral-200">
+                                    No hay evaluaciones para los filtros actuales
+                                </p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Ejecuta “Evaluar ahora” para generar el semáforo del ciclo seleccionado.
+                                </p>
                             </td>
                         </tr>
-                    @endforelse
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

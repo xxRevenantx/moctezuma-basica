@@ -84,26 +84,4 @@ class RiesgoAcademicoEvaluacion extends Model
             default => 'Bajo',
         };
     }
-
-    public function getNombreAlumnoAttribute(): string
-    {
-        $inscripcion = $this->inscripcion;
-
-        if (! $inscripcion) {
-            return 'Alumno no disponible';
-        }
-
-        $nombre = collect([
-            $inscripcion->apellido_paterno,
-            $inscripcion->apellido_materno,
-            $inscripcion->nombre,
-        ])->filter(fn ($parte) => filled($parte))->implode(' ');
-
-        return $nombre !== '' ? $nombre : 'Alumno sin nombre';
-    }
-
-    public function getInicialAlumnoAttribute(): string
-    {
-        return mb_strtoupper(mb_substr($this->nombre_alumno, 0, 1)) ?: 'A';
-    }
 }
