@@ -8,6 +8,7 @@ use App\Models\Grado;
 use App\Models\Inscripcion;
 use App\Models\Grupo;
 use App\Models\Nivel;
+use App\Models\RiesgoAcademicoEvaluacion;
 use App\Models\Semestre;
 use App\Services\DistribucionEscolarService;
 use Illuminate\Support\Collection;
@@ -169,7 +170,27 @@ class DistribucionHistorial extends Component
             default => $listado->sortBy('alumno', SORT_NATURAL | SORT_FLAG_CASE),
         };
 
-        return $listado->values();
+        $ids = $listado->pluck('inscripcion_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $riesgos = $ids->isEmpty()
+            ? collect()
+            : RiesgoAcademicoEvaluacion::query()
+                ->actuales()
+                ->whereIn('inscripcion_id', $ids)
+                ->when($this->ciclo_escolar_id !== '', fn ($query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+                ->orderByDesc('evaluado_at')
+                ->orderByDesc('id')
+                ->get(['id', 'inscripcion_id', 'puntaje', 'nivel_riesgo', 'evaluado_at'])
+                ->unique('inscripcion_id')
+                ->keyBy('inscripcion_id');
+
+        return $listado->map(function (array $fila) use ($riesgos): array {
+            $riesgo = $riesgos->get((int) ($fila['inscripcion_id'] ?? 0));
+            $fila['riesgo_nivel'] = $riesgo?->nivel_riesgo;
+            $fila['riesgo_puntaje'] = $riesgo?->puntaje;
+            $fila['riesgo_evaluacion_id'] = $riesgo?->id;
+
+            return $fila;
+        })->values();
     }
 
     public function getResumenNominalProperty(): array

@@ -92,8 +92,23 @@ class CierreGeneracionReporteController extends Controller
         return Pdf::loadView('pdf.comprobante-cierre-generacion', [
             'proceso' => $proceso,
             'detalle' => $detalle,
+            'etiquetaResultado' => $this->etiquetaResultado((string) $detalle->resultado),
             'logo' => $this->logoDataUri(),
         ])->setPaper('letter')->download($nombre);
+    }
+
+    private function etiquetaResultado(string $resultado): string
+    {
+        return match ($resultado) {
+            'continuidad_interna' => 'PROMOCIÓN O CONTINUIDAD PROYECTADA',
+            'no_reinscrito' => 'ACREDITÓ, PERO NO SE REINSCRIBIRÁ',
+            'egresado' => 'EGRESADO SIN CONTINUIDAD INTERNA',
+            'traslado' => 'TRASLADO',
+            'baja_definitiva' => 'BAJA DEFINITIVA',
+            'no_promovido' => 'NO PROMOVIDO / REPETICIÓN PROYECTADA',
+            'sin_cambio' => 'SIN CAMBIO HISTÓRICO',
+            default => strtoupper(str_replace('_', ' ', $resultado)),
+        };
     }
 
     private function logoDataUri(): ?string

@@ -14,6 +14,8 @@ use App\Models\MovimientoAlumno;
 use App\Models\PreinscripcionCiclo;
 use App\Models\ProcesoCierreCicloDetalle;
 use App\Models\ProyeccionContinuidad;
+use App\Models\RiesgoAcademicoEvaluacion;
+use App\Models\SeguimientoAcademicoEvento;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -193,6 +195,24 @@ class LineaTiempoAcademicaAlumnoService
             ->orderBy('id')
             ->get();
 
+        $evaluacionesRiesgo = RiesgoAcademicoEvaluacion::query()
+            ->where('inscripcion_id', $alumno->id)
+            ->with('evaluador:id,name')
+            ->orderBy('evaluado_at')
+            ->orderBy('id')
+            ->get();
+
+        $eventosSeguimiento = SeguimientoAcademicoEvento::query()
+            ->whereHas('caso', fn ($query) => $query->where('inscripcion_id', $alumno->id))
+            ->with([
+                'caso:id,inscripcion_id,inscripcion_ciclo_id,folio,estado,riesgo_actual,puntaje_actual',
+                'evaluacion:id,nivel_riesgo,puntaje',
+                'usuario:id,name',
+            ])
+            ->orderBy('ocurrido_at')
+            ->orderBy('id')
+            ->get();
+
         $alertas = $this->detectarAlertas($alumno, $historiales, $calificaciones, $bitacora);
         $ciclos = $this->construirCiclos(
             $historiales,
@@ -205,7 +225,9 @@ class LineaTiempoAcademicaAlumnoService
             $preinscripciones,
             $proyecciones,
             $cierres,
-            $matriculas
+            $matriculas,
+            $evaluacionesRiesgo,
+            $eventosSeguimiento
         );
 
         if ($ciclos->isEmpty()) {
@@ -243,6 +265,10 @@ class LineaTiempoAcademicaAlumnoService
                 'documentos' => $documentos->count(),
                 'movimientos' => $movimientos->count() + $cambios->count(),
                 'correcciones' => $bitacora->count() + $correcciones->count(),
+                'evaluaciones_riesgo' => $evaluacionesRiesgo->count(),
+                'eventos_seguimiento' => $eventosSeguimiento->count(),
+                'riesgo_actual' => $evaluacionesRiesgo->where('es_actual', true)->sortByDesc('evaluado_at')->first()?->nivel_riesgo,
+                'puntaje_riesgo_actual' => $evaluacionesRiesgo->where('es_actual', true)->sortByDesc('evaluado_at')->first()?->puntaje,
             ],
             'integridad' => [
                 'estado' => $alertas === [] ? 'correcto' : 'revision',
@@ -269,7 +295,9 @@ class LineaTiempoAcademicaAlumnoService
         Collection $preinscripciones,
         Collection $proyecciones,
         Collection $cierres,
-        Collection $matriculas
+        Collection $matriculas,
+        Collection $evaluacionesRiesgo,
+        Collection $eventosSeguimiento
     ): Collection {
         return $historiales->map(function (InscripcionCiclo $historial) use (
             $calificaciones,
@@ -281,7 +309,9 @@ class LineaTiempoAcademicaAlumnoService
             $preinscripciones,
             $proyecciones,
             $cierres,
-            $matriculas
+            $matriculas,
+            $evaluacionesRiesgo,
+            $eventosSeguimiento
         ): array {
             $calificacionesCiclo = $calificaciones->filter(fn (Calificacion $item) => $this->perteneceAlCiclo($item, $historial));
             $bitacoraCiclo = $bitacora->filter(fn (BitacoraCalificacion $item) => $this->perteneceAlCiclo($item, $historial));
@@ -293,6 +323,8 @@ class LineaTiempoAcademicaAlumnoService
             $proyeccionesCiclo = $proyecciones->filter(fn (ProyeccionContinuidad $item) => (int) $item->inscripcion_ciclo_origen_id === (int) $historial->id);
             $cierresCiclo = $cierres->filter(fn (ProcesoCierreCicloDetalle $item) => (int) $item->inscripcion_ciclo_origen_id === (int) $historial->id);
             $matriculasCiclo = $matriculas->filter(fn (MatriculaAlumno $item) => $this->fechaDentroDelCiclo($item->fecha_asignacion, $historial));
+            $evaluacionesRiesgoCiclo = $evaluacionesRiesgo->filter(fn (RiesgoAcademicoEvaluacion $item) => $this->perteneceAlCiclo($item, $historial));
+            $eventosSeguimientoCiclo = $eventosSeguimiento->filter(fn (SeguimientoAcademicoEvento $item) => (int) ($item->caso?->inscripcion_ciclo_id ?? 0) === (int) $historial->id);
 
             $eventos = collect();
 
@@ -429,6 +461,40 @@ class LineaTiempoAcademicaAlumnoService
                 ));
             }
 
+            foreach ($evaluacionesRiesgoCiclo as $evaluacion) {
+                $factores = collect($evaluacion->factores ?? [])
+                    ->pluck('detalle')
+                    ->filter()
+                    ->take(3)
+                    ->implode(' · ');
+
+                $eventos->push($this->evento(
+                    'riesgo-'.$evaluacion->id,
+                    'riesgo',
+                    $evaluacion->evaluado_at ?? $evaluacion->created_at,
+                    'Semáforo de riesgo: '.$evaluacion->etiqueta_riesgo,
+                    'Puntaje '.$evaluacion->puntaje.'/100'.($factores ? ' · '.$factores : ''),
+                    $evaluacion->es_actual ? 'Evaluación vigente' : 'Evaluación histórica',
+                    $evaluacion->evaluador?->name,
+                    'chart-bar-square',
+                    $this->tonoRiesgo((string) $evaluacion->nivel_riesgo)
+                ));
+            }
+
+            foreach ($eventosSeguimientoCiclo as $seguimiento) {
+                $eventos->push($this->evento(
+                    'seguimiento-'.$seguimiento->id,
+                    'seguimiento',
+                    $seguimiento->ocurrido_at ?? $seguimiento->created_at,
+                    $seguimiento->titulo ?: 'Seguimiento académico',
+                    $seguimiento->descripcion ?: 'Evento registrado en el expediente de seguimiento.',
+                    $seguimiento->caso?->folio ? 'Caso '.$seguimiento->caso->folio : null,
+                    $seguimiento->usuario?->name,
+                    $this->iconoSeguimiento((string) $seguimiento->tipo),
+                    $this->tonoSeguimiento((string) $seguimiento->tipo)
+                ));
+            }
+
             foreach ($cierresCiclo as $detalle) {
                 $proceso = $detalle->proceso;
                 $eventos->push($this->evento(
@@ -528,6 +594,10 @@ class LineaTiempoAcademicaAlumnoService
                     'documentos' => $documentosCiclo->count(),
                     'movimientos' => $movimientosCiclo->count() + $cambiosCiclo->count(),
                     'correcciones' => $bitacoraCiclo->count() + $correccionesCiclo->count(),
+                    'evaluaciones_riesgo' => $evaluacionesRiesgoCiclo->count(),
+                    'seguimientos' => $eventosSeguimientoCiclo->count(),
+                    'riesgo_actual' => $evaluacionesRiesgoCiclo->where('es_actual', true)->sortByDesc('evaluado_at')->first()?->nivel_riesgo,
+                    'puntaje_riesgo' => $evaluacionesRiesgoCiclo->where('es_actual', true)->sortByDesc('evaluado_at')->first()?->puntaje,
                 ],
                 'eventos' => $eventos->all(),
                 'eventos_ocultos' => max(0, ($documentosCiclo->count() - 18) + ($bitacoraCiclo->count() - 20) + ($correccionesCiclo->count() - 12)),
@@ -710,6 +780,10 @@ class LineaTiempoAcademicaAlumnoService
                 'documentos' => 0,
                 'movimientos' => 0,
                 'correcciones' => 0,
+                'evaluaciones_riesgo' => 0,
+                'seguimientos' => 0,
+                'riesgo_actual' => null,
+                'puntaje_riesgo' => null,
             ],
             'eventos' => [
                 $this->evento(
@@ -726,6 +800,37 @@ class LineaTiempoAcademicaAlumnoService
             ],
             'eventos_ocultos' => 0,
         ];
+    }
+
+    private function tonoRiesgo(string $nivel): string
+    {
+        return match ($nivel) {
+            'critico' => 'rose',
+            'alto' => 'orange',
+            'moderado' => 'amber',
+            default => 'emerald',
+        };
+    }
+
+    private function tonoSeguimiento(string $tipo): string
+    {
+        return match ($tipo) {
+            'cierre', 'mejora' => 'emerald',
+            'reapertura' => 'rose',
+            'plan', 'accion' => 'indigo',
+            'accion_actualizada' => 'violet',
+            default => 'blue',
+        };
+    }
+
+    private function iconoSeguimiento(string $tipo): string
+    {
+        return match ($tipo) {
+            'cierre', 'mejora' => 'check-circle',
+            'reapertura' => 'arrow-uturn-left',
+            'plan', 'accion', 'accion_actualizada' => 'clipboard-document-check',
+            default => 'history',
+        };
     }
 
     private function perteneceAlCiclo(Model $modelo, InscripcionCiclo $historial): bool

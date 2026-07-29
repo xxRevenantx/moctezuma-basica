@@ -97,6 +97,7 @@
                         evaluacion: ['calificaciones', 'correccion'],
                         documentos: ['documento'],
                         movimientos: ['movimiento', 'cambio'],
+                        seguimiento: ['riesgo', 'seguimiento'],
                     };
 
                     return (grupos[this.filtro] || []).includes(tipo);
@@ -227,7 +228,7 @@
 
                     <div class="px-4 py-5 sm:px-7 sm:py-7 lg:px-10">
                         {{-- Resumen visual --}}
-                        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
+                        <div class="grid grid-cols-2 gap-3 lg:grid-cols-5 xl:grid-cols-10">
                             @php
                                 $tarjetas = [
                                     ['icono' => 'calendar-days', 'valor' => $resumen['ciclos'], 'etiqueta' => 'Ciclos', 'clase' => 'from-sky-500 to-blue-600'],
@@ -238,6 +239,8 @@
                                     ['icono' => 'document-text', 'valor' => $resumen['documentos'], 'etiqueta' => 'Documentos', 'clase' => 'from-emerald-500 to-teal-600'],
                                     ['icono' => 'arrows-right-left', 'valor' => $resumen['movimientos'], 'etiqueta' => 'Movimientos', 'clase' => 'from-violet-500 to-fuchsia-600'],
                                     ['icono' => 'history', 'valor' => $resumen['correcciones'], 'etiqueta' => 'Correcciones', 'clase' => 'from-orange-500 to-amber-500'],
+                                    ['icono' => 'chart-bar-square', 'valor' => $resumen['puntaje_riesgo_actual'] !== null ? $resumen['puntaje_riesgo_actual'].'/100' : '—', 'etiqueta' => 'Riesgo actual', 'clase' => 'from-amber-500 to-orange-600'],
+                                    ['icono' => 'clipboard-document-check', 'valor' => $resumen['eventos_seguimiento'], 'etiqueta' => 'Seguimientos', 'clase' => 'from-[#88AC2E] to-emerald-600'],
                                 ];
                             @endphp
 
@@ -272,6 +275,7 @@
                                     'evaluacion' => ['Evaluaciones', 'chart-bar-square'],
                                     'documentos' => ['Documentos', 'document-text'],
                                     'movimientos' => ['Movimientos', 'arrows-right-left'],
+                                    'seguimiento' => ['Riesgo y seguimiento', 'clipboard-document-check'],
                                 ] as $valorFiltro => [$textoFiltro, $iconoFiltro])
                                     <button type="button" x-on:click="filtro = '{{ $valorFiltro }}'"
                                         x-bind:class="filtro === '{{ $valorFiltro }}'

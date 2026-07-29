@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Academico\SeguimientoAcademico;
+
 use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\PromedioAnualBachilleratoController;
@@ -74,6 +76,10 @@ Route::get('/centro-control/correcciones-calificaciones', CorreccionesCalificaci
 Route::get('/integridad-academica', CentroIntegridadAcademica::class)
     ->middleware('permission:integridad.consultar')
     ->name('misrutas.integridad-academica');
+
+Route::get('/seguimiento-academico', SeguimientoAcademico::class)
+    ->middleware('permission:seguimiento.consultar')
+    ->name('misrutas.seguimiento-academico');
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');

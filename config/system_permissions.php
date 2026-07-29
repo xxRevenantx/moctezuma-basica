@@ -9,7 +9,7 @@ return [
         'control_escolar' => [
             'label' => 'Control escolar',
             'permissions' => [
-                'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'auditoria.consultar',
+                'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'seguimiento.consultar', 'seguimiento.gestionar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'respaldos.gestionar', 'papelera.gestionar',
                 'flujos.gestionar', 'alumnos.*', 'personal.*', 'academico.*',
                 'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*',
@@ -18,7 +18,7 @@ return [
         'direccion' => [
             'label' => 'Dirección',
             'permissions' => [
-                'administracion.acceder', 'integridad.consultar', 'auditoria.consultar',
+                'administracion.acceder', 'integridad.consultar', 'seguimiento.consultar', 'seguimiento.gestionar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'flujos.gestionar', 'alumnos.consultar',
                 'personal.consultar', 'academico.consultar', 'calificaciones.consultar',
                 'calificaciones.autorizar', 'documentos.consultar', 'documentos.autorizar',
@@ -28,7 +28,7 @@ return [
         'profesor' => [
             'label' => 'Profesor',
             'permissions' => [
-                'alumnos.consultar', 'academico.consultar', 'calificaciones.consultar',
+                'alumnos.consultar', 'academico.consultar', 'seguimiento.consultar', 'calificaciones.consultar',
                 'calificaciones.capturar', 'documentos.consultar', 'horarios.consultar',
                 'fichas.consultar', 'fichas.capturar',
             ],
@@ -47,6 +47,8 @@ return [
         'administracion.acceder' => 'Acceder al centro de control',
         'integridad.consultar' => 'Consultar integridad académica',
         'integridad.gestionar' => 'Gestionar casos y aplicar correcciones de integridad',
+        'seguimiento.consultar' => 'Consultar riesgo y seguimiento académico',
+        'seguimiento.gestionar' => 'Gestionar planes, acciones y reglas de riesgo',
         'auditoria.consultar' => 'Consultar auditoría',
         'notificaciones.gestionar' => 'Gestionar notificaciones internas',
         'respaldos.gestionar' => 'Crear y consultar respaldos',

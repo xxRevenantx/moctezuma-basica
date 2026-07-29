@@ -29,17 +29,6 @@
         </table>
     </div>
 
-    @php
-        $etiquetaResultado = match ($detalle->resultado) {
-            'continuidad_interna' => 'PROMOCIÓN O CONTINUIDAD PROYECTADA',
-            'no_reinscrito' => 'ACREDITÓ, PERO NO SE REINSCRIBIRÁ',
-            'egresado' => 'EGRESADO SIN CONTINUIDAD INTERNA',
-            'traslado' => 'TRASLADO',
-            'baja_definitiva' => 'BAJA DEFINITIVA',
-            'no_promovido' => 'NO PROMOVIDO / REPETICIÓN PROYECTADA',
-            default => strtoupper(str_replace('_', ' ', $detalle->resultado)),
-        };
-    @endphp
     <div class="result">Resultado: {{ $etiquetaResultado }}</div>
 
     @if($detalle->inscripcionCicloDestino || $proyeccion)

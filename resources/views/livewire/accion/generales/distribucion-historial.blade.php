@@ -533,6 +533,7 @@
                                     <th class="px-5 py-4 text-left font-black">Alumno</th>
                                     <th class="px-4 py-4 text-center font-black">Generación</th>
                                     <th class="px-4 py-4 text-center font-black">Ubicación</th>
+                                    <th class="px-4 py-4 text-center font-black">Riesgo</th>
                                     <th class="px-4 py-4 text-center font-black">Estatus</th>
                                     <th class="px-5 py-4 text-center font-black">Fecha</th>
                                     <th class="px-5 py-4 text-center font-black">Acciones</th>
@@ -598,6 +599,30 @@
                                             </div>
                                         </td>
                                         <td class="px-4 py-4 text-center">
+                                            @php
+                                                $riesgoColor = match ($fila['riesgo_nivel'] ?? null) {
+                                                    'critico' => 'red',
+                                                    'alto' => 'orange',
+                                                    'moderado' => 'amber',
+                                                    'bajo' => 'green',
+                                                    default => 'zinc',
+                                                };
+                                                $riesgoEtiqueta = match ($fila['riesgo_nivel'] ?? null) {
+                                                    'critico' => 'Crítico',
+                                                    'alto' => 'Alto',
+                                                    'moderado' => 'Moderado',
+                                                    'bajo' => 'Bajo',
+                                                    default => 'Sin evaluar',
+                                                };
+                                            @endphp
+                                            <div class="inline-flex flex-col items-center gap-1">
+                                                <flux:badge :color="$riesgoColor" size="sm">{{ $riesgoEtiqueta }}</flux:badge>
+                                                @if ($fila['riesgo_puntaje'] !== null)
+                                                    <span class="text-[11px] font-black text-slate-500">{{ $fila['riesgo_puntaje'] }}/100</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4 text-center">
                                             <span
                                                 class="inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 ring-inset {{ $estatusClase }}">
                                                 {{ $fila['estado_actual'] }}
@@ -646,7 +671,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-16 text-center">
+                                        <td colspan="7" class="px-6 py-16 text-center">
                                             <div
                                                 class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">
                                                 <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none"

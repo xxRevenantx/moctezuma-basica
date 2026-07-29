@@ -50,6 +50,7 @@ return [
 
         'misrutas.centro-control' => 'administracion.acceder',
         'misrutas.integridad-academica' => 'integridad.consultar',
+        'misrutas.seguimiento-academico' => 'seguimiento.consultar',
         'misrutas.respaldos-academicos' => 'respaldos.gestionar',
     ],
 
