@@ -40,6 +40,7 @@ class CalificacionCorreccionService
             'calificacion_id' => $calificacion?->id,
             'periodo_id' => $periodo->id,
             'inscripcion_id' => $alumno->id,
+            'inscripcion_ciclo_id' => $valorPropuesto['inscripcion_ciclo_id'] ?? $calificacion?->inscripcion_ciclo_id,
             'estado' => CalificacionCorreccion::SOLICITADA,
             'motivo' => trim($motivo),
             'valor_anterior' => $calificacion?->getAttributes(),
@@ -71,6 +72,7 @@ class CalificacionCorreccionService
 
             $correccion->update([
                 'calificacion_id' => $calificacion?->id,
+                'inscripcion_ciclo_id' => $calificacion?->inscripcion_ciclo_id ?: $correccion->inscripcion_ciclo_id,
                 'estado' => CalificacionCorreccion::APLICADA,
                 'aplicada_por' => $usuarioId,
                 'aplicada_at' => now(),
@@ -103,6 +105,7 @@ class CalificacionCorreccionService
                 'calificacion_id' => $calificacion?->id,
                 'periodo_id' => $periodo->id,
                 'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $valorPropuesto['inscripcion_ciclo_id'] ?? $calificacion?->inscripcion_ciclo_id,
                 'estado' => CalificacionCorreccion::AUTORIZADA,
                 'motivo' => trim($motivo),
                 'valor_anterior' => $calificacion?->getAttributes(),
@@ -118,6 +121,7 @@ class CalificacionCorreccionService
 
             $correccion->update([
                 'calificacion_id' => $resultado?->id,
+                'inscripcion_ciclo_id' => $resultado?->inscripcion_ciclo_id ?: $correccion->inscripcion_ciclo_id,
                 'estado' => CalificacionCorreccion::APLICADA,
                 'aplicada_por' => $usuarioId,
                 'aplicada_at' => $ahora,

@@ -17,6 +17,7 @@ class BitacoraCalificacion extends Model
         'ciclo_escolar_id',
         'periodo_id',
         'inscripcion_id',
+        'inscripcion_ciclo_id',
         'asignacion_materia_id',
         'user_id',
         'accion',
@@ -73,6 +74,11 @@ class BitacoraCalificacion extends Model
     public function inscripcion()
     {
         return $this->belongsTo(Inscripcion::class, 'inscripcion_id');
+    }
+
+    public function inscripcionCiclo()
+    {
+        return $this->belongsTo(InscripcionCiclo::class, 'inscripcion_ciclo_id');
     }
 
     public function asignacionMateria()

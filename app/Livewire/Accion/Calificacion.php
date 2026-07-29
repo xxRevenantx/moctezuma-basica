@@ -2362,6 +2362,7 @@ class Calificacion extends Component
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'periodo_id' => $this->periodo_id,
             'inscripcion_id' => $inscripcionId,
+            'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara($inscripcionId),
             'asignacion_materia_id' => $asignacionMateriaId,
             'user_id' => auth()->id(),
             'accion' => $accion,

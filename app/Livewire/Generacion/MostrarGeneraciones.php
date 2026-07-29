@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Generacion;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Nivel;
+use App\Services\GeneracionTrayectoriaService;
 use App\Services\GestionAcademicaService;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\On;
@@ -16,7 +18,10 @@ class MostrarGeneraciones extends Component
 
     public string $search = '';
     public string $nivel_id = '';
+    public string $ciclo_escolar_id = '';
     public string $estado = '';
+    public string $resultado_historial = '';
+    public string $contenido_historial = '';
     public string $anio_ingreso = '';
     public string $anio_egreso = '';
     public string $orden = 'recientes';
@@ -31,10 +36,20 @@ class MostrarGeneraciones extends Component
     public string $motivo_reactivacion = '';
     public bool $reactivar_egresados = true;
 
+    public bool $modalTrayectoria = false;
+    public ?int $generacionTrayectoriaId = null;
+    public array $trayectoriaGeneracion = [];
+    public array $trayectoriaResumen = [];
+    public array $trayectoriaCiclos = [];
+    public array $trayectoriaContextos = [];
+
     protected $queryString = [
         'search' => ['as' => 'buscar', 'except' => ''],
         'nivel_id' => ['as' => 'nivel', 'except' => ''],
+        'ciclo_escolar_id' => ['as' => 'ciclo', 'except' => ''],
         'estado' => ['as' => 'estado', 'except' => ''],
+        'resultado_historial' => ['as' => 'resultado', 'except' => ''],
+        'contenido_historial' => ['as' => 'contenido', 'except' => ''],
         'anio_ingreso' => ['as' => 'ingreso', 'except' => ''],
         'anio_egreso' => ['as' => 'egreso', 'except' => ''],
         'orden' => ['as' => 'orden', 'except' => 'recientes'],
@@ -48,7 +63,10 @@ class MostrarGeneraciones extends Component
         if (in_array($property, [
             'search',
             'nivel_id',
+            'ciclo_escolar_id',
             'estado',
+            'resultado_historial',
+            'contenido_historial',
             'anio_ingreso',
             'anio_egreso',
             'orden',
@@ -62,13 +80,52 @@ class MostrarGeneraciones extends Component
         $this->reset([
             'search',
             'nivel_id',
+            'ciclo_escolar_id',
             'estado',
+            'resultado_historial',
+            'contenido_historial',
             'anio_ingreso',
             'anio_egreso',
         ]);
 
         $this->orden = 'recientes';
         $this->resetPage();
+    }
+
+    public function abrirTrayectoria(int $id, GeneracionTrayectoriaService $service): void
+    {
+        $detalle = $service->detalle($id);
+        /** @var Generacion $generacion */
+        $generacion = $detalle['generacion'];
+
+        $this->generacionTrayectoriaId = $generacion->id;
+        $this->trayectoriaGeneracion = [
+            'id' => $generacion->id,
+            'etiqueta' => $generacion->etiqueta,
+            'nombre' => $generacion->nombre ?: 'Generación escolar',
+            'nivel' => $generacion->nivel?->nombre ?: 'Sin nivel',
+            'estado' => $generacion->etiqueta_estado_cierre,
+            'periodo' => collect([
+                optional($generacion->fecha_inicio)->format('d/m/Y'),
+                optional($generacion->fecha_termino)->format('d/m/Y'),
+            ])->filter()->join(' — '),
+        ];
+        $this->trayectoriaResumen = $detalle['resumen'];
+        $this->trayectoriaCiclos = $detalle['ciclos']->map(fn ($fila) => (array) $fila)->all();
+        $this->trayectoriaContextos = $detalle['contextos']->map(fn ($fila) => (array) $fila)->all();
+        $this->modalTrayectoria = true;
+    }
+
+    public function cerrarTrayectoria(): void
+    {
+        $this->modalTrayectoria = false;
+        $this->reset([
+            'generacionTrayectoriaId',
+            'trayectoriaGeneracion',
+            'trayectoriaResumen',
+            'trayectoriaCiclos',
+            'trayectoriaContextos',
+        ]);
     }
 
     public function prepararDesactivacion(int $id): void
@@ -188,6 +245,11 @@ class MostrarGeneraciones extends Component
             'nivel' => $query->orderBy('nivel_id')->orderByDesc('anio_ingreso'),
             'nombre' => $query->orderBy('nombre')->orderByDesc('anio_ingreso'),
             'alumnos' => $query->orderByDesc('alumnos_total_count')->orderByDesc('anio_ingreso'),
+            'historicos' => $query->orderByDesc('alumnos_historicos_count')->orderByDesc('anio_ingreso'),
+            'ciclos' => $query->orderByDesc('ciclos_historicos_count')->orderByDesc('anio_ingreso'),
+            'revisar' => $query
+                ->orderByRaw('(COALESCE(contextos_inferidos_count, 0) + COALESCE(calificaciones_sin_historial_count, 0)) DESC')
+                ->orderByDesc('anio_ingreso'),
             default => $query->orderByDesc('anio_ingreso')->orderBy('nivel_id'),
         };
     }
@@ -195,6 +257,9 @@ class MostrarGeneraciones extends Component
     #[On('refreshGeneraciones')]
     public function render()
     {
+        $trayectorias = app(GeneracionTrayectoriaService::class);
+        $cicloId = $this->ciclo_escolar_id !== '' ? (int) $this->ciclo_escolar_id : null;
+
         $query = Generacion::query()
             ->with(['nivel', 'cicloEscolarInicio', 'cicloEscolarFin'])
             ->withCount([
@@ -206,7 +271,7 @@ class MostrarGeneraciones extends Component
             ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', (int) $this->nivel_id))
             ->when($this->anio_ingreso !== '', fn ($q) => $q->where('anio_ingreso', (int) $this->anio_ingreso))
             ->when($this->anio_egreso !== '', fn ($q) => $q->where('anio_egreso', (int) $this->anio_egreso))
-            ->when($this->search !== '', function ($q) {
+            ->when($this->search !== '', function ($q): void {
                 $term = '%' . trim($this->search) . '%';
 
                 $q->where(fn ($sub) => $sub
@@ -224,6 +289,11 @@ class MostrarGeneraciones extends Component
                         ->orWhereRaw("CONCAT(inicio_anio, '-', fin_anio) LIKE ?", [$term])));
             });
 
+        $trayectorias->filtrarPorCiclo($query, $cicloId);
+        $trayectorias->filtrarPorResultado($query, $this->resultado_historial, $cicloId);
+        $trayectorias->filtrarPorContenido($query, $this->contenido_historial, $cicloId);
+        $trayectorias->agregarResumenes($query, $cicloId);
+
         $this->aplicarFiltroEstado($query);
         $this->aplicarOrden($query);
 
@@ -233,6 +303,16 @@ class MostrarGeneraciones extends Component
             ->whereHas('generaciones')
             ->orderBy('id')
             ->get(['id', 'nombre']);
+
+        $ciclosEscolares = CicloEscolar::query()
+            ->where(function (Builder $query): void {
+                $query->whereHas('inscripcionesCiclos')
+                    ->orWhereHas('grupos')
+                    ->orWhereHas('periodos');
+            })
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
         $aniosIngreso = Generacion::query()
             ->whereNotNull('anio_ingreso')
@@ -248,7 +328,10 @@ class MostrarGeneraciones extends Component
 
         $hayFiltrosActivos = $this->search !== ''
             || $this->nivel_id !== ''
+            || $this->ciclo_escolar_id !== ''
             || $this->estado !== ''
+            || $this->resultado_historial !== ''
+            || $this->contenido_historial !== ''
             || $this->anio_ingreso !== ''
             || $this->anio_egreso !== ''
             || $this->orden !== 'recientes';
@@ -266,6 +349,7 @@ class MostrarGeneraciones extends Component
             'generaciones',
             'generacionReactivar',
             'niveles',
+            'ciclosEscolares',
             'aniosIngreso',
             'aniosEgreso',
             'hayFiltrosActivos'

@@ -14,7 +14,7 @@ class CalificacionCorreccion extends Model
     protected $table = 'calificacion_correcciones';
 
     protected $fillable = [
-        'calificacion_id', 'periodo_id', 'inscripcion_id', 'estado', 'motivo',
+        'calificacion_id', 'periodo_id', 'inscripcion_id', 'inscripcion_ciclo_id', 'estado', 'motivo',
         'valor_anterior', 'valor_propuesto', 'solicitada_por', 'solicitada_at',
         'autorizada_por', 'autorizada_at', 'observacion_autorizacion',
         'aplicada_por', 'aplicada_at',
@@ -31,6 +31,7 @@ class CalificacionCorreccion extends Model
     public function calificacion() { return $this->belongsTo(Calificacion::class); }
     public function periodo() { return $this->belongsTo(Periodos::class, 'periodo_id'); }
     public function inscripcion() { return $this->belongsTo(Inscripcion::class); }
+    public function inscripcionCiclo() { return $this->belongsTo(InscripcionCiclo::class, 'inscripcion_ciclo_id'); }
     public function solicitante() { return $this->belongsTo(User::class, 'solicitada_por'); }
     public function autorizador() { return $this->belongsTo(User::class, 'autorizada_por'); }
 }
