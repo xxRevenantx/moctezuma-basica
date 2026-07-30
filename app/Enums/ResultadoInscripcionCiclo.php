@@ -13,6 +13,7 @@ enum ResultadoInscripcionCiclo: string
     case TRASLADADO = 'trasladado';
     case BAJA_TEMPORAL_AL_CIERRE = 'baja_temporal_al_cierre';
     case BAJA_DEFINITIVA = 'baja_definitiva';
+    case NO_INICIADO = 'no_iniciado';
 
     public static function normalizar(?string $valor): ?string
     {
@@ -25,6 +26,7 @@ enum ResultadoInscripcionCiclo: string
         return match ($valor) {
             'traslado' => self::TRASLADADO->value,
             'repetidor' => self::NO_PROMOVIDO->value,
+            'no iniciado', 'anulado' => self::NO_INICIADO->value,
             default => $valor,
         };
     }

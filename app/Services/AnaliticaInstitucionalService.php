@@ -133,7 +133,8 @@ class AnaliticaInstitucionalService
     private function historialBase(int $cicloId, array $filtros, string $alias = 'ic'): Builder
     {
         $query = DB::table('inscripcion_ciclos as '.$alias)
-            ->where($alias.'.ciclo_escolar_id', $cicloId);
+            ->where($alias.'.ciclo_escolar_id', $cicloId)
+            ->where($alias.'.estado', '!=', 'anulado');
 
         foreach (['nivel_id', 'generacion_id', 'grado_id', 'grupo_id'] as $campo) {
             if (filled($filtros[$campo] ?? null)) {
@@ -505,7 +506,8 @@ class AnaliticaInstitucionalService
         if (! Schema::hasTable('inscripcion_ciclos') || ! Schema::hasTable('niveles')) return [];
         $query = DB::table('inscripcion_ciclos as ic')
             ->join('niveles as n', 'n.id', '=', 'ic.nivel_id')
-            ->where('ic.ciclo_escolar_id', $cicloId);
+            ->where('ic.ciclo_escolar_id', $cicloId)
+            ->where('ic.estado', '!=', 'anulado');
         foreach (['nivel_id', 'generacion_id', 'grado_id', 'grupo_id'] as $campo) {
             if (filled($filtros[$campo] ?? null)) $query->where('ic.'.$campo, $filtros[$campo]);
         }
@@ -519,7 +521,9 @@ class AnaliticaInstitucionalService
     {
         if (! Schema::hasTable('grupos') || ! Schema::hasTable('inscripcion_ciclos')) return [];
 
-        $alumnos = DB::table('inscripcion_ciclos as icg')->where('icg.ciclo_escolar_id', $cicloId);
+        $alumnos = DB::table('inscripcion_ciclos as icg')
+            ->where('icg.ciclo_escolar_id', $cicloId)
+            ->where('icg.estado', '!=', 'anulado');
         foreach (['nivel_id', 'generacion_id', 'grado_id', 'grupo_id'] as $campo) {
             if (filled($filtros[$campo] ?? null)) $alumnos->where('icg.'.$campo, $filtros[$campo]);
         }

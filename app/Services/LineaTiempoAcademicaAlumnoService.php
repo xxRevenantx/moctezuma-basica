@@ -170,6 +170,7 @@ class LineaTiempoAcademicaAlumnoService
                 'usuarioProyecto:id,name',
                 'usuarioConfirmo:id,name',
                 'usuarioCancelo:id,name',
+                'usuarioRevirtio:id,name',
                 'grupoDestino' => fn ($query) => $query
                     ->select(['id', 'asignacion_grupo_id'])
                     ->with('asignacionGrupo:id,nombre'),
@@ -514,13 +515,25 @@ class LineaTiempoAcademicaAlumnoService
                 $eventos->push($this->evento(
                     'proyeccion-'.$proyeccion->id,
                     'proyeccion',
-                    $proyeccion->confirmada_at ?? $proyeccion->cancelada_at ?? $proyeccion->fecha_proyeccion ?? $proyeccion->created_at,
+                    $proyeccion->revertida_at ?? $proyeccion->confirmada_at ?? $proyeccion->cancelada_at ?? $proyeccion->fecha_proyeccion ?? $proyeccion->created_at,
                     $proyeccion->etiqueta_estado,
                     $this->descripcionProyeccion($proyeccion),
-                    $proyeccion->etiqueta_tipo,
-                    $proyeccion->usuarioConfirmo?->name ?? $proyeccion->usuarioCancelo?->name ?? $proyeccion->usuarioProyecto?->name,
-                    $proyeccion->estado === 'confirmada' ? 'check-circle' : ($proyeccion->estado === 'cancelada' ? 'x-circle' : 'arrow-right'),
-                    $proyeccion->estado === 'confirmada' ? 'emerald' : ($proyeccion->estado === 'cancelada' ? 'rose' : 'indigo')
+                    $proyeccion->estado === 'revertida'
+                        ? ($proyeccion->motivo_reversion ?: $proyeccion->etiqueta_tipo)
+                        : $proyeccion->etiqueta_tipo,
+                    $proyeccion->usuarioRevirtio?->name ?? $proyeccion->usuarioConfirmo?->name ?? $proyeccion->usuarioCancelo?->name ?? $proyeccion->usuarioProyecto?->name,
+                    match ($proyeccion->estado) {
+                        'confirmada' => 'check-circle',
+                        'cancelada' => 'x-circle',
+                        'revertida' => 'arrow-uturn-left',
+                        default => 'arrow-right',
+                    },
+                    match ($proyeccion->estado) {
+                        'confirmada' => 'emerald',
+                        'cancelada' => 'rose',
+                        'revertida' => 'violet',
+                        default => 'indigo',
+                    }
                 ));
             }
 

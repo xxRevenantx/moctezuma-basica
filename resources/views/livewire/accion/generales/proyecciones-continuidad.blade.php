@@ -6,6 +6,7 @@
             'pendiente' => 'bg-amber-100 text-amber-800',
             'confirmada' => 'bg-emerald-100 text-emerald-800',
             'cancelada' => 'bg-slate-200 text-slate-700',
+            'revertida' => 'bg-violet-100 text-violet-800 dark:bg-violet-950/30 dark:text-violet-200',
         ];
     @endphp
 
@@ -19,11 +20,10 @@
                     <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Confirmación de alumnos para el ciclo destino</h3>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                         Cada alumno conserva el resultado académico del ciclo de origen: promoción de grado, repetición pendiente o egreso.
-                        Todavía no está activo en el destino. Confirma únicamente a quienes realmente regresaron; al cancelar se conserva el historial
-                        de origen y no se registra una baja en una ubicación que nunca inició.
+                        Todavía no está activo en el destino. Confirma a quienes se reinscribieron. Si después una familia informa que el alumno no continuará y nunca inició actividades, podrás retirarlo individualmente del ciclo destino sin borrar la promoción ni el historial del grado concluido.
                     </p>
                 </div>
-                <div class="grid min-w-[300px] grid-cols-3 gap-2 text-center">
+                <div class="grid min-w-[420px] grid-cols-4 gap-2 text-center">
                     <div
                         class="rounded-2xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
                         <p class="text-2xl font-black text-amber-700 dark:text-amber-300">
@@ -42,6 +42,12 @@
                             {{ $conteosProyeccion['cancelada'] }}</p>
                         <p class="text-[11px] font-black uppercase tracking-wide text-slate-600">No continúan</p>
                     </div>
+                    <div
+                        class="rounded-2xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-900/50 dark:bg-violet-950/20">
+                        <p class="text-2xl font-black text-violet-700 dark:text-violet-300">
+                            {{ $conteosProyeccion['revertida'] }}</p>
+                        <p class="text-[11px] font-black uppercase tracking-wide text-violet-700">Retirados</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -55,6 +61,7 @@
                     <flux:select.option value="pendiente">Pendiente de confirmar</flux:select.option>
                     <flux:select.option value="confirmada">Proyección confirmada</flux:select.option>
                     <flux:select.option value="cancelada">No continuará</flux:select.option>
+                    <flux:select.option value="revertida">Retirado del ciclo destino</flux:select.option>
                 </flux:select>
                 <flux:select wire:model.live="filtro_ciclo_destino_id" label="Ciclo destino">
                     <flux:select.option value="">Todos</flux:select.option>
@@ -191,6 +198,9 @@
                                 @if ($proyeccion->estado === 'cancelada' && $proyeccion->motivo_cancelacion)
                                     <p class="mt-2 max-w-xs text-left text-xs text-slate-500">
                                         {{ $proyeccion->motivo_cancelacion }}</p>
+                                @elseif ($proyeccion->estado === 'revertida' && $proyeccion->motivo_reversion)
+                                    <p class="mt-2 max-w-xs text-left text-xs text-violet-700 dark:text-violet-300">
+                                        {{ $proyeccion->motivo_reversion }}</p>
                                 @endif
                             </td>
                             <td class="p-3 text-right">
@@ -224,8 +234,27 @@
                                         </flux:button>
                                     </div>
                                 @elseif ($proyeccion->estado === 'confirmada')
-                                    <p class="text-xs font-semibold text-emerald-700">Confirmada
-                                        {{ $proyeccion->confirmada_at?->format('d/m/Y H:i') }}</p>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <p class="text-xs font-semibold text-emerald-700">Confirmada
+                                            {{ $proyeccion->confirmada_at?->format('d/m/Y H:i') }}</p>
+                                        <flux:button wire:key="retirar-proyeccion-{{ $proyeccion->id }}" size="sm"
+                                            variant="danger" :loading="false"
+                                            wire:click="prepararRetiro({{ $proyeccion->id }})"
+                                            wire:target="prepararRetiro({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            <span wire:loading.remove wire:target="prepararRetiro({{ $proyeccion->id }})">
+                                                Retirar del ciclo destino
+                                            </span>
+                                            <span wire:loading wire:target="prepararRetiro({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                <flux:icon name="loading" class="size-4" />
+                                                Revisando...
+                                            </span>
+                                        </flux:button>
+                                    </div>
+                                @elseif ($proyeccion->estado === 'revertida')
+                                    <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">Retirado
+                                        {{ $proyeccion->revertida_at?->format('d/m/Y H:i') }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">El destino quedó como no iniciado; el origen se conserva.</p>
                                 @else
                                     <p class="text-xs font-semibold text-slate-500">Cancelada
                                         {{ $proyeccion->cancelada_at?->format('d/m/Y H:i') }}</p>
@@ -286,6 +315,92 @@
                     <flux:button wire:click="$set('modalCancelar', false)">Volver</flux:button>
                     <flux:button variant="danger" wire:click="cancelarSeleccionadas" spinner="cancelarSeleccionadas">
                         Confirmar que no continuarán</flux:button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($modalRetirar)
+        <div wire:key="modal-retirar-ciclo-destino"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm">
+            <div class="my-6 w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Reversión individual protegida</p>
+                        <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Retirar del ciclo destino</h3>
+                    </div>
+                    <flux:button variant="ghost" wire:click="$set('modalRetirar', false)">Cerrar</flux:button>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                    Esta acción se usa únicamente cuando la promoción fue confirmada administrativamente, pero la familia informó que el alumno no continuará y el alumno <b>no inició actividades</b> en el ciclo destino. No elimina registros ni modifica la promoción o egreso del ciclo de origen.
+                </div>
+
+                @if ($diagnostico_retiro !== [])
+                    <div class="mt-5 grid gap-3 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Último ciclo concluido</p>
+                            <p class="mt-2 font-black text-slate-900 dark:text-white">{{ $diagnostico_retiro['alumno'] ?? 'Alumno' }}</p>
+                            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                {{ data_get($diagnostico_retiro, 'origen.ciclo', '—') }} ·
+                                {{ data_get($diagnostico_retiro, 'origen.nivel', '—') }} ·
+                                {{ data_get($diagnostico_retiro, 'origen.grado', '—') }}
+                                @if (data_get($diagnostico_retiro, 'origen.semestre'))
+                                    · Semestre {{ data_get($diagnostico_retiro, 'origen.semestre') }}
+                                @endif
+                            </p>
+                            <p class="mt-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">El resultado académico de este ciclo se conserva sin cambios.</p>
+                        </div>
+                        <div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+                            <p class="text-xs font-black uppercase tracking-wide text-violet-600">Ciclo que será anulado</p>
+                            <p class="mt-2 text-sm font-bold text-violet-950 dark:text-violet-100">
+                                {{ data_get($diagnostico_retiro, 'destino.ciclo', '—') }} ·
+                                {{ data_get($diagnostico_retiro, 'destino.nivel', '—') }} ·
+                                {{ data_get($diagnostico_retiro, 'destino.grado', '—') }}
+                                @if (data_get($diagnostico_retiro, 'destino.semestre'))
+                                    · Semestre {{ data_get($diagnostico_retiro, 'destino.semestre') }}
+                                @endif
+                            </p>
+                            <p class="mt-2 text-xs text-violet-700 dark:text-violet-300">Se conservará como evidencia con estado “Anulado: no inició”.</p>
+                        </div>
+                    </div>
+
+                    @if (! data_get($diagnostico_retiro, 'puede_retirar', false))
+                        <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+                            <p class="font-black text-rose-800 dark:text-rose-200">No puede aplicarse la reversión individual</p>
+                            <p class="mt-1 text-sm text-rose-700 dark:text-rose-300">El sistema encontró actividad o cambios que deben conservarse. En ese caso registra una baja o traslado.</p>
+                            <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-rose-700 dark:text-rose-300">
+                                @foreach (data_get($diagnostico_retiro, 'bloqueos', []) as $bloqueo)
+                                    <li>{{ $bloqueo }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @else
+                        <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                            No se encontraron calificaciones, asistencias, fichas, seguimientos ni otros registros académicos en el ciclo destino. La reversión individual está disponible.
+                        </div>
+                    @endif
+                @endif
+
+                @error('retiro_proyeccion')
+                    <div class="mt-4 whitespace-pre-line rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:bg-rose-950/20 dark:text-rose-300">{{ $message }}</div>
+                @enderror
+
+                <div class="mt-5 grid gap-4">
+                    <flux:input type="date" wire:model="fecha_retiro" label="Fecha en que la familia confirmó que no continuará" />
+                    <flux:textarea wire:model="motivo_retiro" label="Motivo y observaciones" rows="4"
+                        placeholder="Ejemplo: La madre informó que el alumno se inscribirá en otra institución y no inició clases en el ciclo destino." />
+                    <flux:input type="password" wire:model="password_retiro_proyeccion"
+                        label="Contraseña del usuario" autocomplete="current-password" />
+                </div>
+
+                <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <flux:button wire:click="$set('modalRetirar', false)">Cancelar</flux:button>
+                    <flux:button variant="danger" wire:click="retirarDelCicloDestino"
+                        spinner="retirarDelCicloDestino"
+                        :disabled="! data_get($diagnostico_retiro, 'puede_retirar', false)">
+                        Confirmar retiro individual
+                    </flux:button>
                 </div>
             </div>
         </div>

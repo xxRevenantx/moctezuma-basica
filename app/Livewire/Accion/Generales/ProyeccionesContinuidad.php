@@ -14,7 +14,7 @@ use Livewire\Component;
 class ProyeccionesContinuidad extends Component
 {
     private const MOTIVO_CANCELACION_PREDETERMINADO =
-        'La familia confirmó que el alumno no continuará en la institución durante el ciclo escolar destino.';
+    'La familia confirmó que el alumno no continuará en la institución durante el ciclo escolar destino.';
 
     public string $slug_nivel = '';
     public ?Nivel $nivel = null;
@@ -29,11 +29,18 @@ class ProyeccionesContinuidad extends Component
 
     public bool $modalConfirmar = false;
     public bool $modalCancelar = false;
+    public bool $modalRetirar = false;
     public string $motivo_confirmacion = '';
     public string $fecha_confirmacion = '';
     public string $password_confirmacion_proyeccion = '';
     public string $motivo_cancelacion = '';
     public string $password_cancelacion_proyeccion = '';
+
+    public ?int $proyeccion_retiro_id = null;
+    public string $fecha_retiro = '';
+    public string $motivo_retiro = '';
+    public string $password_retiro_proyeccion = '';
+    public array $diagnostico_retiro = [];
 
     public function mount(string $slug_nivel): void
     {
@@ -91,6 +98,53 @@ class ProyeccionesContinuidad extends Component
     {
         $this->seleccionados = [(string) $proyeccionId];
         $this->prepararCancelacion();
+    }
+
+    public function prepararRetiro(int $proyeccionId, CierreGeneracionContinuidadService $service): void
+    {
+        $this->resetValidation();
+        $this->proyeccion_retiro_id = $proyeccionId;
+        $this->fecha_retiro = now()->toDateString();
+        $this->motivo_retiro = 'La familia confirmó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar destino.';
+        $this->password_retiro_proyeccion = '';
+        $this->diagnostico_retiro = $service->diagnosticoRetiroProyeccion($proyeccionId);
+        $this->modalRetirar = true;
+    }
+
+    public function retirarDelCicloDestino(CierreGeneracionContinuidadService $service): void
+    {
+        $this->validate([
+            'proyeccion_retiro_id' => ['required', 'integer', 'min:1'],
+            'fecha_retiro' => ['required', 'date', 'before_or_equal:today'],
+            'motivo_retiro' => ['required', 'string', 'min:10', 'max:1500'],
+            'password_retiro_proyeccion' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($this->password_retiro_proyeccion, (string) auth()->user()?->password)) {
+            $this->addError('password_retiro_proyeccion', 'La contraseña no es correcta.');
+            return;
+        }
+
+        $proyeccion = $service->retirarProyeccionConfirmada(
+            (int) $this->proyeccion_retiro_id,
+            trim($this->motivo_retiro),
+            $this->fecha_retiro,
+            (int) auth()->id(),
+        );
+
+        $estatus = $proyeccion->inscripcion?->estatus === 'egresado'
+            ? 'egresado del nivel de origen'
+            : 'no reinscrito en el último grado concluido';
+
+        $this->modalRetirar = false;
+        $this->resetOperacion();
+        $this->inicializarDatos();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Alumno retirado del ciclo destino',
+            'text' => "La activación fue anulada sin borrar el historial. El alumno quedó {$estatus}.",
+            'position' => 'top-end',
+        ]);
     }
 
     public function prepararConfirmacion(): void
@@ -217,6 +271,7 @@ class ProyeccionesContinuidad extends Component
             'pendiente' => (int) ($conteos['pendiente'] ?? 0),
             'confirmada' => (int) ($conteos['confirmada'] ?? 0),
             'cancelada' => (int) ($conteos['cancelada'] ?? 0),
+            'revertida' => (int) ($conteos['revertida'] ?? 0),
         ];
     }
 
@@ -259,7 +314,7 @@ class ProyeccionesContinuidad extends Component
                 ?? $proyeccion->grupo_destino_id;
 
             if (blank($grupoActual) && $grupos->count() === 1) {
-                $grupoActual = (int) $grupos->first()->id;
+                $grupoActual = (int) data_get($grupos->first(), 'id');
             }
 
             $this->datos[$proyeccion->id] = [
@@ -292,6 +347,11 @@ class ProyeccionesContinuidad extends Component
         $this->password_confirmacion_proyeccion = '';
         $this->motivo_cancelacion = '';
         $this->password_cancelacion_proyeccion = '';
+        $this->proyeccion_retiro_id = null;
+        $this->fecha_retiro = '';
+        $this->motivo_retiro = '';
+        $this->password_retiro_proyeccion = '';
+        $this->diagnostico_retiro = [];
         $this->resetValidation();
     }
 

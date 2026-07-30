@@ -124,6 +124,7 @@ class EstabilizacionHistorialCiclosService
                     ->whereNotIn('estado', [
                         EstadoInscripcionCiclo::EN_CURSO->value,
                         EstadoInscripcionCiclo::CERRADO->value,
+                        EstadoInscripcionCiclo::ANULADO->value,
                     ])->count(),
                 'multiples_en_curso_por_alumno' => $multiplesEnCurso,
                 'inscripciones_actuales_sin_historial' => $sinHistorialActual,

@@ -166,6 +166,7 @@ class DistribucionEscolarService
                 'inscripcion', 'cicloEscolar', 'nivel', 'generacion', 'grado', 'semestre', 'grupo.asignacionGrupo',
             ])
             ->where('nivel_id', $nivel->id)
+            ->where('estado', '!=', 'anulado')
             ->when(filled($filtros['ciclo_escolar_id'] ?? null), fn (Builder $q) => $q->where('ciclo_escolar_id', (int) $filtros['ciclo_escolar_id']))
             ->when(filled($filtros['generacion_id'] ?? null), fn (Builder $q) => $q->where('generacion_id', (int) $filtros['generacion_id']))
             ->when(filled($filtros['grado_id'] ?? null), fn (Builder $q) => $q->where('grado_id', (int) $filtros['grado_id']))

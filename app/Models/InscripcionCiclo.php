@@ -12,6 +12,7 @@ class InscripcionCiclo extends Model
 {
     public const ESTADO_EN_CURSO = 'en_curso';
     public const ESTADO_CERRADO = 'cerrado';
+    public const ESTADO_ANULADO = 'anulado';
 
     protected $table = 'inscripcion_ciclos';
 
@@ -81,6 +82,11 @@ class InscripcionCiclo extends Model
         return $this->estado === self::ESTADO_CERRADO;
     }
 
+    public function estaAnulado(): bool
+    {
+        return $this->estado === self::ESTADO_ANULADO;
+    }
+
     public function getEtiquetaEstadoAttribute(): string
     {
         return EstadoInscripcionCiclo::tryFrom((string) $this->estado)?->etiqueta()
@@ -100,6 +106,7 @@ class InscripcionCiclo extends Model
             'baja_definitiva' => 'Baja definitiva',
             'trasladado' => 'Trasladado',
             'egresado' => 'Egresado',
+            'no_iniciado' => 'No inició el ciclo',
             'suspendido' => 'Suspendido',
             default => 'Inactivo',
         };

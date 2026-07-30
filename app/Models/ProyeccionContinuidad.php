@@ -15,9 +15,12 @@ class ProyeccionContinuidad extends Model
         'fecha_proyeccion' => 'date',
         'confirmada_at' => 'datetime',
         'cancelada_at' => 'datetime',
+        'revertida_at' => 'datetime',
+        'fecha_reversion' => 'date',
         'snapshot_origen' => 'array',
         'snapshot_confirmacion' => 'array',
         'snapshot_cancelacion' => 'array',
+        'snapshot_reversion' => 'array',
     ];
 
     public function scopePendientes(Builder $query): Builder
@@ -95,11 +98,17 @@ class ProyeccionContinuidad extends Model
         return $this->belongsTo(User::class, 'cancelada_por');
     }
 
+    public function usuarioRevirtio()
+    {
+        return $this->belongsTo(User::class, 'revertida_por');
+    }
+
     public function getEtiquetaEstadoAttribute(): string
     {
         return match ($this->estado) {
             'confirmada' => 'Proyección confirmada',
             'cancelada' => 'No continuará',
+            'revertida' => 'Retirado del ciclo destino',
             default => 'Pendiente de confirmar',
         };
     }

@@ -27,6 +27,7 @@ class HistorialCicloEscolarService
         'trasladado',
         'baja_temporal_al_cierre',
         'continuidad',
+        'no_iniciado',
     ];
 
     public function registrarPreinscripcion(

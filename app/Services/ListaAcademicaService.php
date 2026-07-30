@@ -240,6 +240,7 @@ class ListaAcademicaService
                     ->orderBy('id'),
             ])
             ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('estado', '!=', 'anulado')
             ->whereHas('inscripcion')
             ->where(function (Builder $contexto) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
                 $contexto
@@ -502,6 +503,7 @@ class ListaAcademicaService
 
         $registrosCiclo = InscripcionCiclo::query()
             ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('estado', '!=', 'anulado')
             ->whereIn('inscripcion_id', $inscripcionIds)
             ->get()
             ->keyBy('inscripcion_id');
@@ -512,6 +514,7 @@ class ListaAcademicaService
         $asignaciones = DB::table('inscripcion_ciclo_asignaciones as asignacion')
             ->join('inscripcion_ciclos as historial', 'historial.id', '=', 'asignacion.inscripcion_ciclo_id')
             ->where('historial.ciclo_escolar_id', $cicloEscolarId)
+            ->where('historial.estado', '!=', 'anulado')
             ->whereIn('historial.inscripcion_id', $inscripcionIds)
             ->where('asignacion.nivel_id', $nivelId)
             ->where('asignacion.grado_id', $gradoId)
@@ -527,6 +530,7 @@ class ListaAcademicaService
 
         $snapshots = DB::table('inscripcion_ciclos')
             ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('estado', '!=', 'anulado')
             ->whereIn('inscripcion_id', $inscripcionIds)
             ->where('nivel_id', $nivelId)
             ->where('grado_id', $gradoId)

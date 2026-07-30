@@ -935,6 +935,7 @@ class CierreGeneracionContinuidadService
                 'usuarioProyecto:id,name',
                 'usuarioConfirmo:id,name',
                 'usuarioCancelo:id,name',
+                'usuarioRevirtio:id,name',
             ])
             ->whereHas('inscripcionCicloOrigen', fn ($query) => $query->where('nivel_id', $nivelOrigenId))
             ->when($cicloDestinoId, fn ($query) => $query->where('ciclo_destino_id', $cicloDestinoId))
@@ -950,7 +951,7 @@ class CierreGeneracionContinuidadService
                     });
                 });
             })
-            ->orderByRaw("CASE estado WHEN 'pendiente' THEN 0 WHEN 'confirmada' THEN 1 ELSE 2 END")
+            ->orderByRaw("CASE estado WHEN 'pendiente' THEN 0 WHEN 'confirmada' THEN 1 WHEN 'revertida' THEN 2 ELSE 3 END")
             ->latest('id')
             ->get();
     }
@@ -1084,6 +1085,399 @@ class CierreGeneracionContinuidadService
 
             return $canceladas;
         });
+    }
+
+    /**
+     * Revisa si una continuidad ya confirmada puede anularse de forma
+     * individual porque el alumno finalmente no inició el ciclo destino.
+     *
+     * La promoción o el egreso del ciclo de origen no se revierte. Únicamente
+     * se anula la activación administrativa creada en el ciclo destino.
+     */
+    public function diagnosticoRetiroProyeccion(int $proyeccionId): array
+    {
+        $proyeccion = ProyeccionContinuidad::query()
+            ->with([
+                'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
+                'inscripcionCicloOrigen.cicloEscolar',
+                'inscripcionCicloOrigen.nivel',
+                'inscripcionCicloOrigen.grado',
+                'inscripcionCicloOrigen.semestre',
+                'inscripcionCicloOrigen.grupo.asignacionGrupo',
+                'inscripcionCicloDestino.cicloEscolar',
+                'inscripcionCicloDestino.nivel',
+                'inscripcionCicloDestino.grado',
+                'inscripcionCicloDestino.semestre',
+                'inscripcionCicloDestino.grupo.asignacionGrupo',
+                'cicloDestino',
+                'nivelDestino',
+                'gradoDestino',
+                'semestreDestino',
+                'grupoDestino.asignacionGrupo',
+            ])
+            ->findOrFail($proyeccionId);
+
+        return $this->evaluarRetiroProyeccion($proyeccion);
+    }
+
+    /**
+     * Anula de manera auditada la activación de un alumno en el ciclo destino.
+     * El registro destino se conserva como "anulado / no inició" y el alumno
+     * vuelve a mostrar como última ubicación el grado o nivel que concluyó.
+     */
+    public function retirarProyeccionConfirmada(
+        int $proyeccionId,
+        string $motivo,
+        string $fecha,
+        int $usuarioId
+    ): ProyeccionContinuidad {
+        $motivo = trim($motivo);
+
+        if (mb_strlen($motivo) < 10) {
+            throw ValidationException::withMessages([
+                'motivo_retiro' => 'Escribe un motivo de al menos 10 caracteres.',
+            ]);
+        }
+
+        try {
+            $fechaRetiro = CarbonImmutable::parse($fecha)->startOfDay();
+            if ($fechaRetiro->isAfter(CarbonImmutable::today())) {
+                throw ValidationException::withMessages([
+                    'fecha_retiro' => 'La fecha del retiro no puede estar en el futuro.',
+                ]);
+            }
+            $fecha = $fechaRetiro->toDateString();
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'fecha_retiro' => 'La fecha del retiro no es válida.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($proyeccionId, $motivo, $fecha, $usuarioId): ProyeccionContinuidad {
+            $proyeccion = ProyeccionContinuidad::query()
+                ->with([
+                    'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
+                    'inscripcionCicloOrigen.cicloEscolar',
+                    'inscripcionCicloOrigen.nivel',
+                    'inscripcionCicloOrigen.grado',
+                    'inscripcionCicloOrigen.semestre',
+                    'inscripcionCicloOrigen.grupo.asignacionGrupo',
+                    'inscripcionCicloDestino.cicloEscolar',
+                    'inscripcionCicloDestino.nivel',
+                    'inscripcionCicloDestino.grado',
+                    'inscripcionCicloDestino.semestre',
+                    'inscripcionCicloDestino.grupo.asignacionGrupo',
+                ])
+                ->lockForUpdate()
+                ->findOrFail($proyeccionId);
+
+            $diagnostico = $this->evaluarRetiroProyeccion($proyeccion);
+            if (! $diagnostico['puede_retirar']) {
+                throw ValidationException::withMessages([
+                    'retiro_proyeccion' => "No se puede retirar al alumno del ciclo destino:\n- "
+                        .implode("\n- ", $diagnostico['bloqueos']),
+                ]);
+            }
+
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($proyeccion->inscripcion_id);
+            $origen = InscripcionCiclo::query()->lockForUpdate()->findOrFail($proyeccion->inscripcion_ciclo_origen_id);
+            $destino = InscripcionCiclo::query()->lockForUpdate()->findOrFail($proyeccion->inscripcion_ciclo_destino_id);
+
+            $antesAlumno = $this->snapshotAlumno($alumno);
+            $antesOrigen = $this->snapshotHistorialParaFirma($origen);
+            $antesDestino = $this->snapshotHistorialParaFirma($destino);
+
+            $estatusFinal = $this->estatusFinalTrasRetiro($proyeccion);
+            $fechaCierreDestino = CarbonImmutable::parse($fecha);
+            if ($destino->fecha_ingreso && $fechaCierreDestino->lessThan(CarbonImmutable::parse($destino->fecha_ingreso))) {
+                $fechaCierreDestino = CarbonImmutable::parse($destino->fecha_ingreso);
+            }
+            $fechaCierreDestino = $fechaCierreDestino->toDateString();
+
+            $destino->asignaciones()
+                ->where('es_actual', true)
+                ->update([
+                    'es_actual' => false,
+                    'fecha_fin' => $fechaCierreDestino,
+                    'motivo' => $motivo,
+                    'updated_at' => now(),
+                ]);
+
+            $destino->forceFill([
+                'estado' => 'anulado',
+                'fecha_salida' => $fechaCierreDestino,
+                'estatus_ingreso' => 'no_reinscrito',
+                'estatus_actual_ciclo' => 'no_reinscrito',
+                'resultado_final' => 'no_iniciado',
+                'promovido' => false,
+                'cerrado_at' => now(),
+                'cerrado_por' => $usuarioId,
+                'motivo_cierre' => $motivo,
+                'inscripcion_ciclo_destino_id' => null,
+                'origen' => 'continuidad_confirmada_anulada',
+            ])->save();
+
+            $snapshotDestino = $this->snapshotHistorialParaFirma($destino->fresh());
+            unset($snapshotDestino['snapshot_cierre']);
+            $destino->forceFill(['snapshot_cierre' => $snapshotDestino])->saveQuietly();
+
+            $origen->forceFill([
+                'estatus_actual_ciclo' => $estatusFinal,
+                'inscripcion_ciclo_destino_id' => null,
+            ])->save();
+            $snapshotOrigen = $this->snapshotHistorialParaFirma($origen->fresh());
+            unset($snapshotOrigen['snapshot_cierre']);
+            $origen->forceFill(['snapshot_cierre' => $snapshotOrigen])->saveQuietly();
+
+            $alumno->forceFill([
+                'matricula' => $origen->matricula ?: ($proyeccion->snapshot_origen['matricula'] ?? $alumno->matricula),
+                'ciclo_escolar_id' => $origen->ciclo_escolar_id,
+                'nivel_id' => $origen->nivel_id,
+                'grado_id' => $origen->grado_id,
+                'generacion_id' => $origen->generacion_id,
+                'grupo_id' => $origen->grupo_id,
+                'semestre_id' => $origen->semestre_id,
+                'estatus' => $estatusFinal,
+                'activo' => false,
+                'fecha_estatus' => $fecha,
+                'motivo_estatus' => $motivo,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => null,
+                'indicador_reingreso' => false,
+                'usuario_acceso_activo' => false,
+            ])->save();
+
+            $alumno = $alumno->fresh();
+            $this->matriculas->cerrarVigentes($alumno, $fecha);
+
+            $proyeccion->forceFill([
+                'estado' => 'revertida',
+                'revertida_at' => now(),
+                'revertida_por' => $usuarioId,
+                'fecha_reversion' => $fecha,
+                'tipo_reversion' => 'no_inicio_ciclo_destino',
+                'motivo_reversion' => $motivo,
+                'snapshot_reversion' => [
+                    'alumno' => $this->snapshotAlumno($alumno),
+                    'origen' => $this->snapshotHistorialParaFirma($origen->fresh()),
+                    'destino' => $this->snapshotHistorialParaFirma($destino->fresh()),
+                    'resultado' => 'El ciclo destino se conserva como anulado/no iniciado. El resultado del ciclo de origen no fue modificado.',
+                ],
+            ])->save();
+
+            $proyeccion->detalleCierre?->update([
+                'observacion' => $estatusFinal === 'egresado'
+                    ? 'La continuidad confirmada fue retirada individualmente porque el alumno no inició el nivel destino. Se conserva el egreso del nivel de origen.'
+                    : 'La continuidad confirmada fue retirada individualmente porque el alumno no inició el grado o semestre destino. Se conserva la promoción del ciclo de origen y queda como no reinscrito.',
+                'estado_nuevo' => $this->snapshotAlumno($alumno),
+            ]);
+
+            CambioAcademico::query()->create([
+                'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $destino->id,
+                'generacion_id' => $origen->generacion_id,
+                'tipo' => 'reversion_continuidad_confirmada',
+                'motivo' => $motivo,
+                'datos_anteriores' => [
+                    'alumno' => $antesAlumno,
+                    'origen' => $antesOrigen,
+                    'destino' => $antesDestino,
+                    'proyeccion' => 'confirmada',
+                ],
+                'datos_nuevos' => [
+                    'alumno' => $this->snapshotAlumno($alumno),
+                    'origen' => $this->snapshotHistorialParaFirma($origen->fresh()),
+                    'destino' => $this->snapshotHistorialParaFirma($destino->fresh()),
+                    'proyeccion' => 'revertida',
+                ],
+                'realizado_por' => $usuarioId,
+                'realizado_at' => now(),
+            ]);
+
+            MovimientoAlumno::query()->create([
+                'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $destino->id,
+                'ciclo_escolar_id' => $destino->ciclo_escolar_id,
+                'ciclo_id' => $alumno->ciclo_id,
+                'nivel_anterior_id' => $destino->nivel_id,
+                'nivel_nuevo_id' => $origen->nivel_id,
+                'resultado_continuidad' => 'no_iniciado',
+                'usuario_acceso_activo' => false,
+                'tipo' => 'retiro_ciclo_destino',
+                'fecha' => $fecha,
+                'motivo' => $motivo,
+                'observaciones' => 'Retiro individual de una continuidad ya confirmada. No se eliminó el historial y no se modificó el resultado académico del ciclo de origen.',
+                'estado_anterior' => $antesAlumno,
+                'estado_nuevo' => $this->snapshotAlumno($alumno),
+                'registrado_por' => $usuarioId,
+            ]);
+
+            return $proyeccion->fresh([
+                'inscripcion',
+                'inscripcionCicloOrigen',
+                'inscripcionCicloDestino',
+                'usuarioRevirtio',
+            ]);
+        });
+    }
+
+    private function evaluarRetiroProyeccion(ProyeccionContinuidad $proyeccion): array
+    {
+        $proyeccion->loadMissing([
+            'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
+            'inscripcionCicloOrigen.cicloEscolar',
+            'inscripcionCicloDestino.cicloEscolar',
+            'cicloDestino',
+        ]);
+
+        $bloqueos = collect();
+        $actividad = collect();
+        $alumno = $proyeccion->inscripcion;
+        $origen = $proyeccion->inscripcionCicloOrigen;
+        $destino = $proyeccion->inscripcionCicloDestino;
+
+        if ($proyeccion->estado !== 'confirmada') {
+            $bloqueos->push('La proyección ya no está confirmada o fue atendida anteriormente.');
+        }
+        if (! $alumno) {
+            $bloqueos->push('No se encontró el expediente del alumno.');
+        } elseif ($alumno->trashed()) {
+            $bloqueos->push('El expediente del alumno está eliminado. Restáuralo antes de continuar.');
+        }
+        if (! $origen) {
+            $bloqueos->push('No se encontró el historial del ciclo de origen.');
+        }
+        if (! $destino) {
+            $bloqueos->push('No se encontró el historial creado en el ciclo destino.');
+        }
+
+        if ($alumno && $destino) {
+            if ((int) $alumno->ciclo_escolar_id !== (int) $destino->ciclo_escolar_id) {
+                $bloqueos->push('El alumno ya tiene otra ubicación académica vigente. Revisa su trayectoria antes de retirar la continuidad.');
+            }
+
+            if ($destino->estado !== 'en_curso') {
+                $bloqueos->push('El ciclo destino ya fue cerrado, anulado o atendido mediante otro proceso.');
+            }
+
+            if (! in_array((string) $destino->estatus_actual_ciclo, ['activo', 'reingreso', 'no_promovido'], true)) {
+                $bloqueos->push('El alumno ya tiene una baja, traslado, suspensión u otro estatus en el ciclo destino. Debe conservarse ese movimiento.');
+            }
+
+            if (filled($destino->resultado_final)) {
+                $bloqueos->push('El ciclo destino ya tiene un resultado final registrado.');
+            }
+
+            if ($destino->inscripcion_ciclo_destino_id) {
+                $bloqueos->push('El alumno ya fue enlazado con un ciclo posterior.');
+            }
+        }
+
+        if ($alumno && $destino && $destino->cicloEscolar) {
+            $posterior = InscripcionCiclo::query()
+                ->where('inscripcion_id', $alumno->id)
+                ->where('id', '!=', $destino->id)
+                ->whereHas('cicloEscolar', function ($query) use ($destino): void {
+                    $query->where('inicio_anio', '>', (int) $destino->cicloEscolar->inicio_anio);
+                })
+                ->exists();
+
+            if ($posterior) {
+                $bloqueos->push('Existe un historial en un ciclo posterior. No se puede retroceder esta continuidad de forma aislada.');
+            }
+        }
+
+        if ($destino) {
+            $tablasActividad = [
+                'alertas_academicas' => 'alertas académicas',
+                'calificaciones' => 'calificaciones',
+                'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
+                'ficha_descriptivas' => 'fichas descriptivas',
+                'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
+                'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
+                'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
+                'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
+                'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
+                'integridad_academica_casos' => 'casos de integridad académica',
+                'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
+                'seguimiento_academico_casos' => 'casos de seguimiento académico',
+                'seguimiento_academico_eventos' => 'eventos de seguimiento académico',
+            ];
+
+            foreach ($tablasActividad as $tabla => $etiqueta) {
+                if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
+                    continue;
+                }
+
+                $cantidad = (int) DB::table($tabla)
+                    ->where('inscripcion_ciclo_id', $destino->id)
+                    ->count();
+
+                if ($cantidad > 0) {
+                    $actividad->push([
+                        'tabla' => $tabla,
+                        'etiqueta' => $etiqueta,
+                        'cantidad' => $cantidad,
+                    ]);
+                    $bloqueos->push("Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino.");
+                }
+            }
+
+            if (Schema::hasTable('documentos_alumnos')
+                && Schema::hasColumn('documentos_alumnos', 'ciclo_escolar_id')) {
+                $documentosDestino = (int) DB::table('documentos_alumnos')
+                    ->where('inscripcion_id', $destino->inscripcion_id)
+                    ->where('ciclo_escolar_id', $destino->ciclo_escolar_id)
+                    ->whereNull('deleted_at')
+                    ->count();
+
+                if ($documentosDestino > 0) {
+                    $actividad->push([
+                        'tabla' => 'documentos_alumnos',
+                        'etiqueta' => 'documentos emitidos o asociados al ciclo destino',
+                        'cantidad' => $documentosDestino,
+                    ]);
+                    $bloqueos->push("Tiene {$documentosDestino} documento(s) emitido(s) o asociado(s) al ciclo destino.");
+                }
+            }
+        }
+
+        $estatusFinal = $this->estatusFinalTrasRetiro($proyeccion);
+
+        return [
+            'puede_retirar' => $bloqueos->isEmpty(),
+            'bloqueos' => $bloqueos->unique()->values()->all(),
+            'actividad' => $actividad->values()->all(),
+            'estatus_final' => $estatusFinal,
+            'alumno' => $alumno ? trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}") : 'Alumno',
+            'origen' => $origen ? [
+                'ciclo' => $origen->cicloEscolar ? "{$origen->cicloEscolar->inicio_anio}-{$origen->cicloEscolar->fin_anio}" : 'Ciclo de origen',
+                'nivel' => $origen->nivel?->nombre,
+                'grado' => $origen->grado?->nombre,
+                'semestre' => $origen->semestre?->numero,
+                'grupo' => $origen->grupo?->asignacionGrupo?->nombre,
+                'resultado' => $origen->resultado_final,
+            ] : [],
+            'destino' => $destino ? [
+                'ciclo' => $destino->cicloEscolar ? "{$destino->cicloEscolar->inicio_anio}-{$destino->cicloEscolar->fin_anio}" : 'Ciclo destino',
+                'nivel' => $destino->nivel?->nombre,
+                'grado' => $destino->grado?->nombre,
+                'semestre' => $destino->semestre?->numero,
+                'grupo' => $destino->grupo?->asignacionGrupo?->nombre,
+                'estado' => $destino->estado,
+            ] : [],
+        ];
+    }
+
+    private function estatusFinalTrasRetiro(ProyeccionContinuidad $proyeccion): string
+    {
+        return ($proyeccion->tipo_proyeccion === 'siguiente_nivel'
+            || in_array((string) $proyeccion->resultado_origen, ['egresado', 'promovido_nivel'], true))
+            ? 'egresado'
+            : 'no_reinscrito';
     }
 
     public function bloqueosReversion(ProcesoCierreCiclo $proceso): Collection
@@ -2207,6 +2601,12 @@ class CierreGeneracionContinuidadService
                 'cancelada_por' => null,
                 'motivo_cancelacion' => null,
                 'snapshot_cancelacion' => null,
+                'revertida_at' => null,
+                'revertida_por' => null,
+                'fecha_reversion' => null,
+                'tipo_reversion' => null,
+                'motivo_reversion' => null,
+                'snapshot_reversion' => null,
             ]
         );
     }
@@ -2304,6 +2704,12 @@ class CierreGeneracionContinuidadService
             'cancelada_por' => null,
             'motivo_cancelacion' => null,
             'snapshot_cancelacion' => null,
+            'revertida_at' => null,
+            'revertida_por' => null,
+            'fecha_reversion' => null,
+            'tipo_reversion' => null,
+            'motivo_reversion' => null,
+            'snapshot_reversion' => null,
         ]);
 
         $proyeccion->detalleCierre?->update([
