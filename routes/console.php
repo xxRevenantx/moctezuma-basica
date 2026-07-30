@@ -15,3 +15,5 @@ Schedule::command('expedientes:limpiar-temporales-organizador')->dailyAt('03:30'
 Schedule::command('academico:evaluar-riesgo')->dailyAt('06:30')->withoutOverlapping();
 
 Schedule::command('horarios:publicar-programados')->everyFiveMinutes()->withoutOverlapping();
+
+Schedule::command('analitica:generar-snapshot --todos-niveles')->dailyAt((string) config('analitica_institucional.snapshot_schedule', '07:00'))->withoutOverlapping();

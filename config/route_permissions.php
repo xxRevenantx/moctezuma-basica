@@ -51,6 +51,8 @@ return [
         'misrutas.centro-control' => 'administracion.acceder',
         'misrutas.integridad-academica' => 'integridad.consultar',
         'misrutas.seguimiento-academico' => 'seguimiento.consultar',
+        'misrutas.analitica-institucional' => 'analitica.consultar',
+        'misrutas.analitica.reporte' => 'analitica.exportar',
         'misrutas.respaldos-academicos' => 'respaldos.gestionar',
     ],
 

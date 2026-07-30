@@ -57,15 +57,15 @@
 
         $nombreGrado = $grado->nombre ?? ($grado->grado ?? '');
         $nombreNivel = strtoupper($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL'));
-        $nombreGrupo = $grupo->nombre ?? '';
+        $nombreGrupo = $grupo->asignacionGrupo->nombre ?? '';
 
     @endphp
 
 
 
-
     <table>
         @forelse ($alumnos as $alumno)
+
             <tr>
                 <td style="width:260px">
                     {{ $alumno->apellido_paterno }} {{ $alumno->apellido_materno }} {{ $alumno->nombre }}

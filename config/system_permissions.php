@@ -9,7 +9,7 @@ return [
         'control_escolar' => [
             'label' => 'Control escolar',
             'permissions' => [
-                'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'seguimiento.consultar', 'seguimiento.gestionar', 'auditoria.consultar',
+                'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'seguimiento.consultar', 'seguimiento.gestionar', 'analitica.consultar', 'analitica.exportar', 'analitica.gestionar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'respaldos.gestionar', 'papelera.gestionar',
                 'flujos.gestionar', 'alumnos.*', 'personal.*', 'academico.*',
                 'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*',
@@ -18,7 +18,7 @@ return [
         'direccion' => [
             'label' => 'Dirección',
             'permissions' => [
-                'administracion.acceder', 'integridad.consultar', 'seguimiento.consultar', 'seguimiento.gestionar', 'auditoria.consultar',
+                'administracion.acceder', 'integridad.consultar', 'seguimiento.consultar', 'seguimiento.gestionar', 'analitica.consultar', 'analitica.exportar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'flujos.gestionar', 'alumnos.consultar',
                 'personal.consultar', 'academico.consultar', 'calificaciones.consultar',
                 'calificaciones.autorizar', 'documentos.consultar', 'documentos.autorizar',
@@ -49,6 +49,9 @@ return [
         'integridad.gestionar' => 'Gestionar casos y aplicar correcciones de integridad',
         'seguimiento.consultar' => 'Consultar riesgo y seguimiento académico',
         'seguimiento.gestionar' => 'Gestionar planes, acciones y reglas de riesgo',
+        'analitica.consultar' => 'Consultar analítica institucional avanzada',
+        'analitica.exportar' => 'Exportar reportes ejecutivos de analítica',
+        'analitica.gestionar' => 'Guardar instantáneas y administrar alertas directivas',
         'auditoria.consultar' => 'Consultar auditoría',
         'notificaciones.gestionar' => 'Gestionar notificaciones internas',
         'respaldos.gestionar' => 'Crear y consultar respaldos',

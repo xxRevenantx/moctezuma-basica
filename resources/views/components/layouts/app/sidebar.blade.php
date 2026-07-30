@@ -147,7 +147,7 @@
 
                     {{-- Académica --}}
                     <flux:sidebar.group expandable
-                        :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos', 'misrutas.integridad-academica', 'misrutas.seguimiento-academico')"
+                        :expanded="request()->routeIs('misrutas.alumnos', 'misrutas.escuela', 'misrutas.ciclos', 'misrutas.tutores', 'misrutas.autoridades', 'misrutas.niveles', 'misrutas.respaldos-academicos', 'misrutas.integridad-academica', 'misrutas.seguimiento-academico', 'misrutas.analitica-institucional')"
                         heading="ACADÉMICA" class="grid gap-1 text-xs text-zinc-300">
                         <flux:navlist.item icon="graduation-cap" :href="route('misrutas.alumnos')"
                             :current="request()->routeIs('misrutas.alumnos')" wire:navigate>
@@ -177,6 +177,19 @@
                                     @php($alertasAcademicas = \Illuminate\Support\Facades\Schema::hasTable('alertas_academicas') ? \App\Models\AlertaAcademica::query()->where('estado', 'pendiente')->count() : 0)
                                     @if ($alertasAcademicas > 0)
                                         <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-black text-white">{{ $alertasAcademicas > 99 ? '99+' : $alertasAcademicas }}</span>
+                                    @endif
+                                </span>
+                            </flux:navlist.item>
+                        @endif
+
+                        @if (auth()->user()?->canAccess('analitica.consultar'))
+                            <flux:navlist.item icon="presentation-chart-line" :href="route('misrutas.analitica-institucional')"
+                                :current="request()->routeIs('misrutas.analitica-institucional', 'misrutas.analitica.*')" wire:navigate>
+                                <span class="flex w-full items-center justify-between gap-2">
+                                    <span>Analítica institucional</span>
+                                    @php($alertasDirectivas = \Illuminate\Support\Facades\Schema::hasTable('analitica_institucional_alertas') ? \App\Models\AnaliticaInstitucionalAlerta::query()->activas()->count() : 0)
+                                    @if ($alertasDirectivas > 0)
+                                        <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-black text-white">{{ $alertasDirectivas > 99 ? '99+' : $alertasDirectivas }}</span>
                                     @endif
                                 </span>
                             </flux:navlist.item>

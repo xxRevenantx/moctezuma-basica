@@ -1,12 +1,14 @@
 <?php
 
 use App\Livewire\Academico\SeguimientoAcademico;
+use App\Livewire\Academico\AnaliticaInstitucional;
 
 use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\CierreGeneracionReporteController;
+use App\Http\Controllers\AnaliticaInstitucionalReporteController;
 use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
@@ -80,6 +82,15 @@ Route::get('/integridad-academica', CentroIntegridadAcademica::class)
 Route::get('/seguimiento-academico', SeguimientoAcademico::class)
     ->middleware('permission:seguimiento.consultar')
     ->name('misrutas.seguimiento-academico');
+
+Route::get('/analitica-institucional', AnaliticaInstitucional::class)
+    ->middleware('permission:analitica.consultar')
+    ->name('misrutas.analitica-institucional');
+
+Route::get('/analitica-institucional/reporte/{formato}', AnaliticaInstitucionalReporteController::class)
+    ->whereIn('formato', ['pdf', 'excel'])
+    ->middleware('permission:analitica.exportar')
+    ->name('misrutas.analitica.reporte');
 
 // RUTA INSCRIPCIÓN
 Route::get('/inscripcion', [InscripcionController::class, 'inscripcion'])->name('misrutas.inscripcion');
