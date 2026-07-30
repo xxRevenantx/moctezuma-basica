@@ -28,7 +28,7 @@ class DocumentosOficiales extends Component
     public string $grupo_id = '';
     public string $asignacion_materia_id = '';
     public string $inscripcion_id = '';
-    public string $estatus = 'todos';
+    public string $estatus = 'activos';
     public string $buscar_alumno = '';
     public string $modalidad_certificado = 'parcial';
     public string $formato_zip = 'pdf';

@@ -253,6 +253,7 @@ class CredencialImagenController extends Controller
         );
 
         $query = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel',
                 'grado',

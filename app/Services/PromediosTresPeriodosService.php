@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CicloEscolar;
+use App\Models\Inscripcion;
 use App\Models\MateriaPromediar;
 use App\Models\Nivel;
 use App\Support\CalificacionBachillerato;
@@ -90,6 +91,8 @@ class PromediosTresPeriodosService
             ->leftJoin('parciales', 'parciales.id', '=', 'periodos.parcial_bachillerato_id')
             ->leftJoin('campos_formativos', 'campos_formativos.id', '=', 'materias.campo_formativo_id')
             ->whereNull('inscripciones.deleted_at')
+            ->where('inscripciones.activo', true)
+            ->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS)
             ->where('calificaciones.nivel_id', $nivelId)
             ->where('calificaciones.ciclo_escolar_id', $cicloEscolarId)
             ->where('materias.calificable', true)

@@ -4,6 +4,7 @@ namespace App\Exports\Inscripciones;
 
 use App\Models\Ciclo;
 use App\Models\Grupo;
+use App\Models\Inscripcion;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -45,7 +46,7 @@ class CatalogosInscripcionesSheet implements FromArray, ShouldAutoSize, WithTitl
                 'semestre:id,numero',
             ])
             ->withCount([
-                'inscripciones as alumnos_activos_count' => fn ($query) => $query->where('activo', true),
+                'inscripciones as alumnos_activos_count' => fn ($query) => $query->visiblesEnListas(),
             ])
             ->whereNotNull('ciclo_escolar_id')
             ->whereNotNull('clave')

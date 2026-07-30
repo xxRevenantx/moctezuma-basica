@@ -1335,7 +1335,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
                 generacionId: $this->generacion_id,
                 semestreId: $this->esBachillerato ? $this->semestre_id : null,
                 usarHistorialCiclo: true,
-                incluirNoActivos: true,
+                incluirNoActivos: false,
                 fechaInicio: $this->fecha_inicio,
                 fechaFin: $this->fecha_fin,
                 periodoId: $this->periodo_id,
@@ -1345,13 +1345,13 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
         } else {
             // Compatibilidad con exportaciones antiguas sin periodo relacionado.
             $alumnos = Inscripcion::query()
+                ->visiblesEnListas()
                 ->where('nivel_id', $this->nivel_id)
                 ->where('grado_id', $this->grado_id)
                 ->where('grupo_id', $this->grupo_id)
                 ->when($this->generacion_id, fn ($q) => $q->where('generacion_id', $this->generacion_id))
                 ->when($this->esBachillerato, fn ($q) => $q->where('semestre_id', $this->semestre_id))
                 ->when(!$this->esBachillerato && Schema::hasColumn('inscripciones', 'semestre_id'), fn ($q) => $q->whereNull('semestre_id'))
-                ->where('activo', 1)
                 ->get();
         }
 

@@ -965,7 +965,8 @@ class DocumentosOficialesService
             ->where('grupo_id', $contexto['grupo']->id)
             ->pluck('inscripcion_id');
 
-        return Inscripcion::withTrashed()
+        return Inscripcion::query()
+            ->visiblesEnListas()
             ->where('nivel_id', $contexto['nivel']->id)
             ->where('generacion_id', $contexto['generacion']->id)
             ->where(function (Builder $query) use ($contexto, $idsHistoricos): void {
@@ -974,13 +975,6 @@ class DocumentosOficialesService
                         $actual->where('grupo_id', $contexto['grupo']->id)
                             ->where('semestre_id', $contexto['semestre']->id);
                     });
-            })
-            ->when($estatus !== 'todos', function (Builder $query) use ($estatus): void {
-                if ($estatus === 'activos') {
-                    $query->where('activo', true)->where('estatus', 'activo');
-                } else {
-                    $query->where('estatus', $estatus);
-                }
             })
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')

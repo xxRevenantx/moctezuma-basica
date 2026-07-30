@@ -677,14 +677,7 @@ class AlumnosGenerales extends Component
 
     private function aplicarActivos(Builder $consulta): Builder
     {
-        return $consulta->where(function (Builder $query): void {
-            $query->whereIn('estatus', Inscripcion::ESTATUS_ACTIVOS)
-                ->orWhere(function (Builder $legacy): void {
-                    $legacy->where(function (Builder $sinEstatus): void {
-                        $sinEstatus->whereNull('estatus')->orWhere('estatus', '');
-                    })->where('activo', true);
-                });
-        });
+        return $consulta->visiblesEnListas();
     }
 
     private function aplicarBajasAdministrativas(Builder $consulta): Builder

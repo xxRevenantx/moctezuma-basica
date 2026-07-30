@@ -57,30 +57,40 @@ class PromedioSecundariaService
             ->keyBy('id');
 
         $inscripcionesBase = Inscripcion::withTrashed()
+            ->when(
+                $inscripcionId,
+                fn ($query) => $query->whereKey($inscripcionId),
+                fn ($query) => $query->visiblesEnListas(),
+            )
             ->with('grupo.asignacionGrupo:id,nombre')
             ->where('nivel_id', $nivelId)
             ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
             ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
             ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-            ->when($inscripcionId, fn ($query) => $query->whereKey($inscripcionId))
             ->get()
             ->keyBy('id');
 
         $contextosCalificacion = DB::table('calificaciones')
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('nivel_id', $nivelId)
-            ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
-            ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
-            ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-            ->when($inscripcionId, fn ($query) => $query->where('inscripcion_id', $inscripcionId))
+            ->join('inscripciones', 'inscripciones.id', '=', 'calificaciones.inscripcion_id')
+            ->when(! $inscripcionId, function ($query): void {
+                $query->whereNull('inscripciones.deleted_at')
+                    ->where('inscripciones.activo', true)
+                    ->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS);
+            })
+            ->where('calificaciones.ciclo_escolar_id', $cicloEscolarId)
+            ->where('calificaciones.nivel_id', $nivelId)
+            ->when($generacionId, fn ($query) => $query->where('calificaciones.generacion_id', $generacionId))
+            ->when($gradoId, fn ($query) => $query->where('calificaciones.grado_id', $gradoId))
+            ->when($grupoId, fn ($query) => $query->where('calificaciones.grupo_id', $grupoId))
+            ->when($inscripcionId, fn ($query) => $query->where('calificaciones.inscripcion_id', $inscripcionId))
             ->select([
-                'id',
-                'inscripcion_id',
-                'generacion_id',
-                'grado_id',
-                'grupo_id',
+                'calificaciones.id',
+                'calificaciones.inscripcion_id',
+                'calificaciones.generacion_id',
+                'calificaciones.grado_id',
+                'calificaciones.grupo_id',
             ])
-            ->orderByDesc('id')
+            ->orderByDesc('calificaciones.id')
             ->get()
             ->unique('inscripcion_id')
             ->keyBy('inscripcion_id');
@@ -98,6 +108,7 @@ class PromedioSecundariaService
         }
 
         $alumnosPorId = Inscripcion::withTrashed()
+            ->when(! $inscripcionId, fn ($query) => $query->visiblesEnListas())
             ->whereIn('id', $idsAlumnos->all())
             ->get()
             ->keyBy('id');

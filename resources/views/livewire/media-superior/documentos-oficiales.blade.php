@@ -308,19 +308,10 @@
                                 </flux:select>
                             </flux:field>
                         @endif
-                        <flux:field>
-                            <flux:label>Estatus de alumnos</flux:label>
-                            <flux:select wire:model.live="estatus">
-                                <flux:select.option value="todos">Todos los del corte histórico</flux:select.option>
-                                <flux:select.option value="activos">Solo activos</flux:select.option>
-                                <flux:select.option value="egresado">Egresados</flux:select.option>
-                                <flux:select.option value="baja_temporal">Baja temporal</flux:select.option>
-                                <flux:select.option value="baja_definitiva">Baja definitiva</flux:select.option>
-                                <flux:select.option value="trasladado">Trasladados</flux:select.option>
-                                <flux:select.option value="suspendido">Suspendidos</flux:select.option>
-                                <flux:select.option value="inactivo">Inactivos</flux:select.option>
-                            </flux:select>
-                        </flux:field>
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                            <p class="font-semibold">Matrícula operativa</p>
+                            <p class="mt-1">Estos documentos incluyen únicamente alumnos con estatus Activo y bandera activa.</p>
+                        </div>
                     </div>
                 @else
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

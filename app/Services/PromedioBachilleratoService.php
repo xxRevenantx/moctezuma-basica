@@ -75,7 +75,8 @@ class PromedioBachilleratoService
         $idsAlumnos = $contextos->pluck('inscripcion_id')->unique()->values();
         $idsGrupos = $contextos->pluck('grupo_id')->unique()->values();
 
-        $alumnos = Inscripcion::withTrashed()
+        $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->whereIn('id', $idsAlumnos->all())
             ->get()
             ->keyBy('id');
@@ -373,8 +374,8 @@ class PromedioBachilleratoService
 
         $inscripciones = $esCicloActual
             ? Inscripcion::query()
+                ->visiblesEnListas()
                 ->where('nivel_id', $nivelId)
-                ->where('activo', true)
                 ->whereNotNull('semestre_id')
                 ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
                 ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
@@ -392,7 +393,11 @@ class PromedioBachilleratoService
             : collect();
 
         $calificaciones = DB::table('calificaciones')
-            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->join('inscripciones', 'inscripciones.id', '=', 'calificaciones.inscripcion_id')
+            ->whereNull('inscripciones.deleted_at')
+            ->where('inscripciones.activo', true)
+            ->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS)
+            ->where('calificaciones.ciclo_escolar_id', $cicloEscolarId)
             ->where('nivel_id', $nivelId)
             ->whereNotNull('semestre_id')
             ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))

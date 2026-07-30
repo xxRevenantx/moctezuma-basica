@@ -314,9 +314,9 @@ class PromediosGenerales extends Component
         $like = '%' . $termino . '%';
 
         $coincidencia = Inscripcion::query()
+            ->visiblesEnListas()
             ->with('generacion:id,anio_ingreso,anio_egreso')
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
             ->where('generacion_id', '!=', (int) $this->generacion_id)
             ->where(function ($query) use ($like): void {
                 $query
@@ -355,6 +355,7 @@ class PromediosGenerales extends Component
         }
 
         $alumno = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grado:id,nombre',
@@ -363,7 +364,6 @@ class PromediosGenerales extends Component
             ])
             ->whereKey($this->alumno_seleccionado_id)
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
             ->first();
 
         return $alumno ? $this->normalizarSugerenciaAlumno($alumno) : null;
@@ -510,8 +510,8 @@ class PromediosGenerales extends Component
     private function consultaAlumnosSegunFiltros()
     {
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
             ->when(
                 $this->generacion_id !== '',
                 fn($query) => $query->where('generacion_id', (int) $this->generacion_id)
@@ -596,6 +596,7 @@ class PromediosGenerales extends Component
         }
 
         $inscripciones = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'generacion:id,anio_ingreso,anio_egreso',
                 'grado:id,nombre',
@@ -604,7 +605,6 @@ class PromediosGenerales extends Component
             ])
             ->whereIn('id', $ids)
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
             ->get()
             ->keyBy('id');
 
@@ -939,6 +939,7 @@ class PromediosGenerales extends Component
             ->leftJoin('semestres', 'semestres.id', '=', 'calificaciones.semestre_id')
             ->whereNull('inscripciones.deleted_at')
             ->where('inscripciones.activo', true)
+            ->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS)
             ->where('calificaciones.nivel_id', $this->nivel->id)
             ->where('calificaciones.ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('calificaciones.es_numerica', true)

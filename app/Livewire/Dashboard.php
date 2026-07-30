@@ -501,6 +501,7 @@ class Dashboard extends Component
         $servicio = app(ExpedienteDigitalService::class);
 
         $query = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre,slug,color',
                 'grupo:id,asignacion_grupo_id',
@@ -508,7 +509,6 @@ class Dashboard extends Component
                 'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
                 'documentos.nivel:id,nombre,slug,color',
             ])
-            ->where('activo', true)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre');

@@ -264,7 +264,7 @@ class MostrarGeneraciones extends Component
             ->with(['nivel', 'cicloEscolarInicio', 'cicloEscolarFin'])
             ->withCount([
                 'inscripciones as alumnos_total_count',
-                'inscripciones as alumnos_activos_count' => fn ($q) => $q->whereIn('estatus', ['activo', 'reingreso', 'no_promovido']),
+                'inscripciones as alumnos_activos_count' => fn ($q) => $q->visiblesEnListas(),
                 'inscripciones as alumnos_egresados_count' => fn ($q) => $q->where('estatus', 'egresado'),
                 'inscripciones as alumnos_bajas_count' => fn ($q) => $q->whereIn('estatus', ['baja_temporal', 'baja_definitiva', 'trasladado', 'suspendido', 'inactivo']),
             ])

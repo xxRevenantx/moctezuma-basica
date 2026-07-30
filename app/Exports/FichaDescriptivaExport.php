@@ -50,6 +50,7 @@ class FichaDescriptivaExport implements FromArray, WithHeadings, ShouldAutoSize,
     public function array(): array
     {
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre',
                 'grado:id,nombre',
@@ -61,7 +62,6 @@ class FichaDescriptivaExport implements FromArray, WithHeadings, ShouldAutoSize,
             ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))
             ->when($this->gradoId, fn($q) => $q->where('grado_id', $this->gradoId))
             ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
-            ->where('activo', true)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')

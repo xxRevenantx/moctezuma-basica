@@ -269,6 +269,7 @@ class Credenciales extends Component
         }
 
         $query = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre,slug',
                 'grado:id,nombre',
@@ -338,6 +339,7 @@ class Credenciales extends Component
         }
 
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre,slug',
                 'grado:id,nombre',

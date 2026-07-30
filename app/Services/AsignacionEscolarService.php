@@ -169,8 +169,7 @@ class AsignacionEscolarService
             ])
             ->withCount([
                 'inscripciones as alumnos_activos_count' => fn ($query) => $query
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
+                    ->visiblesEnListas(),
             ])
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('nivel_id', $nivelId)

@@ -749,18 +749,17 @@ class Constancia extends Component
         ];
 
         if ($this->esConstanciaTerminoSeleccionada()) {
-            return $consulta->where(function (Builder $query) use ($estatusSalida) {
-                $query->where('estatus', 'egresado')
-                    ->orWhere(function (Builder $activos) use ($estatusSalida) {
+            return $consulta->where(function (Builder $query): void {
+                $query->where('estatus', Inscripcion::ESTATUS_EGRESADO)
+                    ->orWhere(function (Builder $activos): void {
                         $activos->where('activo', true)
-                            ->whereNotIn('estatus', $estatusSalida);
+                            ->where('estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS)
+                            ->whereNull('deleted_at');
                     });
             });
         }
 
-        return $consulta
-            ->where('activo', true)
-            ->whereNotIn('estatus', $estatusSalida);
+        return $consulta->visiblesEnListas();
     }
 
     private function crearConstanciaIndividual(int $inscripcionId): ConstanciaModelo

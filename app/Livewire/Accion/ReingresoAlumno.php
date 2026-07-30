@@ -339,8 +339,7 @@ class ReingresoAlumno extends Component
             ->with('asignacionGrupo:id,nombre')
             ->withCount([
                 'inscripciones as alumnos_activos_count' => fn (Builder $query) => $query
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
+                    ->visiblesEnListas(),
             ])
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('estado', 'activo')

@@ -1321,7 +1321,7 @@ class Calificacion extends Component
             generacionId: (int) $this->generacion_id,
             semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
             usarHistorialCiclo: true,
-            incluirNoActivos: true,
+            incluirNoActivos: false,
             fechaInicio: $fechaInicio,
             fechaFin: $fechaFin,
             periodoId: (int) $this->periodo_id,

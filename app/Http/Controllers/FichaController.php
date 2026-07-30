@@ -91,6 +91,7 @@ class FichaController extends Controller
         $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: $this->cicloActual()?->id;
 
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel.director',
                 'grado',
@@ -101,7 +102,6 @@ class FichaController extends Controller
             ->when($request->integer('generacion_id'), fn ($q, $id) => $q->where('generacion_id', $id))
             ->when($request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
             ->when($request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
-            ->where('activo', true)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')

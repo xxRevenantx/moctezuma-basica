@@ -132,7 +132,23 @@ class DocumentosPDFController extends Controller
             abort(404, 'No se encontró la plantilla de constancia.');
         }
 
-        $alumnos = Inscripcion::query()
+        $consultaAlumnos = Inscripcion::query();
+        $identificadorPlantilla = Str::lower(Str::ascii(trim(
+            (string) $plantilla->clave . ' ' . (string) $plantilla->titulo
+        )));
+        $esConstanciaTermino = Str::contains($identificadorPlantilla, 'estudio')
+            && Str::contains($identificadorPlantilla, ['termino', 'terminacion', 'conclusion', 'egreso']);
+
+        if ($esConstanciaTermino) {
+            $consultaAlumnos->where(function ($query): void {
+                $query->where('estatus', Inscripcion::ESTATUS_EGRESADO)
+                    ->orWhere(fn ($activos) => $activos->visiblesEnListas());
+            });
+        } else {
+            $consultaAlumnos->visiblesEnListas();
+        }
+
+        $alumnos = $consultaAlumnos
             ->with([
                 'nivel.director',
                 'grado:id,nombre',

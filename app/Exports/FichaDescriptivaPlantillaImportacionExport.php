@@ -55,6 +55,7 @@ class FichaDescriptivaPlantillaImportacionExport implements FromArray, WithHeadi
         $ciclo = CicloEscolar::query()->find($this->cicloEscolarId);
 
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre',
                 'grado:id,nombre',
@@ -64,7 +65,6 @@ class FichaDescriptivaPlantillaImportacionExport implements FromArray, WithHeadi
             ->where('grado_id', $this->gradoId)
             ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
             ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))
-            ->where('activo', true)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')

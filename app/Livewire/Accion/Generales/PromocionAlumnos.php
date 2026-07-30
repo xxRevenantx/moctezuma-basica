@@ -623,8 +623,7 @@ class PromocionAlumnos extends Component
         return Grupo::query()
             ->with('asignacionGrupo')
             ->withCount(['inscripciones as alumnos_activos_count' => fn (Builder $alumnos) => $alumnos
-                ->where('activo', true)
-                ->whereNull('deleted_at')])
+                ->visiblesEnListas()])
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('estado', 'activo')
             ->where('nivel_id', $this->nivel->id)
@@ -637,6 +636,7 @@ class PromocionAlumnos extends Component
     private function alumnosQuery(): Builder
     {
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->with(['grado', 'semestre', 'grupo.asignacionGrupo'])
             ->where('nivel_id', $this->nivel->id)
             ->when($this->ciclo_origen_id, fn (Builder $q) => $q->where('ciclo_escolar_id', $this->ciclo_origen_id))
@@ -644,8 +644,6 @@ class PromocionAlumnos extends Component
             ->when($this->grado_origen_id, fn (Builder $q) => $q->where('grado_id', $this->grado_origen_id))
             ->when($this->esBachillerato() && $this->semestre_origen_id, fn (Builder $q) => $q->where('semestre_id', $this->semestre_origen_id))
             ->when($this->grupo_origen_id, fn (Builder $q) => $q->where('grupo_id', $this->grupo_origen_id))
-            ->where('activo', true)
-            ->whereIn('estatus', ['activo', 'reingreso', 'no_promovido'])
             ->orderBy('apellido_paterno')->orderBy('apellido_materno')->orderBy('nombre');
     }
 

@@ -12,6 +12,7 @@ use App\Models\Nivel;
 use App\Models\ObservacionInscripcion;
 use App\Models\Semestre;
 use App\Models\Tutor;
+use App\Services\AnulacionIngresoNoIniciadoService;
 use App\Services\CurpService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\GestionAcademicaService;
@@ -20,6 +21,7 @@ use App\Services\ObservacionInscripcionService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -76,6 +78,14 @@ class EditarMatricula extends Component
     public string $motivo_cambio = '';
     public bool $confirmar_cambio_academico = false;
 
+    public bool $modal_anular_ingreso = false;
+    public string $fecha_anulacion_ingreso = '';
+    public string $motivo_anulacion_ingreso = '';
+    public string $password_anulacion_ingreso = '';
+
+    /** @var array<string, mixed> */
+    public array $diagnostico_anulacion_ingreso = [];
+
     public ?string $observaciones = null;
     public ?int $observacion_ciclo_escolar_id = null;
 
@@ -118,6 +128,12 @@ class EditarMatricula extends Component
             ->get();
 
         $this->cargar($inscripcion);
+        $this->diagnostico_anulacion_ingreso = app(AnulacionIngresoNoIniciadoService::class)
+            ->diagnosticar((int) $this->InscripcionId);
+
+        if (request()->boolean('anular_ingreso')) {
+            $this->prepararAnulacionIngreso(app(AnulacionIngresoNoIniciadoService::class));
+        }
     }
 
     private function cargar(Inscripcion $alumno): void
@@ -177,6 +193,70 @@ class EditarMatricula extends Component
         $this->cargarObservacionCiclo();
 
         $this->recargarOpcionesAsignacionEscolar();
+    }
+
+    public function prepararAnulacionIngreso(AnulacionIngresoNoIniciadoService $service): void
+    {
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
+
+        $this->resetValidation([
+            'anulacion_ingreso',
+            'fecha_anulacion_ingreso',
+            'motivo_anulacion_ingreso',
+            'password_anulacion_ingreso',
+        ]);
+
+        $this->diagnostico_anulacion_ingreso = $service->diagnosticar((int) $this->InscripcionId);
+        $this->fecha_anulacion_ingreso = now()->toDateString();
+        $this->motivo_anulacion_ingreso = 'La familia informó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar.';
+        $this->password_anulacion_ingreso = '';
+        $this->modal_anular_ingreso = true;
+    }
+
+    public function cerrarModalAnulacionIngreso(): void
+    {
+        $this->modal_anular_ingreso = false;
+        $this->password_anulacion_ingreso = '';
+        $this->resetValidation([
+            'anulacion_ingreso',
+            'fecha_anulacion_ingreso',
+            'motivo_anulacion_ingreso',
+            'password_anulacion_ingreso',
+        ]);
+    }
+
+    public function anularIngresoNoIniciado(AnulacionIngresoNoIniciadoService $service)
+    {
+        abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
+
+        $this->validate([
+            'fecha_anulacion_ingreso' => ['required', 'date', 'before_or_equal:today'],
+            'motivo_anulacion_ingreso' => ['required', 'string', 'min:10', 'max:1500'],
+            'password_anulacion_ingreso' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($this->password_anulacion_ingreso, (string) auth()->user()?->password)) {
+            $this->addError('password_anulacion_ingreso', 'La contraseña no es correcta.');
+
+            return null;
+        }
+
+        $service->anular(
+            (int) $this->InscripcionId,
+            trim($this->motivo_anulacion_ingreso),
+            $this->fecha_anulacion_ingreso,
+            (int) auth()->id(),
+        );
+
+        session()->flash(
+            'success',
+            'El ingreso fue anulado como “No inició el ciclo”. El alumno ya no forma parte de las listas, boletas ni calificaciones del ciclo, pero su evidencia administrativa se conservó.'
+        );
+
+        return redirect()->route('submodulos.accion', [
+            'slug_nivel' => $this->slug_nivel,
+            'accion' => 'matricula',
+        ]);
     }
 
     public function updatingObservacionCicloEscolarId($value): void
@@ -398,8 +478,7 @@ class EditarMatricula extends Component
             ])
             ->withCount([
                 'inscripciones as alumnos_activos_count' => fn ($alumnos) => $alumnos
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
+                    ->visiblesEnListas(),
             ])
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
             ->select('grupos.*')
@@ -863,6 +942,27 @@ class EditarMatricula extends Component
 
         $cambioEstatus = ($alumno->estatus ?? 'activo') !== $data['estatus'];
 
+        $diagnosticoAnulacion = app(AnulacionIngresoNoIniciadoService::class)
+            ->diagnosticar($alumno);
+
+        if (data_get($diagnosticoAnulacion, 'ya_anulado', false) && ($cambioAcademico || $cambioEstatus)) {
+            $this->addError(
+                'estatus',
+                'Este ingreso está anulado como “No inició el ciclo”. No lo reactives ni lo cambies de grupo desde la edición general; utiliza el flujo formal de reingreso o una nueva inscripción para conservar la trayectoria.'
+            );
+
+            return null;
+        }
+
+        if ($cambioEstatus && $data['estatus'] === 'no_reinscrito') {
+            $this->addError(
+                'estatus',
+                'No cambies este estado manualmente. Utiliza “Anular ingreso / No inició el ciclo” si nunca comenzó clases, o el flujo de continuidad cuando fue promovido desde un ciclo anterior.'
+            );
+
+            return null;
+        }
+
         if (($cambioAcademico || $cambioEstatus) && mb_strlen(trim($data['motivo_cambio'] ?? '')) < 5) {
             $this->addError('motivo_cambio', 'Indica el motivo del cambio académico o de estatus.');
             return null;
@@ -977,6 +1077,7 @@ class EditarMatricula extends Component
             'tutores' => $this->tutores,
             'esBachillerato' => $this->esBachillerato(),
             'resumenDocumental' => $resumenDocumental,
+            'diagnosticoAnulacionIngreso' => $this->diagnostico_anulacion_ingreso,
         ]);
     }
 }

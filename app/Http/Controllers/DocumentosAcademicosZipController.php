@@ -151,7 +151,8 @@ class DocumentosAcademicosZipController extends Controller
              * reconocimientos de un semestre ya concluido aunque el alumno
              * actualmente esté registrado en el semestre siguiente.
              */
-            $alumnosPorId = Inscripcion::withTrashed()
+            $alumnosPorId = Inscripcion::query()
+                ->visiblesEnListas()
                 ->where('nivel_id', $nivel->id)
                 ->whereIn(
                     'id',
@@ -201,6 +202,7 @@ class DocumentosAcademicosZipController extends Controller
                 : collect();
 
             $alumnos = Inscripcion::query()
+                ->visiblesEnListas()
                 ->with([
                     'grupo.asignacionGrupo:id,nombre',
                     'grupo.semestre:id,grado_id,numero',
@@ -208,7 +210,6 @@ class DocumentosAcademicosZipController extends Controller
                 ->where('nivel_id', $nivel->id)
                 ->where('grado_id', $grado->id)
                 ->whereIn('grupo_id', $grupos->pluck('id'))
-                ->where('activo', true)
                 ->when(
                     ! empty($datos['generacion_id']),
                     fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
@@ -421,7 +422,7 @@ class DocumentosAcademicosZipController extends Controller
                         !empty($datos['generacion_id']),
                         fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])
                     )
-                    ->whereHas('alumno', fn ($query) => $query->where('activo', true))
+                    ->whereHas('alumno', fn ($query) => $query->visiblesEnListas())
                     ->orderBy('grupo_id')
                     ->orderBy('inscripcion_id')
                     ->get();
@@ -459,6 +460,7 @@ class DocumentosAcademicosZipController extends Controller
                 }
             } else {
                 $alumnos = Inscripcion::query()
+                    ->visiblesEnListas()
                     ->with([
                         'grupo.asignacionGrupo:id,nombre',
                         'nivel.director',
@@ -468,7 +470,6 @@ class DocumentosAcademicosZipController extends Controller
                     ])
                     ->where('nivel_id', $nivel->id)
                     ->where('grado_id', $grado->id)
-                    ->where('activo', true)
                     ->when(
                         !empty($datos['generacion_id']),
                         fn ($query) => $query->where('generacion_id', (int) $datos['generacion_id'])

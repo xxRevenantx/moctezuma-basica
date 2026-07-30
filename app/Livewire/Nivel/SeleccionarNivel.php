@@ -42,18 +42,18 @@ class SeleccionarNivel extends Component
                 // ✅ TOTAL (inscripciones en ese grado y nivel)
                 'inscripciones as total' => fn ($q) =>
                     $q->where('nivel_id', $nivel->id)
-                      ->where('activo', 1),
+                      ->visiblesEnListas(),
 
                 // ✅ HOMBRES
                 'inscripciones as hombres' => fn ($q) =>
                     $q->where('nivel_id', $nivel->id)
-                      ->where('activo', 1)
+                      ->visiblesEnListas()
                       ->where('genero', 'H'),
 
                 // ✅ MUJERES
                 'inscripciones as mujeres' => fn ($q) =>
                     $q->where('nivel_id', $nivel->id)
-                      ->where('activo', 1)
+                      ->visiblesEnListas()
                       ->where('genero', 'M'),
             ])
             ->orderBy('orden')

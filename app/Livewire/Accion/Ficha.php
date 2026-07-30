@@ -496,11 +496,11 @@ class Ficha extends Component
     private function construirDatosAnonimosGrupoParaIa(): array
     {
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->where('nivel_id', $this->nivel_id)
             ->where('grado_id', $this->grado_id)
             ->where('grupo_id', $this->grupo_id)
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
-            ->where('activo', true)
             ->orderBy('id')
             ->get([
                 'id',
@@ -810,6 +810,7 @@ class Ficha extends Component
     private function queryAlumnos()
     {
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->with(['nivel:id,nombre,slug', 'grado:id,nombre', 'grupo.asignacionGrupo:id,nombre', 'generacion:id,nivel_id,anio_ingreso,anio_egreso'])
             ->where('nivel_id', $this->nivel_id)
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
@@ -825,7 +826,6 @@ class Ficha extends Component
                         ->orWhere('matricula', 'like', $texto);
                 });
             })
-            ->where('activo', true)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre');

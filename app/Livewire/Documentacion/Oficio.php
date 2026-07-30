@@ -322,6 +322,7 @@ class Oficio extends Component
         }
 
         $this->alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre,cct,director_id',
                 'grado:id,nombre',
@@ -330,7 +331,6 @@ class Oficio extends Component
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
             ])
-            ->where('activo', true)
             ->where(function ($consulta) use ($texto) {
                 $consulta->where('nombre', 'like', "%{$texto}%")
                     ->orWhere('apellido_paterno', 'like', "%{$texto}%")

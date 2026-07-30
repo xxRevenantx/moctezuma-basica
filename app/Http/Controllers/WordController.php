@@ -84,12 +84,12 @@ class WordController extends Controller
         | La tabla inscripciones ya contiene los datos del alumno.
         */
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id)
             ->where('grupo_id', $grupo->id)
             ->whereNull('semestre_id')
-            ->where('activo', 1)
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')

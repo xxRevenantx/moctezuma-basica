@@ -144,14 +144,13 @@ class LugaresPreescolar extends Component
         }
 
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'grado:id,nombre,orden',
                 'grupo.asignacionGrupo:id,nombre',
                 'generacion:id,anio_ingreso,anio_egreso',
             ])
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
-            ->whereNull('deleted_at')
             ->when($this->generacion_id !== '', fn($q) => $q->where('generacion_id', $this->generacion_id))
             ->when($this->grado_id !== '', fn($q) => $q->where('grado_id', $this->grado_id))
             ->when($this->grupo_id !== '', fn($q) => $q->where('grupo_id', $this->grupo_id))
@@ -174,9 +173,9 @@ class LugaresPreescolar extends Component
         ]);
 
         $alumno = Inscripcion::query()
+            ->visiblesEnListas()
             ->where('id', $inscripcionId)
             ->where('nivel_id', $this->nivel->id)
-            ->where('activo', true)
             ->firstOrFail();
 
         $tipo = $this->tipo_reconocimiento;

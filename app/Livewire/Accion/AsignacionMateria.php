@@ -1028,10 +1028,10 @@ class AsignacionMateria extends Component
         }
 
         $idsVigentes = Inscripcion::query()
+            ->visiblesEnListas()
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $grupoOrigen->grado_id)
             ->whereNotNull('grupo_id')
-            ->where('activo', true)
             ->when($grupoOrigen->semestre_id, fn($q) => $q->where('semestre_id', $grupoOrigen->semestre_id))
             ->pluck('grupo_id')
             ->unique();

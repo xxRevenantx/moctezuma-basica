@@ -69,7 +69,7 @@ class ListaAcademicaService
         ?int $generacionId = null,
         ?int $semestreId = null,
         bool $usarHistorialCiclo = false,
-        bool $incluirNoActivos = false,
+        bool $incluirNoActivos = false, // Compatibilidad: la política vigente siempre exige estatus activo.
         CarbonInterface|string|null $fechaInicio = null,
         CarbonInterface|string|null $fechaFin = null,
         ?int $periodoId = null,
@@ -99,9 +99,10 @@ class ListaAcademicaService
             }
 
             /*
-             * Una calificación ya capturada es evidencia académica suficiente
-             * para conservar al alumno en la lista, incluso si un historial
-             * antiguo quedó incompleto o fue reconstruido parcialmente.
+             * Una calificación ya capturada puede reconstruir el contexto
+             * académico cuando el historial antiguo está incompleto. La
+             * incorporación sigue condicionada a que el alumno permanezca
+             * exactamente activo en su registro principal.
              */
             if (Schema::hasTable('calificaciones')) {
                 $historicos = $historicos
@@ -118,10 +119,10 @@ class ListaAcademicaService
 
             /*
              * Regla especial de Bachillerato: cuando se solicita, todos los
-             * alumnos vinculados alguna vez a la generación permanecen
-             * visibles a lo largo de sus ciclos, grados y semestres. La fecha
-             * real de inscripción no limita la captura. Si ya existe evidencia
-             * en otro grupo del mismo contexto, el alumno no se duplica.
+             * alumnos activos vinculados a la generación pueden mostrarse
+             * a lo largo de sus ciclos, grados y semestres. La fecha real de
+             * inscripción no limita la captura. Los estados distintos de
+             * activo quedan excluidos y el alumno no se duplica.
              */
             if (
                 $incluirTodaGeneracionBachillerato
@@ -142,7 +143,11 @@ class ListaAcademicaService
                     ));
             }
 
-            $historicos = $this->ordenarAlumnos($historicos);
+            $historicos = $this->ordenarAlumnos(
+                $historicos->filter(
+                    fn (Inscripcion $alumno): bool => $alumno->visibleEnListas()
+                )
+            );
 
             if ($historicos->isNotEmpty() || ! $usarActualComoRespaldo) {
                 return $historicos;
@@ -155,7 +160,6 @@ class ListaAcademicaService
             gradoId: $gradoId,
             generacionId: $generacionId,
             semestreId: $semestreId,
-            incluirNoActivos: $incluirNoActivos,
         );
     }
 
@@ -168,26 +172,15 @@ class ListaAcademicaService
         ?int $gradoId,
         ?int $generacionId,
         ?int $semestreId,
-        bool $incluirNoActivos,
     ): Collection {
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion', 'cicloEscolar'])
             ->when($grupoIds !== [], fn(Builder $q) => $q->whereIn('grupo_id', $grupoIds))
             ->when($nivelId, fn(Builder $q) => $q->where('nivel_id', $nivelId))
             ->when($gradoId, fn(Builder $q) => $q->where('grado_id', $gradoId))
             ->when($generacionId, fn(Builder $q) => $q->where('generacion_id', $generacionId))
             ->when($semestreId, fn(Builder $q) => $q->where('semestre_id', $semestreId))
-            ->when(!$incluirNoActivos, function (Builder $q): void {
-                $q->where('activo', true)
-                    ->whereNotIn('estatus', [
-                        'baja_temporal',
-                        'baja_definitiva',
-                        'trasladado',
-                        'suspendido',
-                        'egresado',
-                        'inactivo',
-                    ]);
-            })
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
@@ -241,7 +234,7 @@ class ListaAcademicaService
             ])
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('estado', '!=', 'anulado')
-            ->whereHas('inscripcion')
+            ->whereHas('inscripcion', fn (Builder $inscripcion) => $inscripcion->visiblesEnListas())
             ->where(function (Builder $contexto) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
                 $contexto
                     ->whereHas('asignaciones', function (Builder $asignacion) use ($grupoIds, $inicio, $fin, $nivelId, $gradoId, $generacionId, $semestreId): void {
@@ -387,7 +380,8 @@ class ListaAcademicaService
             return collect();
         }
 
-        $alumnos = Inscripcion::withTrashed()
+        $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion', 'cicloEscolar'])
             ->whereIn('id', $registros->pluck('inscripcion_id')->all())
             ->get()
@@ -457,8 +451,14 @@ class ListaAcademicaService
             return collect();
         }
 
-        $alumnos = Inscripcion::withTrashed()
+        $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with(['nivel', 'grado', 'semestre', 'grupo.asignacionGrupo', 'generacion', 'cicloEscolar'])
+            ->whereDoesntHave('ciclosEscolaresHistorial', function (Builder $historial) use ($cicloEscolarId): void {
+                $historial
+                    ->where('ciclo_escolar_id', $cicloEscolarId)
+                    ->where('estado', 'anulado');
+            })
             ->where(function (Builder $query) use ($nivelId, $generacionId): void {
                 $query
                     ->where(function (Builder $actual) use ($nivelId, $generacionId): void {

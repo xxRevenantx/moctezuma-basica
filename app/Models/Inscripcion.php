@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,8 @@ class Inscripcion extends Model
     ];
 
     public const ESTATUS_EGRESADO = 'egresado';
+
+    public const ESTATUS_VISIBLE_LISTAS = 'activo';
 
     /** @use HasFactory<\Database\Factories\InscripcionFactory> */
     use HasFactory, SoftDeletes;
@@ -184,6 +187,33 @@ class Inscripcion extends Model
         }
 
         return $this->activo ? 'activo' : 'inactivo';
+    }
+
+
+    /**
+     * Regla institucional para listas operativas.
+     *
+     * Un alumno solo puede mostrarse en asistencias, evaluaciones, boletas
+     * masivas, credenciales, fichas, reconocimientos y demás listados
+     * académicos cuando su bandera y su estatus principal son exactamente
+     * activos. Los demás estados conservan su historial, pero no forman parte
+     * de la matrícula vigente mostrada en listas.
+     */
+    public function scopeVisiblesEnListas(Builder $query): Builder
+    {
+        $modelo = $query->getModel();
+
+        return $query
+            ->where($modelo->qualifyColumn('activo'), true)
+            ->where($modelo->qualifyColumn('estatus'), self::ESTATUS_VISIBLE_LISTAS)
+            ->whereNull($modelo->qualifyColumn('deleted_at'));
+    }
+
+    public function visibleEnListas(): bool
+    {
+        return ! $this->trashed()
+            && $this->activo === true
+            && $this->estatusNormalizado() === self::ESTATUS_VISIBLE_LISTAS;
     }
 
     public function esEgresado(): bool

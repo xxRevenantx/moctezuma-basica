@@ -172,6 +172,7 @@ class BusquedaGlobalService
         $like = $this->like($termino);
 
         return Inscripcion::query()
+            ->visiblesEnListas()
             ->select([
                 'id',
                 'matricula',
@@ -196,7 +197,6 @@ class BusquedaGlobalService
                 'generacion:id,nombre,anio_ingreso,anio_egreso',
                 'semestre:id,numero',
             ])
-            ->where('activo', true)
             ->whereHas('grupo.horarios')
             ->where(function (Builder $query) use ($like): void {
                 $query->where('matricula', 'like', $like)
@@ -1062,8 +1062,7 @@ class BusquedaGlobalService
             ])
             ->withCount([
                 'inscripciones as alumnos_activos_count' => fn(Builder $query) => $query
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
+                    ->visiblesEnListas(),
             ])
             ->where(function (Builder $query) use ($like): void {
                 $query->whereHas('asignacionGrupo', fn(Builder $grupo) => $grupo->where('nombre', 'like', $like))
@@ -1127,8 +1126,7 @@ class BusquedaGlobalService
             ->with('nivel:id,nombre')
             ->withCount([
                 'inscripciones as alumnos_activos_count' => fn(Builder $query) => $query
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
+                    ->visiblesEnListas(),
             ])
             ->where(function (Builder $query) use ($like): void {
                 $query->where('nombre', 'like', $like)

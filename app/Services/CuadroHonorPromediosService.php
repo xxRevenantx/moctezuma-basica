@@ -212,14 +212,13 @@ class CuadroHonorPromediosService
         int $periodo,
     ): Collection {
         $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'grado:id,nombre,orden',
                 'grupo.asignacionGrupo:id,nombre',
             ])
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $gradoId)
-            ->where('activo', true)
-            ->whereNull('deleted_at')
             ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
             ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
             ->get();

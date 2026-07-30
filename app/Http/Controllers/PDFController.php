@@ -642,6 +642,7 @@ class PDFController extends Controller
         $textoLugarAlumno = 'Pendiente';
 
         $queryInscripcionesGrupo = \App\Models\Inscripcion::query()
+            ->visiblesEnListas()
             ->select(['id', 'matricula', 'nombre', 'apellido_paterno', 'apellido_materno'])
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
@@ -2864,7 +2865,7 @@ class PDFController extends Controller
                 generacionId: (int) $generacion->id,
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
-                incluirNoActivos: true,
+                incluirNoActivos: false,
                 fechaInicio: $periodo->fecha_inicio,
                 fechaFin: $periodo->fecha_fin,
                 periodoId: (int) $periodo->id,
@@ -3457,7 +3458,7 @@ class PDFController extends Controller
             generacionId: (int) $generacion->id,
             semestreId: $esBachillerato ? (int) $semestre?->id : null,
             usarHistorialCiclo: true,
-            incluirNoActivos: true,
+            incluirNoActivos: false,
             fechaInicio: $periodo->fecha_inicio,
             fechaFin: $periodo->fecha_fin,
             periodoId: (int) $periodo->id,
@@ -4497,7 +4498,7 @@ class PDFController extends Controller
                 generacionId: (int) $generacion->id,
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
-                incluirNoActivos: true,
+                incluirNoActivos: false,
                 fechaInicio: $periodo->fecha_inicio,
                 fechaFin: $periodo->fecha_fin,
                 periodoId: (int) $periodo->id,
@@ -5216,7 +5217,7 @@ class PDFController extends Controller
                 generacionId: (int) $generacion->id,
                 semestreId: $esBachillerato ? (int) $semestre?->id : null,
                 usarHistorialCiclo: true,
-                incluirNoActivos: true,
+                incluirNoActivos: false,
                 fechaInicio: $periodo->fecha_inicio,
                 fechaFin: $periodo->fecha_fin,
                 periodoId: (int) $periodo->id,
@@ -5552,6 +5553,7 @@ class PDFController extends Controller
         $modoDescarga = $request->get('modo_descarga', 'grupo');
 
         $query = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel',
                 'grado',
@@ -6276,7 +6278,7 @@ class PDFController extends Controller
             generacionId: (int) $generacion->id,
             semestreId: $esBachillerato ? (int) $semestre?->id : null,
             usarHistorialCiclo: true,
-            incluirNoActivos: true,
+            incluirNoActivos: false,
             fechaInicio: $periodo?->fecha_inicio ?? $request->input('fecha_inicio'),
             fechaFin: $periodo?->fecha_fin ?? $request->input('fecha_fin'),
             periodoId: $periodo?->id ? (int) $periodo->id : null,
@@ -6475,16 +6477,17 @@ class PDFController extends Controller
 
     private function aplicarFiltroActivoInscripcionPdf($query): void
     {
-        if (!Schema::hasColumn('inscripciones', 'activo')) {
-            return;
+        if (Schema::hasColumn('inscripciones', 'activo')) {
+            $query->where('inscripciones.activo', true);
         }
 
-        $query->where(function ($q) {
-            $q->where('activo', 1)
-                ->orWhere('activo', true)
-                ->orWhere('activo', '1')
-                ->orWhere('activo', 'true');
-        });
+        if (Schema::hasColumn('inscripciones', 'estatus')) {
+            $query->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS);
+        }
+
+        if (Schema::hasColumn('inscripciones', 'deleted_at')) {
+            $query->whereNull('inscripciones.deleted_at');
+        }
     }
 
     private function queryInscripcionesPorContextoPdf(
@@ -6549,7 +6552,7 @@ class PDFController extends Controller
                     generacionId: (int) $generacion->id,
                     semestreId: $esBachillerato ? (int) $grupo->semestre_id : null,
                     usarHistorialCiclo: true,
-                    incluirNoActivos: true,
+                    incluirNoActivos: false,
                     incluirTodaGeneracionBachillerato: $esBachillerato,
                 )
                 ->firstWhere('id', $inscripcionId);

@@ -478,6 +478,9 @@ class AcademicIntegrityService
         if (Schema::hasColumn('inscripciones', 'activo')) {
             $query->where('inscripciones.activo', true);
         }
+        if (Schema::hasColumn('inscripciones', 'estatus')) {
+            $query->where('inscripciones.estatus', 'activo');
+        }
         if (Schema::hasColumn('inscripciones', 'deleted_at')) {
             $query->whereNull('inscripciones.deleted_at');
         }

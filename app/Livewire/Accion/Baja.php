@@ -358,8 +358,7 @@ class Baja extends Component
     private function activosQuery(): Builder
     {
         return $this->baseQuery()
-            ->where('activo', true)
-            ->when($this->filtro_estatus !== '', fn (Builder $query) => $query->where('estatus', $this->filtro_estatus));
+            ->visiblesEnListas();
     }
 
     private function inactivosQuery(): Builder

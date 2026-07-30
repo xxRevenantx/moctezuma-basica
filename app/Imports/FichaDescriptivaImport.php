@@ -50,13 +50,13 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
             }
 
             $alumno = Inscripcion::query()
+                ->visiblesEnListas()
                 ->where('id', $inscripcionId)
                 ->where('ciclo_escolar_id', $this->cicloEscolarId)
                 ->where('nivel_id', $this->nivelId)
                 ->where('grado_id', $this->gradoId)
                 ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
                 ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))
-                ->where('activo', true)
                 ->first();
 
             if (!$alumno) {

@@ -86,7 +86,8 @@ class ListaAlumnosSeleccionadosController extends Controller
             ->values()
             ->all();
 
-        $alumnos = Inscripcion::withTrashed()
+        $alumnos = Inscripcion::query()
+            ->visiblesEnListas()
             ->with([
                 'nivel:id,nombre,slug,color,cct',
                 'grado:id,nombre,slug,orden',
@@ -189,8 +190,7 @@ class ListaAlumnosSeleccionadosController extends Controller
             'hombres' => $alumnos->where('genero', 'H')->count(),
             'mujeres' => $alumnos->where('genero', 'M')->count(),
             'activos' => $alumnos
-                ->filter(fn (Inscripcion $alumno) => ! $alumno->trashed()
-                    && in_array($alumno->estatusNormalizado(), Inscripcion::ESTATUS_ACTIVOS, true))
+                ->filter(fn (Inscripcion $alumno) => $alumno->visibleEnListas())
                 ->count(),
             'bajas' => $alumnos
                 ->filter(fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esBajaAdministrativa())
