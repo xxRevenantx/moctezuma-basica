@@ -143,9 +143,10 @@ class HistorialCicloEscolarService
         string $motivo,
         ?int $usuarioId,
         ?string $fecha = null,
-        ?string $resultadoCambioCiclo = null
+        ?string $resultadoCambioCiclo = null,
+        bool $reactivarMismoCiclo = false,
     ): InscripcionCiclo {
-        return DB::transaction(function () use ($alumno, $antes, $despues, $motivo, $usuarioId, $fecha, $resultadoCambioCiclo): InscripcionCiclo {
+        return DB::transaction(function () use ($alumno, $antes, $despues, $motivo, $usuarioId, $fecha, $resultadoCambioCiclo, $reactivarMismoCiclo): InscripcionCiclo {
             $fecha = $this->fecha($fecha);
             $cicloAnteriorId = (int) ($antes['ciclo_escolar_id'] ?? 0);
             $cicloNuevoId = (int) ($despues['ciclo_escolar_id'] ?? 0);
@@ -196,10 +197,30 @@ class HistorialCicloEscolarService
 
             $this->cerrarAsignacionActual($ciclo, $fecha);
             $this->crearAsignacion($ciclo, $despues, $this->tipoCambio($antes, $despues), $motivo, $usuarioId, $fecha);
-            $ciclo->update($this->camposResumen($despues) + [
+            $camposCiclo = $this->camposResumen($despues) + [
                 'estatus_actual_ciclo' => $despues['estatus'] ?? $ciclo->estatus_actual_ciclo,
                 'snapshot_cierre' => null,
-            ]);
+            ];
+
+            // Los cambios 1→2, 3→4 y 5→6 de Bachillerato ocurren dentro del
+            // mismo ciclo escolar. Si una proyección antigua llegó a cerrar el
+            // historial anual, la confirmación debe reabrirlo sin crear un
+            // segundo registro de ciclo ni perder la asignación anterior.
+            if ($reactivarMismoCiclo && $cicloAnteriorId > 0 && $cicloAnteriorId === $cicloNuevoId) {
+                $camposCiclo = array_merge($camposCiclo, [
+                    'estado' => 'en_curso',
+                    'fecha_salida' => null,
+                    'resultado_final' => null,
+                    'promovido' => false,
+                    'cerrado_at' => null,
+                    'cerrado_por' => null,
+                    'motivo_cierre' => null,
+                    'inscripcion_ciclo_destino_id' => null,
+                    'snapshot_cierre' => null,
+                ]);
+            }
+
+            $ciclo->update($camposCiclo);
 
             return $ciclo->refresh();
         });

@@ -139,7 +139,10 @@ class CierreNivelContinuidad extends Component
 
         if ($this->ciclo_destino_id && !$this->ciclosDestinoPermitidos->contains('id', $this->ciclo_destino_id)) {
             $this->ciclo_destino_id = null;
-            $this->addError('ciclo_destino_id', 'El ciclo destino debe ser el consecutivo inmediato del ciclo de origen.');
+            $mensaje = ($this->reglaCicloDestino['tipo'] ?? null) === 'mismo_ciclo'
+                ? 'Para este cambio de semestre debes conservar el mismo ciclo escolar de origen.'
+                : 'El ciclo destino debe ser el consecutivo inmediato del ciclo de origen.';
+            $this->addError('ciclo_destino_id', $mensaje);
         } else {
             $this->resetValidation('ciclo_destino_id');
         }
@@ -155,30 +158,112 @@ class CierreNivelContinuidad extends Component
         }
 
         $origen = $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id);
-        if (!$origen) {
+        if (!$origen || !$this->nivel) {
             return collect();
         }
 
-        return $this->ciclos
-            ->filter(
-                fn($ciclo): bool =>
-                (int) $ciclo->inicio_anio === (int) $origen->inicio_anio + 1
-                && (int) $ciclo->fin_anio === (int) $origen->fin_anio + 1
-            )
-            ->values();
+        return app(CierreGeneracionContinuidadService::class)->ciclosDestinoPermitidos(
+            $this->nivel,
+            $origen,
+            $this->modo_proceso ?: 'promocion_grado',
+            filled($this->contexto_origen['semestre_id'] ?? null)
+                ? (int) $this->contexto_origen['semestre_id']
+                : null,
+            $this->semestre_destino_id,
+        );
     }
 
-    public function getEtiquetaCicloDestinoEsperadoProperty(): string
+    public function getReglaCicloDestinoProperty(): array
     {
         $origen = $this->ciclo_origen_id
             ? $this->ciclos->firstWhere('id', (int) $this->ciclo_origen_id)
             : null;
 
-        if (!$origen) {
-            return 'el ciclo consecutivo';
+        if (!$origen || !$this->nivel) {
+            return [
+                'tipo' => 'sin_contexto',
+                'ciclo' => null,
+                'ciclo_id' => null,
+                'etiqueta' => 'el ciclo correspondiente',
+                'semestre_origen' => null,
+                'semestre_destino' => null,
+            ];
         }
 
-        return ((int) $origen->inicio_anio + 1) . '-' . ((int) $origen->fin_anio + 1);
+        return app(CierreGeneracionContinuidadService::class)->reglaCicloDestino(
+            $this->nivel,
+            $origen,
+            $this->modo_proceso ?: 'promocion_grado',
+            filled($this->contexto_origen['semestre_id'] ?? null)
+                ? (int) $this->contexto_origen['semestre_id']
+                : null,
+            $this->semestre_destino_id,
+        );
+    }
+
+    public function getEtiquetaCicloDestinoEsperadoProperty(): string
+    {
+        return (string) ($this->reglaCicloDestino['etiqueta'] ?? 'el ciclo correspondiente');
+    }
+
+    public function getEtiquetaCampoCicloDestinoProperty(): string
+    {
+        return ($this->reglaCicloDestino['tipo'] ?? null) === 'mismo_ciclo'
+            ? 'Ciclo destino (mismo ciclo)'
+            : 'Ciclo destino consecutivo';
+    }
+
+    public function getMensajeReglaCicloDestinoProperty(): string
+    {
+        $regla = $this->reglaCicloDestino;
+        $origen = $regla['semestre_origen'] ?? null;
+        $destino = $regla['semestre_destino'] ?? null;
+        $etiqueta = (string) ($regla['etiqueta'] ?? '');
+
+        if ($this->modo_proceso === 'egreso_terminal') {
+            $hayRepetidores = collect($this->decisiones)
+                ->contains(fn(array $decision): bool => ($decision['resultado'] ?? null) === 'no_promovido');
+
+            if ($hayRepetidores) {
+                return ($regla['ciclo'] ?? null)
+                    ? "Los alumnos no promovidos repetirán 6.º semestre en el ciclo escolar {$etiqueta}. Los alumnos egresados no generan un séptimo semestre."
+                    : "Para repetir 6.º semestre debes crear primero el ciclo escolar {$etiqueta}. Los alumnos egresados no generan un séptimo semestre.";
+            }
+
+            return 'El grupo concluye 6.º semestre. El resultado correspondiente es el egreso de Bachillerato y no se crea un séptimo semestre.';
+        }
+
+        if (($regla['tipo'] ?? null) === 'mismo_ciclo') {
+            return $origen && $destino
+                ? "El cambio de {$origen}.º a {$destino}.º semestre se realizará dentro del ciclo escolar {$etiqueta}."
+                : "El destino permanecerá dentro del ciclo escolar {$etiqueta}.";
+        }
+
+        if (($regla['tipo'] ?? null) === 'ciclo_consecutivo') {
+            if (!($regla['ciclo'] ?? null)) {
+                return $origen && $destino
+                    ? "Para promover de {$origen}.º a {$destino}.º semestre debes crear primero el ciclo escolar {$etiqueta}."
+                    : "Primero crea el ciclo escolar {$etiqueta} para continuar con la proyección.";
+            }
+
+            return $origen && $destino
+                ? "El cambio de {$origen}.º a {$destino}.º semestre utilizará el ciclo escolar consecutivo {$etiqueta}."
+                : "El destino corresponde al ciclo escolar consecutivo {$etiqueta}.";
+        }
+
+        if (($regla['tipo'] ?? null) === 'invalido') {
+            return 'No existe un semestre inmediato válido. Bachillerato únicamente admite semestres del 1.º al 6.º.';
+        }
+
+        return 'Selecciona el origen para calcular automáticamente el ciclo de destino.';
+    }
+
+    public function getFaltaCicloDestinoProperty(): bool
+    {
+        $regla = $this->reglaCicloDestino;
+
+        return ($regla['tipo'] ?? null) === 'ciclo_consecutivo'
+            && !($regla['ciclo'] ?? null);
     }
 
     public function updatedNivelDestinoId(): void
@@ -397,6 +482,22 @@ class CierreNivelContinuidad extends Component
                 $this->addError('decisiones', 'Asigna un resultado definitivo a todos los alumnos procesables.');
                 return;
             }
+
+            $requiereDestino = collect($this->alumnos)
+                ->where('procesable', true)
+                ->contains(function (array $alumno): bool {
+                    return in_array(
+                        $this->decisiones[$alumno['id']]['resultado'] ?? null,
+                        ['continuidad_interna', 'no_promovido'],
+                        true,
+                    );
+                });
+
+            if ($requiereDestino && !$this->ciclo_destino_id) {
+                $this->ciclo_destino_id = $this->ciclosDestinoPermitidos->first()?->id;
+                $this->resolverGeneracionDestino();
+            }
+
             $this->paso = 3;
             $this->cargarGruposDestino();
             return;
@@ -937,7 +1038,14 @@ class CierreNivelContinuidad extends Component
         $repetidores = $procesables->filter(fn(array $alumno): bool => ($this->decisiones[$alumno['id']]['resultado'] ?? '') === 'no_promovido');
 
         if (($continuidad->isNotEmpty() || $repetidores->isNotEmpty()) && !$this->ciclo_destino_id) {
-            throw ValidationException::withMessages(['ciclo_destino_id' => 'Selecciona el ciclo destino consecutivo.']);
+            $regla = $this->reglaCicloDestino;
+            $mensaje = ($regla['tipo'] ?? null) === 'mismo_ciclo'
+                ? 'Conserva el ciclo escolar de origen para este cambio de semestre.'
+                : (($regla['ciclo'] ?? null)
+                    ? 'Selecciona el ciclo destino consecutivo.'
+                    : $this->mensajeReglaCicloDestino);
+
+            throw ValidationException::withMessages(['ciclo_destino_id' => $mensaje]);
         }
 
         if ($continuidad->isNotEmpty()) {

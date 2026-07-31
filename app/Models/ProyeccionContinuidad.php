@@ -12,6 +12,7 @@ class ProyeccionContinuidad extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'semestre_destino_clave' => 'integer',
         'fecha_proyeccion' => 'date',
         'confirmada_at' => 'datetime',
         'cancelada_at' => 'datetime',

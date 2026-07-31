@@ -196,6 +196,15 @@ class AsignacionEscolarService
                 ),
                 'alumnos' => (int) $grupo->alumnos_activos_count,
                 'clave' => $grupo->clave,
+                'ciclo' => $grupo->cicloEscolar
+                    ? $grupo->cicloEscolar->inicio_anio.'-'.$grupo->cicloEscolar->fin_anio
+                    : null,
+                'generacion_id' => (int) $grupo->generacion_id,
+                'generacion' => $grupo->generacion
+                    ? $grupo->generacion->anio_ingreso.'-'.$grupo->generacion->anio_egreso
+                    : null,
+                'grado' => $grupo->grado?->nombre,
+                'semestre' => $grupo->semestre?->numero,
             ]);
     }
 

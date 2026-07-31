@@ -263,18 +263,16 @@
                 @if (($conteos['continuidad_interna'] ?? 0) > 0 || ($conteos['no_promovido'] ?? 0) > 0)
                     <div class="mt-5 grid gap-4 lg:grid-cols-3">
                         <div>
-                            <flux:select wire:model.live="ciclo_destino_id" label="Ciclo destino consecutivo"
+                            <flux:select wire:model.live="ciclo_destino_id" label="{{ $this->etiquetaCampoCicloDestino }}"
                                 :disabled="$this->ciclosDestinoPermitidos->isEmpty()">
                                 <flux:select.option value="">Selecciona</flux:select.option>
                                 @foreach ($this->ciclosDestinoPermitidos as $ciclo)
                                     <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
                                 @endforeach
                             </flux:select>
-                            @if ($this->ciclosDestinoPermitidos->isEmpty())
-                                <p class="mt-2 text-xs font-bold text-rose-600">
-                                    Primero crea el ciclo escolar {{ $this->etiquetaCicloDestinoEsperado }}. No se permite proyectar al mismo ciclo de origen.
-                                </p>
-                            @endif
+                            <div class="mt-2 rounded-xl border px-3 py-2 text-xs leading-5 {{ $this->faltaCicloDestino ? 'border-rose-200 bg-rose-50 font-bold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200' : (($this->reglaCicloDestino['tipo'] ?? null) === 'mismo_ciclo' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200' : 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200') }}">
+                                {{ $this->mensajeReglaCicloDestino }}
+                            </div>
                             @error('ciclo_destino_id')
                                 <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
                             @enderror
@@ -296,7 +294,7 @@
                             </flux:select>
 
                             @if ($semestresDestino->isNotEmpty())
-                                <flux:select wire:model.live="semestre_destino_id" label="Semestre destino">
+                                <flux:select wire:model.live="semestre_destino_id" label="Semestre destino propuesto" disabled>
                                     <flux:select.option value="">Selecciona</flux:select.option>
                                     @foreach ($semestresDestino as $semestre)
                                         <flux:select.option value="{{ $semestre->id }}">Semestre {{ $semestre->numero }}</flux:select.option>
@@ -343,13 +341,23 @@
 
                 <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
                     <div class="border-b border-slate-200 p-5 dark:border-neutral-800">
-                        <h4 class="font-black text-slate-900 dark:text-white">Grupo y matrícula propuestos por alumno</h4>
+                        <h4 class="font-black text-slate-900 dark:text-white">Destino propuesto por alumno</h4>
                         <p class="mt-1 text-sm text-slate-500">El grupo puede dejarse pendiente al generar la proyección, pero será obligatorio al confirmar la reinscripción. La matrícula sugerida puede ajustarse antes de formalizar.</p>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-[900px] w-full text-sm">
+                        <table class="min-w-[1500px] w-full text-sm">
                             <thead class="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-neutral-800">
-                                <tr><th class="p-3 text-left">Alumno</th><th class="p-3 text-left">Resultado</th><th class="p-3 text-left">Grupo destino</th><th class="p-3 text-left">Matrícula destino</th></tr>
+                                <tr>
+                                    <th class="p-3 text-left">Alumno</th>
+                                    <th class="p-3 text-left">Ubicación actual</th>
+                                    <th class="p-3 text-left">Resultado</th>
+                                    <th class="p-3 text-left">Ciclo destino</th>
+                                    <th class="p-3 text-left">Grado / semestre</th>
+                                    <th class="p-3 text-left">Generación destino</th>
+                                    <th class="p-3 text-left">Grupo destino</th>
+                                    <th class="p-3 text-left">Validación</th>
+                                    <th class="p-3 text-left">Matrícula destino</th>
+                                </tr>
                             </thead>
                             <tbody class="divide-y dark:divide-neutral-800">
                                 @foreach (collect($alumnos)->where('procesable', true) as $alumno)
@@ -357,11 +365,44 @@
                                         $resultado = $decisiones[$alumno['id']]['resultado'] ?? 'pendiente';
                                         $requiereDestino = in_array($resultado, ['continuidad_interna', 'no_promovido'], true);
                                         $gruposAlumno = $this->gruposParaAlumno($alumno);
+                                        $grupoDestinoId = filled($decisiones[$alumno['id']]['grupo_destino_id'] ?? null)
+                                            ? (int) $decisiones[$alumno['id']]['grupo_destino_id']
+                                            : null;
+                                        $grupoElegido = collect($gruposAlumno)->firstWhere('id', $grupoDestinoId);
+                                        $cicloDestino = $ciclo_destino_id
+                                            ? $ciclos->firstWhere('id', (int) $ciclo_destino_id)
+                                            : null;
+                                        $gradoDestino = $resultado === 'no_promovido'
+                                            ? $alumno['grado']
+                                            : ($gradosDestino->firstWhere('id', (int) $grado_destino_id)?->nombre ?? 'Pendiente');
+                                        $semestreDestino = $resultado === 'no_promovido'
+                                            ? ($alumno['semestre'] ?? null)
+                                            : ($semestresDestino->firstWhere('id', (int) $semestre_destino_id)?->numero ?? null);
+                                        $generacionDestino = $grupoElegido['generacion']
+                                            ?? ($resultado === 'continuidad_interna'
+                                                ? ($generacionesDestino->firstWhere('id', (int) $generacion_destino_id)?->etiqueta ?? 'Pendiente')
+                                                : 'Se calculará según el grupo');
+                                        $estadoDestino = $grupoDestinoId
+                                            ? 'Listo para proyectar'
+                                            : ($gruposAlumno === [] ? 'Falta crear grupo compatible' : 'Grupo pendiente de asignar');
                                     @endphp
                                     @if ($requiereDestino)
                                     <tr>
-                                        <td class="p-3"><b class="text-slate-900 dark:text-white">{{ $alumno['nombre'] }}</b><br><small class="text-slate-500">{{ $alumno['grado'] }} · {{ $alumno['grupo'] }}</small></td>
+                                        <td class="p-3"><b class="text-slate-900 dark:text-white">{{ $alumno['nombre'] }}</b><br><small class="text-slate-500">{{ $alumno['matricula'] }}</small></td>
+                                        <td class="p-3 text-slate-600 dark:text-slate-300">
+                                            {{ $alumno['grado'] }}
+                                            @if (filled($alumno['semestre'] ?? null)) · {{ $alumno['semestre'] }}.º semestre @endif
+                                            <br><small>{{ $alumno['grupo'] }}</small>
+                                        </td>
                                         <td class="p-3">{{ $resultados[$resultado][0] ?? $resultado }}</td>
+                                        <td class="p-3 font-semibold text-slate-700 dark:text-slate-200">
+                                            {{ $cicloDestino ? $cicloDestino->inicio_anio.'-'.$cicloDestino->fin_anio : 'Pendiente' }}
+                                        </td>
+                                        <td class="p-3 text-slate-600 dark:text-slate-300">
+                                            {{ $gradoDestino }}
+                                            @if (filled($semestreDestino)) <br><small>{{ $semestreDestino }}.º semestre</small> @endif
+                                        </td>
+                                        <td class="p-3 text-slate-600 dark:text-slate-300">{{ $generacionDestino }}</td>
                                         <td class="p-3">
                                             <select wire:model="decisiones.{{ $alumno['id'] }}.grupo_destino_id"
                                                 class="w-full rounded-xl border-slate-300 text-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -374,6 +415,11 @@
                                                 <p class="mt-1 text-xs font-bold text-amber-600">No existen grupos compatibles todavía. Podrás crearlo y asignarlo antes de confirmar la reinscripción.</p>
                                             @endif
                                             @error("decisiones.{$alumno['id']}.grupo_destino_id")<p class="mt-1 text-xs font-bold text-rose-600">{{ $message }}</p>@enderror
+                                        </td>
+                                        <td class="p-3">
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-black {{ $grupoDestinoId ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200' : ($gruposAlumno === [] ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200') }}">
+                                                {{ $estadoDestino }}
+                                            </span>
                                         </td>
                                         <td class="p-3">
                                             <input wire:model="decisiones.{{ $alumno['id'] }}.matricula"

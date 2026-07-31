@@ -33,9 +33,17 @@ class GestionAcademicaService
         'no_reinscrito',
     ];
 
-    public function cambiarAsignacion(Inscripcion $alumno, array $destino, string $motivo, ?int $usuarioId, ?string $resultadoCambioCiclo = null, ?string $fecha = null): Inscripcion
+    public function cambiarAsignacion(
+        Inscripcion $alumno,
+        array $destino,
+        string $motivo,
+        ?int $usuarioId,
+        ?string $resultadoCambioCiclo = null,
+        ?string $fecha = null,
+        bool $reactivarMismoCiclo = false,
+    ): Inscripcion
     {
-        return DB::transaction(function () use ($alumno, $destino, $motivo, $usuarioId, $resultadoCambioCiclo, $fecha): Inscripcion {
+        return DB::transaction(function () use ($alumno, $destino, $motivo, $usuarioId, $resultadoCambioCiclo, $fecha, $reactivarMismoCiclo): Inscripcion {
             $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($alumno->id);
             $antes = $this->snapshot($alumno);
 
@@ -76,7 +84,16 @@ class GestionAcademicaService
             $alumno = $alumno->fresh();
             $despues = $this->snapshot($alumno);
             $this->matriculas->sincronizarCambioAsignacion($alumno, $antes, $despues, $usuarioId, $fecha);
-            $this->historialCiclos->registrarCambioAsignacion($alumno, $antes, $despues, $motivo, $usuarioId, $fecha, $resultadoCambioCiclo);
+            $this->historialCiclos->registrarCambioAsignacion(
+                $alumno,
+                $antes,
+                $despues,
+                $motivo,
+                $usuarioId,
+                $fecha,
+                $resultadoCambioCiclo,
+                $reactivarMismoCiclo,
+            );
             $this->registrarCambio($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId);
             $this->registrarMovimiento($alumno, 'cambio_asignacion', $motivo, $antes, $despues, $usuarioId, $fecha);
 
@@ -104,7 +121,8 @@ class GestionAcademicaService
             $motivo,
             $usuarioId,
             $resultado,
-            $fecha
+            $fecha,
+            true,
         );
 
         if (($actualizado->estatus ?? 'activo') !== 'activo') {
@@ -133,7 +151,8 @@ class GestionAcademicaService
             $motivo,
             $usuarioId,
             'no_promovido',
-            $fecha
+            $fecha,
+            true,
         );
 
         $actualizado = $this->cambiarEstatus(
