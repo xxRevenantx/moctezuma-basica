@@ -31,6 +31,35 @@ class EditarMatricula extends Component
 {
     use WithFileUploads;
 
+    /**
+     * Estatus que sí pueden establecerse desde la edición administrativa.
+     * Los resultados académicos y de continuidad se generan desde sus flujos formales.
+     *
+     * @var array<int, string>
+     */
+    public const ESTATUS_EDITABLES_MANUALMENTE = [
+        'activo',
+        'preinscrito',
+        'baja_temporal',
+        'baja_definitiva',
+        'trasladado',
+        'suspendido',
+        'inactivo',
+    ];
+
+    /**
+     * Estatus informativos controlados por cierre, continuidad o reingreso.
+     *
+     * @var array<int, string>
+     */
+    public const ESTATUS_CONTROLADOS_POR_PROCESO = [
+        'egresado',
+        'reingreso',
+        'no_promovido',
+        'pendiente_reinscripcion',
+        'no_reinscrito',
+    ];
+
     public string $slug_nivel = '';
     public ?int $InscripcionId = null;
 
@@ -172,7 +201,7 @@ class EditarMatricula extends Component
             $this->{$campo} = $alumno->{$campo};
         }
 
-        if (! $this->ciclo_escolar_id && $alumno->grupo_id) {
+        if (!$this->ciclo_escolar_id && $alumno->grupo_id) {
             $this->ciclo_escolar_id = Grupo::query()->whereKey($alumno->grupo_id)->value('ciclo_escolar_id');
         }
 
@@ -235,7 +264,7 @@ class EditarMatricula extends Component
             'password_anulacion_ingreso' => ['required', 'string'],
         ]);
 
-        if (! Hash::check($this->password_anulacion_ingreso, (string) auth()->user()?->password)) {
+        if (!Hash::check($this->password_anulacion_ingreso, (string) auth()->user()?->password)) {
             $this->addError('password_anulacion_ingreso', 'La contraseña no es correcta.');
 
             return null;
@@ -261,7 +290,7 @@ class EditarMatricula extends Component
 
     public function updatingObservacionCicloEscolarId($value): void
     {
-        if (! $this->observacion_ciclo_escolar_id) {
+        if (!$this->observacion_ciclo_escolar_id) {
             return;
         }
 
@@ -278,7 +307,7 @@ class EditarMatricula extends Component
 
     private function cargarObservacionCiclo(bool $actualizarEditor = false): void
     {
-        if (! $this->InscripcionId || ! $this->observacion_ciclo_escolar_id) {
+        if (!$this->InscripcionId || !$this->observacion_ciclo_escolar_id) {
             $this->observaciones = null;
         } elseif (array_key_exists((int) $this->observacion_ciclo_escolar_id, $this->observacionesPorCiclo)) {
             $this->observaciones = $this->observacionesPorCiclo[(int) $this->observacion_ciclo_escolar_id];
@@ -357,7 +386,7 @@ class EditarMatricula extends Component
 
     protected function loadGradosFromGrupos(): Collection
     {
-        if (! $this->nivel_id || $this->esBachillerato()) {
+        if (!$this->nivel_id || $this->esBachillerato()) {
             return collect();
         }
 
@@ -371,21 +400,21 @@ class EditarMatricula extends Component
 
         return Grado::query()
             ->where('nivel_id', $this->nivel_id)
-            ->when($ids->isNotEmpty(), fn ($query) => $query->whereIn('id', $ids))
+            ->when($ids->isNotEmpty(), fn($query) => $query->whereIn('id', $ids))
             ->orderBy('orden')
             ->get(['id', 'nivel_id', 'nombre', 'orden']);
     }
 
     protected function loadGeneracionesFromGrupos(): Collection
     {
-        if (! $this->nivel_id) {
+        if (!$this->nivel_id) {
             return collect();
         }
 
         $query = $this->baseGrupoQuery()->where('nivel_id', $this->nivel_id);
 
-        if (! $this->esBachillerato()) {
-            if (! $this->grado_id) {
+        if (!$this->esBachillerato()) {
+            if (!$this->grado_id) {
                 return collect();
             }
 
@@ -420,7 +449,7 @@ class EditarMatricula extends Component
 
     protected function loadSemestresFromGrupos(): Collection
     {
-        if (! $this->esBachillerato() || ! $this->nivel_id || ! $this->generacion_id) {
+        if (!$this->esBachillerato() || !$this->nivel_id || !$this->generacion_id) {
             return collect();
         }
 
@@ -447,7 +476,7 @@ class EditarMatricula extends Component
 
     protected function loadGruposOptionsFromGrupos(): array
     {
-        if (! $this->nivel_id || ! $this->generacion_id) {
+        if (!$this->nivel_id || !$this->generacion_id) {
             return [];
         }
 
@@ -456,13 +485,13 @@ class EditarMatricula extends Component
             ->where('generacion_id', $this->generacion_id);
 
         if ($this->esBachillerato()) {
-            if (! $this->semestre_id) {
+            if (!$this->semestre_id) {
                 return [];
             }
 
             $query->where('semestre_id', $this->semestre_id);
         } else {
-            if (! $this->grado_id) {
+            if (!$this->grado_id) {
                 return [];
             }
 
@@ -477,7 +506,7 @@ class EditarMatricula extends Component
                 'semestre:id,numero',
             ])
             ->withCount([
-                'inscripciones as alumnos_activos_count' => fn ($alumnos) => $alumnos
+                'inscripciones as alumnos_activos_count' => fn($alumnos) => $alumnos
                     ->visiblesEnListas(),
             ])
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
@@ -524,7 +553,7 @@ class EditarMatricula extends Component
         $this->semestresOptions = collect();
         $this->gruposOptions = [];
 
-        if (! $this->nivel_id) {
+        if (!$this->nivel_id) {
             return;
         }
 
@@ -659,7 +688,7 @@ class EditarMatricula extends Component
     {
         $tutor = Tutor::query()->find($this->tutor_id);
 
-        if (! $tutor) {
+        if (!$tutor) {
             return;
         }
 
@@ -699,7 +728,7 @@ class EditarMatricula extends Component
             ? $datos['genero']
             : $this->genero;
 
-        if (! empty($datos['fecha_nacimiento'])) {
+        if (!empty($datos['fecha_nacimiento'])) {
             try {
                 $this->fecha_nacimiento = Carbon::parse($datos['fecha_nacimiento'])->format('Y-m-d');
             } catch (\Throwable) {
@@ -788,7 +817,7 @@ class EditarMatricula extends Component
             ],
 
             'nivel_id' => ['required', 'integer', Rule::exists('niveles', 'id')],
-            'grado_id' => [Rule::requiredIf(! $this->esBachillerato()), 'nullable', 'integer', Rule::exists('grados', 'id')],
+            'grado_id' => [Rule::requiredIf(!$this->esBachillerato()), 'nullable', 'integer', Rule::exists('grados', 'id')],
             'generacion_id' => ['required', 'integer', Rule::exists('generaciones', 'id')],
             'semestre_id' => [Rule::requiredIf($this->esBachillerato()), 'nullable', 'integer', Rule::exists('semestres', 'id')],
             'grupo_id' => ['required', 'integer', Rule::exists('grupos', 'id')],
@@ -821,12 +850,12 @@ class EditarMatricula extends Component
 
         $generacion = Generacion::query()->find((int) $data['generacion_id']);
 
-        if (! $generacion || (int) $generacion->nivel_id !== (int) $data['nivel_id']) {
+        if (!$generacion || (int) $generacion->nivel_id !== (int) $data['nivel_id']) {
             $this->addError('generacion_id', 'La generación no pertenece al nivel seleccionado.');
             return false;
         }
 
-        if (! $generacion->status && (int) $alumno->generacion_id !== (int) $generacion->id) {
+        if (!$generacion->status && (int) $alumno->generacion_id !== (int) $generacion->id) {
             $this->addError('generacion_id', 'No puedes reasignar al alumno a una generación inactiva.');
             return false;
         }
@@ -842,7 +871,7 @@ class EditarMatricula extends Component
                 ->where('semestre_id', (int) $data['semestre_id'])
                 ->first(['id', 'ciclo_escolar_id', 'grado_id', 'semestre_id', 'estado']);
 
-            if (! $grupo) {
+            if (!$grupo) {
                 $this->addError('grupo_id', 'El grupo no corresponde al ciclo escolar, nivel, generación y semestre seleccionados.');
                 return false;
             }
@@ -857,7 +886,7 @@ class EditarMatricula extends Component
                 ->where('grado_id', (int) $grupo->grado_id)
                 ->exists();
 
-            if (! $semestreValido) {
+            if (!$semestreValido) {
                 $this->addError('semestre_id', 'El semestre no corresponde al grado interno del grupo seleccionado.');
                 return false;
             }
@@ -873,7 +902,7 @@ class EditarMatricula extends Component
             ->whereNull('semestre_id')
             ->first(['id', 'ciclo_escolar_id', 'estado']);
 
-        if (! $grupo) {
+        if (!$grupo) {
             $this->addError('grupo_id', 'El grupo no corresponde al ciclo escolar, nivel, grado y generación seleccionados.');
             return false;
         }
@@ -902,13 +931,13 @@ class EditarMatricula extends Component
         }
 
         foreach ($this->observacionesPorCiclo as $cicloId => $contenido) {
-            if ($contenido !== null && ! is_string($contenido)) {
+            if ($contenido !== null && !is_string($contenido)) {
                 $this->addError('observaciones', 'El contenido de las observaciones no tiene un formato válido.');
 
                 return null;
             }
 
-            if (! $this->ciclosEscolaresObservacion->contains('id', (int) $cicloId)) {
+            if (!$this->ciclosEscolaresObservacion->contains('id', (int) $cicloId)) {
                 $this->addError('observacion_ciclo_escolar_id', 'El ciclo escolar de una observación ya no está disponible.');
 
                 return null;
@@ -919,7 +948,7 @@ class EditarMatricula extends Component
 
             if ($observacionesService->excedeLimite($contenido)) {
                 $ciclo = $this->ciclosEscolaresObservacion->firstWhere('id', (int) $cicloId);
-                $nombreCiclo = $ciclo ? $ciclo->inicio_anio.'-'.$ciclo->fin_anio : (string) $cicloId;
+                $nombreCiclo = $ciclo ? $ciclo->inicio_anio . '-' . $ciclo->fin_anio : (string) $cicloId;
                 $this->addError('observaciones', "Las observaciones del ciclo {$nombreCiclo} superan 5,000 caracteres.");
 
                 return null;
@@ -929,7 +958,7 @@ class EditarMatricula extends Component
         $data = $this->validate();
         $alumno = Inscripcion::withTrashed()->findOrFail($this->InscripcionId);
 
-        if (! $this->validarRelacionAcademica($data, $alumno)) {
+        if (!$this->validarRelacionAcademica($data, $alumno)) {
             return null;
         }
 
@@ -941,6 +970,30 @@ class EditarMatricula extends Component
             || (int) ($alumno->semestre_id ?? 0) !== (int) ($data['semestre_id'] ?? 0);
 
         $cambioEstatus = ($alumno->estatus ?? 'activo') !== $data['estatus'];
+
+        if (
+            $cambioEstatus
+            && in_array((string) ($alumno->estatus ?? ''), self::ESTATUS_CONTROLADOS_POR_PROCESO, true)
+        ) {
+            $this->addError(
+                'estatus',
+                'El estatus actual fue generado por un proceso académico. No puede reemplazarse desde la edición general; utiliza el flujo formal de continuidad, reingreso o cierre correspondiente.'
+            );
+
+            return null;
+        }
+
+        if (
+            $cambioEstatus
+            && !in_array((string) $data['estatus'], self::ESTATUS_EDITABLES_MANUALMENTE, true)
+        ) {
+            $this->addError(
+                'estatus',
+                'Ese estatus no se asigna manualmente. Utiliza el proceso académico correspondiente para conservar correctamente el historial.'
+            );
+
+            return null;
+        }
 
         $diagnosticoAnulacion = app(AnulacionIngresoNoIniciadoService::class)
             ->diagnosticar($alumno);
@@ -968,7 +1021,7 @@ class EditarMatricula extends Component
             return null;
         }
 
-        if ($cambioAcademico && ! $this->confirmar_cambio_academico) {
+        if ($cambioAcademico && !$this->confirmar_cambio_academico) {
             $this->addError('confirmar_cambio_academico', 'Confirma que deseas reemplazar la asignación académica actual.');
             return null;
         }
@@ -1023,7 +1076,7 @@ class EditarMatricula extends Component
                     'nivel_id' => (int) $data['nivel_id'],
                     'grado_id' => (int) $data['grado_id'],
                     'generacion_id' => (int) $data['generacion_id'],
-                    'semestre_id' => ! empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                    'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
                     'grupo_id' => (int) $data['grupo_id'],
                     'matricula' => $data['matricula'],
                 ], trim((string) $data['motivo_cambio']), auth()->id());

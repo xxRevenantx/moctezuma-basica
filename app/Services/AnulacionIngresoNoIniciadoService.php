@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\CambioAcademico;
@@ -53,7 +55,7 @@ class AnulacionIngresoNoIniciadoService
             ? $alumno
             : Inscripcion::withTrashed()->find($alumno);
 
-        if (! $alumno) {
+        if (!$alumno) {
             return $this->diagnosticoBase('No se encontró el alumno.', false);
         }
 
@@ -90,12 +92,7 @@ class AnulacionIngresoNoIniciadoService
             ]);
         }
 
-        return DB::transaction(function () use (
-            $inscripcionId,
-            $motivo,
-            $fechaNotificacion,
-            $usuarioId,
-        ): Inscripcion {
+        return DB::transaction(function () use ($inscripcionId, $motivo, $fechaNotificacion, $usuarioId, ): Inscripcion {
             $alumno = Inscripcion::withTrashed()
                 ->lockForUpdate()
                 ->findOrFail($inscripcionId);
@@ -103,10 +100,10 @@ class AnulacionIngresoNoIniciadoService
             $historial = $this->historialObjetivo($alumno, true);
             $diagnostico = $this->evaluar($alumno, $historial);
 
-            if (! $diagnostico['puede_anular']) {
+            if (!$diagnostico['puede_anular']) {
                 throw ValidationException::withMessages([
                     'anulacion_ingreso' => "No se puede anular el ingreso:\n- "
-                        .implode("\n- ", $diagnostico['bloqueos']),
+                        . implode("\n- ", $diagnostico['bloqueos']),
                 ]);
             }
 
@@ -116,12 +113,14 @@ class AnulacionIngresoNoIniciadoService
             $antesAsignaciones = $historial->asignaciones()
                 ->orderBy('id')
                 ->get()
-                ->map(fn ($asignacion): array => $asignacion->getAttributes())
+                ->map(fn($asignacion): array => $asignacion->getAttributes())
                 ->all();
 
             $fechaCierre = $fechaNotificacion;
-            if ($historial->fecha_ingreso
-                && $fechaCierre->lessThan(CarbonImmutable::parse($historial->fecha_ingreso))) {
+            if (
+                $historial->fecha_ingreso
+                && $fechaCierre->lessThan(CarbonImmutable::parse($historial->fecha_ingreso))
+            ) {
                 $fechaCierre = CarbonImmutable::parse($historial->fecha_ingreso);
             }
 
@@ -260,7 +259,7 @@ class AnulacionIngresoNoIniciadoService
             ->where('inscripcion_id', $alumno->id)
             ->when(
                 $alumno->ciclo_escolar_id,
-                fn ($consulta) => $consulta->where('ciclo_escolar_id', $alumno->ciclo_escolar_id),
+                fn($consulta) => $consulta->where('ciclo_escolar_id', $alumno->ciclo_escolar_id),
             )
             ->orderByDesc('id');
 
@@ -279,10 +278,23 @@ class AnulacionIngresoNoIniciadoService
         $bloqueos = collect();
         $actividad = collect();
 
-        if (! $historial) {
+        if (!$historial) {
             $bloqueos->push('No existe un historial formal del ciclo que pueda anularse.');
 
             return $this->diagnosticoDesdeColecciones($alumno, null, $bloqueos, $actividad, 0);
+        }
+
+        if ($alumno->trashed()) {
+            $bloqueos->push('El alumno está archivado. Restáuralo o revisa su trayectoria antes de anular el ingreso.');
+        }
+
+        if (
+            !(bool) $alumno->activo
+            || !in_array((string) $alumno->estatus, ['activo', 'preinscrito'], true)
+        ) {
+            $bloqueos->push(
+                'La anulación de ingreso solo está disponible para alumnos activos o preinscritos que todavía no comenzaron el ciclo.'
+            );
         }
 
         if ($historial->estado === InscripcionCiclo::ESTADO_ANULADO) {
@@ -300,11 +312,13 @@ class AnulacionIngresoNoIniciadoService
             $bloqueos->push('Este ciclo proviene de una continuidad confirmada. Utiliza Generales → Confirmación del ciclo destino → Retirar del ciclo destino.');
         }
 
-        if (in_array((string) $historial->origen, [
-            'continuidad_confirmada',
-            'promocion_nivel',
-            'promocion_o_continuidad',
-        ], true)) {
+        if (
+            in_array((string) $historial->origen, [
+                'continuidad_confirmada',
+                'promocion_nivel',
+                'promocion_o_continuidad',
+            ], true)
+        ) {
             $bloqueos->push('El historial fue creado por una promoción o continuidad. Debe revertirse desde el módulo de continuidad.');
         }
 
@@ -365,7 +379,7 @@ class AnulacionIngresoNoIniciadoService
 
     private function contarActividad(string $tabla, Inscripcion $alumno, InscripcionCiclo $historial): int
     {
-        if (! Schema::hasTable($tabla)) {
+        if (!Schema::hasTable($tabla)) {
             return 0;
         }
 
@@ -375,7 +389,7 @@ class AnulacionIngresoNoIniciadoService
             return (int) $consulta->where('inscripcion_ciclo_id', $historial->id)->count();
         }
 
-        if (! Schema::hasColumn($tabla, 'inscripcion_id')) {
+        if (!Schema::hasColumn($tabla, 'inscripcion_id')) {
             return 0;
         }
 
@@ -394,7 +408,7 @@ class AnulacionIngresoNoIniciadoService
 
     private function contarDocumentosConservados(Inscripcion $alumno, InscripcionCiclo $historial): int
     {
-        if (! Schema::hasTable('documentos_alumnos')) {
+        if (!Schema::hasTable('documentos_alumnos')) {
             return 0;
         }
 
@@ -417,8 +431,10 @@ class AnulacionIngresoNoIniciadoService
 
     private function proyeccionConfirmadaDelDestino(InscripcionCiclo $historial): ?ProyeccionContinuidad
     {
-        if (! Schema::hasTable('proyecciones_continuidad')
-            || ! Schema::hasColumn('proyecciones_continuidad', 'inscripcion_ciclo_destino_id')) {
+        if (
+            !Schema::hasTable('proyecciones_continuidad')
+            || !Schema::hasColumn('proyecciones_continuidad', 'inscripcion_ciclo_destino_id')
+        ) {
             return null;
         }
 
@@ -435,7 +451,7 @@ class AnulacionIngresoNoIniciadoService
         string $motivo,
         int $usuarioId,
     ): void {
-        if (! Schema::hasTable('preinscripciones_ciclos')) {
+        if (!Schema::hasTable('preinscripciones_ciclos')) {
             return;
         }
 
@@ -504,10 +520,25 @@ class AnulacionIngresoNoIniciadoService
     private function snapshotAlumno(Inscripcion $alumno): array
     {
         return Arr::only($alumno->getAttributes(), [
-            'id', 'matricula', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id',
-            'grupo_id', 'semestre_id', 'estatus', 'activo', 'fecha_inscripcion', 'fecha_estatus',
-            'motivo_estatus', 'fecha_baja', 'motivo_baja', 'observaciones_baja',
-            'indicador_reingreso', 'documentacion_reingreso_pendiente', 'usuario_acceso_activo',
+            'id',
+            'matricula',
+            'ciclo_escolar_id',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'grupo_id',
+            'semestre_id',
+            'estatus',
+            'activo',
+            'fecha_inscripcion',
+            'fecha_estatus',
+            'motivo_estatus',
+            'fecha_baja',
+            'motivo_baja',
+            'observaciones_baja',
+            'indicador_reingreso',
+            'documentacion_reingreso_pendiente',
+            'usuario_acceso_activo',
         ]);
     }
 
@@ -515,11 +546,31 @@ class AnulacionIngresoNoIniciadoService
     private function snapshotHistorial(InscripcionCiclo $historial): array
     {
         return Arr::only($historial->getAttributes(), [
-            'id', 'inscripcion_id', 'ciclo_escolar_id', 'matricula', 'nivel_id', 'grado_id',
-            'generacion_id', 'grupo_id', 'semestre_id', 'fecha_ingreso', 'fecha_salida', 'estado',
-            'estatus_ingreso', 'estatus_actual_ciclo', 'resultado_final', 'promovido', 'cerrado_at',
-            'cerrado_por', 'motivo_cierre', 'inscripcion_ciclo_destino_id', 'snapshot_ingreso',
-            'snapshot_cierre', 'origen', 'reconstruido', 'nivel_confianza',
+            'id',
+            'inscripcion_id',
+            'ciclo_escolar_id',
+            'matricula',
+            'nivel_id',
+            'grado_id',
+            'generacion_id',
+            'grupo_id',
+            'semestre_id',
+            'fecha_ingreso',
+            'fecha_salida',
+            'estado',
+            'estatus_ingreso',
+            'estatus_actual_ciclo',
+            'resultado_final',
+            'promovido',
+            'cerrado_at',
+            'cerrado_por',
+            'motivo_cierre',
+            'inscripcion_ciclo_destino_id',
+            'snapshot_ingreso',
+            'snapshot_cierre',
+            'origen',
+            'reconstruido',
+            'nivel_confianza',
         ]);
     }
 }

@@ -409,106 +409,110 @@
 
     {{-- Cambio masivo de asignación: solo para el ciclo vigente --}}
     @if ($this->esCicloActual)
-    <section
-        class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex items-center gap-3">
-                <span
-                    class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                    <flux:icon.pencil-square class="h-5 w-5" />
-                </span>
-                <div>
-                    <h2 class="font-black text-amber-950 dark:text-amber-100">Cambiar asignación seleccionada</h2>
-                    <p class="text-sm text-amber-800/80 dark:text-amber-200/70">
-                        Reemplaza ciclo escolar, generación, grado, semestre y grupo; el cambio queda registrado en la
-                        bitácora.
-                    </p>
+        <section
+            class="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex items-center gap-3">
+                    <span
+                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        <flux:icon.pencil-square class="h-5 w-5" />
+                    </span>
+                    <div>
+                        <h2 class="font-black text-amber-950 dark:text-amber-100">Cambiar asignación seleccionada</h2>
+                        <p class="text-sm text-amber-800/80 dark:text-amber-200/70">
+                            Reemplaza ciclo escolar, generación, grado, semestre y grupo; el cambio queda registrado en
+                            la
+                            bitácora.
+                        </p>
+                    </div>
                 </div>
+                <span
+                    class="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">
+                    {{ $this->selectedCount }} seleccionado(s)
+                </span>
             </div>
-            <span
-                class="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">
-                {{ $this->selectedCount }} seleccionado(s)
-            </span>
-        </div>
 
-        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <flux:select wire:model.live="destino_ciclo_escolar_id">
-                <flux:select.option value="">Ciclo escolar destino</flux:select.option>
-                @foreach ($ciclosEscolares as $cicloEscolar)
-                    <flux:select.option value="{{ $cicloEscolar->id }}">
-                        {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · Actual' : '' }}
-                    </flux:select.option>
-                @endforeach
-            </flux:select>
-
-            <flux:select wire:model.live="destino_generacion_id">
-                <flux:select.option value="">Nueva generación</flux:select.option>
-                @foreach ($generacionesDestino->where('status', true) as $item)
-                    <flux:select.option value="{{ $item->id }}">{{ $item->etiqueta }}</flux:select.option>
-                @endforeach
-            </flux:select>
-
-            <flux:select wire:model.live="destino_grado_id">
-                <flux:select.option value="">Nuevo grado</flux:select.option>
-                @foreach ($grados as $item)
-                    <flux:select.option value="{{ $item->id }}">{{ $item->nombre }}</flux:select.option>
-                @endforeach
-            </flux:select>
-
-            @if ($this->esBachillerato())
-                <flux:select wire:model.live="destino_semestre_id" :disabled="$semestresDestino->isEmpty()">
-                    <flux:select.option value="">Nuevo semestre</flux:select.option>
-                    @foreach ($semestresDestino as $item)
-                        <flux:select.option value="{{ $item->id }}">Semestre {{ $item->numero }}
+            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <flux:select wire:model.live="destino_ciclo_escolar_id">
+                    <flux:select.option value="">Ciclo escolar destino</flux:select.option>
+                    @foreach ($ciclosEscolares as $cicloEscolar)
+                        <flux:select.option value="{{ $cicloEscolar->id }}">
+                            {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · Actual' : '' }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
-            @endif
 
-            <flux:select wire:model="destino_grupo_id" :disabled="$gruposDestino->isEmpty()">
-                <flux:select.option value="">Nuevo grupo</flux:select.option>
-                @foreach ($gruposDestino as $item)
-                    <flux:select.option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}
-                    </flux:select.option>
-                @endforeach
-            </flux:select>
+                <flux:select wire:model.live="destino_generacion_id">
+                    <flux:select.option value="">Nueva generación</flux:select.option>
+                    @foreach ($generacionesDestino->where('status', true) as $item)
+                        <flux:select.option value="{{ $item->id }}">{{ $item->etiqueta }}</flux:select.option>
+                    @endforeach
+                </flux:select>
 
-            <flux:input wire:model="motivo_cambio" type="text" placeholder="Motivo obligatorio del cambio"
-                class="{{ $this->esBachillerato() ? 'xl:col-span-3' : 'xl:col-span-3' }}" />
+                <flux:select wire:model.live="destino_grado_id">
+                    <flux:select.option value="">Nuevo grado</flux:select.option>
+                    @foreach ($grados as $item)
+                        <flux:select.option value="{{ $item->id }}">{{ $item->nombre }}</flux:select.option>
+                    @endforeach
+                </flux:select>
 
-            <button type="button" wire:click="cambiarGeneracionSeleccionados" wire:loading.attr="disabled"
-                @disabled($this->selectedCount === 0)
-                class="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50">
-                <flux:icon.check class="h-4 w-4" /> Aplicar cambio
-            </button>
-        </div>
+                @if ($this->esBachillerato())
+                    <flux:select wire:model.live="destino_semestre_id" :disabled="$semestresDestino->isEmpty()">
+                        <flux:select.option value="">Nuevo semestre</flux:select.option>
+                        @foreach ($semestresDestino as $item)
+                            <flux:select.option value="{{ $item->id }}">Semestre {{ $item->numero }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                @endif
 
-        @error('destino_ciclo_escolar_id')
-            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-        @enderror
-        @error('selected')
-            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-        @enderror
-        @error('destino_generacion_id')
-            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-        @enderror
-        @error('destino_grupo_id')
-            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-        @enderror
-        @error('motivo_cambio')
-            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-        @enderror
-    </section>
+                <flux:select wire:model="destino_grupo_id" :disabled="$gruposDestino->isEmpty()">
+                    <flux:select.option value="">Nuevo grupo</flux:select.option>
+                    @foreach ($gruposDestino as $item)
+                        <flux:select.option value="{{ $item->id }}">{{ $this->textoGrupo($item) }}
+                        </flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <flux:input wire:model="motivo_cambio" type="text" placeholder="Motivo obligatorio del cambio"
+                    class="{{ $this->esBachillerato() ? 'xl:col-span-3' : 'xl:col-span-3' }}" />
+
+                <button type="button" wire:click="cambiarGeneracionSeleccionados" wire:loading.attr="disabled"
+                    @disabled($this->selectedCount === 0)
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    <flux:icon.check class="h-4 w-4" /> Aplicar cambio
+                </button>
+            </div>
+
+            @error('destino_ciclo_escolar_id')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+            @error('selected')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+            @error('destino_generacion_id')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+            @error('destino_grupo_id')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+            @error('motivo_cambio')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+        </section>
     @else
-        <section class="rounded-3xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/20">
+        <section
+            class="rounded-3xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/20">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                <span
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
                     <flux:icon.archive-box class="h-5 w-5" />
                 </span>
                 <div>
                     <h2 class="font-black text-sky-950 dark:text-sky-100">Consulta histórica de solo lectura</h2>
                     <p class="mt-1 text-sm text-sky-800/80 dark:text-sky-200/70">
-                        Se muestra la generación, grado, grupo, matrícula y resultado que el alumno tenía en el ciclo seleccionado.
+                        Se muestra la generación, grado, grupo, matrícula y resultado que el alumno tenía en el ciclo
+                        seleccionado.
                         Su ubicación académica vigente no se modifica desde esta vista.
                     </p>
                 </div>
@@ -598,13 +602,15 @@
                                 @if ($this->esCicloActual)
                                     <flux:checkbox wire:model.live="selected" value="{{ $alumno->id }}" />
                                 @else
-                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-neutral-800">
+                                    <span
+                                        class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-neutral-800">
                                         <flux:icon.archive-box class="h-3.5 w-3.5" />
                                     </span>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
-                                <p class="font-black text-slate-900 dark:text-white">{{ $contexto?->matricula ?: $alumno->matricula ?: '—' }}
+                                <p class="font-black text-slate-900 dark:text-white">
+                                    {{ $contexto?->matricula ?: $alumno->matricula ?: '—' }}
                                 </p>
                                 <p class="mt-1 text-xs text-slate-500">{{ $alumno->curp ?: 'Sin CURP' }}</p>
                             </td>
@@ -625,14 +631,16 @@
                                 <p class="font-semibold text-slate-700 dark:text-slate-200">
                                     {{ $contexto?->generacion?->etiqueta ?? 'Sin generación' }}</p>
                                 @if ($contexto?->generacion && !$contexto->generacion->status)
-                                    <span class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
+                                    <span
+                                        class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
                                         Generación inactiva
                                     </span>
                                 @endif
                             </td>
                             <td class="px-4 py-4">
                                 <p class="font-bold text-slate-800 dark:text-slate-100">
-                                    {{ $contexto?->grado?->nombre ?? '—' }} · {{ $this->textoGrupo($contexto?->grupo) }}
+                                    {{ $contexto?->grado?->nombre ?? '—' }} ·
+                                    {{ $this->textoGrupo($contexto?->grupo) }}
                                 </p>
                                 @if ($this->esBachillerato())
                                     <p class="mt-1 text-xs text-slate-500">Semestre
@@ -645,24 +653,29 @@
                                     {{ $this->etiquetaEstatus($estado) }}
                                 </span>
                                 @if ($estado === 'preinscrito')
-                                    <p class="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                                    <p
+                                        class="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
                                         <flux:icon.clock class="h-3.5 w-3.5" /> Acceso pendiente
                                     </p>
                                 @elseif ($this->esCicloActual && $contexto?->estado === 'en_curso')
                                     <p class="mt-2 text-[11px] font-bold text-sky-600">Ubicación vigente</p>
                                 @else
-                                    <p class="mt-2 text-[11px] font-bold text-slate-500">Registro histórico del ciclo</p>
+                                    <p class="mt-2 text-[11px] font-bold text-slate-500">Registro histórico del ciclo
+                                    </p>
                                 @endif
                             </td>
                             <td class="max-w-xs px-4 py-4">
                                 <p class="text-xs text-slate-500">Ingreso al ciclo:
-                                    <b class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_ingreso)->format('d/m/Y') ?: '—' }}</b>
+                                    <b
+                                        class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_ingreso)->format('d/m/Y') ?: '—' }}</b>
                                 </p>
                                 <p class="mt-1 text-xs text-slate-500">Salida o cierre:
-                                    <b class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_salida)->format('d/m/Y') ?: optional($contexto?->cerrado_at)->format('d/m/Y') ?: '—' }}</b>
+                                    <b
+                                        class="text-slate-700 dark:text-slate-200">{{ optional($contexto?->fecha_salida)->format('d/m/Y') ?: optional($contexto?->cerrado_at)->format('d/m/Y') ?: '—' }}</b>
                                 </p>
                                 @if ($contexto?->motivo_cierre)
-                                    <p class="mt-1 line-clamp-2 text-xs text-slate-500" title="{{ $contexto->motivo_cierre }}">
+                                    <p class="mt-1 line-clamp-2 text-xs text-slate-500"
+                                        title="{{ $contexto->motivo_cierre }}">
                                         {{ $contexto->motivo_cierre }}
                                     </p>
                                 @endif
@@ -691,6 +704,23 @@
                                             class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/30 dark:text-sky-300">
                                             <flux:icon.pencil-square class="h-4 w-4" />
                                         </button>
+
+                                        @if (!$alumno->deleted_at && $contexto?->estado === 'en_curso' && in_array($estado, ['activo', 'preinscrito'], true))
+                                            <button type="button"
+                                                x-on:click="abrirEdicion(
+                                                    {{ $alumno->id }},
+                                                    @js(
+    route('misrutas.matricula.editar', [
+        'slug_nivel' => $slug_nivel,
+        'inscripcion' => $alumno->id,
+    ]) . '?anular_ingreso=1',
+)
+                                                )"
+                                                title="Anular ingreso porque no inició el ciclo"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-700 transition hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300">
+                                                <flux:icon.user-minus class="h-4 w-4" />
+                                            </button>
+                                        @endif
                                         @if ($alumno->deleted_at)
                                             <button type="button" wire:click="restaurar({{ $alumno->id }})"
                                                 title="Restaurar"

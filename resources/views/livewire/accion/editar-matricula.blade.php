@@ -9,10 +9,12 @@
     regresarMatricula() {
         if (this.regresandoMatricula) return;
 
-        let url = @js(route('submodulos.accion', [
-            'slug_nivel' => $slug_nivel,
-            'accion' => 'matricula',
-        ]));
+        let url = @js(
+    route('submodulos.accion', [
+        'slug_nivel' => $slug_nivel,
+        'accion' => 'matricula',
+    ]),
+);
 
         const raw = localStorage.getItem(this.llaveRetorno());
 
@@ -54,8 +56,7 @@
             <h3 class="text-lg font-bold text-slate-800 dark:text-white">Cargando matrícula</h3>
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Consultando la información del alumno...</p>
             <div class="mt-5 flex items-center justify-center gap-1.5">
-                <span
-                    class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500 [animation-delay:-0.3s]"></span>
+                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500 [animation-delay:-0.3s]"></span>
                 <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
                 <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500"></span>
             </div>
@@ -387,7 +388,8 @@
                             <flux:select wire:model="ciclo_id">
                                 <flux:select.option value="">Selecciona un periodo</flux:select.option>
                                 @foreach ($ciclos as $ciclo)
-                                    <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->ciclo }}</flux:select.option>
+                                    <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->ciclo }}
+                                    </flux:select.option>
                                 @endforeach
                             </flux:select>
                             @error('ciclo_id')
@@ -416,8 +418,7 @@
                         </div>
                     </div>
 
-                    <div
-                        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
                         <div>
                             <div class="mb-1 flex items-center gap-2">
                                 <flux:label>Ciclo escolar</flux:label>
@@ -450,7 +451,8 @@
                             <flux:select wire:model.live="nivel_id" :disabled="!$ciclo_escolar_id">
                                 <flux:select.option value="">Selecciona un nivel</flux:select.option>
                                 @foreach ($niveles as $nivel)
-                                    <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}</flux:select.option>
+                                    <flux:select.option value="{{ $nivel->id }}">{{ $nivel->nombre }}
+                                    </flux:select.option>
                                 @endforeach
                             </flux:select>
                             @error('nivel_id')
@@ -470,7 +472,8 @@
                                 <flux:select wire:model.live="grado_id" :disabled="!$nivel_id || $grados->isEmpty()">
                                     <flux:select.option value="">Selecciona un grado</flux:select.option>
                                     @foreach ($grados as $grado)
-                                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
+                                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}
+                                        </flux:select.option>
                                     @endforeach
                                 </flux:select>
                                 @error('grado_id')
@@ -534,10 +537,12 @@
                                 </span>
                             </div>
                             <flux:select wire:model.live="grupo_id"
-                                :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || (!$esBachillerato && !$grado_id) || empty($grupos)">
+                                :disabled="!$generacion_id || ($esBachillerato && !$semestre_id) || (!$esBachillerato && !
+                                    $grado_id) || empty($grupos)">
                                 <flux:select.option value="">Selecciona un grupo</flux:select.option>
                                 @foreach ($grupos as $grupo)
-                                    <flux:select.option value="{{ $grupo['id'] }}">{{ $grupo['label'] }}</flux:select.option>
+                                    <flux:select.option value="{{ $grupo['id'] }}">{{ $grupo['label'] }}
+                                    </flux:select.option>
                                 @endforeach
                             </flux:select>
                             @error('grupo_id')
@@ -549,17 +554,22 @@
                     @if ($esBachillerato)
                         <div
                             class="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-300">
-                            Los grupos se filtran por <b>ciclo escolar</b>, <b>generación</b> y <b>semestre</b>. El <b>grado</b> se obtiene automáticamente desde el grupo y el cupo es ilimitado.
+                            Los grupos se filtran por <b>ciclo escolar</b>, <b>generación</b> y <b>semestre</b>. El
+                            <b>grado</b> se obtiene automáticamente desde el grupo y el cupo es ilimitado.
                         </div>
                     @else
                         <div
                             class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
-                            La asignación queda ligada al <b>ciclo escolar</b>, <b>nivel</b>, <b>grado</b>, <b>generación</b> y <b>grupo</b>. Los grupos tienen cupo ilimitado.
+                            La asignación queda ligada al <b>ciclo escolar</b>, <b>nivel</b>, <b>grado</b>,
+                            <b>generación</b> y <b>grupo</b>. Los grupos tienen cupo ilimitado.
                         </div>
                     @endif
 
-                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                        Cambiar cualquiera de estos campos reemplaza la asignación académica actual. El sistema solicitará un <b>motivo</b>, una <b>confirmación</b> y registrará el movimiento en el historial del alumno.
+                    <div
+                        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                        Cambiar cualquiera de estos campos reemplaza la asignación académica actual. El sistema
+                        solicitará un <b>motivo</b>, una <b>confirmación</b> y registrará el movimiento en el historial
+                        del alumno.
                     </div>
                 </section>
 
@@ -586,7 +596,8 @@
                                     </span>
                                 </div>
                                 <p class="text-sm text-slate-500 dark:text-slate-400">
-                                    Las notas se guardan por ciclo escolar, conservan historial y no se pierden al cambiar de ciclo antes de guardar.
+                                    Las notas se guardan por ciclo escolar, conservan historial y no se pierden al
+                                    cambiar de ciclo antes de guardar.
                                 </p>
                             </div>
                         </div>
@@ -616,16 +627,172 @@
 
                     <div
                         class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-sky-50/60 p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/10 dark:via-neutral-900 dark:to-sky-950/10 sm:p-5">
-                        <x-forms.tinymce-observaciones
-                            model="observaciones"
-                            id="observaciones-inscripcion-editar"
-                            :value="$observaciones"
-                            :height="280"
-                        />
+                        <x-forms.tinymce-observaciones model="observaciones" id="observaciones-inscripcion-editar"
+                            :value="$observaciones" :height="280" />
 
                         @error('observaciones')
                             <p class="mt-3 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
+                    </div>
+                </section>
+
+                <div
+                    class="my-6 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-neutral-700">
+                </div>
+
+                {{-- ANULACIÓN FORMAL DE INGRESO NO INICIADO --}}
+                <section
+                    class="overflow-hidden rounded-[26px] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-sm dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
+                    <div class="border-b border-sky-100 px-5 py-4 dark:border-sky-900/30 sm:px-6">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                                    <flux:icon.user-minus class="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-lg font-bold text-slate-900 dark:text-white">
+                                            Anular ingreso / No inició el ciclo
+                                        </h2>
+
+                                        @if (data_get($diagnosticoAnulacionIngreso, 'ya_anulado'))
+                                            <span
+                                                class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-700 dark:bg-neutral-700 dark:text-slate-200">
+                                                Ya anulado
+                                            </span>
+                                        @elseif (data_get($diagnosticoAnulacionIngreso, 'puede_anular'))
+                                            <span
+                                                class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                                Disponible
+                                            </span>
+                                        @else
+                                            <span
+                                                class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                Requiere revisión
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+                                        Utiliza esta acción únicamente cuando el alumno fue inscrito directamente en el
+                                        ciclo,
+                                        pero la familia confirmó que nunca comenzó clases. No registra una baja y no
+                                        elimina su expediente.
+                                    </p>
+                                </div>
+                            </div>
+
+                            @if (data_get($diagnosticoAnulacionIngreso, 'puede_anular') && !data_get($diagnosticoAnulacionIngreso, 'ya_anulado'))
+                                <flux:button type="button" variant="primary" wire:click="prepararAnulacionIngreso"
+                                    wire:loading.attr="disabled" wire:target="prepararAnulacionIngreso"
+                                    class="cursor-pointer rounded-2xl">
+                                    <flux:icon.user-minus class="mr-2 h-4 w-4" />
+                                    <span wire:loading.remove wire:target="prepararAnulacionIngreso">
+                                        Revisar y anular ingreso
+                                    </span>
+                                    <span wire:loading wire:target="prepararAnulacionIngreso">
+                                        Revisando…
+                                    </span>
+                                </flux:button>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+                        <div>
+                            <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div
+                                    class="rounded-2xl border border-white bg-white/80 p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80">
+                                    <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Ciclo
+                                    </dt>
+                                    <dd class="mt-1 text-sm font-bold text-slate-800 dark:text-white">
+                                        {{ data_get($diagnosticoAnulacionIngreso, 'ciclo') ?: '—' }}
+                                    </dd>
+                                </div>
+                                <div
+                                    class="rounded-2xl border border-white bg-white/80 p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80">
+                                    <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Nivel
+                                    </dt>
+                                    <dd class="mt-1 text-sm font-bold text-slate-800 dark:text-white">
+                                        {{ data_get($diagnosticoAnulacionIngreso, 'nivel') ?: '—' }}
+                                    </dd>
+                                </div>
+                                <div
+                                    class="rounded-2xl border border-white bg-white/80 p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80">
+                                    <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Grado /
+                                        semestre</dt>
+                                    <dd class="mt-1 text-sm font-bold text-slate-800 dark:text-white">
+                                        {{ data_get($diagnosticoAnulacionIngreso, 'grado') ?: data_get($diagnosticoAnulacionIngreso, 'semestre', '—') }}
+                                    </dd>
+                                </div>
+                                <div
+                                    class="rounded-2xl border border-white bg-white/80 p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80">
+                                    <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Grupo
+                                    </dt>
+                                    <dd class="mt-1 text-sm font-bold text-slate-800 dark:text-white">
+                                        {{ data_get($diagnosticoAnulacionIngreso, 'grupo') ?: '—' }}
+                                    </dd>
+                                </div>
+                            </dl>
+
+                            @if (data_get($diagnosticoAnulacionIngreso, 'ya_anulado'))
+                                <div
+                                    class="mt-4 rounded-2xl border border-slate-200 bg-slate-100 p-4 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
+                                    Este ingreso ya se conserva como <b>anulado / no iniciado</b>. El alumno no forma
+                                    parte de las listas operativas del ciclo.
+                                </div>
+                            @elseif (!data_get($diagnosticoAnulacionIngreso, 'puede_anular'))
+                                <div
+                                    class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                                    <p class="font-black">La operación está bloqueada por estas razones:</p>
+                                    <ul class="mt-2 space-y-1.5">
+                                        @foreach ((array) data_get($diagnosticoAnulacionIngreso, 'bloqueos', []) as $bloqueo)
+                                            <li class="flex gap-2">
+                                                <flux:icon.exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                                                <span>{{ $bloqueo }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @else
+                                <div
+                                    class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                    <div class="flex gap-2">
+                                        <flux:icon.check-circle class="mt-0.5 h-4 w-4 shrink-0" />
+                                        <p>
+                                            No se detectó actividad académica que impida anular el ingreso.
+                                            La confirmación solicitará fecha, motivo y contraseña.
+                                        </p>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @error('anulacion_ingreso')
+                                <div
+                                    class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                                    {!! nl2br(e($message)) !!}
+                                </div>
+                            @enderror
+                        </div>
+
+                        <aside
+                            class="rounded-2xl border border-indigo-100 bg-indigo-50/80 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                            <p class="text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                                Evidencia que se conserva
+                            </p>
+                            <p class="mt-2 text-sm text-indigo-900 dark:text-indigo-100">
+                                Datos personales, CURP, tutor, matrícula histórica, documentos y bitácora.
+                            </p>
+                            <div class="mt-4 rounded-xl bg-white/80 p-3 dark:bg-neutral-900/70">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                    Documentos localizados
+                                </p>
+                                <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+                                    {{ (int) data_get($diagnosticoAnulacionIngreso, 'documentos_conservados', 0) }}
+                                </p>
+                            </div>
+                        </aside>
                     </div>
                 </section>
 
@@ -658,12 +825,22 @@
                                 </span>
                             </div>
                             <flux:select wire:model="estatus">
-                                @foreach (\App\Services\GestionAcademicaService::ESTATUS as $estado)
+                                @if (filled($estatus) && !in_array($estatus, \App\Livewire\Accion\EditarMatricula::ESTATUS_EDITABLES_MANUALMENTE, true))
+                                    <flux:select.option value="{{ $estatus }}">
+                                        {{ str($estatus)->replace('_', ' ')->title() }} · controlado por proceso
+                                    </flux:select.option>
+                                @endif
+
+                                @foreach (\App\Livewire\Accion\EditarMatricula::ESTATUS_EDITABLES_MANUALMENTE as $estado)
                                     <flux:select.option value="{{ $estado }}">
                                         {{ str($estado)->replace('_', ' ')->title() }}
                                     </flux:select.option>
                                 @endforeach
                             </flux:select>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                Egresado, reingreso, no promovido, pendiente de reinscripción y no reinscrito se generan
+                                desde sus procesos formales.
+                            </p>
                             @error('estatus')
                                 <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror
@@ -825,15 +1002,15 @@
                         </div>
 
                         @foreach ([
-                            'calle' => ['Calle', 'Calle'],
-                            'numero_exterior' => ['Número exterior', 'Número exterior'],
-                            'numero_interior' => ['Número interior', 'Número interior'],
-                            'colonia' => ['Colonia', 'Colonia'],
-                            'codigo_postal' => ['Código postal', 'Código postal'],
-                            'municipio' => ['Municipio', 'Municipio'],
-                            'estado_residencia' => ['Estado de residencia', 'Estado de residencia'],
-                            'ciudad_residencia' => ['Ciudad de residencia', 'Ciudad de residencia'],
-                        ] as $campo => [$etiqueta, $placeholder])
+        'calle' => ['Calle', 'Calle'],
+        'numero_exterior' => ['Número exterior', 'Número exterior'],
+        'numero_interior' => ['Número interior', 'Número interior'],
+        'colonia' => ['Colonia', 'Colonia'],
+        'codigo_postal' => ['Código postal', 'Código postal'],
+        'municipio' => ['Municipio', 'Municipio'],
+        'estado_residencia' => ['Estado de residencia', 'Estado de residencia'],
+        'ciudad_residencia' => ['Ciudad de residencia', 'Ciudad de residencia'],
+    ] as $campo => [$etiqueta, $placeholder])
                             <div>
                                 <div class="mb-1 flex items-center gap-2">
                                     <flux:label>{{ $etiqueta }}</flux:label>
@@ -901,7 +1078,8 @@
 
                         <div class="p-5 sm:p-6">
                             <div class="mb-4 flex items-center gap-2">
-                                <h3 class="text-base font-bold text-slate-800 dark:text-white">Fotografía del alumno</h3>
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white">Fotografía del alumno
+                                </h3>
                                 <span
                                     class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
                                     Opcional
@@ -940,8 +1118,7 @@
                                             </template>
 
                                             @if ($foto_actual_existe && $foto_actual_url)
-                                                <img src="{{ $foto_actual_url }}"
-                                                    alt="Fotografía actual del alumno"
+                                                <img src="{{ $foto_actual_url }}" alt="Fotografía actual del alumno"
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                                                     x-show="!preview">
                                             @else
@@ -952,7 +1129,8 @@
                                                         <flux:icon.camera
                                                             class="h-8 w-8 text-slate-400 dark:text-slate-500" />
                                                     </div>
-                                                    <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-600 dark:text-slate-300">
                                                         {{ $foto_actual ? 'Fotografía no disponible' : 'Sin fotografía' }}
                                                     </p>
                                                     <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
@@ -978,8 +1156,8 @@
                                     <label for="foto-editar"
                                         class="group relative flex cursor-pointer flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 px-6 py-8 text-center transition duration-300 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-500/10 dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-indigo-950/20">
                                         <input id="foto-editar" type="file" wire:model="foto"
-                                            accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp" class="hidden"
-                                            @change="usarTemporal($event)">
+                                            accept="image/png,image/jpeg,image/webp,.jpg,.jpeg,.png,.webp"
+                                            class="hidden" @change="usarTemporal($event)">
 
                                         <div
                                             class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20">
@@ -1045,4 +1223,127 @@
             </div>
         </div>
     </form>
+
+    @if ($modal_anular_ingreso)
+        <div class="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+            x-on:keydown.escape.window="$wire.cerrarModalAnulacionIngreso()">
+            <button type="button" aria-label="Cerrar" wire:click="cerrarModalAnulacionIngreso"
+                class="absolute inset-0 h-full w-full cursor-default"></button>
+
+            <section role="dialog" aria-modal="true" aria-labelledby="titulo-anulacion-ingreso"
+                class="relative z-10 max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-white/20 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+                <div class="h-1.5 bg-gradient-to-r from-amber-500 via-rose-500 to-red-600"></div>
+
+                <div class="border-b border-slate-200 p-5 dark:border-neutral-800 sm:p-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                                <flux:icon.user-minus class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h2 id="titulo-anulacion-ingreso"
+                                    class="text-xl font-black text-slate-900 dark:text-white">
+                                    Confirmar que el alumno no inició el ciclo
+                                </h2>
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    Esta acción anula el ingreso del ciclo seleccionado, pero conserva el expediente y
+                                    la evidencia administrativa.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button type="button" wire:click="cerrarModalAnulacionIngreso"
+                            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700">
+                            <flux:icon.x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-5 p-5 sm:p-6">
+                    <div
+                        class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                        <p class="font-black">Antes de confirmar</p>
+                        <p class="mt-1">
+                            Utiliza esta opción solo cuando el alumno nunca comenzó clases. Si sí asistió o tiene
+                            actividad académica,
+                            corresponde registrar una baja o traslado.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <flux:label>Fecha en que la familia informó</flux:label>
+                            <flux:input type="date" wire:model="fecha_anulacion_ingreso" class="mt-1" />
+                            @error('fecha_anulacion_ingreso')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <flux:label>Contraseña del usuario actual</flux:label>
+                            <flux:input type="password" wire:model="password_anulacion_ingreso"
+                                autocomplete="current-password" class="mt-1"
+                                placeholder="Confirma tu contraseña" />
+                            @error('password_anulacion_ingreso')
+                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <flux:label>Motivo y observaciones</flux:label>
+                        <flux:textarea wire:model="motivo_anulacion_ingreso" rows="5" class="mt-1"
+                            placeholder="Explica por qué se anula el ingreso y confirma que el alumno no inició actividades." />
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Este texto quedará registrado en el historial, la línea del tiempo y la bitácora.
+                        </p>
+                        @error('motivo_anulacion_ingreso')
+                            <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @error('anulacion_ingreso')
+                        <div
+                            class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                            {!! nl2br(e($message)) !!}
+                        </div>
+                    @enderror
+
+                    <div
+                        class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
+                        <p class="font-black">Resultado de la operación</p>
+                        <ul class="mt-2 space-y-1">
+                            <li>• Estatus administrativo: <b>No reinscrito</b>.</li>
+                            <li>• Historial del ciclo: <b>Anulado / No inició</b>.</li>
+                            <li>• El alumno deja de aparecer en listas, boletas, evaluaciones y documentos vigentes.
+                            </li>
+                            <li>• El expediente, documentos y auditoría permanecen disponibles.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div
+                    class="flex flex-col-reverse gap-3 border-t border-slate-200 p-5 dark:border-neutral-800 sm:flex-row sm:justify-end sm:p-6">
+                    <flux:button type="button" variant="ghost" wire:click="cerrarModalAnulacionIngreso"
+                        wire:loading.attr="disabled" wire:target="anularIngresoNoIniciado"
+                        class="cursor-pointer rounded-2xl">
+                        Cancelar
+                    </flux:button>
+
+                    <flux:button type="button" variant="danger" wire:click="anularIngresoNoIniciado"
+                        wire:loading.attr="disabled" wire:target="anularIngresoNoIniciado"
+                        class="cursor-pointer rounded-2xl">
+                        <flux:icon.user-minus class="mr-2 h-4 w-4" />
+                        <span wire:loading.remove wire:target="anularIngresoNoIniciado">
+                            Confirmar anulación del ingreso
+                        </span>
+                        <span wire:loading wire:target="anularIngresoNoIniciado">
+                            Aplicando anulación…
+                        </span>
+                    </flux:button>
+                </div>
+            </section>
+        </div>
+    @endif
 </div>
