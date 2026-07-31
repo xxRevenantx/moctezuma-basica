@@ -5661,6 +5661,9 @@ class PDFController extends Controller
         $request->merge(['ciclo_escolar_id' => $cicloEscolar->id]);
 
         $modoDescarga = $request->input('modo_descarga', 'grupo');
+        $alumnosSeleccionadosIds = $modoDescarga === 'seleccionados'
+            ? $this->idsAlumnosSeleccionadosLista($request)
+            : [];
 
         $generacionId = $request->integer('generacion_id');
         $gradoId = $request->integer('grado_id');
@@ -5771,13 +5774,13 @@ class PDFController extends Controller
 
 
 
-        if (!in_array($modoDescarga, ['grupo', 'nivel'], true)) {
+        if (!in_array($modoDescarga, ['grupo', 'seleccionados', 'nivel'], true)) {
             abort(422, 'El modo de descarga no es válido.');
         }
 
 
 
-        if ($modoDescarga === 'grupo') {
+        if (in_array($modoDescarga, ['grupo', 'seleccionados'], true)) {
             if (blank($generacionId) || blank($gradoId) || blank($grupoId)) {
                 abort(422, 'Los parámetros generacion_id, grado_id y grupo_id son obligatorios.');
             }
@@ -5802,7 +5805,8 @@ class PDFController extends Controller
                 tipoDescarga: $tipoDescarga,
                 opcionDescarga: $opcionDescarga,
                 parcialSeleccionado: $parcialSeleccionado,
-                parcialId: $parcialId
+                parcialId: $parcialId,
+                alumnosSeleccionadosIds: $alumnosSeleccionadosIds,
             );
 
             return Pdf::loadView($contexto['vistaPdf'], $contexto['data'])
@@ -5859,6 +5863,41 @@ class PDFController extends Controller
         ])
             ->setPaper('letter', $primerContexto['orientacionPdf'])
             ->stream($nombreArchivo);
+    }
+
+
+    /**
+     * @return array<int, int>
+     */
+    private function idsAlumnosSeleccionadosLista(Request $request): array
+    {
+        $valor = $request->input('alumnos', '');
+        $valores = collect(is_array($valor) ? $valor : explode(',', (string) $valor))
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter(fn (string $id): bool => $id !== '')
+            ->values();
+
+        if ($valores->isEmpty()) {
+            abort(422, 'Selecciona al menos un alumno para generar el documento.');
+        }
+
+        if ($valores->count() > 500) {
+            abort(422, 'No se pueden seleccionar más de 500 alumnos por documento.');
+        }
+
+        $ids = $valores
+            ->map(function (string $id): int {
+                if (!ctype_digit($id) || (int) $id <= 0) {
+                    abort(422, 'La selección de alumnos contiene identificadores no válidos.');
+                }
+
+                return (int) $id;
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        return $ids;
     }
 
 
@@ -5997,7 +6036,8 @@ class PDFController extends Controller
         string $tipoDescarga,
         string $opcionDescarga,
         $parcialSeleccionado = null,
-        ?int $parcialId = null
+        ?int $parcialId = null,
+        array $alumnosSeleccionadosIds = [],
     ): array {
         $esBachillerato = $this->esBachillerato($nivel);
         $esSecundaria = $this->esSecundaria($nivel);
@@ -6285,6 +6325,29 @@ class PDFController extends Controller
             usarActualComoRespaldo: (bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
             incluirTodaGeneracionBachillerato: $esBachillerato,
         );
+
+        if ($alumnosSeleccionadosIds !== []) {
+            $idsEncontrados = $alumnos
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $idsInvalidos = array_values(array_diff($alumnosSeleccionadosIds, $idsEncontrados));
+
+            if ($idsInvalidos !== []) {
+                abort(422, 'Uno o más alumnos seleccionados ya no pertenecen a la matrícula activa del grupo. Actualiza la selección e inténtalo nuevamente.');
+            }
+
+            $alumnos = $alumnos
+                ->filter(fn ($alumno): bool => in_array((int) $alumno->id, $alumnosSeleccionadosIds, true))
+                ->values();
+        }
+
+        if ($alumnos->isEmpty()) {
+            abort(404, 'No se encontraron alumnos activos para generar el documento.');
+        }
 
         /*
     |--------------------------------------------------------------------------

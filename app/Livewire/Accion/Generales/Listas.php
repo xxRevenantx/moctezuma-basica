@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Accion\Generales;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Parcial;
 use App\Models\Semestre;
+use App\Services\ListaAcademicaService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
@@ -29,6 +31,13 @@ class Listas extends Component
     public ?int $grado_id = null;
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
+
+    public ?int $ciclo_escolar_id = null;
+
+    /** @var array<int, int|string> */
+    public array $alumnos_seleccionados = [];
+
+    public string $buscar_alumno = '';
 
     public bool $mostrar_motivo = false;
 
@@ -61,6 +70,16 @@ class Listas extends Component
         $this->semestres = $this->cargarSemestresIniciales();
         $this->parciales = $this->cargarParciales();
         $this->grupos = collect();
+
+        $cicloEscolar = CicloEscolar::query()
+            ->where('es_actual', true)
+            ->first()
+            ?? CicloEscolar::query()
+                ->orderByDesc('inicio_anio')
+                ->orderByDesc('fin_anio')
+                ->first();
+
+        $this->ciclo_escolar_id = $cicloEscolar?->id;
 
         $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
 
@@ -107,12 +126,20 @@ class Listas extends Component
 
     public function updatedModoDescarga(): void
     {
-        $this->grado_id = null;
-        $this->semestre_id = null;
-        $this->grupo_id = null;
+        if (!in_array($this->modo_descarga, ['grupo', 'seleccionados', 'nivel'], true)) {
+            $this->modo_descarga = 'grupo';
+        }
+
+        $this->limpiarSeleccionAlumnos();
         $this->mostrar_motivo = false;
-        $this->grupos = collect();
-        $this->semestres = $this->cargarSemestresIniciales();
+
+        if ($this->modo_descarga === 'nivel') {
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+            $this->grupos = collect();
+            $this->semestres = $this->cargarSemestresIniciales();
+        }
     }
 
     public function updatedGeneracionId(): void
@@ -121,14 +148,15 @@ class Listas extends Component
         $this->semestre_id = null;
         $this->grupo_id = null;
         $this->grupos = collect();
-
         $this->semestres = $this->cargarSemestresIniciales();
+        $this->limpiarSeleccionAlumnos();
     }
 
     public function updatedGradoId(): void
     {
         $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->limpiarSeleccionAlumnos();
 
         $this->cargarSemestresPorGrado();
         $this->cargarGrupos();
@@ -137,8 +165,30 @@ class Listas extends Component
     public function updatedSemestreId(): void
     {
         $this->grupo_id = null;
+        $this->limpiarSeleccionAlumnos();
 
         $this->cargarGrupos();
+    }
+
+    public function updatedGrupoId(): void
+    {
+        $this->limpiarSeleccionAlumnos();
+    }
+
+    public function updatedBuscarAlumno(): void
+    {
+        // El buscador solo filtra visualmente; la selección previa se conserva.
+    }
+
+    public function updatedAlumnosSeleccionados(mixed $value = null, mixed $key = null): void
+    {
+        if ($this->modo_descarga !== 'seleccionados') {
+            $this->alumnos_seleccionados = [];
+
+            return;
+        }
+
+        $this->alumnos_seleccionados = $this->idsAlumnosSeleccionadosValidos;
     }
 
     public function updatedTipoDescarga(): void
@@ -269,6 +319,39 @@ class Listas extends Component
         $this->mostrar_motivo = false;
         $this->semestres = $this->cargarSemestresIniciales();
         $this->parciales = $this->cargarParciales();
+        $this->limpiarSeleccionAlumnos();
+    }
+
+    public function seleccionarTodos(): void
+    {
+        $this->alumnos_seleccionados = $this->alumnosDisponibles
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function limpiarSeleccion(): void
+    {
+        $this->alumnos_seleccionados = [];
+    }
+
+    public function quitarAlumnoSeleccionado(int $alumnoId): void
+    {
+        $this->alumnos_seleccionados = collect($this->alumnos_seleccionados)
+            ->map(fn ($id): int => (int) $id)
+            ->reject(fn (int $id): bool => $id === $alumnoId)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function limpiarSeleccionAlumnos(): void
+    {
+        $this->alumnos_seleccionados = [];
+        $this->buscar_alumno = '';
+        $this->resetErrorBag('alumnos_seleccionados');
     }
 
     public function tiposDescarga(): array
@@ -336,6 +419,101 @@ class Listas extends Component
     }
 
     #[Computed]
+    public function alumnosDisponibles(): Collection
+    {
+        if (
+            $this->modo_descarga !== 'seleccionados'
+            || !$this->ciclo_escolar_id
+            || !$this->generacion_id
+            || !$this->grado_id
+            || !$this->grupo_id
+            || ($this->esBachillerato() && !$this->semestre_id)
+        ) {
+            return collect();
+        }
+
+        $grupo = $this->grupoSeleccionado;
+
+        if (!$grupo) {
+            return collect();
+        }
+
+        return app(ListaAcademicaService::class)
+            ->alumnosPorContexto(
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                grupoIds: [(int) $grupo->id],
+                fechaCorte: now(),
+                nivelId: (int) $this->nivel->id,
+                gradoId: (int) $this->grado_id,
+                generacionId: (int) $this->generacion_id,
+                semestreId: $this->esBachillerato() ? (int) $this->semestre_id : null,
+                usarHistorialCiclo: true,
+                incluirNoActivos: false,
+                usarActualComoRespaldo: true,
+                incluirTodaGeneracionBachillerato: $this->esBachillerato(),
+            )
+            ->filter(fn ($alumno): bool => $alumno->visibleEnListas())
+            ->unique(fn ($alumno): int => (int) $alumno->id)
+            ->sortBy(fn ($alumno): string => mb_strtolower(trim(
+                (string) $alumno->apellido_paterno . ' ' .
+                (string) $alumno->apellido_materno . ' ' .
+                (string) $alumno->nombre
+            )))
+            ->values();
+    }
+
+    #[Computed]
+    public function alumnosFiltrados(): Collection
+    {
+        $busqueda = mb_strtolower(trim($this->buscar_alumno));
+
+        if ($busqueda === '') {
+            return $this->alumnosDisponibles;
+        }
+
+        return $this->alumnosDisponibles
+            ->filter(function ($alumno) use ($busqueda): bool {
+                $texto = mb_strtolower(implode(' ', [
+                    (string) ($alumno->matricula ?? ''),
+                    (string) ($alumno->apellido_paterno ?? ''),
+                    (string) ($alumno->apellido_materno ?? ''),
+                    (string) ($alumno->nombre ?? ''),
+                ]));
+
+                return str_contains($texto, $busqueda);
+            })
+            ->values();
+    }
+
+    #[Computed]
+    public function idsAlumnosSeleccionadosValidos(): array
+    {
+        $idsDisponibles = $this->alumnosDisponibles
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique();
+
+        return collect($this->alumnos_seleccionados)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0 && $idsDisponibles->contains($id))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
+    public function totalAlumnosDisponibles(): int
+    {
+        return $this->alumnosDisponibles->count();
+    }
+
+    #[Computed]
+    public function totalAlumnosSeleccionados(): int
+    {
+        return count($this->idsAlumnosSeleccionadosValidos);
+    }
+
+    #[Computed]
     public function puedeDescargar(): bool
     {
         if (!$this->tipo_descarga || !$this->opcion_descarga) {
@@ -346,11 +524,11 @@ class Listas extends Component
             return true;
         }
 
-        if (!$this->generacion_id) {
+        if (!in_array($this->modo_descarga, ['grupo', 'seleccionados'], true)) {
             return false;
         }
 
-        if (!$this->grado_id) {
+        if (!$this->generacion_id || !$this->grado_id || !$this->grupo_id) {
             return false;
         }
 
@@ -358,8 +536,8 @@ class Listas extends Component
             return false;
         }
 
-        if (!$this->grupo_id) {
-            return false;
+        if ($this->modo_descarga === 'seleccionados') {
+            return $this->totalAlumnosSeleccionados > 0;
         }
 
         return true;
@@ -368,23 +546,22 @@ class Listas extends Component
     #[Computed]
     public function parametrosDescarga(): array
     {
+        $usaContextoGrupo = in_array($this->modo_descarga, ['grupo', 'seleccionados'], true);
+
         return [
             'modo_descarga' => $this->modo_descarga,
-
-            /*
-         * En modo nivel no se manda generación, grado, semestre ni grupo.
-         * Así el PDF traerá todas las listas del nivel completo.
-         */
-            'generacion_id' => $this->modo_descarga === 'grupo' ? $this->generacion_id : null,
-            'grado_id' => $this->modo_descarga === 'grupo' ? $this->grado_id : null,
-            'semestre_id' => $this->modo_descarga === 'grupo' ? $this->semestre_id : null,
-            'grupo_id' => $this->modo_descarga === 'grupo' ? $this->grupo_id : null,
-
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'generacion_id' => $usaContextoGrupo ? $this->generacion_id : null,
+            'grado_id' => $usaContextoGrupo ? $this->grado_id : null,
+            'semestre_id' => $usaContextoGrupo ? $this->semestre_id : null,
+            'grupo_id' => $usaContextoGrupo ? $this->grupo_id : null,
+            'alumnos' => $this->modo_descarga === 'seleccionados'
+                ? implode(',', $this->idsAlumnosSeleccionadosValidos)
+                : null,
             'tipo_descarga' => $this->tipo_descarga,
             'opcion_descarga' => $this->opcion_descarga,
-
             'mostrar_motivo' => $this->tipo_descarga === 'grupo'
-                && $this->modo_descarga === 'grupo'
+                && $usaContextoGrupo
                 && $this->mostrar_motivo ? 1 : 0,
         ];
     }
@@ -418,9 +595,11 @@ class Listas extends Component
     #[Computed]
     public function textoBotonDescarga(): string
     {
-        return $this->modo_descarga === 'nivel'
-            ? 'Descargar PDF por nivel'
-            : 'Descargar PDF';
+        return match ($this->modo_descarga) {
+            'nivel' => 'Descargar PDF por nivel',
+            'seleccionados' => 'Descargar PDF (' . $this->totalAlumnosSeleccionados . ' alumnos)',
+            default => 'Descargar PDF',
+        };
     }
 
     #[Computed]
@@ -430,15 +609,60 @@ class Listas extends Component
             return 'Se generará un PDF con todas las listas del nivel seleccionado, sin necesidad de elegir generación, grado ni grupo.';
         }
 
-        return 'Este documento se generará en PDF.';
+        if ($this->modo_descarga === 'seleccionados') {
+            return 'Se incluirán únicamente los ' . $this->totalAlumnosSeleccionados . ' alumnos seleccionados.';
+        }
+
+        return 'Se incluirán todos los alumnos activos del grupo seleccionado.';
     }
 
     #[Computed]
     public function textoAlcanceDescarga(): string
     {
-        return $this->modo_descarga === 'nivel'
-            ? 'Todas las listas del nivel'
-            : 'Grupo seleccionado';
+        return match ($this->modo_descarga) {
+            'nivel' => 'Todas las listas del nivel',
+            'seleccionados' => 'Alumnos seleccionados',
+            default => 'Grupo seleccionado',
+        };
+    }
+
+    #[Computed]
+    public function mensajeEstadoDescarga(): string
+    {
+        if ($this->modo_descarga === 'nivel') {
+            return $this->puedeDescargar
+                ? 'Se generarán todas las listas disponibles del nivel seleccionado.'
+                : 'Selecciona el tipo de documento y el periodo.';
+        }
+
+        if (!$this->generacion_id || !$this->grado_id || !$this->grupo_id || ($this->esBachillerato() && !$this->semestre_id)) {
+            return $this->esBachillerato()
+                ? 'Selecciona generación, grado, semestre y grupo.'
+                : 'Selecciona generación, grado y grupo.';
+        }
+
+        if ($this->modo_descarga === 'seleccionados') {
+            if ($this->totalAlumnosDisponibles === 0) {
+                return 'No hay alumnos activos disponibles para los filtros seleccionados.';
+            }
+
+            if ($this->totalAlumnosSeleccionados === 0) {
+                return 'Selecciona al menos un alumno para generar el documento.';
+            }
+
+            return 'Se incluirán ' . $this->totalAlumnosSeleccionados . ' alumnos seleccionados.';
+        }
+
+        return 'Se incluirán todos los alumnos activos del grupo seleccionado.';
+    }
+
+    public function nombreAlumno($alumno): string
+    {
+        return trim(implode(' ', array_filter([
+            $alumno?->apellido_paterno,
+            $alumno?->apellido_materno,
+            $alumno?->nombre,
+        ])));
     }
 
     #[Computed]

@@ -154,21 +154,22 @@
 
 
     {{-- MENÚ CURVO COMPACTO --}}
-    <nav class="relative mx-auto w-full" aria-label="Módulos del nivel">
+    <nav class="relative isolate mx-auto w-full" aria-label="Módulos del nivel">
         <div
-            class="pointer-events-none absolute inset-x-4 bottom-0 top-8 rounded-[32px] bg-gradient-to-r from-sky-500/25 via-violet-500/25 to-fuchsia-500/25 blur-md dark:from-sky-500/10 dark:via-violet-500/10 dark:to-fuchsia-500/10">
+            class="pointer-events-none absolute inset-x-4 bottom-0 top-8 z-0 rounded-[32px] bg-gradient-to-r from-sky-500/25 via-violet-500/25 to-fuchsia-500/25 blur-md dark:from-sky-500/10 dark:via-violet-500/10 dark:to-fuchsia-500/10">
         </div>
 
-        <div class="absolute inset-x-0 top-8 z-30 h-[3px] overflow-hidden rounded-t-[30px]" aria-hidden="true">
-            <div class="h-full w-full origin-left scale-x-0 bg-gradient-to-r from-[#006492] via-violet-500 to-[#88AC2E] transition-transform duration-500"
-                :class="nav ? 'scale-x-100' : 'scale-x-0'"></div>
-        </div>
 
         {{-- El padding superior permite que el botón activo sobresalga sin ser recortado al desplazar el menú. --}}
         <div
-            class="relative overflow-x-auto overflow-y-hidden pt-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            class="relative z-10 overflow-x-auto overflow-y-hidden pt-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-                class="relative flex h-[82px] min-w-[720px] items-stretch rounded-[30px] border border-white/80 bg-white/95 px-2 shadow-[0_18px_42px_-24px_rgba(67,56,202,0.50)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/95 sm:min-w-full sm:px-3">
+                class="relative isolate flex h-[82px] min-w-[720px] items-stretch overflow-visible rounded-[30px] border border-white/80 bg-white/95 px-2 shadow-[0_18px_42px_-24px_rgba(67,56,202,0.50)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/95 sm:min-w-full sm:px-3">
+
+                <div class="pointer-events-none absolute inset-x-0 top-0 z-0 h-[3px] overflow-hidden rounded-t-[30px]" aria-hidden="true">
+                    <div class="h-full w-full origin-left scale-x-0 bg-gradient-to-r from-[#006492] via-violet-500 to-[#88AC2E] transition-transform duration-500"
+                        :class="nav ? 'scale-x-100' : 'scale-x-0'"></div>
+                </div>
 
                 @foreach ($accionesVisibles as $a)
                     @php
@@ -203,18 +204,18 @@
                         @else
                             x-on:click="if (nav) { $event.preventDefault() } else { nav = true }" @endif
                         aria-current="{{ $isActive ? 'page' : 'false' }}"
-                        class="group relative flex min-w-[118px] flex-1 flex-col items-center justify-end px-2 pb-3 text-center outline-none transition">
+                        class="group relative z-10 flex min-w-[118px] flex-1 flex-col items-center justify-end px-2 pb-3 text-center outline-none transition">
 
                         @if ($isActive)
                             {{-- Semicírculo blanco que integra el botón elevado con la barra. --}}
                             <span
-                                class="pointer-events-none absolute -top-[26px] left-1/2 z-10 h-[62px] w-[94px] -translate-x-1/2 rounded-t-[999px] bg-white dark:bg-neutral-900"
+                                class="pointer-events-none absolute -top-[26px] left-1/2 z-20 h-[62px] w-[94px] -translate-x-1/2 rounded-t-[999px] bg-white dark:bg-neutral-900"
                                 aria-hidden="true"></span>
                         @endif
 
                         <span @class([
                             'grid place-items-center transition-all duration-300',
-                            'absolute -top-[28px] left-1/2 z-20 h-[62px] w-[62px] -translate-x-1/2 rounded-full border-[6px] border-white bg-gradient-to-br text-white shadow-[0_12px_26px_-10px_rgba(79,70,229,0.80)] dark:border-neutral-900 ' .
+                            'absolute -top-[28px] left-1/2 z-30 h-[62px] w-[62px] -translate-x-1/2 rounded-full border-[6px] border-white bg-gradient-to-br text-white shadow-[0_12px_26px_-10px_rgba(79,70,229,0.80)] dark:border-neutral-900 ' .
                             $theme['iconBox'] => $isActive,
                             'relative mb-1.5 h-8 w-8 rounded-xl text-slate-400 group-hover:-translate-y-0.5 group-hover:text-violet-500 dark:text-slate-500 dark:group-hover:text-violet-300' => !$isActive,
                         ])>
@@ -232,7 +233,7 @@
                         </span>
 
                         <span @class([
-                            'relative z-20 max-w-[115px] truncate text-[11px] font-black transition-colors duration-300 sm:text-xs',
+                            'relative z-30 max-w-[115px] truncate text-[11px] font-black transition-colors duration-300 sm:text-xs',
                             $theme['accent'] => $isActive,
                             'text-slate-400 group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300' => !$isActive,
                         ])>
@@ -241,7 +242,7 @@
 
                         @if ($isActive)
                             <span
-                                class="absolute bottom-1.5 left-1/2 z-20 h-1 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r {{ $cfg['gradient'] }} shadow-sm"
+                                class="absolute bottom-1.5 left-1/2 z-30 h-1 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r {{ $cfg['gradient'] }} shadow-sm"
                                 aria-hidden="true"></span>
                         @endif
                     </a>
