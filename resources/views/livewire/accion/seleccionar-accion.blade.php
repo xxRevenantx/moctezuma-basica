@@ -15,6 +15,12 @@
                 'gradient' => 'from-indigo-500 to-sky-500',
                 'descripcion' => 'Registro y control de alumnos',
             ],
+            'alumnos-no-vigentes' => [
+                'icon' =>
+                    'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3Zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Zm0 2c-2.33 0-7 1.17-7 3.5V19h10v-2.5c0-.83.33-1.54.86-2.13C10.62 13.45 9.14 13 8 13Zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5C23 14.17 18.33 13 16 13Z',
+                'gradient' => 'from-violet-500 to-indigo-500',
+                'descripcion' => 'Preinscritos, no reinscritos y egresados',
+            ],
             'asignacion-de-materias' => [
                 'icon' =>
                     'M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 4h10V5H7v2Zm0 4h10V9H7v2Zm0 4h10v-2H7v2Z',
@@ -68,6 +74,14 @@
                 'accent' => 'text-sky-700 dark:text-sky-300',
                 'ring' => 'ring-indigo-400/30',
                 'soft' => 'bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300',
+            ],
+            'alumnos-no-vigentes' => [
+                'bg' =>
+                    'from-violet-50 via-white to-indigo-50 dark:from-violet-500/10 dark:via-neutral-900 dark:to-indigo-500/10',
+                'iconBox' => 'from-violet-500 to-indigo-500',
+                'accent' => 'text-violet-700 dark:text-violet-300',
+                'ring' => 'ring-violet-400/30',
+                'soft' => 'bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300',
             ],
             'asignacion-de-materias' => [
                 'bg' =>
@@ -297,6 +311,10 @@
 
                 @case('matricula')
                     <livewire:accion.matricula :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
+                @break
+
+                @case('alumnos-no-vigentes')
+                    <livewire:accion.alumnos-no-vigentes :slug_nivel="$slug_nivel" :slug_grado="$slug_grado" />
                 @break
 
                 @case('asignacion-de-materias')

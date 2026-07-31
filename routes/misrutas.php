@@ -9,6 +9,7 @@ use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\CierreGeneracionReporteController;
 use App\Http\Controllers\AnaliticaInstitucionalReporteController;
+use App\Http\Controllers\AlumnosNoVigentesPdfController;
 use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
@@ -54,6 +55,7 @@ use App\Http\Controllers\ProfesorPdfController;
 use App\Http\Controllers\PromediosMateriasPdfController;
 use App\Http\Controllers\RespaldoAcademicoController;
 use App\Http\Controllers\ReanudacionesLaboralesController;
+use App\Http\Controllers\ReingresoAlumnoController;
 use App\Http\Controllers\SeleccionarGradoController;
 use App\Http\Controllers\SeleccionarNivelController;
 use App\Http\Controllers\SemestreController;
@@ -271,6 +273,14 @@ Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaContr
 Route::get('/nivel/{slug_nivel}/matricula-historica/pdf', MatriculaHistorialPdfController::class)
     ->middleware('admin')
     ->name('misrutas.matricula.historial.pdf');
+
+Route::get('/nivel/{slug_nivel}/alumnos-no-vigentes/pdf', AlumnosNoVigentesPdfController::class)
+    ->middleware('admin')
+    ->name('misrutas.alumnos-no-vigentes.pdf');
+
+Route::get('/nivel/{slug_nivel}/reingreso-alumno/formulario', ReingresoAlumnoController::class)
+    ->middleware('admin')
+    ->name('misrutas.reingreso-alumno');
 
 
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])

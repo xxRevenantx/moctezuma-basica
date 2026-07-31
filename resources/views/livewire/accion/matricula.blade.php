@@ -205,7 +205,7 @@
 
     {{-- Loader general de Livewire --}}
     <div wire:loading.delay.longer
-        wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados,limpiarFiltros,cambiarGeneracionSeleccionados,exportarExcel,archivar,restaurar,activarPreinscripcion"
+        wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search,limpiarFiltros,cambiarGeneracionSeleccionados,exportarExcel,archivar,restaurar"
         class="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]">
         <div class="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-2xl dark:bg-neutral-900">
             <div class="h-7 w-7 animate-spin rounded-full border-4 border-sky-100 border-t-sky-600"></div>
@@ -241,18 +241,29 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-black tracking-tight">Matrícula por generación</h1>
+                        <h1 class="text-2xl font-black tracking-tight">{{ $this->esCicloActual ? 'Matrícula activa' : 'Matrícula histórica' }}</h1>
                         <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/25">
                             {{ $nivel?->nombre }}
                         </span>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-blue-100">
-                        Cada alumno conserva una ubicación académica por ciclo escolar. Las promociones, bajas,
-                        traslados y egresos permanecen disponibles como historial aunque su ubicación actual cambie.
+                        @if ($this->esCicloActual)
+                            Solo se muestran alumnos con estatus Activo y bandera activa. Preinscritos, no reinscritos, egresados y otros estados se consultan por separado.
+                        @else
+                            Se muestran quienes realmente iniciaron el ciclo seleccionado, aunque actualmente tengan otro estatus.
+                        @endif
                     </p>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
+                    <a wire:navigate
+                        href="{{ route('submodulos.accion', ['slug_nivel' => $slug_nivel, 'accion' => 'alumnos-no-vigentes']) }}"
+                        class="inline-flex items-center gap-2 rounded-xl bg-violet-500/25 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 transition hover:bg-violet-500/35">
+                        <flux:icon.user-group class="h-4 w-4" /> No vigentes
+                        @if (($resumen['no_vigentes'] ?? 0) > 0)
+                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-violet-700">{{ $resumen['no_vigentes'] }}</span>
+                        @endif
+                    </a>
                     <button type="button" wire:click="exportarExcel" wire:loading.attr="disabled"
                         class="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 transition hover:bg-white/25 disabled:opacity-60">
                         <flux:icon.table-cells class="h-4 w-4" /> Excel
@@ -268,9 +279,7 @@
                                     'grado_id' => $grado_id,
                                     'semestre_id' => $semestre_id,
                                     'grupo_id' => $grupo_id,
-                                    'estatus' => $estatus,
                                     'search' => $search,
-                                    'mostrar_archivados' => $mostrar_archivados ? 1 : 0,
                                 ],
                                 fn($value) => $value !== null && $value !== '',
                             ),
@@ -282,29 +291,30 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 xl:grid-cols-6 dark:bg-neutral-700">
-            @foreach ([['label' => 'Alumnos', 'value' => $resumen['total'], 'icon' => 'users'], ['label' => 'Hombres', 'value' => $resumen['hombres'], 'icon' => 'user'], ['label' => 'Mujeres', 'value' => $resumen['mujeres'], 'icon' => 'user'], ['label' => 'Activos', 'value' => $resumen['activos'], 'icon' => 'check'], ['label' => 'Bajas / traslados', 'value' => $resumen['bajas'], 'icon' => 'user-minus'], ['label' => 'Egresados', 'value' => $resumen['egresados'], 'icon' => 'academic-cap']] as $dato)
+        <div class="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 xl:grid-cols-5 dark:bg-neutral-700">
+            @foreach ([
+                ['label' => $this->esCicloActual ? 'Activos' : 'Alumnos del ciclo', 'value' => $resumen['total'], 'icon' => 'users'],
+                ['label' => 'Hombres', 'value' => $resumen['hombres'], 'icon' => 'user'],
+                ['label' => 'Mujeres', 'value' => $resumen['mujeres'], 'icon' => 'user'],
+                ['label' => 'Grupos', 'value' => $resumen['grupos'], 'icon' => 'rectangle-group'],
+                ['label' => 'No vigentes', 'value' => $resumen['no_vigentes'], 'icon' => 'user-minus'],
+            ] as $dato)
                 <div class="bg-white p-4 dark:bg-neutral-900">
                     <div class="flex items-center gap-3">
-                        <span
-                            class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                             @if ($dato['icon'] === 'user-minus')
                                 <flux:icon.user-minus class="h-5 w-5" />
                             @elseif ($dato['icon'] === 'users')
                                 <flux:icon.users class="h-5 w-5" />
-                            @elseif ($dato['icon'] === 'academic-cap')
-                                <flux:icon.academic-cap class="h-5 w-5" />
-                            @elseif ($dato['icon'] === 'check')
-                                <flux:icon.check class="h-5 w-5" />
+                            @elseif ($dato['icon'] === 'rectangle-group')
+                                <flux:icon.rectangle-group class="h-5 w-5" />
                             @else
                                 <flux:icon.user class="h-5 w-5" />
                             @endif
                         </span>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $dato['label'] }}
-                            </p>
-                            <p class="text-xl font-black text-slate-900 dark:text-white">
-                                {{ number_format($dato['value']) }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $dato['label'] }}</p>
+                            <p class="text-xl font-black text-slate-900 dark:text-white">{{ number_format($dato['value']) }}</p>
                         </div>
                     </div>
                 </div>
@@ -318,7 +328,7 @@
         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="font-black text-slate-900 dark:text-white">Contexto académico</h2>
-                <p class="text-sm text-slate-500">Filtra el padrón actual o histórico de cada generación.</p>
+                <p class="text-sm text-slate-500">Filtra la matrícula activa o el padrón histórico de quienes realmente iniciaron el ciclo.</p>
             </div>
             <button type="button" wire:click="limpiarFiltros"
                 class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-300 dark:hover:bg-neutral-800">
@@ -384,27 +394,13 @@
                 </flux:select>
             </flux:field>
 
-            <flux:field>
-                <flux:label>Estatus</flux:label>
-                <flux:select wire:model.live="estatus">
-                    <flux:select.option value="todos">Todos</flux:select.option>
-                    @foreach ($this->opcionesEstatus as $estado)
-                        <flux:select.option value="{{ $estado }}">{{ $this->etiquetaEstatus($estado) }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </flux:field>
-
-            <flux:field class="{{ $this->esBachillerato() ? 'xl:col-span-2' : 'xl:col-span-3' }}">
+            <flux:field class="{{ $this->esBachillerato() ? 'xl:col-span-2' : 'xl:col-span-2' }}">
                 <flux:label>Buscar</flux:label>
                 <flux:input wire:model.live.debounce.350ms="search" type="search" icon="magnifying-glass"
                     placeholder="Nombre, matrícula, folio o CURP" />
             </flux:field>
         </div>
 
-        <div class="mt-4">
-            <flux:checkbox wire:model.live="mostrar_archivados" label="Incluir expedientes archivados" />
-        </div>
     </section>
 
     {{-- Cambio masivo de asignación: solo para el ciclo vigente --}}
@@ -526,14 +522,14 @@
         <div
             class="flex flex-col gap-2 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-700">
             <div>
-                <h2 class="font-black text-slate-900 dark:text-white">Alumnos del contexto seleccionado</h2>
+                <h2 class="font-black text-slate-900 dark:text-white">{{ $this->esCicloActual ? 'Alumnos activos del contexto seleccionado' : 'Alumnos que iniciaron el ciclo seleccionado' }}</h2>
                 <p class="text-sm text-slate-500">
                     {{ $nivel?->nombre }} ·
                     {{ $generacion_id ? $generaciones->firstWhere('id', $generacion_id)?->etiqueta ?? 'Generación' : 'Generaciones activas' }}
                 </p>
             </div>
             <div wire:loading.delay
-                wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,estatus,search,mostrar_archivados"
+                wire:target="ciclo_escolar_id,generacion_id,grado_id,semestre_id,grupo_id,search"
                 class="text-sm font-semibold text-sky-600">
                 Actualizando información…
             </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inscripcion;
 use App\Models\InscripcionCiclo;
 use App\Models\Nivel;
+use App\Models\CicloEscolar;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Fluent;
@@ -22,6 +23,10 @@ class MatriculaHistorialPdfController extends Controller
 
         $cicloEscolarId = $request->integer('ciclo_escolar_id');
         $historialCompleto = $request->boolean('historial_completo');
+        $cicloSeleccionado = $cicloEscolarId
+            ? CicloEscolar::query()->find($cicloEscolarId)
+            : null;
+        $esCicloActual = (bool) $cicloSeleccionado?->es_actual;
 
         if ($cicloEscolarId || $historialCompleto) {
             $historico = InscripcionCiclo::query()
@@ -39,12 +44,21 @@ class MatriculaHistorialPdfController extends Controller
                 ->when(! $historialCompleto && $request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
                 ->when(! $historialCompleto && $request->integer('semestre_id'), fn ($q, $id) => $q->where('semestre_id', $id))
                 ->when(! $historialCompleto && $request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
-                ->when($request->input('estatus', 'todos') !== 'todos', function ($q) use ($request): void {
-                    $estatus = (string) $request->input('estatus');
-                    $q->where(function ($sub) use ($estatus): void {
-                        $sub->where('resultado_final', $estatus)
-                            ->orWhere('estatus_actual_ciclo', $estatus);
-                    });
+                ->when(! $historialCompleto && $cicloEscolarId, function ($q) use ($esCicloActual): void {
+                    if ($esCicloActual) {
+                        $q->where('estado', 'en_curso')
+                            ->where('estatus_actual_ciclo', 'activo')
+                            ->whereHas('inscripcion', fn ($alumno) => $alumno->visiblesEnListas());
+
+                        return;
+                    }
+
+                    $q->where('estado', '!=', 'anulado')
+                        ->whereIn('estatus_ingreso', ['activo', 'reingreso', 'no_promovido'])
+                        ->where(function ($resultado): void {
+                            $resultado->whereNull('resultado_final')
+                                ->orWhere('resultado_final', '!=', 'no_iniciado');
+                        });
                 })
                 ->orderBy('ciclo_escolar_id')
                 ->orderBy('id')
@@ -94,9 +108,7 @@ class MatriculaHistorialPdfController extends Controller
                 mb_strtolower(trim($fila->apellido_paterno . ' ' . $fila->apellido_materno . ' ' . $fila->nombre))
             ))->values();
         } else {
-            $query = $request->boolean('mostrar_archivados')
-                ? Inscripcion::withTrashed()
-                : Inscripcion::query();
+            $query = Inscripcion::query()->visiblesEnListas();
 
             $query->with(['generacion', 'grado', 'semestre', 'grupo.asignacionGrupo'])
                 ->where('nivel_id', $nivel->id)
@@ -104,7 +116,6 @@ class MatriculaHistorialPdfController extends Controller
                 ->when($request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
                 ->when($request->integer('semestre_id'), fn ($q, $id) => $q->where('semestre_id', $id))
                 ->when($request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
-                ->when($request->input('estatus', 'todos') !== 'todos', fn ($q) => $q->where('estatus', $request->input('estatus')))
                 ->when(trim((string) $request->input('search')) !== '', function ($q) use ($request): void {
                     $termino = '%' . trim((string) $request->input('search')) . '%';
                     $q->where(function ($subquery) use ($termino): void {
@@ -137,7 +148,7 @@ class MatriculaHistorialPdfController extends Controller
 
         $tituloDocumento = $historialCompleto
             ? 'Historial escolar del alumno por ciclo'
-            : 'Matrícula - ' . (
+            : ($esCicloActual ? 'Matrícula activa - ' : 'Matrícula histórica - ') . (
                 $etiquetasGeneracion->isNotEmpty()
                     ? $etiquetasGeneracion->map(fn ($etiqueta) => 'Gen: ' . $etiqueta)->implode(' | ')
                     : 'Sin generación'
@@ -155,7 +166,7 @@ class MatriculaHistorialPdfController extends Controller
         $filtros = [
             'ciclo_escolar_id' => $request->integer('ciclo_escolar_id'),
             'historial_completo' => $historialCompleto,
-            'estatus' => $request->input('estatus', 'todos'),
+            'estatus' => $esCicloActual ? 'activo' : 'histórico',
             'mostrar_archivados' => $request->boolean('mostrar_archivados'),
             'busqueda' => trim((string) $request->input('search')),
         ];

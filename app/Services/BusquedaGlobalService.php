@@ -499,9 +499,52 @@ class BusquedaGlobalService
                     $alumno->apellido_materno
                 );
 
+                $estatus = mb_strtolower(trim((string) ($alumno->estatus ?: ($alumno->activo ? 'activo' : 'inactivo'))));
                 $estado = $alumno->deleted_at
-                    ? 'Eliminado'
-                    : Str::headline((string) ($alumno->estatus ?: ($alumno->activo ? 'activo' : 'inactivo')));
+                    ? 'Archivado'
+                    : Str::headline($estatus);
+                $esActivoOperativo = ! $alumno->deleted_at
+                    && (bool) $alumno->activo
+                    && $estatus === Inscripcion::ESTATUS_VISIBLE_LISTAS;
+
+                $url = route('misrutas.expedientes.show', ['inscripcion' => $alumno->id]);
+
+                if ($alumno->nivel?->slug) {
+                    if ($esActivoOperativo) {
+                        $url = route('submodulos.accion', [
+                            'slug_nivel' => $alumno->nivel->slug,
+                            'accion' => 'matricula',
+                            'alumno' => $alumno->id,
+                            'origen' => 'busqueda-global',
+                        ]);
+                    } elseif (in_array($estatus, AlumnosNoVigentesService::ESTATUS_BAJAS, true)) {
+                        $url = route('submodulos.accion', [
+                            'slug_nivel' => $alumno->nivel->slug,
+                            'accion' => 'bajas',
+                            'buscar' => $alumno->matricula ?: $alumno->curp ?: $alumno->id,
+                            'origen' => 'busqueda-global',
+                        ]);
+                    } else {
+                        $categoria = $alumno->deleted_at
+                            ? 'archivados'
+                            : match ($estatus) {
+                                'preinscrito' => 'preinscritos',
+                                'pendiente_reinscripcion' => 'pendientes_reinscripcion',
+                                'no_reinscrito', 'no_iniciado' => 'no_reinscritos',
+                                'egresado' => 'egresados',
+                                'reingreso', 'no_promovido' => 'regularizacion',
+                                default => 'todos',
+                            };
+
+                        $url = route('submodulos.accion', [
+                            'slug_nivel' => $alumno->nivel->slug,
+                            'accion' => 'alumnos-no-vigentes',
+                            'categoria' => $categoria,
+                            'alumno' => $alumno->id,
+                            'origen' => 'busqueda-global',
+                        ]);
+                    }
+                }
 
                 return [
                     'tipo' => 'alumno',
@@ -522,9 +565,9 @@ class BusquedaGlobalService
                         $alumno->generacion?->etiqueta,
                     ])->filter()->join(' · '),
                     'estado' => $estado,
-                    'tono' => $alumno->activo && ! $alumno->deleted_at ? 'emerald' : 'amber',
+                    'tono' => $esActivoOperativo ? 'emerald' : 'amber',
                     'iniciales' => $this->iniciales($nombre),
-                    'url' => route('misrutas.expedientes.show', ['inscripcion' => $alumno->id]),
+                    'url' => $url,
                 ];
             })
             ->all();

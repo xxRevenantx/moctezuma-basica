@@ -136,13 +136,24 @@ class GestionAcademicaService
             $fecha
         );
 
-        return $this->cambiarEstatus(
+        $actualizado = $this->cambiarEstatus(
             $actualizado,
-            'no_promovido',
-            'Continuidad en el mismo grado o semestre. '.$motivo,
+            'activo',
+            'Activación para repetir el mismo grado o semestre. ' . $motivo,
             $usuarioId,
             $fecha
         );
+
+        // El resultado "no_promovido" permanece en el ciclo de origen. En el
+        // ciclo vigente el alumno debe ser operacionalmente activo para poder
+        // aparecer en asistencia, evaluación y demás listas actuales.
+        $actualizado->forceFill([
+            'indicador_reingreso' => false,
+            'tipo_ultimo_ingreso' => 'repeticion',
+            'fecha_ultimo_ingreso' => $fecha ?: now()->toDateString(),
+        ])->save();
+
+        return $actualizado->fresh();
     }
 
     public function activarPreinscripcion(

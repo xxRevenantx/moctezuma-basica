@@ -2,27 +2,29 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Accion;
 use Illuminate\Database\Seeder;
 
 class AccionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $acciones = [
-            ['accion' => 'Generales', 'slug' => 'generales'],
-            ['accion' => 'Matrícula', 'slug' => 'matricula'],
-            ['accion' => 'Asignación de materias', 'slug' => 'asignacion-de-materias'],
-            ['accion' => 'Horarios', 'slug' => 'horarios'],
-            ['accion' => 'Calificaciones', 'slug' => 'calificaciones'],
-            ['accion' => 'Bajas', 'slug' => 'bajas'],
+            ['accion' => 'Generales', 'slug' => 'generales', 'orden' => 1],
+            ['accion' => 'Matrícula', 'slug' => 'matricula', 'orden' => 2],
+            ['accion' => 'Alumnos no vigentes', 'slug' => 'alumnos-no-vigentes', 'orden' => 3],
+            ['accion' => 'Asignación de materias', 'slug' => 'asignacion-de-materias', 'orden' => 4],
+            ['accion' => 'Horarios', 'slug' => 'horarios', 'orden' => 5],
+            ['accion' => 'Calificaciones', 'slug' => 'calificaciones', 'orden' => 6],
+            ['accion' => 'Fichas', 'slug' => 'fichas', 'orden' => 7],
+            ['accion' => 'Bajas', 'slug' => 'bajas', 'orden' => 8],
         ];
 
-        foreach ($acciones as $key => $value) {
-            \App\Models\Accion::create($value);
+        foreach ($acciones as $accion) {
+            Accion::query()->updateOrCreate(
+                ['slug' => $accion['slug']],
+                $accion
+            );
         }
     }
 }

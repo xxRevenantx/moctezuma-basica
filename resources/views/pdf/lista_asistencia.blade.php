@@ -640,7 +640,7 @@
 <body>
     <div class="pagina">
         @if ($marcaAgua)
-            <img src="{{ $marcaAgua }}" class="marca-agua" alt="">
+            {{-- <img src="{{ $marcaAgua }}" class="marca-agua" alt=""> --}}
         @endif
 
         <div class="contenido">

@@ -375,7 +375,7 @@
 
         <div class="hoja">
             @if ($logoNivel)
-                <img class="marca" src="{{ $logoNivel }}">
+                {{-- <img class="marca" src="{{ $logoNivel }}"> --}}
             @endif
 
             <table class="encabezado">
@@ -417,7 +417,9 @@
                 </tr>
                 <tr>
                     <td class="label">CORTE</td>
-                    <td class="valor" colspan="3">{{ $fechaCorte ?? optional($bloque['fecha_corte'] ?? null)->locale('es')->translatedFormat('d \d\e F \d\e Y') }}</td>
+                    <td class="valor" colspan="3">
+                        {{ $fechaCorte ??optional($bloque['fecha_corte'] ?? null)->locale('es')->translatedFormat('d \d\e F \d\e Y') }}
+                    </td>
                 </tr>
             </table>
 
@@ -516,11 +518,14 @@
                                 {{ $alumno->nombre }}
                                 @php
                                     $fechaAltaLista = $alumno->fecha_inicio_historica
-                                        ? \Illuminate\Support\Carbon::parse($alumno->fecha_inicio_historica)->startOfDay()
+                                        ? \Illuminate\Support\Carbon::parse(
+                                            $alumno->fecha_inicio_historica,
+                                        )->startOfDay()
                                         : null;
                                 @endphp
                                 @if ($inicioPeriodo && $fechaAltaLista && $fechaAltaLista->gt($inicioPeriodo))
-                                    <span class="alta-posterior">Aún no inscrito antes del {{ $fechaAltaLista->format('d/m/Y') }}</span>
+                                    <span class="alta-posterior">Aún no inscrito antes del
+                                        {{ $fechaAltaLista->format('d/m/Y') }}</span>
                                 @endif
                             </td>
 

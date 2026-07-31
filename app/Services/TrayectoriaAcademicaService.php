@@ -363,7 +363,7 @@ class TrayectoriaAcademicaService
 
             $reingreso = $this->clonarEtapa($origen, [
                 'activo' => true,
-                'estatus' => 'reingreso',
+                'estatus' => 'activo',
                 'fecha_baja' => null,
                 'motivo_baja' => null,
                 'observaciones_baja' => null,
@@ -387,6 +387,12 @@ class TrayectoriaAcademicaService
                     'semestre_id' => $reingreso->semestre_id,
                     'ciclo_id' => $reingreso->ciclo_id,
                     'activo' => true,
+                    'estatus' => 'activo',
+                    'fecha_estatus' => $fecha,
+                    'motivo_estatus' => $motivo ?: 'Reingreso formal del alumno.',
+                    'indicador_reingreso' => true,
+                    'tipo_ultimo_ingreso' => 'reingreso',
+                    'fecha_ultimo_ingreso' => $fecha,
                     'fecha_baja' => null,
                     'motivo_baja' => null,
                     'observaciones_baja' => null,

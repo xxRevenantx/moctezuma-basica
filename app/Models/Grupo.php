@@ -91,6 +91,14 @@ class Grupo extends Model
         return $this->hasMany(Inscripcion::class);
     }
 
+    /**
+     * Historial de alumnos que pertenecieron al grupo por ciclo escolar.
+     */
+    public function inscripcionCiclos()
+    {
+        return $this->hasMany(InscripcionCiclo::class, 'grupo_id');
+    }
+
 
     public function asignacionMaterias()
     {

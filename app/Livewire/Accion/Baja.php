@@ -64,6 +64,7 @@ class Baja extends Component
 
         $this->fecha_movimiento = now()->toDateString();
         $this->fecha_reingreso = now()->toDateString();
+        $this->search = trim((string) request('buscar', ''));
     }
 
     public function updated(string $property): void
@@ -188,13 +189,16 @@ class Baja extends Component
 
         $actualizado = app(GestionAcademicaService::class)->cambiarEstatus(
             $alumno,
-            'reingreso',
+            'activo',
             trim($datos['motivo_reingreso']),
             auth()->id(),
             $datos['fecha_reingreso']
         );
 
         $actualizado->forceFill([
+            'indicador_reingreso' => true,
+            'tipo_ultimo_ingreso' => 'reingreso',
+            'fecha_ultimo_ingreso' => $datos['fecha_reingreso'],
             'observaciones_baja' => null,
         ])->save();
 

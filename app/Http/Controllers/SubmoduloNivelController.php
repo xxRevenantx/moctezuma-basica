@@ -12,6 +12,7 @@ class SubmoduloNivelController extends Controller
     {
         // Una sola consulta obtiene el catálogo y también valida la acción actual.
         $acciones = Accion::query()
+            ->orderBy('orden')
             ->orderBy('id')
             ->get();
 
