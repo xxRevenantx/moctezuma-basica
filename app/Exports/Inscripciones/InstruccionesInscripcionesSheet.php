@@ -17,8 +17,8 @@ class InstruccionesInscripcionesSheet implements FromArray, ShouldAutoSize, With
     {
         return [
             ['Campo', 'Regla'],
-            ['curp', 'Obligatorio. Máximo 18 caracteres.'],
-            ['matricula', 'Obligatorio. Si ya existe, solo se actualiza si conserva el mismo grupo.'],
+            ['curp', 'Obligatorio. CURP mexicana válida de 18 caracteres. Los identificadores históricos no estándar solo pueden actualizarse si ya existen; no se permiten nuevos valores ficticios.'],
+            ['matricula', 'Obligatorio. CURP y matrícula deben identificar al mismo alumno. Si ya existe, solo se actualiza si conserva el mismo grupo.'],
             ['folio', 'Opcional.'],
             ['nombre', 'Obligatorio.'],
             ['apellido_paterno', 'Obligatorio.'],

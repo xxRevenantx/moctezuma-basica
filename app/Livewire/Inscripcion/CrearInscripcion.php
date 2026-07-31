@@ -15,11 +15,13 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\AsignacionEscolarService;
+use App\Services\CurpLocalLookupService;
 use App\Services\CurpService;
 use App\Services\GestionAcademicaService;
 use App\Services\ImagenPersonalService;
 use App\Services\MatriculaAlumnoService;
 use App\Services\ObservacionInscripcionService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -28,7 +30,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\Validators\ValidationException;
+use Maatwebsite\Excel\Validators\ValidationException as ExcelValidationException;
 
 class CrearInscripcion extends Component
 {
@@ -39,6 +41,16 @@ class CrearInscripcion extends Component
     public ?string $curpAdvertencia = null;
     public ?string $curpSuccess = null;
     public ?string $ultimaCurpConsultada = null;
+
+    public string $curpEstado = 'inicial';
+    public string $curpMensaje = 'Escribe una CURP para comprobar si ya está registrada.';
+    public bool $curpLocalValidada = false;
+    public bool $curpExisteLocal = false;
+    public ?string $ultimaCurpValidadaLocal = null;
+    public ?array $alumnoExistente = null;
+    public array $curpDiferencias = [];
+    public ?string $direccionTutorAdvertencia = null;
+    public bool $guardandoInscripcion = false;
 
     public string $curp = '';
     public string $matricula = '';
@@ -150,9 +162,15 @@ class CrearInscripcion extends Component
             'curp' => [
                 'required',
                 'string',
-                'max:18',
+                'size:18',
                 'regex:/^[A-Z0-9]+$/',
-                Rule::unique('inscripciones', 'curp'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $resultado = app(CurpLocalLookupService::class)->validarFormato((string) $value);
+
+                    if (! $resultado['valida']) {
+                        $fail($resultado['mensaje']);
+                    }
+                },
             ],
             'matricula' => [
                 'required',
@@ -329,7 +347,7 @@ class CrearInscripcion extends Component
                 'nullable',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
-                'max:2048',
+                'max:5120',
             ],
 
             'archivoAlumnos' => [
@@ -345,9 +363,8 @@ class CrearInscripcion extends Component
     {
         return [
             'curp.required' => 'La CURP es obligatoria.',
-            'curp.max' => 'La CURP no debe tener más de 18 caracteres.',
+            'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
             'curp.regex' => 'La CURP solo debe contener letras y números.',
-            'curp.unique' => 'Ya existe una inscripción con esta CURP.',
 
             'matricula.required' => 'La matrícula es obligatoria.',
             'matricula.unique' => 'La matrícula generada ya existe.',
@@ -383,7 +400,7 @@ class CrearInscripcion extends Component
             'tutor_id.exists' => 'El tutor seleccionado no es válido.',
 
             'foto.image' => 'La foto debe ser una imagen válida.',
-            'foto.max' => 'La foto no debe exceder 2MB.',
+            'foto.max' => 'La foto no debe exceder 5MB.',
 
             'archivoAlumnos.file' => 'Selecciona un archivo válido.',
             'archivoAlumnos.mimes' => 'El archivo debe ser Excel o CSV.',
@@ -543,6 +560,13 @@ class CrearInscripcion extends Component
             return;
         }
 
+        // La matrícula se calcula únicamente después de confirmar que la CURP
+        // tiene formato válido y no existe en la base local.
+        if (! $this->curpLocalValidada || $this->curpExisteLocal || $this->curpEstado !== 'disponible') {
+            $this->matricula = '';
+            return;
+        }
+
         if (!$this->nivel_id) {
             $this->matricula = '';
             return;
@@ -580,122 +604,182 @@ class CrearInscripcion extends Component
 
     public function updatedCurp(string $value): void
     {
-        $this->curp = mb_strtoupper(trim($value));
+        $servicio = app(CurpLocalLookupService::class);
+        $this->curp = $servicio->normalizar($value);
+
+        $this->limpiarResultadoCurp(false);
+        $resultado = $servicio->validarFormato($this->curp);
+        $this->curpEstado = $resultado['estado'];
+        $this->curpMensaje = $resultado['mensaje'];
+
+        if (! $resultado['valida'] && mb_strlen($this->curp) < 16) {
+            $this->matricula = '';
+            $this->resetValidation('curp');
+            return;
+        }
+
+        // Algunos registros históricos contienen identificadores heredados de
+        // 16 o 17 caracteres. También se buscan de forma exacta para impedir
+        // que se intente crear otro alumno con el mismo identificador.
+        $this->validarCurpLocal();
+    }
+
+    public function validarCurpLocal(): void
+    {
+        $servicio = app(CurpLocalLookupService::class);
+        $this->curp = $servicio->normalizar($this->curp);
+        $resultado = $servicio->validarFormato($this->curp);
+        $longitud = mb_strlen($this->curp);
+
+        if (! $resultado['valida'] && $longitud < 16) {
+            $this->curpEstado = $resultado['estado'];
+            $this->curpMensaje = $resultado['mensaje'];
+            $this->curpLocalValidada = false;
+            return;
+        }
+
+        if ($this->ultimaCurpValidadaLocal === $this->curp && $this->curpLocalValidada) {
+            return;
+        }
+
+        $this->curpEstado = 'consultando';
+        $this->curpMensaje = 'Buscando CURP en la base de datos…';
+        $this->curpLocalValidada = false;
+
+        try {
+            $this->alumnoExistente = $servicio->buscar($this->curp);
+            $this->ultimaCurpValidadaLocal = $this->curp;
+            $this->curpExisteLocal = $this->alumnoExistente !== null;
+
+            if ($this->curpExisteLocal) {
+                $this->curpLocalValidada = true;
+                $this->curpEstado = 'encontrada';
+                $this->curpMensaje = $resultado['valida']
+                    ? 'Esta CURP ya pertenece a un alumno registrado.'
+                    : 'Este identificador histórico ya pertenece a un alumno registrado.';
+                $this->matricula = '';
+                $this->matriculaEditadaManual = false;
+                $this->addError('curp', 'El identificador ya está registrado. Utiliza la acción administrativa indicada en la tarjeta.');
+                return;
+            }
+
+            if (! $resultado['valida']) {
+                $this->curpEstado = $resultado['estado'];
+                $this->curpMensaje = $resultado['mensaje'];
+                $this->curpLocalValidada = false;
+                $this->curpExisteLocal = false;
+                $this->matricula = '';
+                return;
+            }
+
+            $this->curpLocalValidada = true;
+            $this->curpEstado = 'disponible';
+            $this->curpMensaje = 'La CURP no existe en la base de datos. Puedes consultar sus datos externos.';
+            $this->resetValidation('curp');
+            $this->refrescarMatriculaSiPosible();
+        } catch (\Throwable) {
+            $this->curpEstado = 'error';
+            $this->curpMensaje = 'No fue posible validar la CURP localmente. Intenta nuevamente.';
+            $this->curpLocalValidada = false;
+            $this->curpExisteLocal = false;
+            $this->alumnoExistente = null;
+            $this->matricula = '';
+        }
+    }
+
+    public function limpiarResultadoCurp(bool $limpiarCampo = false): void
+    {
+        if ($limpiarCampo) {
+            $this->curp = '';
+            $this->matricula = '';
+            $this->matriculaEditadaManual = false;
+        }
+
         $this->curpError = null;
         $this->curpAdvertencia = null;
         $this->curpSuccess = null;
+        $this->ultimaCurpConsultada = null;
+        $this->ultimaCurpValidadaLocal = null;
+        $this->curpLocalValidada = false;
+        $this->curpExisteLocal = false;
+        $this->alumnoExistente = null;
+        $this->curpDiferencias = [];
+        $this->resetValidation('curp');
 
-        $this->limpiarDatosCurpSiIncompleta();
-
-        if ($this->curp === '') {
-            $this->ultimaCurpConsultada = null;
-            $this->matricula = '';
-            return;
+        if ($limpiarCampo || $this->curp === '') {
+            $this->curpEstado = 'inicial';
+            $this->curpMensaje = 'Escribe una CURP para comprobar si ya está registrada.';
         }
-
-        if (!preg_match('/^[A-Z0-9]+$/', $this->curp)) {
-            $this->curpError = 'La CURP solo debe contener letras y números.';
-            $this->matricula = '';
-            return;
-        }
-
-        if (strlen($this->curp) < 18) {
-            $this->ultimaCurpConsultada = null;
-
-            $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. No se consultó en RENAPO, pero puedes continuar con la inscripción llenando los datos manualmente.';
-
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-
-            return;
-        }
-
-        if (strlen($this->curp) > 18) {
-            $this->curpError = 'La CURP no debe tener más de 18 caracteres.';
-            $this->matricula = '';
-            return;
-        }
-
-        if ($this->ultimaCurpConsultada === $this->curp) {
-            $this->refrescarMatriculaSiPosible();
-            return;
-        }
-
-        $this->consultarCurp();
     }
 
     public function consultarCurp(): void
     {
-        $this->curp = mb_strtoupper(trim($this->curp));
+        $local = app(CurpLocalLookupService::class);
+        $this->curp = $local->normalizar($this->curp);
+        $resultado = $local->validarFormato($this->curp);
+
         $this->curpError = null;
         $this->curpAdvertencia = null;
         $this->curpSuccess = null;
 
-        if ($this->curp === '') {
-            $this->curpError = 'La CURP es obligatoria.';
-            $this->matricula = '';
+        if (! $resultado['valida']) {
+            $this->curpEstado = $resultado['estado'];
+            $this->curpMensaje = $resultado['mensaje'];
             return;
         }
 
-        if (!preg_match('/^[A-Z0-9]+$/', $this->curp)) {
-            $this->curpError = 'La CURP solo debe contener letras y números.';
-            $this->matricula = '';
+        if (! $this->curpLocalValidada || $this->ultimaCurpValidadaLocal !== $this->curp) {
+            $this->validarCurpLocal();
+        }
+
+        if (! $this->curpLocalValidada || $this->curpExisteLocal) {
+            $this->curpAdvertencia = $this->curpExisteLocal
+                ? 'La consulta externa fue bloqueada porque la CURP ya existe localmente.'
+                : 'Espera a que termine la validación local antes de consultar el servicio externo.';
             return;
         }
 
-        if (strlen($this->curp) < 18) {
-            $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. No se consultó en RENAPO, pero puedes continuar con la inscripción llenando los datos manualmente.';
-
-            $this->ultimaCurpConsultada = null;
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-
-            return;
-        }
-
-        if (strlen($this->curp) > 18) {
-            $this->curpError = 'La CURP no debe tener más de 18 caracteres.';
-            $this->matricula = '';
+        if ($this->ultimaCurpConsultada === $this->curp && $this->curpSuccess) {
             return;
         }
 
         $this->ultimaCurpConsultada = $this->curp;
         $this->consultandoCurp = true;
 
-        /** @var CurpService $curpService */
-        $curpService = app(CurpService::class);
-
         try {
-            $payload = $curpService->obtenerDatosPorCurp($this->curp);
-        } catch (\Throwable $e) {
+            $payload = app(CurpService::class)->obtenerDatosPorCurp($this->curp);
+        } catch (\Throwable) {
+            $payload = [
+                'error' => true,
+                'message' => 'No se pudo consultar el servicio externo.',
+                'tipo_error' => 'inesperado',
+            ];
+        } finally {
             $this->consultandoCurp = false;
-
-            $this->curpAdvertencia = 'No se pudo consultar la CURP en RENAPO. Puedes continuar con la inscripción llenando los datos manualmente.';
-
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-
-            return;
         }
-
-        $this->consultandoCurp = false;
 
         if (($payload['error'] ?? true) === true) {
-            $this->curpAdvertencia = 'La CURP no existe en RENAPO o no se pudieron obtener sus datos. Puedes continuar con la inscripción llenando los datos manualmente.';
-
-            $this->refrescarMatriculaSiPosible();
-            $this->resetValidation('curp');
-
+            $this->curpAdvertencia = (string) ($payload['message']
+                ?? 'No se pudieron obtener los datos. Puedes continuar capturándolos manualmente.');
             return;
         }
 
-        $this->llenarDatosDesdePayloadCurp($payload);
+        $datosAntes = [
+            'nombre' => $this->nombre,
+            'apellido_paterno' => $this->apellido_paterno,
+            'apellido_materno' => $this->apellido_materno,
+            'fecha_nacimiento' => $this->fecha_nacimiento,
+            'genero' => $this->genero,
+        ];
 
+        $this->llenarDatosDesdePayloadCurp($payload);
         $this->sanitizeStrings();
         $this->refrescarMatriculaSiPosible();
 
-        $this->curpSuccess = 'La CURP se cargó correctamente y se encuentra registrada en RENAPO.';
-        $this->dispatch('ocultar-curp-success');
+        $habiaDatosCapturados = collect($datosAntes)->filter(fn ($valor) => filled($valor))->isNotEmpty();
+        $this->curpSuccess = $habiaDatosCapturados
+            ? 'Se obtuvieron datos externos. Revisa cualquier diferencia antes de guardar.'
+            : 'Los datos externos se cargaron correctamente.';
 
         $this->resetValidation([
             'curp',
@@ -716,71 +800,78 @@ class CrearInscripcion extends Component
         $this->curpSuccess = null;
     }
 
-    protected function limpiarDatosCurpSiIncompleta(): void
-    {
-        if (strlen($this->curp) === 18) {
-            return;
-        }
-
-        $this->curpError = null;
-    }
-
     protected function llenarDatosDesdePayloadCurp(array $payload): void
     {
         $datos = $payload['datos'] ?? null;
 
-        if (is_array($datos)) {
-            $this->nombre = $this->titleCaseNombre($datos['nombre'] ?? $this->nombre);
-            $this->apellido_paterno = $this->titleCaseNombre($datos['apellido_paterno'] ?? $this->apellido_paterno);
+        if (! is_array($datos)) {
+            $solicitante = data_get($payload, 'response.Solicitante');
 
-            $apellidoMaterno = $datos['apellido_materno'] ?? null;
-            $this->apellido_materno = $apellidoMaterno ? $this->titleCaseNombre($apellidoMaterno) : null;
-
-            if (!empty($datos['fecha_nacimiento'])) {
-                $this->fecha_nacimiento = $datos['fecha_nacimiento'];
+            if (! is_array($solicitante)) {
+                $this->curpAdvertencia = 'No se pudieron obtener los datos de la CURP. Puedes continuar llenando los datos manualmente.';
+                return;
             }
 
-            $genero = mb_strtoupper((string) ($datos['genero'] ?? $datos['clave_sexo'] ?? ''));
+            $datos = [
+                'nombre' => data_get($solicitante, 'Nombres'),
+                'apellido_paterno' => data_get($solicitante, 'ApellidoPaterno'),
+                'apellido_materno' => data_get($solicitante, 'ApellidoMaterno'),
+                'fecha_nacimiento' => data_get($solicitante, 'FechaNacimiento'),
+                'genero' => data_get($solicitante, 'ClaveSexo'),
+                'pais_nacimiento' => data_get($solicitante, 'Nacionalidad'),
+                'estado_nacimiento' => data_get($solicitante, 'EntidadNacimiento'),
+                'lugar_nacimiento' => data_get($solicitante, 'EntidadNacimiento'),
+            ];
+        }
 
-            if (in_array($genero, ['H', 'M'], true)) {
-                $this->genero = $genero;
+        $this->curpDiferencias = [];
+
+        $campos = [
+            'nombre' => 'Nombre(s)',
+            'apellido_paterno' => 'Apellido paterno',
+            'apellido_materno' => 'Apellido materno',
+            'fecha_nacimiento' => 'Fecha de nacimiento',
+            'genero' => 'Género',
+            'pais_nacimiento' => 'País de nacimiento',
+            'estado_nacimiento' => 'Estado de nacimiento',
+            'lugar_nacimiento' => 'Lugar de nacimiento',
+        ];
+
+        foreach ($campos as $campo => $etiqueta) {
+            $nuevo = $datos[$campo] ?? null;
+
+            if (blank($nuevo)) {
+                continue;
             }
 
-            $this->pais_nacimiento = $datos['pais_nacimiento'] ?? $this->pais_nacimiento;
-            $this->estado_nacimiento = $datos['estado_nacimiento'] ?? $this->estado_nacimiento;
-            $this->lugar_nacimiento = $datos['lugar_nacimiento'] ?? $this->lugar_nacimiento;
+            $nuevo = match ($campo) {
+                'nombre', 'apellido_paterno', 'apellido_materno' => $this->titleCaseNombre((string) $nuevo),
+                'genero' => mb_strtoupper(trim((string) $nuevo)),
+                default => trim((string) $nuevo),
+            };
 
-            return;
+            if ($campo === 'genero' && ! in_array($nuevo, ['H', 'M'], true)) {
+                continue;
+            }
+
+            $actual = $this->{$campo};
+
+            if (blank($actual)) {
+                $this->{$campo} = $nuevo;
+                continue;
+            }
+
+            $actualComparar = mb_strtoupper(trim((string) $actual));
+            $nuevoComparar = mb_strtoupper(trim((string) $nuevo));
+
+            if ($actualComparar !== $nuevoComparar) {
+                $this->curpDiferencias[] = [
+                    'campo' => $etiqueta,
+                    'capturado' => (string) $actual,
+                    'servicio' => (string) $nuevo,
+                ];
+            }
         }
-
-        $solicitante = data_get($payload, 'response.Solicitante');
-
-        if (!$solicitante || !is_array($solicitante)) {
-            $this->curpAdvertencia = 'No se pudieron obtener los datos de la CURP. Puedes continuar llenando los datos manualmente.';
-            return;
-        }
-
-        $this->nombre = $this->titleCaseNombre((string) data_get($solicitante, 'Nombres', $this->nombre));
-        $this->apellido_paterno = $this->titleCaseNombre((string) data_get($solicitante, 'ApellidoPaterno', $this->apellido_paterno));
-
-        $apellidoMaterno = data_get($solicitante, 'ApellidoMaterno');
-        $this->apellido_materno = $apellidoMaterno ? $this->titleCaseNombre((string) $apellidoMaterno) : null;
-
-        $fechaApi = data_get($solicitante, 'FechaNacimiento');
-
-        if (!empty($fechaApi)) {
-            $this->fecha_nacimiento = $fechaApi;
-        }
-
-        $sexo = mb_strtoupper((string) data_get($solicitante, 'ClaveSexo', ''));
-
-        if (in_array($sexo, ['H', 'M'], true)) {
-            $this->genero = $sexo;
-        }
-
-        $this->pais_nacimiento = data_get($solicitante, 'Nacionalidad') ?: $this->pais_nacimiento;
-        $this->estado_nacimiento = data_get($solicitante, 'EntidadNacimiento') ?: $this->estado_nacimiento;
-        $this->lugar_nacimiento = data_get($solicitante, 'EntidadNacimiento') ?: $this->lugar_nacimiento;
     }
 
     protected function loadTutores(): Collection
@@ -806,23 +897,46 @@ class CrearInscripcion extends Component
 
     protected function llenarDireccionDesdeTutor(): void
     {
-        if (!$this->tutor_id) {
+        if (! $this->tutor_id) {
             return;
         }
 
         $tutor = Tutor::query()->find($this->tutor_id);
 
-        if (!$tutor) {
+        if (! $tutor) {
             return;
         }
 
-        $this->calle = $tutor->calle ?: $this->calle;
-        $this->numero_exterior = $tutor->numero ?: $this->numero_exterior;
-        $this->colonia = $tutor->colonia ?: $this->colonia;
-        $this->codigo_postal = $tutor->codigo_postal ?: $this->codigo_postal;
-        $this->municipio = $tutor->municipio ?: $this->municipio;
-        $this->estado_residencia = $tutor->estado ?: $this->estado_residencia;
-        $this->ciudad_residencia = $tutor->ciudad ?: $this->ciudad_residencia;
+        $mapeo = [
+            'calle' => $tutor->calle,
+            'numero_exterior' => $tutor->numero,
+            'colonia' => $tutor->colonia,
+            'codigo_postal' => $tutor->codigo_postal,
+            'municipio' => $tutor->municipio,
+            'estado_residencia' => $tutor->estado,
+            'ciudad_residencia' => $tutor->ciudad,
+        ];
+
+        $conflictos = 0;
+
+        foreach ($mapeo as $campo => $valorTutor) {
+            if (blank($valorTutor)) {
+                continue;
+            }
+
+            if (blank($this->{$campo})) {
+                $this->{$campo} = $valorTutor;
+                continue;
+            }
+
+            if (mb_strtoupper(trim((string) $this->{$campo})) !== mb_strtoupper(trim((string) $valorTutor))) {
+                $conflictos++;
+            }
+        }
+
+        $this->direccionTutorAdvertencia = $conflictos > 0
+            ? "Se conservaron {$conflictos} datos de domicilio ya capturados; no se sobrescribieron con la dirección del tutor."
+            : null;
 
         $this->sanitizeStrings();
     }
@@ -833,6 +947,7 @@ class CrearInscripcion extends Component
 
         if (!$this->tutor_id) {
             $this->copiar_direccion_tutor = false;
+            $this->direccionTutorAdvertencia = null;
             return;
         }
 
@@ -844,6 +959,10 @@ class CrearInscripcion extends Component
     public function updatedCopiarDireccionTutor($value): void
     {
         $this->copiar_direccion_tutor = (bool) $value;
+
+        if (! $this->copiar_direccion_tutor) {
+            $this->direccionTutorAdvertencia = null;
+        }
 
         if ($this->copiar_direccion_tutor && $this->tutor_id) {
             $this->llenarDireccionDesdeTutor();
@@ -1218,11 +1337,32 @@ class CrearInscripcion extends Component
         \App\Services\HistorialCicloEscolarService $historialCiclos,
     ): void
     {
+        if ($this->guardandoInscripcion) {
+            return;
+        }
+
+        $this->guardandoInscripcion = true;
         $this->sanitizeStrings();
         $this->observaciones = $observacionesService->sanitizar($this->observaciones);
 
-        if ($this->curp !== '' && strlen($this->curp) < 18) {
-            $this->curpAdvertencia = 'La CURP tiene menos de 18 caracteres. La inscripción se guardará con datos capturados manualmente.';
+        $resultadoCurp = app(CurpLocalLookupService::class)->validarFormato($this->curp);
+
+        if (! $resultadoCurp['valida']) {
+            $this->guardandoInscripcion = false;
+            $this->addError('curp', $resultadoCurp['mensaje']);
+            $this->dispatch('inscripcion-ir-paso', paso: 1);
+            return;
+        }
+
+        $this->validarCurpLocal();
+
+        if (! $this->curpLocalValidada || $this->curpExisteLocal) {
+            $this->guardandoInscripcion = false;
+            $this->addError('curp', $this->curpExisteLocal
+                ? 'La CURP ya está registrada. No se creó una inscripción duplicada.'
+                : 'No fue posible confirmar la CURP en la base local.');
+            $this->dispatch('inscripcion-ir-paso', paso: 1);
+            return;
         }
 
         if (!$this->matriculaEditadaManual || trim($this->matricula) === '') {
@@ -1230,113 +1370,190 @@ class CrearInscripcion extends Component
         }
 
         $this->normalizarTipoIngresoPorCiclo();
-        $data = $this->validate();
+
+        try {
+            $data = $this->validate();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->guardandoInscripcion = false;
+            $this->dispatch('inscripcion-ir-primer-error', campos: array_keys($exception->errors()));
+            throw $exception;
+        }
 
         if ($data['tipo_ingreso'] === 'captura_historica') {
             abort_unless(auth()->user()?->canAccess('academico.editar'), 403);
         }
 
         if (!$this->validarRelacionAcademica($data)) {
+            $this->guardandoInscripcion = false;
+            $this->dispatch('inscripcion-ir-paso', paso: 2);
             return;
         }
 
         $fotoPath = null;
 
-        if ($this->foto) {
-            $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
+        try {
+            if ($this->foto) {
+                $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
+            }
+
+            DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $historialCiclos) {
+                $curpDuplicada = Inscripcion::withTrashed()
+                    ->where('curp', $data['curp'])
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($curpDuplicada) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'curp' => 'La CURP fue registrada por otro usuario antes de guardar. Recarga el formulario.',
+                    ]);
+                }
+
+                $matriculaDuplicada = Inscripcion::withTrashed()
+                    ->where('matricula', $data['matricula'])
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($matriculaDuplicada) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'matricula' => 'La matrícula ya fue utilizada. Genera una nueva e intenta nuevamente.',
+                    ]);
+                }
+
+                $inscripcion = Inscripcion::query()->create([
+                    'curp' => $data['curp'],
+                    'matricula' => $data['matricula'],
+                    'folio' => $data['folio'] ?? null,
+
+                    'nombre' => $data['nombre'],
+                    'apellido_paterno' => $data['apellido_paterno'],
+                    'apellido_materno' => $data['apellido_materno'] ?? null,
+                    'fecha_nacimiento' => $data['fecha_nacimiento'],
+                    'genero' => $data['genero'],
+
+                    'fecha_inscripcion' => $data['fecha_inscripcion'],
+                    'ciclo_id' => (int) $data['ciclo_id'],
+                    'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
+
+                    'fecha_baja' => null,
+                    'motivo_baja' => null,
+                    'observaciones_baja' => null,
+
+                    'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
+                    'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
+                    'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
+
+                    'calle' => $data['calle'] ?? null,
+                    'numero_exterior' => $data['numero_exterior'] ?? null,
+                    'numero_interior' => $data['numero_interior'] ?? null,
+                    'colonia' => $data['colonia'] ?? null,
+                    'codigo_postal' => $data['codigo_postal'] ?? null,
+                    'municipio' => $data['municipio'] ?? null,
+                    'estado_residencia' => $data['estado_residencia'] ?? null,
+                    'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
+
+                    'nivel_id' => (int) $data['nivel_id'],
+                    'grado_id' => (int) $data['grado_id'],
+                    'generacion_id' => (int) $data['generacion_id'],
+                    'semestre_id' => ! empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
+                    'grupo_id' => (int) $data['grupo_id'],
+
+                    'foto_path' => $fotoPath,
+                    'tutor_id' => $data['tutor_id'] ?? null,
+                    'activo' => $data['estado_inscripcion'] === 'inscrito',
+                    'estatus' => $data['estado_inscripcion'] === 'inscrito' ? 'activo' : 'preinscrito',
+                    'motivo_estatus' => $data['tipo_ingreso'] === 'captura_historica'
+                        ? $data['motivo_captura_historica']
+                        : null,
+                    'tipo_ultimo_ingreso' => $data['tipo_ingreso'],
+                    'fecha_ultimo_ingreso' => $data['fecha_inscripcion'],
+                    'usuario_acceso_activo' => $data['estado_inscripcion'] === 'inscrito',
+                    'fecha_estatus' => $data['fecha_inscripcion'],
+                ]);
+
+                $observacionesService->guardar(
+                    inscripcion: $inscripcion,
+                    cicloEscolarId: (int) $data['ciclo_escolar_id'],
+                    contenido: $data['observaciones'] ?? null,
+                    origen: 'registro',
+                    usuarioId: auth()->id(),
+                );
+
+                if ($data['estado_inscripcion'] === 'preinscrito') {
+                    $historialCiclos->registrarPreinscripcion(
+                        $inscripcion,
+                        auth()->id(),
+                        $data['fecha_inscripcion'],
+                    );
+                }
+
+                if ($data['estado_inscripcion'] === 'inscrito') {
+                    $matriculas->asegurarVigente(
+                        $inscripcion,
+                        'inscripcion',
+                        auth()->id(),
+                        $data['fecha_inscripcion'],
+                    );
+
+                    $gestionAcademica->registrarInscripcionInicial(
+                        $inscripcion,
+                        'Inscripción activa registrada en el ciclo ' . (string) $data['ciclo_escolar_id'] . '.',
+                        auth()->id(),
+                        $data['fecha_inscripcion'],
+                    );
+                }
+            });
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            if ($fotoPath) {
+                $imagenes->eliminarRuta($fotoPath);
+            }
+
+            $this->guardandoInscripcion = false;
+            $this->dispatch('inscripcion-ir-primer-error', campos: array_keys($exception->errors()));
+            throw $exception;
+        } catch (QueryException $exception) {
+            if ($fotoPath) {
+                $imagenes->eliminarRuta($fotoPath);
+            }
+
+            $this->guardandoInscripcion = false;
+
+            if ($this->esViolacionDeUnicidad($exception)) {
+                $campo = str_contains(mb_strtolower($exception->getMessage()), 'curp')
+                    ? 'curp'
+                    : 'matricula';
+
+                $this->addError(
+                    $campo,
+                    $campo === 'curp'
+                        ? 'La CURP fue registrada por otro usuario antes de guardar. No se creó un duplicado.'
+                        : 'La matrícula fue utilizada por otro usuario antes de guardar. Genera una nueva e intenta otra vez.'
+                );
+                $this->dispatch('inscripcion-ir-paso', paso: 1);
+                return;
+            }
+
+            report($exception);
+            $this->addError('formulario', 'No fue posible guardar la inscripción. No se realizaron cambios parciales.');
+            return;
+        } catch (\Throwable $exception) {
+            if ($fotoPath) {
+                $imagenes->eliminarRuta($fotoPath);
+            }
+
+            $this->guardandoInscripcion = false;
+            report($exception);
+            $this->addError('formulario', 'No fue posible guardar la inscripción. No se realizaron cambios parciales.');
+            return;
         }
 
-        DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $historialCiclos) {
-            $inscripcion = Inscripcion::query()->create([
-                'curp' => $data['curp'],
-                'matricula' => $data['matricula'],
-                'folio' => $data['folio'] ?? null,
-
-                'nombre' => $data['nombre'],
-                'apellido_paterno' => $data['apellido_paterno'],
-                'apellido_materno' => $data['apellido_materno'] ?? null,
-                'fecha_nacimiento' => $data['fecha_nacimiento'],
-                'genero' => $data['genero'],
-
-                'fecha_inscripcion' => $data['fecha_inscripcion'],
-                'ciclo_id' => (int) $data['ciclo_id'],
-                'ciclo_escolar_id' => (int) $data['ciclo_escolar_id'],
-
-                'fecha_baja' => null,
-                'motivo_baja' => null,
-                'observaciones_baja' => null,
-
-                'pais_nacimiento' => $data['pais_nacimiento'] ?? null,
-                'estado_nacimiento' => $data['estado_nacimiento'] ?? null,
-                'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
-
-                'calle' => $data['calle'] ?? null,
-                'numero_exterior' => $data['numero_exterior'] ?? null,
-                'numero_interior' => $data['numero_interior'] ?? null,
-                'colonia' => $data['colonia'] ?? null,
-                'codigo_postal' => $data['codigo_postal'] ?? null,
-                'municipio' => $data['municipio'] ?? null,
-                'estado_residencia' => $data['estado_residencia'] ?? null,
-                'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
-
-                'nivel_id' => (int) $data['nivel_id'],
-                'grado_id' => (int) $data['grado_id'],
-                'generacion_id' => (int) $data['generacion_id'],
-                'semestre_id' => !empty($data['semestre_id']) ? (int) $data['semestre_id'] : null,
-                'grupo_id' => (int) $data['grupo_id'],
-
-                'foto_path' => $fotoPath,
-                'tutor_id' => $data['tutor_id'] ?? null,
-                'activo' => $data['estado_inscripcion'] === 'inscrito',
-                'estatus' => $data['estado_inscripcion'] === 'inscrito' ? 'activo' : 'preinscrito',
-                'motivo_estatus' => $data['tipo_ingreso'] === 'captura_historica'
-                    ? $data['motivo_captura_historica']
-                    : null,
-                'tipo_ultimo_ingreso' => $data['tipo_ingreso'],
-                'fecha_ultimo_ingreso' => $data['fecha_inscripcion'],
-                'usuario_acceso_activo' => $data['estado_inscripcion'] === 'inscrito',
-                'fecha_estatus' => $data['fecha_inscripcion'],
-            ]);
-
-            $observacionesService->guardar(
-                inscripcion: $inscripcion,
-                cicloEscolarId: (int) $data['ciclo_escolar_id'],
-                contenido: $data['observaciones'] ?? null,
-                origen: 'registro',
-                usuarioId: auth()->id(),
-            );
-
-
-            if ($data['estado_inscripcion'] === 'preinscrito') {
-                $historialCiclos->registrarPreinscripcion(
-                    $inscripcion,
-                    auth()->id(),
-                    $data['fecha_inscripcion'],
-                );
-            }
-
-            if ($data['estado_inscripcion'] === 'inscrito') {
-                $matriculas->asegurarVigente(
-                    $inscripcion,
-                    'inscripcion',
-                    auth()->id(),
-                    $data['fecha_inscripcion'],
-                );
-
-                $gestionAcademica->registrarInscripcionInicial(
-                    $inscripcion,
-                    'Inscripción activa registrada en el ciclo ' . (string) $data['ciclo_escolar_id'] . '.',
-                    auth()->id(),
-                    $data['fecha_inscripcion'],
-                );
-            }
-        });
-
+        $this->guardandoInscripcion = false;
         $this->dispatch('swal', [
-            'title' => '¡Creado correctamente!',
+            'title' => '¡Inscripción creada correctamente!',
+            'text' => $data['matricula'] . ' · ' . $data['nombre'] . ' ' . $data['apellido_paterno'],
             'icon' => 'success',
             'position' => 'top-end',
         ]);
+        $this->dispatch('inscripcion-guardada');
 
         $this->cancelar(true);
         $this->dispatch('refreshInscripciones');
@@ -1397,7 +1614,7 @@ class CrearInscripcion extends Component
             ]);
 
             $this->dispatch('refreshInscripciones');
-        } catch (ValidationException $e) {
+        } catch (ExcelValidationException $e) {
             $errores = [];
 
             foreach ($e->failures() as $failure) {
@@ -1411,8 +1628,13 @@ class CrearInscripcion extends Component
 
             $this->erroresImportacionAlumnos = $errores;
             $this->errorImportacionAlumnos = 'El archivo contiene errores. Revisa las filas marcadas.';
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->errorImportacionAlumnos = collect($e->errors())
+                ->flatten()
+                ->first() ?: 'La importación contiene una identidad duplicada o incompatible.';
         } catch (\Throwable $e) {
-            $this->errorImportacionAlumnos = 'No se pudo importar el archivo: ' . $e->getMessage();
+            report($e);
+            $this->errorImportacionAlumnos = 'No se pudo importar el archivo. No se realizaron cambios parciales.';
         }
     }
 
@@ -1532,6 +1754,15 @@ class CrearInscripcion extends Component
             'curpAdvertencia',
             'curpSuccess',
             'ultimaCurpConsultada',
+            'curpEstado',
+            'curpMensaje',
+            'curpLocalValidada',
+            'curpExisteLocal',
+            'ultimaCurpValidadaLocal',
+            'alumnoExistente',
+            'curpDiferencias',
+            'direccionTutorAdvertencia',
+            'guardandoInscripcion',
 
             'archivoAlumnos',
             'erroresImportacionAlumnos',
@@ -1592,8 +1823,83 @@ class CrearInscripcion extends Component
         $this->dispatch('reset-observaciones-editor', editor: 'observaciones-inscripcion-crear', contenido: '');
     }
 
+    private function camposObligatoriosPendientes(): array
+    {
+        $campos = [
+            'curp' => $this->curpLocalValidada && ! $this->curpExisteLocal,
+            'matricula' => filled($this->matricula),
+            'nombre' => filled($this->nombre),
+            'apellido_paterno' => filled($this->apellido_paterno),
+            'fecha_nacimiento' => filled($this->fecha_nacimiento),
+            'genero' => filled($this->genero),
+            'fecha_inscripcion' => filled($this->fecha_inscripcion),
+            'ciclo_escolar_id' => filled($this->ciclo_escolar_id),
+            'ciclo_id' => filled($this->ciclo_id),
+            'tipo_ingreso' => filled($this->tipo_ingreso),
+            'estado_inscripcion' => filled($this->estado_inscripcion),
+            'motivo_captura_historica' => $this->tipo_ingreso !== 'captura_historica'
+                || mb_strlen(trim((string) $this->motivo_captura_historica)) >= 10,
+            'nivel_id' => filled($this->nivel_id),
+            'ubicacion' => $this->esBachillerato ? filled($this->semestre_id) : filled($this->grado_id),
+            'generacion_id' => filled($this->generacion_id),
+            'grupo_id' => filled($this->grupo_id),
+        ];
+
+        return array_keys(array_filter($campos, fn (bool $completo) => ! $completo));
+    }
+
+    private function resumenInscripcion(): array
+    {
+        $nivel = $this->nivel_id ? $this->niveles->firstWhere('id', $this->nivel_id) : null;
+        $grado = $this->grado_id ? $this->gradosOptions->firstWhere('id', $this->grado_id) : null;
+        $semestre = $this->semestre_id ? $this->semestresOptions->firstWhere('id', $this->semestre_id) : null;
+        $generacion = $this->generacion_id ? $this->generacionesOptions->firstWhere('id', $this->generacion_id) : null;
+        $grupoSeleccionado = collect($this->gruposOptions)->firstWhere('id', $this->grupo_id);
+        $ciclo = $this->ciclo_escolar_id
+            ? $this->cicloEscolaresOptions->firstWhere('id', $this->ciclo_escolar_id)
+            : null;
+        $pendientes = $this->camposObligatoriosPendientes();
+
+        return [
+            'nombre' => trim(implode(' ', array_filter([$this->nombre, $this->apellido_paterno, $this->apellido_materno]))) ?: 'Alumno sin nombre',
+            'curp' => $this->curp ?: 'Sin CURP',
+            'matricula' => $this->matricula ?: 'Pendiente',
+            'ciclo' => $ciclo ? $ciclo->inicio_anio . '-' . $ciclo->fin_anio : 'Pendiente',
+            'nivel' => $nivel?->nombre ?: 'Pendiente',
+            'ubicacion' => $semestre ? $semestre->numero . '° semestre' : ($grado?->nombre ?: 'Pendiente'),
+            'generacion' => $generacion?->etiqueta ?: 'Pendiente',
+            'grupo' => data_get($grupoSeleccionado, 'label')
+                ?: data_get($grupoSeleccionado, 'clave')
+                ?: 'Pendiente',
+            'estado' => $this->estado_inscripcion === 'preinscrito' ? 'Preinscrito' : 'Inscrito y activo',
+            'pendientes' => count($pendientes),
+            'listo' => count($pendientes) === 0 && $this->curpEstado === 'disponible' && ! $this->curpExisteLocal,
+        ];
+    }
+
+    private function esViolacionDeUnicidad(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return in_array($sqlState, ['23000', '23505'], true)
+            || in_array($driverCode, [1062, 1555, 2067], true);
+    }
+
+    private function textoBotonGuardar(): string
+    {
+        return match (true) {
+            $this->estado_inscripcion === 'preinscrito' => 'Guardar como preinscrito',
+            $this->tipo_ingreso === 'captura_historica' => 'Registrar captura histórica',
+            $this->tipo_ingreso === 'traslado' => 'Registrar ingreso por traslado',
+            default => 'Registrar alumno e inscripción',
+        };
+    }
+
     public function render()
     {
+        $resumen = $this->resumenInscripcion();
+
         return view('livewire.inscripcion.crear-inscripcion', [
             'niveles' => $this->niveles,
             'grados' => $this->gradosOptions,
@@ -1604,6 +1910,12 @@ class CrearInscripcion extends Component
             'ciclos' => $this->ciclosOptions,
             'cicloEscolares' => $this->cicloEscolaresOptions,
             'tutores' => $this->tutores,
+            'resumenInscripcion' => $resumen,
+            'puedeConsultarCurpExterna' => $this->curpLocalValidada
+                && ! $this->curpExisteLocal
+                && $this->curpEstado === 'disponible'
+                && ! $this->consultandoCurp,
+            'textoBotonGuardar' => $this->textoBotonGuardar(),
         ]);
     }
 }

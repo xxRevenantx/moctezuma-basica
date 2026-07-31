@@ -2,55 +2,40 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class CurpService
 {
-    protected string $baseUrl = 'https://api.valida-curp.com.mx/curp/obtener_datos/';
-
-    // protected string $token = 'pruebas';
-
-    protected string $token = '8d51c37a-87b1-40c9-8ae6-7b5651406d1f';
-
-    /**
-     * Detecta si se está usando el modo de pruebas.
-     */
     public function esModoPruebas(): bool
     {
-        return $this->token === 'pruebas';
+        return (string) config('curp.token') === 'pruebas';
+    }
+
+    public function estaConfigurado(): bool
+    {
+        return filled(config('curp.token'));
     }
 
     /**
-     * Consulta los datos por CURP.
+     * Consulta datos externos de una CURP. Este método nunca decide si debe
+     * consultarse: el componente debe comprobar primero la base local.
      *
-     * Se regresa una estructura compatible con tu componente:
-     * - error
-     * - message
-     * - response.Solicitante
-     * - datos
+     * @return array<string, mixed>
      */
     public function obtenerDatosPorCurp(string $curp): array
     {
         $curp = mb_strtoupper(trim($curp));
 
-        // dd($curp);
-
-        if (mb_strlen($curp) !== 18) {
-            return [
-                'error' => true,
-                'message' => 'La CURP debe tener 18 caracteres.',
-                'response' => null,
-                'datos' => null,
-            ];
+        if (mb_strlen($curp) !== 18 || ! preg_match('/^[A-Z0-9]{18}$/', $curp)) {
+            return $this->respuestaError('Formato de CURP inválido.', 'formato');
         }
 
-        if (!preg_match('/^[A-Z0-9]{18}$/', $curp)) {
-            return [
-                'error' => true,
-                'message' => 'Formato de CURP inválido.',
-                'response' => null,
-                'datos' => null,
-            ];
+        if (! $this->estaConfigurado()) {
+            return $this->respuestaError(
+                'El servicio externo de CURP no está configurado. Captura los datos manualmente o configura CURP_API_TOKEN.',
+                'configuracion'
+            );
         }
 
         if ($this->esModoPruebas()) {
@@ -59,62 +44,46 @@ class CurpService
 
         try {
             $response = Http::acceptJson()
-                ->timeout(15)
-                ->get($this->baseUrl, [
-                    'token' => $this->token,
+                ->connectTimeout((int) config('curp.connect_timeout', 5))
+                ->timeout((int) config('curp.timeout', 15))
+                ->retry(2, 250, throw: false)
+                ->get((string) config('curp.base_url'), [
+                    'token' => (string) config('curp.token'),
                     'curp' => $curp,
                 ]);
 
-            if (!$response->successful()) {
-                return [
-                    'error' => true,
-                    'message' => 'No se pudo consultar la CURP. Intenta nuevamente.',
-                    'status' => $response->status(),
-                    'response' => null,
-                    'datos' => null,
-                ];
+            if (! $response->successful()) {
+                return $this->respuestaError(
+                    'No se pudo consultar la CURP. Intenta nuevamente.',
+                    'proveedor',
+                    $response->status()
+                );
             }
 
             return $this->normalizarRespuesta($response->json() ?? []);
-
-        } catch (\Throwable $e) {
-            return [
-                'error' => true,
-                'message' => 'Error de conexión al consultar la CURP.',
-                'exception' => $e->getMessage(),
-                'response' => null,
-                'datos' => null,
-            ];
+        } catch (ConnectionException) {
+            return $this->respuestaError('Error de conexión al consultar la CURP.', 'conexion');
+        } catch (\Throwable) {
+            return $this->respuestaError('Ocurrió un error al consultar la CURP.', 'inesperado');
         }
     }
 
-    /**
-     * Normaliza la respuesta para que siempre tenga la misma estructura.
-     */
+    /** @return array<string, mixed> */
     protected function normalizarRespuesta(array $respuesta): array
     {
         if (($respuesta['error'] ?? true) === true) {
-            return [
-                'error' => true,
-                'message' => $respuesta['error_message']
+            return $this->respuestaError(
+                $respuesta['error_message']
                     ?? $respuesta['message']
                     ?? 'No se encontraron datos para la CURP.',
-                'response' => $respuesta['response'] ?? null,
-                'datos' => null,
-                'raw' => $respuesta,
-            ];
+                'no_encontrada'
+            );
         }
 
         $solicitante = data_get($respuesta, 'response.Solicitante');
 
-        if (!$solicitante || !is_array($solicitante)) {
-            return [
-                'error' => true,
-                'message' => 'La respuesta no contiene datos del solicitante.',
-                'response' => $respuesta['response'] ?? null,
-                'datos' => null,
-                'raw' => $respuesta,
-            ];
+        if (! is_array($solicitante)) {
+            return $this->respuestaError('La respuesta no contiene datos del solicitante.', 'respuesta_invalida');
         }
 
         $curp = trim((string) data_get($solicitante, 'CURP', ''));
@@ -123,11 +92,12 @@ class CurpService
         $apellidoMaterno = trim((string) data_get($solicitante, 'ApellidoMaterno', ''));
         $claveSexo = mb_strtoupper(trim((string) data_get($solicitante, 'ClaveSexo', '')));
         $sexo = trim((string) data_get($solicitante, 'Sexo', ''));
-        $fechaNacimiento = trim((string) data_get($solicitante, 'FechaNacimiento', ''));
+        $fechaNacimiento = $this->normalizarFechaNacimiento((string) data_get($solicitante, 'FechaNacimiento', ''));
 
         return [
             'error' => false,
             'message' => 'Datos encontrados correctamente.',
+            'tipo_error' => null,
             'response' => [
                 'Solicitante' => [
                     'CURP' => $curp,
@@ -154,13 +124,43 @@ class CurpService
                 'estado_nacimiento' => trim((string) data_get($solicitante, 'EntidadNacimiento', '')),
                 'lugar_nacimiento' => trim((string) data_get($solicitante, 'EntidadNacimiento', '')),
             ],
-            'raw' => $respuesta,
         ];
     }
 
-    /**
-     * Obtiene el sexo desde la CURP.
-     */
+
+    private function normalizarFechaNacimiento(string $fecha): string
+    {
+        $fecha = trim($fecha);
+
+        if ($fecha === '') {
+            return '';
+        }
+
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'] as $formato) {
+            $valor = \DateTimeImmutable::createFromFormat('!' . $formato, $fecha);
+            $errores = \DateTimeImmutable::getLastErrors();
+
+            if ($valor && ($errores === false || ($errores['warning_count'] === 0 && $errores['error_count'] === 0))) {
+                return $valor->format('Y-m-d');
+            }
+        }
+
+        return '';
+    }
+
+    /** @return array<string, mixed> */
+    private function respuestaError(string $mensaje, string $tipo, ?int $status = null): array
+    {
+        return [
+            'error' => true,
+            'message' => $mensaje,
+            'tipo_error' => $tipo,
+            'status' => $status,
+            'response' => null,
+            'datos' => null,
+        ];
+    }
+
     protected function obtenerSexoDeCurp(string $curp): ?string
     {
         if (mb_strlen($curp) !== 18) {
@@ -169,16 +169,9 @@ class CurpService
 
         $sexo = mb_substr($curp, 10, 1);
 
-        if (in_array($sexo, ['H', 'M'], true)) {
-            return $sexo;
-        }
-
-        return null;
+        return in_array($sexo, ['H', 'M'], true) ? $sexo : null;
     }
 
-    /**
-     * Intenta obtener la fecha de nacimiento desde la CURP.
-     */
     protected function obtenerFechaNacimientoDesdeCurp(string $curp): ?string
     {
         if (mb_strlen($curp) !== 18) {
@@ -188,73 +181,33 @@ class CurpService
         $anio = mb_substr($curp, 4, 2);
         $mes = mb_substr($curp, 6, 2);
         $dia = mb_substr($curp, 8, 2);
+        $homoclave = mb_substr($curp, 16, 1);
 
-        if (!ctype_digit($anio) || !ctype_digit($mes) || !ctype_digit($dia)) {
+        if (! ctype_digit($anio) || ! ctype_digit($mes) || ! ctype_digit($dia)) {
             return null;
         }
 
-        $anioCompleto = ((int) $anio <= 30) ? '20' . $anio : '19' . $anio;
+        $anioCompleto = (ctype_digit($homoclave) ? 1900 : 2000) + (int) $anio;
 
-        if (!checkdate((int) $mes, (int) $dia, (int) $anioCompleto)) {
+        if (! checkdate((int) $mes, (int) $dia, $anioCompleto)) {
             return null;
         }
 
-        return "{$anioCompleto}-{$mes}-{$dia}";
+        return sprintf('%04d-%02d-%02d', $anioCompleto, (int) $mes, (int) $dia);
     }
 
-    /**
-     * Genera datos falsos cuando se trabaja en modo pruebas.
-     */
+    /** @return array<string, mixed> */
     protected function fakeResponse(string $curp): array
     {
         $seed = abs(crc32($curp));
         mt_srand($seed);
 
-        $nombresHombre = [
-            'CARLOS',
-            'ALBERTO',
-            'JUAN',
-            'PEDRO',
-            'ANGEL',
-            'DANIEL',
-            'MIGUEL',
-            'JOSE',
-            'LUIS',
-            'FERNANDO',
-        ];
+        $nombresHombre = ['CARLOS', 'ALBERTO', 'JUAN', 'PEDRO', 'ANGEL', 'DANIEL', 'MIGUEL', 'JOSE', 'LUIS', 'FERNANDO'];
+        $nombresMujer = ['MARIA', 'MELISA', 'PAOLA', 'YULISA', 'KARLA', 'ANDREA', 'SOFIA', 'DANIELA', 'FERNANDA', 'VALERIA'];
+        $apellidos = ['NUNEZ', 'PEREZ', 'GARCIA', 'HERNANDEZ', 'LOPEZ', 'MARTINEZ', 'SANCHEZ', 'RAMIREZ', 'FLORES', 'TORRES'];
 
-        $nombresMujer = [
-            'MARIA',
-            'MELISA',
-            'PAOLA',
-            'YULISA',
-            'KARLA',
-            'ANDREA',
-            'SOFIA',
-            'DANIELA',
-            'FERNANDA',
-            'VALERIA',
-        ];
-
-        $apellidos = [
-            'NUNEZ',
-            'PEREZ',
-            'GARCIA',
-            'HERNANDEZ',
-            'LOPEZ',
-            'MARTINEZ',
-            'SANCHEZ',
-            'RAMIREZ',
-            'FLORES',
-            'TORRES',
-        ];
-
-        $claveSexo = $this->obtenerSexoDeCurp($curp) ?? ((mt_rand(0, 1) === 0) ? 'H' : 'M');
-
-        $listaNombres = $claveSexo === 'H'
-            ? $nombresHombre
-            : $nombresMujer;
-
+        $claveSexo = $this->obtenerSexoDeCurp($curp) ?? (mt_rand(0, 1) === 0 ? 'H' : 'M');
+        $listaNombres = $claveSexo === 'H' ? $nombresHombre : $nombresMujer;
         $nombre1 = $listaNombres[mt_rand(0, count($listaNombres) - 1)];
         $nombre2 = $listaNombres[mt_rand(0, count($listaNombres) - 1)];
 
@@ -262,24 +215,17 @@ class CurpService
             $nombre2 = $listaNombres[mt_rand(0, count($listaNombres) - 1)];
         }
 
-        $apellidoPaterno = $apellidos[mt_rand(0, count($apellidos) - 1)];
-        $apellidoMaterno = $apellidos[mt_rand(0, count($apellidos) - 1)];
-
-        $fechaNacimiento = $this->obtenerFechaNacimientoDesdeCurp($curp) ?? '2000-01-01';
-
         return [
             'error' => false,
-            'code_error' => 0,
-            'error_message' => '',
             'response' => [
                 'Solicitante' => [
                     'CURP' => $curp,
                     'Nombres' => "{$nombre1} {$nombre2}",
-                    'ApellidoPaterno' => $apellidoPaterno,
-                    'ApellidoMaterno' => $apellidoMaterno,
+                    'ApellidoPaterno' => $apellidos[mt_rand(0, count($apellidos) - 1)],
+                    'ApellidoMaterno' => $apellidos[mt_rand(0, count($apellidos) - 1)],
                     'ClaveSexo' => $claveSexo,
                     'Sexo' => $claveSexo === 'H' ? 'Hombre' : 'Mujer',
-                    'FechaNacimiento' => $fechaNacimiento,
+                    'FechaNacimiento' => $this->obtenerFechaNacimientoDesdeCurp($curp) ?? '2000-01-01',
                     'Nacionalidad' => 'MEX',
                     'ClaveEntidadNacimiento' => 'GR',
                     'EntidadNacimiento' => 'Guerrero',
