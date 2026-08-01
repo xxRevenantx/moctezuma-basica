@@ -22,16 +22,16 @@ class MostrarTutor extends Component
     public string $ordenCampo = 'id';
     public string $ordenDireccion = 'desc';
 
-    public function mount(): void
-    {
-        abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
-    }
-
     protected $queryString = [
         'buscar' => ['except' => ''],
         'estado' => ['except' => 'activos'],
         'funcion' => ['except' => 'todas'],
     ];
+
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
+    }
 
     public function updatingBuscar(): void
     {
@@ -50,7 +50,16 @@ class MostrarTutor extends Component
 
     public function ordenarPor(string $campo): void
     {
-        $permitidos = ['id', 'curp', 'nombre', 'apellido_paterno', 'telefono_celular', 'correo_electronico', 'activo', 'updated_at'];
+        $permitidos = [
+            'id',
+            'curp',
+            'nombre',
+            'apellido_paterno',
+            'telefono_celular',
+            'correo_electronico',
+            'activo',
+            'updated_at',
+        ];
 
         if (! in_array($campo, $permitidos, true)) {
             return;
@@ -69,6 +78,7 @@ class MostrarTutor extends Component
     public function archivar(int $id): void
     {
         abort_unless(auth()->user()?->canAccess('alumnos.eliminar'), 403);
+
         $tutor = Tutor::query()
             ->withCount('relacionesActivas')
             ->find($id);
@@ -85,6 +95,7 @@ class MostrarTutor extends Component
                 'icon' => 'warning',
                 'position' => 'top-end',
             ]);
+
             return;
         }
 
@@ -105,6 +116,7 @@ class MostrarTutor extends Component
     public function reactivar(int $id): void
     {
         abort_unless(auth()->user()?->canAccess('alumnos.editar'), 403);
+
         $tutor = Tutor::query()->find($id);
 
         if (! $tutor) {
@@ -142,54 +154,97 @@ class MostrarTutor extends Component
         $funcion = $this->funcion;
         $funcionesSensibles = ['tutores_legales', 'autorizados_recoger'];
 
-        if (in_array($funcion, $funcionesSensibles, true)
-            && ! auth()->user()?->canAccess('alumnos.responsables_sensibles')) {
+        if (
+            in_array($funcion, $funcionesSensibles, true)
+            && ! auth()->user()?->canAccess('alumnos.responsables_sensibles')
+        ) {
             $funcion = 'todas';
         }
 
         return Tutor::query()
+            ->with([
+                'relaciones' => fn($relacion) => $relacion
+                    ->orderByDesc('activo')
+                    ->orderByRaw('CASE WHEN fecha_fin IS NULL THEN 0 ELSE 1 END')
+                    ->orderByDesc('es_principal')
+                    ->orderBy('orden_contacto')
+                    ->orderByDesc('id'),
+                'relaciones.inscripcion' => fn($inscripcion) => $inscripcion->withTrashed(),
+                'relaciones.inscripcion.nivel:id,nombre',
+                'relaciones.inscripcion.grado:id,nombre',
+                'relaciones.inscripcion.grupo:id,clave',
+                'relaciones.inscripcion.semestre:id,numero',
+                'relaciones.inscripcion.generacion:id,nombre,anio_ingreso,anio_egreso',
+                'relaciones.inscripcion.cicloEscolar:id,inicio_anio,fin_anio',
+            ])
             ->withCount([
                 'relaciones as relaciones_total_count',
                 'relacionesActivas as relaciones_activas_count',
             ])
-            ->when($this->estado === 'activos', fn (Builder $query) => $query->where('activo', true))
-            ->when($this->estado === 'archivados', fn (Builder $query) => $query->where('activo', false))
-            ->when($this->estado === 'sin_alumnos', fn (Builder $query) => $query->doesntHave('relacionesActivas'))
-            ->when($funcion === 'principales', fn (Builder $query) => $query->whereHas(
+            ->when($this->estado === 'activos', fn(Builder $query) => $query->where('activo', true))
+            ->when($this->estado === 'archivados', fn(Builder $query) => $query->where('activo', false))
+            ->when($this->estado === 'sin_alumnos', fn(Builder $query) => $query->doesntHave('relacionesActivas'))
+            ->when($funcion === 'principales', fn(Builder $query) => $query->whereHas(
                 'relaciones',
-                fn (Builder $relacion) => $relacion->where('activo', true)->where('es_principal', true),
+                fn(Builder $relacion) => $relacion->where('activo', true)->where('es_principal', true),
             ))
-            ->when($funcion === 'tutores_legales', fn (Builder $query) => $query->whereHas(
+            ->when($funcion === 'tutores_legales', fn(Builder $query) => $query->whereHas(
                 'relaciones',
-                fn (Builder $relacion) => $relacion->where('activo', true)->where('es_tutor_legal', true),
+                fn(Builder $relacion) => $relacion->where('activo', true)->where('es_tutor_legal', true),
             ))
-            ->when($funcion === 'emergencias', fn (Builder $query) => $query->whereHas(
+            ->when($funcion === 'emergencias', fn(Builder $query) => $query->whereHas(
                 'relaciones',
-                fn (Builder $relacion) => $relacion->where('activo', true)->where('contacto_emergencia', true),
+                fn(Builder $relacion) => $relacion->where('activo', true)->where('contacto_emergencia', true),
             ))
-            ->when($funcion === 'autorizados_recoger', fn (Builder $query) => $query->whereHas(
+            ->when($funcion === 'autorizados_recoger', fn(Builder $query) => $query->whereHas(
                 'relaciones',
-                fn (Builder $relacion) => $relacion->where('activo', true)->where('autorizado_recoger', true),
+                fn(Builder $relacion) => $relacion->where('activo', true)->where('autorizado_recoger', true),
             ))
-            ->when($funcion === 'responsables_economicos', fn (Builder $query) => $query->whereHas(
+            ->when($funcion === 'responsables_economicos', fn(Builder $query) => $query->whereHas(
                 'relaciones',
-                fn (Builder $relacion) => $relacion->where('activo', true)->where('responsable_economico', true),
+                fn(Builder $relacion) => $relacion->where('activo', true)->where('responsable_economico', true),
             ))
-            ->when($this->buscar, function (Builder $query): void {
-                $buscar = '%' . trim($this->buscar) . '%';
-                $query->where(function (Builder $q) use ($buscar): void {
-                    $q->where('curp', 'like', mb_strtoupper($buscar))
+            ->when(trim($this->buscar) !== '', function (Builder $query): void {
+                $termino = trim($this->buscar);
+                $buscar = '%' . $termino . '%';
+                $buscarMayusculas = '%' . mb_strtoupper($termino) . '%';
+
+                $query->where(function (Builder $q) use ($buscar, $buscarMayusculas): void {
+                    $q->where('curp', 'like', $buscarMayusculas)
                         ->orWhere('identificador_alternativo', 'like', $buscar)
                         ->orWhere('nombre', 'like', $buscar)
                         ->orWhere('apellido_paterno', 'like', $buscar)
                         ->orWhere('apellido_materno', 'like', $buscar)
+                        ->orWhereRaw(
+                            "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                            [$buscar],
+                        )
                         ->orWhere('telefono_celular', 'like', $buscar)
                         ->orWhere('telefono_casa', 'like', $buscar)
                         ->orWhere('correo_electronico', 'like', $buscar)
                         ->orWhere('ciudad', 'like', $buscar)
                         ->orWhere('municipio', 'like', $buscar)
                         ->orWhere('estado', 'like', $buscar)
-                        ->orWhereHas('relaciones', fn (Builder $relacion) => $relacion->where('parentesco', 'like', $buscar));
+                        ->orWhereHas('relaciones', function (Builder $relacion) use ($buscar, $buscarMayusculas): void {
+                            $relacion->where(function (Builder $relacionQuery) use ($buscar, $buscarMayusculas): void {
+                                $relacionQuery->where('parentesco', 'like', $buscar)
+                                    ->orWhereHas('inscripcion', function (Builder $alumno) use ($buscar, $buscarMayusculas): void {
+                                        $alumno->withTrashed()
+                                            ->where(function (Builder $alumnoQuery) use ($buscar, $buscarMayusculas): void {
+                                                $alumnoQuery->where('nombre', 'like', $buscar)
+                                                    ->orWhere('apellido_paterno', 'like', $buscar)
+                                                    ->orWhere('apellido_materno', 'like', $buscar)
+                                                    ->orWhereRaw(
+                                                        "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                                                        [$buscar],
+                                                    )
+                                                    ->orWhere('curp', 'like', $buscarMayusculas)
+                                                    ->orWhere('matricula', 'like', $buscar)
+                                                    ->orWhere('folio', 'like', $buscar);
+                                            });
+                                    });
+                            });
+                        });
                 });
             })
             ->orderBy($this->ordenCampo, $this->ordenDireccion);
