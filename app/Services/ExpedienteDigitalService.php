@@ -51,6 +51,9 @@ class ExpedienteDigitalService
             $items->push([
                 'tipo_id' => $tipo->id,
                 'nivel_id' => null,
+                'grado_id' => null,
+                'grupo_id' => null,
+                'ciclo_escolar_id' => null,
                 'clave' => $tipo->slug,
                 'nombre' => $tipo->nombre,
                 'etiqueta' => $tipo->nombre,
@@ -74,6 +77,9 @@ class ExpedienteDigitalService
             $items->push([
                 'tipo_id' => $tipoCertificado->id,
                 'nivel_id' => $nivelCertificado->id,
+                'grado_id' => null,
+                'grupo_id' => null,
+                'ciclo_escolar_id' => null,
                 'clave' => 'certificado-estudios',
                 'nombre' => $tipoCertificado->nombre,
                 'etiqueta' => 'Certificado de ' . Str::lower($nivelCertificado->nombre),
@@ -103,6 +109,7 @@ class ExpedienteDigitalService
                         'tipo_id' => $tipoBoleta->id,
                         'nivel_id' => $doc->nivel_id,
                         'grado_id' => $doc->grado_id,
+                        'grupo_id' => $doc->grupo_id,
                         'ciclo_escolar_id' => $doc->ciclo_escolar_id,
                         'clave' => 'boleta-final-grado',
                         'nombre' => $tipoBoleta->nombre,

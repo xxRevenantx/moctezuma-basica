@@ -41,6 +41,47 @@ class OrganizadorExpedienteService
             ->get();
     }
 
+    /**
+     * Valida un archivo temporal antes de decidir cómo integrarlo. Esta
+     * inspección no crea registros ni conserva archivos en el expediente.
+     *
+     * @return array{paginas:int,mime:string,normalizado:bool,normalizador:?string}
+     */
+    public function inspeccionarArchivoSubido(UploadedFile $archivo): array
+    {
+        app(PdfCompatibilityService::class)->assertLibrariesAvailable();
+        $mime = $this->validarMime($archivo);
+        $tamano = (int) ($archivo->getSize() ?: File::size($archivo->getRealPath()));
+        $limiteBytes = max((int) config('expedientes_organizador.max_upload_mb', 30), 1) * 1024 * 1024;
+
+        if ($tamano > $limiteBytes) {
+            throw ValidationException::withMessages([
+                'archivo' => 'El archivo supera el límite de ' . config('expedientes_organizador.max_upload_mb', 30) . ' MB.',
+            ]);
+        }
+
+        $temporalPdf = $this->crearPdfTemporalDesdeArchivo($archivo, $mime);
+        $temporalNormalizado = null;
+
+        try {
+            $compatibilidad = app(PdfCompatibilityService::class)->prepare($temporalPdf);
+            $rutaProcesable = (string) $compatibilidad['path'];
+
+            if ($rutaProcesable !== $temporalPdf) {
+                $temporalNormalizado = $rutaProcesable;
+            }
+
+            return [
+                'paginas' => $this->validarLimitePaginas((int) $compatibilidad['pages']),
+                'mime' => $mime,
+                'normalizado' => ($compatibilidad['status'] ?? null) === 'normalized',
+                'normalizador' => $compatibilidad['normalizer'] ?? null,
+            ];
+        } finally {
+            File::delete(array_filter([$temporalPdf, $temporalNormalizado]));
+        }
+    }
+
     public function registrarFuenteDesdeUpload(
         UploadedFile $archivo,
         Inscripcion $alumno,
@@ -51,6 +92,8 @@ class OrganizadorExpedienteService
         bool $permitirDuplicado = false,
         bool $guardarOriginalSinOrganizar = false
     ): array {
+        app(PdfCompatibilityService::class)->assertLibrariesAvailable();
+
         if (! in_array($modoIntegracion, ['agregar', 'reemplazar'], true)) {
             throw ValidationException::withMessages([
                 'modo_integracion' => 'Selecciona si deseas agregar páginas o reemplazar el documento actual.',
@@ -133,6 +176,7 @@ class OrganizadorExpedienteService
 
             $paginas = $this->validarLimitePaginas((int) $compatibilidad['pages']);
             $this->sincronizarFuentesExistentes($alumno, $usuarioId);
+            $teniaBorrador = $this->borradorTieneCambios($alumno);
 
             $uuid = (string) Str::uuid();
             $extensionOriginal = strtolower($archivo->getClientOriginalExtension() ?: $this->extensionDesdeMime($mimeOriginal));
@@ -162,7 +206,7 @@ class OrganizadorExpedienteService
             }
 
             try {
-                return DB::transaction(function () use (
+                $resultado = DB::transaction(function () use (
                     $alumno,
                     $tipo,
                     $contexto,
@@ -178,7 +222,8 @@ class OrganizadorExpedienteService
                     $compatibilidad,
                     $rutaOriginal,
                     $rutaNormalizada,
-                    $rutasGuardadas
+                    $rutasGuardadas,
+                    $teniaBorrador
                 ): array {
                     $documentoFuente = DocumentoAlumno::query()->create([
                         'inscripcion_id' => $alumno->id,
@@ -278,10 +323,16 @@ class OrganizadorExpedienteService
                         $borrador->retiros_confirmados ?? []
                     );
 
+                    $autoConfirmable = $paginas === 1
+                        && $contenidoArchivo === 'un_documento'
+                        && ! $teniaBorrador;
+
                     return [
                         'fuente' => $fuente->fresh(),
                         'paginas' => $paginas,
                         'organizacion_id' => $borrador->id,
+                        'auto_confirmable' => $autoConfirmable,
+                        'auto_confirmado' => false,
                         'requiere_organizacion' => true,
                         'normalizado' => ($compatibilidad['status'] ?? null) === 'normalized',
                         'normalizador' => $compatibilidad['normalizer'] ?? null,
@@ -292,6 +343,21 @@ class OrganizadorExpedienteService
                             ->exists(),
                     ];
                 });
+
+                if ((bool) ($resultado['auto_confirmable'] ?? false)) {
+                    $this->confirmarOrganizacion(
+                        $alumno,
+                        (int) $resultado['organizacion_id'],
+                        $usuarioId,
+                        true
+                    );
+                    $resultado['auto_confirmado'] = true;
+                    $resultado['requiere_organizacion'] = false;
+                }
+
+                unset($resultado['auto_confirmable']);
+
+                return $resultado;
             } catch (Throwable $e) {
                 foreach ($rutasGuardadas as $ruta) {
                     try {
@@ -1345,6 +1411,45 @@ class OrganizadorExpedienteService
         $query->update(['es_actual' => false, 'estado' => 'reemplazado', 'updated_at' => now()]);
     }
 
+    protected function borradorTieneCambios(Inscripcion $alumno): bool
+    {
+        $borrador = OrganizacionDocumentoAlumno::query()
+            ->where('inscripcion_id', $alumno->id)
+            ->where('estado', 'borrador')
+            ->latest('version')
+            ->first();
+
+        if (! $borrador) {
+            return false;
+        }
+
+        $baseline = (array) data_get($borrador->metadatos, 'baseline_asignaciones', []);
+
+        return $this->firmaAsignacionesCompleta($borrador->asignaciones ?? [])
+            !== $this->firmaAsignacionesCompleta($baseline);
+    }
+
+    protected function firmaAsignacionesCompleta(array $asignaciones): string
+    {
+        $normalizadas = collect($asignaciones)
+            ->map(fn (array $item): array => [
+                'fuente_id' => (int) ($item['fuente_id'] ?? 0),
+                'pagina' => (int) ($item['pagina'] ?? 0),
+                'tipo_documento_id' => filled($item['tipo_documento_id'] ?? null)
+                    ? (int) $item['tipo_documento_id']
+                    : null,
+                'contexto_clave' => ($item['contexto_clave'] ?? null) ?: null,
+                'orden' => (int) ($item['orden'] ?? 0),
+                'rotacion' => $this->normalizarRotacion((int) ($item['rotacion'] ?? 0)),
+            ])
+            ->sortBy(fn (array $item): string => str_pad((string) $item['fuente_id'], 12, '0', STR_PAD_LEFT)
+                . '-' . str_pad((string) $item['pagina'], 8, '0', STR_PAD_LEFT))
+            ->values()
+            ->all();
+
+        return hash('sha256', json_encode($normalizadas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
     protected function firmaGrupo(Collection $grupo): string
     {
         return hash('sha256', json_encode($grupo
@@ -1445,6 +1550,8 @@ class OrganizadorExpedienteService
 
     protected function validarPdf(string $ruta): array
     {
+        app(PdfCompatibilityService::class)->assertLibrariesAvailable();
+
         try {
             $fpdi = new Fpdi();
             $paginas = $fpdi->setSourceFile($ruta);

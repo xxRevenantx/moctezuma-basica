@@ -610,97 +610,66 @@
                 </section>
 
                 <div>
-                    <div class="mb-4 flex items-center justify-between gap-3">
+                    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h3 class="text-lg font-black text-slate-900 dark:text-white">Control de documentos
-                                esperados</h3>
-                            <p class="text-sm text-slate-500 dark:text-slate-400">Son opcionales: el sistema solo
-                                informa cuáles aún no están cargados.</p>
+                            <h3 class="text-lg font-black text-slate-900 dark:text-white">Control de documentos esperados</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Sube cada archivo directamente desde su tarjeta. Los PDF con varias páginas se abren en el organizador para clasificarlos, ordenarlos y girarlos.
+                            </p>
                         </div>
+
+                        @if (! $soloHistorico)
+                            <button
+                                type="button"
+                                wire:click="abrirOrganizador"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-[#006492]/25 bg-[#006492]/5 px-4 py-2.5 text-sm font-black text-[#006492] transition hover:bg-[#006492]/10 dark:border-sky-800 dark:text-sky-300"
+                            >
+                                <flux:icon name="bars-3-bottom-left" class="size-4" />
+                                Organizar todos los archivos
+                            </button>
+                        @endif
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/20 dark:text-sky-200">
+                        <strong>Flujo documental:</strong> una página nueva se confirma automáticamente cuando no existen cambios pendientes. Si el archivo tiene varias páginas, contiene documentos combinados o ya existe una versión, podrás agregar, reemplazar y revisar la organización antes de confirmarla.
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                         @foreach ($resumenSeleccionado['items'] as $item)
-                            <article
-                                id="documento-{{ $item['tipo_id'] }}-{{ $item['nivel_id'] ?? 0 }}-{{ $item['grado_id'] ?? 0 }}-{{ $item['ciclo_escolar_id'] ?? 0 }}"
-                                data-document-type="{{ $item['tipo_id'] }}"
-                                class="rounded-2xl border p-4 transition {{ $item['archivo_faltante'] ? 'border-rose-200 bg-rose-50/60 dark:border-rose-900/50 dark:bg-rose-950/10' : (($item['no_aplica'] ?? false) ? 'border-violet-200 bg-violet-50/60 dark:border-violet-900/50 dark:bg-violet-950/10' : ($item['presente'] ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/10' : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/10')) }}">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="flex items-start gap-3">
-                                        <div
-                                            class="flex size-10 shrink-0 items-center justify-center rounded-2xl {{ $item['archivo_faltante'] ? 'bg-rose-500 text-white' : (($item['no_aplica'] ?? false) ? 'bg-violet-500 text-white' : ($item['presente'] ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white')) }}">
-                                            <flux:icon :name="$item['archivo_faltante'] ? 'exclamation-triangle' : (($item['no_aplica'] ?? false) ? 'minus-circle' : ($item['presente'] ? 'check' : 'clock'))" class="size-5" />
-                                        </div>
-                                        <div>
-                                            <h4 class="font-black text-slate-900 dark:text-white">
-                                                {{ $item['etiqueta'] }}</h4>
-                                            <span
-                                                class="mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ring-1 {{ $coloresEstado[$item['estado']] ?? $coloresEstado['pendiente'] }}">
-                                                {{ ucfirst($item['estado']) }}
-                                            </span>
-                                            @if ($item['archivo_faltante'])
-                                                <span class="ml-1 mt-2 inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black uppercase text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900">
-                                                    Archivo faltante
-                                                </span>
-                                            @endif
-                                            @if (($item['no_aplica'] ?? false) && filled($item['motivo_no_aplica'] ?? null))
-                                                <p class="mt-2 text-xs leading-5 text-violet-700 dark:text-violet-300">
-                                                    <strong>Motivo:</strong> {{ $item['motivo_no_aplica'] }}
-                                                </p>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
+                            @php
+                                $tipoItem = (int) $item['tipo_id'];
+                                $etiquetaItem = (string) $item['etiqueta'];
+                                $nivelItem = $item['nivel_id'] ?? null;
+                                $gradoItem = $item['grado_id'] ?? null;
+                                $grupoItem = $item['grupo_id'] ?? null;
+                                $cicloItem = $item['ciclo_escolar_id'] ?? null;
+                                $claveCarga = implode('-', [
+                                    'carga-documento-expediente',
+                                    $alumnoSeleccionado->id,
+                                    $tipoItem,
+                                    $nivelItem ?: 0,
+                                    $gradoItem ?: 0,
+                                    $grupoItem ?: 0,
+                                    $cicloItem ?: 0,
+                                ]);
+                            @endphp
 
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @if ($item['documento_id'] && ! $item['archivo_faltante'])
-                                        <a href="{{ route('misrutas.expedientes.preview', $item['documento_id']) }}"
-                                            target="_blank"
-                                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
-                                            <flux:icon name="eye" class="size-3.5" />
-                                            Ver archivo
-                                        </a>
-                                    @endif
-
-                                    @if (!$soloHistorico)
-                                        <button type="button"
-                                            @click="openUpload(
-                                                {{ $item['tipo_id'] }},
-                                                {{ $item['nivel_id'] ?? 'null' }},
-                                                {{ $item['grado_id'] ?? 'null' }},
-                                                {{ $item['ciclo_escolar_id'] ?? 'null' }},
-                                                'esperado-{{ $loop->index }}-{{ $item['tipo_id'] }}'
-                                            )"
-                                            :disabled="opening || closing"
-                                            class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-70">
-                                            <span
-                                                x-show="opening && openingKey === 'esperado-{{ $loop->index }}-{{ $item['tipo_id'] }}'"
-                                                class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
-                                            <flux:icon
-                                                x-show="!(opening && openingKey === 'esperado-{{ $loop->index }}-{{ $item['tipo_id'] }}')"
-                                                name="arrow-up-tray" class="size-3.5" />
-                                            {{ $item['presente'] && !($item['no_aplica'] ?? false) ? 'Nueva versión' : 'Subir' }}
-                                        </button>
-
-                                        @if ($item['no_aplica'] ?? false)
-                                            <button type="button"
-                                                wire:click="quitarNoAplica({{ $item['no_aplica_id'] }})"
-                                                wire:confirm="¿Retirar la marca No aplica? El documento volverá a mostrarse como pendiente."
-                                                class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-50 dark:border-violet-900 dark:bg-neutral-900 dark:text-violet-300">
-                                                <flux:icon name="arrow-uturn-left" class="size-3.5" />
-                                                Quitar No aplica
-                                            </button>
-                                        @elseif (!$item['presente'])
-                                            <button type="button"
-                                                wire:click="abrirNoAplica({{ $item['tipo_id'] }}, {{ $item['nivel_id'] ?? 'null' }}, {{ $item['grado_id'] ?? 'null' }}, {{ $item['ciclo_escolar_id'] ?? 'null' }})"
-                                                class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-50 dark:border-violet-900 dark:bg-neutral-900 dark:text-violet-300">
-                                                <flux:icon name="minus-circle" class="size-3.5" />
-                                                No aplica
-                                            </button>
-                                        @endif
-                                    @endif
-                                </div>
-                            </article>
+                            <div
+                                id="documento-{{ $tipoItem }}-{{ $nivelItem ?? 0 }}-{{ $gradoItem ?? 0 }}-{{ $cicloItem ?? 0 }}"
+                                data-document-type="{{ $tipoItem }}"
+                            >
+                                <livewire:documentacion.carga-documento-expediente
+                                    :inscripcion-id="$alumnoSeleccionado->id"
+                                    :tipo-documento-id="$tipoItem"
+                                    :nivel-id="$nivelItem"
+                                    :grado-id="$gradoItem"
+                                    :grupo-id="$grupoItem"
+                                    :ciclo-escolar-id="$cicloItem"
+                                    :etiqueta="$etiquetaItem"
+                                    :solo-lectura="$soloHistorico"
+                                    :key="$claveCarga"
+                                />
+                            </div>
                         @endforeach
                     </div>
                 </div>

@@ -5,6 +5,7 @@ namespace App\Services\Expedientes;
 use App\Exceptions\Expedientes\PdfCompatibilityException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use setasign\Fpdi\Fpdi;
 use Symfony\Component\Process\Process;
@@ -27,6 +28,7 @@ class PdfCompatibilityService
      */
     public function prepare(string $path): array
     {
+        $this->assertLibrariesAvailable();
         $this->assertPdfSignature($path);
 
         try {
@@ -118,6 +120,26 @@ class PdfCompatibilityService
                 ],
                 $originalError,
             );
+        }
+    }
+
+    /**
+     * Verifica las mismas dependencias PDF utilizadas por Moctezuma
+     * Licenciaturas. Sin FPDF y FPDI cualquier archivo terminaría siendo
+     * interpretado erróneamente como incompatible.
+     */
+    public function assertLibrariesAvailable(): void
+    {
+        if (! class_exists(\FPDF::class)) {
+            throw ValidationException::withMessages([
+                'archivo' => 'Falta la librería setasign/fpdf requerida para procesar documentos. Ejecuta: composer require setasign/fpdf:^1.8 setasign/fpdi:^2.6',
+            ]);
+        }
+
+        if (! class_exists(Fpdi::class)) {
+            throw ValidationException::withMessages([
+                'archivo' => 'Falta la librería setasign/fpdi requerida para leer y organizar páginas PDF. Ejecuta: composer require setasign/fpdf:^1.8 setasign/fpdi:^2.6',
+            ]);
         }
     }
 

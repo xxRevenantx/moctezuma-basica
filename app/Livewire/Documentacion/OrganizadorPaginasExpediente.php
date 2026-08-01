@@ -413,6 +413,7 @@ class OrganizadorPaginasExpediente extends Component
             $this->organizacionId = $borrador->id;
             $this->mensaje = $mensaje;
             $this->actualizarConteos();
+            $this->dispatch('organizacion-expediente-borrador-actualizado', inscripcionId: $this->inscripcionId);
         } catch (ValidationException $e) {
             $this->addError('organizacion', $e->validator->errors()->first());
         }

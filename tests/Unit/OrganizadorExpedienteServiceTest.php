@@ -61,4 +61,40 @@ class OrganizadorExpedienteServiceTest extends TestCase
         $this->assertNotSame($firmaBase, $metodo->invoke($servicio, $girada));
         $this->assertNotSame($firmaBase, $metodo->invoke($servicio, $reordenada));
     }
+
+    public function test_la_firma_completa_detecta_cambios_de_clasificacion_sin_depender_del_orden_del_arreglo(): void
+    {
+        $servicio = new OrganizadorExpedienteService();
+        $metodo = new ReflectionMethod($servicio, 'firmaAsignacionesCompleta');
+        $metodo->setAccessible(true);
+
+        $base = [
+            [
+                'fuente_id' => 5,
+                'pagina' => 2,
+                'tipo_documento_id' => 3,
+                'contexto_clave' => '3|0|0|0|0',
+                'orden' => 2,
+                'rotacion' => 0,
+            ],
+            [
+                'fuente_id' => 5,
+                'pagina' => 1,
+                'tipo_documento_id' => 3,
+                'contexto_clave' => '3|0|0|0|0',
+                'orden' => 1,
+                'rotacion' => 0,
+            ],
+        ];
+
+        $mismoContenidoOtroOrden = array_reverse($base);
+        $reclasificada = $base;
+        $reclasificada[0]['tipo_documento_id'] = 4;
+        $reclasificada[0]['contexto_clave'] = '4|0|0|0|0';
+
+        $firmaBase = $metodo->invoke($servicio, $base);
+
+        $this->assertSame($firmaBase, $metodo->invoke($servicio, $mismoContenidoOtroOrden));
+        $this->assertNotSame($firmaBase, $metodo->invoke($servicio, $reclasificada));
+    }
 }

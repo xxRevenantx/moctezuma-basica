@@ -480,6 +480,21 @@ class ExpedientesDigitales extends Component
         }
     }
 
+    #[On('solicitar-no-aplica-expediente')]
+    public function solicitarNoAplicaExpediente(
+        int $inscripcionId,
+        int $tipoId,
+        ?int $nivelId = null,
+        ?int $gradoId = null,
+        ?int $cicloId = null,
+    ): void {
+        if ($inscripcionId !== $this->alumnoSeleccionadoId) {
+            return;
+        }
+
+        $this->abrirNoAplica($tipoId, $nivelId, $gradoId, $cicloId);
+    }
+
     public function abrirNoAplica(int $tipoId, ?int $nivelId = null, ?int $gradoId = null, ?int $cicloId = null): void
     {
         $this->autorizarAdmin();
@@ -575,7 +590,9 @@ class ExpedientesDigitales extends Component
             ]);
         });
 
+        $inscripcionId = (int) $this->alumnoSeleccionadoId;
         $this->cerrarNoAplica();
+        $this->dispatch('documento-expediente-actualizado', inscripcionId: $inscripcionId);
         $this->dispatch('notify', type: 'success', message: 'El documento fue marcado como “No aplica” con su justificación.');
     }
 
@@ -587,7 +604,18 @@ class ExpedientesDigitales extends Component
             ->where('inscripcion_id', $this->alumnoSeleccionadoId)
             ->whereKey($registroId)
             ->update(['activo' => false, 'updated_at' => now()]);
+        $this->dispatch('documento-expediente-actualizado', inscripcionId: (int) $this->alumnoSeleccionadoId);
         $this->dispatch('notify', type: 'success', message: 'La marca “No aplica” fue retirada.');
+    }
+
+    #[On('documento-expediente-actualizado')]
+    public function documentoExpedienteActualizado(int $inscripcionId): void
+    {
+        if ($inscripcionId !== $this->alumnoSeleccionadoId) {
+            return;
+        }
+
+        // El evento fuerza el render del resumen y las métricas del expediente.
     }
 
     #[On('organizacion-expediente-confirmada')]
