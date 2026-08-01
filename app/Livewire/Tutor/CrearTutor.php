@@ -2,27 +2,32 @@
 
 namespace App\Livewire\Tutor;
 
+use App\Models\Tutor;
+use App\Rules\CurpMexicana;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class CrearTutor extends Component
 {
-    // =========================
-    // Campos (según tu tabla)
-    // =========================
-    public ?string $curp = null;
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.crear'), 403);
+    }
 
-    // GENERALES
-    public ?string $parentesco = null;
+    public bool $sin_curp = false;
+    public ?string $curp = null;
+    public ?string $identificador_alternativo = null;
+    public ?string $motivo_sin_curp = null;
     public ?string $nombre = null;
     public ?string $apellido_paterno = null;
     public ?string $apellido_materno = null;
-    public ?string $genero = null; // M|F|O
+    public ?string $genero = null;
     public ?string $fecha_nacimiento = null;
     public ?string $ciudad_nacimiento = null;
     public ?string $estado_nacimiento = null;
     public ?string $municipio_nacimiento = null;
-
-    // DOMICILIO
     public ?string $calle = null;
     public ?string $colonia = null;
     public ?string $ciudad = null;
@@ -30,8 +35,6 @@ class CrearTutor extends Component
     public ?string $estado = null;
     public ?string $numero = null;
     public ?string $codigo_postal = null;
-
-    // CONTACTO
     public ?string $telefono_casa = null;
     public ?string $telefono_celular = null;
     public ?string $correo_electronico = null;
@@ -39,99 +42,91 @@ class CrearTutor extends Component
     protected function rules(): array
     {
         return [
-            'curp' => ['required', 'string', 'size:18', 'unique:tutores,curp'],
-            'parentesco' => ['required', 'string', 'max:50'],
+            'sin_curp' => ['boolean'],
+            'curp' => [Rule::requiredIf(! $this->sin_curp), 'nullable', 'string', 'size:18', new CurpMexicana(), 'unique:tutores,curp'],
+            'identificador_alternativo' => [Rule::requiredIf($this->sin_curp), 'nullable', 'string', 'max:80', 'unique:tutores,identificador_alternativo'],
+            'motivo_sin_curp' => [Rule::requiredIf($this->sin_curp), 'nullable', 'string', 'min:5', 'max:255'],
             'nombre' => ['required', 'string', 'max:255'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
             'apellido_materno' => ['nullable', 'string', 'max:255'],
-            'genero' => ['required', 'in:M,F,O'],
-            'fecha_nacimiento' => ['required', 'date'],
-            'ciudad_nacimiento' => ['required', 'string', 'max:255'],
-            'estado_nacimiento' => ['required', 'string', 'max:255'],
-            'municipio_nacimiento' => ['required', 'string', 'max:255'],
-
-            'calle' => ['required', 'string', 'max:255'],
-            'colonia' => ['required', 'string', 'max:255'],
-            'ciudad' => ['required', 'string', 'max:255'],
-            'municipio' => ['required', 'string', 'max:255'],
-            'estado' => ['required', 'string', 'max:255'],
+            'genero' => ['nullable', Rule::in(['M', 'F', 'O'])],
+            'fecha_nacimiento' => ['nullable', 'date'],
+            'ciudad_nacimiento' => ['nullable', 'string', 'max:255'],
+            'estado_nacimiento' => ['nullable', 'string', 'max:255'],
+            'municipio_nacimiento' => ['nullable', 'string', 'max:255'],
+            'calle' => ['nullable', 'string', 'max:255'],
+            'colonia' => ['nullable', 'string', 'max:255'],
+            'ciudad' => ['nullable', 'string', 'max:255'],
+            'municipio' => ['nullable', 'string', 'max:255'],
+            'estado' => ['nullable', 'string', 'max:255'],
             'numero' => ['nullable', 'string', 'max:20'],
-            'codigo_postal' => ['required', 'string', 'max:10'],
-
+            'codigo_postal' => ['nullable', 'regex:/^[0-9]{5}$/'],
             'telefono_casa' => ['nullable', 'string', 'max:20'],
             'telefono_celular' => ['nullable', 'string', 'max:20'],
             'correo_electronico' => ['nullable', 'email', 'max:255'],
         ];
     }
 
-    protected array $messages = [
-        'curp.required' => 'La CURP es obligatoria.',
-        'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
-        'curp.unique' => 'La CURP ya está registrada.',
+    public function updatedSinCurp(bool $sinCurp): void
+    {
+        if ($sinCurp) {
+            $this->curp = null;
+        } else {
+            $this->identificador_alternativo = null;
+            $this->motivo_sin_curp = null;
+        }
 
-        'parentesco.required' => 'El parentesco es obligatorio.',
+        $this->resetValidation(['curp', 'identificador_alternativo', 'motivo_sin_curp']);
+    }
 
-        'nombre.required' => 'El nombre es obligatorio.',
+    public function updatedCurp(): void
+    {
+        $this->curp = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $this->curp) ?: '');
 
-        'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
+        // La CURP se sincroniza al salir del campo. Mientras está incompleta no
+        // mostramos un error ni provocamos una nueva renderización por cada tecla.
+        if ($this->sin_curp || blank($this->curp) || mb_strlen($this->curp) < 18) {
+            $this->resetValidation('curp');
 
-        'genero.required' => 'El género es obligatorio.',
-        'genero.in' => 'El género seleccionado no es válido.',
+            return;
+        }
 
-        'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
-        'fecha_nacimiento.date' => 'La fecha de nacimiento no es una fecha válida.',
-
-        'correo_electronico.email' => 'El correo electrónico no es válido.',
-
-        'codigo_postal.required' => 'El código postal es obligatorio.',
-        'calle.required' => 'La calle es obligatoria.',
-        'colonia.required' => 'La colonia es obligatoria.',
-        'ciudad.required' => 'La ciudad es obligatoria.',
-        'municipio.required' => 'El municipio es obligatorio.',
-        'estado.required' => 'El estado es obligatorio.',
-        'municipio_nacimiento.required' => 'El municipio de nacimiento es obligatorio.',
-        'ciudad_nacimiento.required' => 'La ciudad de nacimiento es obligatoria.',
-        'estado_nacimiento.required' => 'El estado de nacimiento es obligatorio.',
-
-    ];
+        $this->validateOnly('curp');
+    }
 
     public function guardar(): void
     {
-        $this->validate();
+        $this->normalizar();
+        $data = $this->validate();
 
-        // Aquí guarda tu modelo Tutor (ajusta el namespace/modelo según tu app)
-        \App\Models\Tutor::create([
-            'curp' => $this->curp,
-            'parentesco' => $this->parentesco,
-            'nombre' => $this->nombre,
-            'apellido_paterno' => $this->apellido_paterno,
-            'apellido_materno' => $this->apellido_materno,
-            'genero' => $this->genero,
-            'fecha_nacimiento' => $this->fecha_nacimiento,
-            'ciudad_nacimiento' => $this->ciudad_nacimiento,
-            'estado_nacimiento' => $this->estado_nacimiento,
-            'municipio_nacimiento' => $this->municipio_nacimiento,
-            'calle' => $this->calle,
-            'colonia' => $this->colonia,
-            'ciudad' => $this->ciudad,
-            'municipio' => $this->municipio,
-            'estado' => $this->estado,
-            'numero' => $this->numero,
-            'codigo_postal' => $this->codigo_postal,
-            'telefono_casa' => $this->telefono_casa,
-            'telefono_celular' => $this->telefono_celular,
-            'correo_electronico' => $this->correo_electronico,
-        ]);
+        if (blank($data['telefono_celular']) && blank($data['telefono_casa']) && blank($data['correo_electronico'])) {
+            throw ValidationException::withMessages([
+                'telefono_celular' => 'Captura al menos teléfono celular, teléfono de casa o correo electrónico.',
+            ]);
+        }
+
+        $tutor = DB::transaction(function () use ($data): Tutor {
+            return Tutor::query()->create([
+                ...$data,
+                'curp' => blank($data['curp']) ? null : $data['curp'],
+                'identificador_alternativo' => blank($data['identificador_alternativo']) ? null : $data['identificador_alternativo'],
+                'motivo_sin_curp' => blank($data['motivo_sin_curp']) ? null : $data['motivo_sin_curp'],
+                // Campo legado: el parentesco correcto se captura al relacionar al tutor con cada alumno.
+                'parentesco' => 'NO ESPECIFICADO',
+                'activo' => true,
+            ]);
+        });
 
         $this->dispatch('swal', [
-            'title' => 'Tutor creado correctamente',
+            'title' => 'Responsable creado correctamente',
+            'text' => 'Ahora puedes relacionarlo con uno o varios alumnos y definir el parentesco de cada relación.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
 
-        $this->reset();
-
-        $this->dispatch('refreshTutor'); // Dispara un evento para que el componente de mostrar se actualice
+        $this->dispatch('tutorRegistered', tutor: $tutor->id);
+        $this->limpiar();
+        $this->dispatch('refreshTutor');
     }
 
     public function limpiar(): void
@@ -140,7 +135,27 @@ class CrearTutor extends Component
         $this->resetValidation();
     }
 
+    private function normalizar(): void
+    {
+        $this->curp = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $this->curp) ?: '');
+        $this->identificador_alternativo = mb_strtoupper(trim((string) $this->identificador_alternativo));
 
+        if ($this->sin_curp) {
+            $this->curp = null;
+        } else {
+            $this->identificador_alternativo = null;
+            $this->motivo_sin_curp = null;
+        }
+
+        foreach (['nombre', 'apellido_paterno', 'apellido_materno'] as $campo) {
+            $this->{$campo} = mb_convert_case(trim((string) $this->{$campo}), MB_CASE_TITLE, 'UTF-8');
+        }
+
+        foreach (['motivo_sin_curp', 'ciudad_nacimiento', 'estado_nacimiento', 'municipio_nacimiento', 'calle', 'colonia', 'ciudad', 'municipio', 'estado', 'numero', 'codigo_postal', 'telefono_casa', 'telefono_celular', 'correo_electronico'] as $campo) {
+            $valor = trim((string) $this->{$campo});
+            $this->{$campo} = $valor === '' ? null : $valor;
+        }
+    }
 
     public function render()
     {

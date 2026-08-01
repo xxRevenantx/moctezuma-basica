@@ -2,6 +2,7 @@
 
 namespace App\Services\Expedientes;
 
+use App\Exceptions\Expedientes\PdfCompatibilityException;
 use App\Jobs\ConfirmarOrganizacionExpedienteJob;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoAlumnoFuente;
@@ -47,7 +48,8 @@ class OrganizadorExpedienteService
         string $modoIntegracion,
         string $contenidoArchivo,
         ?int $usuarioId,
-        bool $permitirDuplicado = false
+        bool $permitirDuplicado = false,
+        bool $guardarOriginalSinOrganizar = false
     ): array {
         if (! in_array($modoIntegracion, ['agregar', 'reemplazar'], true)) {
             throw ValidationException::withMessages([
@@ -63,10 +65,10 @@ class OrganizadorExpedienteService
 
         $tipo = $this->validarContexto($contexto);
         $mimeOriginal = $this->validarMime($archivo);
-        $tamano = (int) ($archivo->getSize() ?: File::size($archivo->getRealPath()));
+        $tamanoOriginal = (int) ($archivo->getSize() ?: File::size($archivo->getRealPath()));
         $limiteBytes = max((int) config('expedientes_organizador.max_upload_mb', 30), 1) * 1024 * 1024;
 
-        if ($tamano > $limiteBytes) {
+        if ($tamanoOriginal > $limiteBytes) {
             throw ValidationException::withMessages([
                 'archivo' => 'El archivo supera el límite de ' . config('expedientes_organizador.max_upload_mb', 30) . ' MB.',
             ]);
@@ -88,21 +90,63 @@ class OrganizadorExpedienteService
         }
 
         $temporalPdf = $this->crearPdfTemporalDesdeArchivo($archivo, $mimeOriginal);
+        $temporalNormalizado = null;
 
         try {
-            $validacion = $this->validarPdf($temporalPdf);
+            try {
+                $compatibilidad = app(PdfCompatibilityService::class)->prepare($temporalPdf);
+                $temporalProcesable = (string) $compatibilidad['path'];
+
+                if ($temporalProcesable !== $temporalPdf) {
+                    $temporalNormalizado = $temporalProcesable;
+                }
+            } catch (PdfCompatibilityException $e) {
+                if (
+                    ! $guardarOriginalSinOrganizar
+                    || ! $e->canStoreOriginal
+                    || $mimeOriginal !== 'application/pdf'
+                ) {
+                    throw $e;
+                }
+
+                if ($contenidoArchivo !== 'un_documento') {
+                    throw ValidationException::withMessages([
+                        'archivo' => 'Un PDF combinado con varios documentos no puede guardarse sin organizar. Normalízalo o selecciona un archivo por documento.',
+                    ]);
+                }
+
+                $this->sincronizarFuentesExistentes($alumno, $usuarioId);
+
+                return $this->registrarOriginalSinOrganizar(
+                    $archivo,
+                    $alumno,
+                    $tipo,
+                    $contexto,
+                    $modoIntegracion,
+                    $mimeOriginal,
+                    $tamanoOriginal,
+                    $hash,
+                    $usuarioId,
+                    $e,
+                );
+            }
+
+            $paginas = $this->validarLimitePaginas((int) $compatibilidad['pages']);
             $this->sincronizarFuentesExistentes($alumno, $usuarioId);
 
             $uuid = (string) Str::uuid();
             $extensionOriginal = strtolower($archivo->getClientOriginalExtension() ?: $this->extensionDesdeMime($mimeOriginal));
             $directorio = "expedientes-organizador/fuentes/{$alumno->id}/{$uuid}";
             $rutaOriginal = "{$directorio}/original.{$extensionOriginal}";
-            $rutaNormalizada = $mimeOriginal === 'application/pdf'
-                ? $rutaOriginal
-                : "{$directorio}/normalizado.pdf";
+            $usaCopiaNormalizada = $mimeOriginal !== 'application/pdf'
+                || ($compatibilidad['status'] ?? 'original_compatible') === 'normalized';
+            $rutaNormalizada = $usaCopiaNormalizada
+                ? "{$directorio}/normalizado.pdf"
+                : $rutaOriginal;
             $disk = Storage::disk($this->disk());
             $contenidoOriginal = File::get($archivo->getRealPath());
-            $contenidoPdf = File::get($temporalPdf);
+            $contenidoPdf = File::get($temporalProcesable);
+            $tamanoPdf = strlen($contenidoPdf);
             $rutasGuardadas = [];
 
             if (! $disk->put($rutaOriginal, $contenidoOriginal)) {
@@ -127,9 +171,11 @@ class OrganizadorExpedienteService
                     $usuarioId,
                     $archivo,
                     $mimeOriginal,
-                    $tamano,
+                    $tamanoOriginal,
+                    $tamanoPdf,
                     $hash,
-                    $validacion,
+                    $paginas,
+                    $compatibilidad,
                     $rutaOriginal,
                     $rutaNormalizada,
                     $rutasGuardadas
@@ -150,8 +196,8 @@ class OrganizadorExpedienteService
                         'ruta' => $rutaNormalizada,
                         'nombre_original' => Str::limit($archivo->getClientOriginalName(), 250, ''),
                         'mime_type' => 'application/pdf',
-                        'tamano_bytes' => $tamano,
-                        'paginas_total' => (int) $validacion['paginas'],
+                        'tamano_bytes' => $tamanoPdf,
+                        'paginas_total' => $paginas,
                         'hash_sha256' => $hash,
                         'version' => 1,
                         'es_actual' => false,
@@ -172,9 +218,9 @@ class OrganizadorExpedienteService
                         'nombre_almacenado' => basename($rutaNormalizada),
                         'mime_type' => 'application/pdf',
                         'mime_original' => $mimeOriginal,
-                        'tamano_bytes' => $tamano,
+                        'tamano_bytes' => $tamanoPdf,
                         'hash_sha256' => $hash,
-                        'paginas' => (int) $validacion['paginas'],
+                        'paginas' => $paginas,
                         'estado' => 'activo',
                         'protegido' => false,
                         'subido_por' => $usuarioId,
@@ -184,6 +230,12 @@ class OrganizadorExpedienteService
                             'contenido_archivo' => $contenidoArchivo,
                             'contexto' => $this->normalizarContexto($contexto, $tipo),
                             'rutas_guardadas' => $rutasGuardadas,
+                            'tamano_original_bytes' => $tamanoOriginal,
+                            'pdf_estado' => $compatibilidad['status'] ?? 'original_compatible',
+                            'normalizador' => $compatibilidad['normalizer'] ?? null,
+                            'original_compatible' => (bool) ($compatibilidad['original_compatible'] ?? true),
+                            'original_conservado' => true,
+                            'diagnostico_normalizacion' => $compatibilidad['diagnostics'] ?? [],
                         ],
                     ]);
 
@@ -206,7 +258,7 @@ class OrganizadorExpedienteService
                         ->where('contexto_clave', $claveContexto)
                         ->max('orden')) + 1;
 
-                    for ($pagina = 1; $pagina <= (int) $validacion['paginas']; $pagina++) {
+                    for ($pagina = 1; $pagina <= $paginas; $pagina++) {
                         $clasificada = $contenidoArchivo === 'un_documento';
                         $asignaciones->push(array_merge([
                             'fuente_id' => $fuente->id,
@@ -228,9 +280,11 @@ class OrganizadorExpedienteService
 
                     return [
                         'fuente' => $fuente->fresh(),
-                        'paginas' => (int) $validacion['paginas'],
+                        'paginas' => $paginas,
                         'organizacion_id' => $borrador->id,
                         'requiere_organizacion' => true,
+                        'normalizado' => ($compatibilidad['status'] ?? null) === 'normalized',
+                        'normalizador' => $compatibilidad['normalizer'] ?? null,
                         'duplicado' => $hash !== null && DocumentoAlumnoFuente::query()
                             ->where('inscripcion_id', $alumno->id)
                             ->where('hash_sha256', $hash)
@@ -249,8 +303,185 @@ class OrganizadorExpedienteService
                 throw $e;
             }
         } finally {
-            File::delete($temporalPdf);
+            File::delete(array_filter([$temporalPdf, $temporalNormalizado]));
         }
+    }
+
+    protected function registrarOriginalSinOrganizar(
+        UploadedFile $archivo,
+        Inscripcion $alumno,
+        TipoDocumento $tipo,
+        array $contexto,
+        string $modoIntegracion,
+        string $mimeOriginal,
+        int $tamanoOriginal,
+        ?string $hash,
+        ?int $usuarioId,
+        PdfCompatibilityException $compatibilityError,
+    ): array {
+        $uuid = (string) Str::uuid();
+        $extension = strtolower($archivo->getClientOriginalExtension() ?: 'pdf');
+        $directorio = "expedientes/{$alumno->id}/{$tipo->slug}/originales/" . now()->format('Y');
+        $ruta = "{$directorio}/{$uuid}.{$extension}";
+        $disk = Storage::disk($this->disk());
+        $contenido = File::get($archivo->getRealPath());
+        $paginasEstimadas = $this->validarLimitePaginas(
+            app(PdfCompatibilityService::class)->estimatePages($archivo->getRealPath())
+        );
+        $contextoNormalizado = $this->normalizarContexto($contexto, $tipo);
+
+        if (! $disk->put($ruta, $contenido)) {
+            throw new RuntimeException('No fue posible guardar el PDF original.');
+        }
+
+        try {
+            return DB::transaction(function () use (
+                $archivo,
+                $alumno,
+                $tipo,
+                $contextoNormalizado,
+                $modoIntegracion,
+                $mimeOriginal,
+                $tamanoOriginal,
+                $hash,
+                $usuarioId,
+                $compatibilityError,
+                $ruta,
+                $paginasEstimadas
+            ): array {
+                $consulta = DocumentoAlumno::query()
+                    ->where('inscripcion_id', $alumno->id)
+                    ->where('tipo_documento_id', $tipo->id)
+                    ->where('es_fuente', false)
+                    ->where(fn ($query) => $this->aplicarContextoQuery($query, $contextoNormalizado))
+                    ->lockForUpdate();
+                $version = ((int) (clone $consulta)->max('version')) + 1;
+
+                (clone $consulta)->where('es_actual', true)->update([
+                    'es_actual' => false,
+                    'estado' => 'reemplazado',
+                    'updated_at' => now(),
+                ]);
+
+                $documento = DocumentoAlumno::query()->create([
+                    'inscripcion_id' => $alumno->id,
+                    'tipo_documento_id' => $tipo->id,
+                    'nivel_id' => $contextoNormalizado['nivel_id'],
+                    'grado_id' => $contextoNormalizado['grado_id'],
+                    'grupo_id' => $contextoNormalizado['grupo_id'],
+                    'ciclo_escolar_id' => $contextoNormalizado['ciclo_escolar_id'],
+                    'fecha_documento' => $contextoNormalizado['fecha_documento'],
+                    'folio' => $contextoNormalizado['folio'],
+                    'origen' => $contextoNormalizado['origen'],
+                    'tipo_movimiento' => $contextoNormalizado['tipo_movimiento'],
+                    'motivo' => $contextoNormalizado['motivo'],
+                    'disco' => $this->disk(),
+                    'ruta' => $ruta,
+                    'nombre_original' => Str::limit($archivo->getClientOriginalName(), 250, ''),
+                    'mime_type' => 'application/pdf',
+                    'tamano_bytes' => $tamanoOriginal,
+                    'paginas_total' => $paginasEstimadas,
+                    'hash_sha256' => $hash,
+                    'version' => $version,
+                    'es_actual' => true,
+                    'es_fuente' => false,
+                    'es_organizado' => false,
+                    'estado' => 'recibido',
+                    'observaciones' => $contextoNormalizado['observaciones'],
+                    'subido_por' => $usuarioId,
+                ]);
+
+                $fuente = DocumentoAlumnoFuente::query()->create([
+                    'inscripcion_id' => $alumno->id,
+                    'documento_alumno_id' => $documento->id,
+                    'disco' => $this->disk(),
+                    'ruta' => $ruta,
+                    'ruta_original' => $ruta,
+                    'nombre_original' => Str::limit($archivo->getClientOriginalName(), 255, ''),
+                    'nombre_almacenado' => basename($ruta),
+                    'mime_type' => 'application/pdf',
+                    'mime_original' => $mimeOriginal,
+                    'tamano_bytes' => $tamanoOriginal,
+                    'hash_sha256' => $hash,
+                    'paginas' => $paginasEstimadas,
+                    'estado' => 'activo',
+                    // En este contexto significa “solo lectura para el organizador”,
+                    // no “PDF protegido con contraseña”.
+                    'protegido' => true,
+                    'subido_por' => $usuarioId,
+                    'metadatos' => [
+                        'pdf_estado' => 'original_sin_organizar',
+                        'motivo_solo_lectura' => $compatibilityError->reason,
+                        'mensaje_compatibilidad' => $compatibilityError->getMessage(),
+                        'diagnostico_compatibilidad' => $compatibilityError->details,
+                        'requiere_revision' => true,
+                        'organizable' => false,
+                        'paginas_estimadas' => true,
+                        'original_conservado' => true,
+                        'modo_integracion_solicitado' => $modoIntegracion,
+                        'contexto' => $contextoNormalizado,
+                    ],
+                ]);
+
+                $noAplica = DocumentoAlumnoNoAplica::query()
+                    ->where('inscripcion_id', $alumno->id)
+                    ->where('tipo_documento_id', $tipo->id)
+                    ->where('activo', true);
+                foreach (['nivel_id', 'grado_id', 'ciclo_escolar_id'] as $campo) {
+                    $valor = $contextoNormalizado[$campo] ?? null;
+                    $valor ? $noAplica->where($campo, $valor) : $noAplica->whereNull($campo);
+                }
+                $noAplica->update(['activo' => false, 'updated_at' => now()]);
+
+                if ($tipo->slug === 'constancia-baja-traslado' && filled($contextoNormalizado['tipo_movimiento'])) {
+                    MovimientoAlumno::query()->create([
+                        'inscripcion_id' => $alumno->id,
+                        'documento_alumno_id' => $documento->id,
+                        'tipo' => $contextoNormalizado['tipo_movimiento'],
+                        'fecha' => $contextoNormalizado['fecha_documento'],
+                        'motivo' => $contextoNormalizado['motivo'],
+                        'observaciones' => $contextoNormalizado['observaciones']
+                            ?: 'Documento externo conservado sin organizar; no modifica automáticamente el estado de la inscripción.',
+                        'registrado_por' => $usuarioId,
+                    ]);
+                }
+
+                return [
+                    'fuente' => $fuente->fresh(),
+                    'documento' => $documento->fresh(),
+                    'paginas' => $paginasEstimadas,
+                    'organizacion_id' => null,
+                    'requiere_organizacion' => false,
+                    'guardado_original' => true,
+                    'normalizado' => false,
+                    'normalizador' => null,
+                ];
+            });
+        } catch (Throwable $e) {
+            try {
+                $disk->delete($ruta);
+            } catch (Throwable) {
+            }
+
+            throw $e;
+        }
+    }
+
+    protected function validarLimitePaginas(int $paginas): int
+    {
+        $maximo = max((int) config('expedientes_organizador.max_pages', 50), 1);
+
+        if ($paginas < 1) {
+            throw ValidationException::withMessages(['archivo' => 'El PDF no contiene páginas utilizables.']);
+        }
+
+        if ($paginas > $maximo) {
+            throw ValidationException::withMessages([
+                'archivo' => "El archivo contiene {$paginas} páginas y el límite configurado es {$maximo}.",
+            ]);
+        }
+
+        return $paginas;
     }
 
     public function datosOrganizador(Inscripcion $alumno, ?int $usuarioId = null): array

@@ -8,6 +8,7 @@ use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\InscripcionTutor;
 use App\Models\Nivel;
 use App\Models\ObservacionInscripcion;
 use App\Models\Semestre;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -93,8 +95,6 @@ class EditarMatricula extends Component
     public ?string $foto_actual_url = null;
     public bool $foto_actual_existe = false;
 
-    public ?int $tutor_id = null;
-    public bool $copiar_direccion_tutor = false;
 
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
@@ -128,7 +128,6 @@ class EditarMatricula extends Component
     public array $gruposOptions = [];
     public Collection $ciclosOptions;
     public Collection $ciclosEscolaresObservacion;
-    public Collection $tutores;
 
     public bool $consultandoCurp = false;
     public ?string $curpError = null;
@@ -150,12 +149,6 @@ class EditarMatricula extends Component
             ->orderByDesc('inicio_anio')
             ->orderByDesc('fin_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
-        $this->tutores = Tutor::query()
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
-
         $this->cargar($inscripcion);
         $this->diagnostico_anulacion_ingreso = app(AnulacionIngresoNoIniciadoService::class)
             ->diagnosticar((int) $this->InscripcionId);
@@ -188,7 +181,6 @@ class EditarMatricula extends Component
             'municipio',
             'estado_residencia',
             'ciudad_residencia',
-            'tutor_id',
             'nivel_id',
             'grado_id',
             'generacion_id',
@@ -666,40 +658,59 @@ class EditarMatricula extends Component
         }
     }
 
-    public function updatedTutorId($value): void
+    #[On('usar-domicilio-responsable')]
+    public function usarDomicilioResponsable(int $tutorId): void
     {
-        $this->tutor_id = $value ? (int) $value : null;
+        abort_unless(auth()->user()?->canAccess('alumnos.editar'), 403);
 
-        if ($this->copiar_direccion_tutor && $this->tutor_id) {
-            $this->llenarDireccionDesdeTutor();
-        }
-    }
+        $relacionActiva = InscripcionTutor::query()
+            ->where('inscripcion_id', $this->InscripcionId)
+            ->where('tutor_id', $tutorId)
+            ->where('activo', true)
+            ->exists();
 
-    public function updatedCopiarDireccionTutor($value): void
-    {
-        $this->copiar_direccion_tutor = (bool) $value;
-
-        if ($this->copiar_direccion_tutor && $this->tutor_id) {
-            $this->llenarDireccionDesdeTutor();
-        }
-    }
-
-    private function llenarDireccionDesdeTutor(): void
-    {
-        $tutor = Tutor::query()->find($this->tutor_id);
-
-        if (!$tutor) {
+        if (! $relacionActiva) {
             return;
         }
 
-        $this->calle = $tutor->calle;
-        $this->numero_exterior = $tutor->numero_exterior ?? $tutor->numero ?? null;
-        $this->numero_interior = $tutor->numero_interior;
-        $this->colonia = $tutor->colonia;
-        $this->codigo_postal = $tutor->codigo_postal;
-        $this->municipio = $tutor->municipio;
-        $this->estado_residencia = $tutor->estado_residencia ?? $tutor->estado ?? null;
-        $this->ciudad_residencia = $tutor->ciudad_residencia ?? $tutor->ciudad ?? null;
+        $tutor = Tutor::query()->activos()->find($tutorId);
+
+        if (! $tutor) {
+            return;
+        }
+
+        $mapeo = [
+            'calle' => $tutor->calle,
+            'numero_exterior' => $tutor->numero,
+            'colonia' => $tutor->colonia,
+            'codigo_postal' => $tutor->codigo_postal,
+            'municipio' => $tutor->municipio,
+            'estado_residencia' => $tutor->estado,
+            'ciudad_residencia' => $tutor->ciudad,
+        ];
+
+        $copiados = 0;
+        $conservados = 0;
+
+        foreach ($mapeo as $campo => $valor) {
+            if (blank($valor)) {
+                continue;
+            }
+
+            if (blank($this->{$campo})) {
+                $this->{$campo} = $valor;
+                $copiados++;
+            } else {
+                $conservados++;
+            }
+        }
+
+        $this->dispatch('swal', [
+            'title' => 'Domicilio revisado',
+            'text' => "Se completaron {$copiados} campos vacíos y se conservaron {$conservados} datos ya capturados.",
+            'icon' => 'info',
+            'position' => 'top-end',
+        ]);
     }
 
     public function consultarCurp(CurpService $service): void
@@ -838,7 +849,6 @@ class EditarMatricula extends Component
             'municipio' => ['nullable', 'string', 'max:150'],
             'estado_residencia' => ['nullable', 'string', 'max:150'],
             'ciudad_residencia' => ['nullable', 'string', 'max:150'],
-            'tutor_id' => ['nullable', 'integer', Rule::exists('tutores', 'id')],
             'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];
     }
@@ -1056,7 +1066,6 @@ class EditarMatricula extends Component
                 'municipio' => $data['municipio'] ?? null,
                 'estado_residencia' => $data['estado_residencia'] ?? null,
                 'ciudad_residencia' => $data['ciudad_residencia'] ?? null,
-                'tutor_id' => $data['tutor_id'] ?? null,
                 'foto_path' => $fotoPath,
             ]);
 
@@ -1127,7 +1136,6 @@ class EditarMatricula extends Component
             'grupos' => $this->gruposOptions,
             'ciclos' => $this->ciclosOptions,
             'ciclosEscolaresObservacion' => $this->ciclosEscolaresObservacion,
-            'tutores' => $this->tutores,
             'esBachillerato' => $this->esBachillerato(),
             'resumenDocumental' => $resumenDocumental,
             'diagnosticoAnulacionIngreso' => $this->diagnostico_anulacion_ingreso,

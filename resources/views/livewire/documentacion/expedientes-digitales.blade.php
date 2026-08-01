@@ -460,15 +460,22 @@
 
                     <div
                         class="rounded-3xl border border-slate-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
-                        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Tutor registrado</p>
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Contacto principal</p>
+                        @php
+                            $responsablePrincipal = $alumnoSeleccionado->responsable_principal;
+                        @endphp
                         <p class="mt-3 text-lg font-black text-slate-900 dark:text-white">
-                            @if ($alumnoSeleccionado->tutor)
-                                {{ trim($alumnoSeleccionado->tutor->nombre . ' ' . $alumnoSeleccionado->tutor->apellido_paterno . ' ' . $alumnoSeleccionado->tutor->apellido_materno) }}
+                            @if ($responsablePrincipal)
+                                {{ $responsablePrincipal->nombre_completo }}
                             @else
-                                Sin tutor asignado
+                                Sin responsable principal
                             @endif
                         </p>
-                        <p class="mt-1 text-sm text-slate-500">{{ $alumnoSeleccionado->tutor?->parentesco ?? '—' }}
+                        <p class="mt-1 text-sm text-slate-500">
+                            {{ $alumnoSeleccionado->parentesco_responsable_principal ?? '—' }}
+                            @if ($responsablePrincipal?->telefono_celular || $responsablePrincipal?->telefono_casa)
+                                · {{ $responsablePrincipal->telefono_celular ?: $responsablePrincipal->telefono_casa }}
+                            @endif
                         </p>
                     </div>
 
@@ -868,53 +875,87 @@
 
                     @if (!$soloHistorico)
                         <div class="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            @foreach ([$tipoConstanciaEstudios, $tipoConstanciaBaja] as $tipoAccion)
-                                @if ($tipoAccion)
-                                    @php
-                                        $esBajaAccion = $tipoAccion['slug'] === 'constancia-baja-traslado';
-                                        $claveAccion = 'academico-' . $tipoAccion['id'];
-                                    @endphp
+                            @if ($tipoConstanciaEstudios)
+                                @php
+                                    $claveConstanciaEstudios = 'academico-' . $tipoConstanciaEstudios['id'];
+                                @endphp
 
-                                    <article data-document-type="{{ $tipoAccion['id'] }}"
-                                        class="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-sky-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/20 dark:to-sky-950/20">
-                                        <div class="flex items-start gap-3">
-                                            <div
-                                                class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
-                                                <flux:icon
-                                                    :name="$esBajaAccion ? 'arrow-right-start-on-rectangle' : 'document-text'"
-                                                    class="size-5" />
-                                            </div>
-                                            <div class="min-w-0">
-                                                <h4 class="font-black text-slate-900 dark:text-white">
-                                                    {{ $tipoAccion['nombre'] }}
-                                                </h4>
-                                                <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                                    {{ $esBajaAccion
-                                                        ? 'Registra un archivo externo de baja o traslado sin eliminar el historial.'
-                                                        : 'Adjunta una constancia antigua, externa o emitida fuera del flujo automático.' }}
-                                                </p>
-                                            </div>
+                                <article data-document-type="{{ $tipoConstanciaEstudios['id'] }}"
+                                    class="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-sky-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/20 dark:to-sky-950/20">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                                            <flux:icon name="document-text" class="size-5" />
                                         </div>
+                                        <div class="min-w-0">
+                                            <h4 class="font-black text-slate-900 dark:text-white">
+                                                {{ $tipoConstanciaEstudios['nombre'] }}
+                                            </h4>
+                                            <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                                Adjunta una constancia antigua, externa o emitida fuera del flujo automático.
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                        <button type="button"
-                                            @click="openUpload(
-                                                {{ $tipoAccion['id'] }},
-                                                {{ $nivelContextoId ?? 'null' }},
-                                                {{ $gradoContextoId ?? 'null' }},
-                                                {{ $cicloContextoId ?? 'null' }},
-                                                '{{ $claveAccion }}'
-                                            )"
-                                            :disabled="opening || closing"
-                                            class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-70">
-                                            <span x-show="opening && openingKey === '{{ $claveAccion }}'"
-                                                class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
-                                            <flux:icon x-show="!(opening && openingKey === '{{ $claveAccion }}')"
-                                                name="arrow-up-tray" class="size-4" />
-                                            Subir {{ mb_strtolower($tipoAccion['nombre']) }}
-                                        </button>
-                                    </article>
-                                @endif
-                            @endforeach
+                                    <button type="button"
+                                        @click="openUpload(
+                                            {{ $tipoConstanciaEstudios['id'] }},
+                                            {{ $nivelContextoId ?? 'null' }},
+                                            {{ $gradoContextoId ?? 'null' }},
+                                            {{ $cicloContextoId ?? 'null' }},
+                                            '{{ $claveConstanciaEstudios }}'
+                                        )"
+                                        :disabled="opening || closing"
+                                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-70">
+                                        <span x-show="opening && openingKey === '{{ $claveConstanciaEstudios }}'"
+                                            class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                        <flux:icon x-show="!(opening && openingKey === '{{ $claveConstanciaEstudios }}')"
+                                            name="arrow-up-tray" class="size-4" />
+                                        Subir {{ mb_strtolower($tipoConstanciaEstudios['nombre']) }}
+                                    </button>
+                                </article>
+                            @endif
+
+                            @if ($tipoConstanciaBaja)
+                                @php
+                                    $claveConstanciaBaja = 'academico-' . $tipoConstanciaBaja['id'];
+                                @endphp
+
+                                <article data-document-type="{{ $tipoConstanciaBaja['id'] }}"
+                                    class="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-sky-50 p-4 dark:border-indigo-900/50 dark:from-indigo-950/20 dark:to-sky-950/20">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                                            <flux:icon name="arrow-right-start-on-rectangle" class="size-5" />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <h4 class="font-black text-slate-900 dark:text-white">
+                                                {{ $tipoConstanciaBaja['nombre'] }}
+                                            </h4>
+                                            <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                                Registra un archivo externo de baja o traslado sin eliminar el historial.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button type="button"
+                                        @click="openUpload(
+                                            {{ $tipoConstanciaBaja['id'] }},
+                                            {{ $nivelContextoId ?? 'null' }},
+                                            {{ $gradoContextoId ?? 'null' }},
+                                            {{ $cicloContextoId ?? 'null' }},
+                                            '{{ $claveConstanciaBaja }}'
+                                        )"
+                                        :disabled="opening || closing"
+                                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-70">
+                                        <span x-show="opening && openingKey === '{{ $claveConstanciaBaja }}'"
+                                            class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                        <flux:icon x-show="!(opening && openingKey === '{{ $claveConstanciaBaja }}')"
+                                            name="arrow-up-tray" class="size-4" />
+                                        Subir {{ mb_strtolower($tipoConstanciaBaja['nombre']) }}
+                                    </button>
+                                </article>
+                            @endif
                         </div>
                     @endif
 
@@ -1052,7 +1093,15 @@
                                         </p>
                                         <p class="mt-1 text-xs text-slate-500">
                                             Subió: {{ $fuente->usuario?->name ?? 'Sistema' }}
-                                            @if ($fuente->protegido) · Protegido @endif
+                                            @if ($fuente->protegido)
+                                                @if (data_get($fuente->metadatos, 'pdf_estado') === 'original_sin_organizar')
+                                                    · Solo lectura (PDF original)
+                                                @else
+                                                    · Protegido
+                                                @endif
+                                            @elseif (data_get($fuente->metadatos, 'pdf_estado') === 'normalized')
+                                                · Normalizado con {{ data_get($fuente->metadatos, 'normalizador', 'herramienta PDF') }}
+                                            @endif
                                         </p>
                                     </div>
                                     <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase {{ $fuente->estado === 'activo' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
@@ -1612,8 +1661,42 @@
                                     x-text="fileError"></div>
 
                                 @error('archivo')
-                                    <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                                    @if ($pdf_requiere_decision && $pdf_puede_guardarse_original)
+                                        <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                                            <div class="flex items-start gap-3">
+                                                <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200">
+                                                    <flux:icon name="exclamation-triangle" class="size-5" />
+                                                </div>
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="text-sm font-black text-amber-900 dark:text-amber-100">
+                                                        El PDF puede conservarse, pero no organizarse
+                                                    </p>
+                                                    <p class="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                                                        {{ $pdf_diagnostico ?: $message }}
+                                                    </p>
+                                                    <p class="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                                                        El archivo original se guardará completo como evidencia, quedará visible para consulta y no se intentará dividir, rotar ni combinar.
+                                                    </p>
+                                                    <button type="button" wire:click="guardarOriginalSinOrganizar"
+                                                        wire:loading.attr="disabled" wire:target="guardarOriginalSinOrganizar,subirDocumento"
+                                                        class="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                                        <span wire:loading wire:target="guardarOriginalSinOrganizar,subirDocumento"
+                                                            class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                                        <flux:icon wire:loading.remove wire:target="guardarOriginalSinOrganizar,subirDocumento"
+                                                            name="arrow-down-tray" class="size-4" />
+                                                        Guardar original sin organizar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                                    @endif
                                 @enderror
+                            </div>
+
+                            <div class="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+                                Los PDF incompatibles se intentan normalizar automáticamente con qpdf o Ghostscript. El archivo original siempre se conserva sin sobrescribirse.
                             </div>
 
                             <div>
@@ -1706,12 +1789,13 @@
                                 Cancelar
                             </button>
 
-                            <button type="submit" :disabled="saving || uploading || !uploadReady || closing"
+                            <button type="submit"
+                                :disabled="saving || uploading || !uploadReady || closing || {{ $pdf_requiere_decision ? 'true' : 'false' }}"
                                 class="inline-flex min-w-[190px] items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
                                 <span x-show="saving"
                                     class="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
                                 <flux:icon x-show="!saving" name="arrow-up-tray" class="size-4" />
-                                <span x-text="saving ? 'Preparando…' : 'Guardar y organizar'"></span>
+                                <span x-text="saving ? 'Preparando…' : {{ $pdf_requiere_decision ? "'Elige una opción'" : "'Guardar y organizar'" }}"></span>
                             </button>
                         </div>
                     </div>

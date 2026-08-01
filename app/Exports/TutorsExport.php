@@ -20,8 +20,10 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
 {
     protected Collection $tutores;
 
-    public function __construct(Collection $tutores)
-    {
+    public function __construct(
+        Collection $tutores,
+        private readonly bool $incluirIdentidadCompleta = false,
+    ) {
         $this->tutores = $tutores;
     }
 
@@ -42,7 +44,10 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
             'No.',
             'ID',
             'CURP',
-            'Parentesco',
+            'Identificador alternativo',
+            'Estado',
+            'Relaciones activas',
+            'Relaciones históricas',
             'Género',
             'Nombre',
             'Apellido paterno',
@@ -75,8 +80,15 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
         return [
             $numero,
             $tutor->id,
-            $tutor->curp,
-            $tutor->parentesco,
+            $this->incluirIdentidadCompleta
+                ? $tutor->curp
+                : ($tutor->curp ? $tutor->identidad_protegida : null),
+            $this->incluirIdentidadCompleta
+                ? $tutor->identificador_alternativo
+                : (! $tutor->curp ? $tutor->identidad_protegida : null),
+            $tutor->activo ? 'Activo' : 'Archivado',
+            (int) ($tutor->relaciones_activas_count ?? 0),
+            (int) ($tutor->relaciones_total_count ?? 0),
             $tutor->genero,
             $tutor->nombre,
             $tutor->apellido_paterno,
@@ -159,12 +171,12 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet;
-                $ultimaColumna = 'Y';
+                $ultimaColumna = 'AB';
                 $ultimaFila = $this->tutores->count() + 4; // encabezados en fila 4, datos desde fila 5
     
                 // Título
                 $sheet->mergeCells("A1:{$ultimaColumna}1");
-                $sheet->setCellValue('A1', 'REPORTE GENERAL DE TUTORES');
+                $sheet->setCellValue('A1', 'REPORTE GENERAL DE RESPONSABLES');
 
                 // Subtítulo
                 $sheet->mergeCells("A2:{$ultimaColumna}2");
@@ -197,19 +209,19 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
                         ->setVertical(Alignment::VERTICAL_CENTER);
 
                     // Centrar algunas columnas
-                    $sheet->getStyle("A4:E{$ultimaFila}")
+                    $sheet->getStyle("A4:H{$ultimaFila}")
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                    $sheet->getStyle("J5:J{$ultimaFila}")
+                    $sheet->getStyle("M5:M{$ultimaFila}")
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                    $sheet->getStyle("T5:T{$ultimaFila}")
+                    $sheet->getStyle("W5:W{$ultimaFila}")
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                    $sheet->getStyle("U5:U{$ultimaFila}")
+                    $sheet->getStyle("AA5:AB{$ultimaFila}")
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -230,7 +242,7 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
                     }
 
                     // Nombre completo en negrita
-                    $sheet->getStyle("I5:I{$ultimaFila}")->getFont()->setBold(true);
+                    $sheet->getStyle("L5:L{$ultimaFila}")->getFont()->setBold(true);
                 }
 
                 // Autofiltro
@@ -240,13 +252,14 @@ class TutorsExport implements FromCollection, WithHeadings, WithMapping, ShouldA
                 $sheet->freezePane('A5');
 
                 // Anchos manuales
-                $sheet->getColumnDimension('I')->setWidth(30);
-                $sheet->getColumnDimension('N')->setWidth(25);
-                $sheet->getColumnDimension('P')->setWidth(20);
-                $sheet->getColumnDimension('Q')->setWidth(20);
-                $sheet->getColumnDimension('R')->setWidth(20);
+                $sheet->getColumnDimension('D')->setWidth(22);
+                $sheet->getColumnDimension('L')->setWidth(30);
+                $sheet->getColumnDimension('Q')->setWidth(25);
                 $sheet->getColumnDimension('S')->setWidth(20);
-                $sheet->getColumnDimension('W')->setWidth(30);
+                $sheet->getColumnDimension('T')->setWidth(20);
+                $sheet->getColumnDimension('U')->setWidth(20);
+                $sheet->getColumnDimension('V')->setWidth(20);
+                $sheet->getColumnDimension('Z')->setWidth(30);
 
                 // Borde del título
                 $sheet->getStyle("A1:{$ultimaColumna}1")->applyFromArray([

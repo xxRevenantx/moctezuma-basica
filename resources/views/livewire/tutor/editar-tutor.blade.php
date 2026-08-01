@@ -100,8 +100,7 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Identidad</h3>
-                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">La CURP es obligatoria y
-                                única.</p>
+                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">La CURP se valida localmente. El parentesco se administra por alumno.</p>
                         </div>
 
                         <span
@@ -111,19 +110,39 @@
                     </div>
 
                     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <flux:field>
-                            <flux:label badge="Requerido">CURP *</flux:label>
-                            <flux:input wire:model="curp" maxlength="18" class="uppercase tracking-wider"
-                                placeholder="Ej. NUPC950101HGRXXX09 (18 caracteres)" />
-                            <flux:error name="curp" />
-                        </flux:field>
+                        <div class="sm:col-span-2 space-y-3">
+                            <label class="inline-flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+                                <input type="checkbox" wire:model.live="sin_curp" class="rounded border-zinc-300 text-sky-600 focus:ring-sky-500">
+                                Responsable extranjero o sin CURP disponible
+                            </label>
 
-                        <flux:field>
-                            <flux:label badge="Requerido">Parentesco *</flux:label>
-                            <flux:input wire:model="parentesco" maxlength="50" class="uppercase"
-                                placeholder="Ej. PADRE, MADRE, TUTOR..." />
-                            <flux:error name="parentesco" />
-                        </flux:field>
+                            @if (!$sin_curp)
+                                <flux:field>
+                                    <flux:label badge="Requerido">CURP *</flux:label>
+                                    <flux:input wire:model.blur="curp" maxlength="18" inputmode="text" autocomplete="off" spellcheck="false"
+                                                x-on:input="$el.value = $el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18)"
+                                                class="uppercase tracking-wider" />
+                                    <flux:error name="curp" />
+                                </flux:field>
+                            @else
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <flux:field>
+                                        <flux:label badge="Requerido">Identificador alternativo *</flux:label>
+                                        <flux:input wire:model="identificador_alternativo" maxlength="80" class="uppercase" />
+                                        <flux:error name="identificador_alternativo" />
+                                    </flux:field>
+                                    <flux:field>
+                                        <flux:label badge="Requerido">Motivo sin CURP *</flux:label>
+                                        <flux:input wire:model="motivo_sin_curp" maxlength="255" />
+                                        <flux:error name="motivo_sin_curp" />
+                                    </flux:field>
+                                </div>
+                            @endif
+
+                            <p class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-300">
+                                El parentesco y las autorizaciones se editan desde la relación con cada alumno.
+                            </p>
+                        </div>
 
                         <flux:field>
                             <flux:label badge="Requerido">Género *</flux:label>

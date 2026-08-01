@@ -965,40 +965,16 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 dark:text-white">Tutor y domicilio</h2>
                             <p class="text-sm text-slate-500 dark:text-slate-400">
-                                Selecciona el tutor y actualiza la dirección.
+                                Administra varios responsables, sus funciones y el domicilio del alumno.
                             </p>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <div class="xl:col-span-2">
-                            <div class="mb-1 flex items-center gap-2">
-                                <flux:label>Tutor</flux:label>
-                                <span
-                                    class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-                                    Opcional
-                                </span>
-                            </div>
-                            <flux:select wire:model.live="tutor_id">
-                                <flux:select.option value="">Selecciona un tutor</flux:select.option>
-                                @foreach ($tutores as $tutor)
-                                    <flux:select.option value="{{ $tutor->id }}">
-                                        {{ trim(($tutor->nombre ?? '') . ' ' . ($tutor->apellido_paterno ?? '') . ' ' . ($tutor->apellido_materno ?? '')) }}
-                                    </flux:select.option>
-                                @endforeach
-                            </flux:select>
-                            @error('tutor_id')
-                                <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="flex items-end md:col-span-2">
-                            <label
-                                class="inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
-                                <input type="checkbox" wire:model.live="copiar_direccion_tutor"
-                                    class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                                Copiar dirección del tutor
-                            </label>
+                        <div class="md:col-span-2 xl:col-span-4">
+                            <livewire:tutor.gestion-responsables-alumno
+                                :inscripcion-id="$InscripcionId"
+                                :key="'responsables-alumno-' . $InscripcionId" />
                         </div>
 
                         @foreach ([

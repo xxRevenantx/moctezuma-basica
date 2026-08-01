@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Documentacion;
 
+use App\Exceptions\Expedientes\PdfCompatibilityException;
 use App\Models\CicloEscolar;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoAlumnoFuente;
@@ -53,6 +54,10 @@ class ExpedientesDigitales extends Component
     public string $modo_integracion = 'agregar';
     public string $contenido_archivo = 'un_documento';
     public bool $permitir_archivo_duplicado = false;
+    public bool $pdf_requiere_decision = false;
+    public bool $pdf_puede_guardarse_original = false;
+    public string $pdf_diagnostico = '';
+    public bool $guardar_original_sin_organizar = false;
 
     public bool $mostrarNoAplica = false;
     public ?int $no_aplica_tipo_id = null;
@@ -219,6 +224,7 @@ class ExpedientesDigitales extends Component
         $this->observaciones = '';
         $this->contenido_archivo = 'un_documento';
         $this->permitir_archivo_duplicado = false;
+        $this->reiniciarEstadoCompatibilidadPdf();
 
         if (!$tipo->requiere_nivel) {
             $this->nivel_certificado_id = null;
@@ -250,6 +256,7 @@ class ExpedientesDigitales extends Component
         $this->modo_integracion = 'agregar';
         $this->contenido_archivo = 'un_documento';
         $this->permitir_archivo_duplicado = false;
+        $this->reiniciarEstadoCompatibilidadPdf();
         $this->resetValidation();
     }
 
@@ -292,6 +299,32 @@ class ExpedientesDigitales extends Component
     {
         $this->ciclo_escolar_documento_id = $value ? (int) $value : null;
         $this->actualizarIndicadorReemplazo();
+    }
+
+    public function updatedArchivo(): void
+    {
+        $this->reiniciarEstadoCompatibilidadPdf();
+        $this->resetErrorBag('archivo');
+    }
+
+    public function guardarOriginalSinOrganizar(): void
+    {
+        if (! $this->pdf_puede_guardarse_original || ! $this->archivo) {
+            $this->addError('archivo', 'Selecciona nuevamente el PDF antes de intentar conservarlo sin organizar.');
+            return;
+        }
+
+        $this->guardar_original_sin_organizar = true;
+        $this->resetErrorBag('archivo');
+        $this->subirDocumento();
+    }
+
+    protected function reiniciarEstadoCompatibilidadPdf(): void
+    {
+        $this->pdf_requiere_decision = false;
+        $this->pdf_puede_guardarse_original = false;
+        $this->pdf_diagnostico = '';
+        $this->guardar_original_sin_organizar = false;
     }
 
     public function subirDocumento(): void
@@ -410,18 +443,33 @@ class ExpedientesDigitales extends Component
                 $this->modo_integracion,
                 $this->contenido_archivo,
                 auth()->id(),
-                $this->permitir_archivo_duplicado
+                $this->permitir_archivo_duplicado,
+                $this->guardar_original_sin_organizar
             );
 
             $fuenteId = $resultado['fuente']->id;
             $paginas = $resultado['paginas'];
+            $requiereOrganizacion = (bool) ($resultado['requiere_organizacion'] ?? true);
+            $normalizado = (bool) ($resultado['normalizado'] ?? false);
+            $normalizador = (string) ($resultado['normalizador'] ?? '');
             $this->cerrarCarga();
-            $this->dispatch('abrir-organizador-expediente', inscripcionId: $alumno->id, fuenteId: $fuenteId);
-            $this->dispatch(
-                'notify',
-                type: 'success',
-                message: "Archivo fuente guardado con {$paginas} página(s). Confirma su organización para marcar los documentos como entregados."
-            );
+
+            if ($requiereOrganizacion) {
+                $this->dispatch('abrir-organizador-expediente', inscripcionId: $alumno->id, fuenteId: $fuenteId);
+                $mensaje = $normalizado
+                    ? "El PDF se normalizó automáticamente con {$normalizador} y quedó listo con {$paginas} página(s). Confirma su organización."
+                    : "Archivo fuente guardado con {$paginas} página(s). Confirma su organización para marcar los documentos como entregados.";
+            } else {
+                $mensaje = 'El archivo original se conservó correctamente como documento recibido. Quedó en modo solo lectura porque no pudo organizarse con FPDI.';
+            }
+
+            $this->dispatch('notify', type: 'success', message: $mensaje);
+        } catch (PdfCompatibilityException $e) {
+            $this->pdf_diagnostico = $e->getMessage();
+            $this->pdf_puede_guardarse_original = $e->canStoreOriginal;
+            $this->pdf_requiere_decision = $e->canStoreOriginal;
+            $this->guardar_original_sin_organizar = false;
+            $this->addError('archivo', $e->getMessage());
         } catch (ValidationException $e) {
             $this->addError('archivo', $e->validator->errors()->first());
         } catch (Throwable $e) {
@@ -667,6 +715,7 @@ class ExpedientesDigitales extends Component
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
+                'relacionTutorPrincipal.tutor:id,nombre,apellido_paterno,apellido_materno,telefono_celular,telefono_casa,correo_electronico',
                 'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
                 'documentos.nivel:id,nombre,slug,color',
                 'documentos.grado:id,nombre,orden',
@@ -860,6 +909,7 @@ class ExpedientesDigitales extends Component
                     'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',
                     'semestre:id,numero',
                     'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
+                'relacionTutorPrincipal.tutor:id,nombre,apellido_paterno,apellido_materno,telefono_celular,telefono_casa,correo_electronico',
                     'cambiosAcademicos' => fn($query) => $query
                         ->with([
                             'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',

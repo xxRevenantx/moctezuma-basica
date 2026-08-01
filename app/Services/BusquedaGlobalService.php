@@ -104,12 +104,14 @@ class BusquedaGlobalService
                 $this->buscarHorariosProfesores($termino)
             );
 
-            $categorias[] = $this->categoria(
-                'tutores',
-                'Tutores',
-                'user-group',
-                $this->buscarTutores($termino)
-            );
+            if ($usuario->canAccess('alumnos.consultar')) {
+                $categorias[] = $this->categoria(
+                    'tutores',
+                    'Responsables',
+                    'user-group',
+                    $this->buscarTutores($termino)
+                );
+            }
 
             $categorias[] = $this->categoria(
                 'constancias',
@@ -808,7 +810,7 @@ class BusquedaGlobalService
             ->select([
                 'id',
                 'curp',
-                'parentesco',
+                'identificador_alternativo',
                 'nombre',
                 'apellido_paterno',
                 'apellido_materno',
@@ -817,22 +819,28 @@ class BusquedaGlobalService
                 'correo_electronico',
                 'ciudad',
                 'estado',
+                'activo',
             ])
-            ->withCount('inscripciones')
+            ->withCount([
+                'relaciones as relaciones_total_count',
+                'relacionesActivas as relaciones_activas_count',
+            ])
             ->where(function (Builder $query) use ($like): void {
-                $query->where('curp', 'like', $like)
+                $query->where('curp', 'like', mb_strtoupper($like))
+                    ->orWhere('identificador_alternativo', 'like', $like)
                     ->orWhere('nombre', 'like', $like)
                     ->orWhere('apellido_paterno', 'like', $like)
                     ->orWhere('apellido_materno', 'like', $like)
-                    ->orWhere('parentesco', 'like', $like)
                     ->orWhere('telefono_celular', 'like', $like)
                     ->orWhere('telefono_casa', 'like', $like)
                     ->orWhere('correo_electronico', 'like', $like)
+                    ->orWhereHas('relaciones', fn (Builder $relacion) => $relacion->where('parentesco', 'like', $like))
                     ->orWhereRaw(
                         "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
                         [$like]
                     );
             })
+            ->orderByDesc('activo')
             ->orderBy('apellido_paterno')
             ->limit(self::LIMITE_POR_CATEGORIA)
             ->get()
@@ -847,18 +855,22 @@ class BusquedaGlobalService
                     'tipo' => 'tutor',
                     'titulo' => $nombre,
                     'subtitulo' => collect([
-                        $tutor->parentesco,
-                        $tutor->inscripciones_count . ' alumno(s) relacionado(s)',
+                        $tutor->activo ? 'Responsable activo' : 'Responsable archivado',
+                        (int) $tutor->relaciones_activas_count . ' relación(es) activa(s)',
+                        (int) $tutor->relaciones_total_count . ' histórica(s)',
                     ])->filter()->join(' · '),
                     'detalle' => collect([
                         $tutor->telefono_celular ?: $tutor->telefono_casa,
                         $tutor->correo_electronico,
                         collect([$tutor->ciudad, $tutor->estado])->filter()->join(', '),
                     ])->filter()->join(' · '),
-                    'estado' => 'Tutor',
-                    'tono' => 'amber',
+                    'estado' => $tutor->activo ? 'Activo' : 'Archivado',
+                    'tono' => $tutor->activo ? 'amber' : 'slate',
                     'iniciales' => $this->iniciales($nombre),
-                    'url' => route('misrutas.tutores', ['buscar' => $tutor->curp]),
+                    'url' => route('misrutas.tutores', [
+                        'buscar' => $tutor->curp ?: $tutor->identificador_alternativo,
+                        'estado' => $tutor->activo ? 'activos' : 'archivados',
+                    ]),
                 ];
             })
             ->all();

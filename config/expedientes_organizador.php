@@ -11,6 +11,15 @@ return [
 
     'preview_ttl_hours' => (int) env('EXPEDIENTES_ORGANIZADOR_PREVIEW_TTL_HOURS', 24),
 
+    'pdf_normalization' => [
+        'enabled' => (bool) env('EXPEDIENTES_PDF_NORMALIZATION_ENABLED', true),
+        'timeout_seconds' => (int) env('EXPEDIENTES_PDF_NORMALIZATION_TIMEOUT', 45),
+        // Déjalos vacíos para autodetección. En Laragon/Windows puedes indicar
+        // la ruta completa cuando qpdf o Ghostscript no estén en el PATH.
+        'qpdf_binary' => env('EXPEDIENTES_QPDF_BINARY'),
+        'ghostscript_binary' => env('EXPEDIENTES_GHOSTSCRIPT_BINARY'),
+    ],
+
     'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
     'allowed_mimetypes' => [
         'application/pdf',

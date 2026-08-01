@@ -296,9 +296,62 @@ class Inscripcion extends Model
     }
 
 
+    /** Relación legado temporal con el contacto principal. */
     public function tutor()
     {
         return $this->belongsTo(Tutor::class);
+    }
+
+    public function tutores()
+    {
+        return $this->belongsToMany(Tutor::class, 'inscripcion_tutor')
+            ->using(InscripcionTutor::class)
+            ->withPivot([
+                'id', 'parentesco', 'es_principal', 'orden_contacto',
+                'es_tutor_legal', 'estado_tutela', 'vive_con_alumno',
+                'recibe_avisos', 'recibe_calificaciones',
+                'contacto_emergencia', 'autorizado_recoger',
+                'responsable_economico', 'activo', 'fecha_inicio',
+                'fecha_fin', 'motivo_fin', 'observaciones',
+                'created_by', 'updated_by',
+            ])
+            ->withTimestamps();
+    }
+
+    public function relacionesTutores()
+    {
+        return $this->hasMany(InscripcionTutor::class, 'inscripcion_id');
+    }
+
+    public function relacionesTutoresActivas()
+    {
+        return $this->relacionesTutores()->activas()->orderByDesc('es_principal')->orderBy('orden_contacto');
+    }
+
+    public function relacionTutorPrincipal()
+    {
+        return $this->hasOne(InscripcionTutor::class, 'inscripcion_id')
+            ->where('activo', true)
+            ->orderByDesc('es_principal')
+            ->orderBy('orden_contacto');
+    }
+
+    public function getResponsablePrincipalAttribute(): ?Tutor
+    {
+        $relacion = $this->relationLoaded('relacionTutorPrincipal')
+            ? $this->getRelation('relacionTutorPrincipal')
+            : $this->relacionTutorPrincipal()->with('tutor')->first();
+
+        return $relacion?->tutor ?: $this->tutor;
+    }
+
+    public function getParentescoResponsablePrincipalAttribute(): ?string
+    {
+        $relacion = $this->relationLoaded('relacionTutorPrincipal')
+            ? $this->getRelation('relacionTutorPrincipal')
+            : $this->relacionTutorPrincipal()->first();
+
+        return $relacion?->parentesco ?: $this->tutor?->parentesco;
     }
 
     public function observacionesInscripcion()

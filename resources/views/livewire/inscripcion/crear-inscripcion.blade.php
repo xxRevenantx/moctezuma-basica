@@ -261,7 +261,7 @@
           pasoPorCampo(campo) {
               const paso1 = ['curp', 'matricula', 'folio', 'nombre', 'apellido_paterno', 'apellido_materno', 'fecha_nacimiento', 'genero'];
               const paso2 = ['fecha_inscripcion', 'ciclo_escolar_id', 'ciclo_id', 'tipo_ingreso', 'estado_inscripcion', 'motivo_captura_historica', 'nivel_id', 'grado_id', 'semestre_id', 'generacion_id', 'grupo_id'];
-              const paso3 = ['tutor_id', 'calle', 'numero_exterior', 'numero_interior', 'colonia', 'codigo_postal', 'municipio', 'estado_residencia', 'ciudad_residencia'];
+              const paso3 = ['responsables', 'calle', 'numero_exterior', 'numero_interior', 'colonia', 'codigo_postal', 'municipio', 'estado_residencia', 'ciudad_residencia'];
               return paso1.includes(campo) ? 1 : (paso2.includes(campo) ? 2 : (paso3.includes(campo) ? 3 : 4));
           }
       }" x-ref="inicioFormulario"
@@ -1131,51 +1131,16 @@
                                   </div>
                                   <div>
                                       <h2 class="text-lg font-bold text-slate-800 dark:text-white">
-                                          Tutor y domicilio
+                                          Responsables y domicilio
                                       </h2>
                                       <p class="text-sm text-slate-500 dark:text-slate-400">
-                                          Selecciona el tutor y captura la dirección.
+                                          Relaciona uno o varios responsables y captura el domicilio del alumno.
                                       </p>
                                   </div>
                               </div>
 
                               <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                  <div class="xl:col-span-2">
-                                      <div class="mb-1 flex items-center gap-2">
-                                          <flux:label>Tutor</flux:label>
-                                          <span
-                                              class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-                                              Opcional
-                                          </span>
-                                      </div>
-                                      <flux:select wire:model="tutor_id">
-                                          <flux:select.option value="">Selecciona un tutor</flux:select.option>
-                                          @foreach ($tutores as $tutor)
-                                              <flux:select.option value="{{ $tutor->id }}">
-                                                  {{ trim(($tutor->nombre ?? '') . ' ' . ($tutor->apellido_paterno ?? '') . ' ' . ($tutor->apellido_materno ?? '')) }}
-                                              </flux:select.option>
-                                          @endforeach
-                                      </flux:select>
-                                      @error('tutor_id')
-                                          <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                                      @enderror
-                                  </div>
-
-                                  <div class="md:col-span-2 flex flex-col justify-end gap-2">
-                                      <label
-                                          class="inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
-                                          <input type="checkbox" wire:model.live="copiar_direccion_tutor"
-                                              class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                                          Copiar solo los datos vacíos de la dirección del tutor
-                                      </label>
-
-                                      @if ($direccionTutorAdvertencia)
-                                          <p
-                                              class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-                                              {{ $direccionTutorAdvertencia }}
-                                          </p>
-                                      @endif
-                                  </div>
+                                  @include('livewire.inscripcion.partials.responsables-borrador')
 
                                   <div>
                                       <div class="mb-1 flex items-center gap-2">

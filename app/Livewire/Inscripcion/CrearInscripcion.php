@@ -14,10 +14,12 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
+use App\Rules\CurpMexicana;
 use App\Services\AsignacionEscolarService;
 use App\Services\CurpLocalLookupService;
 use App\Services\CurpService;
 use App\Services\GestionAcademicaService;
+use App\Services\GestionResponsablesAlumnoService;
 use App\Services\ImagenPersonalService;
 use App\Services\MatriculaAlumnoService;
 use App\Services\ObservacionInscripcionService;
@@ -26,6 +28,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -51,6 +54,8 @@ class CrearInscripcion extends Component
     public array $curpDiferencias = [];
     public ?string $direccionTutorAdvertencia = null;
     public bool $guardandoInscripcion = false;
+    #[Locked]
+    public bool $puedeGestionarResponsablesSensibles = false;
 
     public string $curp = '';
     public string $matricula = '';
@@ -93,8 +98,33 @@ class CrearInscripcion extends Component
 
     public $foto = null;
 
-    public ?int $tutor_id = null;
-    public bool $copiar_direccion_tutor = false;
+    /** @var array<int, array<string, mixed>> */
+    public array $responsables = [];
+    public string $buscarTutor = '';
+    public array $resultadosTutores = [];
+    public bool $mostrarNuevoTutor = false;
+    public ?string $responsablesMensaje = null;
+    public array $nuevoTutor = [
+        'sin_curp' => false,
+        'curp' => '',
+        'identificador_alternativo' => '',
+        'motivo_sin_curp' => '',
+        'nombre' => '',
+        'apellido_paterno' => '',
+        'apellido_materno' => '',
+        'genero' => '',
+        'fecha_nacimiento' => '',
+        'telefono_celular' => '',
+        'telefono_casa' => '',
+        'correo_electronico' => '',
+        'calle' => '',
+        'numero' => '',
+        'colonia' => '',
+        'codigo_postal' => '',
+        'municipio' => '',
+        'estado' => '',
+        'ciudad' => '',
+    ];
 
     public ?int $nivel_id = null;
     public ?int $grado_id = null;
@@ -111,7 +141,6 @@ class CrearInscripcion extends Component
     public array $gruposOptions = [];
     public Collection $ciclosOptions;
     public Collection $cicloEscolaresOptions;
-    public Collection $tutores;
 
     public $archivoAlumnos = null;
     public array $erroresImportacionAlumnos = [];
@@ -121,6 +150,7 @@ class CrearInscripcion extends Component
     public function mount(): void
     {
         abort_unless(auth()->user()?->canAccess('alumnos.crear'), 403);
+        $this->puedeGestionarResponsablesSensibles = (bool) auth()->user()?->canAccess('alumnos.responsables_sensibles');
 
         $this->niveles = $this->loadNiveles();
         $this->gradosOptions = collect();
@@ -131,7 +161,6 @@ class CrearInscripcion extends Component
         $this->cicloEscolaresOptions = $this->loadCicloEscolares();
         $this->ciclo_escolar_id = $this->cicloEscolaresOptions->firstWhere('es_actual', true)?->id
             ?: $this->cicloEscolaresOptions->first()?->id;
-        $this->tutores = $this->loadTutores();
 
         $this->fecha_inscripcion = now()->toDateString();
         $this->ciclo_escolar_id = $this->ciclo_escolar_id ?: $this->cicloEscolaresOptions->first()?->id;
@@ -338,11 +367,19 @@ class CrearInscripcion extends Component
                 Rule::exists('grupos', 'id'),
             ],
 
-            'tutor_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('tutores', 'id'),
-            ],
+            'responsables' => ['array'],
+            'responsables.*.tutor_id' => ['required', 'integer', Rule::exists('tutores', 'id')],
+            'responsables.*.parentesco' => ['required', Rule::in(GestionResponsablesAlumnoService::PARENTESCOS)],
+            'responsables.*.estado_tutela' => ['required', Rule::in(GestionResponsablesAlumnoService::ESTADOS_TUTELA)],
+            'responsables.*.es_principal' => ['boolean'],
+            'responsables.*.es_tutor_legal' => ['boolean'],
+            'responsables.*.vive_con_alumno' => ['boolean'],
+            'responsables.*.recibe_avisos' => ['boolean'],
+            'responsables.*.recibe_calificaciones' => ['boolean'],
+            'responsables.*.contacto_emergencia' => ['boolean'],
+            'responsables.*.autorizado_recoger' => ['boolean'],
+            'responsables.*.responsable_economico' => ['boolean'],
+            'responsables.*.observaciones' => ['nullable', 'string', 'max:1000'],
             'foto' => [
                 'nullable',
                 'image',
@@ -397,7 +434,7 @@ class CrearInscripcion extends Component
             'grupo_id.required' => 'Selecciona un grupo.',
 
             'codigo_postal.regex' => 'El código postal debe tener 5 dígitos.',
-            'tutor_id.exists' => 'El tutor seleccionado no es válido.',
+            'responsables.*.tutor_id.exists' => 'Uno de los responsables seleccionados no es válido.',
 
             'foto.image' => 'La foto debe ser una imagen válida.',
             'foto.max' => 'La foto no debe exceder 5MB.',
@@ -874,34 +911,127 @@ class CrearInscripcion extends Component
         }
     }
 
-    protected function loadTutores(): Collection
+    public function updatedBuscarTutor(): void
     {
-        return Tutor::query()
-            ->orderBy('nombre')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->get([
-                'id',
-                'nombre',
-                'apellido_paterno',
-                'apellido_materno',
-                'calle',
-                'numero',
-                'colonia',
-                'codigo_postal',
-                'municipio',
-                'estado',
-                'ciudad',
-            ]);
+        $this->buscarTutores();
     }
 
-    protected function llenarDireccionDesdeTutor(): void
+    public function buscarTutores(): void
     {
-        if (! $this->tutor_id) {
+        $termino = trim($this->buscarTutor);
+
+        if (mb_strlen($termino) < 2) {
+            $this->resultadosTutores = [];
             return;
         }
 
-        $tutor = Tutor::query()->find($this->tutor_id);
+        $yaSeleccionados = collect($this->responsables)
+            ->pluck('tutor_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->resultadosTutores = Tutor::query()
+            ->activos()
+            ->whereNotIn('id', $yaSeleccionados ?: [0])
+            ->where(function ($query) use ($termino): void {
+                $like = '%' . $termino . '%';
+                $query->where('nombre', 'like', $like)
+                    ->orWhere('apellido_paterno', 'like', $like)
+                    ->orWhere('apellido_materno', 'like', $like)
+                    ->orWhere('curp', 'like', '%' . mb_strtoupper($termino) . '%')
+                    ->orWhere('identificador_alternativo', 'like', $like)
+                    ->orWhere('telefono_celular', 'like', $like)
+                    ->orWhere('telefono_casa', 'like', $like)
+                    ->orWhere('correo_electronico', 'like', $like);
+            })
+            ->withCount('relacionesActivas')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->limit(8)
+            ->get()
+            ->map(fn (Tutor $tutor): array => [
+                'id' => $tutor->id,
+                'nombre' => $tutor->nombre_completo,
+                'curp' => $tutor->identidad_protegida,
+                'telefono' => $tutor->telefono_celular ?: $tutor->telefono_casa,
+                'correo' => $tutor->correo_electronico,
+                'relaciones' => (int) $tutor->relaciones_activas_count,
+            ])
+            ->all();
+    }
+
+    public function agregarResponsable(int $tutorId): void
+    {
+        if (collect($this->responsables)->contains(fn (array $item): bool => (int) $item['tutor_id'] === $tutorId)) {
+            $this->responsablesMensaje = 'Ese responsable ya fue agregado al alumno.';
+            return;
+        }
+
+        $tutor = Tutor::query()->activos()->findOrFail($tutorId);
+        $primero = $this->responsables === [];
+        $this->responsables[] = [
+            'tutor_id' => $tutor->id,
+            'nombre' => $tutor->nombre_completo,
+            'curp' => $tutor->identidad_protegida,
+            'telefono' => $tutor->telefono_celular ?: $tutor->telefono_casa,
+            'correo' => $tutor->correo_electronico,
+            'parentesco' => 'OTRO',
+            'es_principal' => $primero,
+            'es_tutor_legal' => false,
+            'estado_tutela' => 'no_aplica',
+            'vive_con_alumno' => false,
+            'recibe_avisos' => true,
+            'recibe_calificaciones' => true,
+            'contacto_emergencia' => false,
+            'autorizado_recoger' => false,
+            'responsable_economico' => false,
+            'observaciones' => null,
+        ];
+
+        $this->buscarTutor = '';
+        $this->resultadosTutores = [];
+        $this->responsablesMensaje = 'Responsable agregado. Configura su parentesco y funciones.';
+        $this->resetValidation('responsables');
+    }
+
+    public function quitarResponsable(int $indice): void
+    {
+        if (! isset($this->responsables[$indice])) {
+            return;
+        }
+
+        $eraPrincipal = (bool) ($this->responsables[$indice]['es_principal'] ?? false);
+        array_splice($this->responsables, $indice, 1);
+
+        if ($eraPrincipal && $this->responsables !== []) {
+            $this->responsables[0]['es_principal'] = true;
+        }
+
+        $this->responsables = array_values($this->responsables);
+        $this->resetValidation('responsables');
+    }
+
+    public function establecerPrincipalBorrador(int $indice): void
+    {
+        if (! isset($this->responsables[$indice])) {
+            return;
+        }
+
+        foreach ($this->responsables as $i => $responsable) {
+            $this->responsables[$i]['es_principal'] = $i === $indice;
+        }
+    }
+
+    public function usarDomicilioResponsable(int $indice, string $modo = 'vacios'): void
+    {
+        $responsable = $this->responsables[$indice] ?? null;
+
+        if (! $responsable) {
+            return;
+        }
+
+        $tutor = Tutor::query()->find((int) $responsable['tutor_id']);
 
         if (! $tutor) {
             return;
@@ -917,55 +1047,201 @@ class CrearInscripcion extends Component
             'ciudad_residencia' => $tutor->ciudad,
         ];
 
-        $conflictos = 0;
+        $copiados = 0;
+        $conservados = 0;
 
-        foreach ($mapeo as $campo => $valorTutor) {
-            if (blank($valorTutor)) {
+        foreach ($mapeo as $campo => $valor) {
+            if (blank($valor)) {
                 continue;
             }
 
-            if (blank($this->{$campo})) {
-                $this->{$campo} = $valorTutor;
-                continue;
-            }
-
-            if (mb_strtoupper(trim((string) $this->{$campo})) !== mb_strtoupper(trim((string) $valorTutor))) {
-                $conflictos++;
+            if ($modo === 'reemplazar' || blank($this->{$campo})) {
+                $this->{$campo} = $valor;
+                $copiados++;
+            } else {
+                $conservados++;
             }
         }
 
-        $this->direccionTutorAdvertencia = $conflictos > 0
-            ? "Se conservaron {$conflictos} datos de domicilio ya capturados; no se sobrescribieron con la dirección del tutor."
-            : null;
-
-        $this->sanitizeStrings();
+        $this->responsables[$indice]['vive_con_alumno'] = true;
+        $this->direccionTutorAdvertencia = "Se copiaron {$copiados} datos del domicilio. Se conservaron {$conservados} campos ya capturados.";
     }
 
-    public function updatedTutorId($value): void
+    public function updatedNuevoTutor(mixed $value, string $key): void
     {
-        $this->tutor_id = $value ? (int) $value : null;
+        if ($key === 'sin_curp') {
+            if ((bool) $value) {
+                $this->nuevoTutor['curp'] = '';
+            } else {
+                $this->nuevoTutor['identificador_alternativo'] = '';
+                $this->nuevoTutor['motivo_sin_curp'] = '';
+            }
 
-        if (!$this->tutor_id) {
-            $this->copiar_direccion_tutor = false;
-            $this->direccionTutorAdvertencia = null;
+            $this->resetValidation([
+                'nuevoTutor.curp',
+                'nuevoTutor.identificador_alternativo',
+                'nuevoTutor.motivo_sin_curp',
+            ]);
             return;
         }
 
-        if ($this->copiar_direccion_tutor) {
-            $this->llenarDireccionDesdeTutor();
+        if ($key !== 'curp') {
+            return;
         }
+
+        $this->nuevoTutor['curp'] = mb_strtoupper(
+            preg_replace('/[^A-Z0-9]/i', '', (string) $value) ?: ''
+        );
+
+        if (($this->nuevoTutor['sin_curp'] ?? false) || blank($this->nuevoTutor['curp'])) {
+            $this->resetValidation('nuevoTutor.curp');
+            return;
+        }
+
+        $this->validateOnly('nuevoTutor.curp', [
+            'nuevoTutor.curp' => ['required', 'string', 'size:18', new CurpMexicana(), 'unique:tutores,curp'],
+        ]);
     }
 
-    public function updatedCopiarDireccionTutor($value): void
+    public function crearTutorBorrador(): void
     {
-        $this->copiar_direccion_tutor = (bool) $value;
+        $this->normalizarNuevoTutor();
+        $sinCurp = (bool) ($this->nuevoTutor['sin_curp'] ?? false);
 
-        if (! $this->copiar_direccion_tutor) {
-            $this->direccionTutorAdvertencia = null;
+        $this->validate([
+            'nuevoTutor.sin_curp' => ['boolean'],
+            'nuevoTutor.curp' => [Rule::requiredIf(! $sinCurp), 'nullable', 'string', 'size:18', new CurpMexicana(), 'unique:tutores,curp'],
+            'nuevoTutor.identificador_alternativo' => [Rule::requiredIf($sinCurp), 'nullable', 'string', 'max:80', 'unique:tutores,identificador_alternativo'],
+            'nuevoTutor.motivo_sin_curp' => [Rule::requiredIf($sinCurp), 'nullable', 'string', 'min:5', 'max:255'],
+            'nuevoTutor.nombre' => ['required', 'string', 'max:255'],
+            'nuevoTutor.apellido_paterno' => ['required', 'string', 'max:255'],
+            'nuevoTutor.apellido_materno' => ['nullable', 'string', 'max:255'],
+            'nuevoTutor.genero' => ['nullable', Rule::in(['M', 'F', 'O'])],
+            'nuevoTutor.fecha_nacimiento' => ['nullable', 'date'],
+            'nuevoTutor.telefono_celular' => ['nullable', 'string', 'max:20'],
+            'nuevoTutor.telefono_casa' => ['nullable', 'string', 'max:20'],
+            'nuevoTutor.correo_electronico' => ['nullable', 'email', 'max:255'],
+            'nuevoTutor.codigo_postal' => ['nullable', 'regex:/^[0-9]{5}$/'],
+        ]);
+
+        if (blank($this->nuevoTutor['telefono_celular']) && blank($this->nuevoTutor['telefono_casa']) && blank($this->nuevoTutor['correo_electronico'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'nuevoTutor.telefono_celular' => 'Captura al menos teléfono celular, teléfono de casa o correo.',
+            ]);
         }
 
-        if ($this->copiar_direccion_tutor && $this->tutor_id) {
-            $this->llenarDireccionDesdeTutor();
+        $tutor = DB::transaction(function (): Tutor {
+            return Tutor::query()->create([
+                'curp' => blank($this->nuevoTutor['curp']) ? null : $this->nuevoTutor['curp'],
+                'identificador_alternativo' => blank($this->nuevoTutor['identificador_alternativo']) ? null : $this->nuevoTutor['identificador_alternativo'],
+                'motivo_sin_curp' => blank($this->nuevoTutor['motivo_sin_curp']) ? null : $this->nuevoTutor['motivo_sin_curp'],
+                'parentesco' => 'NO ESPECIFICADO',
+                'nombre' => $this->nuevoTutor['nombre'],
+                'apellido_paterno' => $this->nuevoTutor['apellido_paterno'],
+                'apellido_materno' => blank($this->nuevoTutor['apellido_materno']) ? null : $this->nuevoTutor['apellido_materno'],
+                'genero' => blank($this->nuevoTutor['genero']) ? null : $this->nuevoTutor['genero'],
+                'fecha_nacimiento' => blank($this->nuevoTutor['fecha_nacimiento']) ? null : $this->nuevoTutor['fecha_nacimiento'],
+                'telefono_celular' => blank($this->nuevoTutor['telefono_celular']) ? null : $this->nuevoTutor['telefono_celular'],
+                'telefono_casa' => blank($this->nuevoTutor['telefono_casa']) ? null : $this->nuevoTutor['telefono_casa'],
+                'correo_electronico' => blank($this->nuevoTutor['correo_electronico']) ? null : $this->nuevoTutor['correo_electronico'],
+                'calle' => blank($this->nuevoTutor['calle']) ? null : $this->nuevoTutor['calle'],
+                'numero' => blank($this->nuevoTutor['numero']) ? null : $this->nuevoTutor['numero'],
+                'colonia' => blank($this->nuevoTutor['colonia']) ? null : $this->nuevoTutor['colonia'],
+                'codigo_postal' => blank($this->nuevoTutor['codigo_postal']) ? null : $this->nuevoTutor['codigo_postal'],
+                'municipio' => blank($this->nuevoTutor['municipio']) ? null : $this->nuevoTutor['municipio'],
+                'estado' => blank($this->nuevoTutor['estado']) ? null : $this->nuevoTutor['estado'],
+                'ciudad' => blank($this->nuevoTutor['ciudad']) ? null : $this->nuevoTutor['ciudad'],
+                'activo' => true,
+            ]);
+        });
+
+        $this->dispatch('tutorRegistered', tutor: $tutor->id);
+        $this->resetNuevoTutor();
+        $this->mostrarNuevoTutor = false;
+        $this->agregarResponsable($tutor->id);
+    }
+
+    public function resetNuevoTutor(): void
+    {
+        $this->nuevoTutor = [
+            'sin_curp' => false,
+            'curp' => '',
+            'identificador_alternativo' => '',
+            'motivo_sin_curp' => '',
+            'nombre' => '',
+            'apellido_paterno' => '',
+            'apellido_materno' => '',
+            'genero' => '',
+            'fecha_nacimiento' => '',
+            'telefono_celular' => '',
+            'telefono_casa' => '',
+            'correo_electronico' => '',
+            'calle' => '',
+            'numero' => '',
+            'colonia' => '',
+            'codigo_postal' => '',
+            'municipio' => '',
+            'estado' => '',
+            'ciudad' => '',
+        ];
+        $this->resetValidation('nuevoTutor');
+    }
+
+    private function normalizarNuevoTutor(): void
+    {
+        foreach ($this->nuevoTutor as $campo => $valor) {
+            if (is_string($valor)) {
+                $this->nuevoTutor[$campo] = trim($valor);
+            }
+        }
+
+        $this->nuevoTutor['curp'] = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $this->nuevoTutor['curp']) ?: '');
+        $this->nuevoTutor['identificador_alternativo'] = mb_strtoupper((string) $this->nuevoTutor['identificador_alternativo']);
+
+        if ($this->nuevoTutor['sin_curp'] ?? false) {
+            $this->nuevoTutor['curp'] = '';
+        } else {
+            $this->nuevoTutor['identificador_alternativo'] = '';
+            $this->nuevoTutor['motivo_sin_curp'] = '';
+        }
+
+        $this->nuevoTutor['nombre'] = $this->titleCaseNombre($this->nuevoTutor['nombre']);
+        $this->nuevoTutor['apellido_paterno'] = $this->titleCaseNombre($this->nuevoTutor['apellido_paterno']);
+        $this->nuevoTutor['apellido_materno'] = $this->titleCaseNombre($this->nuevoTutor['apellido_materno']);
+    }
+
+    private function validarResponsablesAntesDeGuardar(): void
+    {
+        $this->puedeGestionarResponsablesSensibles = (bool) auth()->user()?->canAccess('alumnos.responsables_sensibles');
+
+        if (! $this->puedeGestionarResponsablesSensibles) {
+            foreach ($this->responsables as $indice => $responsable) {
+                $this->responsables[$indice]['es_tutor_legal'] = false;
+                $this->responsables[$indice]['estado_tutela'] = 'no_aplica';
+                $this->responsables[$indice]['recibe_calificaciones'] = false;
+                $this->responsables[$indice]['autorizado_recoger'] = false;
+            }
+        }
+
+        $servicio = app(GestionResponsablesAlumnoService::class);
+        $normalizados = $servicio->normalizarLista($this->responsables);
+        $this->responsables = array_map(function (array $item): array {
+            $actual = collect($this->responsables)->firstWhere('tutor_id', $item['tutor_id']) ?: [];
+            return [...$actual, ...$item];
+        }, $normalizados);
+
+        $esMenor = $servicio->esMenor($this->fecha_nacimiento, $this->fecha_inscripcion);
+
+        if ($esMenor && $this->responsables === []) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'responsables' => 'Un alumno menor de edad debe tener al menos un responsable.',
+            ]);
+        }
+
+        if ($this->responsables !== [] && collect($this->responsables)->where('es_principal', true)->count() !== 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'responsables' => 'Selecciona exactamente un contacto principal.',
+            ]);
         }
     }
 
@@ -1280,7 +1556,15 @@ class CrearInscripcion extends Component
     {
         $this->sanitizeStrings();
 
-        if ($property === 'foto' || $property === 'curp' || $property === 'archivoAlumnos') {
+        if (
+            $property === 'foto'
+            || $property === 'curp'
+            || $property === 'archivoAlumnos'
+            || $property === 'buscarTutor'
+            || $property === 'mostrarNuevoTutor'
+            || str_starts_with($property, 'responsables.')
+            || str_starts_with($property, 'nuevoTutor.')
+        ) {
             return;
         }
 
@@ -1334,6 +1618,7 @@ class CrearInscripcion extends Component
         ObservacionInscripcionService $observacionesService,
         MatriculaAlumnoService $matriculas,
         GestionAcademicaService $gestionAcademica,
+        GestionResponsablesAlumnoService $responsablesService,
         \App\Services\HistorialCicloEscolarService $historialCiclos,
     ): void
     {
@@ -1383,6 +1668,19 @@ class CrearInscripcion extends Component
             abort_unless(auth()->user()?->canAccess('academico.editar'), 403);
         }
 
+        try {
+            $this->validarResponsablesAntesDeGuardar();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->guardandoInscripcion = false;
+            foreach ($exception->errors() as $campo => $mensajes) {
+                foreach ($mensajes as $mensaje) {
+                    $this->addError($campo, $mensaje);
+                }
+            }
+            $this->dispatch('inscripcion-ir-paso', paso: 3);
+            return;
+        }
+
         if (!$this->validarRelacionAcademica($data)) {
             $this->guardandoInscripcion = false;
             $this->dispatch('inscripcion-ir-paso', paso: 2);
@@ -1396,7 +1694,7 @@ class CrearInscripcion extends Component
                 $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
             }
 
-            DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $historialCiclos) {
+            DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $responsablesService, $historialCiclos) {
                 $curpDuplicada = Inscripcion::withTrashed()
                     ->where('curp', $data['curp'])
                     ->lockForUpdate()
@@ -1458,7 +1756,7 @@ class CrearInscripcion extends Component
                     'grupo_id' => (int) $data['grupo_id'],
 
                     'foto_path' => $fotoPath,
-                    'tutor_id' => $data['tutor_id'] ?? null,
+                    'tutor_id' => collect($this->responsables)->firstWhere('es_principal', true)['tutor_id'] ?? null,
                     'activo' => $data['estado_inscripcion'] === 'inscrito',
                     'estatus' => $data['estado_inscripcion'] === 'inscrito' ? 'activo' : 'preinscrito',
                     'motivo_estatus' => $data['tipo_ingreso'] === 'captura_historica'
@@ -1469,6 +1767,13 @@ class CrearInscripcion extends Component
                     'usuario_acceso_activo' => $data['estado_inscripcion'] === 'inscrito',
                     'fecha_estatus' => $data['fecha_inscripcion'],
                 ]);
+
+                $responsablesService->sincronizar(
+                    $inscripcion,
+                    $this->responsables,
+                    auth()->id(),
+                    $data['fecha_inscripcion'],
+                );
 
                 $observacionesService->guardar(
                     inscripcion: $inscripcion,
@@ -1746,8 +2051,12 @@ class CrearInscripcion extends Component
             'estado_residencia',
             'ciudad_residencia',
 
-            'tutor_id',
-            'copiar_direccion_tutor',
+            'responsables',
+            'buscarTutor',
+            'resultadosTutores',
+            'mostrarNuevoTutor',
+            'responsablesMensaje',
+            'nuevoTutor',
             'foto',
             'consultandoCurp',
             'curpError',
@@ -1803,7 +2112,6 @@ class CrearInscripcion extends Component
 
         $this->ciclosOptions = $this->loadCiclos();
         $this->cicloEscolaresOptions = $this->loadCicloEscolares();
-        $this->tutores = $this->loadTutores();
 
         if (! $this->ciclo_escolar_id) {
             $this->ciclo_escolar_id = $this->cicloEscolaresOptions->firstWhere('es_actual', true)?->id
@@ -1825,6 +2133,13 @@ class CrearInscripcion extends Component
 
     private function camposObligatoriosPendientes(): array
     {
+        $esMenor = app(GestionResponsablesAlumnoService::class)
+            ->esMenor($this->fecha_nacimiento, $this->fecha_inscripcion);
+        $responsablesCompletos = ! $esMenor || (
+            $this->responsables !== []
+            && collect($this->responsables)->where('es_principal', true)->count() === 1
+        );
+
         $campos = [
             'curp' => $this->curpLocalValidada && ! $this->curpExisteLocal,
             'matricula' => filled($this->matricula),
@@ -1843,6 +2158,7 @@ class CrearInscripcion extends Component
             'ubicacion' => $this->esBachillerato ? filled($this->semestre_id) : filled($this->grado_id),
             'generacion_id' => filled($this->generacion_id),
             'grupo_id' => filled($this->grupo_id),
+            'responsables' => $responsablesCompletos,
         ];
 
         return array_keys(array_filter($campos, fn (bool $completo) => ! $completo));
@@ -1909,7 +2225,6 @@ class CrearInscripcion extends Component
             'esBachillerato' => $this->esBachillerato,
             'ciclos' => $this->ciclosOptions,
             'cicloEscolares' => $this->cicloEscolaresOptions,
-            'tutores' => $this->tutores,
             'resumenInscripcion' => $resumen,
             'puedeConsultarCurpExterna' => $this->curpLocalValidada
                 && ! $this->curpExisteLocal
