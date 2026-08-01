@@ -171,6 +171,55 @@ class ExpedientesDigitales extends Component
         $this->resetPage();
     }
 
+    /**
+     * Restaura la vista persistida en localStorage. Ningún valor del navegador
+     * se considera confiable: todos los identificadores y opciones se validan
+     * nuevamente antes de aplicarlos.
+     */
+    public function restaurarVistaGuardada(array $estado): void
+    {
+        $this->autorizarAdmin();
+
+        $nivelId = filter_var($estado['nivel_id'] ?? null, FILTER_VALIDATE_INT) !== false
+            ? (int) $estado['nivel_id']
+            : null;
+        $nivelValido = $nivelId && collect($this->niveles)->contains(
+            fn (array $nivel): bool => (int) $nivel['id'] === $nivelId
+        );
+
+        $estadoExpediente = (string) ($estado['estado_expediente'] ?? 'todos');
+        $porPagina = (int) ($estado['perPage'] ?? 20);
+
+        $this->buscar = Str::limit(trim((string) ($estado['buscar'] ?? '')), 120, '');
+        $this->nivel_id = $nivelValido ? $nivelId : null;
+        $this->estado_expediente = in_array(
+            $estadoExpediente,
+            ['todos', 'completos', 'incompletos', 'egresados', 'bajas'],
+            true
+        ) ? $estadoExpediente : 'todos';
+        $this->perPage = in_array($porPagina, [10, 20, 50], true) ? $porPagina : 20;
+
+        $alumnoId = filter_var($estado['alumnoSeleccionadoId'] ?? null, FILTER_VALIDATE_INT) !== false
+            ? (int) $estado['alumnoSeleccionadoId']
+            : null;
+
+        $this->alumnoSeleccionadoId = $alumnoId
+            && Inscripcion::withTrashed()->whereKey($alumnoId)->exists()
+                ? $alumnoId
+                : null;
+
+        $pagina = max(1, min((int) ($estado['page'] ?? 1), 10000));
+        $this->setPage($pagina);
+        $this->cerrarCarga();
+    }
+
+    public function limpiarVistaGuardada(): void
+    {
+        $this->limpiarFiltros();
+        $this->alumnoSeleccionadoId = null;
+        $this->cerrarCarga();
+    }
+
     public function verExpediente(int $alumnoId): void
     {
         $this->autorizarAdmin();

@@ -14,6 +14,7 @@ use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
+use App\Http\Controllers\DirectorioTutoresController;
 use App\Http\Controllers\DistribucionEscolarController;
 use App\Http\Controllers\DocumentosController;
 use App\Http\Controllers\DocumentosAcademicosZipController;
@@ -374,6 +375,12 @@ Route::get('/profesores/horarios/todos/pdf', TodosHorariosProfesoresPdfControlle
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
     ->name('accion.generales.listas.pdf');
+
+
+Route::get('/generales/directorio-tutores/{formato}', DirectorioTutoresController::class)
+    ->middleware('admin')
+    ->whereIn('formato', ['pdf', 'word', 'zip-pdf', 'zip-word'])
+    ->name('generales.directorio-tutores.descargar');
 
 Route::get('/generales/{slug_nivel}/generaciones-historicas/{formato}', ListaGeneracionesHistoricasController::class)
     ->middleware('admin')

@@ -1,5 +1,10 @@
-<div id="expedientes-digitales-root" class="space-y-6" x-data="expedienteUploader()"
+<div id="expedientes-digitales-root" class="space-y-6"
+    x-data="expedienteUploader({
+        userId: @js(auth()->id()),
+        autoRestore: @js(request()->routeIs('misrutas.expedientes')),
+    })"
     @expediente-documento-guardado.window="onSaved($event.detail)">
+    <span class="hidden" data-expedientes-current-page="{{ $alumnos->currentPage() }}"></span>
     @php
         $coloresEstado = [
             'pendiente' =>
@@ -143,6 +148,26 @@
                     class="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-indigo-950/30"
                     title="Limpiar filtros">
                     <flux:icon name="arrow-path" class="size-4" />
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 dark:border-neutral-800 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <flux:icon name="circle-stack" class="size-4" />
+                <span x-text="restoringView ? 'Restaurando la vista guardada…' : (hasStoredView ? 'Filtros, página y expediente guardados durante 7 días en este navegador.' : 'La vista se guardará al modificar filtros o abrir un expediente.')"></span>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button type="button" @click="restoreStoredView(false)" :disabled="restoringView || !hasStoredView"
+                    class="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-300">
+                    <flux:icon name="arrow-path" class="size-4" />
+                    Restablecer vista guardada
+                </button>
+                <button type="button" @click="clearStoredView()" :disabled="restoringView"
+                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:border-rose-200 hover:text-rose-600 disabled:opacity-45 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
+                    <flux:icon name="trash" class="size-4" />
+                    Limpiar estado guardado
                 </button>
             </div>
         </div>
@@ -1774,7 +1799,7 @@
     @endif
 
     <script>
-        window.expedienteUploader = window.expedienteUploader || function() {
+        window.expedienteUploader = window.expedienteUploader || function(config = {}) {
             return {
                 opening: false,
                 openingKey: null,
@@ -1792,6 +1817,158 @@
                 hasFile: false,
                 dragging: false,
                 serverUploadName: null,
+                restoringView: false,
+                hasStoredView: false,
+                persistenceTimer: null,
+                persistenceObserver: null,
+                persistenceSuppressUntil: 0,
+                persistenceTtl: 7 * 24 * 60 * 60 * 1000,
+
+                init() {
+                    this.hasStoredView = this.readStoredView() !== null;
+                    this.bindPersistenceWatchers();
+                    this.observePaginationChanges();
+
+                    if (config.autoRestore && this.hasStoredView) {
+                        this.$nextTick(() => this.restoreStoredView(true));
+                    } else if (!config.autoRestore) {
+                        this.$nextTick(() => this.scheduleStoredViewSave());
+                    }
+                },
+
+                storedViewKey() {
+                    return `moctezuma:expedientes-digitales:v1:user:${config.userId}`;
+                },
+
+                removeStoredView() {
+                    try {
+                        localStorage.removeItem(this.storedViewKey());
+                    } catch (error) {
+                        // El navegador puede bloquear localStorage; la operación normal continúa sin persistencia.
+                    }
+                },
+
+                bindPersistenceWatchers() {
+                    ['buscar', 'nivel_id', 'estado_expediente', 'perPage', 'alumnoSeleccionadoId']
+                        .forEach(property => this.$wire.$watch(property, () => this.scheduleStoredViewSave()));
+                },
+
+                observePaginationChanges() {
+                    this.persistenceObserver?.disconnect();
+                    this.persistenceObserver = new MutationObserver(() => this.scheduleStoredViewSave());
+                    this.persistenceObserver.observe(this.$root, { childList: true, subtree: true, attributes: true });
+                },
+
+                currentExpedientesPage() {
+                    return Number(this.$root.querySelector('[data-expedientes-current-page]')?.dataset.expedientesCurrentPage || 1);
+                },
+
+                currentStoredViewState() {
+                    return {
+                        buscar: this.$wire.get('buscar'),
+                        nivel_id: this.$wire.get('nivel_id'),
+                        estado_expediente: this.$wire.get('estado_expediente'),
+                        perPage: this.$wire.get('perPage'),
+                        alumnoSeleccionadoId: this.$wire.get('alumnoSeleccionadoId'),
+                        page: this.currentExpedientesPage(),
+                    };
+                },
+
+                scheduleStoredViewSave() {
+                    if (this.restoringView || Date.now() < this.persistenceSuppressUntil) {
+                        return;
+                    }
+
+                    window.clearTimeout(this.persistenceTimer);
+                    this.persistenceTimer = window.setTimeout(() => this.saveStoredView(), 450);
+                },
+
+                saveStoredView() {
+                    if (this.restoringView || Date.now() < this.persistenceSuppressUntil) {
+                        return;
+                    }
+
+                    try {
+                        const now = Date.now();
+                        localStorage.setItem(this.storedViewKey(), JSON.stringify({
+                            version: 1,
+                            savedAt: now,
+                            expiresAt: now + this.persistenceTtl,
+                            state: this.currentStoredViewState(),
+                        }));
+                        this.hasStoredView = true;
+                    } catch (error) {
+                        this.hasStoredView = false;
+                    }
+                },
+
+                readStoredView() {
+                    try {
+                        const raw = localStorage.getItem(this.storedViewKey());
+                        if (!raw) return null;
+
+                        const packet = JSON.parse(raw);
+                        if (packet?.version !== 1 || !packet?.state || Number(packet.expiresAt || 0) <= Date.now()) {
+                            this.removeStoredView();
+                            return null;
+                        }
+
+                        return packet;
+                    } catch (error) {
+                        this.removeStoredView();
+                        return null;
+                    }
+                },
+
+                async restoreStoredView(automatic = false) {
+                    const packet = this.readStoredView();
+                    this.hasStoredView = packet !== null;
+                    if (!packet || this.restoringView) return;
+
+                    this.restoringView = true;
+                    window.clearTimeout(this.persistenceTimer);
+
+                    try {
+                        await this.$wire.restaurarVistaGuardada(packet.state);
+                        this.persistenceSuppressUntil = Date.now() + 750;
+                        if (!automatic) this.showPersistenceMessage('success', 'Vista de expedientes restaurada.');
+                    } catch (error) {
+                        this.removeStoredView();
+                        this.hasStoredView = false;
+                        this.showPersistenceMessage('error', 'No fue posible restaurar la vista guardada.');
+                    } finally {
+                        this.restoringView = false;
+                    }
+                },
+
+                async clearStoredView() {
+                    window.clearTimeout(this.persistenceTimer);
+                    this.removeStoredView();
+                    this.hasStoredView = false;
+                    this.restoringView = true;
+
+                    try {
+                        await this.$wire.limpiarVistaGuardada();
+                        this.persistenceSuppressUntil = Date.now() + 1000;
+                        this.showPersistenceMessage('success', 'El estado guardado fue eliminado.');
+                    } finally {
+                        this.restoringView = false;
+                    }
+                },
+
+                showPersistenceMessage(icon, title) {
+                    if (window.Swal) {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon,
+                            title,
+                            showConfirmButton: false,
+                            timer: 2400,
+                            timerProgressBar: true,
+                        });
+                    }
+                },
 
                 wait(milliseconds) {
                     return new Promise(resolve => window.setTimeout(resolve, milliseconds));
