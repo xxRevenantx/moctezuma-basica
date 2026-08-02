@@ -42,7 +42,7 @@ class GestionResponsablesAlumnoService
             $fechaInicio,
             $desactivarAusentes,
         ): void {
-            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($inscripcion->getKey());
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($inscripcion->getKey());
             $normalizados = $this->normalizarLista($responsables);
             $this->validarLista($alumno, $normalizados, $fechaInicio);
 
@@ -122,7 +122,7 @@ class GestionResponsablesAlumnoService
         ?int $usuarioId = null,
     ): InscripcionTutor {
         return DB::transaction(function () use ($inscripcion, $tutor, $datos, $usuarioId): InscripcionTutor {
-            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($inscripcion->id);
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($inscripcion->id);
             $tutor = Tutor::query()->lockForUpdate()->findOrFail($tutor->id);
 
             if (! $tutor->activo) {
@@ -161,13 +161,17 @@ class GestionResponsablesAlumnoService
                     'created_by' => $usuarioId,
                 ]);
 
+            $fechaInicioSolicitada = $this->fecha(Arr::get($datos, 'fecha_inicio'));
+
             $relacion->fill([
                 ...$normalizado,
                 'orden_contacto' => $relacion->exists
                     ? max(1, (int) $relacion->orden_contacto)
                     : ((int) $relaciones->max('orden_contacto') + 1),
                 'activo' => true,
-                'fecha_inicio' => $relacion->fecha_inicio ?: now()->toDateString(),
+                'fecha_inicio' => $fechaInicioSolicitada
+                    ?: optional($relacion->fecha_inicio)->toDateString()
+                    ?: now()->toDateString(),
                 'fecha_fin' => null,
                 'motivo_fin' => null,
                 'updated_by' => $usuarioId,
@@ -202,7 +206,7 @@ class GestionResponsablesAlumnoService
     public function establecerPrincipal(Inscripcion $inscripcion, int $tutorId, ?int $usuarioId = null): void
     {
         DB::transaction(function () use ($inscripcion, $tutorId, $usuarioId): void {
-            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($inscripcion->id);
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($inscripcion->id);
             $relaciones = InscripcionTutor::query()
                 ->where('inscripcion_id', $alumno->id)
                 ->lockForUpdate()
@@ -266,7 +270,7 @@ class GestionResponsablesAlumnoService
         }
 
         DB::transaction(function () use ($inscripcion, $tutorId, $motivo, $usuarioId): void {
-            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($inscripcion->id);
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($inscripcion->id);
             $relaciones = InscripcionTutor::query()
                 ->where('inscripcion_id', $alumno->id)
                 ->lockForUpdate()
@@ -334,7 +338,7 @@ class GestionResponsablesAlumnoService
     public function reactivar(Inscripcion $inscripcion, int $tutorId, ?int $usuarioId = null): void
     {
         DB::transaction(function () use ($inscripcion, $tutorId, $usuarioId): void {
-            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($inscripcion->id);
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($inscripcion->id);
             $relacion = InscripcionTutor::query()
                 ->where('inscripcion_id', $alumno->id)
                 ->where('tutor_id', $tutorId)
@@ -433,6 +437,7 @@ class GestionResponsablesAlumnoService
             'contacto_emergencia' => (bool) Arr::get($datos, 'contacto_emergencia', false),
             'autorizado_recoger' => (bool) Arr::get($datos, 'autorizado_recoger', false),
             'responsable_economico' => (bool) Arr::get($datos, 'responsable_economico', false),
+            'fecha_inicio' => $this->fecha(Arr::get($datos, 'fecha_inicio')),
             'observaciones' => blank(Arr::get($datos, 'observaciones'))
                 ? null
                 : mb_substr(trim((string) Arr::get($datos, 'observaciones')), 0, 1000),

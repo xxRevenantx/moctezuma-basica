@@ -214,6 +214,17 @@
                             <td class="px-6 py-4">
                                 <div class="flex items-center justify-center gap-2">
                                     @if (auth()->user()?->canAccess('alumnos.editar'))
+                                        <button type="button"
+                                            @click="$dispatch('abrir-modal-alumnos-tutor'); Livewire.dispatch('administrarAlumnosTutor', { id: {{ $tutor->id }} });"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700"
+                                            title="Administrar alumnos relacionados">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                                                <circle cx="9" cy="7" r="4" />
+                                                <path d="M19 8v6M22 11h-6" />
+                                            </svg>
+                                        </button>
+
                                         <flux:button variant="primary"
                                             class="cursor-pointer bg-amber-500 text-white hover:bg-amber-600"
                                             @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $tutor->id }} });">
@@ -363,6 +374,17 @@
                         <div
                             class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                             @if (auth()->user()?->canAccess('alumnos.editar'))
+                                <button type="button"
+                                    @click="$dispatch('abrir-modal-alumnos-tutor'); Livewire.dispatch('administrarAlumnosTutor', { id: {{ $tutor->id }} });"
+                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-700">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                        <path d="M19 8v6M22 11h-6" />
+                                    </svg>
+                                    Administrar
+                                </button>
+
                                 <flux:button variant="primary"
                                     class="cursor-pointer bg-amber-500 text-white hover:bg-amber-600"
                                     @click="$dispatch('abrir-modal-editar'); Livewire.dispatch('editarModal', { id: {{ $tutor->id }} });">

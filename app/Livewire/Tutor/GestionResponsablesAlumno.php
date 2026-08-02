@@ -6,8 +6,9 @@ use App\Models\Inscripcion;
 use App\Models\InscripcionTutor;
 use App\Models\Tutor;
 use App\Rules\CurpMexicana;
+use App\Services\CurpService;
 use App\Services\GestionResponsablesAlumnoService;
-use Illuminate\Support\Collection;
+use App\Services\TutorCurpAutofillService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -50,6 +51,19 @@ class GestionResponsablesAlumno extends Component
         'estado' => '',
         'ciudad' => '',
     ];
+
+    public bool $consultandoCurpNuevo = false;
+    public string $curpNuevoEstado = 'inicial';
+    public string $curpNuevoMensaje = 'Escribe una CURP para comprobar si el responsable ya existe.';
+    public bool $curpNuevoValida = false;
+    public ?string $ultimaCurpNuevoValidada = null;
+    public ?string $ultimaCurpNuevoConsultada = null;
+    public ?string $curpNuevoAdvertencia = null;
+    public ?string $curpNuevoExito = null;
+    public ?array $tutorExistenteNuevo = null;
+    public ?array $alumnoMismaCurpNuevo = null;
+    public array $datosCurpNuevo = [];
+    public array $diferenciasCurpNuevo = [];
 
     public function mount(int $inscripcionId): void
     {
@@ -260,35 +274,144 @@ class GestionResponsablesAlumno extends Component
         if ($key === 'sin_curp') {
             if ((bool) $value) {
                 $this->nuevo['curp'] = '';
+                $this->limpiarCurpNuevo();
             } else {
                 $this->nuevo['identificador_alternativo'] = '';
                 $this->nuevo['motivo_sin_curp'] = '';
             }
 
-            $this->resetValidation([
-                'nuevo.curp',
-                'nuevo.identificador_alternativo',
-                'nuevo.motivo_sin_curp',
+            $this->resetValidation(['nuevo.curp', 'nuevo.identificador_alternativo', 'nuevo.motivo_sin_curp']);
+            return;
+        }
+
+        if ($key === 'curp') {
+            $this->validarCurpNuevo();
+        }
+    }
+
+    public function validarCurpNuevo(): void
+    {
+        if ($this->nuevo['sin_curp'] ?? false) {
+            return;
+        }
+
+        $resultado = app(TutorCurpAutofillService::class)->validarLocal($this->nuevo['curp'] ?? '');
+        $this->nuevo['curp'] = $resultado['curp'];
+        $this->curpNuevoEstado = $resultado['estado'];
+        $this->curpNuevoMensaje = $resultado['mensaje'];
+        $this->curpNuevoValida = (bool) $resultado['valida'];
+        $this->ultimaCurpNuevoValidada = $resultado['curp'];
+        $this->tutorExistenteNuevo = $resultado['tutor_existente'];
+        $this->alumnoMismaCurpNuevo = $resultado['alumno_existente'];
+        $this->curpNuevoAdvertencia = null;
+        $this->curpNuevoExito = null;
+        $this->datosCurpNuevo = [];
+        $this->diferenciasCurpNuevo = [];
+        $this->resetValidation('nuevo.curp');
+
+        if ($this->tutorExistenteNuevo) {
+            $this->addError('nuevo.curp', 'La CURP ya pertenece a un responsable. Relaciona el registro existente.');
+        }
+    }
+
+    public function consultarCurpNuevo(): void
+    {
+        $servicio = app(TutorCurpAutofillService::class);
+        $this->nuevo['curp'] = $servicio->normalizar($this->nuevo['curp'] ?? '');
+        $this->curpNuevoAdvertencia = null;
+        $this->curpNuevoExito = null;
+
+        if (! $this->curpNuevoValida || $this->ultimaCurpNuevoValidada !== $this->nuevo['curp']) {
+            $this->validarCurpNuevo();
+        }
+
+        if (! $this->curpNuevoValida || $this->tutorExistenteNuevo) {
+            $this->curpNuevoAdvertencia = $this->tutorExistenteNuevo
+                ? 'El responsable ya existe y debe relacionarse sin duplicarlo.'
+                : 'Captura una CURP válida antes de consultar.';
+            return;
+        }
+
+        if ($this->ultimaCurpNuevoConsultada === $this->nuevo['curp'] && $this->datosCurpNuevo !== []) {
+            return;
+        }
+
+        $this->consultandoCurpNuevo = true;
+        try {
+            $payload = app(CurpService::class)->obtenerDatosPorCurp($this->nuevo['curp']);
+        } catch (\Throwable) {
+            $payload = ['error' => true, 'message' => 'No fue posible consultar el servicio. Puedes continuar manualmente.'];
+        } finally {
+            $this->consultandoCurpNuevo = false;
+        }
+
+        $this->ultimaCurpNuevoConsultada = $this->nuevo['curp'];
+        if (($payload['error'] ?? true) === true) {
+            $this->curpNuevoAdvertencia = (string) ($payload['message'] ?? 'No se encontraron datos.');
+            return;
+        }
+
+        $this->datosCurpNuevo = $servicio->datosDesdePayload($payload);
+        $this->aplicarCurpNuevo(false);
+    }
+
+    public function aplicarCurpNuevo(bool $reemplazar = false): void
+    {
+        if ($this->datosCurpNuevo === []) {
+            return;
+        }
+
+        $resultado = app(TutorCurpAutofillService::class)->aplicar([
+            'nombre' => $this->nuevo['nombre'] ?? '',
+            'apellido_paterno' => $this->nuevo['apellido_paterno'] ?? '',
+            'apellido_materno' => $this->nuevo['apellido_materno'] ?? '',
+            'genero' => $this->nuevo['genero'] ?? '',
+            'fecha_nacimiento' => $this->nuevo['fecha_nacimiento'] ?? '',
+            'estado_nacimiento' => '',
+        ], $this->datosCurpNuevo, $reemplazar);
+
+        foreach (['nombre', 'apellido_paterno', 'apellido_materno', 'genero', 'fecha_nacimiento'] as $campo) {
+            $this->nuevo[$campo] = $resultado['valores'][$campo] ?? $this->nuevo[$campo];
+        }
+
+        $this->diferenciasCurpNuevo = $resultado['diferencias'];
+        $this->curpNuevoExito = $reemplazar
+            ? 'Se aplicaron todos los datos del servicio.'
+            : 'Se completaron campos vacíos sin reemplazar la captura previa.';
+    }
+
+    public function usarTutorExistenteNuevo(GestionResponsablesAlumnoService $service): void
+    {
+        $id = (int) ($this->tutorExistenteNuevo['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        if (! (bool) ($this->tutorExistenteNuevo['activo'] ?? false)) {
+            throw ValidationException::withMessages([
+                'nuevo.curp' => 'El responsable está archivado. Reactívalo desde el directorio de Tutores antes de relacionarlo.',
             ]);
-            return;
         }
 
-        if ($key !== 'curp') {
-            return;
-        }
+        $this->agregarTutor($id, $service);
+        $this->mostrarNuevo = false;
+        $this->resetNuevo();
+    }
 
-        $this->nuevo['curp'] = mb_strtoupper(
-            preg_replace('/[^A-Z0-9]/i', '', (string) $value) ?: ''
-        );
-
-        if (($this->nuevo['sin_curp'] ?? false) || blank($this->nuevo['curp'])) {
-            $this->resetValidation('nuevo.curp');
-            return;
-        }
-
-        $this->validateOnly('nuevo.curp', [
-            'nuevo.curp' => ['required', 'string', 'size:18', new CurpMexicana(), 'unique:tutores,curp'],
-        ]);
+    public function limpiarCurpNuevo(): void
+    {
+        $this->curpNuevoEstado = 'inicial';
+        $this->curpNuevoMensaje = 'Escribe una CURP para comprobar si el responsable ya existe.';
+        $this->curpNuevoValida = false;
+        $this->ultimaCurpNuevoValidada = null;
+        $this->ultimaCurpNuevoConsultada = null;
+        $this->curpNuevoAdvertencia = null;
+        $this->curpNuevoExito = null;
+        $this->tutorExistenteNuevo = null;
+        $this->alumnoMismaCurpNuevo = null;
+        $this->datosCurpNuevo = [];
+        $this->diferenciasCurpNuevo = [];
+        $this->resetValidation('nuevo.curp');
     }
 
     public function crearTutor(GestionResponsablesAlumnoService $service): void
@@ -465,6 +588,7 @@ class GestionResponsablesAlumno extends Component
             'estado' => '',
             'ciudad' => '',
         ];
+        $this->limpiarCurpNuevo();
         $this->resetValidation('nuevo');
     }
 

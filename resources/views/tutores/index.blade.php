@@ -5,5 +5,9 @@
         @endif
 
         <livewire:tutor.mostrar-tutor />
+
+        @if (auth()->user()?->canAccess('alumnos.editar'))
+            <livewire:tutor.gestion-alumnos-tutor />
+        @endif
     </div>
 </x-layouts.app>

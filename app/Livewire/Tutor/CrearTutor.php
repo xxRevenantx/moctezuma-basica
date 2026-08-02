@@ -2,21 +2,22 @@
 
 namespace App\Livewire\Tutor;
 
+use App\Models\Inscripcion;
+use App\Models\InscripcionTutor;
 use App\Models\Tutor;
 use App\Rules\CurpMexicana;
-use App\Services\CurpDataDecoder;
-use App\Services\TutorDocumentOcrService;
+use App\Services\CurpService;
+use App\Services\GestionResponsablesAlumnoService;
+use App\Services\TutorCurpAutofillService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 class CrearTutor extends Component
 {
-    use WithFileUploads;
-
     public bool $sin_curp = false;
     public ?string $curp = null;
     public ?string $identificador_alternativo = null;
@@ -40,20 +41,36 @@ class CrearTutor extends Component
     public ?string $telefono_celular = null;
     public ?string $correo_electronico = null;
 
-    // Lector local de INE / constancia de CURP.
-    public $documento_ocr = null;
-    public string $tipo_documento_ocr = 'ine';
-    public bool $ocr_reemplazar = false;
-    public array $ocr_resultado = [];
-    public array $ocr_campos_seleccionados = [];
-    public array $ocr_capacidades = [];
-    public ?string $ocr_error = null;
-    public ?string $curp_local_mensaje = null;
+    // Consulta profesional de CURP, igual al flujo principal de inscripción.
+    public bool $consultando_curp = false;
+    public string $curp_estado = 'inicial';
+    public string $curp_mensaje = 'Escribe una CURP para comprobar si ya está registrada.';
+    public bool $curp_local_validada = false;
+    public bool $curp_existe_local = false;
+    public ?string $ultima_curp_validada_local = null;
+    public ?string $ultima_curp_consultada = null;
+    public ?string $curp_error = null;
+    public ?string $curp_advertencia = null;
+    public ?string $curp_exito = null;
+    public ?array $tutor_existente = null;
+    public ?array $alumno_con_misma_curp = null;
+    public array $curp_datos_externos = [];
+    public array $curp_diferencias = [];
+
+    // Relación opcional con alumnos al registrar al responsable.
+    public string $buscar_alumno = '';
+    public bool $incluir_alumnos_historicos = false;
+    public array $resultados_alumnos = [];
+    public array $alumnos_relacionar = [];
+    public bool $abrir_gestion_despues = true;
+
+    #[Locked]
+    public bool $puede_relaciones_sensibles = false;
 
     public function mount(): void
     {
         abort_unless(auth()->user()?->canAccess('alumnos.crear'), 403);
-        $this->cargarCapacidadesOcr();
+        $this->puede_relaciones_sensibles = (bool) auth()->user()?->canAccess('alumnos.responsables_sensibles');
     }
 
     protected function rules(): array
@@ -81,6 +98,12 @@ class CrearTutor extends Component
             'telefono_casa' => ['nullable', 'string', 'max:20'],
             'telefono_celular' => ['nullable', 'string', 'max:20'],
             'correo_electronico' => ['nullable', 'email', 'max:255'],
+            'alumnos_relacionar' => ['array'],
+            'alumnos_relacionar.*.inscripcion_id' => ['required', 'integer', 'exists:inscripciones,id'],
+            'alumnos_relacionar.*.parentesco' => ['required', Rule::in(GestionResponsablesAlumnoService::PARENTESCOS)],
+            'alumnos_relacionar.*.estado_tutela' => ['required', Rule::in(GestionResponsablesAlumnoService::ESTADOS_TUTELA)],
+            'alumnos_relacionar.*.fecha_inicio' => ['required', 'date'],
+            'alumnos_relacionar.*.observaciones' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -88,7 +111,7 @@ class CrearTutor extends Component
     {
         if ($sinCurp) {
             $this->curp = null;
-            $this->curp_local_mensaje = null;
+            $this->limpiarResultadoCurp();
         } else {
             $this->identificador_alternativo = null;
             $this->motivo_sin_curp = null;
@@ -99,186 +122,260 @@ class CrearTutor extends Component
 
     public function updatedCurp(): void
     {
-        $this->curp = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $this->curp) ?: '');
-        $this->curp_local_mensaje = null;
+        $this->validarCurpLocal();
+    }
 
-        // Mientras está incompleta no mostramos error ni consultamos servicios externos.
-        if ($this->sin_curp || blank($this->curp) || mb_strlen($this->curp) < 18) {
-            $this->resetValidation('curp');
+    public function validarCurpLocal(): void
+    {
+        if ($this->sin_curp) {
             return;
         }
 
-        $this->validateOnly('curp');
-        $this->aplicarInterpretacionLocalCurp();
+        $servicio = app(TutorCurpAutofillService::class);
+        $resultado = $servicio->validarLocal($this->curp);
+        $this->curp = $resultado['curp'];
+        $this->curp_estado = $resultado['estado'];
+        $this->curp_mensaje = $resultado['mensaje'];
+        $this->curp_local_validada = (bool) $resultado['valida'];
+        $this->curp_existe_local = $resultado['tutor_existente'] !== null;
+        $this->tutor_existente = $resultado['tutor_existente'];
+        $this->alumno_con_misma_curp = $resultado['alumno_existente'];
+        $this->ultima_curp_validada_local = $this->curp;
+        $this->curp_error = null;
+        $this->curp_advertencia = null;
+        $this->curp_exito = null;
+        $this->curp_datos_externos = [];
+        $this->curp_diferencias = [];
+        $this->resetValidation('curp');
+
+        if ($this->curp_existe_local) {
+            $this->addError('curp', 'Esta CURP ya está registrada como responsable. Utiliza el registro existente.');
+        }
     }
 
-    public function updatedDocumentoOcr(): void
+    public function consultarCurp(): void
     {
-        $this->ocr_error = null;
-        $this->ocr_resultado = [];
-        $this->ocr_campos_seleccionados = [];
-        $this->resetValidation('documento_ocr');
-    }
+        if ($this->sin_curp) {
+            return;
+        }
 
-    public function updatedTipoDocumentoOcr(): void
-    {
-        $this->ocr_error = null;
-        $this->ocr_resultado = [];
-        $this->ocr_campos_seleccionados = [];
-    }
+        $autofill = app(TutorCurpAutofillService::class);
+        $this->curp = $autofill->normalizar($this->curp);
+        $this->curp_error = null;
+        $this->curp_advertencia = null;
+        $this->curp_exito = null;
 
-    public function analizarDocumentoTutor(): void
-    {
-        $this->ocr_error = null;
-        $this->ocr_resultado = [];
-        $this->ocr_campos_seleccionados = [];
+        if (! $this->curp_local_validada || $this->ultima_curp_validada_local !== $this->curp) {
+            $this->validarCurpLocal();
+        }
 
-        $maxKb = max(1024, (int) config('tutor_ocr.max_file_kb', 12288));
+        if (! $this->curp_local_validada || $this->curp_existe_local) {
+            $this->curp_advertencia = $this->curp_existe_local
+                ? 'La consulta externa se bloqueó porque el responsable ya existe localmente.'
+                : 'Completa una CURP válida antes de consultar el servicio externo.';
+            return;
+        }
 
-        $this->validate([
-            'tipo_documento_ocr' => ['required', Rule::in(['ine', 'curp'])],
-            'documento_ocr' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:' . $maxKb],
-        ], [
-            'documento_ocr.required' => 'Selecciona una fotografía, imagen o PDF.',
-            'documento_ocr.mimes' => 'El documento debe ser PDF, JPG, JPEG, PNG o WEBP.',
-            'documento_ocr.max' => 'El documento no debe superar ' . round($maxKb / 1024, 1) . ' MB.',
-        ]);
+        if ($this->ultima_curp_consultada === $this->curp && $this->curp_datos_externos !== []) {
+            return;
+        }
 
-        $storedPath = null;
-
+        $this->consultando_curp = true;
         try {
-            Storage::disk('local')->makeDirectory('tmp/tutor-ocr/uploads');
-            $storedPath = $this->documento_ocr->store('tmp/tutor-ocr/uploads', 'local');
-            $absolutePath = Storage::disk('local')->path($storedPath);
-
-            /** @var TutorDocumentOcrService $service */
-            $service = app(TutorDocumentOcrService::class);
-            $result = $service->analyze($absolutePath, $this->tipo_documento_ocr);
-
-            $this->ocr_resultado = [
-                'campos' => $result['campos'] ?? [],
-                'advertencias' => $result['advertencias'] ?? [],
-                'confianza' => $result['confianza'] ?? null,
-                'metodo' => $result['metodo'] ?? 'Lector local',
-                'texto' => $result['texto'] ?? null,
+            $payload = app(CurpService::class)->obtenerDatosPorCurp((string) $this->curp);
+        } catch (\Throwable) {
+            $payload = [
+                'error' => true,
+                'message' => 'No fue posible consultar el servicio externo. Puedes continuar manualmente.',
             ];
-
-            $this->ocr_campos_seleccionados = collect($this->ocr_resultado['campos'])
-                ->filter(fn ($value) => filled($value))
-                ->keys()
-                ->values()
-                ->all();
-
-            $this->dispatch('swal', [
-                'title' => 'Documento analizado localmente',
-                'text' => 'Revisa los campos detectados y presiona “Aplicar al formulario”.',
-                'icon' => 'success',
-                'position' => 'top-end',
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
-            $this->ocr_error = $e->getMessage();
-
-            $this->dispatch('swal', [
-                'title' => 'No se pudo leer el documento',
-                'text' => $this->ocr_error,
-                'icon' => 'error',
-                'position' => 'top-end',
-            ]);
         } finally {
-            if ($storedPath !== null) {
-                Storage::disk('local')->delete($storedPath);
-            }
-            $this->documento_ocr = null;
+            $this->consultando_curp = false;
         }
-    }
 
-    public function aplicarDatosOcr(): void
-    {
-        $fields = $this->ocr_resultado['campos'] ?? [];
-        if ($fields === [] || $this->ocr_campos_seleccionados === []) {
-            $this->dispatch('swal', [
-                'title' => 'No hay campos seleccionados',
-                'text' => 'Selecciona al menos un dato detectado.',
-                'icon' => 'warning',
-                'position' => 'top-end',
-            ]);
+        $this->ultima_curp_consultada = $this->curp;
+
+        if (($payload['error'] ?? true) === true) {
+            $this->curp_advertencia = (string) ($payload['message'] ?? 'No se encontraron datos para la CURP.');
             return;
         }
 
-        $allowed = array_keys($this->etiquetasCamposOcr());
-        $applied = 0;
-        $omitted = 0;
-
-        foreach ($this->ocr_campos_seleccionados as $field) {
-            if (! in_array($field, $allowed, true)) {
-                continue;
-            }
-
-            $value = $fields[$field] ?? null;
-            if (blank($value)) {
-                continue;
-            }
-
-            $current = $this->{$field} ?? null;
-            $isEmpty = is_string($current) ? trim($current) === '' : blank($current);
-
-            if (! $this->ocr_reemplazar && ! $isEmpty) {
-                $omitted++;
-                continue;
-            }
-
-            if (in_array($field, ['nombre', 'apellido_paterno', 'apellido_materno'], true)) {
-                $value = $this->titleCase((string) $value);
-            }
-
-            if ($field === 'curp') {
-                $value = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $value) ?: '');
-                $this->sin_curp = false;
-                $this->identificador_alternativo = null;
-                $this->motivo_sin_curp = null;
-            }
-
-            $this->{$field} = $value;
-            $applied++;
-        }
-
-        if (filled($this->curp) && mb_strlen((string) $this->curp) === 18) {
-            try {
-                $this->validateOnly('curp');
-                $this->aplicarInterpretacionLocalCurp();
-            } catch (ValidationException) {
-                // Livewire ya presenta el error específico en el campo CURP.
-            }
-        }
-
-        $this->dispatch('tutor-ocr-aplicado');
-        $message = "Se aplicaron {$applied} campos.";
-        if ($omitted > 0) {
-            $message .= " Se conservaron {$omitted} valores que ya estaban capturados.";
-        }
-
-        $this->dispatch('swal', [
-            'title' => 'Datos aplicados al formulario',
-            'text' => $message . ' Verifica la información antes de guardar.',
-            'icon' => 'success',
-            'position' => 'top-end',
-        ]);
+        $this->curp_datos_externos = $autofill->datosDesdePayload($payload);
+        $this->aplicarDatosCurp(false);
     }
 
-    public function limpiarResultadoOcr(): void
+    public function aplicarDatosCurp(bool $reemplazar = false): void
     {
-        $this->documento_ocr = null;
-        $this->ocr_resultado = [];
-        $this->ocr_campos_seleccionados = [];
-        $this->ocr_error = null;
-        $this->ocr_reemplazar = false;
-        $this->resetValidation('documento_ocr');
+        if ($this->curp_datos_externos === []) {
+            return;
+        }
+
+        $servicio = app(TutorCurpAutofillService::class);
+        $actuales = [
+            'nombre' => $this->nombre,
+            'apellido_paterno' => $this->apellido_paterno,
+            'apellido_materno' => $this->apellido_materno,
+            'genero' => $this->genero,
+            'fecha_nacimiento' => $this->fecha_nacimiento,
+            'estado_nacimiento' => $this->estado_nacimiento,
+        ];
+        $resultado = $servicio->aplicar($actuales, $this->curp_datos_externos, $reemplazar);
+
+        foreach ($resultado['valores'] as $campo => $valor) {
+            $this->{$campo} = $valor;
+        }
+
+        $this->curp_diferencias = $resultado['diferencias'];
+        $this->curp_exito = $reemplazar
+            ? "Se aplicaron {$resultado['aplicados']} datos del servicio, reemplazando los valores capturados."
+            : "Se completaron {$resultado['aplicados']} campos vacíos y se conservaron {$resultado['conservados']} datos capturados.";
+        $this->dispatch('tutor-curp-aplicada');
     }
 
-    public function guardar(): void
+    public function administrarTutorExistente(): void
+    {
+        $id = (int) ($this->tutor_existente['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $this->dispatch('abrir-modal-alumnos-tutor');
+        $this->dispatch('administrarAlumnosTutor', id: $id);
+    }
+
+    public function limpiarResultadoCurp(bool $limpiarCampo = false): void
+    {
+        if ($limpiarCampo) {
+            $this->curp = '';
+        }
+
+        $this->curp_estado = 'inicial';
+        $this->curp_mensaje = 'Escribe una CURP para comprobar si ya está registrada.';
+        $this->curp_local_validada = false;
+        $this->curp_existe_local = false;
+        $this->ultima_curp_validada_local = null;
+        $this->ultima_curp_consultada = null;
+        $this->curp_error = null;
+        $this->curp_advertencia = null;
+        $this->curp_exito = null;
+        $this->tutor_existente = null;
+        $this->alumno_con_misma_curp = null;
+        $this->curp_datos_externos = [];
+        $this->curp_diferencias = [];
+        $this->resetValidation('curp');
+    }
+
+    public function updatedBuscarAlumno(): void
+    {
+        $this->buscarAlumnos();
+    }
+
+    public function updatedIncluirAlumnosHistoricos(): void
+    {
+        $this->buscarAlumnos();
+    }
+
+    public function buscarAlumnos(): void
+    {
+        $termino = trim($this->buscar_alumno);
+        if (mb_strlen($termino) < 2) {
+            $this->resultados_alumnos = [];
+            return;
+        }
+
+        $seleccionados = collect($this->alumnos_relacionar)
+            ->pluck('inscripcion_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $query = $this->incluir_alumnos_historicos
+            ? Inscripcion::withTrashed()
+            : Inscripcion::query()->visiblesEnListas();
+
+        $alumnos = $query
+            ->with(['nivel:id,nombre', 'grado:id,nombre', 'semestre:id,numero', 'grupo:id,clave', 'cicloEscolar:id,inicio_anio,fin_anio'])
+            ->whereNotIn('id', $seleccionados ?: [0])
+            ->where(function (Builder $q) use ($termino): void {
+                $like = '%' . $termino . '%';
+                $q->where('nombre', 'like', $like)
+                    ->orWhere('apellido_paterno', 'like', $like)
+                    ->orWhere('apellido_materno', 'like', $like)
+                    ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", [$like])
+                    ->orWhere('curp', 'like', '%' . mb_strtoupper($termino) . '%')
+                    ->orWhere('matricula', 'like', $like)
+                    ->orWhere('folio', 'like', $like);
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->limit(12)
+            ->get();
+
+        $this->resultados_alumnos = $alumnos
+            ->map(fn (Inscripcion $alumno): array => $this->alumnoParaVista($alumno))
+            ->all();
+    }
+
+    public function seleccionarAlumno(int $inscripcionId): void
+    {
+        if (collect($this->alumnos_relacionar)->contains('inscripcion_id', $inscripcionId)) {
+            return;
+        }
+
+        $alumno = Inscripcion::withTrashed()
+            ->with(['nivel:id,nombre', 'grado:id,nombre', 'semestre:id,numero', 'grupo:id,clave', 'cicloEscolar:id,inicio_anio,fin_anio'])
+            ->findOrFail($inscripcionId);
+
+        $tienePrincipal = InscripcionTutor::query()
+            ->where('inscripcion_id', $alumno->id)
+            ->activas()
+            ->where('es_principal', true)
+            ->exists();
+
+        $this->alumnos_relacionar[] = [
+            ...$this->alumnoParaVista($alumno),
+            'inscripcion_id' => (int) $alumno->id,
+            'parentesco' => 'OTRO',
+            'es_principal' => ! $tienePrincipal,
+            'es_tutor_legal' => false,
+            'estado_tutela' => 'no_aplica',
+            'vive_con_alumno' => false,
+            'recibe_avisos' => true,
+            'recibe_calificaciones' => true,
+            'contacto_emergencia' => false,
+            'autorizado_recoger' => false,
+            'responsable_economico' => false,
+            'fecha_inicio' => now()->toDateString(),
+            'observaciones' => '',
+            'reemplazara_principal' => $tienePrincipal,
+        ];
+
+        $this->buscar_alumno = '';
+        $this->resultados_alumnos = [];
+    }
+
+    public function quitarAlumno(int $indice): void
+    {
+        if (! isset($this->alumnos_relacionar[$indice])) {
+            return;
+        }
+
+        unset($this->alumnos_relacionar[$indice]);
+        $this->alumnos_relacionar = array_values($this->alumnos_relacionar);
+    }
+
+    public function guardar(GestionResponsablesAlumnoService $responsablesService): void
     {
         $this->normalizar();
+
+        if (! $this->sin_curp) {
+            $this->validarCurpLocal();
+            if ($this->curp_existe_local) {
+                throw ValidationException::withMessages([
+                    'curp' => 'La CURP ya pertenece a un responsable. Selecciona el registro existente.',
+                ]);
+            }
+        }
+
         $data = $this->validate();
 
         if (blank($data['telefono_celular']) && blank($data['telefono_casa']) && blank($data['correo_electronico'])) {
@@ -287,86 +384,65 @@ class CrearTutor extends Component
             ]);
         }
 
-        $tutor = DB::transaction(function () use ($data): Tutor {
-            return Tutor::query()->create([
-                ...$data,
+        $tutor = DB::transaction(function () use ($data, $responsablesService): Tutor {
+            $tutor = Tutor::query()->create([
+                ...collect($data)->except(['alumnos_relacionar', 'sin_curp'])->all(),
                 'curp' => blank($data['curp']) ? null : $data['curp'],
                 'identificador_alternativo' => blank($data['identificador_alternativo']) ? null : $data['identificador_alternativo'],
                 'motivo_sin_curp' => blank($data['motivo_sin_curp']) ? null : $data['motivo_sin_curp'],
-                // Campo legado: el parentesco correcto se captura al relacionar al tutor con cada alumno.
                 'parentesco' => 'NO ESPECIFICADO',
                 'activo' => true,
             ]);
+
+            foreach ($this->alumnos_relacionar as $relacion) {
+                if (! $this->puede_relaciones_sensibles) {
+                    $relacion['es_tutor_legal'] = false;
+                    $relacion['estado_tutela'] = 'no_aplica';
+                    $relacion['recibe_calificaciones'] = false;
+                    $relacion['autorizado_recoger'] = false;
+                }
+
+                $alumno = Inscripcion::withTrashed()->findOrFail((int) $relacion['inscripcion_id']);
+                $responsablesService->agregarOActualizar($alumno, $tutor, $relacion, auth()->id());
+            }
+
+            return $tutor;
         });
 
+        $relaciones = count($this->alumnos_relacionar);
         $this->dispatch('swal', [
             'title' => 'Responsable creado correctamente',
-            'text' => 'Ahora puedes relacionarlo con uno o varios alumnos y definir el parentesco de cada relación.',
+            'text' => $relaciones > 0
+                ? "Se relacionó con {$relaciones} alumno(s). Puedes revisar cada vínculo en el administrador."
+                : 'El responsable quedó disponible para relacionarlo con uno o varios alumnos.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
 
+        $abrirGestion = $this->abrir_gestion_despues;
         $this->dispatch('tutorRegistered', tutor: $tutor->id);
         $this->limpiar();
         $this->dispatch('refreshTutor');
+
+        if ($abrirGestion) {
+            $this->dispatch('abrir-modal-alumnos-tutor');
+            $this->dispatch('administrarAlumnosTutor', id: $tutor->id);
+        }
     }
 
     public function limpiar(): void
     {
         $this->reset();
-        $this->tipo_documento_ocr = 'ine';
-        $this->cargarCapacidadesOcr();
+        $this->curp_estado = 'inicial';
+        $this->curp_mensaje = 'Escribe una CURP para comprobar si ya está registrada.';
+        $this->abrir_gestion_despues = true;
+        $this->puede_relaciones_sensibles = (bool) auth()->user()?->canAccess('alumnos.responsables_sensibles');
         $this->resetValidation();
-    }
-
-    private function aplicarInterpretacionLocalCurp(): void
-    {
-        /** @var CurpDataDecoder $decoder */
-        $decoder = app(CurpDataDecoder::class);
-        $decoded = $decoder->decode($this->curp);
-
-        if (! $decoded['valida']) {
-            return;
-        }
-
-        if (blank($this->fecha_nacimiento) && filled($decoded['fecha_nacimiento'])) {
-            $this->fecha_nacimiento = $decoded['fecha_nacimiento'];
-        }
-        if (blank($this->genero) && filled($decoded['genero'])) {
-            $this->genero = $decoded['genero'];
-        }
-        if (blank($this->estado_nacimiento) && filled($decoded['estado_nacimiento'])) {
-            $this->estado_nacimiento = $decoded['estado_nacimiento'];
-        }
-
-        $this->curp_local_mensaje = $decoded['mensaje'];
-    }
-
-    private function cargarCapacidadesOcr(): void
-    {
-        try {
-            $capabilities = app(TutorDocumentOcrService::class)->capabilities();
-            $this->ocr_capacidades = [
-                'enabled' => (bool) ($capabilities['enabled'] ?? false),
-                'tesseract' => (bool) ($capabilities['tesseract'] ?? false),
-                'pdftoppm' => (bool) ($capabilities['pdftoppm'] ?? false),
-                'imagemagick' => (bool) ($capabilities['imagemagick'] ?? false),
-                'pdf_text' => true,
-            ];
-        } catch (\Throwable) {
-            $this->ocr_capacidades = [
-                'enabled' => false,
-                'tesseract' => false,
-                'pdftoppm' => false,
-                'imagemagick' => false,
-                'pdf_text' => true,
-            ];
-        }
     }
 
     private function normalizar(): void
     {
-        $this->curp = mb_strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $this->curp) ?: '');
+        $this->curp = app(TutorCurpAutofillService::class)->normalizar($this->curp);
         $this->identificador_alternativo = mb_strtoupper(trim((string) $this->identificador_alternativo));
 
         if ($this->sin_curp) {
@@ -386,6 +462,27 @@ class CrearTutor extends Component
         }
     }
 
+    private function alumnoParaVista(Inscripcion $alumno): array
+    {
+        $ubicacion = $alumno->semestre
+            ? $alumno->semestre->numero . '° semestre'
+            : ($alumno->grado?->nombre ?: 'Sin grado');
+        $ciclo = $alumno->cicloEscolar
+            ? $alumno->cicloEscolar->inicio_anio . '-' . $alumno->cicloEscolar->fin_anio
+            : 'Sin ciclo';
+
+        return [
+            'id' => (int) $alumno->id,
+            'nombre' => trim(collect([$alumno->nombre, $alumno->apellido_paterno, $alumno->apellido_materno])->filter()->join(' ')),
+            'matricula' => $alumno->matricula ?: ($alumno->folio ?: 'Sin matrícula'),
+            'curp' => $alumno->curp,
+            'estatus' => $alumno->etiqueta_estatus,
+            'activo_listas' => $alumno->visibleEnListas(),
+            'ubicacion' => trim(collect([$alumno->nivel?->nombre, $ubicacion, $alumno->grupo?->clave ? 'Grupo ' . $alumno->grupo->clave : null])->filter()->join(' · ')),
+            'ciclo' => $ciclo,
+        ];
+    }
+
     private function titleCase(string $value): string
     {
         $value = trim((string) preg_replace('/\s+/u', ' ', $value));
@@ -401,33 +498,11 @@ class CrearTutor extends Component
         return $value;
     }
 
-    /** @return array<string, string> */
-    private function etiquetasCamposOcr(): array
-    {
-        return [
-            'curp' => 'CURP',
-            'nombre' => 'Nombre(s)',
-            'apellido_paterno' => 'Apellido paterno',
-            'apellido_materno' => 'Apellido materno',
-            'fecha_nacimiento' => 'Fecha de nacimiento',
-            'genero' => 'Género',
-            'ciudad_nacimiento' => 'Ciudad de nacimiento',
-            'municipio_nacimiento' => 'Municipio de nacimiento',
-            'estado_nacimiento' => 'Estado de nacimiento',
-            'calle' => 'Calle',
-            'numero' => 'Número',
-            'colonia' => 'Colonia',
-            'ciudad' => 'Ciudad',
-            'municipio' => 'Municipio',
-            'estado' => 'Estado',
-            'codigo_postal' => 'Código postal',
-        ];
-    }
-
     public function render()
     {
         return view('livewire.tutor.crear-tutor', [
-            'etiquetasCamposOcr' => $this->etiquetasCamposOcr(),
+            'parentescos' => GestionResponsablesAlumnoService::PARENTESCOS,
+            'estadosTutela' => GestionResponsablesAlumnoService::ESTADOS_TUTELA,
         ]);
     }
 }

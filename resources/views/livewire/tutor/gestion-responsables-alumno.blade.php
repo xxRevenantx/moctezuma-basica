@@ -82,10 +82,58 @@
 
             <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 @if (!($nuevo['sin_curp'] ?? false))
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">CURP</label>
-                        <input type="text" wire:model.live.debounce.500ms="nuevo.curp" maxlength="18" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 uppercase dark:border-neutral-700 dark:bg-neutral-950">
-                        @error('nuevo.curp') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
+                    <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
+                            <div class="flex-1">
+                                <label class="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">CURP del responsable</label>
+                                <input type="text" wire:model.blur="nuevo.curp" maxlength="18" autocomplete="off"
+                                    x-on:input="$el.value = $el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18)"
+                                    class="w-full rounded-xl border border-slate-200 px-3 py-2.5 uppercase tracking-wider dark:border-neutral-700 dark:bg-neutral-950">
+                                <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $curpNuevoMensaje }}</p>
+                                @error('nuevo.curp') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <button type="button" wire:click="consultarCurpNuevo" wire:loading.attr="disabled"
+                                @disabled(!$curpNuevoValida || $tutorExistenteNuevo)
+                                class="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                <span wire:loading.remove wire:target="consultarCurpNuevo">Consultar datos</span>
+                                <span wire:loading wire:target="consultarCurpNuevo">Consultando…</span>
+                            </button>
+                        </div>
+
+                        @if ($tutorExistenteNuevo)
+                            <div class="mt-3 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-white p-3 dark:border-indigo-900/50 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-extrabold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Responsable ya registrado</p>
+                                    <p class="mt-1 font-bold text-slate-800 dark:text-white">{{ $tutorExistenteNuevo['nombre_completo'] }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $tutorExistenteNuevo['activo'] ? 'Activo' : 'Archivado' }}</p>
+                                    @if (!$tutorExistenteNuevo['activo'])
+                                        <p class="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">Reactívalo desde Tutores antes de relacionarlo.</p>
+                                    @endif
+                                </div>
+                                <button type="button" wire:click="usarTutorExistenteNuevo"
+                                    @disabled(!$tutorExistenteNuevo['activo'])
+                                    class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                    Relacionar existente
+                                </button>
+                            </div>
+                        @endif
+
+                        @if ($alumnoMismaCurpNuevo)
+                            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-200">
+                                La CURP también aparece en el alumno {{ $alumnoMismaCurpNuevo['nombre_completo'] }}. Verifica la coincidencia; no se bloquea el registro.
+                            </div>
+                        @endif
+                        @if ($curpNuevoAdvertencia)
+                            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-200">{{ $curpNuevoAdvertencia }}</div>
+                        @endif
+                        @if ($curpNuevoExito)
+                            <div class="mt-3 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:text-emerald-200 sm:flex-row sm:items-center sm:justify-between">
+                                <span>{{ $curpNuevoExito }}</span>
+                                @if ($diferenciasCurpNuevo !== [])
+                                    <button type="button" wire:click="aplicarCurpNuevo(true)" class="rounded-lg border border-emerald-300 px-3 py-1.5 font-bold">Aplicar todos</button>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 @else
                     <div>

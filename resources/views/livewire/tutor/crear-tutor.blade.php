@@ -92,157 +92,125 @@
                                 </span>
                             </div>
 
-                            {{-- Lector local de INE / CURP --}}
-                            <div class="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm dark:border-emerald-900/50 dark:from-emerald-950/25 dark:via-zinc-950 dark:to-sky-950/20">
-                                <div class="flex flex-col gap-3 border-b border-emerald-100 p-4 dark:border-emerald-900/40 sm:flex-row sm:items-start sm:justify-between">
+                            {{-- Consulta de CURP con el mismo servicio utilizado en Inscripción --}}
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-sm dark:border-sky-900/50 dark:from-sky-950/25 dark:via-zinc-950 dark:to-indigo-950/20">
+                                <div class="flex flex-col gap-3 border-b border-sky-100 p-4 dark:border-sky-900/40 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="flex gap-3">
-                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-sm">
                                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
-                                                <rect x="7" y="8" width="10" height="8" rx="1.5" />
-                                                <path d="M9.5 11h5M9.5 13.5h3" />
+                                                <path d="M9 12l2 2 4-4" />
+                                                <path d="M12 3 4.5 6v5.5c0 4.7 3.2 8.9 7.5 9.9 4.3-1 7.5-5.2 7.5-9.9V6L12 3Z" />
                                             </svg>
                                         </span>
                                         <div>
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <h4 class="font-bold text-zinc-900 dark:text-zinc-100">Autollenado desde INE o CURP</h4>
-                                                <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Sin tokens</span>
-                                                <span class="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Procesamiento local</span>
+                                                <h4 class="font-bold text-zinc-900 dark:text-zinc-100">Consulta y autollenado por CURP</h4>
+                                                <span class="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Mismo servicio de Inscripción</span>
                                             </div>
                                             <p class="mt-1 max-w-3xl text-xs leading-5 text-zinc-600 dark:text-zinc-400">
-                                                Sube una fotografía frontal del INE o la constancia de CURP. El sistema presenta una vista previa y nunca modifica el formulario sin tu confirmación.
+                                                Primero se valida la CURP en la base local. Si no existe, el servicio completa nombre, apellidos, género, fecha y estado de nacimiento sin reemplazar lo que ya capturaste.
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-wrap gap-2 text-[11px] font-bold">
-                                        <span @class([
-                                            'rounded-full px-2.5 py-1',
-                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' => $ocr_capacidades['tesseract'] ?? false,
-                                            'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' => !($ocr_capacidades['tesseract'] ?? false),
-                                        ])>
-                                            Tesseract: {{ ($ocr_capacidades['tesseract'] ?? false) ? 'listo' : 'no detectado' }}
-                                        </span>
-                                        <span @class([
-                                            'rounded-full px-2.5 py-1',
-                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' => $ocr_capacidades['pdftoppm'] ?? false,
-                                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' => !($ocr_capacidades['pdftoppm'] ?? false),
-                                        ])>
-                                            PDF escaneado: {{ ($ocr_capacidades['pdftoppm'] ?? false) ? 'listo' : 'requiere Poppler' }}
-                                        </span>
-                                    </div>
+                                    <span @class([
+                                        'inline-flex rounded-full px-3 py-1 text-xs font-bold',
+                                        'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' => $curp_estado === 'inicial',
+                                        'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' => in_array($curp_estado, ['incompleta', 'invalida', 'error'], true),
+                                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' => $curp_estado === 'disponible',
+                                        'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' => $curp_estado === 'encontrada',
+                                    ])>
+                                        {{ match($curp_estado) { 'disponible' => 'Disponible', 'encontrada' => 'Ya registrada', 'incompleta' => 'Incompleta', 'invalida' => 'No válida', 'error' => 'Error', default => 'Pendiente' } }}
+                                    </span>
                                 </div>
 
-                                <div class="grid gap-4 p-4 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
+                                <div class="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                                     <flux:field>
-                                        <flux:label>Tipo de documento</flux:label>
-                                        <flux:select wire:model.live="tipo_documento_ocr">
-                                            <option value="ine">INE / identificación</option>
-                                            <option value="curp">Constancia de CURP</option>
-                                        </flux:select>
-                                        <flux:error name="tipo_documento_ocr" />
+                                        <flux:label badge="Requerido">CURP del responsable *</flux:label>
+                                        <flux:input wire:model.blur="curp" maxlength="18" inputmode="text" autocomplete="off" spellcheck="false"
+                                            :disabled="$sin_curp"
+                                            x-on:input="$el.value = $el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18)"
+                                            class="uppercase tracking-wider" placeholder="18 caracteres" />
+                                        <flux:error name="curp" />
+                                        @if (!$sin_curp)
+                                            <p @class([
+                                                'mt-1 text-xs font-semibold',
+                                                'text-zinc-500 dark:text-zinc-400' => $curp_estado === 'inicial',
+                                                'text-amber-700 dark:text-amber-300' => in_array($curp_estado, ['incompleta', 'invalida', 'error'], true),
+                                                'text-emerald-700 dark:text-emerald-300' => $curp_estado === 'disponible',
+                                                'text-indigo-700 dark:text-indigo-300' => $curp_estado === 'encontrada',
+                                            ])>{{ $curp_mensaje }}</p>
+                                        @endif
                                     </flux:field>
 
-                                    <div>
-                                        <label for="documento-tutor-ocr" class="mb-2 block text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                                            Archivo o fotografía
-                                        </label>
-                                        <input id="documento-tutor-ocr" type="file" wire:model="documento_ocr"
-                                            accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-                                            capture="environment"
-                                            class="block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-sky-700 hover:file:bg-sky-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:file:bg-sky-950/50 dark:file:text-sky-300" />
-                                        <flux:error name="documento_ocr" />
-                                        <p class="mt-1 text-[11px] text-zinc-500">PDF, JPG, PNG o WEBP; máximo {{ round(config('tutor_ocr.max_file_kb', 12288) / 1024, 1) }} MB.</p>
-                                    </div>
-
-                                    <flux:button type="button" variant="primary" wire:click="analizarDocumentoTutor"
-                                        wire:loading.attr="disabled" wire:target="documento_ocr,analizarDocumentoTutor"
-                                        class="rounded-xl bg-emerald-600 hover:bg-emerald-700">
-                                        <span wire:loading.remove wire:target="analizarDocumentoTutor">Analizar documento</span>
-                                        <span wire:loading wire:target="analizarDocumentoTutor" class="inline-flex items-center gap-2">
+                                    <flux:button type="button" variant="primary" wire:click="consultarCurp"
+                                        wire:loading.attr="disabled" wire:target="consultarCurp,curp"
+                                        :disabled="$sin_curp || !$curp_local_validada || $curp_existe_local"
+                                        class="rounded-xl bg-sky-600 hover:bg-sky-700">
+                                        <span wire:loading.remove wire:target="consultarCurp">Consultar datos</span>
+                                        <span wire:loading wire:target="consultarCurp" class="inline-flex items-center gap-2">
                                             <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
                                             </svg>
-                                            Leyendo…
+                                            Consultando…
                                         </span>
                                     </flux:button>
                                 </div>
 
-                                @if (!($ocr_capacidades['tesseract'] ?? false))
-                                    <div class="mx-4 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                                        <strong>Lectura parcial disponible:</strong> las constancias de CURP con texto seleccionable funcionan sin instalar nada. Para fotografías del INE o documentos escaneados instala Tesseract y configura <code class="rounded bg-black/5 px-1 py-0.5 dark:bg-white/10">TESSERACT_BINARY</code> en <code>.env</code>.
-                                    </div>
-                                @endif
-
-                                @if ($ocr_error)
-                                    <div class="mx-4 mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
-                                        <strong>No se pudo completar la lectura:</strong> {{ $ocr_error }}
-                                    </div>
-                                @endif
-
-                                @if (!empty($ocr_resultado['campos']))
-                                    <div class="border-t border-emerald-100 bg-white/75 p-4 dark:border-emerald-900/40 dark:bg-zinc-950/60">
+                                @if ($tutor_existente)
+                                    <div class="mx-4 mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
                                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
-                                                <h5 class="font-bold text-zinc-900 dark:text-zinc-100">Vista previa de datos detectados</h5>
-                                                <p class="mt-1 text-xs text-zinc-500">
-                                                    Método: {{ $ocr_resultado['metodo'] ?? 'Lector local' }}
-                                                    @if (isset($ocr_resultado['confianza']) && $ocr_resultado['confianza'] !== null)
-                                                        · Confianza OCR: {{ $ocr_resultado['confianza'] }}%
-                                                    @endif
+                                                <p class="text-xs font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Responsable ya registrado</p>
+                                                <p class="mt-1 font-bold text-zinc-900 dark:text-zinc-100">{{ $tutor_existente['nombre_completo'] }}</p>
+                                                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                                    {{ $tutor_existente['curp'] }} · {{ $tutor_existente['relaciones_activas'] }} relación(es) activa(s)
+                                                    · {{ $tutor_existente['activo'] ? 'Activo' : 'Archivado' }}
+                                                    @if ($tutor_existente['telefono']) · {{ $tutor_existente['telefono'] }} @endif
                                                 </p>
-                                            </div>
-                                            <label class="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                                                <input type="checkbox" wire:model="ocr_reemplazar" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
-                                                Reemplazar campos que ya tienen información
-                                            </label>
-                                        </div>
-
-                                        @if (!empty($ocr_resultado['advertencias']))
-                                            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-                                                <ul class="space-y-1">
-                                                    @foreach ($ocr_resultado['advertencias'] as $advertencia)
-                                                        <li class="flex gap-2"><span>•</span><span>{{ $advertencia }}</span></li>
-                                                    @endforeach
-                                                </ul>
-                                            </div>
-                                        @endif
-
-                                        <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                            @foreach (($ocr_resultado['campos'] ?? []) as $campo => $valor)
-                                                @if (filled($valor) && isset($etiquetasCamposOcr[$campo]))
-                                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition hover:border-emerald-300 hover:bg-emerald-50/50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20">
-                                                        <input type="checkbox" value="{{ $campo }}" wire:model="ocr_campos_seleccionados"
-                                                            class="mt-0.5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
-                                                        <span class="min-w-0">
-                                                            <span class="block text-[11px] font-black uppercase tracking-wide text-zinc-500">{{ $etiquetasCamposOcr[$campo] }}</span>
-                                                            <span class="mt-1 block break-words text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                                                @if ($campo === 'genero')
-                                                                    {{ $valor === 'M' ? 'Masculino' : ($valor === 'F' ? 'Femenino' : $valor) }}
-                                                                @else
-                                                                    {{ $valor }}
-                                                                @endif
-                                                            </span>
-                                                        </span>
-                                                    </label>
+                                                @if (!$tutor_existente['activo'])
+                                                    <p class="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">Reactívalo desde el directorio de Tutores para agregar o reactivar relaciones.</p>
                                                 @endif
-                                            @endforeach
-                                        </div>
-
-                                        <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                            <flux:button type="button" variant="outline" wire:click="limpiarResultadoOcr" class="rounded-xl">
-                                                Descartar lectura
-                                            </flux:button>
-                                            <flux:button type="button" variant="primary" wire:click="aplicarDatosOcr" class="rounded-xl bg-emerald-600 hover:bg-emerald-700">
-                                                Aplicar al formulario
+                                            </div>
+                                            <flux:button type="button" variant="primary" wire:click="administrarTutorExistente" class="rounded-xl">
+                                                {{ $tutor_existente['activo'] ? 'Administrar alumnos' : 'Ver historial' }}
                                             </flux:button>
                                         </div>
+                                    </div>
+                                @endif
 
-                                        @if (!empty($ocr_resultado['texto']))
-                                            <details class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
-                                                <summary class="cursor-pointer text-xs font-bold text-zinc-700 dark:text-zinc-300">Ver texto reconocido para comprobación</summary>
-                                                <pre class="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-zinc-600 dark:text-zinc-400">{{ $ocr_resultado['texto'] }}</pre>
+                                @if ($alumno_con_misma_curp)
+                                    <div class="mx-4 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                        <strong>Coincidencia permitida:</strong> esta CURP también aparece en el alumno {{ $alumno_con_misma_curp['nombre_completo'] }}
+                                        ({{ $alumno_con_misma_curp['matricula'] ?: 'sin matrícula' }} · {{ $alumno_con_misma_curp['estatus'] }}). Verifica que se trate de la misma persona antes de guardar.
+                                    </div>
+                                @endif
+
+                                @if ($curp_advertencia)
+                                    <div class="mx-4 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                        {{ $curp_advertencia }}
+                                    </div>
+                                @endif
+
+                                @if ($curp_exito)
+                                    <div class="mx-4 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <span>{{ $curp_exito }}</span>
+                                            @if (!empty($curp_diferencias))
+                                                <flux:button type="button" size="sm" variant="outline" wire:click="aplicarDatosCurp(true)" class="rounded-xl">
+                                                    Aplicar todos y reemplazar
+                                                </flux:button>
+                                            @endif
+                                        </div>
+                                        @if (!empty($curp_diferencias))
+                                            <details class="mt-3 rounded-lg border border-emerald-200/70 bg-white/70 p-3 dark:border-emerald-900/50 dark:bg-zinc-950/40">
+                                                <summary class="cursor-pointer text-xs font-bold">Revisar {{ count($curp_diferencias) }} diferencia(s)</summary>
+                                                <div class="mt-2 space-y-2 text-xs">
+                                                    @foreach ($curp_diferencias as $diferencia)
+                                                        <p><strong>{{ str($diferencia['campo'])->replace('_', ' ')->title() }}:</strong> capturado “{{ $diferencia['actual'] }}” · servicio “{{ $diferencia['externo'] }}”</p>
+                                                    @endforeach
+                                                </div>
                                             </details>
                                         @endif
                                     </div>
@@ -256,19 +224,7 @@
                                         Responsable extranjero o sin CURP disponible
                                     </label>
 
-                                    @if (!$sin_curp)
-                                        <flux:field>
-                                            <flux:label badge="Requerido">CURP *</flux:label>
-                                            <flux:input wire:model.blur="curp" maxlength="18" inputmode="text" autocomplete="off" spellcheck="false"
-                                                x-on:input="$el.value = $el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18)"
-                                                class="uppercase tracking-wider"
-                                                placeholder="18 caracteres" />
-                                            <flux:error name="curp" />
-                                            @if ($curp_local_mensaje)
-                                                <p class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ $curp_local_mensaje }}</p>
-                                            @endif
-                                        </flux:field>
-                                    @else
+                                    @if ($sin_curp)
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             <flux:field>
                                                 <flux:label badge="Requerido">Identificador alternativo *</flux:label>
@@ -303,7 +259,7 @@
 
                         {{-- Secciones colapsables --}}
                         <div class="mt-4 space-y-4" x-data="{ gen: true, dom: false, con: false }"
-                            x-on:tutor-ocr-aplicado.window="gen = true; dom = true">
+                            x-on:tutor-curp-aplicada.window="gen = true">
                             {{-- DATOS GENERALES --}}
                             <div
                                 class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -499,18 +455,166 @@
                             </div>
                         </div>
 
+                        {{-- Relación opcional con alumnos --}}
+                        <div class="mt-4 overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/50 dark:bg-zinc-950">
+                            <div class="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50 p-4 dark:border-violet-900/40 dark:from-violet-950/20 dark:to-indigo-950/20">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Alumnos relacionados</h3>
+                                        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Opcional. Busca y selecciona uno o varios alumnos; cada relación conserva su parentesco y autorizaciones.</p>
+                                    </div>
+                                    <span class="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                                        {{ count($alumnos_relacionar) }} seleccionado(s)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="p-4">
+                                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                                    <flux:field>
+                                        <flux:label>Buscar alumno</flux:label>
+                                        <flux:input wire:model.live.debounce.350ms="buscar_alumno" placeholder="Nombre, matrícula, folio o CURP" />
+                                        <flux:error name="buscar_alumno" />
+                                    </flux:field>
+                                    <label class="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+                                        <input type="checkbox" wire:model.live="incluir_alumnos_historicos" class="rounded border-zinc-300 text-violet-600 focus:ring-violet-500">
+                                        Incluir egresados, bajas e históricos
+                                    </label>
+                                </div>
+
+                                @if (!empty($resultados_alumnos))
+                                    <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                        @foreach ($resultados_alumnos as $resultado)
+                                            <button type="button" wire:click="seleccionarAlumno({{ $resultado['id'] }})"
+                                                class="rounded-xl border border-zinc-200 p-3 text-left transition hover:border-violet-300 hover:bg-violet-50 dark:border-zinc-800 dark:hover:border-violet-800 dark:hover:bg-violet-950/20">
+                                                <span class="block font-semibold text-zinc-900 dark:text-zinc-100">{{ $resultado['nombre'] }}</span>
+                                                <span class="mt-1 block text-xs text-zinc-500">{{ $resultado['matricula'] }} · {{ $resultado['ubicacion'] }}</span>
+                                                <span class="mt-1 block text-[11px] font-bold {{ $resultado['activo_listas'] ? 'text-emerald-600' : 'text-amber-600' }}">{{ $resultado['estatus'] }} · {{ $resultado['ciclo'] }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @elseif (mb_strlen(trim($buscar_alumno)) >= 2)
+                                    <p class="mt-3 rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-700">No se encontraron alumnos con ese criterio.</p>
+                                @endif
+
+                                @if (!empty($alumnos_relacionar))
+                                    <div class="mt-4 space-y-4">
+                                        @foreach ($alumnos_relacionar as $indice => $relacion)
+                                            <div wire:key="nuevo-tutor-alumno-{{ $relacion['inscripcion_id'] }}" class="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div>
+                                                        <p class="font-bold text-zinc-900 dark:text-zinc-100">{{ $relacion['nombre'] }}</p>
+                                                        <p class="mt-1 text-xs text-zinc-500">{{ $relacion['matricula'] }} · {{ $relacion['ubicacion'] }} · {{ $relacion['ciclo'] }}</p>
+                                                        @if ($relacion['reemplazara_principal'] && $relacion['es_principal'])
+                                                            <p class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">Al guardar, el responsable principal actual quedará como secundario.</p>
+                                                        @endif
+                                                    </div>
+                                                    <button type="button" wire:click="quitarAlumno({{ $indice }})" class="rounded-lg px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">Quitar</button>
+                                                </div>
+
+                                                <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                                    <flux:field>
+                                                        <flux:label>Parentesco *</flux:label>
+                                                        <flux:select wire:model="alumnos_relacionar.{{ $indice }}.parentesco">
+                                                            @foreach ($parentescos as $parentesco)
+                                                                <option value="{{ $parentesco }}">{{ str($parentesco)->replace('_', ' ')->title() }}</option>
+                                                            @endforeach
+                                                        </flux:select>
+                                                        <flux:error name="alumnos_relacionar.{{ $indice }}.parentesco" />
+                                                    </flux:field>
+                                                    <flux:field>
+                                                        <flux:label>Inicio de relación *</flux:label>
+                                                        <flux:input type="date" wire:model="alumnos_relacionar.{{ $indice }}.fecha_inicio" />
+                                                        <flux:error name="alumnos_relacionar.{{ $indice }}.fecha_inicio" />
+                                                    </flux:field>
+                                                    <flux:field class="md:col-span-2">
+                                                        <flux:label>Observaciones</flux:label>
+                                                        <flux:input wire:model="alumnos_relacionar.{{ $indice }}.observaciones" maxlength="1000" />
+                                                        <flux:error name="alumnos_relacionar.{{ $indice }}.observaciones" />
+                                                    </flux:field>
+                                                </div>
+
+                                                <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                                                    @foreach ([
+                                                        'es_principal' => 'Principal',
+                                                        'vive_con_alumno' => 'Vive con el alumno',
+                                                        'recibe_avisos' => 'Recibe avisos',
+                                                        'contacto_emergencia' => 'Emergencia',
+                                                        'responsable_economico' => 'Responsable económico',
+                                                    ] as $campo => $etiqueta)
+                                                        <label class="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+                                                            <input type="checkbox" wire:model.live="alumnos_relacionar.{{ $indice }}.{{ $campo }}" class="rounded border-zinc-300 text-violet-600 focus:ring-violet-500">
+                                                            {{ $etiqueta }}
+                                                        </label>
+                                                    @endforeach
+
+                                                    @if ($puede_relaciones_sensibles)
+                                                        @foreach ([
+                                                            'es_tutor_legal' => 'Tutor legal',
+                                                            'recibe_calificaciones' => 'Recibe calificaciones',
+                                                            'autorizado_recoger' => 'Autorizado para recoger',
+                                                        ] as $campo => $etiqueta)
+                                                            <label class="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-200">
+                                                                <input type="checkbox" wire:model.live="alumnos_relacionar.{{ $indice }}.{{ $campo }}" class="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                                                                {{ $etiqueta }}
+                                                            </label>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+
+                                                @if ($puede_relaciones_sensibles && $relacion['es_tutor_legal'])
+                                                    <div class="mt-3 max-w-sm">
+                                                        <flux:field>
+                                                            <flux:label>Estado de tutela</flux:label>
+                                                            <flux:select wire:model="alumnos_relacionar.{{ $indice }}.estado_tutela">
+                                                                @foreach ($estadosTutela as $estadoTutela)
+                                                                    <option value="{{ $estadoTutela }}">{{ str($estadoTutela)->replace('_', ' ')->title() }}</option>
+                                                                @endforeach
+                                                            </flux:select>
+                                                        </flux:field>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                <label class="mt-4 inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                                    <input type="checkbox" wire:model="abrir_gestion_despues" class="rounded border-zinc-300 text-violet-600 focus:ring-violet-500">
+                                    Abrir el administrador de relaciones después de guardar
+                                </label>
+                            </div>
+                        </div>
+
                         {{-- Acciones finales --}}
                         <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
                             <flux:button type="button" variant="outline" wire:click="limpiar" class="rounded-xl">
                                 Cancelar
                             </flux:button>
 
-                            <flux:button type="submit" variant="primary"
-                                class="rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:brightness-110"
-                                wire:loading.attr="disabled" wire:target="guardar">
-                                <span wire:loading.remove wire:target="guardar">Guardar tutor</span>
-                                <span wire:loading wire:target="guardar">Guardando…</span>
-                            </flux:button>
+                            @php
+                                $requiereConfirmacionPrincipal = collect($alumnos_relacionar ?? [])->contains(
+                                    fn ($item) => ($item['es_principal'] ?? false)
+                                        && ($item['reemplazara_principal'] ?? false)
+                                );
+                            @endphp
+
+                            @if ($requiereConfirmacionPrincipal)
+                                <flux:button type="submit" variant="primary"
+                                    wire:confirm="Uno o más alumnos ya tienen un contacto principal. El anterior se conservará como secundario. ¿Continuar?"
+                                    class="rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:brightness-110"
+                                    wire:loading.attr="disabled" wire:target="guardar">
+                                    <span wire:loading.remove wire:target="guardar">Guardar tutor</span>
+                                    <span wire:loading wire:target="guardar">Guardando…</span>
+                                </flux:button>
+                            @else
+                                <flux:button type="submit" variant="primary"
+                                    class="rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:brightness-110"
+                                    wire:loading.attr="disabled" wire:target="guardar">
+                                    <span wire:loading.remove wire:target="guardar">Guardar tutor</span>
+                                    <span wire:loading wire:target="guardar">Guardando…</span>
+                                </flux:button>
+                            @endif
                         </div>
                     </form>
                 </div>
