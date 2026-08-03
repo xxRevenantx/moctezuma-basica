@@ -61,7 +61,7 @@ class HorariosVaciosPdfController extends Controller
             generacionId: isset($datos['generacion_id']) ? (int) $datos['generacion_id'] : null,
             gradoId: isset($datos['grado_id']) ? (int) $datos['grado_id'] : null,
             semestreId: isset($datos['semestre_id']) ? (int) $datos['semestre_id'] : null,
-            gruposSeleccionados: collect($datos['grupos_seleccionados'] ?? [])->map(fn ($id) => (int) $id)->all(),
+            gruposSeleccionados: collect($datos['grupos_seleccionados'] ?? [])->map(fn($id) => (int) $id)->all(),
         );
 
         abort_if($grupos->isEmpty(), 404, 'No se encontraron grupos para los filtros seleccionados.');
@@ -110,7 +110,7 @@ class HorariosVaciosPdfController extends Controller
                 'etiqueta_grupo' => $this->etiquetaGrupo($grupo),
                 'generacion' => $grupo->generacion?->etiqueta,
                 'receso_hora_ids' => collect($recesosPorGrupo->get((int) $grupo->id, []))
-                    ->map(fn ($id) => (int) $id)
+                    ->map(fn($id) => (int) $id)
                     ->values()
                     ->all(),
             ];
@@ -137,8 +137,8 @@ class HorariosVaciosPdfController extends Controller
             'logoIzquierdo' => $this->imagenBase64Publica('imagenes/logo-letra.png'),
             'logoDerecho' => $this->imagenBase64Publica(
                 !empty($nivel->logo)
-                    ? 'storage/logos/' . $nivel->logo
-                    : 'imagenes/logo-letra.png'
+                ? 'storage/logos/' . $nivel->logo
+                : 'imagenes/logo-letra.png'
             ),
             'imagenNivel' => $this->imagenBase64Publica(match ((string) $nivel->slug) {
                 'preescolar' => 'imagenes/personajes_preescolar.png',
@@ -148,7 +148,7 @@ class HorariosVaciosPdfController extends Controller
                 default => null,
             }),
         ])
-            ->setPaper('letter', 'portrait')
+            ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
     }
 
@@ -202,8 +202,8 @@ class HorariosVaciosPdfController extends Controller
 
     private function filtrarHoras(Collection $horasNivel, int $horaInicioId, int $horaFinId): Collection
     {
-        $indiceInicio = $horasNivel->search(fn (Hora $hora) => (int) $hora->id === $horaInicioId);
-        $indiceFin = $horasNivel->search(fn (Hora $hora) => (int) $hora->id === $horaFinId);
+        $indiceInicio = $horasNivel->search(fn(Hora $hora) => (int) $hora->id === $horaInicioId);
+        $indiceFin = $horasNivel->search(fn(Hora $hora) => (int) $hora->id === $horaFinId);
 
         if ($indiceInicio === false || $indiceFin === false) {
             return collect();
@@ -220,8 +220,7 @@ class HorariosVaciosPdfController extends Controller
         int $cicloEscolarId,
         Collection $grupos,
         Collection $horas,
-    ): Collection
-    {
+    ): Collection {
         $grupoIds = $grupos->pluck('id')->all();
         $horaIds = $horas->pluck('id')->all();
 
@@ -240,11 +239,11 @@ class HorariosVaciosPdfController extends Controller
                 return !$horario->taller_sesion_id
                     && (int) ($horario->asignacionMateria?->materia?->receso ?? 0) === 1;
             })
-            ->groupBy(fn (Horario $horario) => (int) $horario->grupo_id)
+            ->groupBy(fn(Horario $horario) => (int) $horario->grupo_id)
             ->map(function (Collection $horariosGrupo) {
                 return $horariosGrupo
                     ->pluck('hora_id')
-                    ->map(fn ($id) => (int) $id)
+                    ->map(fn($id) => (int) $id)
                     ->unique()
                     ->values();
             });
@@ -270,7 +269,7 @@ class HorariosVaciosPdfController extends Controller
             ->vigenteEnCiclo($cicloEscolarId)
             ->where('grado_id', $grupo->grado_id)
             ->where('grupo_id', $grupo->id)
-            ->whereHas('cabecera', fn ($query) => $query->where('nivel_id', $nivelId))
+            ->whereHas('cabecera', fn($query) => $query->where('nivel_id', $nivelId))
             ->titularReconocido()
             ->orderByRaw("CASE WHEN es_titular_principal = 1 THEN 0 WHEN es_titular = 1 THEN 1 ELSE 2 END")
             ->orderByRaw("CASE WHEN estado = 'activo' THEN 0 ELSE 1 END")
@@ -314,8 +313,7 @@ class HorariosVaciosPdfController extends Controller
         Grupo $grupo,
         ?int $titularId,
         string $nivelSlug,
-    ): array
-    {
+    ): array {
         $asignaciones = AsignacionMateria::query()
             ->with([
                 'materia:id,materia,orden,receso',
@@ -328,20 +326,20 @@ class HorariosVaciosPdfController extends Controller
             ->where('grupo_id', $grupo->id)
             ->when(
                 $grupo->generacion_id,
-                fn ($query) => $query->where('generacion_id', $grupo->generacion_id)
+                fn($query) => $query->where('generacion_id', $grupo->generacion_id)
             )
             ->when(
                 $grupo->semestre_id,
-                fn ($query) => $query->where('semestre_id', $grupo->semestre_id),
-                fn ($query) => $query->whereNull('semestre_id')
+                fn($query) => $query->where('semestre_id', $grupo->semestre_id),
+                fn($query) => $query->whereNull('semestre_id')
             )
-            ->whereHas('materia', fn ($query) => $query->where('receso', false))
+            ->whereHas('materia', fn($query) => $query->where('receso', false))
             ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('orden')
             ->orderBy('materia_id')
             ->get(['id', 'materia_id', 'profesor_id', 'orden'])
-            ->filter(fn (AsignacionMateria $asignacion) => filled($asignacion->materia?->materia))
-            ->unique(fn (AsignacionMateria $asignacion) => implode('-', [
+            ->filter(fn(AsignacionMateria $asignacion) => filled($asignacion->materia?->materia))
+            ->unique(fn(AsignacionMateria $asignacion) => implode('-', [
                 (int) $asignacion->materia_id,
                 (int) ($asignacion->profesor_id ?? 0),
             ]))
@@ -389,7 +387,7 @@ class HorariosVaciosPdfController extends Controller
                     'sin_docente' => !$profesor?->id,
                 ];
             })
-            ->groupBy(fn (array $item) => $item['profesor_id'] !== null
+            ->groupBy(fn(array $item) => $item['profesor_id'] !== null
                 ? 'profesor-' . $item['profesor_id']
                 : 'sin-docente')
             ->map(function (Collection $items) {
@@ -408,7 +406,7 @@ class HorariosVaciosPdfController extends Controller
                     'materias' => $itemsOrdenados
                         ->pluck('materia')
                         ->filter()
-                        ->unique(fn ($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
+                        ->unique(fn($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
                         ->values()
                         ->all(),
                     'orden' => (int) $itemsOrdenados->min('orden'),

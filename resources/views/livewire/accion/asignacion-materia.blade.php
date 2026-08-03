@@ -389,13 +389,30 @@
                     </p>
                 </div>
 
-                @if (auth()->user()?->is_admin && $this->hayBorradoresFiltrados)
-                    <button type="button" wire:click="confirmarTodas"
-                        wire:confirm="¿Confirmar todas las cargas en borrador de este nivel?"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
-                        <flux:icon.check-circle class="h-4 w-4" />
-                        Confirmar todos los borradores
-                    </button>
+                @if (auth()->user()?->is_admin)
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" wire:click="abrirHistorialReasignaciones"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            <flux:icon.clock class="h-4 w-4" />
+                            Historial de cambios
+                        </button>
+                        <button type="button" wire:click="abrirReasignacionMasiva"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5">
+                            <flux:icon.users class="h-4 w-4" />
+                            Reasignación masiva
+                            @if (count($seleccionados) > 0)
+                                <span class="rounded-full bg-white/20 px-2 py-0.5">{{ count($seleccionados) }}</span>
+                            @endif
+                        </button>
+                        @if ($this->hayBorradoresFiltrados)
+                            <button type="button" wire:click="confirmarTodas"
+                                wire:confirm="¿Confirmar todas las cargas en borrador de este nivel?"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
+                                <flux:icon.check-circle class="h-4 w-4" />
+                                Confirmar borradores
+                            </button>
+                        @endif
+                    </div>
                 @endif
             </div>
 
@@ -561,6 +578,32 @@
             </div>
         </div>
 
+        @if (auth()->user()?->is_admin && count($seleccionados) > 0)
+            <div class="flex flex-col gap-3 border-b border-blue-200 bg-blue-50/80 px-5 py-4 dark:border-blue-900/50 dark:bg-blue-950/20 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div class="flex flex-wrap items-center gap-2 text-sm font-bold text-blue-900 dark:text-blue-100">
+                    <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-[#006492] px-2 text-xs font-black text-white">{{ count($seleccionados) }}</span>
+                    <span>materia(s) seleccionada(s)</span>
+                    <span class="text-xs font-semibold text-blue-700/70 dark:text-blue-200/70">Los recesos y registros auxiliares se excluyen automáticamente.</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if (count($seleccionados) < $this->totalSeleccionablesFiltrados)
+                        <button type="button" wire:click="seleccionarTodosFiltrados"
+                            class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300">
+                            Seleccionar las {{ $this->totalSeleccionablesFiltrados }} materias filtradas
+                        </button>
+                    @endif
+                    <button type="button" wire:click="limpiarSeleccionTabla"
+                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                        Limpiar selección
+                    </button>
+                    <button type="button" wire:click="abrirReasignacionMasiva"
+                        class="rounded-xl bg-[#006492] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#00557b]">
+                        Cambiar profesor
+                    </button>
+                </div>
+            </div>
+        @endif
+
         @if ($this->asignacionesFiltradas->count() === 0)
             <div class="p-12 text-center">
                 <div
@@ -577,6 +620,14 @@
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                     <thead class="bg-slate-100 dark:bg-slate-900">
                         <tr>
+                            @if (auth()->user()?->is_admin)
+                                <th class="w-12 px-4 py-3 text-center">
+                                    <input type="checkbox" aria-label="Seleccionar página"
+                                        @checked($this->paginaSeleccionada)
+                                        wire:click="alternarSeleccionPagina"
+                                        class="h-4 w-4 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                                </th>
+                            @endif
                             <th class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500">
                                 Materia</th>
                             <th class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500">
@@ -596,7 +647,19 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @foreach ($this->asignacionesFiltradas as $asignacion)
                             <tr wire:key="carga-academica-{{ $asignacion->id }}"
-                                class="align-top transition hover:bg-slate-50 dark:hover:bg-slate-900/60">
+                                @class([
+                                    'align-top transition hover:bg-slate-50 dark:hover:bg-slate-900/60',
+                                    'bg-blue-50/50 dark:bg-blue-950/10' => in_array((int) $asignacion->id, array_map('intval', $seleccionados), true),
+                                ])>
+                                @if (auth()->user()?->is_admin)
+                                    <td class="px-4 py-4 text-center">
+                                        <input type="checkbox" value="{{ $asignacion->id }}"
+                                            wire:model.live="seleccionados"
+                                            @disabled((bool) $asignacion->materia?->receso)
+                                            aria-label="Seleccionar {{ $asignacion->materia?->materia ?? 'materia' }}"
+                                            class="h-4 w-4 rounded border-slate-300 text-[#006492] focus:ring-[#006492] disabled:cursor-not-allowed disabled:opacity-30">
+                                    </td>
+                                @endif
                                 <td class="px-4 py-4">
                                     <p class="font-black text-slate-900 dark:text-white">
                                         {{ $asignacion->materia?->materia ?? 'Materia' }}</p>
@@ -957,6 +1020,474 @@
                         <span wire:loading wire:target="actualizarMateria">Actualizando…</span>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Reasignación masiva de profesores --}}
+    <div x-data="{ abierto: $wire.entangle('modalReasignacionAbierto') }" x-show="abierto" x-cloak
+        x-on:keydown.escape.window="if (abierto) $wire.cerrarReasignacionMasiva()"
+        x-effect="document.body.classList.toggle('overflow-hidden', abierto)"
+        class="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-5" role="dialog" aria-modal="true"
+        aria-labelledby="titulo-reasignacion-masiva">
+        <div class="absolute inset-0 bg-slate-950/65 backdrop-blur-sm" wire:click="cerrarReasignacionMasiva"></div>
+
+        <div class="relative flex max-h-[95vh] w-full max-w-7xl flex-col overflow-hidden rounded-[2rem] border border-white/60 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+            <div class="h-1.5 shrink-0 bg-gradient-to-r from-[#006492] via-blue-500 to-[#88AC2E]"></div>
+            <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-lime-50 px-5 py-4 dark:border-slate-800 dark:from-blue-950/30 dark:via-slate-950 dark:to-lime-950/20 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#006492] text-white shadow-lg shadow-blue-500/20">
+                        <flux:icon.users class="h-6 w-6" />
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 id="titulo-reasignacion-masiva" class="text-xl font-black text-slate-900 dark:text-white">Reasignación masiva de docentes</h2>
+                            <span class="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                                {{ $nivel?->nombre }} · {{ $this->cicloSeleccionado?->inicio_anio }}-{{ $this->cicloSeleccionado?->fin_anio }}
+                            </span>
+                        </div>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            Cambia el profesor de varias materias sin alterar calificaciones ni las versiones publicadas del horario.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" wire:click="cerrarReasignacionMasiva"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:bg-slate-900">
+                    <flux:icon.x-mark class="h-5 w-5" />
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                @if ($reasignacion_paso === 'seleccion')
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+                            <div class="xl:col-span-4">
+                                <p class="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Forma de selección</p>
+                                <div class="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5 dark:bg-slate-900">
+                                    <label @class([
+                                        'cursor-pointer rounded-xl px-3 py-3 text-center text-xs font-black transition',
+                                        'bg-white text-[#006492] shadow-sm dark:bg-slate-800 dark:text-blue-300' => $reasignacion_modo === 'seleccion',
+                                        'text-slate-500' => $reasignacion_modo !== 'seleccion',
+                                    ])>
+                                        <input type="radio" value="seleccion" wire:model.live="reasignacion_modo" class="sr-only">
+                                        Selección de tabla
+                                        <span class="mt-1 block text-[10px] font-bold opacity-70">{{ count($reasignacion_ids_base) }} registro(s)</span>
+                                    </label>
+                                    <label @class([
+                                        'cursor-pointer rounded-xl px-3 py-3 text-center text-xs font-black transition',
+                                        'bg-white text-[#006492] shadow-sm dark:bg-slate-800 dark:text-blue-300' => $reasignacion_modo === 'profesor',
+                                        'text-slate-500' => $reasignacion_modo !== 'profesor',
+                                    ])>
+                                        <input type="radio" value="profesor" wire:model.live="reasignacion_modo" class="sr-only">
+                                        Profesor actual
+                                        <span class="mt-1 block text-[10px] font-bold opacity-70">Incluye “sin docente”</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="xl:col-span-4">
+                                <flux:field>
+                                    <flux:label>Profesor actual</flux:label>
+                                    <flux:select wire:model.live="reasignacion_origen" :disabled="$reasignacion_modo !== 'profesor'">
+                                        <flux:select.option value="">Selecciona el origen</flux:select.option>
+                                        @foreach ($this->profesoresOrigenReasignacion as $profesorOrigen)
+                                            <flux:select.option value="{{ $profesorOrigen['valor'] }}">
+                                                {{ $profesorOrigen['nombre'] }} · {{ $profesorOrigen['total'] }} materia(s)
+                                            </flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                </flux:field>
+                            </div>
+
+                            <div class="xl:col-span-4">
+                                <flux:field>
+                                    <flux:label>Nuevo profesor</flux:label>
+                                    <flux:select wire:model="reasignacion_destino_id" :disabled="$this->profesores->isEmpty()">
+                                        <flux:select.option value="">Selecciona el profesor sustituto</flux:select.option>
+                                        @foreach ($this->profesores as $profesor)
+                                            <flux:select.option value="{{ $profesor['id'] }}">{{ $profesor['nombre'] }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                    <flux:error name="reasignacion_destino_id" />
+                                    @if ($this->profesores->isEmpty())
+                                        <p class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                            Publica la plantilla de este ciclo y nivel para habilitar los docentes destino.
+                                        </p>
+                                    @endif
+                                </flux:field>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="font-black text-slate-900 dark:text-white">Filtros de la reasignación</p>
+                                    <p class="text-xs text-slate-500">El alcance siempre queda limitado al ciclo y nivel mostrados arriba.</p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                        <input type="checkbox" wire:model.live="reasignacion_incluir_cerradas" class="rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                                        Incluir cerradas
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                                        <input type="checkbox" wire:model.live="reasignacion_incluir_archivadas" class="rounded border-rose-300 text-rose-600 focus:ring-rose-500">
+                                        Incluir archivadas
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+                                <div class="md:col-span-2 xl:col-span-2">
+                                    <flux:field>
+                                        <flux:label>Buscar materia</flux:label>
+                                        <flux:input wire:model.live.debounce.300ms="reasignacion_buscar" icon="magnifying-glass" placeholder="Materia, clave, grado o grupo" />
+                                    </flux:field>
+                                </div>
+                                <flux:field>
+                                    <flux:label>Generación</flux:label>
+                                    <flux:select wire:model.live="reasignacion_generacion">
+                                        <flux:select.option value="">Todas</flux:select.option>
+                                        @foreach ($this->reasignacionGeneraciones as $generacion)
+                                            <flux:select.option value="{{ $generacion->id }}">{{ $generacion->anio_ingreso }}-{{ $generacion->anio_egreso }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                </flux:field>
+                                <flux:field>
+                                    <flux:label>Estado</flux:label>
+                                    <flux:select wire:model.live="reasignacion_estado">
+                                        <flux:select.option value="">Todos permitidos</flux:select.option>
+                                        <flux:select.option value="borrador">Borrador</flux:select.option>
+                                        <flux:select.option value="activa">Activa</flux:select.option>
+                                        @if ($reasignacion_incluir_cerradas)
+                                            <flux:select.option value="cerrada">Cerrada</flux:select.option>
+                                        @endif
+                                        @if ($reasignacion_incluir_archivadas)
+                                            <flux:select.option value="archivada">Archivada</flux:select.option>
+                                        @endif
+                                    </flux:select>
+                                </flux:field>
+                                <flux:field>
+                                    <flux:label>Grado</flux:label>
+                                    <flux:select wire:model.live="reasignacion_grado">
+                                        <flux:select.option value="">Todos</flux:select.option>
+                                        @foreach ($this->reasignacionGrados as $grado)
+                                            <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                </flux:field>
+                                @if ($this->esBachillerato)
+                                    <flux:field>
+                                        <flux:label>Semestre</flux:label>
+                                        <flux:select wire:model.live="reasignacion_semestre">
+                                            <flux:select.option value="">Todos</flux:select.option>
+                                            @foreach ($this->reasignacionSemestres as $semestre)
+                                                <flux:select.option value="{{ $semestre->id }}">{{ $semestre->numero }}°</flux:select.option>
+                                            @endforeach
+                                        </flux:select>
+                                    </flux:field>
+                                @endif
+                                <flux:field>
+                                    <flux:label>Grupo</flux:label>
+                                    <flux:select wire:model.live="reasignacion_grupo">
+                                        <flux:select.option value="">Todos</flux:select.option>
+                                        @foreach ($this->reasignacionGrupos as $grupo)
+                                            <flux:select.option value="{{ $grupo->id }}">{{ $grupo->grado?->nombre }} · {{ $grupo->asignacionGrupo?->nombre }}{{ $grupo->semestre ? ' · ' . $grupo->semestre->numero . '°' : '' }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                </flux:field>
+                                <flux:field>
+                                    <flux:label>Horario</flux:label>
+                                    <flux:select wire:model.live="reasignacion_horario">
+                                        <flux:select.option value="">Todos</flux:select.option>
+                                        <flux:select.option value="con">Con horario</flux:select.option>
+                                        <flux:select.option value="sin">Sin horario</flux:select.option>
+                                    </flux:select>
+                                </flux:field>
+                            </div>
+                        </div>
+
+                        <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <div class="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                    <span class="font-black text-[#006492]">{{ $this->totalCandidatosReasignacion }}</span> materia(s) encontradas ·
+                                    <span class="font-black text-[#88AC2E]">{{ count($reasignacion_seleccionados) }}</span> seleccionadas
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button type="button" wire:click="seleccionarTodosCandidatosReasignacion"
+                                        class="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+                                        Seleccionar todos los resultados
+                                    </button>
+                                    <button type="button" wire:click="limpiarSeleccionReasignacion"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                        Quitar selección
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if ($this->candidatosReasignacion->isEmpty())
+                                <div class="p-10 text-center text-sm font-semibold text-slate-500">
+                                    {{ $reasignacion_modo === 'profesor' && blank($reasignacion_origen) ? 'Selecciona un profesor actual para mostrar sus materias.' : 'No hay materias que coincidan con estos filtros.' }}
+                                </div>
+                            @else
+                                <div class="max-h-72 overflow-auto">
+                                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                        <thead class="sticky top-0 z-10 bg-slate-100 dark:bg-slate-900">
+                                            <tr>
+                                                <th class="w-12 px-4 py-3"></th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Materia</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Contexto</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Profesor actual</th>
+                                                <th class="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Bloques</th>
+                                                <th class="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($this->candidatosReasignacion as $candidato)
+                                                <tr wire:key="candidato-reasignacion-{{ $candidato->id }}" class="hover:bg-slate-50 dark:hover:bg-slate-900/60">
+                                                    <td class="px-4 py-3 text-center">
+                                                        <input type="checkbox" value="{{ $candidato->id }}" wire:model.live="reasignacion_seleccionados"
+                                                            class="h-4 w-4 rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <p class="font-black text-slate-900 dark:text-white">{{ $candidato->materia?->materia }}</p>
+                                                        @if ($candidato->materia?->clave)<p class="text-xs text-slate-500">{{ $candidato->materia->clave }}</p>@endif
+                                                    </td>
+                                                    <td class="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                        {{ $candidato->grupo?->grado?->nombre }} · Grupo {{ $candidato->grupo?->asignacionGrupo?->nombre }}
+                                                        <span class="block text-slate-400">{{ $candidato->grupo?->generacion?->anio_ingreso }}-{{ $candidato->grupo?->generacion?->anio_egreso }}{{ $candidato->grupo?->semestre ? ' · ' . $candidato->grupo->semestre->numero . '° semestre' : '' }}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                        {{ $candidato->profesor ? trim(($candidato->profesor->titulo ?? '') . ' ' . ($candidato->profesor->nombre ?? '') . ' ' . ($candidato->profesor->apellido_paterno ?? '') . ' ' . ($candidato->profesor->apellido_materno ?? '')) : 'Sin docente' }}
+                                                    </td>
+                                                    <td class="px-4 py-3 text-center text-xs font-black text-blue-700">{{ $candidato->horarios_count }}</td>
+                                                    <td class="px-4 py-3 text-center">
+                                                        <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $candidato->estado }}</span>
+                                                        @if (($candidato->calificaciones_count + $candidato->bitacora_calificaciones_count + $candidato->horarios_count) > 0)
+                                                            <span class="mt-1 block text-[10px] font-bold text-amber-600">Historial protegido</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                                @if ($this->totalCandidatosReasignacion > 250)
+                                    <p class="border-t border-slate-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 dark:border-slate-800 dark:bg-amber-950/20 dark:text-amber-200">
+                                        Se muestran los primeros 250 registros. “Seleccionar todos los resultados” incluye la consulta completa.
+                                    </p>
+                                @endif
+                            @endif
+                        </div>
+
+                        <flux:error name="reasignacion_seleccionados" />
+                    </div>
+                @else
+                    @php($resumenReasignacion = $reasignacion_preview['resumen'] ?? [])
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+                            @foreach ([
+                                ['Seleccionadas', $resumenReasignacion['seleccionadas'] ?? 0, 'text-slate-900'],
+                                ['Aplicables', $resumenReasignacion['aplicables'] ?? 0, 'text-emerald-700'],
+                                ['Grupos', $resumenReasignacion['grupos'] ?? 0, 'text-blue-700'],
+                                ['Bloques', $resumenReasignacion['bloques'] ?? 0, 'text-indigo-700'],
+                                ['Con historial', $resumenReasignacion['con_historial'] ?? 0, 'text-amber-700'],
+                                ['Excluidas', $resumenReasignacion['excluidas'] ?? 0, 'text-slate-500'],
+                                ['Conflictos', $resumenReasignacion['conflictos'] ?? 0, 'text-rose-700'],
+                            ] as [$etiqueta, $valor, $color])
+                                <div class="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">{{ $etiqueta }}</p>
+                                    <p class="mt-1 text-2xl font-black {{ $color }}">{{ $valor }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        @if (($resumenReasignacion['conflictos'] ?? 0) > 0)
+                            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white">
+                                        <flux:icon.exclamation-triangle class="h-5 w-5" />
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-black text-rose-900 dark:text-rose-100">Se detectaron conflictos críticos</p>
+                                        <p class="mt-1 text-sm text-rose-800/80 dark:text-rose-200/80">La operación queda bloqueada hasta autorizar la excepción administrativa y explicar el motivo.</p>
+                                        <div class="mt-3 max-h-36 space-y-2 overflow-auto">
+                                            @foreach (($reasignacion_preview['conflictos'] ?? []) as $conflicto)
+                                                <div class="rounded-xl border border-rose-200 bg-white/80 px-3 py-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-slate-950/40 dark:text-rose-100">
+                                                    <span class="font-black">{{ $conflicto['titulo'] }}</span>
+                                                    <span class="block mt-0.5">{{ $conflicto['detalle'] }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @else
+                            <div class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                                <flux:icon.check-circle class="h-5 w-5" />
+                                La disponibilidad y los traslapes fueron revisados. No se encontraron conflictos críticos.
+                            </div>
+                        @endif
+
+                        <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <div class="max-h-[40vh] overflow-auto">
+                                <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                    <thead class="sticky top-0 z-10 bg-slate-100 dark:bg-slate-900">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Materia y grupo</th>
+                                            <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Profesor actual</th>
+                                            <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Profesor nuevo</th>
+                                            <th class="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Bloques</th>
+                                            <th class="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Estado</th>
+                                            <th class="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Resultado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        @foreach (($reasignacion_preview['filas'] ?? []) as $fila)
+                                            <tr @class(['bg-slate-50/70 dark:bg-slate-900/50' => !($fila['aplicable'] ?? false)])>
+                                                <td class="px-4 py-3">
+                                                    <p class="font-black text-slate-900 dark:text-white">{{ $fila['materia'] }}</p>
+                                                    <p class="mt-1 text-xs text-slate-500">{{ $fila['grupo'] }} · Generación {{ $fila['generacion'] }}{{ $fila['semestre'] ? ' · ' . $fila['semestre'] . '° semestre' : '' }}</p>
+                                                </td>
+                                                <td class="px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">{{ $fila['profesor_actual'] }}</td>
+                                                <td class="px-4 py-3 text-xs font-black text-[#006492] dark:text-blue-300">{{ $fila['profesor_nuevo'] }}</td>
+                                                <td class="px-4 py-3 text-center text-xs font-black">{{ $fila['bloques'] }}</td>
+                                                <td class="px-4 py-3 text-center"><span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $fila['estado'] }}</span></td>
+                                                <td class="px-4 py-3 text-xs font-bold {{ count($fila['conflictos'] ?? []) > 0 ? 'text-rose-700' : (($fila['aplicable'] ?? false) ? 'text-emerald-700' : 'text-slate-500') }}">{{ $fila['resultado'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        @if (($resumenReasignacion['conflictos'] ?? 0) > 0)
+                            <div class="grid grid-cols-1 gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20 lg:grid-cols-2">
+                                <label class="flex cursor-pointer items-start gap-3 text-sm font-bold text-amber-900 dark:text-amber-100">
+                                    <input type="checkbox" wire:model.live="reasignacion_autorizar_conflictos" class="mt-1 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                                    <span>Autorizo administrativamente la reasignación aun con los conflictos mostrados.</span>
+                                </label>
+                                <flux:field>
+                                    <flux:label>Motivo de la excepción</flux:label>
+                                    <flux:textarea wire:model="reasignacion_motivo_conflictos" rows="3" placeholder="Explica por qué este traslape o restricción es válido..." />
+                                    <flux:error name="reasignacion_autorizar_conflictos" />
+                                    <flux:error name="reasignacion_motivo_conflictos" />
+                                </flux:field>
+                            </div>
+                        @endif
+
+                        <div class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-200">
+                            Se actualizarán la carga académica, los horarios operativos y las versiones en estado propuesta o borrador. Las versiones publicadas, sustituidas y archivadas conservarán al docente anterior como evidencia.
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <div class="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50/80 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                <button type="button" wire:click="cerrarReasignacionMasiva" wire:loading.attr="disabled"
+                    class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                    Cancelar
+                </button>
+                <div class="flex flex-col-reverse gap-2 sm:flex-row">
+                    @if ($reasignacion_paso === 'preview')
+                        <button type="button" wire:click="volverSeleccionReasignacion" wire:loading.attr="disabled"
+                            class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            Volver a selección
+                        </button>
+                        <button type="button" wire:click="aplicarReasignacionMasiva" wire:loading.attr="disabled" wire:target="aplicarReasignacionMasiva"
+                            @disabled(
+                                ($reasignacion_preview['resumen']['aplicables'] ?? 0) === 0
+                                || (($reasignacion_preview['resumen']['conflictos'] ?? 0) > 0
+                                    && (! $reasignacion_autorizar_conflictos || mb_strlen(trim($reasignacion_motivo_conflictos)) < 10))
+                            )
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50">
+                            <flux:icon.check class="h-5 w-5" />
+                            <span wire:loading.remove wire:target="aplicarReasignacionMasiva">Aplicar reasignación</span>
+                            <span wire:loading wire:target="aplicarReasignacionMasiva">Aplicando…</span>
+                        </button>
+                    @else
+                        <button type="button" wire:click="previsualizarReasignacion" wire:loading.attr="disabled" wire:target="previsualizarReasignacion"
+                            @disabled(count($reasignacion_seleccionados) === 0 || blank($reasignacion_destino_id))
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#006492] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-[#00557b] disabled:cursor-not-allowed disabled:opacity-50">
+                            <flux:icon.eye class="h-5 w-5" />
+                            <span wire:loading.remove wire:target="previsualizarReasignacion">Revisar antes de aplicar</span>
+                            <span wire:loading wire:target="previsualizarReasignacion">Analizando…</span>
+                        </button>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Historial y reversión de lotes --}}
+    <div x-data="{ abierto: $wire.entangle('modalHistorialReasignacionesAbierto') }" x-show="abierto" x-cloak
+        x-on:keydown.escape.window="if (abierto) $wire.cerrarHistorialReasignaciones()"
+        class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-slate-950/65 backdrop-blur-sm" wire:click="cerrarHistorialReasignaciones"></div>
+        <div class="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/60 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+            <div class="h-1.5 bg-gradient-to-r from-[#006492] to-[#88AC2E]"></div>
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
+                <div>
+                    <h2 class="text-xl font-black text-slate-900 dark:text-white">Historial de reasignaciones masivas</h2>
+                    <p class="mt-1 text-sm text-slate-500">Los lotes pueden revertirse mientras las cargas y los horarios no tengan cambios posteriores incompatibles.</p>
+                </div>
+                <button type="button" wire:click="cerrarHistorialReasignaciones" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"><flux:icon.x-mark class="h-5 w-5" /></button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+                @if ($this->historialReasignaciones->isEmpty())
+                    <div class="p-12 text-center text-sm font-semibold text-slate-500">Todavía no hay reasignaciones masivas en este ciclo y nivel.</div>
+                @else
+                    <div class="space-y-3">
+                        @foreach ($this->historialReasignaciones as $lote)
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span @class([
+                                                'rounded-full px-2.5 py-1 text-[10px] font-black uppercase',
+                                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' => $lote->estado === 'aplicada',
+                                                'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' => $lote->estado === 'revertida',
+                                                'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' => $lote->estado === 'reversion_parcial',
+                                            ])>{{ str_replace('_', ' ', $lote->estado) }}</span>
+                                            <span class="text-xs font-black text-slate-400">Lote {{ substr($lote->uuid, 0, 8) }}</span>
+                                            <span class="text-xs font-semibold text-slate-500">{{ $lote->aplicado_at?->format('d/m/Y H:i') }}</span>
+                                        </div>
+                                        <p class="mt-2 font-black text-slate-900 dark:text-white">
+                                            {{ $lote->profesorOrigen
+                                                ? trim(($lote->profesorOrigen->titulo ?? '') . ' ' . ($lote->profesorOrigen->nombre ?? '') . ' ' . ($lote->profesorOrigen->apellido_paterno ?? '') . ' ' . ($lote->profesorOrigen->apellido_materno ?? ''))
+                                                : ($lote->metadata['profesor_origen_nombre'] ?? ($lote->modo === 'profesor' ? 'Sin docente asignado' : 'Selección manual')) }}
+                                            <span class="mx-2 text-slate-300">→</span>
+                                            {{ $lote->profesorDestino
+                                                ? trim(($lote->profesorDestino->titulo ?? '') . ' ' . ($lote->profesorDestino->nombre ?? '') . ' ' . ($lote->profesorDestino->apellido_paterno ?? '') . ' ' . ($lote->profesorDestino->apellido_materno ?? ''))
+                                                : ($lote->metadata['profesor_destino_nombre'] ?? 'Docente no disponible') }}
+                                        </p>
+                                        <div class="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
+                                            <span>{{ $lote->total_asignaciones }} materias</span><span>•</span>
+                                            <span>{{ $lote->total_horarios }} bloques</span><span>•</span>
+                                            <span>{{ $lote->total_versiones }} bloques en propuestas</span>
+                                            @if ($lote->total_conflictos > 0)<span>•</span><span class="text-rose-600">{{ $lote->total_conflictos }} conflictos autorizados</span>@endif
+                                        </div>
+                                    </div>
+                                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                        @if ($lote->estado === 'aplicada')
+                                            <button type="button" wire:click="revertirReasignacion({{ $lote->id }})"
+                                                wire:confirm="Se intentará restaurar cada profesor anterior. Los registros con cambios posteriores incompatibles se omitirán. ¿Continuar?"
+                                                wire:loading.attr="disabled" wire:target="revertirReasignacion"
+                                                class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                                <flux:icon.arrow-uturn-left class="h-4 w-4" />
+                                                Revertir lote
+                                            </button>
+                                        @else
+                                            <span class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500 dark:bg-slate-800">Sin acción disponible</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+            <div class="border-t border-slate-200 bg-slate-50 px-6 py-4 text-right dark:border-slate-800 dark:bg-slate-900/70">
+                <button type="button" wire:click="cerrarHistorialReasignaciones" class="rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-black text-white hover:bg-slate-900">Cerrar</button>
             </div>
         </div>
     </div>
