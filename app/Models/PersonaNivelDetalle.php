@@ -81,6 +81,46 @@ class PersonaNivelDetalle extends Model
             });
     }
 
+    /**
+     * Incluye titulares marcados de forma explícita y asignaciones históricas
+     * de frente a grupo que todavía no tienen las banderas normalizadas.
+     */
+    public function scopeTitularReconocido(Builder $query): Builder
+    {
+        return $query->where(function (Builder $titular) {
+            $titular
+                ->where('es_titular_principal', true)
+                ->orWhere('es_titular', true)
+                ->orWhere(function (Builder $automatico) {
+                    $automatico
+                        ->whereNotNull('grupo_id')
+                        ->whereHas('cabecera.nivel', function (Builder $nivel) {
+                            $nivel->whereIn('slug', RolePersona::NIVELES_TITULAR_AUTOMATICO);
+                        })
+                        ->whereHas('personaRole.rolePersona', function (Builder $rol) {
+                            $rol->whereIn('slug', RolePersona::SLUGS_TITULAR_GRUPO);
+                        });
+                });
+        });
+    }
+
+    public function esTitularAutomatico(): bool
+    {
+        if (!$this->grupo_id) {
+            return false;
+        }
+
+        $nivelSlug = $this->cabecera?->nivel?->slug;
+        $rol = $this->personaRole?->rolePersona;
+
+        return (bool) $rol?->esTitularAutomaticoEnNivel($nivelSlug);
+    }
+
+    public function esTitularReconocido(): bool
+    {
+        return (bool) ($this->es_titular || $this->es_titular_principal || $this->esTitularAutomatico());
+    }
+
     public function cabecera()
     {
         return $this->belongsTo(PersonaNivel::class, 'persona_nivel_id');

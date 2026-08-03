@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AsignacionMateria;
 use App\Models\CicloEscolar;
 use App\Models\Dia;
 use App\Models\Escuela;
@@ -9,7 +10,7 @@ use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Horario;
 use App\Models\Nivel;
-use App\Models\PersonaNivel;
+use App\Models\PersonaNivelDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -83,17 +84,35 @@ class HorariosVaciosPdfController extends Controller
         $horas = $this->filtrarHoras($horasNivel, (int) $datos['hora_inicio_id'], (int) $datos['hora_fin_id']);
         abort_if($horas->isEmpty(), 404, 'No se pudo determinar el rango de horas a imprimir.');
 
-        $recesoHoraIds = $this->obtenerHorasDeReceso($nivel->id, $cicloEscolar->id, $grupos, $horas)
-            ->values()
-            ->all();
+        $recesosPorGrupo = $this->obtenerHorasDeRecesoPorGrupo(
+            $nivel->id,
+            $cicloEscolar->id,
+            $grupos,
+            $horas,
+        );
 
-        $paginas = $grupos->map(function (Grupo $grupo) use ($nivel, $cicloEscolar, $recesoHoraIds) {
+        $paginas = $grupos->map(function (Grupo $grupo) use ($nivel, $cicloEscolar, $recesosPorGrupo) {
+            $titular = $this->obtenerTitular($nivel->id, $cicloEscolar->id, $grupo);
+            $materias = $this->obtenerMateriasAsignadas(
+                nivelId: $nivel->id,
+                cicloEscolarId: $cicloEscolar->id,
+                grupo: $grupo,
+                titularId: $titular['id'] ?? null,
+                nivelSlug: (string) $nivel->slug,
+            );
+
             return [
                 'grupo' => $grupo,
-                'titular' => $this->obtenerTitular($nivel->id, $cicloEscolar->id, $grupo),
+                'titular' => $titular['nombre'] ?? null,
+                'titular_id' => $titular['id'] ?? null,
+                'materias_docentes' => $materias['filas'],
+                'mensaje_materias' => $materias['mensaje'],
                 'etiqueta_grupo' => $this->etiquetaGrupo($grupo),
                 'generacion' => $grupo->generacion?->etiqueta,
-                'receso_hora_ids' => $recesoHoraIds,
+                'receso_hora_ids' => collect($recesosPorGrupo->get((int) $grupo->id, []))
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
             ];
         });
 
@@ -121,8 +140,15 @@ class HorariosVaciosPdfController extends Controller
                     ? 'storage/logos/' . $nivel->logo
                     : 'imagenes/logo-letra.png'
             ),
+            'imagenNivel' => $this->imagenBase64Publica(match ((string) $nivel->slug) {
+                'preescolar' => 'imagenes/personajes_preescolar.png',
+                'primaria' => 'imagenes/personajes_primaria.png',
+                'secundaria' => 'imagenes/personajes_secundaria.png',
+                'bachillerato' => 'imagenes/personajes_bachillerato.png',
+                default => null,
+            }),
         ])
-            ->setPaper('letter', 'landscape')
+            ->setPaper('letter', 'portrait')
             ->stream($nombreArchivo);
     }
 
@@ -189,7 +215,12 @@ class HorariosVaciosPdfController extends Controller
         return $horasNivel->slice($inicio, $fin - $inicio + 1)->values();
     }
 
-    private function obtenerHorasDeReceso(int $nivelId, int $cicloEscolarId, Collection $grupos, Collection $horas): Collection
+    private function obtenerHorasDeRecesoPorGrupo(
+        int $nivelId,
+        int $cicloEscolarId,
+        Collection $grupos,
+        Collection $horas,
+    ): Collection
     {
         $grupoIds = $grupos->pluck('id')->all();
         $horaIds = $horas->pluck('id')->all();
@@ -209,30 +240,45 @@ class HorariosVaciosPdfController extends Controller
                 return !$horario->taller_sesion_id
                     && (int) ($horario->asignacionMateria?->materia?->receso ?? 0) === 1;
             })
-            ->pluck('hora_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
+            ->groupBy(fn (Horario $horario) => (int) $horario->grupo_id)
+            ->map(function (Collection $horariosGrupo) {
+                return $horariosGrupo
+                    ->pluck('hora_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+            });
     }
 
-    private function obtenerTitular(int $nivelId, int $cicloEscolarId, Grupo $grupo): ?string
+    /**
+     * @return array{id:int,nombre:string}|null
+     */
+    private function obtenerTitular(int $nivelId, int $cicloEscolarId, Grupo $grupo): ?array
     {
-        $personaNivel = PersonaNivel::query()
-            ->with('persona:id,titulo,nombre,apellido_paterno,apellido_materno')
-            ->where('nivel_id', $nivelId)
-            ->whereHas('detalles', function ($query) use ($grupo, $cicloEscolarId) {
-                $query
-                    ->vigenteEnCiclo($cicloEscolarId)
-                    ->where('grado_id', $grupo->grado_id)
-                    ->where('grupo_id', $grupo->id)
-                    ->where(function ($condicion) {
-                        $condicion->where('es_titular_principal', true)
-                            ->orWhere('es_titular', true);
-                    });
-            })
+        /*
+         * El titular se obtiene de la plantilla publicada o cerrada del ciclo.
+         * Primero se respetan las banderas explícitas; para registros históricos
+         * también se reconoce la función de frente a grupo en preescolar y
+         * primaria, siempre que coincidan nivel, grado y grupo.
+         */
+        $detalle = PersonaNivelDetalle::query()
+            ->with([
+                'cabecera.persona:id,titulo,nombre,apellido_paterno,apellido_materno',
+                'cabecera.nivel:id,slug',
+                'personaRole.rolePersona:id,slug',
+            ])
+            ->vigenteEnCiclo($cicloEscolarId)
+            ->where('grado_id', $grupo->grado_id)
+            ->where('grupo_id', $grupo->id)
+            ->whereHas('cabecera', fn ($query) => $query->where('nivel_id', $nivelId))
+            ->titularReconocido()
+            ->orderByRaw("CASE WHEN es_titular_principal = 1 THEN 0 WHEN es_titular = 1 THEN 1 ELSE 2 END")
+            ->orderByRaw("CASE WHEN estado = 'activo' THEN 0 ELSE 1 END")
+            ->orderBy('orden')
+            ->orderBy('id')
             ->first();
 
-        $persona = $personaNivel?->persona;
+        $persona = $detalle?->cabecera?->persona;
 
         if (!$persona) {
             return null;
@@ -245,7 +291,140 @@ class HorariosVaciosPdfController extends Controller
             $persona->apellido_materno,
         ])->filter()->implode(' '));
 
-        return $nombre !== '' ? $nombre : null;
+        if ($nombre === '') {
+            return null;
+        }
+
+        return [
+            'id' => (int) $persona->id,
+            'nombre' => $nombre,
+        ];
+    }
+
+    /**
+     * Obtiene la tabla inferior con la misma lógica visual del horario lleno.
+     * En preescolar y primaria se excluye al titular para mostrar únicamente
+     * materias impartidas por personal distinto al responsable del grupo.
+     *
+     * @return array{filas:Collection<int,array<string,mixed>>,mensaje:?string}
+     */
+    private function obtenerMateriasAsignadas(
+        int $nivelId,
+        int $cicloEscolarId,
+        Grupo $grupo,
+        ?int $titularId,
+        string $nivelSlug,
+    ): array
+    {
+        $asignaciones = AsignacionMateria::query()
+            ->with([
+                'materia:id,materia,orden,receso',
+                'profesor:id,titulo,nombre,apellido_paterno,apellido_materno',
+            ])
+            ->utilizables()
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('nivel_id', $nivelId)
+            ->where('grado_id', $grupo->grado_id)
+            ->where('grupo_id', $grupo->id)
+            ->when(
+                $grupo->generacion_id,
+                fn ($query) => $query->where('generacion_id', $grupo->generacion_id)
+            )
+            ->when(
+                $grupo->semestre_id,
+                fn ($query) => $query->where('semestre_id', $grupo->semestre_id),
+                fn ($query) => $query->whereNull('semestre_id')
+            )
+            ->whereHas('materia', fn ($query) => $query->where('receso', false))
+            ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('orden')
+            ->orderBy('materia_id')
+            ->get(['id', 'materia_id', 'profesor_id', 'orden'])
+            ->filter(fn (AsignacionMateria $asignacion) => filled($asignacion->materia?->materia))
+            ->unique(fn (AsignacionMateria $asignacion) => implode('-', [
+                (int) $asignacion->materia_id,
+                (int) ($asignacion->profesor_id ?? 0),
+            ]))
+            ->values();
+
+        if ($asignaciones->isEmpty()) {
+            return [
+                'filas' => collect(),
+                'mensaje' => 'Aún no hay materias asignadas para este grupo en el ciclo escolar seleccionado.',
+            ];
+        }
+
+        $excluirTitular = in_array($nivelSlug, ['preescolar', 'primaria'], true) && $titularId !== null;
+
+        $asignacionesVisibles = $asignaciones
+            ->reject(function (AsignacionMateria $asignacion) use ($excluirTitular, $titularId) {
+                return $excluirTitular
+                    && $asignacion->profesor_id !== null
+                    && (int) $asignacion->profesor_id === (int) $titularId;
+            })
+            ->values();
+
+        if ($asignacionesVisibles->isEmpty()) {
+            return [
+                'filas' => collect(),
+                'mensaje' => 'No hay materias asignadas a docentes distintos del titular del grupo.',
+            ];
+        }
+
+        $filas = $asignacionesVisibles
+            ->map(function (AsignacionMateria $asignacion) {
+                $profesor = $asignacion->profesor;
+                $nombreProfesor = trim(collect([
+                    $profesor?->titulo,
+                    $profesor?->nombre,
+                    $profesor?->apellido_paterno,
+                    $profesor?->apellido_materno,
+                ])->filter()->implode(' '));
+
+                return [
+                    'profesor_id' => $profesor?->id ? (int) $profesor->id : null,
+                    'docente' => $nombreProfesor !== '' ? $nombreProfesor : 'Sin docente asignado',
+                    'materia' => trim((string) $asignacion->materia->materia),
+                    'orden' => (int) ($asignacion->orden ?? $asignacion->materia?->orden ?? 999999),
+                    'sin_docente' => !$profesor?->id,
+                ];
+            })
+            ->groupBy(fn (array $item) => $item['profesor_id'] !== null
+                ? 'profesor-' . $item['profesor_id']
+                : 'sin-docente')
+            ->map(function (Collection $items) {
+                $itemsOrdenados = $items
+                    ->sortBy([
+                        ['orden', 'asc'],
+                        ['materia', 'asc'],
+                    ])
+                    ->values();
+
+                $primero = $itemsOrdenados->first();
+
+                return [
+                    'profesor_id' => $primero['profesor_id'],
+                    'docente' => $primero['docente'],
+                    'materias' => $itemsOrdenados
+                        ->pluck('materia')
+                        ->filter()
+                        ->unique(fn ($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
+                        ->values()
+                        ->all(),
+                    'orden' => (int) $itemsOrdenados->min('orden'),
+                    'sin_docente' => (bool) $primero['sin_docente'],
+                ];
+            })
+            ->sortBy([
+                ['orden', 'asc'],
+                ['docente', 'asc'],
+            ])
+            ->values();
+
+        return [
+            'filas' => $filas,
+            'mensaje' => null,
+        ];
     }
 
     private function etiquetaGrupo(Grupo $grupo): string

@@ -172,7 +172,7 @@ class PersonaNivelReporteController extends Controller
                 $detalle->grado?->nombre ?? '—',
                 $detalle->grupo?->asignacionGrupo?->nombre ?? '—',
                 $detalle->grupo?->generacion?->nombre ?? '—',
-                $detalle->es_titular_principal ? 'Principal' : ($detalle->es_titular ? 'Auxiliar' : 'No'),
+                $detalle->es_titular_principal ? 'Principal' : ($detalle->esTitularAutomatico() ? 'Automático' : ($detalle->es_titular ? 'Auxiliar' : 'No')),
                 $detalle->nombreMateria() ?? '—',
                 optional($detalle->fecha_inicio)->format('d/m/Y') ?? '—',
                 optional($detalle->fecha_fin)->format('d/m/Y') ?? 'Vigente',

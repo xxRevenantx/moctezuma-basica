@@ -35,6 +35,9 @@ class EditarPersonaNivel extends Component
     public bool $rolPermiteGrupo = false;
     public bool $rolRequiereGrupo = false;
     public string $plantillaEstado = '';
+    public bool $es_titular = false;
+    public bool $es_titular_principal = false;
+    public bool $titular_automatico = false;
 
     public ?int $originalPersonaRoleId = null;
     public ?int $originalGradoId = null;
@@ -92,6 +95,11 @@ class EditarPersonaNivel extends Component
         $this->cargarReglasRol();
         $this->cargarCatalogos();
         $this->cargarGrupos();
+        $this->sincronizarTitular(
+            conservarActual: true,
+            titularActual: (bool) $detalle->es_titular,
+            principalActual: (bool) $detalle->es_titular_principal,
+        );
 
         $this->open = true;
         $this->resetValidation();
@@ -106,6 +114,8 @@ class EditarPersonaNivel extends Component
             $this->generacionTexto = '';
             $this->grupos = collect();
         }
+
+        $this->sincronizarTitular();
     }
 
     public function updatedGradoId(): void
@@ -113,6 +123,7 @@ class EditarPersonaNivel extends Component
         $this->grupo_id = null;
         $this->generacionTexto = '';
         $this->cargarGrupos();
+        $this->sincronizarTitular();
     }
 
     public function updatedSemestreId(): void
@@ -120,6 +131,7 @@ class EditarPersonaNivel extends Component
         $this->grupo_id = null;
         $this->generacionTexto = '';
         $this->cargarGrupos();
+        $this->sincronizarTitular();
     }
 
     public function updatedGrupoId($value): void
@@ -128,6 +140,22 @@ class EditarPersonaNivel extends Component
         $this->generacionTexto = (string) ($grupo?->generacion?->etiqueta ?? '');
         if ($grupo && $this->esBachillerato()) {
             $this->grado_id = $grupo->grado_id;
+        }
+
+        $this->sincronizarTitular();
+    }
+
+    public function updatedEsTitular($value): void
+    {
+        if (!$value) {
+            $this->es_titular_principal = false;
+        }
+    }
+
+    public function updatedEsTitularPrincipal($value): void
+    {
+        if ($value) {
+            $this->es_titular = true;
         }
     }
 
@@ -174,6 +202,54 @@ class EditarPersonaNivel extends Component
         return Nivel::query()->whereKey($this->nivel_id)->value('slug') === 'bachillerato';
     }
 
+    private function sincronizarTitular(
+        bool $conservarActual = false,
+        bool $titularActual = false,
+        bool $principalActual = false,
+    ): void {
+        $eraAutomatico = $this->titular_automatico;
+        $personaRol = $this->persona_role_id
+            ? $this->rolesPersona->firstWhere('id', (int) $this->persona_role_id)
+            : null;
+        $rol = $personaRol?->rolePersona;
+        $nivelSlug = Nivel::query()->whereKey($this->nivel_id)->value('slug');
+
+        $this->titular_automatico = (bool) ($this->grupo_id
+            && $rol?->esTitularAutomaticoEnNivel($nivelSlug));
+
+        if ($this->titular_automatico) {
+            $this->es_titular = true;
+            $this->es_titular_principal = true;
+            return;
+        }
+
+        if ($conservarActual && $this->grupo_id) {
+            $this->es_titular = $titularActual || $principalActual;
+            $this->es_titular_principal = $principalActual;
+            return;
+        }
+
+        if ($eraAutomatico || !$this->rolPermiteGrupo || !$this->grupo_id) {
+            $this->es_titular = false;
+            $this->es_titular_principal = false;
+        }
+    }
+
+    private function existeOtroTitularPrincipal(int $plantillaId, int $grupoId, int $ignorarDetalleId): bool
+    {
+        return PersonaNivelDetalle::query()
+            ->where('grupo_id', $grupoId)
+            ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+            ->where('confirmado', true)
+            ->whereNull('archivado_at')
+            ->whereKeyNot($ignorarDetalleId)
+            ->whereHas('cicloAsignacion', fn ($query) => $query
+                ->where('plantilla_personal_nivel_id', $plantillaId)
+                ->where('estado', 'activo'))
+            ->titularReconocido()
+            ->exists();
+    }
+
     public function actualizar(PlantillaPersonalCicloService $service): void
     {
         $this->validate([
@@ -186,6 +262,8 @@ class EditarPersonaNivel extends Component
             'ingreso_sep' => ['nullable', 'date'],
             'ingreso_ct' => ['nullable', 'date'],
             'motivoCambio' => ['nullable', 'string', 'max:1000'],
+            'es_titular' => ['boolean'],
+            'es_titular_principal' => ['boolean'],
         ]);
 
         $detalle = PersonaNivelDetalle::query()
@@ -196,6 +274,20 @@ class EditarPersonaNivel extends Component
             ->whereKey($this->persona_role_id)->where('persona_id', $this->persona_id)->firstOrFail();
         $grupo = $service->validarAsignacion($plantilla, $personaRole->rolePersona, $this->grado_id, $this->grupo_id, $detalle->id);
         $service->bloquearDuplicado($detalle->cicloAsignacion, $personaRole->id, $grupo?->grado_id, $grupo?->id, $detalle->id);
+
+        $titularAutomatico = (bool) ($grupo
+            && $personaRole->rolePersona->esTitularAutomaticoEnNivel($plantilla->nivel?->slug));
+        $esTitularPrincipal = (bool) ($grupo && ($titularAutomatico || $this->es_titular_principal));
+        $esTitular = (bool) ($grupo && ($titularAutomatico || $this->es_titular || $esTitularPrincipal));
+
+        if ($esTitularPrincipal && $grupo
+            && $this->existeOtroTitularPrincipal($plantilla->id, $grupo->id, $detalle->id)) {
+            $this->addError(
+                'es_titular_principal',
+                'El grupo ya tiene otro titular principal activo. Modifica primero la asignación anterior.'
+            );
+            return;
+        }
 
         $cambioAsignacion = (int) $this->originalPersonaRoleId !== (int) $personaRole->id
             || (int) ($this->originalGradoId ?? 0) !== (int) ($grupo?->grado_id ?? 0)
@@ -218,11 +310,18 @@ class EditarPersonaNivel extends Component
                 'persona_role_id' => $personaRole->id,
                 'grado_id' => $grupo?->grado_id,
                 'grupo_id' => $grupo?->id,
+                'es_titular' => $esTitular,
+                'es_titular_principal' => $esTitularPrincipal,
                 'orden' => $detalle->orden,
                 'observaciones' => trim($this->motivoCambio),
             ], $this->motivoCambio);
         } else {
-            $detalle->update(['confirmado' => true, 'pendiente_motivo' => null]);
+            $detalle->update([
+                'confirmado' => true,
+                'pendiente_motivo' => null,
+                'es_titular' => $esTitular,
+                'es_titular_principal' => $esTitularPrincipal,
+            ]);
         }
 
         $service->actualizarDiagnostico($plantilla);
@@ -239,7 +338,8 @@ class EditarPersonaNivel extends Component
             'open', 'detalleId', 'cicloEscolarId', 'plantillaId', 'persona_id', 'persona_role_id',
             'nivel_id', 'grado_id', 'semestre_id', 'grupo_id', 'ingreso_seg', 'ingreso_sep', 'ingreso_ct',
             'motivoCambio', 'nombrePersona', 'nombreNivel', 'generacionTexto', 'rolPermiteGrupo',
-            'rolRequiereGrupo', 'plantillaEstado', 'originalPersonaRoleId', 'originalGradoId', 'originalGrupoId',
+            'rolRequiereGrupo', 'plantillaEstado', 'es_titular', 'es_titular_principal', 'titular_automatico',
+            'originalPersonaRoleId', 'originalGradoId', 'originalGrupoId',
         ]);
         $this->rolesPersona = $this->grados = $this->semestres = $this->grupos = collect();
         $this->resetValidation();

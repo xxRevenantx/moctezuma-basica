@@ -6,6 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class RolePersona extends Model
 {
+    public const SLUG_MAESTRO_FRENTE_GRUPO = 'maestro_frente_a_grupo';
+
+    /**
+     * Roles que, por su propia naturaleza, pueden representar al titular
+     * responsable de un grupo en preescolar y primaria.
+     *
+     * Los slugs heredados se conservan para instalaciones anteriores.
+     */
+    public const SLUGS_TITULAR_GRUPO = [
+        'docente_titular',
+        self::SLUG_MAESTRO_FRENTE_GRUPO,
+        'docente_grupo',
+        'director_con_grupo',
+    ];
+
+    public const NIVELES_TITULAR_AUTOMATICO = [
+        'preescolar',
+        'primaria',
+    ];
+
     protected $table = 'role_personas';
 
     protected $fillable = [
@@ -44,6 +64,16 @@ class RolePersona extends Model
     public function permiteAsignacionGrupo(): bool
     {
         return $this->requiere_grupo || $this->permite_grupo;
+    }
+
+    /**
+     * Determina si la función debe registrarse automáticamente como titular
+     * principal cuando está ligada a un grupo de preescolar o primaria.
+     */
+    public function esTitularAutomaticoEnNivel(?string $nivelSlug): bool
+    {
+        return in_array((string) $nivelSlug, self::NIVELES_TITULAR_AUTOMATICO, true)
+            && in_array((string) $this->slug, self::SLUGS_TITULAR_GRUPO, true);
     }
 
     public function personaRoles()

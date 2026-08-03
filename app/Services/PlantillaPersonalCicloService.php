@@ -132,6 +132,8 @@ class PlantillaPersonalCicloService
                             'estado' => PersonaNivelDetalle::ESTADO_ACTIVO,
                             'confirmado' => !$requiereRevision,
                             'pendiente_motivo' => $requiereRevision ? 'Confirmar grupo para el nuevo ciclo.' : null,
+                            'es_titular' => (bool) $detalleOrigen->es_titular,
+                            'es_titular_principal' => (bool) $detalleOrigen->es_titular_principal,
                             'materia_manual' => $detalleOrigen->materia_manual,
                             'horas_administrativas' => $detalleOrigen->horas_administrativas,
                             'actividad_administrativa_id' => $detalleOrigen->actividad_administrativa_id,

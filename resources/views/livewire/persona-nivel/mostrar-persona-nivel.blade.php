@@ -156,7 +156,15 @@
                                             @foreach ($profesor['detalles'] as $detalle)
                                                 <tr data-id="{{ $detalle->id }}" class="{{ !$detalle->confirmado ? 'bg-rose-50/60 dark:bg-rose-950/10' : '' }}">
                                                     <td class="px-3 py-3"><button data-handle type="button" @disabled(!$editable) class="inline-flex items-center gap-2 text-xs font-bold text-slate-500 disabled:opacity-40"><flux:icon.bars-3 class="h-4 w-4" />{{ $detalle->orden }}</button></td>
-                                                    <td class="px-3 py-3"><b class="text-slate-800 dark:text-slate-200">{{ $detalle->personaRole?->rolePersona?->nombre }}</b>@if(!$detalle->confirmado)<span class="mt-1 block text-[10px] font-black uppercase text-rose-600">Pendiente de confirmar</span>@endif</td>
+                                                    <td class="px-3 py-3">
+                                                        <b class="text-slate-800 dark:text-slate-200">{{ $detalle->personaRole?->rolePersona?->nombre }}</b>
+                                                        @if ($detalle->esTitularReconocido())
+                                                            <span class="mt-1 block text-[10px] font-black uppercase text-indigo-600">
+                                                                {{ $detalle->es_titular_principal ? 'Titular principal' : ($detalle->esTitularAutomatico() ? 'Titular automático' : 'Titular auxiliar') }}
+                                                            </span>
+                                                        @endif
+                                                        @if(!$detalle->confirmado)<span class="mt-1 block text-[10px] font-black uppercase text-rose-600">Pendiente de confirmar</span>@endif
+                                                    </td>
                                                     <td class="px-3 py-3 text-xs text-slate-600 dark:text-slate-300">{{ $detalle->grado?->nombre ?: 'General' }} · {{ $detalle->grupo?->asignacionGrupo?->nombre ?: 'Sin grupo' }}</td>
                                                     <td class="px-3 py-3"><div class="flex justify-end gap-1"><button type="button" wire:click="$dispatch('editarPersonaNivel', { id: {{ $detalle->id }} })" @disabled(!$editable) class="rounded-xl bg-amber-500 p-2 text-white disabled:opacity-40"><flux:icon.pencil-square class="h-4 w-4" /></button><button type="button" wire:click="solicitarArchivar({{ $detalle->id }})" @disabled(!$editable) class="rounded-xl bg-rose-600 p-2 text-white disabled:opacity-40"><flux:icon.archive-box class="h-4 w-4" /></button></div></td>
                                                 </tr>
@@ -198,6 +206,11 @@
                                         </td>
                                         <td class="px-4 py-3">
                                             <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">{{ $detalle->personaRole?->rolePersona?->nombre }}</span>
+                                            @if ($detalle->esTitularReconocido())
+                                                <span class="mt-1 block text-[10px] font-black uppercase text-indigo-600">
+                                                    {{ $detalle->es_titular_principal ? 'Titular principal' : ($detalle->esTitularAutomatico() ? 'Titular automático' : 'Titular auxiliar') }}
+                                                </span>
+                                            @endif
                                             @if (!$detalle->confirmado)
                                                 <span class="mt-1 block text-[10px] font-black uppercase text-rose-600">Pendiente de confirmar</span>
                                             @endif

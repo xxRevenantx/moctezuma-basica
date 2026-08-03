@@ -364,9 +364,9 @@
                                 <td class="px-4 py-4">
                                     <p class="font-bold">{{ $d->cabecera?->nivel?->nombre ?? '—' }}</p>
                                     <p class="text-xs text-slate-500">{{ $d->personaRole?->rolePersona?->nombre ?? 'Sin función' }}</p>
-                                    @if ($d->es_titular)
+                                    @if ($d->esTitularReconocido())
                                         <span class="mt-2 inline-flex rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                                            {{ $d->es_titular_principal ? 'Titular principal' : 'Titular auxiliar' }}
+                                            {{ $d->es_titular_principal ? 'Titular principal' : ($d->esTitularAutomatico() ? 'Titular automático' : 'Titular auxiliar') }}
                                         </span>
                                     @endif
                                 </td>
@@ -586,9 +586,15 @@
                     <div><label class="mb-1 block text-xs font-bold">Estado</label><select wire:model.live="editEstado" class="w-full rounded-xl border-slate-200 dark:border-neutral-700 dark:bg-neutral-950" @disabled($editEstadoOriginal === 'baja')><option value="activo">Activo</option><option value="baja">Baja</option></select>@error('editEstado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror</div>
                 </div>
 
+                @if ($editTitularAutomatico)
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                        La función se reconoce automáticamente como titular principal para este nivel y grupo.
+                    </div>
+                @endif
+
                 <div class="grid gap-4 md:grid-cols-2">
-                    <label class="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 dark:border-neutral-700"><input type="checkbox" wire:model.live="editEsTitular" class="rounded text-blue-700" /><span><b class="block">Titular de grupo</b><small class="text-slate-500">Puede ser principal o auxiliar.</small></span></label>
-                    <label class="flex items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900 dark:bg-indigo-950/20"><input type="checkbox" wire:model.live="editEsTitularPrincipal" class="rounded text-indigo-700" /><span><b class="block">Titular principal</b><small class="text-slate-500">Si ya existe otro, se advertirá pero permitirá guardar.</small></span></label>
+                    <label class="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 dark:border-neutral-700"><input type="checkbox" wire:model.live="editEsTitular" @disabled($editTitularAutomatico) class="rounded text-blue-700 disabled:opacity-70" /><span><b class="block">Titular de grupo</b><small class="text-slate-500">Puede ser principal o auxiliar.</small></span></label>
+                    <label class="flex items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900 dark:bg-indigo-950/20"><input type="checkbox" wire:model.live="editEsTitularPrincipal" @disabled($editTitularAutomatico) class="rounded text-indigo-700 disabled:opacity-70" /><span><b class="block">Titular principal</b><small class="text-slate-500">Nombre que se mostrará en los formatos del grupo.</small></span></label>
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-2">

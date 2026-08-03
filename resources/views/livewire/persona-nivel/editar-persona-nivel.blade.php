@@ -70,6 +70,42 @@
                     </div>
                 @endif
 
+                @if ($rolPermiteGrupo && $grupo_id)
+                    <section class="rounded-3xl border border-violet-100 bg-violet-50/50 p-5 dark:border-violet-900 dark:bg-violet-950/15">
+                        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h4 class="font-black text-slate-900 dark:text-white">Responsable titular del grupo</h4>
+                                <p class="text-xs text-slate-500">El titular principal se usa en los formatos vacíos de horario.</p>
+                            </div>
+                            @if ($titular_automatico)
+                                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                    <flux:icon.check-circle class="h-3.5 w-3.5" /> Automático
+                                </span>
+                            @endif
+                        </div>
+
+                        @if ($titular_automatico)
+                            <div class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                                La función y el grupo seleccionados se reconocen automáticamente como titular principal.
+                            </div>
+                        @endif
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                                <input type="checkbox" wire:model.live="es_titular" @disabled($titular_automatico)
+                                    class="rounded border-slate-300 text-blue-700 disabled:opacity-70" />
+                                <span><b class="block text-sm">Titular de grupo</b><small class="text-slate-500">Responsable directo del grupo.</small></span>
+                            </label>
+                            <label class="flex items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
+                                <input type="checkbox" wire:model.live="es_titular_principal" @disabled($titular_automatico)
+                                    class="rounded border-indigo-300 text-indigo-700 disabled:opacity-70" />
+                                <span><b class="block text-sm">Titular principal</b><small class="text-slate-500">Nombre que aparecerá en el formato.</small></span>
+                            </label>
+                        </div>
+                        <flux:error name="es_titular_principal" />
+                    </section>
+                @endif
+
                 <section class="rounded-3xl border border-amber-100 bg-amber-50/40 p-5 dark:border-amber-900 dark:bg-amber-950/10">
                     <h4 class="font-black text-slate-900 dark:text-white">Fechas laborales por nivel</h4>
                     <p class="mb-4 text-xs text-slate-500">Se conservan en todos los ciclos de esta persona dentro del nivel.</p>

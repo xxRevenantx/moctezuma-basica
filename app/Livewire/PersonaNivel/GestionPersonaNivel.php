@@ -63,6 +63,7 @@ class GestionPersonaNivel extends Component
     public string $editEstadoOriginal = 'activo';
     public bool $editEsTitular = false;
     public bool $editEsTitularPrincipal = false;
+    public bool $editTitularAutomatico = false;
     public ?int $editAsignacionMateriaId = null;
     public string $editMateriaManual = '';
     public $editAjusteHoras = 0;
@@ -166,7 +167,10 @@ class GestionPersonaNivel extends Component
     public function editarGestion(int $detalleId): void
     {
         $detalle = PersonaNivelDetalle::query()
-            ->with(['cabecera.persona', 'cabecera.nivel', 'cicloAsignacion.plantilla'])
+            ->with([
+                'cabecera.persona', 'cabecera.nivel', 'cicloAsignacion.plantilla',
+                'personaRole.rolePersona',
+            ])
             ->findOrFail($detalleId);
 
         $this->detalleEditId = $detalle->id;
@@ -185,8 +189,9 @@ class GestionPersonaNivel extends Component
         $this->editFechaFin = optional($detalle->fecha_fin)->format('Y-m-d');
         $this->editEstado = $detalle->estado ?: PersonaNivelDetalle::ESTADO_ACTIVO;
         $this->editEstadoOriginal = $this->editEstado;
-        $this->editEsTitular = (bool) $detalle->es_titular;
-        $this->editEsTitularPrincipal = (bool) $detalle->es_titular_principal;
+        $this->editTitularAutomatico = $detalle->esTitularAutomatico();
+        $this->editEsTitular = (bool) ($detalle->es_titular || $this->editTitularAutomatico);
+        $this->editEsTitularPrincipal = (bool) ($detalle->es_titular_principal || $this->editTitularAutomatico);
         $this->editAsignacionMateriaId = $detalle->asignacion_materia_id;
         $this->editMateriaManual = (string) ($detalle->materia_manual ?? '');
         $this->editAjusteHoras = (float) ($detalle->ajuste_horas_frente_grupo ?? 0);
@@ -264,7 +269,10 @@ class GestionPersonaNivel extends Component
 
         DB::transaction(function () use (&$advertenciaTitular) {
             $detalle = PersonaNivelDetalle::query()
-                ->with(['cabecera', 'cicloAsignacion.plantilla'])
+                ->with([
+                    'cabecera.nivel', 'cicloAsignacion.plantilla',
+                    'personaRole.rolePersona',
+                ])
                 ->lockForUpdate()
                 ->findOrFail($this->detalleEditId);
 
@@ -282,12 +290,23 @@ class GestionPersonaNivel extends Component
                 }
             }
 
-            if ($this->editEsTitularPrincipal && $detalle->grupo_id) {
+            $titularAutomatico = $detalle->esTitularAutomatico();
+            $esTitularPrincipal = (bool) ($detalle->grupo_id
+                && ($titularAutomatico || $this->editEsTitularPrincipal));
+            $esTitular = (bool) ($detalle->grupo_id
+                && ($titularAutomatico || $this->editEsTitular || $esTitularPrincipal));
+
+            if ($esTitularPrincipal && $detalle->grupo_id) {
                 $advertenciaTitular = PersonaNivelDetalle::query()
                     ->where('grupo_id', $detalle->grupo_id)
                     ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
-                    ->where('es_titular_principal', true)
+                    ->where('confirmado', true)
+                    ->whereNull('archivado_at')
                     ->where('id', '!=', $detalle->id)
+                    ->whereHas('cicloAsignacion', fn (Builder $query) => $query
+                        ->where('plantilla_personal_nivel_id', $detalle->cicloAsignacion?->plantilla_personal_nivel_id)
+                        ->where('estado', 'activo'))
+                    ->titularReconocido()
                     ->exists();
             }
 
@@ -317,8 +336,8 @@ class GestionPersonaNivel extends Component
                 'fecha_inicio' => $this->editFechaInicio,
                 'fecha_fin' => $this->editFechaFin ?: ($esBaja ? now()->toDateString() : null),
                 'estado' => $this->editEstado,
-                'es_titular' => $this->editEsTitular || $this->editEsTitularPrincipal,
-                'es_titular_principal' => $this->editEsTitularPrincipal,
+                'es_titular' => $esTitular,
+                'es_titular_principal' => $esTitularPrincipal,
                 'asignacion_materia_id' => $this->editAsignacionMateriaId,
                 'materia_manual' => trim($this->editMateriaManual) ?: null,
                 'ajuste_horas_frente_grupo' => $this->editAjusteHoras,
@@ -356,7 +375,7 @@ class GestionPersonaNivel extends Component
             'editCabHorasAdministrativas', 'editCabLimiteHoras', 'editCabActividadAdministrativa',
             'editCabObservaciones', 'editCabFechaBaja', 'editCabMotivoBaja',
             'editFechaInicio', 'editFechaFin', 'editEstado', 'editEstadoOriginal',
-            'editEsTitular', 'editEsTitularPrincipal', 'editAsignacionMateriaId',
+            'editEsTitular', 'editEsTitularPrincipal', 'editTitularAutomatico', 'editAsignacionMateriaId',
             'editMateriaManual', 'editAjusteHoras', 'editHorasAdministrativas',
             'editActividadAdministrativaId', 'editActividadAdministrativaManual',
             'editLimiteHoras', 'editObservaciones', 'editFechaBaja', 'editMotivoBaja',
@@ -760,7 +779,7 @@ class GestionPersonaNivel extends Component
                     ->where('confirmado', true)
                     ->whereNull('archivado_at')
                     ->whereHas('cicloAsignacion.plantilla', fn (Builder $plantilla) => $plantilla->where('ciclo_escolar_id', (int) $this->cicloEscolarId))
-                    ->where('es_titular_principal', true);
+                    ->titularReconocido();
             })
             ->count();
 
