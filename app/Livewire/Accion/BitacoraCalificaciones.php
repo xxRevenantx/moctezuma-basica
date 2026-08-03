@@ -7,6 +7,7 @@ use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Periodos;
 use App\Models\Semestre;
+use App\Services\ContextoEscolarService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -17,6 +18,7 @@ class BitacoraCalificaciones extends Component
     use WithPagination;
 
     public ?int $nivel_id = null;
+    public ?int $ciclo_escolar_id = null;
     public ?int $grado_id = null;
     public ?int $grupo_id = null;
     public ?int $semestre_id = null;
@@ -43,6 +45,7 @@ class BitacoraCalificaciones extends Component
 
     public function mount(
         ?int $nivel_id = null,
+        ?int $ciclo_escolar_id = null,
         ?int $grado_id = null,
         ?int $grupo_id = null,
         ?int $semestre_id = null,
@@ -51,6 +54,7 @@ class BitacoraCalificaciones extends Component
         bool $esBachillerato = false
     ): void {
         $this->nivel_id = $nivel_id;
+        $this->ciclo_escolar_id = $ciclo_escolar_id;
         $this->grado_id = $grado_id;
         $this->grupo_id = $grupo_id;
         $this->semestre_id = $semestre_id;
@@ -118,28 +122,61 @@ class BitacoraCalificaciones extends Component
             return;
         }
 
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get();
+        if ($this->ciclo_escolar_id) {
+            $contexto = app(ContextoEscolarService::class);
+            $this->grados = $contexto->grados(
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+                soloGruposActivos: false,
+            );
 
-        $this->grupos = $this->consultaGruposBase()
-            ->when($this->grupo_id, function ($query) {
-                $query->where('grupos.id', $this->grupo_id);
-            })
-            ->get();
+            $this->grupos = $contexto->grupos(
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+                gradoId: $this->grado_id,
+                semestreId: $this->semestre_id,
+                bachillerato: $this->esBachillerato,
+                soloActivos: false,
+            )->when(
+                $this->grupo_id,
+                fn ($grupos) => $grupos->where('id', (int) $this->grupo_id)->values(),
+            );
 
-        if ($this->esBachillerato && $this->grado_id) {
-            $this->semestres = Semestre::query()
-                ->where('grado_id', $this->grado_id)
-                ->orderBy('numero')
+            if ($this->esBachillerato && $this->grado_id) {
+                $this->semestres = $contexto->semestres(
+                    nivelId: (int) $this->nivel_id,
+                    cicloEscolarId: (int) $this->ciclo_escolar_id,
+                    generacionId: $this->generacion_id,
+                    gradoId: $this->grado_id,
+                    soloGruposActivos: false,
+                );
+            }
+        } else {
+            // Compatibilidad defensiva para bitácoras antiguas abiertas sin ciclo.
+            $this->grados = Grado::query()
+                ->where('nivel_id', $this->nivel_id)
+                ->orderBy('orden')
+                ->orderBy('nombre')
                 ->get();
+
+            $this->grupos = $this->consultaGruposBase()
+                ->when($this->grupo_id, fn ($query) => $query->where('grupos.id', $this->grupo_id))
+                ->get();
+
+            if ($this->esBachillerato && $this->grado_id) {
+                $this->semestres = Semestre::query()
+                    ->where('grado_id', $this->grado_id)
+                    ->orderBy('numero')
+                    ->get();
+            }
         }
 
         $query = Periodos::query()
             ->with('cicloEscolar')
-            ->where('nivel_id', $this->nivel_id);
+            ->where('nivel_id', $this->nivel_id)
+            ->when($this->ciclo_escolar_id, fn ($query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id));
 
         if ($this->esBachillerato) {
             if ($this->generacion_id) {
@@ -179,6 +216,9 @@ class BitacoraCalificaciones extends Component
             ->when($this->nivel_id, function ($query) {
                 $query->where('grupos.nivel_id', $this->nivel_id);
             })
+            ->when($this->ciclo_escolar_id, function ($query) {
+                $query->where('grupos.ciclo_escolar_id', $this->ciclo_escolar_id);
+            })
             ->when($this->grado_id, function ($query) {
                 $query->where('grupos.grado_id', $this->grado_id);
             })
@@ -216,6 +256,9 @@ class BitacoraCalificaciones extends Component
             ])
             ->when($this->nivel_id, function ($query) {
                 $query->where('nivel_id', $this->nivel_id);
+            })
+            ->when($this->ciclo_escolar_id, function ($query) {
+                $query->where('ciclo_escolar_id', $this->ciclo_escolar_id);
             })
             ->when($this->grado_id, function ($query) {
                 $query->where('grado_id', $this->grado_id);

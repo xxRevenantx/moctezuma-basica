@@ -225,7 +225,8 @@ class PDFController extends Controller
                 'mesesBasica',
                 'mesesBachillerato',
             ])
-            ->where('nivel_id', $nivel->id);
+            ->where('nivel_id', $nivel->id)
+            ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId));
 
         if (Schema::hasColumn('periodos', 'ciclo_escolar_id')) {
             $periodosQuery->where('ciclo_escolar_id', $cicloEscolar->id);
@@ -1745,11 +1746,12 @@ class PDFController extends Controller
             $slugNivel === '' ||
             !$generacionId ||
             !$gradoId ||
-            !$grupoId
+            !$grupoId ||
+            !$cicloEscolarId
         ) {
             abort(
                 422,
-                'Los parámetros slug_nivel, generacion_id, grado_id y grupo_id son obligatorios.'
+                'Los parámetros slug_nivel, ciclo_escolar_id, generacion_id, grado_id y grupo_id son obligatorios.'
             );
         }
 
@@ -1798,6 +1800,7 @@ class PDFController extends Controller
                 'semestre:id,numero',
             ])
             ->whereKey($grupoId)
+            ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('nivel_id', $nivel->id)
             ->where('generacion_id', $generacion->id)
             ->where('grado_id', $grado->id);
@@ -1837,18 +1840,10 @@ class PDFController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $cicloEscolar = $cicloEscolarId
-            ? CicloEscolar::query()->find($cicloEscolarId)
-            : null;
+        $cicloEscolar = CicloEscolar::query()->find($cicloEscolarId);
 
         if (!$cicloEscolar) {
-            $cicloEscolar = CicloEscolar::query()
-                ->orderByDesc('id')
-                ->first();
-        }
-
-        if (!$cicloEscolar) {
-            abort(404, 'No se encontró el ciclo escolar.');
+            abort(404, 'No se encontró el ciclo escolar seleccionado.');
         }
 
         /*
@@ -5551,6 +5546,12 @@ class PDFController extends Controller
             ->firstOrFail();
 
         $modoDescarga = $request->get('modo_descarga', 'grupo');
+        $cicloEscolarId = $request->integer('ciclo_escolar_id')
+            ?: CicloEscolar::query()
+                ->orderByDesc('es_actual')
+                ->orderByDesc('inicio_anio')
+                ->orderByDesc('id')
+                ->value('id');
 
         $query = Inscripcion::query()
             ->visiblesEnListas()
@@ -5628,9 +5629,9 @@ class PDFController extends Controller
             abort(404, 'No se encontraron alumnos para generar credenciales.');
         }
 
-        $cicloEscolar = CicloEscolar::query()
-            ->orderBy('id', 'desc')
-            ->first();
+        $cicloEscolar = $cicloEscolarId
+            ? CicloEscolar::query()->find($cicloEscolarId)
+            : null;
 
         $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';
 

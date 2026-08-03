@@ -12,6 +12,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\CalificacionOficialPrimariaService;
+use App\Services\ContextoEscolarService;
 use App\Services\PromedioAnualBachilleratoService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
@@ -66,18 +67,8 @@ class PromediosGenerales extends Component
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderByDesc('status')
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'status']);
-
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
-
+        $this->generaciones = collect();
+        $this->grados = collect();
         $this->grupos = collect();
         $this->semestres = collect();
 
@@ -87,16 +78,20 @@ class PromediosGenerales extends Component
             ?? ''
         );
 
+        $this->cargarGeneraciones();
         $this->cargarGrupos();
         $this->cargarSemestres();
     }
 
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = '';
         $this->grupo_id = '';
         $this->semestre_id = '';
-        $this->cargarGrupos();
-        $this->cargarSemestres();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->cargarGrados();
         $this->validarAlumnoSeleccionado();
     }
 
@@ -104,19 +99,24 @@ class PromediosGenerales extends Component
     {
         $this->grupo_id = '';
         $this->semestre_id = '';
-        $this->cargarGrupos();
+        $this->grupos = collect();
+        $this->semestres = collect();
         $this->cargarSemestres();
+        $this->cargarGrupos();
         $this->validarAlumnoSeleccionado();
     }
 
     public function updatedCicloEscolarId(): void
     {
-        if ($this->esAnualBachillerato) {
-            $this->grado_id = '';
-            $this->grupo_id = '';
-            $this->semestre_id = '';
-        }
-
+        $this->generacion_id = '';
+        $this->grado_id = '';
+        $this->grupo_id = '';
+        $this->semestre_id = '';
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->cargarGeneraciones();
         $this->validarAlumnoSeleccionado();
     }
 
@@ -129,8 +129,10 @@ class PromediosGenerales extends Component
         $this->grado_id = '';
         $this->grupo_id = '';
         $this->semestre_id = '';
-        $this->cargarGrupos();
-        $this->cargarSemestres();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->cargarGrados();
         $this->validarAlumnoSeleccionado();
     }
 
@@ -141,6 +143,9 @@ class PromediosGenerales extends Component
 
     public function updatedSemestreId(): void
     {
+        $this->grupo_id = '';
+        $this->grupos = collect();
+        $this->cargarGrupos();
         $this->validarAlumnoSeleccionado();
     }
 
@@ -165,9 +170,11 @@ class PromediosGenerales extends Component
         $this->orden = 'promedio_desc';
         $this->modalidad_bachillerato = 'semestral';
         $this->limpiarBusquedaAlumno();
-
-        $this->cargarGrupos();
-        $this->cargarSemestres();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->semestres = collect();
+        $this->cargarGeneraciones();
     }
 
     public function abrirSugerencias(): void
@@ -446,6 +453,33 @@ class PromediosGenerales extends Component
         ];
     }
 
+    private function cargarGeneraciones(): void
+    {
+        if ($this->ciclo_escolar_id === '') {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '' || $this->esAnualBachillerato) {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+        );
+    }
+
     private function cargarGrupos(): void
     {
         if ($this->esAnualBachillerato) {
@@ -453,44 +487,19 @@ class PromediosGenerales extends Component
             return;
         }
 
-        $this->grupos = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-                'grado:id,nombre,orden',
-                'semestre:id,numero,grado_id',
-            ])
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id !== '', fn($query) => $query->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
-            ->get([
-                'id',
-                'asignacion_grupo_id',
-                'nivel_id',
-                'grado_id',
-                'generacion_id',
-                'semestre_id',
-            ])
-            ->sort(function (Grupo $grupoA, Grupo $grupoB): int {
-                $comparacion = (int) ($grupoA->grado?->orden ?? PHP_INT_MAX)
-                    <=> (int) ($grupoB->grado?->orden ?? PHP_INT_MAX);
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '' || $this->grado_id === '') {
+            $this->grupos = collect();
+            return;
+        }
 
-                if ($comparacion !== 0) {
-                    return $comparacion;
-                }
-
-                $comparacion = strnatcasecmp(
-                    trim((string) ($grupoA->asignacionGrupo?->nombre ?? '')),
-                    trim((string) ($grupoB->asignacionGrupo?->nombre ?? ''))
-                );
-
-                if ($comparacion !== 0) {
-                    return $comparacion;
-                }
-
-                return (int) ($grupoA->semestre?->numero ?? PHP_INT_MAX)
-                    <=> (int) ($grupoB->semestre?->numero ?? PHP_INT_MAX);
-            })
-            ->values();
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+            semestreId: $this->semestre_id !== '' ? (int) $this->semestre_id : null,
+            bachillerato: $this->esBachillerato,
+        );
     }
 
     private function cargarSemestres(): void
@@ -500,11 +509,17 @@ class PromediosGenerales extends Component
             return;
         }
 
-        $this->semestres = Semestre::query()
-            ->whereHas('grado', fn($query) => $query->where('nivel_id', $this->nivel->id))
-            ->when($this->grado_id !== '', fn($query) => $query->where('grado_id', $this->grado_id))
-            ->orderBy('numero')
-            ->get(['id', 'grado_id', 'numero', 'orden_global']);
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '' || $this->grado_id === '') {
+            $this->semestres = collect();
+            return;
+        }
+
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+        );
     }
 
     private function consultaAlumnosSegunFiltros()

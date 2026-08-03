@@ -11,6 +11,7 @@ use App\Models\Grupo;
 use App\Models\Materia;
 use App\Models\Nivel;
 use App\Services\PromediosTresPeriodosService;
+use App\Services\ContextoEscolarService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use Illuminate\Support\Collection;
@@ -53,17 +54,8 @@ class PromediosMaterias extends Component
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderByDesc('anio_ingreso')
-            ->orderByDesc('id')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'status']);
-
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
+        $this->generaciones = collect();
+        $this->grados = collect();
 
         $this->camposFormativos = CampoFormativo::query()
             ->where('activo', true)
@@ -74,13 +66,27 @@ class PromediosMaterias extends Component
         $this->grupos = collect();
         $actual = $this->cicloEscolares->firstWhere('es_actual', true) ?? $this->cicloEscolares->first();
         $this->ciclo_escolar_id = (string) ($actual?->id ?? '');
-        $this->cargarGrupos();
+        $this->cargarGeneraciones();
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->generacion_id = '';
+        $this->grado_id = '';
+        $this->grupo_id = '';
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGeneraciones();
     }
 
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = '';
         $this->grupo_id = '';
-        $this->cargarGrupos();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGrados();
     }
 
     public function updatedGradoId(): void
@@ -104,7 +110,10 @@ class PromediosMaterias extends Component
         $this->buscar = '';
         $this->alcance_exportacion = 'completo';
         $this->resetErrorBag();
-        $this->cargarGrupos();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGeneraciones();
     }
 
     public function getDisponibleProperty(): bool
@@ -268,36 +277,47 @@ class PromediosMaterias extends Component
             : PromedioExcel::formatear($valor, 1, '—');
     }
 
+    private function cargarGeneraciones(): void
+    {
+        if ($this->ciclo_escolar_id === '') {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '') {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+        );
+    }
+
     private function cargarGrupos(): void
     {
-        $this->grupos = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-                'grado:id,nombre,orden',
-                'generacion:id,anio_ingreso,anio_egreso,status',
-                'semestre:id,numero',
-            ])
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id !== '', fn ($query) => $query->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn ($query) => $query->where('grado_id', $this->grado_id))
-            ->get(['id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id'])
-            ->sort(function (Grupo $a, Grupo $b): int {
-                $comparacion = (int) ($a->grado?->orden ?? 999) <=> (int) ($b->grado?->orden ?? 999);
-                if ($comparacion !== 0) {
-                    return $comparacion;
-                }
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '' || $this->grado_id === '') {
+            $this->grupos = collect();
+            return;
+        }
 
-                $comparacion = (int) ($a->semestre?->numero ?? 999) <=> (int) ($b->semestre?->numero ?? 999);
-                if ($comparacion !== 0) {
-                    return $comparacion;
-                }
-
-                return strnatcasecmp(
-                    (string) ($a->asignacionGrupo?->nombre ?? ''),
-                    (string) ($b->asignacionGrupo?->nombre ?? '')
-                );
-            })
-            ->values();
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+            bachillerato: $this->nivel?->slug === 'bachillerato',
+        );
     }
 
     private function validarExportacion(): void
@@ -312,7 +332,13 @@ class PromediosMaterias extends Component
         }
 
         if ($this->alcance_exportacion === 'grupo') {
-            $reglas['grupo_id'] = ['required', Rule::exists('grupos', 'id')->where('nivel_id', $this->nivel->id)];
+            $reglas['grupo_id'] = [
+                'required',
+                Rule::exists('grupos', 'id')
+                    ->where('nivel_id', $this->nivel->id)
+                    ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+                    ->where('estado', 'activo'),
+            ];
         }
 
         $this->validate($reglas, [

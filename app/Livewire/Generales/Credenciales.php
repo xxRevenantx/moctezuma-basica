@@ -2,14 +2,15 @@
 
 namespace App\Livewire\Generales;
 
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\ContextoEscolarService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -24,6 +25,7 @@ class Credenciales extends Component
     public Collection $grupos;
     public Collection $semestres;
 
+    public ?int $ciclo_escolar_id = null;
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
     public ?int $semestre_id = null;
@@ -46,61 +48,23 @@ class Credenciales extends Component
             ->where('slug', $slug_nivel)
             ->firstOrFail();
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('status', 1)
-            ->orderByDesc('anio_ingreso')
-            ->get([
-                'id',
-                'nivel_id',
-                'anio_ingreso',
-                'anio_egreso',
-            ]);
+        $this->ciclo_escolar_id = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->value('id');
 
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get([
-                'id',
-                'nivel_id',
-                'nombre',
-                'orden',
-            ]);
-
-        $this->semestres = $this->cargarSemestresIniciales();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
         $this->grupos = collect();
+        $this->cargarCatalogosContexto();
 
         /*
      * Por defecto se deja por grupo como ya lo venías usando.
      * Ahora también existe el modo nivel para descargar todo el nivel.
      */
         $this->modo_descarga = 'grupo';
-    }
-
-    private function cargarSemestresIniciales(): Collection
-    {
-        if (!$this->esBachillerato()) {
-            return collect();
-        }
-
-        $columnas = ['id'];
-
-        if (Schema::hasColumn('semestres', 'numero')) {
-            $columnas[] = 'numero';
-        }
-
-        if (Schema::hasColumn('semestres', 'semestre')) {
-            $columnas[] = 'semestre';
-        }
-
-        if (Schema::hasColumn('semestres', 'grado_id')) {
-            $columnas[] = 'grado_id';
-        }
-
-        return Semestre::query()
-            ->orderBy('id')
-            ->get($columnas);
     }
 
     public function updatedGeneracionId(): void
@@ -111,8 +75,9 @@ class Credenciales extends Component
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
 
+        $this->cargarGradosContexto();
+        $this->semestres = collect();
         $this->grupos = collect();
-        $this->semestres = $this->cargarSemestresIniciales();
     }
 
     public function updatedGradoId(): void
@@ -161,94 +126,71 @@ class Credenciales extends Component
 
     public function cargarSemestresPorGrado(): void
     {
-        if (!$this->esBachillerato()) {
+        if (! $this->esBachillerato() || ! $this->ciclo_escolar_id || ! $this->grado_id) {
             $this->semestres = collect();
-
             return;
         }
 
-        $columnas = ['id'];
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+        );
+    }
 
-        if (Schema::hasColumn('semestres', 'numero')) {
-            $columnas[] = 'numero';
+    private function cargarCatalogosContexto(): void
+    {
+        if (! $this->ciclo_escolar_id) {
+            $this->generaciones = collect();
+            $this->grados = collect();
+            $this->semestres = collect();
+            $this->grupos = collect();
+            return;
         }
 
-        if (Schema::hasColumn('semestres', 'semestre')) {
-            $columnas[] = 'semestre';
+        $contexto = app(ContextoEscolarService::class);
+        $this->generaciones = $contexto->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+        $this->cargarGradosContexto();
+    }
+
+    private function cargarGradosContexto(): void
+    {
+        if (! $this->ciclo_escolar_id) {
+            $this->grados = collect();
+            return;
         }
 
-        if (Schema::hasColumn('semestres', 'grado_id')) {
-            $columnas[] = 'grado_id';
-        }
-
-        $query = Semestre::query();
-
-        if ($this->grado_id && Schema::hasColumn('semestres', 'grado_id')) {
-            $query->where('grado_id', $this->grado_id);
-        }
-
-        $this->semestres = $query
-            ->orderBy('id')
-            ->get($columnas);
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+        );
     }
 
     public function cargarGrupos(): void
     {
         $this->grupos = collect();
 
-        if (!$this->generacion_id || !$this->grado_id) {
+        if (! $this->ciclo_escolar_id || ! $this->generacion_id || ! $this->grado_id) {
             return;
         }
 
-        if ($this->esBachillerato() && !$this->semestre_id) {
+        if ($this->esBachillerato() && ! $this->semestre_id) {
             return;
         }
 
-        $columnas = [
-            'grupos.id',
-            'grupos.nivel_id',
-            'grupos.asignacion_grupo_id',
-        ];
-
-        if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $columnas[] = 'grupos.generacion_id';
-        }
-
-        if (Schema::hasColumn('grupos', 'grado_id')) {
-            $columnas[] = 'grupos.grado_id';
-        }
-
-        if (Schema::hasColumn('grupos', 'semestre_id')) {
-            $columnas[] = 'grupos.semestre_id';
-        }
-
-        $query = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-            ])
-            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->select($columnas)
-            ->where('grupos.nivel_id', $this->nivel->id);
-
-        if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $query->where('grupos.generacion_id', $this->generacion_id);
-        }
-
-        if (Schema::hasColumn('grupos', 'grado_id')) {
-            $query->where('grupos.grado_id', $this->grado_id);
-        }
-
-        if ($this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $query->where('grupos.semestre_id', $this->semestre_id);
-        }
-
-        if (!$this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $query->whereNull('grupos.semestre_id');
-        }
-
-        $this->grupos = $query
-            ->orderBy('asignacion_grupos.nombre')
-            ->get();
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+            semestreId: $this->semestre_id,
+            bachillerato: $this->esBachillerato(),
+        );
     }
 
     #[Computed]
@@ -277,7 +219,8 @@ class Credenciales extends Component
                 'grupo.asignacionGrupo:id,nombre',
                 'semestre:id',
             ])
-            ->where('nivel_id', $this->nivel->id);
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
 
         if ($this->generacion_id) {
             $query->where('generacion_id', $this->generacion_id);
@@ -348,6 +291,7 @@ class Credenciales extends Component
                 'semestre:id',
             ])
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->whereIn('id', $ids->all())
             ->get();
 
@@ -409,7 +353,8 @@ class Credenciales extends Component
         $this->buscar_alumno = '';
 
         $this->grupos = collect();
-        $this->semestres = $this->cargarSemestresIniciales();
+        $this->semestres = collect();
+        $this->cargarCatalogosContexto();
 
         $this->modo_descarga = $this->esBachillerato() ? 'semestre' : 'grupo';
     }
@@ -483,6 +428,7 @@ class Credenciales extends Component
     {
         return [
             'slug_nivel' => $this->slug_nivel,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'modo_descarga' => $this->modo_descarga,
             'generacion_id' => $this->generacion_id,
             'grado_id' => $this->grado_id,

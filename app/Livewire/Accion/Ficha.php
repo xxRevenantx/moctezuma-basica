@@ -15,6 +15,7 @@ use App\Services\GroqFichaService;
 use App\Services\GroqFichaGrupoService;
 use App\Services\HtmlSanitizerService;
 use App\Services\CicloNivelGateService;
+use App\Services\ContextoEscolarService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -163,6 +164,7 @@ class Ficha extends Component
         $this->nivel_id = $nivel->id;
 
         $this->ciclo_escolar_id = CicloEscolar::query()
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->value('id');
@@ -187,6 +189,36 @@ class Ficha extends Component
         ) {
             $this->limpiarInformeGrupoIa();
         }
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->grupo_id = null;
+        $this->resetPage();
+        $this->limpiarInformeGrupoIa();
+    }
+
+    public function updatedGeneracionId(): void
+    {
+        $this->grado_id = null;
+        $this->grupo_id = null;
+        $this->resetPage();
+        $this->limpiarInformeGrupoIa();
+    }
+
+    public function updatedGradoId(): void
+    {
+        $this->grupo_id = null;
+        $this->resetPage();
+        $this->limpiarInformeGrupoIa();
+    }
+
+    public function updatedGrupoId(): void
+    {
+        $this->resetPage();
+        $this->limpiarInformeGrupoIa();
     }
 
     public function cambiarPeriodo(int $periodo): void
@@ -400,13 +432,16 @@ class Ficha extends Component
             'tipo_informe_grupo_ia.in' => 'El tipo de informe seleccionado no es válido.',
         ]);
 
-        $grupoValido = Grupo::query()
-            ->whereKey($this->grupo_id)
-            ->where('nivel_id', $this->nivel_id)
-            ->where('grado_id', $this->grado_id)
-            ->exists();
+        $grupoValido = app(ContextoEscolarService::class)->grupoValido(
+            grupoId: (int) $this->grupo_id,
+            nivelId: (int) $this->nivel_id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+            bachillerato: false,
+        );
 
-        if (!$grupoValido) {
+        if (! $grupoValido) {
             $this->addError('grupo_id', 'El grupo seleccionado no pertenece al grado indicado.');
 
             return;
@@ -613,9 +648,16 @@ class Ficha extends Component
 
         $grado = Grado::query()->whereKey($this->grado_id)->value('nombre') ?? 'Sin grado';
 
-        $grupo = Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->find($this->grupo_id);
+        $grupo = $this->grupo_id
+            ? app(ContextoEscolarService::class)->grupoValido(
+                grupoId: (int) $this->grupo_id,
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+                gradoId: $this->grado_id,
+                bachillerato: false,
+            )
+            : null;
 
         $grupoNombre = $grupo?->asignacionGrupo?->nombre
             ?? ($grupo?->nombre ?? 'Sin grupo');
@@ -700,36 +742,48 @@ class Ficha extends Component
 
     public function getGeneracionesProperty()
     {
-        return Generacion::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->where('status', true)
-            ->orderByDesc('anio_ingreso')
-            ->orderByDesc('anio_egreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        return app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel_id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
     }
 
     public function getGradosProperty()
     {
-        return Grado::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->orderBy('id')
-            ->get(['id', 'nombre']);
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        return app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel_id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+        );
     }
 
     public function getGruposProperty()
     {
-        return Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->where('nivel_id', $this->nivel_id)
-            ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
-            ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
-            ->orderBy('id')
-            ->get();
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        return app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel_id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+            bachillerato: false,
+        );
     }
 
     public function getCiclosEscolaresProperty()
     {
         return CicloEscolar::query()
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->get();
@@ -813,6 +867,7 @@ class Ficha extends Component
             ->visiblesEnListas()
             ->with(['nivel:id,nombre,slug', 'grado:id,nombre', 'grupo.asignacionGrupo:id,nombre', 'generacion:id,nivel_id,anio_ingreso,anio_egreso'])
             ->where('nivel_id', $this->nivel_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
             ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
             ->when($this->grupo_id, fn($q) => $q->where('grupo_id', $this->grupo_id))

@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\Tutor;
+use App\Services\ContextoEscolarService;
 use App\Services\DirectorioTutoresService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -100,7 +101,11 @@ class DirectorioTutores extends Component
     public function updatedGeneracionId(mixed $value): void
     {
         $this->generacion_id = $this->enteroValido($value) ? (int) $value : null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->cargarGrados();
+        $this->cargarSemestres();
         $this->cargarGrupos();
         $this->resetPage('directorioPage');
     }
@@ -108,8 +113,11 @@ class DirectorioTutores extends Component
     public function updatedCicloEscolarId(mixed $value): void
     {
         $this->ciclo_escolar_id = $this->enteroValido($value) ? (int) $value : null;
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
         $this->grupo_id = null;
-        $this->cargarGrupos();
+        $this->cargarCatalogosDependientes();
         $this->resetPage('directorioPage');
     }
 
@@ -281,74 +289,105 @@ class DirectorioTutores extends Component
 
     private function cargarCatalogosDependientes(): void
     {
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->orderByDesc('status')
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'nombre', 'anio_ingreso', 'anio_egreso', 'status'])
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            $this->generaciones = [];
+            $this->grados = [];
+            $this->semestres = [];
+            $this->grupos = [];
+            $this->cargarParentescos();
+            return;
+        }
+
+        $contexto = app(ContextoEscolarService::class);
+
+        $this->generaciones = $contexto
+            ->generaciones((int) $this->nivel_id, (int) $this->ciclo_escolar_id)
             ->map(fn (Generacion $generacion): array => [
                 'id' => (int) $generacion->id,
                 'nombre' => $generacion->etiqueta,
                 'status' => (bool) $generacion->status,
             ])->all();
 
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel_id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden'])
-            ->map(fn (Grado $grado): array => [
-                'id' => (int) $grado->id,
-                'nombre' => $grado->nombre,
-            ])->all();
+        if ($this->generacion_id && ! collect($this->generaciones)->contains('id', (int) $this->generacion_id)) {
+            $this->generacion_id = null;
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+        }
 
+        $this->cargarGrados();
         $this->cargarSemestres();
         $this->cargarGrupos();
         $this->cargarParentescos();
     }
 
-    private function cargarSemestres(): void
+    private function cargarGrados(): void
     {
-        if (! $this->grado_id) {
-            $this->semestres = [];
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            $this->grados = [];
             return;
         }
 
-        $this->semestres = Semestre::query()
-            ->where('grado_id', $this->grado_id)
-            ->orderBy('orden_global')
-            ->orderBy('numero')
-            ->get(['id', 'grado_id', 'numero', 'orden_global'])
+        $this->grados = app(ContextoEscolarService::class)
+            ->grados(
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+            )
+            ->map(fn (Grado $grado): array => [
+                'id' => (int) $grado->id,
+                'nombre' => $grado->nombre,
+            ])->all();
+
+        if ($this->grado_id && ! collect($this->grados)->contains('id', (int) $this->grado_id)) {
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+        }
+    }
+
+    private function cargarSemestres(): void
+    {
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id || ! $this->grado_id || ! $this->esBachillerato()) {
+            $this->semestres = [];
+            $this->semestre_id = null;
+            return;
+        }
+
+        $this->semestres = app(ContextoEscolarService::class)
+            ->semestres(
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+                gradoId: $this->grado_id,
+            )
             ->map(fn (Semestre $semestre): array => [
                 'id' => (int) $semestre->id,
                 'nombre' => 'Semestre ' . $semestre->numero,
             ])->all();
+
+        if ($this->semestre_id && ! collect($this->semestres)->contains('id', (int) $this->semestre_id)) {
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+        }
     }
 
     private function cargarGrupos(): void
     {
-        $query = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-                'grado:id,nombre,orden',
-                'semestre:id,numero,orden_global',
-                'generacion:id,nombre,anio_ingreso,anio_egreso',
-                'cicloEscolar:id,inicio_anio,fin_anio',
-            ])
-            ->where('nivel_id', $this->nivel_id)
-            ->when($this->generacion_id, fn ($q, int $id) => $q->where('generacion_id', $id))
-            ->when($this->ciclo_escolar_id, fn ($q, int $id) => $q->where('ciclo_escolar_id', $id))
-            ->when($this->grado_id, fn ($q, int $id) => $q->where('grado_id', $id))
-            ->when($this->semestre_id, fn ($q, int $id) => $q->where('semestre_id', $id));
+        if (! $this->nivel_id || ! $this->ciclo_escolar_id) {
+            $this->grupos = [];
+            return;
+        }
 
-        $this->grupos = $query
-            ->get(['id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'ciclo_escolar_id', 'asignacion_grupo_id'])
-            ->sortBy(fn (Grupo $grupo): string => Str::lower(implode('|', [
-                str_pad((string) ($grupo->grado?->orden ?? 999), 4, '0', STR_PAD_LEFT),
-                str_pad((string) ($grupo->semestre?->orden_global ?? 999), 4, '0', STR_PAD_LEFT),
-                $grupo->asignacionGrupo?->nombre ?? '',
-                $grupo->generacion?->etiqueta ?? '',
-            ])))
+        $this->grupos = app(ContextoEscolarService::class)
+            ->grupos(
+                nivelId: (int) $this->nivel_id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+                generacionId: $this->generacion_id,
+                gradoId: $this->grado_id,
+                semestreId: $this->semestre_id,
+                bachillerato: $this->esBachillerato(),
+            )
             ->map(function (Grupo $grupo): array {
                 $nombreGrupo = $grupo->asignacionGrupo?->nombre ?? 'Sin grupo';
                 $contexto = collect([
@@ -357,9 +396,6 @@ class DirectorioTutores extends Component
                         ? 'Semestre ' . $grupo->semestre->numero
                         : null,
                     ! $this->generacion_id ? $grupo->generacion?->etiqueta : null,
-                    ! $this->ciclo_escolar_id && $grupo->cicloEscolar
-                        ? $grupo->cicloEscolar->inicio_anio . '-' . $grupo->cicloEscolar->fin_anio
-                        : null,
                 ])->filter()->join(' · ');
 
                 return [
@@ -368,9 +404,17 @@ class DirectorioTutores extends Component
                 ];
             })->values()->all();
 
-        if ($this->grupo_id && ! collect($this->grupos)->contains('id', $this->grupo_id)) {
+        if ($this->grupo_id && ! collect($this->grupos)->contains('id', (int) $this->grupo_id)) {
             $this->grupo_id = null;
         }
+    }
+
+    private function esBachillerato(): bool
+    {
+        $nivel = collect($this->niveles)->firstWhere('id', (int) $this->nivel_id);
+        $texto = Str::lower(trim(($nivel['slug'] ?? '') . ' ' . ($nivel['nombre'] ?? '')));
+
+        return Str::contains($texto, 'bachillerato');
     }
 
     private function cargarParentescos(): void

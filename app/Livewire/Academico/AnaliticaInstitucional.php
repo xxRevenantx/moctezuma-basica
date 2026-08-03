@@ -61,8 +61,9 @@ class AnaliticaInstitucional extends Component
 
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = '';
         $this->grupo_id = '';
-        $this->cargarGrupos();
+        $this->cargarCatalogosDependientes();
     }
 
     public function updatedGradoId(): void
@@ -141,31 +142,83 @@ class AnaliticaInstitucional extends Component
 
     private function cargarCatalogosDependientes(): void
     {
+        if ($this->ciclo_escolar_id === '') {
+            $this->generaciones = [];
+            $this->grados = [];
+            $this->grupos = [];
+            return;
+        }
+
+        $cicloId = (int) $this->ciclo_escolar_id;
+        $nivelId = $this->nivel_id !== '' ? (int) $this->nivel_id : null;
+        $generacionId = $this->generacion_id !== '' ? (int) $this->generacion_id : null;
+
         $this->generaciones = Generacion::query()
-            ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', $this->nivel_id))
-            ->orderByDesc('anio_ingreso')->get()
-            ->map(fn (Generacion $g) => ['id' => $g->id, 'nombre' => $g->etiqueta])->all();
+            ->when($nivelId, fn ($q) => $q->where('nivel_id', $nivelId))
+            ->whereHas('grupos', function ($grupos) use ($cicloId, $nivelId): void {
+                $grupos->where('ciclo_escolar_id', $cicloId)
+                    ->where('estado', 'activo')
+                    ->when($nivelId, fn ($q) => $q->where('nivel_id', $nivelId));
+            })
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
+            ->get()
+            ->map(fn (Generacion $g) => ['id' => $g->id, 'nombre' => $g->etiqueta])
+            ->all();
+
+        if ($generacionId && ! collect($this->generaciones)->contains('id', $generacionId)) {
+            $this->generacion_id = '';
+            $generacionId = null;
+            $this->grado_id = '';
+            $this->grupo_id = '';
+        }
 
         $this->grados = Grado::query()
-            ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', $this->nivel_id))
-            ->orderBy('orden')->get(['id', 'nombre'])->toArray();
+            ->when($nivelId, fn ($q) => $q->where('nivel_id', $nivelId))
+            ->whereHas('grupos', function ($grupos) use ($cicloId, $nivelId, $generacionId): void {
+                $grupos->where('ciclo_escolar_id', $cicloId)
+                    ->where('estado', 'activo')
+                    ->when($nivelId, fn ($q) => $q->where('nivel_id', $nivelId))
+                    ->when($generacionId, fn ($q) => $q->where('generacion_id', $generacionId));
+            })
+            ->orderBy('orden')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre'])
+            ->toArray();
+
+        if ($this->grado_id !== '' && ! collect($this->grados)->contains('id', (int) $this->grado_id)) {
+            $this->grado_id = '';
+            $this->grupo_id = '';
+        }
 
         $this->cargarGrupos();
     }
 
     private function cargarGrupos(): void
     {
-        $query = Grupo::query()->with('asignacionGrupo')
-            ->when($this->ciclo_escolar_id !== '' && Schema::hasColumn('grupos', 'ciclo_escolar_id'), fn ($q) => $q->where('ciclo_escolar_id', $this->ciclo_escolar_id))
-            ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', $this->nivel_id))
-            ->when($this->generacion_id !== '', fn ($q) => $q->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn ($q) => $q->where('grado_id', $this->grado_id))
-            ->orderBy('grado_id')->orderBy('asignacion_grupo_id');
+        if ($this->ciclo_escolar_id === '') {
+            $this->grupos = [];
+            return;
+        }
+
+        $query = Grupo::query()
+            ->with(['asignacionGrupo:id,nombre', 'grado:id,nombre'])
+            ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
+            ->when($this->nivel_id !== '', fn ($q) => $q->where('nivel_id', (int) $this->nivel_id))
+            ->when($this->generacion_id !== '', fn ($q) => $q->where('generacion_id', (int) $this->generacion_id))
+            ->when($this->grado_id !== '', fn ($q) => $q->where('grado_id', (int) $this->grado_id))
+            ->orderBy('grado_id')
+            ->orderBy('asignacion_grupo_id');
 
         $this->grupos = $query->get()->map(fn (Grupo $g) => [
             'id' => $g->id,
-            'nombre' => trim(($g->grado?->nombre ? $g->grado->nombre.' · ' : '').($g->asignacionGrupo?->nombre ?? $g->clave ?? 'Grupo')),
+            'nombre' => trim(($g->grado?->nombre ? $g->grado->nombre . ' · ' : '') . ($g->asignacionGrupo?->nombre ?? $g->clave ?? 'Grupo')),
         ])->all();
+
+        if ($this->grupo_id !== '' && ! collect($this->grupos)->contains('id', (int) $this->grupo_id)) {
+            $this->grupo_id = '';
+        }
     }
 
     private function asignarComparacionPredeterminada(): void

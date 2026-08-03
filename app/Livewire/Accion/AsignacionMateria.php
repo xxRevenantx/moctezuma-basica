@@ -12,7 +12,6 @@ use App\Models\Materia;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\PersonaNivelDetalle;
-use App\Models\PlantillaPersonalNivel;
 use App\Models\Semestre;
 use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
@@ -51,12 +50,10 @@ class AsignacionMateria extends Component
     public $editar_grupo_id = '';
     public $editar_materia_id = '';
     public $editar_profesor_id = '';
-    public string $editarBuscarProfesor = '';
 
     public $grupo_id = '';
     public $materia_id = '';
     public $profesor_id = '';
-    public string $buscarProfesor = '';
     public ?int $ultimoRegistroId = null;
     public string $ultimoMovimiento = '';
 
@@ -143,6 +140,8 @@ class AsignacionMateria extends Component
             ->with(['asignacionGrupo', 'grado', 'generacion', 'semestre'])
             ->whereKey($this->grupo_id)
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->first();
     }
 
@@ -161,6 +160,8 @@ class AsignacionMateria extends Component
             ->with(['asignacionGrupo', 'grado', 'generacion', 'semestre'])
             ->whereKey($this->editar_grupo_id)
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->first();
     }
 
@@ -198,26 +199,23 @@ class AsignacionMateria extends Component
             return collect();
         }
 
-        $plantillaIds = PlantillaPersonalNivel::query()
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('nivel_id', $this->nivel->id)
-            ->whereIn('estado', [PlantillaPersonalNivel::ESTADO_PUBLICADA, PlantillaPersonalNivel::ESTADO_CERRADA])
-            ->pluck('id');
-
+        /*
+         * Los docentes solo estarán disponibles cuando la plantilla del mismo
+         * ciclo y nivel se encuentre publicada (o cerrada para consulta
+         * histórica). El selector muestra la lista completa, sin buscador.
+         */
         return PersonaNivelDetalle::query()
             ->with('cabecera.persona')
-            ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
-            ->where('confirmado', true)
-            ->whereNull('archivado_at')
-            ->whereHas('cicloAsignacion', fn (Builder $q) => $q
-                ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
-                ->where('estado', 'activo'))
+            ->vigenteEnCiclo((int) $this->ciclo_escolar_id)
             ->whereHas('personaRole.rolePersona', fn (Builder $q) => $q
                 ->where('status', true)
                 ->where('es_docente', true))
             ->whereHas('cabecera', fn (Builder $q) => $q
                 ->where('nivel_id', $this->nivel->id)
-                ->whereHas('persona', fn (Builder $p) => $p->where('status', true)))
+                ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                ->whereHas('persona', fn (Builder $p) => $p
+                    ->where('status', true)
+                    ->where('estado_laboral', 'activo')))
             ->get()
             ->map(function (PersonaNivelDetalle $detalle) {
                 $persona = $detalle->cabecera?->persona;
@@ -227,31 +225,12 @@ class AsignacionMateria extends Component
                 return [
                     'id' => (int) ($persona?->id ?? 0),
                     'nombre' => $nombre,
-                    'buscar' => mb_strtolower($nombre),
                 ];
             })
             ->filter(fn ($item) => $item['id'] > 0 && filled($item['nombre']))
             ->unique('id')
             ->sortBy('nombre')
             ->values();
-    }
-
-    public function getProfesoresFiltradosProperty(): Collection
-    {
-        $buscar = mb_strtolower(trim($this->buscarProfesor));
-
-        return $buscar === ''
-            ? $this->profesores
-            : $this->profesores->filter(fn($item) => str_contains($item['buscar'], $buscar))->values();
-    }
-
-    public function getProfesoresEdicionFiltradosProperty(): Collection
-    {
-        $buscar = mb_strtolower(trim($this->editarBuscarProfesor));
-
-        return $buscar === ''
-            ? $this->profesores
-            : $this->profesores->filter(fn($item) => str_contains($item['buscar'], $buscar))->values();
     }
 
     private function consultaAsignacionesBase(): Builder
@@ -335,6 +314,8 @@ class AsignacionMateria extends Component
         return Grupo::query()
             ->with(['asignacionGrupo', 'grado', 'generacion', 'semestre'])
             ->whereIn('id', $ids)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->get()
             ->sortBy(fn($grupo) => sprintf(
                 '%03d|%03d|%s|%04d',
@@ -551,34 +532,6 @@ class AsignacionMateria extends Component
         $this->resetValidation(['editar_grupo_id', 'editar_materia_id']);
     }
 
-    public function updatedBuscarProfesor(): void
-    {
-        if (blank($this->buscarProfesor)) {
-            $this->profesor_id = '';
-        }
-    }
-
-    public function updatedEditarBuscarProfesor(): void
-    {
-        if (blank($this->editarBuscarProfesor)) {
-            $this->editar_profesor_id = '';
-        }
-    }
-
-    public function seleccionarProfesor(int $profesorId): void
-    {
-        $profesor = $this->profesores->firstWhere('id', $profesorId);
-        $this->profesor_id = $profesorId;
-        $this->buscarProfesor = $profesor['nombre'] ?? '';
-    }
-
-    public function seleccionarProfesorEdicion(int $profesorId): void
-    {
-        $profesor = $this->profesores->firstWhere('id', $profesorId);
-        $this->editar_profesor_id = $profesorId;
-        $this->editarBuscarProfesor = $profesor['nombre'] ?? '';
-    }
-
     public function guardarMateria(): void
     {
         $this->validate();
@@ -589,7 +542,12 @@ class AsignacionMateria extends Component
             'asignacion_materias'
         );
 
-        $grupo = Grupo::query()->whereKey($this->grupo_id)->where('nivel_id', $this->nivel->id)->first();
+        $grupo = Grupo::query()
+            ->whereKey($this->grupo_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
+            ->first();
         $materia = Materia::query()->find($this->materia_id);
 
         if (!$grupo || !$materia) {
@@ -665,10 +623,6 @@ class AsignacionMateria extends Component
         $this->editar_grupo_id = $asignacion->grupo_id;
         $this->editar_materia_id = $asignacion->materia_id;
         $this->editar_profesor_id = $asignacion->profesor_id ?: '';
-        $this->editarBuscarProfesor = $asignacion->profesor
-            ? trim(($asignacion->profesor->titulo ?? '') . ' ' . ($asignacion->profesor->nombre ?? '') . ' '
-                . ($asignacion->profesor->apellido_paterno ?? '') . ' ' . ($asignacion->profesor->apellido_materno ?? ''))
-            : '';
 
         $this->modalEditarAbierto = true;
     }
@@ -708,6 +662,8 @@ class AsignacionMateria extends Component
         $grupo = Grupo::query()
             ->whereKey($this->editar_grupo_id)
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->first();
 
         $materia = Materia::query()->find($this->editar_materia_id);
@@ -779,7 +735,6 @@ class AsignacionMateria extends Component
             'editar_grupo_id',
             'editar_materia_id',
             'editar_profesor_id',
-            'editarBuscarProfesor',
         ]);
         $this->resetValidation([
             'editandoId',
@@ -1070,14 +1025,14 @@ class AsignacionMateria extends Component
     public function limpiarFormularioDespuesDeGuardar(): void
     {
         $grupo = $this->grupo_id;
-        $this->reset(['materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->reset(['materia_id', 'profesor_id']);
         $this->grupo_id = $grupo;
         $this->resetValidation(['grupo_id', 'materia_id', 'profesor_id']);
     }
 
     public function limpiarFormulario(): void
     {
-        $this->reset(['grupo_id', 'materia_id', 'profesor_id', 'buscarProfesor']);
+        $this->reset(['grupo_id', 'materia_id', 'profesor_id']);
         $this->resetValidation(['grupo_id', 'materia_id', 'profesor_id']);
     }
 

@@ -53,6 +53,18 @@ class TallerConjunto extends Component
             ->value('id') ?: CicloEscolar::query()->max('id');
     }
 
+
+    public function updatedCicloEscolarId(): void
+    {
+        $this->grupos_seleccionados = [];
+        $this->dia_id = null;
+        $this->hora_id = null;
+        $this->conflictos = [];
+        $this->autorizar_conflicto = false;
+        $this->motivo_conflicto = '';
+        $this->resetValidation();
+    }
+
     public function getEsSecundariaProperty(): bool
     {
         return $this->nivel?->slug === 'secundaria';
@@ -102,7 +114,8 @@ class TallerConjunto extends Component
                 'semestre:id,numero',
             ])
             ->where('nivel_id', $this->nivel?->id)
-            ->whereHas('generacion', fn($query) => $query->where('status', true))
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->get()
             ->sortBy([
                 fn($a, $b) => ($a->grado?->orden ?? 999) <=> ($b->grado?->orden ?? 999),
@@ -304,6 +317,8 @@ class TallerConjunto extends Component
         $gruposValidos = Grupo::query()
             ->whereIn('id', $datos['grupos_seleccionados'])
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $datos['ciclo_escolar_id'])
+            ->where('estado', 'activo')
             ->count();
 
         if ($gruposValidos !== count(array_unique($datos['grupos_seleccionados']))) {
@@ -320,6 +335,9 @@ class TallerConjunto extends Component
 
         $gradosSeleccionados = Grupo::query()
             ->whereIn('id', $datos['grupos_seleccionados'])
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $datos['ciclo_escolar_id'])
+            ->where('estado', 'activo')
             ->pluck('grado_id')
             ->map(fn($id) => (int) $id)
             ->unique()

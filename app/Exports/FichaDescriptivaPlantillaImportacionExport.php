@@ -62,6 +62,7 @@ class FichaDescriptivaPlantillaImportacionExport implements FromArray, WithHeadi
                 'grupo.asignacionGrupo:id,nombre',
             ])
             ->where('nivel_id', $this->nivelId)
+            ->when($this->cicloEscolarId, fn($q) => $q->where('ciclo_escolar_id', $this->cicloEscolarId))
             ->where('grado_id', $this->gradoId)
             ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
             ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))

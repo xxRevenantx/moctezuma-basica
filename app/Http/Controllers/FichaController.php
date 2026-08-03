@@ -99,6 +99,7 @@ class FichaController extends Controller
                 'generacion',
             ])
             ->where('nivel_id', $nivel->id)
+            ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId))
             ->when($request->integer('generacion_id'), fn ($q, $id) => $q->where('generacion_id', $id))
             ->when($request->integer('grado_id'), fn ($q, $id) => $q->where('grado_id', $id))
             ->when($request->integer('grupo_id'), fn ($q, $id) => $q->where('grupo_id', $id))
@@ -164,6 +165,7 @@ class FichaController extends Controller
     private function cicloActual(): ?CicloEscolar
     {
         return CicloEscolar::query()
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->first();

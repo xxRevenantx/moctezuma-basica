@@ -36,10 +36,7 @@ class CredencialImagenController extends Controller
         $alumnos = $this->obtenerAlumnos($request, $nivel);
         $this->asegurarResultados($alumnos, 'No se encontraron alumnos para generar credenciales.');
 
-        $cicloEscolar = CicloEscolar::query()
-            ->orderByDesc('es_actual')
-            ->orderByDesc('id')
-            ->first();
+        $cicloEscolar = $this->cicloEscolarCredencial($request);
 
         return $this->descargarAlumnos($alumnos, $nivel, $cicloEscolar, $formato);
     }
@@ -55,10 +52,7 @@ class CredencialImagenController extends Controller
         $alumno = $this->obtenerAlumnos($request, $nivel)->first();
         abort_unless($alumno, 404, 'No se encontró un alumno para mostrar la vista previa.');
 
-        $cicloEscolar = CicloEscolar::query()
-            ->orderByDesc('es_actual')
-            ->orderByDesc('id')
-            ->first();
+        $cicloEscolar = $this->cicloEscolarCredencial($request);
 
         $contenido = $this->imagenes->renderAlumno($alumno, $nivel, $cicloEscolar, 'png');
 
@@ -261,7 +255,11 @@ class CredencialImagenController extends Controller
                 'grupo.asignacionGrupo',
                 'semestre',
             ])
-            ->where('nivel_id', $nivel->id);
+            ->where('nivel_id', $nivel->id)
+            ->when(
+                $this->cicloEscolarCredencial($request)?->id,
+                fn (Builder $q, int $cicloId) => $q->where('ciclo_escolar_id', $cicloId)
+            );
 
         if ($modo === 'generacion') {
             $query->where('generacion_id', $request->integer('generacion_id'));
@@ -364,6 +362,21 @@ class CredencialImagenController extends Controller
             ->orderBy('personas.apellido_materno')
             ->orderBy('personas.nombre')
             ->get();
+    }
+
+    private function cicloEscolarCredencial(Request $request): ?CicloEscolar
+    {
+        $id = $request->integer('ciclo_escolar_id');
+
+        if ($id > 0) {
+            return CicloEscolar::query()->find($id);
+        }
+
+        return CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function validarFormato(string $formato): string

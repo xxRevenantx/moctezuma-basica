@@ -10,6 +10,7 @@ use App\Models\Nivel;
 use App\Models\Parcial;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Services\ContextoEscolarService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
@@ -55,19 +56,9 @@ class Listas extends Component
             ->where('slug', $slug_nivel)
             ->firstOrFail();
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('status', 1)
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
-
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
-
-        $this->semestres = $this->cargarSemestresIniciales();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
         $this->parciales = $this->cargarParciales();
         $this->grupos = collect();
 
@@ -80,12 +71,40 @@ class Listas extends Component
                 ->first();
 
         $this->ciclo_escolar_id = $cicloEscolar?->id;
+        $this->cargarGeneraciones();
 
         $this->tipo_descarga = $this->esBachillerato() ? 'grupo' : 'evaluacion';
 
         $opciones = $this->opcionesDescarga();
 
         $this->opcion_descarga = array_key_first($opciones) ?? '';
+    }
+
+    private function cargarGeneraciones(): void
+    {
+        if (!$this->ciclo_escolar_id) {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if (!$this->ciclo_escolar_id || !$this->generacion_id) {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+        );
     }
 
     private function cargarSemestresIniciales(): Collection
@@ -147,8 +166,10 @@ class Listas extends Component
         $this->grado_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->grados = collect();
         $this->grupos = collect();
-        $this->semestres = $this->cargarSemestresIniciales();
+        $this->semestres = collect();
+        $this->cargarGrados();
         $this->limpiarSeleccionAlumnos();
     }
 
@@ -206,98 +227,41 @@ class Listas extends Component
 
     public function cargarSemestresPorGrado(): void
     {
-        if (!$this->esBachillerato()) {
+        if (!$this->esBachillerato() || !$this->ciclo_escolar_id || !$this->generacion_id || !$this->grado_id) {
             $this->semestres = collect();
-
             return;
         }
 
-        $columnas = ['id'];
-
-        if (Schema::hasColumn('semestres', 'numero')) {
-            $columnas[] = 'numero';
-        }
-
-        if (Schema::hasColumn('semestres', 'semestre')) {
-            $columnas[] = 'semestre';
-        }
-
-        if (Schema::hasColumn('semestres', 'grado_id')) {
-            $columnas[] = 'grado_id';
-        }
-
-        $consulta = Semestre::query();
-
-        if ($this->grado_id && Schema::hasColumn('semestres', 'grado_id')) {
-            $consulta->where('grado_id', $this->grado_id);
-        }
-
-        $this->semestres = $consulta
-            ->orderBy('id')
-            ->get($columnas);
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+        );
     }
 
     public function cargarGrupos(): void
     {
         $this->grupos = collect();
 
-        if ($this->modo_descarga === 'nivel') {
+        if (
+            $this->modo_descarga === 'nivel'
+            || !$this->ciclo_escolar_id
+            || !$this->generacion_id
+            || !$this->grado_id
+            || ($this->esBachillerato() && !$this->semestre_id)
+        ) {
             return;
         }
 
-        if (!$this->generacion_id || !$this->grado_id) {
-            return;
-        }
-
-        if ($this->esBachillerato() && !$this->semestre_id) {
-            return;
-        }
-
-        $columnas = [
-            'grupos.id',
-            'grupos.nivel_id',
-            'grupos.asignacion_grupo_id',
-        ];
-
-        if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $columnas[] = 'grupos.generacion_id';
-        }
-
-        if (Schema::hasColumn('grupos', 'grado_id')) {
-            $columnas[] = 'grupos.grado_id';
-        }
-
-        if (Schema::hasColumn('grupos', 'semestre_id')) {
-            $columnas[] = 'grupos.semestre_id';
-        }
-
-        $consulta = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-            ])
-            ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->select($columnas)
-            ->where('grupos.nivel_id', $this->nivel->id);
-
-        if (Schema::hasColumn('grupos', 'generacion_id')) {
-            $consulta->where('grupos.generacion_id', $this->generacion_id);
-        }
-
-        if (Schema::hasColumn('grupos', 'grado_id')) {
-            $consulta->where('grupos.grado_id', $this->grado_id);
-        }
-
-        if ($this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $consulta->where('grupos.semestre_id', $this->semestre_id);
-        }
-
-        if (!$this->esBachillerato() && Schema::hasColumn('grupos', 'semestre_id')) {
-            $consulta->whereNull('grupos.semestre_id');
-        }
-
-        $this->grupos = $consulta
-            ->orderBy('asignacion_grupos.nombre')
-            ->get();
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+            semestreId: $this->semestre_id,
+            bachillerato: $this->esBachillerato(),
+        );
     }
 
     public function limpiarFiltros(): void
@@ -315,9 +279,12 @@ class Listas extends Component
 
         $this->opcion_descarga = array_key_first($opciones) ?? '';
 
+        $this->generaciones = collect();
+        $this->grados = collect();
         $this->grupos = collect();
         $this->mostrar_motivo = false;
-        $this->semestres = $this->cargarSemestresIniciales();
+        $this->semestres = collect();
+        $this->cargarGeneraciones();
         $this->parciales = $this->cargarParciales();
         $this->limpiarSeleccionAlumnos();
     }

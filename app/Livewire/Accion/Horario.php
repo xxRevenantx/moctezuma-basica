@@ -16,6 +16,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\TallerSesion;
 use App\Services\CicloNivelGateService;
+use App\Services\ContextoEscolarService;
 use App\Services\GroqHorarioService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -153,8 +154,19 @@ class Horario extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
+        $this->grupos = collect();
+
         $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
+        $this->cargarGeneraciones();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
         $this->cargarTalleresGuardados();
@@ -173,10 +185,14 @@ class Horario extends Component
 
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = null;
+        $this->semestre_id = null;
         $this->grupo_id = null;
 
         $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
+        $this->cargarGrados();
+        $this->cargarSemestres();
         $this->cargarGrupos();
         $this->cargarMateriasDisponibles();
         $this->cargarHorariosGuardados();
@@ -1451,11 +1467,18 @@ class Horario extends Component
 
     protected function consultaGruposBase(): Builder
     {
-        return Grupo::query()
+        if (!$this->ciclo_escolar_id) {
+            return Grupo::query()->whereRaw('1 = 0');
+        }
+
+        return app(ContextoEscolarService::class)
+            ->consultaGrupos(
+                nivelId: (int) $this->nivel->id,
+                cicloEscolarId: (int) $this->ciclo_escolar_id,
+            )
             ->with('asignacionGrupo:id,nombre')
             ->leftJoin('asignacion_grupos', 'asignacion_grupos.id', '=', 'grupos.asignacion_grupo_id')
-            ->select('grupos.*')
-            ->where('grupos.nivel_id', $this->nivel->id);
+            ->select('grupos.*');
     }
 
     protected function filtrosCompletos(): bool
@@ -1487,40 +1510,47 @@ class Horario extends Component
             return null;
         }
 
-        return $this->consultaGruposBase()
-            ->where('grupos.id', $this->grupo_id)
-            ->where('grupos.grado_id', $this->grado_id)
-            ->where('grupos.generacion_id', $this->generacion_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('grupos.semestre_id')
-            )
-            ->first();
+        return app(ContextoEscolarService::class)->grupoValido(
+            grupoId: (int) $this->grupo_id,
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+            semestreId: $this->semestre_id,
+            bachillerato: $this->esBachillerato,
+        );
     }
 
     protected function cargarGeneraciones(): void
     {
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('status', 1)
-            ->orderByDesc('anio_ingreso')
-            ->orderByDesc('anio_egreso')
-            ->get();
+        if (!$this->ciclo_escolar_id) {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
     }
 
     protected function cargarGrados(): void
     {
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('id')
-            ->get();
+        if (!$this->ciclo_escolar_id || !$this->generacion_id) {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+        );
     }
 
     protected function cargarGrupos(): void
     {
-        if (!$this->generacion_id || !$this->grado_id) {
+        if (!$this->ciclo_escolar_id || !$this->generacion_id || !$this->grado_id) {
             $this->grupos = collect();
             return;
         }
@@ -1530,17 +1560,14 @@ class Horario extends Component
             return;
         }
 
-        $this->grupos = $this->consultaGruposBase()
-            ->where('grupos.generacion_id', $this->generacion_id)
-            ->where('grupos.grado_id', $this->grado_id)
-            ->when(
-                $this->esBachillerato,
-                fn($query) => $query->where('grupos.semestre_id', $this->semestre_id),
-                fn($query) => $query->whereNull('grupos.semestre_id')
-            )
-            ->orderBy('asignacion_grupos.nombre')
-            ->orderBy('grupos.id')
-            ->get();
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+            semestreId: $this->semestre_id,
+            bachillerato: $this->esBachillerato,
+        );
     }
 
     protected function cargarHoras(): void
@@ -1564,20 +1591,17 @@ class Horario extends Component
 
     protected function cargarSemestres(): void
     {
-        if (!$this->esBachillerato) {
+        if (!$this->esBachillerato || !$this->ciclo_escolar_id || !$this->generacion_id || !$this->grado_id) {
             $this->semestres = collect();
             return;
         }
 
-        if (!$this->grado_id) {
-            $this->semestres = collect();
-            return;
-        }
-
-        $this->semestres = Semestre::query()
-            ->where('grado_id', $this->grado_id)
-            ->orderBy('numero')
-            ->get();
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+        );
     }
 
     protected function cargarMateriasDisponibles(): void
@@ -2215,9 +2239,19 @@ class Horario extends Component
             return null;
         }
 
-        $grupo = Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->find($this->grupo_id);
+        $grupo = $this->obtenerGrupoSeleccionado();
+
+        if (!$grupo) {
+            $this->dispatch('swal', [
+                'title' => 'El grupo ya no pertenece al ciclo y contexto seleccionados.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+
+            $this->cargarGrupos();
+
+            return null;
+        }
 
         $nombreNivel = mb_strtoupper($this->nivel?->nombre ?? $this->slug_nivel ?? 'NIVEL');
 

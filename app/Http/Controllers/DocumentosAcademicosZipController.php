@@ -104,6 +104,7 @@ class DocumentosAcademicosZipController extends Controller
                 'grado:id,nombre,orden',
                 'semestre:id,grado_id,numero',
             ])
+            ->where('ciclo_escolar_id', (int) $datos['ciclo_escolar_id'])
             ->where('nivel_id', $nivel->id)
             ->where('grado_id', $grado->id)
             ->when(

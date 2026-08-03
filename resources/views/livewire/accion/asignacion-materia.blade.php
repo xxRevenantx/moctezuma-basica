@@ -258,26 +258,24 @@
                     </flux:field>
                 </div>
 
-                <div class="relative xl:col-span-3">
+                <div class="xl:col-span-3">
                     <flux:field>
                         <flux:label>Profesor responsable</flux:label>
-                        <flux:input wire:model.live.debounce.300ms="buscarProfesor" icon="magnifying-glass"
-                            placeholder="Puede quedar pendiente" autocomplete="off" />
+                        <flux:select wire:model="profesor_id" :disabled="$this->profesores->isEmpty()">
+                            <flux:select.option value="">Puede quedar pendiente</flux:select.option>
+                            @foreach ($this->profesores as $profesor)
+                                <flux:select.option value="{{ $profesor['id'] }}">
+                                    {{ $profesor['nombre'] }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
                         <flux:error name="profesor_id" />
                     </flux:field>
 
-                    @if ($buscarProfesor !== '' && blank($profesor_id))
-                        <div
-                            class="absolute z-30 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                            @forelse ($this->profesoresFiltrados as $profesor)
-                                <button type="button" wire:click="seleccionarProfesor({{ $profesor['id'] }})"
-                                    class="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-700 last:border-0 hover:bg-indigo-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-indigo-950/20">
-                                    {{ $profesor['nombre'] }}
-                                </button>
-                            @empty
-                                <p class="p-4 text-center text-sm text-slate-500">Sin coincidencias.</p>
-                            @endforelse
-                        </div>
+                    @if ($this->profesores->isEmpty())
+                        <p class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            Los docentes aparecerán cuando la plantilla de este ciclo y nivel esté publicada.
+                        </p>
                     @endif
                 </div>
 
@@ -902,29 +900,24 @@
                         <flux:error name="editar_materia_id" />
                     </flux:field>
 
-                    <div class="relative">
-                        <flux:field>
-                            <flux:label>Profesor responsable</flux:label>
-                            <flux:input wire:model.live.debounce.300ms="editarBuscarProfesor" icon="magnifying-glass"
-                                placeholder="Puede quedar pendiente" autocomplete="off" />
-                            <flux:error name="editar_profesor_id" />
-                        </flux:field>
+                    <flux:field>
+                        <flux:label>Profesor responsable</flux:label>
+                        <flux:select wire:model="editar_profesor_id" :disabled="$this->profesores->isEmpty()">
+                            <flux:select.option value="">Puede quedar pendiente</flux:select.option>
+                            @foreach ($this->profesores as $profesor)
+                                <flux:select.option value="{{ $profesor['id'] }}">
+                                    {{ $profesor['nombre'] }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="editar_profesor_id" />
 
-                        @if ($editarBuscarProfesor !== '' && blank($editar_profesor_id))
-                            <div
-                                class="absolute z-40 mt-2 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-                                @forelse ($this->profesoresEdicionFiltrados as $profesor)
-                                    <button type="button"
-                                        wire:click="seleccionarProfesorEdicion({{ $profesor['id'] }})"
-                                        class="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-700 last:border-0 hover:bg-blue-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-blue-950/30">
-                                        {{ $profesor['nombre'] }}
-                                    </button>
-                                @empty
-                                    <p class="p-4 text-center text-sm text-slate-500">Sin coincidencias.</p>
-                                @endforelse
-                            </div>
+                        @if ($this->profesores->isEmpty())
+                            <p class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                Los docentes aparecerán cuando la plantilla de este ciclo y nivel esté publicada.
+                            </p>
                         @endif
-                    </div>
+                    </flux:field>
                 </div>
 
                 @if ($this->grupoEdicionSeleccionado)

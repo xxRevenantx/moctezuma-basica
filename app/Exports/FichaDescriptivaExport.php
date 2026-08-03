@@ -59,6 +59,7 @@ class FichaDescriptivaExport implements FromArray, WithHeadings, ShouldAutoSize,
                 'generacion:id,nivel_id,anio_ingreso,anio_egreso',
             ])
             ->where('nivel_id', $this->nivelId)
+            ->when($this->cicloEscolarId, fn($q) => $q->where('ciclo_escolar_id', $this->cicloEscolarId))
             ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))
             ->when($this->gradoId, fn($q) => $q->where('grado_id', $this->gradoId))
             ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))

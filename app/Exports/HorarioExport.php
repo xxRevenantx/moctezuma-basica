@@ -425,17 +425,30 @@ class HorarioExport implements FromArray, ShouldAutoSize, WithColumnWidths, With
 
     protected function cargarDatos(): void
     {
-        $this->nivel = Nivel::query()->find($this->nivel_id);
-        $this->generacion = Generacion::query()->find($this->generacion_id);
-        $this->grado = Grado::query()->find($this->grado_id);
-
         $this->grupo = Grupo::query()
-            ->with('asignacionGrupo:id,nombre')
-            ->find($this->grupo_id);
+            ->with([
+                'asignacionGrupo:id,nombre',
+                'nivel:id,nombre,slug',
+                'generacion:id,nivel_id,nombre,anio_ingreso,anio_egreso',
+                'grado:id,nivel_id,nombre,orden',
+                'semestre:id,grado_id,numero,orden_global',
+            ])
+            ->whereKey($this->grupo_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('generacion_id', $this->generacion_id)
+            ->where('grado_id', $this->grado_id)
+            ->when(
+                $this->esBachillerato,
+                fn ($query) => $query->where('semestre_id', $this->semestre_id),
+                fn ($query) => $query->whereNull('semestre_id'),
+            )
+            ->firstOrFail();
 
-        $this->semestre = $this->esBachillerato && $this->semestre_id
-            ? Semestre::query()->find($this->semestre_id)
-            : null;
+        $this->nivel = $this->grupo->nivel;
+        $this->generacion = $this->grupo->generacion;
+        $this->grado = $this->grupo->grado;
+        $this->semestre = $this->esBachillerato ? $this->grupo->semestre : null;
 
         $this->horas = Hora::query()
             ->where('nivel_id', $this->nivel_id)

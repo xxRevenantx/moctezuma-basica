@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use App\Models\Nivel;
+use App\Services\ContextoEscolarService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -62,32 +63,27 @@ class LugaresPreescolar extends Component
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio']);
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('status', true)
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
+        $this->generaciones = collect();
+        $this->grados = collect();
 
-        $this->grados = Grado::query()
+        $this->grado_terminal_id = Grado::query()
             ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
-
-        $this->grado_terminal_id = $this->grados
-            ->sortByDesc('orden')
-            ->first()?->id;
+            ->orderByDesc('orden')
+            ->value('id');
 
         $this->ciclo_escolar_id = (string) ($this->cicloEscolares->first()?->id ?? '');
 
-        $this->cargarGrupos();
+        $this->cargarGeneraciones();
         $this->cargarAsignaciones();
     }
 
     public function updatedGeneracionId(): void
     {
+        $this->grado_id = '';
         $this->grupo_id = '';
-        $this->cargarGrupos();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGrados();
         $this->cargarAsignaciones();
     }
 
@@ -105,6 +101,13 @@ class LugaresPreescolar extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        $this->generacion_id = '';
+        $this->grado_id = '';
+        $this->grupo_id = '';
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGeneraciones();
         $this->cargarAsignaciones();
     }
 
@@ -133,7 +136,10 @@ class LugaresPreescolar extends Component
         $this->tipo_reconocimiento = 'periodo';
         $this->periodo = '1';
 
-        $this->cargarGrupos();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->grupos = collect();
+        $this->cargarGeneraciones();
         $this->cargarAsignaciones();
     }
 
@@ -241,16 +247,46 @@ class LugaresPreescolar extends Component
         ]);
     }
 
+    private function cargarGeneraciones(): void
+    {
+        if ($this->ciclo_escolar_id === '') {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '') {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+        );
+    }
+
     private function cargarGrupos(): void
     {
-        $this->grupos = Grupo::query()
-            ->with(['asignacionGrupo:id,nombre', 'grado:id,nombre,orden'])
-            ->where('nivel_id', $this->nivel->id)
-            ->when($this->generacion_id !== '', fn($q) => $q->where('generacion_id', $this->generacion_id))
-            ->when($this->grado_id !== '', fn($q) => $q->where('grado_id', $this->grado_id))
-            ->orderBy('grado_id')
-            ->orderBy('asignacion_grupo_id')
-            ->get(['id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id']);
+        if ($this->ciclo_escolar_id === '' || $this->generacion_id === '' || $this->grado_id === '') {
+            $this->grupos = collect();
+            return;
+        }
+
+        $this->grupos = app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+        );
     }
 
     private function cargarAsignaciones(): void

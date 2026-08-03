@@ -2540,12 +2540,13 @@ iniciarHerramientasAcademicas()" class="w-full">
                         </div>
 
                         <div wire:loading.remove wire:target="abrirModalBitacora">
-                            <livewire:accion.bitacora-calificaciones :nivel_id="$nivel_id" :grado_id="$grado_id"
+                            <livewire:accion.bitacora-calificaciones :nivel_id="$nivel_id" :ciclo_escolar_id="$ciclo_escolar_id" :grado_id="$grado_id"
                                 :grupo_id="$grupo_id" :semestre_id="$semestre_id" :generacion_id="$generacion_id" :periodo_id="$periodo_id"
                                 :esBachillerato="$this->esBachillerato" :key="'bitacora-calificaciones-' .
                                     md5(
                                         json_encode([
                                             'nivel' => $nivel_id,
+                                            'ciclo' => $ciclo_escolar_id,
                                             'grado' => $grado_id,
                                             'grupo' => $grupo_id,
                                             'semestre' => $semestre_id,

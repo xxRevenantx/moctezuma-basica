@@ -143,6 +143,8 @@ class HorariosGeneralesPdfController extends Controller
                 'semestre:id,grado_id,numero,orden_global',
             ])
             ->where('nivel_id', $nivel->id)
+            ->where('ciclo_escolar_id', $cicloEscolar->id)
+            ->where('estado', 'activo')
             ->whereHas('horarios', function ($query) use ($nivel, $cicloEscolar) {
                 $query
                     ->where('nivel_id', $nivel->id)

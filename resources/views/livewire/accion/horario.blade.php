@@ -196,7 +196,7 @@
                     <flux:field>
                         <flux:label>Generación</flux:label>
 
-                        <flux:select wire:model.live="generacion_id" data-preservar-scroll-horario>
+                        <flux:select wire:model.live="generacion_id" :disabled="!$ciclo_escolar_id" data-preservar-scroll-horario>
                             <option value="">Selecciona una generación</option>
 
                             @foreach ($generaciones as $generacion)
@@ -210,7 +210,7 @@
                     <flux:field>
                         <flux:label>Grado</flux:label>
 
-                        <flux:select wire:model.live="grado_id" data-preservar-scroll-horario>
+                        <flux:select wire:model.live="grado_id" :disabled="!$generacion_id" data-preservar-scroll-horario>
                             <option value="">Selecciona un grado</option>
 
                             @foreach ($grados as $grado)
@@ -225,7 +225,7 @@
                         <flux:field>
                             <flux:label>Semestre</flux:label>
 
-                            <flux:select wire:model.live="semestre_id" :disabled="!$grado_id"
+                            <flux:select wire:model.live="semestre_id" :disabled="!$generacion_id || !$grado_id"
                                 data-preservar-scroll-horario>
                                 <option value="">Selecciona un semestre</option>
 

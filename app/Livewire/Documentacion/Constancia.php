@@ -4,6 +4,7 @@ namespace App\Livewire\Documentacion;
 
 use App\Models\Constancia as ConstanciaModelo;
 use App\Models\ConstanciaPlantilla;
+use App\Models\CicloEscolar;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
@@ -42,6 +43,8 @@ class Constancia extends Component
     public ?int $grado_id = null;
 
     public ?int $grupo_id = null;
+
+    public ?int $ciclo_escolar_id = null;
 
     public array $niveles = [];
 
@@ -115,6 +118,11 @@ class Constancia extends Component
     public function mount(): void
     {
         $this->fecha_expedicion = now()->format('Y-m-d');
+        $this->ciclo_escolar_id = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->value('id');
 
         $this->cargarCatalogos();
         $this->cargarPrimeraPlantilla();
@@ -160,6 +168,8 @@ class Constancia extends Component
         $this->grupos = Grupo::query()
             ->with('asignacionGrupo:id,nombre')
             ->select('id', 'nivel_id', 'grado_id', 'asignacion_grupo_id')
+            ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->where('estado', 'activo')
             ->orderBy('nivel_id')
             ->orderBy('grado_id')
             ->orderBy('id')

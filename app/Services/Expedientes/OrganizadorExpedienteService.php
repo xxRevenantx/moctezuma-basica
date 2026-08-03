@@ -1274,8 +1274,9 @@ class OrganizadorExpedienteService
         if ($grupoId && ! Grupo::query()->whereKey($grupoId)
             ->when($nivelId, fn ($q) => $q->where('nivel_id', $nivelId))
             ->when($gradoId, fn ($q) => $q->where('grado_id', $gradoId))
+            ->when($cicloId, fn ($q) => $q->where('ciclo_escolar_id', $cicloId))
             ->exists()) {
-            throw ValidationException::withMessages(['organizacion' => 'El grupo no pertenece al nivel y grado seleccionados.']);
+            throw ValidationException::withMessages(['organizacion' => 'El grupo no pertenece al nivel, grado y ciclo escolar seleccionados.']);
         }
 
         return $tipo;

@@ -9,6 +9,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Models\CicloEscolar;
 use App\Services\HorarioGeneralBuilder;
+use App\Services\ContextoEscolarService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -60,20 +61,11 @@ class HorariosGenerales extends Component
 
         $this->ciclo_escolar_id = $this->ciclosEscolares->first()?->id;
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->where('status', 1)
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso']);
-
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
-
+        $this->generaciones = collect();
+        $this->grados = collect();
         $this->semestres = collect();
         $this->grupos = collect();
+        $this->cargarGeneraciones();
     }
 
     public function updatedAlcance(): void
@@ -89,8 +81,15 @@ class HorariosGenerales extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
         $this->grupo_id = null;
-        $this->cargarGrupos();
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
+        $this->grupos = collect();
+        $this->cargarGeneraciones();
         $this->reiniciarFiltrosTabla();
     }
 
@@ -99,8 +98,10 @@ class HorariosGenerales extends Component
         $this->grado_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->grados = collect();
         $this->semestres = collect();
         $this->grupos = collect();
+        $this->cargarGrados();
         $this->reiniciarFiltrosTabla();
     }
 
@@ -170,18 +171,46 @@ class HorariosGenerales extends Component
         $this->filtro_materia = '';
     }
 
+    private function cargarGeneraciones(): void
+    {
+        if (!$this->ciclo_escolar_id || !$this->nivel) {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if (!$this->ciclo_escolar_id || !$this->generacion_id || !$this->nivel) {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+        );
+    }
+
     private function cargarSemestres(): void
     {
-        if (!$this->esBachillerato || !$this->grado_id) {
+        if (!$this->esBachillerato || !$this->ciclo_escolar_id || !$this->generacion_id || !$this->grado_id) {
             $this->semestres = collect();
             return;
         }
 
-        $this->semestres = Semestre::query()
-            ->where('grado_id', $this->grado_id)
-            ->orderBy('orden_global')
-            ->orderBy('numero')
-            ->get(['id', 'grado_id', 'numero', 'orden_global']);
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+        );
     }
 
     private function cargarGrupos(): void
@@ -201,6 +230,8 @@ class HorariosGenerales extends Component
         $consulta = Grupo::query()
             ->with('asignacionGrupo:id,nombre')
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->where('generacion_id', $this->generacion_id)
             ->where('grado_id', $this->grado_id)
             ->whereHas('horarios', function ($query) {
@@ -268,6 +299,8 @@ class HorariosGenerales extends Component
                 'semestre:id,grado_id,numero,orden_global',
             ])
             ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
             ->whereHas('horarios', function ($query) {
                 $query
                     ->where('nivel_id', $this->nivel->id)

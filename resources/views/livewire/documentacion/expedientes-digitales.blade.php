@@ -1340,6 +1340,7 @@
                     : collect($niveles);
             $gradosFiltrados = collect($grados)->where('nivel_id', (int) $nivel_certificado_id);
             $gruposFiltrados = collect($grupos)
+                ->where('ciclo_escolar_id', (int) $ciclo_escolar_documento_id)
                 ->where('nivel_id', (int) $nivel_certificado_id)
                 ->where('grado_id', (int) $grado_documento_id);
         @endphp
@@ -1504,8 +1505,9 @@
                                             Grupo opcional
                                         </label>
                                         <select wire:model="grupo_documento_id"
+                                            @disabled(!$ciclo_escolar_documento_id || !$nivel_certificado_id || !$grado_documento_id)
                                             class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-indigo-950/40">
-                                            <option value="">Sin grupo específico</option>
+                                            <option value="">{{ $ciclo_escolar_documento_id ? 'Sin grupo específico' : 'Selecciona primero el ciclo escolar' }}</option>
                                             @foreach ($gruposFiltrados as $grupo)
                                                 <option value="{{ $grupo['id'] }}">{{ $grupo['nombre'] }}</option>
                                             @endforeach

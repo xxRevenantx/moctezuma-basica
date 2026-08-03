@@ -114,12 +114,13 @@ class ExpedientesDigitales extends Component
 
         $this->grupos = Grupo::query()
             ->with('asignacionGrupo:id,nombre')
-            ->select('id', 'nivel_id', 'grado_id', 'asignacion_grupo_id')
+            ->select('id', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'asignacion_grupo_id')
             ->orderBy('nivel_id')
             ->orderBy('grado_id')
             ->get()
             ->map(fn(Grupo $grupo) => [
                 'id' => $grupo->id,
+                'ciclo_escolar_id' => $grupo->ciclo_escolar_id,
                 'nivel_id' => $grupo->nivel_id,
                 'grado_id' => $grupo->grado_id,
                 'nombre' => $grupo->asignacionGrupo?->nombre ?? 'Sin grupo',
@@ -347,6 +348,7 @@ class ExpedientesDigitales extends Component
     public function updatedCicloEscolarDocumentoId($value): void
     {
         $this->ciclo_escolar_documento_id = $value ? (int) $value : null;
+        $this->grupo_documento_id = null;
         $this->actualizarIndicadorReemplazo();
     }
 
@@ -456,8 +458,13 @@ class ExpedientesDigitales extends Component
                 return;
             }
 
-            if ($grupoId && ! Grupo::query()->whereKey($grupoId)->where('nivel_id', $nivelId)->where('grado_id', $gradoId)->exists()) {
-                $this->addError('grupo_documento_id', 'El grupo no pertenece al nivel y grado seleccionados.');
+            if ($grupoId && ! Grupo::query()
+                ->whereKey($grupoId)
+                ->where('ciclo_escolar_id', $cicloEscolarId)
+                ->where('nivel_id', $nivelId)
+                ->where('grado_id', $gradoId)
+                ->exists()) {
+                $this->addError('grupo_documento_id', 'El grupo no pertenece al ciclo, nivel y grado seleccionados.');
                 return;
             }
         }

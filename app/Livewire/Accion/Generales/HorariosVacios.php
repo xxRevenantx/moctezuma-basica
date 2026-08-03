@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\ContextoEscolarService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -54,18 +55,8 @@ class HorariosVacios extends Component
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio']);
 
-        $this->generaciones = Generacion::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderByDesc('status')
-            ->orderByDesc('anio_ingreso')
-            ->get(['id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'nombre', 'status']);
-
-        $this->grados = Grado::query()
-            ->where('nivel_id', $this->nivel->id)
-            ->orderBy('orden')
-            ->orderBy('nombre')
-            ->get(['id', 'nivel_id', 'nombre', 'orden']);
-
+        $this->generaciones = collect();
+        $this->grados = collect();
         $this->semestres = collect();
 
         $this->horas = Hora::query()
@@ -77,6 +68,8 @@ class HorariosVacios extends Component
         $this->ciclo_escolar_id = $this->ciclosEscolares->first()?->id;
         $this->hora_inicio_id = $this->horas->first()?->id;
         $this->hora_fin_id = $this->horas->last()?->id;
+
+        $this->cargarGeneraciones();
     }
 
     public function updatedAlcance(): void
@@ -93,15 +86,24 @@ class HorariosVacios extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
         $this->grupos_seleccionados = [];
+        $this->cargarGeneraciones();
     }
 
     public function updatedGeneracionId(): void
     {
         $this->grado_id = null;
         $this->semestre_id = null;
+        $this->grados = collect();
         $this->semestres = collect();
         $this->grupos_seleccionados = [];
+        $this->cargarGrados();
     }
 
     public function updatedGradoId(): void
@@ -130,64 +132,61 @@ class HorariosVacios extends Component
         $this->grupos_seleccionados = [];
     }
 
+    private function cargarGeneraciones(): void
+    {
+        if (!$this->ciclo_escolar_id || !$this->nivel) {
+            $this->generaciones = collect();
+            return;
+        }
+
+        $this->generaciones = app(ContextoEscolarService::class)->generaciones(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+        );
+    }
+
+    private function cargarGrados(): void
+    {
+        if (!$this->ciclo_escolar_id || !$this->generacion_id || !$this->nivel) {
+            $this->grados = collect();
+            return;
+        }
+
+        $this->grados = app(ContextoEscolarService::class)->grados(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+        );
+    }
+
     private function cargarSemestres(): void
     {
-        if (!$this->esBachillerato || !$this->grado_id) {
+        if (!$this->esBachillerato || !$this->ciclo_escolar_id || !$this->generacion_id || !$this->grado_id) {
             $this->semestres = collect();
             return;
         }
 
-        $this->semestres = Semestre::query()
-            ->where('grado_id', $this->grado_id)
-            ->orderBy('orden_global')
-            ->orderBy('numero')
-            ->get(['id', 'grado_id', 'numero', 'orden_global']);
+        $this->semestres = app(ContextoEscolarService::class)->semestres(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $this->generacion_id,
+            gradoId: $this->grado_id,
+        );
     }
 
     #[Computed]
     public function gruposDisponibles(): Collection
     {
-        $consulta = Grupo::query()
-            ->with([
-                'asignacionGrupo:id,nombre',
-                'grado:id,nombre,orden',
-                'generacion:id,nombre,anio_ingreso,anio_egreso,status',
-                'semestre:id,numero,orden_global',
-            ])
-            ->where('nivel_id', $this->nivel?->id)
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->whereNull('deleted_at');
+        $filtrarContexto = $this->alcance !== 'nivel';
 
-        if ($this->alcance !== 'nivel') {
-            if ($this->generacion_id) {
-                $consulta->where('generacion_id', $this->generacion_id);
-            }
-
-            if ($this->grado_id) {
-                $consulta->where('grado_id', $this->grado_id);
-            }
-
-            if ($this->esBachillerato) {
-                if ($this->semestre_id) {
-                    $consulta->where('semestre_id', $this->semestre_id);
-                } elseif ($this->grado_id) {
-                    $consulta->whereNotNull('semestre_id');
-                }
-            }
-        }
-
-        return $consulta
-            ->get(['id', 'ciclo_escolar_id', 'asignacion_grupo_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id'])
-            ->sortBy(function (Grupo $grupo) {
-                return sprintf(
-                    '%06d-%06d-%s-%06d',
-                    (int) ($grupo->grado?->orden ?? 999999),
-                    (int) ($grupo->semestre?->orden_global ?? $grupo->semestre?->numero ?? 0),
-                    Str::lower(Str::ascii(trim((string) ($grupo->asignacionGrupo?->nombre ?? '')))),
-                    (int) $grupo->id,
-                );
-            })
-            ->values();
+        return app(ContextoEscolarService::class)->grupos(
+            nivelId: (int) $this->nivel->id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            generacionId: $filtrarContexto ? $this->generacion_id : null,
+            gradoId: $filtrarContexto ? $this->grado_id : null,
+            semestreId: $filtrarContexto ? $this->semestre_id : null,
+            bachillerato: $this->esBachillerato,
+        );
     }
 
     #[Computed]
