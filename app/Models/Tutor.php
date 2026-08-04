@@ -79,6 +79,36 @@ class Tutor extends Model
         return $this->relaciones()->activas();
     }
 
+    public function documentos()
+    {
+        return $this->hasMany(DocumentoTutor::class, 'tutor_id');
+    }
+
+    public function documentosActuales()
+    {
+        return $this->documentos()->where('es_actual', true)->where('es_fuente', false);
+    }
+
+    public function fuentesDocumentales()
+    {
+        return $this->hasMany(DocumentoTutorFuente::class, 'tutor_id');
+    }
+
+    public function organizacionesDocumentales()
+    {
+        return $this->hasMany(OrganizacionDocumentoTutor::class, 'tutor_id');
+    }
+
+    public function documentosNoAplican()
+    {
+        return $this->hasMany(DocumentoTutorNoAplica::class, 'tutor_id');
+    }
+
+    public function eventosDocumentales()
+    {
+        return $this->hasMany(EventoDocumentoTutor::class, 'tutor_id');
+    }
+
     public function scopeActivos(Builder $query): Builder
     {
         return $query->where('activo', true);

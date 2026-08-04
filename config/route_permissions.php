@@ -42,6 +42,12 @@ return [
 
         'misrutas.constancias*' => 'documentos.consultar',
         'misrutas.oficios*' => 'documentos.consultar',
+        'misrutas.expedientes-tutores*' => [
+            'documentos.consultar',
+            'documentos.organizar',
+            'alumnos.consultar',
+            'alumnos.editar',
+        ],
         'misrutas.expedientes*' => 'documentos.consultar',
         'misrutas.fichas*' => 'fichas.consultar',
         'media-superior.documentos*' => 'documentos.consultar',

@@ -21,6 +21,9 @@ use App\Http\Controllers\DocumentosAcademicosZipController;
 use App\Http\Controllers\DocumentosPDFController;
 use App\Http\Controllers\EscuelaController;
 use App\Http\Controllers\ExpedienteDigitalController;
+use App\Http\Controllers\ExpedienteTutorController;
+use App\Http\Controllers\ExpedientesTutoresLoteController;
+use App\Http\Controllers\DocumentoTutorFuenteController;
 use App\Http\Controllers\DocumentoAlumnoFuenteController;
 use App\Http\Controllers\ExpedientePersonalController;
 use App\Http\Controllers\InscripcionController;
@@ -193,6 +196,26 @@ Route::middleware('permission:documentos.organizar')->group(function () {
         ->withTrashed()
         ->name('misrutas.expedientes.zip');
 });
+
+// Expedientes documentales de responsables. La autorización fina se valida en
+// cada controlador para permitir consulta desde Tutores y desde el alumno.
+Route::get('/expedientes-tutores/{tutor}/zip', [ExpedienteTutorController::class, 'zip'])
+    ->name('misrutas.expedientes-tutores.zip');
+Route::get('/expedientes-tutores/documento/{documento}/ver', [ExpedienteTutorController::class, 'preview'])
+    ->name('misrutas.expedientes-tutores.preview');
+Route::get('/expedientes-tutores/documento/{documento}/descargar', [ExpedienteTutorController::class, 'download'])
+    ->name('misrutas.expedientes-tutores.download');
+Route::get('/expedientes-tutores/fuente/{fuente}/ver', [DocumentoTutorFuenteController::class, 'preview'])
+    ->name('misrutas.expedientes-tutores.fuentes.preview');
+Route::get('/expedientes-tutores/fuente/{fuente}/descargar', [DocumentoTutorFuenteController::class, 'download'])
+    ->name('misrutas.expedientes-tutores.fuentes.download');
+Route::get('/expedientes-tutores/fuente/{fuente}/pagina/{pagina}', [DocumentoTutorFuenteController::class, 'page'])
+    ->whereNumber('pagina')
+    ->name('misrutas.expedientes-tutores.fuentes.page');
+Route::get('/expedientes-tutores/grupo/{grupo}/zip', [ExpedientesTutoresLoteController::class, 'grupo'])
+    ->name('misrutas.expedientes-tutores.grupo.zip');
+Route::get('/expedientes-tutores/generacion/{generacion}/zip', [ExpedientesTutoresLoteController::class, 'generacion'])
+    ->name('misrutas.expedientes-tutores.generacion.zip');
 
 // Expedientes del personal
 Route::middleware('admin')->group(function () {

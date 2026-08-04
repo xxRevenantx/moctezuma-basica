@@ -35,8 +35,10 @@ class EnsureRoutePermission
         }
 
         if ($permission) {
+            $permissions = array_values(array_filter((array) $permission, 'is_string'));
+
             abort_unless(
-                $user->canAccess($permission),
+                collect($permissions)->contains(fn (string $candidate): bool => $user->canAccess($candidate)),
                 403,
                 'No tienes permiso para acceder a este módulo.'
             );

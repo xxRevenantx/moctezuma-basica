@@ -29,7 +29,7 @@ class ExpedienteDigitalService
     {
         $alumno->loadMissing([
             'nivel:id,nombre,slug,color',
-            'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+            'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,nivel_aplica_id,orden',
             'documentos.nivel:id,nombre,slug,color',
             'documentos.grado:id,nombre,orden',
             'documentos.cicloEscolar:id,inicio_anio,fin_anio',
@@ -43,7 +43,9 @@ class ExpedienteDigitalService
             ->filter(fn (DocumentoAlumno $d) => $d->archivo_existe);
         $items = collect();
 
-        foreach ($this->tiposActivos()->where('es_general', true) as $tipo) {
+        foreach ($this->tiposActivos()
+            ->where('es_general', true)
+            ->filter(fn (TipoDocumento $tipo): bool => ! $tipo->nivel_aplica_id || (int) $tipo->nivel_aplica_id === (int) $alumno->nivel_id) as $tipo) {
             $actual = $actuales->where('tipo_documento_id', $tipo->id)->sortByDesc('version')->first();
             $disponible = $disponibles->where('tipo_documento_id', $tipo->id)->sortByDesc('version')->first();
             $noAplica = $noAplican->where('tipo_documento_id', $tipo->id)

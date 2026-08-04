@@ -80,11 +80,16 @@ class CargaDocumentoExpediente extends Component
         $this->maxMb = max((int) config('expedientes_organizador.max_upload_mb', 30), 1);
 
         $tipo = TipoDocumento::query()->where('activo', true)->findOrFail($tipoDocumentoId);
+        $alumno = $this->alumno();
+        abort_unless(
+            ! $tipo->nivel_aplica_id || (int) $tipo->nivel_aplica_id === (int) $alumno->nivel_id,
+            404,
+            'El documento solicitado no aplica para el nivel del alumno.'
+        );
         $this->etiqueta = filled($etiqueta) ? trim((string) $etiqueta) : $tipo->nombre;
         $this->descripcion = (string) ($tipo->descripcion ?: 'Documento del expediente del alumno.');
         $this->obligatorio = (bool) $tipo->es_obligatorio;
 
-        $alumno = $this->alumno();
         $this->soloLectura = $this->soloLectura || $alumno->expedienteSoloLectura();
 
         $this->cargarEstado();

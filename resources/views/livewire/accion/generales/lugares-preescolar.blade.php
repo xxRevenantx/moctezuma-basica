@@ -81,7 +81,7 @@
                 <flux:label>Grupo</flux:label>
                 <flux:select wire:model.live="grupo_id">
                     <flux:select.option value="">Todos</flux:select.option>
-                    @foreach ($grupos as $grupo)
+                    @foreach (($grupos ?? collect()) as $grupo)
                         <flux:select.option value="{{ $grupo->id }}">
                             {{ $grupo->grado?->nombre ?? 'Grado' }} · Grupo
                             {{ $grupo->asignacionGrupo?->nombre ?? '—' }}

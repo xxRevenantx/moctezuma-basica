@@ -32,10 +32,16 @@ class OrganizadorExpedienteService
         return (string) config('filesystems.expedientes_disk', config('expedientes_organizador.disk', 'local'));
     }
 
-    public function tiposOrganizables(): Collection
+    public function tiposOrganizables(?Inscripcion $alumno = null): Collection
     {
         return TipoDocumento::query()
             ->where('activo', true)
+            ->when($alumno, function ($query) use ($alumno): void {
+                $query->where(function ($subconsulta) use ($alumno): void {
+                    $subconsulta->whereNull('nivel_aplica_id')
+                        ->orWhere('nivel_aplica_id', $alumno->nivel_id);
+                });
+            })
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get();
@@ -106,7 +112,7 @@ class OrganizadorExpedienteService
             ]);
         }
 
-        $tipo = $this->validarContexto($contexto);
+        $tipo = $this->validarContexto($contexto, $alumno);
         $mimeOriginal = $this->validarMime($archivo);
         $tamanoOriginal = (int) ($archivo->getSize() ?: File::size($archivo->getRealPath()));
         $limiteBytes = max((int) config('expedientes_organizador.max_upload_mb', 30), 1) * 1024 * 1024;
@@ -571,7 +577,7 @@ class OrganizadorExpedienteService
         $asignaciones = $this->normalizarAsignaciones(
             $borrador->asignaciones ?? [],
             $fuentes,
-            $this->tiposOrganizables()
+            $this->tiposOrganizables($alumno)
         );
 
         if ($asignaciones !== ($borrador->asignaciones ?? [])) {
@@ -585,7 +591,7 @@ class OrganizadorExpedienteService
             'organizacion' => $borrador->fresh(),
             'fuentes' => $fuentes,
             'asignaciones' => $asignaciones,
-            'tipos' => $this->tiposOrganizables(),
+            'tipos' => $this->tiposOrganizables($alumno),
             'historial' => OrganizacionDocumentoAlumno::query()
                 ->where('inscripcion_id', $alumno->id)
                 ->whereIn('estado', ['confirmado', 'error'])
@@ -611,7 +617,7 @@ class OrganizadorExpedienteService
             ->where('estado', 'activo')
             ->where('protegido', false)
             ->get();
-        $normalizadas = $this->normalizarAsignaciones($asignaciones, $fuentes, $this->tiposOrganizables());
+        $normalizadas = $this->normalizarAsignaciones($asignaciones, $fuentes, $this->tiposOrganizables($alumno));
 
         return DB::transaction(function () use ($alumno, $usuarioId, $organizacionId, $normalizadas, $fuentes, $retirosConfirmados): OrganizacionDocumentoAlumno {
             $borrador = $organizacionId
@@ -1137,10 +1143,11 @@ class OrganizadorExpedienteService
             ->where('estado', 'activo')
             ->where('protegido', false)
             ->get();
+        $alumno = Inscripcion::withTrashed()->findOrFail($organizacion->inscripcion_id);
         $normalizadas = $this->normalizarAsignaciones(
             $organizacion->asignaciones ?? [],
             $fuentes,
-            $this->tiposOrganizables()
+            $this->tiposOrganizables($alumno)
         );
 
         foreach ($normalizadas as $asignacion) {
@@ -1148,7 +1155,7 @@ class OrganizadorExpedienteService
                 continue;
             }
 
-            $this->validarContexto($asignacion);
+            $this->validarContexto($asignacion, $alumno);
         }
 
         if (collect($normalizadas)->whereNotNull('tipo_documento_id')->isEmpty()) {
@@ -1238,13 +1245,19 @@ class OrganizadorExpedienteService
             ->all();
     }
 
-    protected function validarContexto(array $contexto): TipoDocumento
+    protected function validarContexto(array $contexto, ?Inscripcion $alumno = null): TipoDocumento
     {
         $tipoId = (int) ($contexto['tipo_documento_id'] ?? 0);
         $tipo = TipoDocumento::query()->where('activo', true)->find($tipoId);
 
         if (! $tipo) {
             throw ValidationException::withMessages(['organizacion' => 'Selecciona un tipo documental válido.']);
+        }
+
+        if ($alumno && $tipo->nivel_aplica_id && (int) $tipo->nivel_aplica_id !== (int) $alumno->nivel_id) {
+            throw ValidationException::withMessages([
+                'organizacion' => "{$tipo->nombre} no aplica para el nivel actual del alumno.",
+            ]);
         }
 
         $nivelId = filled($contexto['nivel_id'] ?? null) ? (int) $contexto['nivel_id'] : null;

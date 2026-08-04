@@ -13,6 +13,7 @@ use App\Models\Inscripcion;
 use App\Models\TipoDocumento;
 use App\Services\ExpedienteDigitalService;
 use App\Services\Expedientes\OrganizadorExpedienteService;
+use App\Services\Expedientes\ExpedienteTutorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -86,6 +87,7 @@ class ExpedientesDigitales extends Component
                 'nombre' => $tipo->nombre,
                 'slug' => $tipo->slug,
                 'requiere_nivel' => $tipo->requiere_nivel,
+                'nivel_aplica_id' => $tipo->nivel_aplica_id,
             ])
             ->values()
             ->all();
@@ -258,6 +260,7 @@ class ExpedientesDigitales extends Component
         $tipo = TipoDocumento::query()
             ->where('activo', true)
             ->findOrFail($tipoId);
+        $this->asegurarTipoAplicaAlAlumno($tipo);
 
         $this->resetValidation();
         $this->archivo = null;
@@ -393,6 +396,7 @@ class ExpedientesDigitales extends Component
         $tipo = TipoDocumento::query()
             ->where('activo', true)
             ->findOrFail($this->tipo_documento_id);
+        $this->asegurarTipoAplicaAlAlumno($tipo);
 
         $esAcademico = in_array($tipo->slug, [
             'boleta-final-grado',
@@ -556,7 +560,8 @@ class ExpedientesDigitales extends Component
         $this->autorizarAdmin();
         abort_unless($this->alumnoSeleccionadoId, 422);
         $this->asegurarAlumnoModificable();
-        TipoDocumento::query()->where('activo', true)->findOrFail($tipoId);
+        $tipo = TipoDocumento::query()->where('activo', true)->findOrFail($tipoId);
+        $this->asegurarTipoAplicaAlAlumno($tipo);
         $this->no_aplica_tipo_id = $tipoId;
         $this->no_aplica_nivel_id = $nivelId;
         $this->no_aplica_grado_id = $gradoId;
@@ -588,6 +593,9 @@ class ExpedientesDigitales extends Component
             'no_aplica_motivo.required' => 'Escribe el motivo por el que el documento no aplica.',
             'no_aplica_motivo.min' => 'El motivo debe tener al menos 5 caracteres.',
         ]);
+
+        $tipoNoAplica = TipoDocumento::query()->where('activo', true)->findOrFail($this->no_aplica_tipo_id);
+        $this->asegurarTipoAplicaAlAlumno($tipoNoAplica);
 
         $documentoDisponible = DocumentoAlumno::query()
             ->where('inscripcion_id', $this->alumnoSeleccionadoId)
@@ -800,7 +808,17 @@ class ExpedientesDigitales extends Component
                 'grupo.asignacionGrupo:id,nombre',
                 'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
                 'relacionTutorPrincipal.tutor:id,nombre,apellido_paterno,apellido_materno,telefono_celular,telefono_casa,correo_electronico',
-                'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+                    'relacionesTutoresActivas.tutor' => fn ($query) => $query->select(
+                        'tutores.id', 'nombre', 'apellido_paterno', 'apellido_materno', 'parentesco',
+                        'telefono_celular', 'telefono_casa', 'correo_electronico', 'activo'
+                    ),
+                    'relacionesTutoresActivas.tutor.documentos' => fn ($query) => $query
+                        ->where('es_fuente', false)
+                        ->with(['tipoDocumento:id,nombre,slug,es_obligatorio,orden', 'usuarioQueSubio:id,name'])
+                        ->orderByDesc('es_actual')
+                        ->orderByDesc('version'),
+                    'relacionesTutoresActivas.tutor.documentosNoAplican' => fn ($query) => $query->where('activo', true),
+                'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,nivel_aplica_id,orden',
                 'documentos.nivel:id,nombre,slug,color',
                 'documentos.grado:id,nombre,orden',
                 'documentos.grupo:id,asignacion_grupo_id',
@@ -808,7 +826,7 @@ class ExpedientesDigitales extends Component
                 'documentos.cicloEscolar:id,inicio_anio,fin_anio',
                 'documentos.usuarioQueSubio:id,name',
                 'documentos.usuarioQueValido:id,name',
-                'documentos.organizacion:id,fuentes_ids',
+                    'documentos.organizacion:id,fuentes_ids',
             ])
             ->when($this->nivel_id, fn(Builder $query) => $query->where('nivel_id', $this->nivel_id))
             ->when(trim($this->buscar) !== '', function (Builder $query) {
@@ -849,6 +867,23 @@ class ExpedientesDigitales extends Component
             ),
             default => $alumnos,
         };
+    }
+
+    private function asegurarTipoAplicaAlAlumno(TipoDocumento $tipo): void
+    {
+        if (! $tipo->nivel_aplica_id) {
+            return;
+        }
+
+        $nivelAlumnoId = Inscripcion::withTrashed()
+            ->whereKey($this->alumnoSeleccionadoId)
+            ->value('nivel_id');
+
+        abort_unless(
+            (int) $tipo->nivel_aplica_id === (int) $nivelAlumnoId,
+            422,
+            $tipo->nombre . ' solo aplica al nivel configurado para este documento.'
+        );
     }
 
     private function paginar(Collection $items): LengthAwarePaginator
@@ -982,6 +1017,7 @@ class ExpedientesDigitales extends Component
         $resumenSeleccionado = null;
         $documentosSeleccionados = collect();
         $fuentesSeleccionadas = collect();
+        $responsablesDocumentales = collect();
 
         if ($this->alumnoSeleccionadoId) {
             $alumnoSeleccionado = Inscripcion::withTrashed()
@@ -993,7 +1029,17 @@ class ExpedientesDigitales extends Component
                     'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',
                     'semestre:id,numero',
                     'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
-                'relacionTutorPrincipal.tutor:id,nombre,apellido_paterno,apellido_materno,telefono_celular,telefono_casa,correo_electronico',
+                    'relacionTutorPrincipal.tutor:id,nombre,apellido_paterno,apellido_materno,telefono_celular,telefono_casa,correo_electronico',
+                    'relacionesTutoresActivas.tutor' => fn ($query) => $query->select(
+                        'tutores.id', 'nombre', 'apellido_paterno', 'apellido_materno', 'parentesco',
+                        'telefono_celular', 'telefono_casa', 'correo_electronico', 'activo'
+                    ),
+                    'relacionesTutoresActivas.tutor.documentos' => fn ($query) => $query
+                        ->where('es_fuente', false)
+                        ->with(['tipoDocumento:id,nombre,slug,es_obligatorio,orden', 'usuarioQueSubio:id,name'])
+                        ->orderByDesc('es_actual')
+                        ->orderByDesc('version'),
+                    'relacionesTutoresActivas.tutor.documentosNoAplican' => fn ($query) => $query->where('activo', true),
                     'cambiosAcademicos' => fn($query) => $query
                         ->with([
                             'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre,status',
@@ -1012,7 +1058,7 @@ class ExpedientesDigitales extends Component
                         ])
                         ->orderByDesc('fecha')
                         ->orderByDesc('id'),
-                    'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+                    'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,nivel_aplica_id,orden',
                     'documentos.nivel:id,nombre,slug,color',
                     'documentos.grado:id,nombre,orden',
                     'documentos.grupo:id,asignacion_grupo_id',
@@ -1020,7 +1066,7 @@ class ExpedientesDigitales extends Component
                     'documentos.cicloEscolar:id,inicio_anio,fin_anio',
                     'documentos.usuarioQueSubio:id,name',
                     'documentos.usuarioQueValido:id,name',
-                'documentos.organizacion:id,fuentes_ids',
+                    'documentos.organizacion:id,fuentes_ids',
                 ])
                 ->find($this->alumnoSeleccionadoId);
 
@@ -1032,6 +1078,46 @@ class ExpedientesDigitales extends Component
                     ->with(['documentoAlumno.tipoDocumento:id,nombre,slug', 'usuario:id,name'])
                     ->orderByDesc('created_at')
                     ->get();
+
+
+                $servicioTutores = app(ExpedienteTutorService::class);
+                $responsablesDocumentales = $alumnoSeleccionado->relacionesTutoresActivas
+                    ->filter(fn ($relacion) => (bool) $relacion->tutor)
+                    ->unique('tutor_id')
+                    ->map(function ($relacion) use ($servicioTutores): array {
+                        $tutor = $relacion->tutor;
+                        $documentos = $tutor->documentos
+                            ->where('es_fuente', false)
+                            ->sort(function ($a, $b): int {
+                                return (($a->tipoDocumento?->orden ?? 999) <=> ($b->tipoDocumento?->orden ?? 999))
+                                    ?: ($b->es_actual <=> $a->es_actual)
+                                    ?: ($b->version <=> $a->version);
+                            })->values();
+
+                        return [
+                            'tutor' => $tutor,
+                            'parentesco' => $relacion->parentesco ?: $tutor->parentesco ?: 'Responsable',
+                            'es_principal' => (bool) $relacion->es_principal,
+                            'resumen' => $servicioTutores->resumen($tutor),
+                            'documentos' => $documentos,
+                        ];
+                    })->values();
+
+                if ($responsablesDocumentales->isEmpty() && $alumnoSeleccionado->tutor) {
+                    $tutorLegado = $alumnoSeleccionado->tutor;
+                    $tutorLegado->loadMissing([
+                        'documentos.tipoDocumento:id,nombre,slug,es_obligatorio,orden',
+                        'documentos.usuarioQueSubio:id,name',
+                        'documentosNoAplican' => fn ($query) => $query->where('activo', true),
+                    ]);
+                    $responsablesDocumentales = collect([[
+                        'tutor' => $tutorLegado,
+                        'parentesco' => $tutorLegado->parentesco ?: 'Responsable principal',
+                        'es_principal' => true,
+                        'resumen' => $servicioTutores->resumen($tutorLegado),
+                        'documentos' => $tutorLegado->documentos->where('es_fuente', false)->values(),
+                    ]]);
+                }
             }
         }
 
@@ -1042,6 +1128,7 @@ class ExpedientesDigitales extends Component
             'resumenSeleccionado' => $resumenSeleccionado,
             'documentosSeleccionados' => $documentosSeleccionados,
             'fuentesSeleccionadas' => $fuentesSeleccionadas,
+            'responsablesDocumentales' => $responsablesDocumentales,
         ]);
     }
 }

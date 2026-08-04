@@ -63,8 +63,12 @@ class LugaresPreescolar extends Component
             ->orderByDesc('id')
             ->get(['id', 'inicio_anio', 'fin_anio']);
 
+        // Inicializa todas las colecciones públicas antes del primer render.
+        // Livewire expone como null las propiedades tipadas que aún no han sido
+        // asignadas y Blade no puede recorrer null con @foreach.
         $this->generaciones = collect();
         $this->grados = collect();
+        $this->grupos = collect();
 
         $this->grado_terminal_id = Grado::query()
             ->where('nivel_id', $this->nivel->id)

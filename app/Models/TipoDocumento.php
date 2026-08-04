@@ -17,6 +17,7 @@ class TipoDocumento extends Model
         'descripcion',
         'es_general',
         'requiere_nivel',
+        'nivel_aplica_id',
         'es_obligatorio',
         'activo',
         'orden',
@@ -25,6 +26,7 @@ class TipoDocumento extends Model
     protected $casts = [
         'es_general' => 'boolean',
         'requiere_nivel' => 'boolean',
+        'nivel_aplica_id' => 'integer',
         'es_obligatorio' => 'boolean',
         'activo' => 'boolean',
         'orden' => 'integer',
@@ -33,5 +35,10 @@ class TipoDocumento extends Model
     public function documentos()
     {
         return $this->hasMany(DocumentoAlumno::class, 'tipo_documento_id');
+    }
+
+    public function nivelAplica()
+    {
+        return $this->belongsTo(Nivel::class, 'nivel_aplica_id');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentoAlumno;
+use App\Models\DocumentoTutor;
 use App\Models\Inscripcion;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -73,6 +74,14 @@ class ExpedienteDigitalController extends Controller
             'documentos.nivel:id,nombre,slug',
             'documentos.grado:id,nombre,orden',
             'documentos.cicloEscolar:id,inicio_anio,fin_anio',
+            'relacionesTutoresActivas.tutor' => fn ($query) => $query->select(
+                'tutores.id', 'nombre', 'apellido_paterno', 'apellido_materno', 'parentesco'
+            ),
+            'relacionesTutoresActivas.tutor.documentos' => fn ($query) => $query
+                ->where('es_actual', true)
+                ->where('es_fuente', false)
+                ->whereNotIn('estado', ['rechazado', 'reemplazado', 'cancelado'])
+                ->with('tipoDocumento:id,nombre,slug,orden'),
             'matriculasAlumno.nivel:id,nombre,slug',
             'cambiosAcademicos' => fn ($query) => $query
                 ->with([
@@ -96,8 +105,22 @@ class ExpedienteDigitalController extends Controller
         $documentos = $inscripcion->documentos
             ->filter(fn (DocumentoAlumno $documento) => ! $documento->es_fuente && $documento->archivo_existe);
 
+        $documentosResponsables = $inscripcion->relacionesTutoresActivas
+            ->filter(fn ($relacion): bool => (bool) $relacion->tutor)
+            ->unique('tutor_id')
+            ->flatMap(function ($relacion): array {
+                return $relacion->tutor->documentos
+                    ->filter(fn (DocumentoTutor $documento): bool => $documento->archivo_existe)
+                    ->map(fn (DocumentoTutor $documento): array => [
+                        'documento' => $documento,
+                        'tutor' => $relacion->tutor,
+                        'parentesco' => $relacion->parentesco ?: $relacion->tutor->parentesco ?: 'responsable',
+                    ])->all();
+            })->values();
+
         abort_if(
             $documentos->isEmpty()
+                && $documentosResponsables->isEmpty()
                 && $inscripcion->cambiosAcademicos->isEmpty()
                 && $inscripcion->movimientos->isEmpty()
                 && $inscripcion->matriculasAlumno->isEmpty(),
@@ -122,6 +145,22 @@ class ExpedienteDigitalController extends Controller
         foreach ($documentos as $documento) {
             $rutaFisica = $this->rutaFisicaParaZip($documento, $directorioTemporal, $archivosTemporales);
             $zip->addFile($rutaFisica, $this->nombreDentroZip($documento));
+        }
+
+        foreach ($documentosResponsables as $item) {
+            /** @var DocumentoTutor $documentoTutor */
+            $documentoTutor = $item['documento'];
+            $tutor = $item['tutor'];
+            $rutaFisica = $this->rutaFisicaTutorParaZip($documentoTutor, $directorioTemporal, $archivosTemporales);
+            $carpetaTutor = Str::slug(trim(
+                ($tutor->apellido_paterno ?? '') . ' ' .
+                ($tutor->apellido_materno ?? '') . ' ' .
+                ($tutor->nombre ?? '') . ' ' .
+                ($item['parentesco'] ?? 'responsable')
+            ), '_') ?: 'responsable_' . $tutor->id;
+            $tipo = Str::slug($documentoTutor->tipoDocumento?->nombre ?? 'documento', '_') ?: 'documento';
+            $nombre = $tipo . '_v' . $documentoTutor->version . '_' . $documentoTutor->id . '.' . ($documentoTutor->extension ?: 'pdf');
+            $zip->addFile($rutaFisica, '08_Documentos_de_responsables/' . $carpetaTutor . '/' . $nombre);
         }
 
         $zip->addFromString(
@@ -171,6 +210,25 @@ class ExpedienteDigitalController extends Controller
         $extension = $documento->extension ?: 'bin';
         $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.' . $extension;
         File::put($rutaTemporal, $contenido);
+        $archivosTemporales[] = $rutaTemporal;
+
+        return $rutaTemporal;
+    }
+
+    private function rutaFisicaTutorParaZip(DocumentoTutor $documento, string $directorioTemporal, array &$archivosTemporales): string
+    {
+        $disco = Storage::disk($documento->disco);
+
+        try {
+            $rutaFisica = $disco->path($documento->ruta);
+            if (is_file($rutaFisica)) {
+                return $rutaFisica;
+            }
+        } catch (\Throwable) {
+        }
+
+        $rutaTemporal = $directorioTemporal . DIRECTORY_SEPARATOR . Str::uuid() . '.' . ($documento->extension ?: 'pdf');
+        File::put($rutaTemporal, $disco->get($documento->ruta));
         $archivosTemporales[] = $rutaTemporal;
 
         return $rutaTemporal;
@@ -351,6 +409,7 @@ class ExpedienteDigitalController extends Controller
             'ine-padre',
             'ine-madre',
             'ine-tutor',
+            'cartilla-vacunacion',
         ], true)) {
             return '01_Documentos_personales/' . $nombre;
         }

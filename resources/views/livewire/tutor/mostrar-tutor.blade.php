@@ -213,6 +213,18 @@
 
                             <td class="px-6 py-4">
                                 <div class="flex items-center justify-center gap-2">
+                                    @if (auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
+                                        <button type="button"
+                                            @click="Livewire.dispatch('abrir-expediente-tutor', { tutorId: {{ $tutor->id }} })"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#006492] text-white transition hover:bg-[#00557b]"
+                                            title="Expediente documental del responsable">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                <path d="M14 2v6h6M8 13h8M8 17h6" />
+                                            </svg>
+                                        </button>
+                                    @endif
+
                                     @if (auth()->user()?->canAccess('alumnos.editar'))
                                         <button type="button"
                                             @click="$dispatch('abrir-modal-alumnos-tutor'); Livewire.dispatch('administrarAlumnosTutor', { id: {{ $tutor->id }} });"
@@ -373,6 +385,18 @@
 
                         <div
                             class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                            @if (auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
+                                <button type="button"
+                                    @click="Livewire.dispatch('abrir-expediente-tutor', { tutorId: {{ $tutor->id }} })"
+                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#006492] px-3 text-xs font-semibold text-white hover:bg-[#00557b]">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <path d="M14 2v6h6M8 13h8M8 17h6" />
+                                    </svg>
+                                    Expediente
+                                </button>
+                            @endif
+
                             @if (auth()->user()?->canAccess('alumnos.editar'))
                                 <button type="button"
                                     @click="$dispatch('abrir-modal-alumnos-tutor'); Livewire.dispatch('administrarAlumnosTutor', { id: {{ $tutor->id }} });"
