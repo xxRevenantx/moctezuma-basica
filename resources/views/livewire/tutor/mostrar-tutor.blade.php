@@ -213,11 +213,13 @@
 
                             <td class="px-6 py-4">
                                 <div class="flex items-center justify-center gap-2">
-                                    @if (auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
+                                    @if (auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
                                         <button type="button"
-                                            @click="Livewire.dispatch('abrir-expediente-tutor', { tutorId: {{ $tutor->id }} })"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#006492] text-white transition hover:bg-[#00557b]"
-                                            title="Expediente documental del responsable">
+                                            wire:click="alternarExpediente({{ $tutor->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="alternarExpediente"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition disabled:opacity-60 {{ $expedienteTutorId === $tutor->id ? 'bg-[#88AC2E] hover:bg-[#769925]' : 'bg-[#006492] hover:bg-[#00557b]' }}"
+                                            title="{{ $expedienteTutorId === $tutor->id ? 'Ocultar expediente documental' : 'Mostrar expediente documental' }}">
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                                 <path d="M14 2v6h6M8 13h8M8 17h6" />
@@ -285,6 +287,16 @@
                                         'tutor' => $tutor,
                                     ])
                                 </div>
+
+                                @if ($expedienteTutorId === $tutor->id)
+                                    <div class="border-t border-emerald-100 bg-slate-100/80 p-4 dark:border-emerald-500/10 dark:bg-neutral-950/70"
+                                        wire:key="expediente-tutor-desktop-panel-{{ $tutor->id }}">
+                                        <livewire:tutor.expediente-tutor
+                                            :tutor-id="$tutor->id"
+                                            :key="'expediente-tutor-desktop-' . $tutor->id"
+                                        />
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     </tbody>
@@ -385,10 +397,12 @@
 
                         <div
                             class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                            @if (auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
+                            @if (auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.consultar') || auth()->user()?->canAccess('documentos.consultar') || auth()->user()?->canAccess('documentos.organizar'))
                                 <button type="button"
-                                    @click="Livewire.dispatch('abrir-expediente-tutor', { tutorId: {{ $tutor->id }} })"
-                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#006492] px-3 text-xs font-semibold text-white hover:bg-[#00557b]">
+                                    wire:click="alternarExpediente({{ $tutor->id }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="alternarExpediente"
+                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-60 {{ $expedienteTutorId === $tutor->id ? 'bg-[#88AC2E] hover:bg-[#769925]' : 'bg-[#006492] hover:bg-[#00557b]' }}">
                                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                         <path d="M14 2v6h6M8 13h8M8 17h6" />
@@ -443,6 +457,16 @@
                             'tutor' => $tutor,
                         ])
                     </div>
+
+                    @if ($expedienteTutorId === $tutor->id)
+                        <div class="border-t border-emerald-100 bg-slate-100/80 p-3 dark:border-emerald-500/10 dark:bg-neutral-950/70"
+                            wire:key="expediente-tutor-mobile-panel-{{ $tutor->id }}">
+                            <livewire:tutor.expediente-tutor
+                                :tutor-id="$tutor->id"
+                                :key="'expediente-tutor-mobile-' . $tutor->id"
+                            />
+                        </div>
+                    @endif
                 </article>
             @empty
                 <div class="rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">

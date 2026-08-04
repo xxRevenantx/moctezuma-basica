@@ -5,7 +5,6 @@
         @endif
 
         <livewire:tutor.mostrar-tutor />
-        <livewire:tutor.expediente-tutor />
         <livewire:tutor.organizador-paginas-tutor />
 
         @if (auth()->user()?->canAccess('alumnos.editar'))

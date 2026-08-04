@@ -21,6 +21,7 @@ class MostrarTutor extends Component
     public string $funcion = 'todas';
     public string $ordenCampo = 'id';
     public string $ordenDireccion = 'desc';
+    public ?int $expedienteTutorId = null;
 
     protected $queryString = [
         'buscar' => ['except' => ''],
@@ -35,17 +36,46 @@ class MostrarTutor extends Component
 
     public function updatingBuscar(): void
     {
+        $this->cerrarExpediente();
         $this->resetPage();
     }
 
     public function updatedEstado(): void
     {
+        $this->cerrarExpediente();
         $this->resetPage();
     }
 
     public function updatedFuncion(): void
     {
+        $this->cerrarExpediente();
         $this->resetPage();
+    }
+
+    public function alternarExpediente(int $tutorId): void
+    {
+        abort_unless(
+            auth()->user()?->is_admin
+                || auth()->user()?->canAccess('alumnos.consultar')
+                || auth()->user()?->canAccess('documentos.consultar')
+                || auth()->user()?->canAccess('documentos.organizar'),
+            403
+        );
+        abort_unless(Tutor::query()->whereKey($tutorId)->exists(), 404);
+
+        $this->expedienteTutorId = $this->expedienteTutorId === $tutorId
+            ? null
+            : $tutorId;
+    }
+
+    #[On('cerrar-expediente-tutor-inline')]
+    public function cerrarExpediente(?int $tutorId = null): void
+    {
+        if ($tutorId !== null && $this->expedienteTutorId !== $tutorId) {
+            return;
+        }
+
+        $this->expedienteTutorId = null;
     }
 
     public function ordenarPor(string $campo): void

@@ -2,6 +2,7 @@
 
 namespace App\Services\Expedientes;
 
+use App\Exceptions\Expedientes\PdfCompatibilityException;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoTutor;
 use App\Models\DocumentoTutorFuente;
@@ -36,6 +37,18 @@ class ExpedienteTutorService
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get();
+    }
+
+    /**
+     * Inspecciona un archivo temporal sin crear registros. Comparte la misma
+     * validación de formatos, páginas y compatibilidad usada por el expediente
+     * digital del alumno.
+     *
+     * @return array{paginas:int,mime:string,normalizado:bool,normalizador:?string}
+     */
+    public function inspeccionarArchivoSubido(UploadedFile $archivo): array
+    {
+        return app(OrganizadorExpedienteService::class)->inspeccionarArchivoSubido($archivo);
     }
 
     public function resumen(Tutor $tutor): array
@@ -108,11 +121,19 @@ class ExpedienteTutorService
         string $contenidoArchivo,
         ?int $usuarioId,
         bool $permitirDuplicado = false,
-        array $metadatos = []
+        array $metadatos = [],
+        string $modoIntegracion = 'agregar',
+        bool $guardarOriginalSinOrganizar = false
     ): array {
         if (! in_array($contenidoArchivo, ['un_documento', 'varios_documentos'], true)) {
             throw ValidationException::withMessages([
                 'contenido_archivo' => 'Indica si el archivo contiene uno o varios documentos combinados.',
+            ]);
+        }
+
+        if (! in_array($modoIntegracion, ['agregar', 'reemplazar'], true)) {
+            throw ValidationException::withMessages([
+                'modo_integracion' => 'Selecciona si deseas agregar páginas o reemplazar el documento vigente.',
             ]);
         }
 
@@ -143,13 +164,43 @@ class ExpedienteTutorService
         $temporalNormalizado = null;
 
         try {
-            $compatibilidad = app(PdfCompatibilityService::class)->prepare($temporalPdf);
-            $rutaProcesable = (string) $compatibilidad['path'];
-            if ($rutaProcesable !== $temporalPdf) {
-                $temporalNormalizado = $rutaProcesable;
+            try {
+                $compatibilidad = app(PdfCompatibilityService::class)->prepare($temporalPdf);
+                $rutaProcesable = (string) $compatibilidad['path'];
+                if ($rutaProcesable !== $temporalPdf) {
+                    $temporalNormalizado = $rutaProcesable;
+                }
+            } catch (PdfCompatibilityException $e) {
+                if (
+                    ! $guardarOriginalSinOrganizar
+                    || ! $e->canStoreOriginal
+                    || $mimeOriginal !== 'application/pdf'
+                ) {
+                    throw $e;
+                }
+
+                if ($contenidoArchivo !== 'un_documento') {
+                    throw ValidationException::withMessages([
+                        'archivo' => 'Un PDF combinado con varios documentos no puede guardarse sin organizar.',
+                    ]);
+                }
+
+                return $this->registrarOriginalSinOrganizar(
+                    $archivo,
+                    $tutor,
+                    $tipo,
+                    $mimeOriginal,
+                    $tamanoOriginal,
+                    $hash,
+                    $usuarioId,
+                    $metadatos,
+                    $modoIntegracion,
+                    $e,
+                );
             }
 
             $paginas = $this->validarLimitePaginas((int) $compatibilidad['pages']);
+            $teniaBorrador = $this->borradorTieneCambios($tutor);
             $uuid = (string) Str::uuid();
             $extensionOriginal = strtolower($archivo->getClientOriginalExtension() ?: $this->extensionDesdeMime($mimeOriginal));
             $directorio = "expedientes-tutores/fuentes/{$tutor->id}/{$uuid}";
@@ -188,7 +239,9 @@ class ExpedienteTutorService
                     $rutaPdf,
                     $contenidoPdf,
                     $contenidoArchivo,
-                    $metadatos
+                    $metadatos,
+                    $modoIntegracion,
+                    $teniaBorrador
                 ): array {
                     $versionFuente = ((int) DocumentoTutor::query()
                         ->where('tutor_id', $tutor->id)
@@ -237,6 +290,7 @@ class ExpedienteTutorService
                         'metadatos' => [
                             'tipo_documento_tutor_id' => $tipo->id,
                             'contenido_archivo' => $contenidoArchivo,
+                            'modo_integracion' => $modoIntegracion,
                             'pdf_estado' => ($compatibilidad['status'] ?? null) === 'normalized' ? 'normalized' : 'compatible',
                             'normalizador' => $compatibilidad['normalizer'] ?? null,
                             'fecha_documento' => $metadatos['fecha_documento'] ?? now()->toDateString(),
@@ -248,6 +302,26 @@ class ExpedienteTutorService
 
                     $borrador = $this->obtenerOCrearBorrador($tutor, $usuarioId);
                     $asignaciones = collect($borrador->asignaciones ?? []);
+
+                    if ($modoIntegracion === 'reemplazar') {
+                        $asignaciones = $asignaciones->map(function (array $asignacion) use ($tipo): array {
+                            if ((int) ($asignacion['tipo_documento_tutor_id'] ?? 0) !== (int) $tipo->id) {
+                                return $asignacion;
+                            }
+
+                            return array_merge($asignacion, [
+                                'tipo_documento_tutor_id' => null,
+                                'tipo_slug' => null,
+                                'tipo_nombre' => null,
+                                'orden' => 0,
+                            ]);
+                        });
+                    }
+
+                    $ordenInicial = ((int) $asignaciones
+                        ->where('tipo_documento_tutor_id', $tipo->id)
+                        ->max('orden')) + 1;
+
                     for ($pagina = 1; $pagina <= $paginas; $pagina++) {
                         $clave = $fuente->id . ':' . $pagina;
                         $asignacion = [
@@ -257,7 +331,7 @@ class ExpedienteTutorService
                             'tipo_slug' => $contenidoArchivo === 'un_documento' ? $tipo->slug : null,
                             'tipo_nombre' => $contenidoArchivo === 'un_documento' ? $tipo->nombre : null,
                             'orden' => $contenidoArchivo === 'un_documento'
-                                ? ((int) $asignaciones->where('tipo_documento_tutor_id', $tipo->id)->max('orden')) + $pagina
+                                ? $ordenInicial + $pagina - 1
                                 : 0,
                             'rotacion' => 0,
                             'fecha_documento' => $metadatos['fecha_documento'] ?? now()->toDateString(),
@@ -285,8 +359,30 @@ class ExpedienteTutorService
                         'paginas' => $paginas,
                     ]);
 
-                    return ['fuente' => $fuente, 'documento_fuente' => $documentoFuente, 'organizacion' => $borrador];
+                    return [
+                        'fuente' => $fuente,
+                        'documento_fuente' => $documentoFuente,
+                        'organizacion' => $borrador,
+                        'organizacion_id' => $borrador->id,
+                        'auto_confirmable' => $paginas === 1
+                            && $contenidoArchivo === 'un_documento'
+                            && ! $teniaBorrador,
+                        'auto_confirmado' => false,
+                        'requiere_organizacion' => true,
+                    ];
                 });
+
+                if ((bool) ($resultado['auto_confirmable'] ?? false)) {
+                    $this->confirmarOrganizacion(
+                        $tutor,
+                        (int) $resultado['organizacion_id'],
+                        $usuarioId
+                    );
+                    $resultado['auto_confirmado'] = true;
+                    $resultado['requiere_organizacion'] = false;
+                }
+
+                unset($resultado['auto_confirmable']);
             } catch (Throwable $e) {
                 foreach ($rutasGuardadas as $ruta) {
                     try {
@@ -304,6 +400,154 @@ class ExpedienteTutorService
             ]);
         } finally {
             File::delete(array_filter([$temporalPdf, $temporalNormalizado]));
+        }
+    }
+
+    protected function registrarOriginalSinOrganizar(
+        UploadedFile $archivo,
+        Tutor $tutor,
+        TipoDocumentoTutor $tipo,
+        string $mimeOriginal,
+        int $tamanoOriginal,
+        ?string $hash,
+        ?int $usuarioId,
+        array $metadatos,
+        string $modoIntegracion,
+        PdfCompatibilityException $compatibilityError
+    ): array {
+        $uuid = (string) Str::uuid();
+        $extension = strtolower($archivo->getClientOriginalExtension() ?: 'pdf');
+        $directorio = "expedientes-tutores/{$tutor->id}/{$tipo->slug}/originales/" . now()->format('Y');
+        $ruta = "{$directorio}/{$uuid}.{$extension}";
+        $disk = Storage::disk($this->disk());
+        $contenido = File::get($archivo->getRealPath());
+        $paginasEstimadas = $this->validarLimitePaginas(
+            app(PdfCompatibilityService::class)->estimatePages($archivo->getRealPath())
+        );
+
+        if (! $disk->put($ruta, $contenido)) {
+            throw new RuntimeException('No fue posible guardar el PDF original.');
+        }
+
+        try {
+            return DB::transaction(function () use (
+                $archivo,
+                $tutor,
+                $tipo,
+                $mimeOriginal,
+                $tamanoOriginal,
+                $hash,
+                $usuarioId,
+                $metadatos,
+                $modoIntegracion,
+                $compatibilityError,
+                $ruta,
+                $paginasEstimadas
+            ): array {
+                $consulta = DocumentoTutor::query()
+                    ->where('tutor_id', $tutor->id)
+                    ->where('tipo_documento_tutor_id', $tipo->id)
+                    ->where('es_fuente', false)
+                    ->lockForUpdate();
+                $version = ((int) (clone $consulta)->max('version')) + 1;
+                $anteriores = (clone $consulta)->where('es_actual', true)->get();
+
+                (clone $consulta)->where('es_actual', true)->update([
+                    'es_actual' => false,
+                    'estado' => 'reemplazado',
+                    'updated_at' => now(),
+                ]);
+
+                $documento = DocumentoTutor::query()->create([
+                    'tutor_id' => $tutor->id,
+                    'tipo_documento_tutor_id' => $tipo->id,
+                    'fecha_documento' => $metadatos['fecha_documento'] ?? now()->toDateString(),
+                    'folio' => filled($metadatos['folio'] ?? null) ? trim((string) $metadatos['folio']) : null,
+                    'origen' => $metadatos['origen'] ?? 'subido',
+                    'disco' => $this->disk(),
+                    'ruta' => $ruta,
+                    'nombre_original' => Str::limit($archivo->getClientOriginalName(), 250, ''),
+                    'mime_type' => 'application/pdf',
+                    'tamano_bytes' => $tamanoOriginal,
+                    'paginas_total' => $paginasEstimadas,
+                    'hash_sha256' => $hash,
+                    'version' => $version,
+                    'es_actual' => true,
+                    'es_fuente' => false,
+                    'es_organizado' => false,
+                    'estado' => 'recibido',
+                    'observaciones' => filled($metadatos['observaciones'] ?? null)
+                        ? trim((string) $metadatos['observaciones'])
+                        : 'PDF conservado en modo de solo lectura porque no pudo normalizarse.',
+                    'subido_por' => $usuarioId,
+                ]);
+
+                $fuente = DocumentoTutorFuente::query()->create([
+                    'tutor_id' => $tutor->id,
+                    'documento_tutor_id' => $documento->id,
+                    'disco' => $this->disk(),
+                    'ruta' => $ruta,
+                    'ruta_original' => $ruta,
+                    'nombre_original' => Str::limit($archivo->getClientOriginalName(), 255, ''),
+                    'nombre_almacenado' => basename($ruta),
+                    'mime_type' => 'application/pdf',
+                    'mime_original' => $mimeOriginal,
+                    'tamano_bytes' => $tamanoOriginal,
+                    'hash_sha256' => $hash,
+                    'paginas' => $paginasEstimadas,
+                    'estado' => 'activo',
+                    'protegido' => true,
+                    'subido_por' => $usuarioId,
+                    'metadatos' => [
+                        'pdf_estado' => 'original_sin_organizar',
+                        'motivo_solo_lectura' => $compatibilityError->reason,
+                        'mensaje_compatibilidad' => $compatibilityError->getMessage(),
+                        'diagnostico_compatibilidad' => $compatibilityError->details,
+                        'requiere_revision' => true,
+                        'organizable' => false,
+                        'paginas_estimadas' => true,
+                        'original_conservado' => true,
+                        'modo_integracion_solicitado' => $modoIntegracion,
+                        'tipo_documento_tutor_id' => $tipo->id,
+                    ],
+                ]);
+
+                DocumentoTutorNoAplica::query()
+                    ->where('tutor_id', $tutor->id)
+                    ->where('tipo_documento_tutor_id', $tipo->id)
+                    ->where('activo', true)
+                    ->update(['activo' => false, 'updated_at' => now()]);
+
+                $this->registrarEvento(
+                    $tutor,
+                    $anteriores->isEmpty() ? 'documento_original_guardado' : 'documento_original_reemplazado',
+                    'Se conservó el PDF original en modo de solo lectura para no perder el archivo recibido.',
+                    $usuarioId,
+                    $documento,
+                    null,
+                    $anteriores->toArray(),
+                    $documento->toArray()
+                );
+
+                return [
+                    'fuente' => $fuente->fresh(),
+                    'documento' => $documento->fresh(),
+                    'paginas' => $paginasEstimadas,
+                    'organizacion_id' => null,
+                    'requiere_organizacion' => false,
+                    'auto_confirmado' => true,
+                    'guardado_original' => true,
+                    'normalizado' => false,
+                    'normalizador' => null,
+                ];
+            });
+        } catch (Throwable $e) {
+            try {
+                $disk->delete($ruta);
+            } catch (Throwable) {
+            }
+
+            throw $e;
         }
     }
 
@@ -589,6 +833,44 @@ class ExpedienteTutorService
         ]);
     }
 
+    protected function borradorTieneCambios(Tutor $tutor): bool
+    {
+        $borrador = OrganizacionDocumentoTutor::query()
+            ->where('tutor_id', $tutor->id)
+            ->where('estado', 'borrador')
+            ->latest('version')
+            ->first();
+
+        if (! $borrador) {
+            return false;
+        }
+
+        $baseline = (array) data_get($borrador->metadatos, 'baseline_asignaciones', []);
+
+        return $this->firmaAsignacionesCompleta($borrador->asignaciones ?? [])
+            !== $this->firmaAsignacionesCompleta($baseline);
+    }
+
+    protected function firmaAsignacionesCompleta(array $asignaciones): string
+    {
+        $normalizadas = collect($asignaciones)
+            ->map(fn (array $item): array => [
+                'fuente_id' => (int) ($item['fuente_id'] ?? 0),
+                'pagina' => (int) ($item['pagina'] ?? 0),
+                'tipo_documento_tutor_id' => filled($item['tipo_documento_tutor_id'] ?? null)
+                    ? (int) $item['tipo_documento_tutor_id']
+                    : null,
+                'orden' => (int) ($item['orden'] ?? 0),
+                'rotacion' => $this->normalizarRotacion((int) ($item['rotacion'] ?? 0)),
+            ])
+            ->sortBy(fn (array $item): string => str_pad((string) $item['fuente_id'], 12, '0', STR_PAD_LEFT)
+                . '-' . str_pad((string) $item['pagina'], 8, '0', STR_PAD_LEFT))
+            ->values()
+            ->all();
+
+        return hash('sha256', json_encode($normalizadas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
     protected function obtenerOCrearBorrador(Tutor $tutor, ?int $usuarioId): OrganizacionDocumentoTutor
     {
         $borrador = OrganizacionDocumentoTutor::query()
@@ -671,7 +953,9 @@ class ExpedienteTutorService
                 $clave = $pagina['fuente_id'] . ':' . $pagina['pagina'];
                 $posicion = $coleccion->search(fn (array $item): bool => ($item['fuente_id'] . ':' . $item['pagina']) === $clave);
                 if ($posicion !== false) {
-                    $coleccion[$posicion]['orden'] = $indice + 1;
+                    $itemActualizado = (array) $coleccion->get($posicion);
+                    $itemActualizado['orden'] = $indice + 1;
+                    $coleccion->put($posicion, $itemActualizado);
                 }
             }
         }
