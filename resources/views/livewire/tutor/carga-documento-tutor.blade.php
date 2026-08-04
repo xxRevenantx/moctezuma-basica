@@ -1,10 +1,22 @@
 <div
-    x-data="{ progreso: 0, subiendo: false }"
+    x-data="{ progreso: 0, subiendo: false, resaltado: false, temporizadorResaltado: null }"
     x-on:livewire-upload-start="subiendo = true; progreso = 0"
     x-on:livewire-upload-progress="progreso = Number($event.detail.progress || 0)"
     x-on:livewire-upload-finish="subiendo = false; progreso = 100"
     x-on:livewire-upload-error="subiendo = false; progreso = 0"
-    class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+    x-on:resaltar-documento-tutor.window="
+        if (Number($event.detail.tutorId) === {{ $tutorId }} && Number($event.detail.tipoDocumentoId) === {{ $tipoDocumentoId }}) {
+            clearTimeout(temporizadorResaltado);
+            resaltado = false;
+            requestAnimationFrame(() => {
+                resaltado = true;
+                temporizadorResaltado = setTimeout(() => resaltado = false, 1150);
+            });
+        }
+    "
+    :class="resaltado ? 'ring-4 ring-emerald-300/60 shadow-lg shadow-emerald-500/10 dark:ring-emerald-500/30' : ''"
+    data-expediente-documento-card
+    class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 motion-reduce:transition-none dark:border-neutral-800 dark:bg-neutral-900"
 >
     <div class="h-1 bg-gradient-to-r from-[#006492] to-[#88AC2E]"></div>
 
@@ -88,10 +100,16 @@
 
         <div class="mt-4 flex flex-wrap items-center gap-2">
             @if ($documentoId && $archivoGuardadoUrl)
-                <a href="{{ $archivoGuardadoUrl }}" target="_blank" rel="noopener"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
-                    <flux:icon name="eye" class="size-4" /> Ver
-                </a>
+                @include('livewire.tutor.partials.vista-previa-hover', [
+                    'url' => $archivoGuardadoUrl,
+                    'downloadUrl' => $archivoDescargaUrl,
+                    'nombre' => $nombreArchivo ?: $etiqueta,
+                    'mime' => $archivoMimeType,
+                    'tamano' => $tamanoArchivo,
+                    'paginas' => $paginasDocumento,
+                    'estado' => ucfirst($estadoDocumento),
+                    'label' => 'Ver',
+                ])
                 <a href="{{ $archivoDescargaUrl }}"
                     class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
                     <flux:icon name="arrow-down-tray" class="size-4" /> Descargar
@@ -250,8 +268,18 @@
                                 </p>
                             </div>
                             @if ($version['url'])
-                                <a href="{{ $version['url'] }}" target="_blank" rel="noopener"
-                                    class="shrink-0 font-semibold text-[#006492] hover:underline dark:text-sky-300">Consultar</a>
+                                @include('livewire.tutor.partials.vista-previa-hover', [
+                                    'url' => $version['url'],
+                                    'downloadUrl' => $version['download_url'] ?? $version['url'],
+                                    'nombre' => $version['nombre'] ?: ($etiqueta . ' · versión ' . $version['version']),
+                                    'mime' => $version['mime'] ?? 'application/pdf',
+                                    'tamano' => $version['tamano'],
+                                    'paginas' => $version['paginas'],
+                                    'estado' => ucfirst($version['estado']),
+                                    'label' => 'Ver',
+                                    'mostrarIcono' => false,
+                                    'buttonClass' => 'shrink-0 rounded-lg px-2.5 py-1.5 font-semibold text-[#006492] transition hover:bg-sky-50 focus:outline-none focus:ring-4 focus:ring-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-950/30',
+                                ])
                             @else
                                 <span class="shrink-0 font-medium text-rose-600 dark:text-rose-300">Archivo no disponible</span>
                             @endif

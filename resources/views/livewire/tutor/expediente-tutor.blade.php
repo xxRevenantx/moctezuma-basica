@@ -39,8 +39,9 @@
                             class="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-xs font-black text-sky-800 shadow-lg transition hover:-translate-y-0.5 sm:text-sm">
                             <flux:icon name="archive-box" class="size-4" /> Descargar ZIP
                         </a>
-                        <button type="button" wire:click="cerrar"
-                            class="inline-flex size-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 transition hover:bg-white/20"
+                        <button type="button"
+                            @click="$dispatch('solicitar-cierre-expediente-tutor', { tutorId: {{ $tutor->id }} })"
+                            class="inline-flex size-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 transition hover:-translate-y-0.5 hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-white/20 motion-reduce:transform-none"
                             title="Contraer expediente" aria-label="Contraer expediente">
                             <flux:icon name="chevron-up" class="size-5" />
                         </button>
@@ -115,8 +116,18 @@
                                     <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{{ $pendiente->motivo }}</p>
                                     <div class="mt-3 flex flex-wrap gap-2">
                                         @if ($pendiente->documentoAlumno?->archivo_existe)
-                                            <a href="{{ route('misrutas.expedientes.preview', $pendiente->documentoAlumno) }}" target="_blank" rel="noopener"
-                                                class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:text-slate-200">Ver archivo</a>
+                                            @include('livewire.tutor.partials.vista-previa-hover', [
+                                                'url' => route('misrutas.expedientes.preview', $pendiente->documentoAlumno),
+                                                'downloadUrl' => route('misrutas.expedientes.download', $pendiente->documentoAlumno),
+                                                'nombre' => $pendiente->documentoAlumno->nombre_original ?: ($pendiente->documentoAlumno?->tipoDocumento?->nombre ?? 'Documento antiguo'),
+                                                'mime' => $pendiente->documentoAlumno->mime_type,
+                                                'tamano' => $pendiente->documentoAlumno->tamano_legible,
+                                                'paginas' => (int) ($pendiente->documentoAlumno->paginas_total ?? 0),
+                                                'estado' => ucfirst((string) $pendiente->documentoAlumno->estado),
+                                                'label' => 'Ver archivo',
+                                                'mostrarIcono' => false,
+                                                'buttonClass' => 'rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-500/15 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800',
+                                            ])
                                         @endif
                                         @if ($puedeEditar)
                                             <button type="button" wire:click="vincularLegado({{ $pendiente->id }}, {{ $tutor->id }})"
@@ -173,8 +184,19 @@
                                         @endif
                                     </div>
                                     <div class="mt-3 flex flex-wrap gap-2">
-                                        <a href="{{ route('misrutas.expedientes-tutores.fuentes.preview', $fuente) }}" target="_blank" rel="noopener" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:text-slate-200">Vista previa</a>
-                                        <a href="{{ route('misrutas.expedientes-tutores.fuentes.download', $fuente) }}" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 dark:border-neutral-700 dark:text-slate-200">Original</a>
+                                        @include('livewire.tutor.partials.vista-previa-hover', [
+                                            'url' => route('misrutas.expedientes-tutores.fuentes.preview', $fuente),
+                                            'downloadUrl' => route('misrutas.expedientes-tutores.fuentes.download', $fuente),
+                                            'nombre' => $fuente->nombre_original,
+                                            'mime' => $fuente->mime_type ?: $fuente->mime_original,
+                                            'tamano' => $fuente->tamano_legible,
+                                            'paginas' => (int) $fuente->paginas,
+                                            'estado' => $fuente->protegido ? 'Solo lectura' : 'Activo',
+                                            'label' => 'Ver',
+                                            'mostrarIcono' => false,
+                                            'buttonClass' => 'rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-500/15 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800',
+                                        ])
+                                        <a href="{{ route('misrutas.expedientes-tutores.fuentes.download', $fuente) }}" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800">Original</a>
                                         @if ($puedeEditar && ! $fuente->protegido)
                                             <button type="button" wire:click="abrirOrganizador({{ $fuente->id }})" class="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">Organizar</button>
                                         @endif
@@ -201,7 +223,18 @@
                                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ ucfirst($documento->estado) }} · {{ $documento->created_at?->format('d/m/Y H:i') }} · {{ $documento->usuarioQueSubio?->name ?? 'Sistema' }}</p>
                                         </div>
                                         @if ($documento->archivo_existe)
-                                            <a href="{{ route('misrutas.expedientes-tutores.preview', $documento) }}" target="_blank" rel="noopener" class="shrink-0 text-xs font-black text-sky-700 dark:text-sky-300">Ver</a>
+                                            @include('livewire.tutor.partials.vista-previa-hover', [
+                                                'url' => route('misrutas.expedientes-tutores.preview', $documento),
+                                                'downloadUrl' => route('misrutas.expedientes-tutores.download', $documento),
+                                                'nombre' => $documento->nombre_original ?: (($documento->tipoDocumento?->nombre ?? 'Documento') . ' · v' . $documento->version),
+                                                'mime' => $documento->mime_type,
+                                                'tamano' => $documento->tamano_legible,
+                                                'paginas' => (int) ($documento->paginas_total ?? 0),
+                                                'estado' => ucfirst((string) $documento->estado),
+                                                'label' => 'Ver',
+                                                'mostrarIcono' => false,
+                                                'buttonClass' => 'shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-black text-sky-700 transition hover:bg-sky-50 focus:outline-none focus:ring-4 focus:ring-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-950/30',
+                                            ])
                                         @else
                                             <span class="shrink-0 text-[10px] font-black uppercase text-rose-600">No disponible</span>
                                         @endif

@@ -48,6 +48,7 @@ class CargaDocumentoTutor extends Component
     public string $nombreArchivo = '';
     public string $tamanoArchivo = '';
     public int $paginasDocumento = 0;
+    public string $archivoMimeType = 'application/pdf';
     public int $archivoPaginas = 0;
     public int $maxMb = 30;
     public string $estadoDocumento = 'pendiente';
@@ -169,6 +170,7 @@ class CargaDocumentoTutor extends Component
                     : 'Documento guardado y confirmado correctamente.';
                 $this->dispatch('organizacion-tutor-confirmada', tutorId: $this->tutorId);
                 $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+                $this->resaltarTarjeta();
                 $this->dispatch('notify', type: 'success', message: $this->mensaje);
             } else {
                 $this->mensaje = $normalizado
@@ -228,6 +230,7 @@ class CargaDocumentoTutor extends Component
             $this->limpiarArchivoTemporal();
             $this->mensaje = 'El archivo original se conservó como documento recibido en modo de solo lectura.';
             $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+            $this->resaltarTarjeta();
             $this->dispatch('notify', type: 'success', message: $this->mensaje);
             $this->cargarEstado(false);
         } catch (ValidationException $e) {
@@ -322,6 +325,7 @@ class CargaDocumentoTutor extends Component
         $this->cancelarNoAplica();
         $this->mensaje = 'El documento fue marcado como “No aplica”.';
         $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+        $this->resaltarTarjeta();
         $this->dispatch('notify', type: 'success', message: $this->mensaje);
         $this->cargarEstado(false);
     }
@@ -338,6 +342,7 @@ class CargaDocumentoTutor extends Component
 
         $this->mensaje = 'La marca “No aplica” fue retirada.';
         $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+        $this->resaltarTarjeta();
         $this->dispatch('notify', type: 'success', message: $this->mensaje);
         $this->cargarEstado(false);
     }
@@ -376,6 +381,7 @@ class CargaDocumentoTutor extends Component
 
         $this->mensaje = 'Estado del documento actualizado.';
         $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+        $this->resaltarTarjeta();
         $this->dispatch('notify', type: 'success', message: $this->mensaje);
         $this->cargarEstado(false);
     }
@@ -405,6 +411,7 @@ class CargaDocumentoTutor extends Component
 
         $this->mensaje = 'Documento archivado sin eliminar su historial.';
         $this->dispatch('expediente-tutor-actualizado', tutorId: $this->tutorId);
+        $this->resaltarTarjeta();
         $this->dispatch('notify', type: 'success', message: $this->mensaje);
         $this->cargarEstado(false);
     }
@@ -448,6 +455,7 @@ class CargaDocumentoTutor extends Component
         $this->nombreArchivo = '';
         $this->tamanoArchivo = '';
         $this->paginasDocumento = 0;
+        $this->archivoMimeType = 'application/pdf';
         $this->estadoDocumento = $documento?->estado ?: 'pendiente';
 
         if ($documento) {
@@ -464,6 +472,7 @@ class CargaDocumentoTutor extends Component
             $this->nombreArchivo = (string) $documento->nombre_original;
             $this->tamanoArchivo = $documento->tamano_legible;
             $this->paginasDocumento = max((int) ($documento->paginas_total ?? 0), 0);
+            $this->archivoMimeType = (string) ($documento->mime_type ?: 'application/pdf');
         }
 
         $noAplica = DocumentoTutorNoAplica::query()
@@ -503,10 +512,14 @@ class CargaDocumentoTutor extends Component
                 'nombre' => (string) $item->nombre_original,
                 'tamano' => $item->tamano_legible,
                 'paginas' => max((int) ($item->paginas_total ?? 0), 0),
+                'mime' => (string) ($item->mime_type ?: 'application/pdf'),
                 'actual' => (bool) $item->es_actual,
                 'disponible' => $item->archivo_existe,
                 'url' => $item->archivo_existe
                     ? route('misrutas.expedientes-tutores.preview', $item)
+                    : null,
+                'download_url' => $item->archivo_existe
+                    ? route('misrutas.expedientes-tutores.download', $item)
                     : null,
             ])
             ->all();
@@ -547,6 +560,15 @@ class CargaDocumentoTutor extends Component
             ->all();
 
         return $actual !== $baseline;
+    }
+
+    protected function resaltarTarjeta(): void
+    {
+        $this->dispatch(
+            'resaltar-documento-tutor',
+            tutorId: $this->tutorId,
+            tipoDocumentoId: $this->tipoDocumentoId,
+        );
     }
 
     protected function validarArchivo(): void
