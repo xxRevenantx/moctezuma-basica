@@ -18,9 +18,12 @@ class ProfesorHorarioPdfController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $profesorId = $request->integer('profesor_id');
+        $profesorId = $request->user()?->isProfessor()
+            ? (int) $request->user()->persona_id
+            : $request->integer('profesor_id');
 
-        abort_if(!$profesorId, 404);
+        abort_if(! $profesorId, 404);
+        abort_if($request->user()?->isProfessor() && $request->integer('profesor_id') > 0 && $request->integer('profesor_id') !== $profesorId, 403);
 
         $profesor = Persona::query()->findOrFail($profesorId);
 
@@ -61,6 +64,10 @@ class ProfesorHorarioPdfController extends Controller
                 });
             })
             ->when($cicloEscolar, fn($query) => $query->where('ciclo_escolar_id', $cicloEscolar->id))
+            ->when(
+                $request->user()?->isProfessor(),
+                fn ($query) => $query->whereHas('version', fn ($version) => $version->where('estado', 'publicada'))
+            )
             ->when($request->filled('nivel_id'), function ($query) use ($request) {
                 $query->where('nivel_id', $request->integer('nivel_id'));
             })

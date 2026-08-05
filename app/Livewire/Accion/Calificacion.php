@@ -8,11 +8,13 @@ use App\Imports\CalificacionesImport;
 use App\Models\AsignacionMateria;
 use App\Models\BitacoraCalificacion;
 use App\Models\Calificacion as ModelsCalificacion;
+use App\Models\CalificacionEntrega;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\InscripcionCiclo;
 use App\Models\MateriaPromediar;
 use App\Models\Nivel;
 use App\Models\Parcial;
@@ -24,6 +26,8 @@ use App\Services\CalificacionCorreccionService;
 use App\Services\CicloNivelGateService;
 use App\Services\HistorialCalificacionesGeneracionService;
 use App\Services\ListaAcademicaService;
+use App\Services\TeacherAcademicScopeService;
+use App\Services\CalificacionEntregaService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
@@ -31,9 +35,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Locked;
 use Throwable;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -44,8 +50,10 @@ class Calificacion extends Component
 
     private array $contextosGeneracionConfirmados = [];
 
+    #[Locked]
     public string $slug_nivel = '';
 
+    #[Locked]
     public $nivel_id = null;
     public $generacion_id = null;
     public $grado_id = null;
@@ -84,6 +92,8 @@ class Calificacion extends Component
 
     public array $resumenRevision = [];
     public string $motivo_guardado = '';
+    public bool $acepta_conformidad = false;
+    public string $password_confirmacion = '';
 
     public bool $correccionHistoricaHabilitada = false;
     public bool $mostrarModalCorreccionHistorica = false;
@@ -112,6 +122,16 @@ class Calificacion extends Component
 
     public ?array $periodoSeleccionado = null;
 
+    public function boot(): void
+    {
+        $user = auth()->user();
+        abort_unless($user?->canAccess('calificaciones.consultar'), 403);
+
+        if ($user->isProfessor()) {
+            app(TeacherAcademicScopeService::class)->personaIdOrFail($user);
+        }
+    }
+
     public function mount(string $slug_nivel): void
     {
         $this->slug_nivel = $slug_nivel;
@@ -121,6 +141,16 @@ class Calificacion extends Component
             ->firstOrFail();
 
         $this->nivel_id = $nivel->id;
+
+        if ($this->esProfesorAutenticado) {
+            abort_if($nivel->slug === 'preescolar', 404);
+            $scope = app(TeacherAcademicScopeService::class);
+            abort_unless(
+                $scope->assignedLevels(auth()->user())->contains(fn ($item): bool => (int) $item->id === (int) $nivel->id),
+                403,
+                'No tienes materias asignadas en este nivel.'
+            );
+        }
 
         $this->niveles = Nivel::query()
             ->orderBy('id')
@@ -143,6 +173,12 @@ class Calificacion extends Component
         if (request()->string('origen')->toString() !== 'busqueda-global') {
             return;
         }
+
+        abort_if(
+            $this->esProfesorAutenticado,
+            403,
+            'La búsqueda académica global está reservada para administración.'
+        );
 
         $this->contextoBusquedaGlobal = true;
         $this->alumnoBusquedaId = request()->integer('alumno') ?: null;
@@ -243,6 +279,48 @@ class Calificacion extends Component
         }
     }
 
+    public function getEsProfesorAutenticadoProperty(): bool
+    {
+        return (bool) auth()->user()?->isProfessor();
+    }
+
+    public function getDeclaracionConformidadProperty(): string
+    {
+        return CalificacionEntregaService::DECLARATION;
+    }
+
+    public function getEntregaConfirmadaActualProperty(): ?CalificacionEntrega
+    {
+        if (! $this->esProfesorAutenticado || blank($this->periodo_id) || blank($this->grupo_id)) {
+            return null;
+        }
+
+        return CalificacionEntrega::query()
+            ->where('user_id', auth()->id())
+            ->where('periodo_id', (int) $this->periodo_id)
+            ->where('grupo_id', (int) $this->grupo_id)
+            ->where('estado', 'confirmada')
+            ->latest('confirmada_at')
+            ->first();
+    }
+
+    public function getCapturaCompletaProperty(): bool
+    {
+        if (count($this->inscripciones) === 0 || count($this->materias) === 0) {
+            return false;
+        }
+
+        foreach (collect($this->inscripciones)->pluck('inscripcion_id') as $inscripcionId) {
+            foreach (collect($this->materias)->pluck('id') as $asignacionId) {
+                if ($this->normalizarCalificacion($this->calificaciones[$inscripcionId][$asignacionId] ?? null) === null) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     public function getEsBachilleratoProperty(): bool
     {
         return $this->slug_nivel === 'bachillerato';
@@ -283,6 +361,10 @@ class Calificacion extends Component
 
     public function getEdicionCalificacionesHabilitadaProperty(): bool
     {
+        if ($this->esProfesorAutenticado && $this->entregaConfirmadaActual) {
+            return false;
+        }
+
         if ($this->esConsultaHistorica) {
             return $this->puedeAdministrarCorreccionHistorica
                 && $this->correccionHistoricaHabilitada;
@@ -525,6 +607,19 @@ class Calificacion extends Component
                             ->where('calificaciones.nivel_id', $this->nivel_id);
                     });
             })
+            ->when($this->esProfesorAutenticado, function ($query): void {
+                $personaId = (int) auth()->user()->persona_id;
+                $query->where('es_actual', true)
+                    ->whereNull('cerrado_at')
+                    ->whereExists(function ($subquery) use ($personaId): void {
+                        $subquery->selectRaw('1')
+                            ->from('asignacion_materias')
+                            ->whereColumn('asignacion_materias.ciclo_escolar_id', 'ciclo_escolares.id')
+                            ->where('asignacion_materias.profesor_id', $personaId)
+                            ->where('asignacion_materias.nivel_id', $this->nivel_id)
+                            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                    });
+            })
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->get();
@@ -583,6 +678,18 @@ class Calificacion extends Component
                             ->where('calificaciones.ciclo_escolar_id', $cicloId)
                             ->where('calificaciones.nivel_id', $this->nivel_id);
                     });
+            })
+            ->when($this->esProfesorAutenticado, function ($query) use ($cicloId): void {
+                $personaId = (int) auth()->user()->persona_id;
+                $query->whereExists(function ($subquery) use ($cicloId, $personaId): void {
+                    $subquery->selectRaw('1')
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.generacion_id', 'generaciones.id')
+                        ->where('asignacion_materias.ciclo_escolar_id', $cicloId)
+                        ->where('asignacion_materias.nivel_id', $this->nivel_id)
+                        ->where('asignacion_materias.profesor_id', $personaId)
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                });
             })
             ->orderByDesc('anio_ingreso')
             ->orderByDesc('id')
@@ -808,9 +915,7 @@ class Calificacion extends Component
 
     public function updatedBusqueda(): void
     {
-        if ($this->puedeCargarDatos()) {
-            $this->cargarDatos();
-        }
+        $this->aplicarFiltroEstado();
     }
 
     public function updatedFiltroEstado(): void
@@ -879,6 +984,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'acepta_conformidad',
+            'password_confirmacion',
             'correccionHistoricaHabilitada',
             'mostrarModalCorreccionHistorica',
             'motivoCorreccionCatalogo',
@@ -951,6 +1058,19 @@ class Calificacion extends Component
                             ->where('calificaciones.generacion_id', $generacionId);
                     });
             })
+            ->when($this->esProfesorAutenticado, function ($query) use ($cicloId, $generacionId): void {
+                $personaId = (int) auth()->user()->persona_id;
+                $query->whereExists(function ($subquery) use ($cicloId, $generacionId, $personaId): void {
+                    $subquery->selectRaw('1')
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.grado_id', 'grados.id')
+                        ->where('asignacion_materias.ciclo_escolar_id', $cicloId)
+                        ->where('asignacion_materias.nivel_id', $this->nivel_id)
+                        ->where('asignacion_materias.generacion_id', $generacionId)
+                        ->where('asignacion_materias.profesor_id', $personaId)
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                });
+            })
             ->orderBy('orden')
             ->orderBy('id')
             ->get();
@@ -1015,6 +1135,20 @@ class Calificacion extends Component
                             ->where('calificaciones.generacion_id', $generacionId)
                             ->where('calificaciones.grado_id', $gradoId);
                     });
+            })
+            ->when($this->esProfesorAutenticado, function ($query) use ($cicloId, $generacionId, $gradoId): void {
+                $personaId = (int) auth()->user()->persona_id;
+                $query->whereExists(function ($subquery) use ($cicloId, $generacionId, $gradoId, $personaId): void {
+                    $subquery->selectRaw('1')
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.semestre_id', 'semestres.id')
+                        ->where('asignacion_materias.ciclo_escolar_id', $cicloId)
+                        ->where('asignacion_materias.nivel_id', $this->nivel_id)
+                        ->where('asignacion_materias.generacion_id', $generacionId)
+                        ->where('asignacion_materias.grado_id', $gradoId)
+                        ->where('asignacion_materias.profesor_id', $personaId)
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                });
             })
             ->orderBy('numero')
             ->get();
@@ -1110,6 +1244,25 @@ class Calificacion extends Component
                             ->where('calificaciones.ciclo_escolar_id', $cicloId);
                     });
             })
+            ->when($this->esProfesorAutenticado, function ($query) use ($cicloId): void {
+                $personaId = (int) auth()->user()->persona_id;
+                $query->whereExists(function ($subquery) use ($cicloId, $personaId): void {
+                    $subquery->selectRaw('1')
+                        ->from('asignacion_materias')
+                        ->whereColumn('asignacion_materias.grupo_id', 'grupos.id')
+                        ->where('asignacion_materias.ciclo_escolar_id', $cicloId)
+                        ->where('asignacion_materias.nivel_id', $this->nivel_id)
+                        ->where('asignacion_materias.generacion_id', $this->generacion_id)
+                        ->where('asignacion_materias.grado_id', $this->grado_id)
+                        ->when(
+                            $this->esBachillerato,
+                            fn ($inner) => $inner->where('asignacion_materias.semestre_id', $this->semestre_id),
+                            fn ($inner) => $inner->whereNull('asignacion_materias.semestre_id')
+                        )
+                        ->where('asignacion_materias.profesor_id', $personaId)
+                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                });
+            })
             ->orderBy('asignacion_grupos.nombre')
             ->orderBy('grupos.id')
             ->get();
@@ -1148,6 +1301,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'acepta_conformidad',
+            'password_confirmacion',
             'correccionHistoricaHabilitada',
             'mostrarModalCorreccionHistorica',
             'motivoCorreccionCatalogo',
@@ -1191,6 +1346,8 @@ class Calificacion extends Component
             'mostrarModalRevision',
             'resumenRevision',
             'motivo_guardado',
+            'acepta_conformidad',
+            'password_confirmacion',
             'archivo_calificaciones',
             'resumenImportacion',
             'diagnosticoIa',
@@ -1212,6 +1369,7 @@ class Calificacion extends Component
             return;
         }
 
+        $this->asegurarContextoDocente();
         $this->cargarInscripciones();
         $this->cargarMaterias();
 
@@ -1224,6 +1382,24 @@ class Calificacion extends Component
         $this->cargarCalificaciones();
         $this->calcularPromedios();
         $this->aplicarFiltroEstado();
+    }
+
+    private function asegurarContextoDocente(): void
+    {
+        if (! $this->esProfesorAutenticado) {
+            return;
+        }
+
+        app(TeacherAcademicScopeService::class)->assertGradeContext(
+            user: auth()->user(),
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            nivelId: (int) $this->nivel_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+            grupoId: (int) $this->grupo_id,
+            semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
+            periodoId: (int) $this->periodo_id,
+        );
     }
 
     public function cargarPeriodoSeleccionado(): void
@@ -1328,20 +1504,6 @@ class Calificacion extends Component
             usarActualComoRespaldo: $this->cicloSeleccionadoEsActual(),
             incluirTodaGeneracionBachillerato: $this->esBachillerato,
         );
-
-        if (filled($this->busqueda)) {
-            $buscar = mb_strtolower(trim($this->busqueda));
-            $alumnos = $alumnos->filter(function ($alumno) use ($buscar) {
-                $texto = mb_strtolower(trim(
-                    ($alumno->matricula ?? '') . ' ' .
-                    ($alumno->nombre ?? '') . ' ' .
-                    ($alumno->apellido_paterno ?? '') . ' ' .
-                    ($alumno->apellido_materno ?? '')
-                ));
-
-                return str_contains($texto, $buscar);
-            })->values();
-        }
 
         $this->inscripciones = $alumnos
             ->map(function ($inscripcion) {
@@ -1829,6 +1991,18 @@ class Calificacion extends Component
                 ->all()
             : [];
 
+        if (filled($this->busqueda)) {
+            $buscar = mb_strtolower(trim($this->busqueda));
+            $filas = $filas->filter(function (array $fila) use ($buscar): bool {
+                $texto = mb_strtolower(trim(implode(' ', [
+                    $fila['matricula'] ?? '',
+                    $fila['alumno'] ?? '',
+                ])));
+
+                return str_contains($texto, $buscar);
+            });
+        }
+
         if ($this->filtro_estatus_historico !== '') {
             $filas = $filas->filter(
                 fn ($fila) => ($fila['estatus_historico'] ?? 'activo') === $this->filtro_estatus_historico
@@ -1952,7 +2126,9 @@ class Calificacion extends Component
 
     public function abrirRevisionGuardado(): void
     {
-        $this->resetErrorBag('calificaciones');
+        $this->resetErrorBag(['calificaciones', 'acepta_conformidad', 'password_confirmacion']);
+        $this->acepta_conformidad = false;
+        $this->password_confirmacion = '';
 
         if ($this->hayCambiosEnAlumnosConContextoPendiente() && ! $this->correccionHistoricaHabilitada) {
             $this->addError(
@@ -2028,9 +2204,60 @@ class Calificacion extends Component
         $this->mostrarModalRevision = false;
     }
 
-    public function guardarCalificaciones(CalificacionCorreccionService $correcciones, CicloNivelGateService $gate): void
-    {
-        $this->resetErrorBag('calificaciones');
+    public function guardarBorrador(
+        CalificacionCorreccionService $correcciones,
+        CicloNivelGateService $gate,
+        TeacherAcademicScopeService $scope,
+    ): void {
+        abort_unless($this->esProfesorAutenticado, 403);
+        $this->persistirCalificaciones(false, $correcciones, $gate, $scope);
+    }
+
+    public function guardarCalificaciones(
+        CalificacionCorreccionService $correcciones,
+        CicloNivelGateService $gate,
+        TeacherAcademicScopeService $scope,
+        CalificacionEntregaService $deliveryService,
+    ): void {
+        $this->persistirCalificaciones(true, $correcciones, $gate, $scope, $deliveryService);
+    }
+
+    private function persistirCalificaciones(
+        bool $confirmarEntrega,
+        CalificacionCorreccionService $correcciones,
+        CicloNivelGateService $gate,
+        TeacherAcademicScopeService $scope,
+        ?CalificacionEntregaService $deliveryService = null,
+    ): void {
+        $this->resetErrorBag(['calificaciones', 'acepta_conformidad', 'password_confirmacion']);
+
+        if ($this->esProfesorAutenticado) {
+            abort_if($this->esConsultaHistorica, 403, 'El profesor solo puede capturar en el ciclo escolar vigente.');
+            abort_if($this->entregaConfirmadaActual, 423, 'La entrega ya fue confirmada y está bloqueada.');
+
+            if ($confirmarEntrega) {
+                $this->validate([
+                    'acepta_conformidad' => ['accepted'],
+                    'password_confirmacion' => ['required', 'string'],
+                ], [
+                    'acepta_conformidad.accepted' => 'Debes aceptar expresamente la declaración de conformidad.',
+                    'password_confirmacion.required' => 'Escribe tu contraseña actual para confirmar la entrega.',
+                ]);
+
+                if (! Hash::check($this->password_confirmacion, (string) auth()->user()->password)) {
+                    $this->addError('password_confirmacion', 'La contraseña actual no es correcta.');
+                    return;
+                }
+
+                if (! $this->capturaCompleta) {
+                    $this->addError(
+                        'calificaciones',
+                        'Para confirmar la entrega debes capturar todas las calificaciones de los alumnos y materias mostrados.'
+                    );
+                    return;
+                }
+            }
+        }
 
         $cambiosEnContextoPendiente = $this->hayCambiosEnAlumnosConContextoPendiente();
 
@@ -2042,7 +2269,7 @@ class Calificacion extends Component
             return;
         }
 
-        if (!$this->puedeGuardar) {
+        if (! $this->puedeGuardar) {
             $mensaje = $this->esConsultaHistorica && ! $this->correccionHistoricaHabilitada
                 ? 'Habilita primero la corrección histórica para guardar cambios en este ciclo.'
                 : 'Selecciona todos los filtros requeridos antes de guardar.';
@@ -2056,7 +2283,6 @@ class Calificacion extends Component
         }
 
         $ciclo = CicloEscolar::query()->find($this->ciclo_escolar_id);
-
         $this->validate($this->reglasCalificaciones(), $this->mensajesCalificaciones());
 
         if (
@@ -2064,16 +2290,54 @@ class Calificacion extends Component
             || ! (bool) $ciclo?->es_actual
             || ($cambiosEnContextoPendiente && $this->correccionHistoricaHabilitada)
         ) {
+            abort_if($this->esProfesorAutenticado, 403, 'El profesor no puede modificar ciclos históricos o cerrados.');
             $this->aplicarCorreccionesHistoricas($correcciones);
             return;
         }
 
         $gate->asegurar((int) $this->ciclo_escolar_id, (int) $this->nivel_id, 'calificaciones');
 
-        DB::transaction(function () {
-            foreach ($this->calificaciones as $inscripcionId => $materiasAlumno) {
-                foreach ($materiasAlumno as $asignacionMateriaId => $valorNuevo) {
-                    $valorNuevo = $this->normalizarCalificacion($valorNuevo);
+        $authorized = [
+            'assignment_ids' => collect($this->materias)->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            'student_ids' => collect($this->inscripciones)->pluck('inscripcion_id')->map(fn ($id) => (int) $id)->all(),
+        ];
+
+        DB::transaction(function () use ($scope, &$authorized): void {
+            if ($this->esProfesorAutenticado) {
+                $alreadyConfirmed = CalificacionEntrega::query()
+                    ->where('user_id', auth()->id())
+                    ->where('periodo_id', (int) $this->periodo_id)
+                    ->where('grupo_id', (int) $this->grupo_id)
+                    ->where('estado', 'confirmada')
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($alreadyConfirmed) {
+                    throw ValidationException::withMessages([
+                        'calificaciones' => 'La entrega ya fue confirmada y no admite cambios docentes.',
+                    ]);
+                }
+
+                $authorized = $scope->validateGradePayload(
+                    user: auth()->user(),
+                    cicloEscolarId: (int) $this->ciclo_escolar_id,
+                    nivelId: (int) $this->nivel_id,
+                    generacionId: (int) $this->generacion_id,
+                    gradoId: (int) $this->grado_id,
+                    grupoId: (int) $this->grupo_id,
+                    semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
+                    periodoId: (int) $this->periodo_id,
+                    payloadAssignmentIds: $authorized['assignment_ids'],
+                    payloadStudentIds: $authorized['student_ids'],
+                    lock: true,
+                );
+            }
+
+            foreach ($authorized['student_ids'] as $inscripcionId) {
+                foreach ($authorized['assignment_ids'] as $asignacionMateriaId) {
+                    $valorNuevo = $this->normalizarCalificacion(
+                        $this->calificaciones[$inscripcionId][$asignacionMateriaId] ?? null
+                    );
                     $valorAnterior = $this->normalizarCalificacion(
                         $this->calificacionesOriginales[$inscripcionId][$asignacionMateriaId] ?? null
                     );
@@ -2086,19 +2350,16 @@ class Calificacion extends Component
                     }
 
                     $condiciones = [
-                        'periodo_id' => $this->periodo_id,
+                        'periodo_id' => (int) $this->periodo_id,
                         'inscripcion_id' => (int) $inscripcionId,
                         'asignacion_materia_id' => (int) $asignacionMateriaId,
                     ];
 
                     if ($valorNuevo === null) {
-                        $calificacion = ModelsCalificacion::query()
-                            ->where($condiciones)
-                            ->first();
+                        $calificacion = ModelsCalificacion::query()->where($condiciones)->lockForUpdate()->first();
 
                         if ($calificacion) {
                             $calificacion->delete();
-
                             $this->crearBitacoraCalificacion(
                                 accion: 'eliminar',
                                 inscripcionId: (int) $inscripcionId,
@@ -2112,22 +2373,19 @@ class Calificacion extends Component
                         continue;
                     }
 
-                    $existe = ModelsCalificacion::query()
-                        ->where($condiciones)
-                        ->exists();
-
+                    $existe = ModelsCalificacion::query()->where($condiciones)->lockForUpdate()->exists();
                     $accion = $existe ? 'editar' : 'crear';
 
                     ModelsCalificacion::query()->updateOrCreate(
                         $condiciones,
                         [
                             'inscripcion_ciclo_id' => $this->inscripcionCicloIdPara((int) $inscripcionId, true),
-                            'nivel_id' => $this->nivel_id,
-                            'grado_id' => $this->grado_id,
-                            'grupo_id' => $this->grupo_id,
-                            'ciclo_escolar_id' => $this->ciclo_escolar_id,
-                            'generacion_id' => $this->generacion_id,
-                            'semestre_id' => $this->esBachillerato ? $this->semestre_id : null,
+                            'nivel_id' => (int) $this->nivel_id,
+                            'grado_id' => (int) $this->grado_id,
+                            'grupo_id' => (int) $this->grupo_id,
+                            'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
+                            'generacion_id' => (int) $this->generacion_id,
+                            'semestre_id' => $this->esBachillerato ? (int) $this->semestre_id : null,
                             'calificacion' => $valorNuevo,
                             'valor_numerico' => $this->obtenerValorNumerico($valorNuevo),
                             'es_numerica' => $this->esCalificacionNumerica($valorNuevo),
@@ -2149,20 +2407,42 @@ class Calificacion extends Component
                     );
                 }
             }
-        });
+        }, 3);
+
+        $delivery = null;
+        if ($confirmarEntrega && $this->esProfesorAutenticado) {
+            $delivery = $deliveryService?->create(auth()->user(), [
+                'ciclo_escolar_id' => (int) $this->ciclo_escolar_id,
+                'nivel_id' => (int) $this->nivel_id,
+                'generacion_id' => (int) $this->generacion_id,
+                'grado_id' => (int) $this->grado_id,
+                'grupo_id' => (int) $this->grupo_id,
+                'semestre_id' => $this->esBachillerato ? (int) $this->semestre_id : null,
+                'periodo_id' => (int) $this->periodo_id,
+                'assignment_ids' => $authorized['assignment_ids'],
+                'student_ids' => $authorized['student_ids'],
+            ]);
+        }
 
         $this->calificacionesOriginales = $this->calificaciones;
         $this->observacionesOriginales = $this->observaciones;
         $this->mostrarModalRevision = false;
         $this->motivo_guardado = '';
+        $this->acepta_conformidad = false;
+        $this->password_confirmacion = '';
 
         $this->calcularPromedios();
         $this->aplicarFiltroEstado();
-
         $this->dispatch('calificaciones-internas-guardadas');
 
+        if ($delivery) {
+            $this->dispatch('abrir-pdf-entrega', url: route('docente.entregas.pdf', $delivery));
+        }
+
         $this->dispatch('swal', [
-            'title' => '¡Calificaciones guardadas correctamente!',
+            'title' => $delivery
+                ? 'Entrega confirmada y PDF generado'
+                : ($this->esProfesorAutenticado ? 'Borrador guardado correctamente' : '¡Calificaciones guardadas correctamente!'),
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -2276,12 +2556,30 @@ class Calificacion extends Component
 
     private function inscripcionCicloIdPara(int $inscripcionId, bool $asegurarContexto = false): ?int
     {
-        $fila = collect($this->inscripciones)
-            ->firstWhere('inscripcion_id', $inscripcionId);
+        if ($this->esProfesorAutenticado) {
+            $id = (int) InscripcionCiclo::query()
+                ->where('inscripcion_id', $inscripcionId)
+                ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+                ->where('nivel_id', (int) $this->nivel_id)
+                ->where('generacion_id', (int) $this->generacion_id)
+                ->where('grado_id', (int) $this->grado_id)
+                ->where('grupo_id', (int) $this->grupo_id)
+                ->when(
+                    $this->esBachillerato,
+                    fn ($query) => $query->where('semestre_id', (int) $this->semestre_id),
+                    fn ($query) => $query->whereNull('semestre_id')
+                )
+                ->where('estado', '!=', InscripcionCiclo::ESTADO_ANULADO)
+                ->latest('id')
+                ->value('id');
+        } else {
+            $fila = collect($this->inscripciones)
+                ->firstWhere('inscripcion_id', $inscripcionId);
 
-        $id = (int) ($fila['inscripcion_ciclo_id'] ?? 0);
+            $id = (int) ($fila['inscripcion_ciclo_id'] ?? 0);
+        }
 
-        if (! $asegurarContexto || ! $this->esBachillerato) {
+        if (! $asegurarContexto || ! $this->esBachillerato || $id > 0) {
             return $id > 0 ? $id : null;
         }
 
@@ -2528,7 +2826,8 @@ class Calificacion extends Component
                     && $this->correccionHistoricaHabilitada;
             }
 
-            return (bool) auth()->user()?->canAccess('calificaciones.capturar');
+            return $this->edicionCalificacionesHabilitada
+                && (bool) auth()->user()?->canAccess('calificaciones.capturar');
         }
 
         return $this->puedeAdministrarCorreccionHistorica
@@ -2592,6 +2891,12 @@ class Calificacion extends Component
 
     public function abrirModalBitacora(): void
     {
+        abort_if(
+            $this->esProfesorAutenticado,
+            403,
+            'La bitácora institucional está reservada para administración.'
+        );
+
         $this->mostrarModalBitacora = true;
     }
 
@@ -3191,6 +3496,7 @@ class Calificacion extends Component
 
     public function generarDiagnosticoIa(GroqCalificacionService $groq): void
     {
+        $this->assertAdministrativeAcademicToolAccess();
         $this->validate([
             'tipoDiagnosticoIa' => ['required', 'in:pedagogico,direccion,consejo_tecnico,familias'],
         ], [
@@ -3625,6 +3931,15 @@ class Calificacion extends Component
             ->exists();
     }
 
+    private function assertAdministrativeAcademicToolAccess(): void
+    {
+        abort_if(
+            $this->esProfesorAutenticado,
+            403,
+            'Las cuentas docentes no tienen acceso a plantillas, importaciones, boletas, reconocimientos ni herramientas de inteligencia artificial.'
+        );
+    }
+
     private function tipoPeriodoImportacion(): string
     {
         return $this->esBachillerato ? 'bachillerato' : 'basica';
@@ -3663,8 +3978,70 @@ class Calificacion extends Component
             '.xlsx';
     }
 
+    /** @return array{assignment_ids:array<int,int>,student_ids:array<int,int>} */
+    private function validarPayloadDocenteActual(bool $lock = false): array
+    {
+        $payload = [
+            'assignment_ids' => collect($this->materias)->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            'student_ids' => collect($this->inscripciones)->pluck('inscripcion_id')->map(fn ($id) => (int) $id)->all(),
+        ];
+
+        if (! $this->esProfesorAutenticado) {
+            return $payload;
+        }
+
+        return app(TeacherAcademicScopeService::class)->validateGradePayload(
+            user: auth()->user(),
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            nivelId: (int) $this->nivel_id,
+            generacionId: (int) $this->generacion_id,
+            gradoId: (int) $this->grado_id,
+            grupoId: (int) $this->grupo_id,
+            semestreId: $this->esBachillerato ? (int) $this->semestre_id : null,
+            periodoId: (int) $this->periodo_id,
+            payloadAssignmentIds: $payload['assignment_ids'],
+            payloadStudentIds: $payload['student_ids'],
+            lock: $lock,
+        );
+    }
+
+    /** @param array<int,int> $studentIds */
+    private function inscripcionCicloIdsSeguros(array $studentIds): array
+    {
+        if (! $this->esProfesorAutenticado) {
+            return collect($this->inscripciones)
+                ->filter(fn ($fila) => ! empty($fila['inscripcion_ciclo_id']))
+                ->mapWithKeys(fn ($fila) => [
+                    (int) $fila['inscripcion_id'] => (int) $fila['inscripcion_ciclo_id'],
+                ])
+                ->all();
+        }
+
+        return InscripcionCiclo::query()
+            ->whereIn('inscripcion_id', $studentIds)
+            ->where('ciclo_escolar_id', (int) $this->ciclo_escolar_id)
+            ->where('nivel_id', (int) $this->nivel_id)
+            ->where('generacion_id', (int) $this->generacion_id)
+            ->where('grado_id', (int) $this->grado_id)
+            ->where('grupo_id', (int) $this->grupo_id)
+            ->when(
+                $this->esBachillerato,
+                fn ($query) => $query->where('semestre_id', (int) $this->semestre_id),
+                fn ($query) => $query->whereNull('semestre_id')
+            )
+            ->where('estado', '!=', InscripcionCiclo::ESTADO_ANULADO)
+            ->latest('id')
+            ->get(['id', 'inscripcion_id'])
+            ->unique('inscripcion_id')
+            ->mapWithKeys(fn (InscripcionCiclo $history) => [
+                (int) $history->inscripcion_id => (int) $history->id,
+            ])
+            ->all();
+    }
+
     public function descargarPlantillaImportacion()
     {
+        $this->assertAdministrativeAcademicToolAccess();
         if (!$this->puedeUsarPlantillaImportacion) {
             $this->dispatch('swal', [
                 'title' => 'Selecciona todos los filtros antes de descargar la plantilla.',
@@ -3685,6 +4062,8 @@ class Calificacion extends Component
 
             return null;
         }
+
+        $this->validarPayloadDocenteActual();
 
         $nivel = Nivel::query()->find($this->nivel_id);
         $grado = Grado::query()->find($this->grado_id);
@@ -3738,6 +4117,7 @@ class Calificacion extends Component
 
     public function importarPlantillaCalificaciones(): void
     {
+        $this->assertAdministrativeAcademicToolAccess();
         if (!$this->puedeUsarPlantillaImportacion) {
             $this->addError('archivo_calificaciones', 'Selecciona todos los filtros antes de importar calificaciones.');
             return;
@@ -3773,6 +4153,18 @@ class Calificacion extends Component
         ]);
 
         try {
+            abort_if(
+                $this->esProfesorAutenticado && $this->entregaConfirmadaActual,
+                423,
+                'La entrega ya fue confirmada y no admite nuevas importaciones.'
+            );
+
+            $authorized = $this->validarPayloadDocenteActual();
+            $materiasSeguras = collect($this->materias)
+                ->whereIn('id', $authorized['assignment_ids'])
+                ->values()
+                ->all();
+
             $import = new CalificacionesImport(
                 nivelId: (int) $this->nivel_id,
                 gradoId: (int) $this->grado_id,
@@ -3784,18 +4176,9 @@ class Calificacion extends Component
                 esBachillerato: $this->esBachillerato,
                 tipoPeriodo: $this->tipoPeriodoImportacion(),
                 periodoReferenciaId: $this->periodoReferenciaIdImportacion(),
-                inscripcionIdsPermitidas: collect($this->inscripciones)
-                    ->pluck('inscripcion_id')
-                    ->map(fn($id) => (int) $id)
-                    ->values()
-                    ->all(),
-                inscripcionCicloIds: collect($this->inscripciones)
-                    ->filter(fn ($fila) => ! empty($fila['inscripcion_ciclo_id']))
-                    ->mapWithKeys(fn ($fila) => [
-                        (int) $fila['inscripcion_id'] => (int) $fila['inscripcion_ciclo_id'],
-                    ])
-                    ->all(),
-                materiasPermitidas: $this->materias,
+                inscripcionIdsPermitidas: $authorized['student_ids'],
+                inscripcionCicloIds: $this->inscripcionCicloIdsSeguros($authorized['student_ids']),
+                materiasPermitidas: $materiasSeguras,
                 userId: Auth::id(),
                 ip: request()->ip(),
                 motivo: ($this->esConsultaHistorica || $this->hayAlumnosConContextoPendiente)
@@ -3857,6 +4240,8 @@ class Calificacion extends Component
 
     public function exportarCalificaciones()
     {
+        abort_unless(auth()->user()?->is_admin, 403, 'La exportación general está reservada para administración.');
+
         if (!$this->puedeExportarPdf) {
             $this->dispatch('swal', [
                 'title' => 'Selecciona todos los filtros antes de exportar.',

@@ -28,9 +28,11 @@ return [
         'profesor' => [
             'label' => 'Profesor',
             'permissions' => [
-                'alumnos.consultar', 'academico.consultar', 'seguimiento.consultar', 'calificaciones.consultar',
-                'calificaciones.capturar', 'documentos.consultar', 'horarios.consultar',
-                'fichas.consultar', 'fichas.capturar',
+                'horarios.consultar',
+                'calificaciones.consultar',
+                'calificaciones.capturar',
+                'fichas.consultar',
+                'fichas.capturar',
             ],
         ],
         'consulta' => [

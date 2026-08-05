@@ -1,3 +1,5 @@
+@php($esProfesor = auth()->user()?->isProfessor())
+
 <div class="space-y-6" x-data="{ copiadoInformeGrupo: false }">
     <div
         class="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -106,14 +108,18 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2">
+                    @unless ($esProfesor)
                     <flux:button href="{{ $this->urlExcel }}" target="_blank" variant="primary" icon="arrow-down-tray">
                         Excel
                     </flux:button>
+
+                    @endunless
 
                     <flux:button href="{{ $this->urlPdfGrupo }}" target="_blank" variant="filled" icon="document-text">
                         PDF grupo
                     </flux:button>
 
+                    @unless ($esProfesor)
                     <flux:button type="button" wire:click="descargarPlantillaImportacion" wire:loading.attr="disabled"
                         wire:target="descargarPlantillaImportacion" variant="outline" icon="document-arrow-down">
                         <span wire:loading.remove wire:target="descargarPlantillaImportacion">
@@ -123,11 +129,13 @@
                             Generando...
                         </span>
                     </flux:button>
+                    @endunless
                 </div>
             </div>
         </div>
     </div>
 
+    @unless ($esProfesor)
     <div
         class="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -505,6 +513,7 @@
             @endif
         </div>
     </div>
+    @endunless
 
     <div
         class="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -661,6 +670,7 @@
                     @endif
 
                     <div @class(['min-w-0', 'lg:col-span-2' => $campo === 'recomendaciones'])>
+                        @unless ($esProfesor)
                         <div wire:init="verificarGroq"
                             class="mb-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 shadow-sm dark:border-emerald-500/30 dark:from-emerald-500/10 dark:via-neutral-900 dark:to-cyan-500/10">
                             <div class="border-b border-emerald-100 px-5 py-4 dark:border-emerald-500/20">
@@ -843,6 +853,7 @@
                                 </div>
                             </div>
                         </div>
+                        @endunless
 
                         <flux:field>
                             <flux:label>

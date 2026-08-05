@@ -43,6 +43,18 @@ class BitacoraCalificaciones extends Component
 
     protected $paginationTheme = 'tailwind';
 
+    public function boot(): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user?->canAccess('calificaciones.consultar'), 403);
+        abort_if(
+            $user->isProfessor(),
+            403,
+            'La bitácora institucional está reservada para administración.'
+        );
+    }
+
     public function mount(
         ?int $nivel_id = null,
         ?int $ciclo_escolar_id = null,

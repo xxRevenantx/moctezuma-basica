@@ -26,6 +26,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'photo',
+        'email_verified_at',
+        'is_admin',
+        'rol_sistema',
+        'permisos',
+        'activo',
+        'must_change_password',
+        'temporary_password_issued_at',
     ];
 
     /**
@@ -53,6 +60,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'permisos' => 'array',
             'activo' => 'boolean',
             'ultimo_acceso_at' => 'datetime',
+            'must_change_password' => 'boolean',
+            'temporary_password_issued_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -98,6 +107,11 @@ class User extends Authenticatable implements MustVerifyEmail
         );
     }
 
+    public function isProfessor(): bool
+    {
+        return ! (bool) $this->is_admin && $this->rol_sistema === 'profesor';
+    }
+
     public function roleLabel(): string
     {
         if ($this->is_admin) {
@@ -108,6 +122,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'system_permissions.roles.'.($this->rol_sistema ?: 'consulta').'.label',
             'Usuario'
         );
+    }
+
+    public function calificacionEntregas()
+    {
+        return $this->hasMany(CalificacionEntrega::class);
     }
 
     public function persona()

@@ -17,10 +17,10 @@ Route::get('/register', function () {
 })->name('register.disabled');
 
 Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'active', 'verified'])
+    ->middleware(['auth', 'active', 'verified', 'role.scope', 'password.changed'])
     ->name('dashboard');
 
-Route::middleware(['auth', 'active'])->group(function () {
+Route::middleware(['auth', 'active', 'role.scope', 'password.changed'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
     Route::get('settings/profile', Profile::class)->name('profile.edit');
@@ -39,7 +39,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         ->name('two-factor.show');
 });
 
-Route::middleware(['auth', 'active', 'route.permission'])->group(base_path('routes/misrutas.php'));
+Route::middleware(['auth', 'active', 'role.scope', 'password.changed', 'route.permission'])->group(base_path('routes/misrutas.php'));
 
 /*
 |--------------------------------------------------------------------------
@@ -51,7 +51,7 @@ Route::middleware(['auth', 'active', 'route.permission'])->group(base_path('rout
 | una copia anterior de ese archivo o cuando la caché de rutas quedó desfasada.
 |
 */
-Route::middleware(['auth', 'active', 'route.permission'])->group(function (): void {
+Route::middleware(['auth', 'active', 'role.scope', 'password.changed', 'route.permission'])->group(function (): void {
     if (! Route::has('generales.cierre-generacion.reporte')) {
         Route::get(
             '/generales/cierre-generacion/{proceso}/reporte/{formato}',

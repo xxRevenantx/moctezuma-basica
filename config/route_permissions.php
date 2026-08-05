@@ -2,6 +2,11 @@
 
 return [
     'names' => [
+        'docente.horario' => 'horarios.consultar',
+        'docente.calificaciones' => 'calificaciones.consultar',
+        'docente.fichas' => 'fichas.consultar',
+        'docente.entregas.pdf' => 'calificaciones.consultar',
+
         'misrutas.inscripcion' => 'alumnos.crear',
         'misrutas.matricula.editar' => 'alumnos.editar',
         'misrutas.alumnos*' => 'alumnos.consultar',
@@ -13,6 +18,7 @@ return [
         'misrutas.plantilla*' => 'personal.consultar',
         'misrutas.profesores*' => 'personal.consultar',
         'credenciales.profesores*' => 'personal.consultar',
+        'profesor.horario.pdf' => 'horarios.consultar',
         'profesor.*' => 'personal.consultar',
         'profesores.*' => 'personal.consultar',
 

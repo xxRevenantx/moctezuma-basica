@@ -7,6 +7,7 @@ use App\Models\FichaDescriptiva;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\CicloEscolar;
+use App\Services\TeacherAcademicScopeService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,15 @@ class FichaController extends Controller
     {
         $periodo = (int) $request->integer('periodo', 1);
         $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: $this->cicloActual()?->id;
+
+        if ($request->user()?->isProfessor()) {
+            abort_unless(
+                (int) $inscripcion->ciclo_escolar_id === (int) $cicloEscolarId
+                && $this->teacherGroupIds($request, $cicloEscolarId)->contains((int) $inscripcion->grupo_id),
+                403,
+                'El alumno no pertenece a uno de tus grupos autorizados.'
+            );
+        }
 
         $inscripcion->load([
             'nivel.director',
@@ -89,6 +99,11 @@ class FichaController extends Controller
 
         $periodo = (int) $request->integer('periodo', 1);
         $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: $this->cicloActual()?->id;
+
+        if ($request->user()?->isProfessor()) {
+            $grupoId = $request->integer('grupo_id');
+            abort_unless($grupoId && $this->teacherGroupIds($request, $cicloEscolarId)->contains($grupoId), 403, 'Selecciona uno de tus grupos autorizados.');
+        }
 
         $alumnos = Inscripcion::query()
             ->visiblesEnListas()
@@ -148,6 +163,11 @@ class FichaController extends Controller
         $periodo = (int) $request->integer('periodo', 1);
         $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: $this->cicloActual()?->id;
 
+        if ($request->user()?->isProfessor()) {
+            $grupoId = $request->integer('grupo_id');
+            abort_unless($grupoId && $this->teacherGroupIds($request, $cicloEscolarId)->contains($grupoId), 403, 'Selecciona uno de tus grupos autorizados.');
+        }
+
         return Excel::download(
             new FichaDescriptivaExport(
                 $nivel->id,
@@ -160,6 +180,26 @@ class FichaController extends Controller
             ),
             'fichas-descriptivas-preescolar.xlsx'
         );
+    }
+
+    private function teacherGroupIds(Request $request, ?int $cicloEscolarId): \Illuminate\Support\Collection
+    {
+        if (! $request->user()?->isProfessor()) {
+            return collect();
+        }
+
+        $currentCycleId = CicloEscolar::query()
+            ->where('es_actual', true)
+            ->whereNull('cerrado_at')
+            ->orderByDesc('id')
+            ->value('id');
+
+        if (! $currentCycleId || (int) $cicloEscolarId !== (int) $currentCycleId) {
+            return collect();
+        }
+
+        return app(TeacherAcademicScopeService::class)
+            ->preschoolHomeroomGroupIds($request->user(), (int) $currentCycleId);
     }
 
     private function cicloActual(): ?CicloEscolar

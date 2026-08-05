@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\FichaDescriptiva;
 use App\Models\Inscripcion;
 use App\Models\Periodos;
+use App\Services\HtmlSanitizerService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -166,15 +167,6 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
 
     private function limpiarDescripcion(mixed $descripcion): string
     {
-        $descripcion = trim((string) $descripcion);
-
-        if ($descripcion === '') {
-            return '';
-        }
-
-        return trim(strip_tags(
-            $descripcion,
-            '<p><br><strong><b><em><i><u><s><strike><span><ul><ol><li><table><thead><tbody><tr><th><td><h1><h2><h3><h4><h5><h6><blockquote>'
-        ));
+        return app(HtmlSanitizerService::class)->sanitize((string) $descripcion);
     }
 }

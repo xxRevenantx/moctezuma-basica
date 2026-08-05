@@ -9,6 +9,8 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\EnsureUserHasPermission;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\EnsureRoleRouteScope;
+use App\Http\Middleware\EnsurePasswordChanged;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => EnsureUserHasPermission::class,
             'academic.unlocked' => EnsureAcademicModuleUnlocked::class,
             'route.permission' => EnsureRoutePermission::class,
+            'role.scope' => EnsureRoleRouteScope::class,
+            'password.changed' => EnsurePasswordChanged::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

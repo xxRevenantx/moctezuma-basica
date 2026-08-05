@@ -33,6 +33,8 @@ class Password extends Component
 
         Auth::user()->update([
             'password' => $validated['password'],
+            'must_change_password' => false,
+            'temporary_password_issued_at' => null,
         ]);
 
         $this->reset('current_password', 'password', 'password_confirmation');

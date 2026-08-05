@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\CalificacionEntrega;
 use App\Models\Constancia;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoPersonal;
@@ -22,8 +23,10 @@ use App\Services\SystemBackupService;
 use App\Services\SystemHealthService;
 use App\Services\SystemNotificationService;
 use App\Services\SystemAssistantService;
+use App\Services\InstitutionalTeacherAccountService;
 use App\Services\WorkflowService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -44,10 +47,17 @@ class SystemControlCenter extends Component
     public array $configuration = [];
 
     public ?int $selectedUserId = null;
-    public string $selectedRole = 'consulta';
+    public string $selectedRole = 'administrador';
     public ?int $selectedPersonaId = null;
     public bool $selectedIsAdmin = false;
     public bool $selectedActive = true;
+    public ?int $newTeacherPersonaId = null;
+
+    /** @var array<string,mixed> */
+    public array $temporaryCredential = [];
+
+    public ?int $reopenSubmissionId = null;
+    public string $reopenSubmissionReason = '';
 
     /** @var array<int,string> */
     public array $selectedPermissions = [];
@@ -139,20 +149,23 @@ class SystemControlCenter extends Component
         $this->authorizePermission('usuarios.gestionar');
         $user = User::query()->findOrFail($id);
         $this->selectedUserId = $user->id;
-        $this->selectedRole = $user->rol_sistema ?: 'consulta';
+        $this->selectedRole = $user->is_admin ? 'administrador' : ($user->rol_sistema ?: 'profesor');
         $this->selectedPersonaId = $user->persona_id ? (int) $user->persona_id : null;
         $this->selectedIsAdmin = (bool) $user->is_admin;
         $this->selectedActive = (bool) ($user->activo ?? true);
-        $this->selectedPermissions = array_values($user->permisos ?? []);
+        $this->selectedPermissions = $user->isProfessor() ? [] : array_values($user->permisos ?? []);
     }
 
-    public function saveUserAccess(SystemAuditService $audit): void
-    {
+    public function saveUserAccess(
+        SystemAuditService $audit,
+        InstitutionalTeacherAccountService $accounts,
+    ): void {
+
         $this->authorizePermission('usuarios.gestionar');
 
         $this->validate([
             'selectedUserId' => ['required', 'integer', 'exists:users,id'],
-            'selectedRole' => ['required', 'string', 'in:'.implode(',', array_keys(config('system_permissions.roles', [])))],
+            'selectedRole' => ['required', 'string', 'in:administrador,profesor'],
             'selectedPersonaId' => [
                 'nullable',
                 'integer',
@@ -166,20 +179,58 @@ class SystemControlCenter extends Component
         ]);
 
         $user = User::query()->findOrFail($this->selectedUserId);
+        $isAdminRole = $this->selectedRole === 'administrador';
 
-        if ($user->is(auth()->user()) && (! $this->selectedIsAdmin || ! $this->selectedActive)) {
-            $this->addError('selectedIsAdmin', 'No puedes quitarte el acceso administrativo ni desactivar tu propia cuenta.');
+        if ($user->is(auth()->user()) && (! $isAdminRole || ! $this->selectedActive)) {
+            $this->addError('selectedRole', 'No puedes quitarte el acceso administrativo ni desactivar tu propia cuenta.');
             return;
+        }
+
+        if ($this->selectedRole === 'profesor' && ! $this->selectedPersonaId) {
+            $this->addError('selectedPersonaId', 'El rol Profesor requiere una persona docente vinculada.');
+            return;
+        }
+
+        if ($this->selectedRole === 'profesor') {
+            if (! $user->isProfessor()) {
+                $this->addError(
+                    'selectedRole',
+                    'Las cuentas docentes deben crearse desde “Nuevo acceso docente” para generar su identidad institucional y contraseña temporal.'
+                );
+                return;
+            }
+
+            if ((int) $this->selectedPersonaId !== (int) $user->persona_id) {
+                $this->addError(
+                    'selectedPersonaId',
+                    'La identidad vinculada a una cuenta docente no puede sustituirse. Crea una cuenta para el profesor correcto.'
+                );
+                return;
+            }
+
+            $persona = Persona::query()->findOrFail((int) $this->selectedPersonaId);
+            $accounts->assertEligible($persona, 'selectedPersonaId');
+
+            if (! $accounts->isInstitutionalEmail($user->email)) {
+                $this->addError(
+                    'selectedRole',
+                    'La cuenta docente no utiliza un identificador institucional válido. Restablece el acceso desde administración.'
+                );
+                return;
+            }
         }
 
         $before = $user->only(['persona_id', 'is_admin', 'rol_sistema', 'permisos', 'activo']);
         $user->forceFill([
             'persona_id' => $this->selectedPersonaId ?: null,
-            'is_admin' => $this->selectedIsAdmin,
+            'is_admin' => $isAdminRole,
             'rol_sistema' => $this->selectedRole,
-            'permisos' => array_values(array_unique($this->selectedPermissions)),
+            'permisos' => $this->selectedRole === 'profesor' ? null : array_values(array_unique($this->selectedPermissions)),
             'activo' => $this->selectedActive,
         ])->save();
+
+        $this->selectedIsAdmin = $isAdminRole;
+        $this->selectedPermissions = $this->selectedRole === 'profesor' ? [] : $this->selectedPermissions;
 
         $audit->record('permissions_updated', 'usuarios', [
             'user_id' => $user->id,
@@ -190,6 +241,66 @@ class SystemControlCenter extends Component
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => 'Accesos actualizados',
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function createTeacherAccount(InstitutionalTeacherAccountService $accounts, SystemAuditService $audit): void
+    {
+        $this->authorizePermission('usuarios.gestionar');
+
+        $this->validate([
+            'newTeacherPersonaId' => ['required', 'integer', 'exists:personas,id'],
+        ]);
+
+        $persona = Persona::query()->findOrFail($this->newTeacherPersonaId);
+        $result = $accounts->createFor($persona);
+
+        if (! $result['created']) {
+            $this->addError('newTeacherPersonaId', 'El profesor ya tiene una cuenta vinculada.');
+            return;
+        }
+
+        $this->temporaryCredential = [
+            'name' => $result['user']->name,
+            'email' => $result['user']->email,
+            'password' => $result['password'],
+        ];
+        $this->selectedUserId = $result['user']->id;
+        $this->selectUser($result['user']->id);
+        $this->newTeacherPersonaId = null;
+
+        $audit->record('teacher_account_created', 'usuarios', [
+            'user_id' => $result['user']->id,
+            'persona_id' => $persona->id,
+            'email' => $result['user']->email,
+        ]);
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Acceso docente creado',
+            'text' => 'Copia la contraseña temporal antes de salir de esta pantalla.',
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function resetTeacherPassword(InstitutionalTeacherAccountService $accounts, SystemAuditService $audit): void
+    {
+        $this->authorizePermission('usuarios.gestionar');
+        $user = User::query()->findOrFail($this->selectedUserId);
+        $result = $accounts->resetTemporaryPassword($user);
+
+        $this->temporaryCredential = [
+            'name' => $result['user']->name,
+            'email' => $result['user']->email,
+            'password' => $result['password'],
+        ];
+
+        $audit->record('teacher_password_reset', 'usuarios', ['user_id' => $user->id]);
+
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Contraseña temporal renovada',
             'position' => 'top-end',
         ]);
     }
@@ -237,6 +348,70 @@ class SystemControlCenter extends Component
             'icon' => 'success',
             'title' => 'Estado actualizado',
             'text' => ucfirst($module).': '.$state->status,
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function prepareGradeSubmissionReopen(int $submissionId): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        CalificacionEntrega::query()
+            ->where('estado', 'confirmada')
+            ->findOrFail($submissionId);
+
+        $this->reopenSubmissionId = $submissionId;
+        $this->reopenSubmissionReason = '';
+        $this->resetErrorBag('reopenSubmissionReason');
+    }
+
+    public function cancelGradeSubmissionReopen(): void
+    {
+        $this->reopenSubmissionId = null;
+        $this->reopenSubmissionReason = '';
+        $this->resetErrorBag('reopenSubmissionReason');
+    }
+
+    public function reopenGradeSubmission(SystemAuditService $audit): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $this->validate([
+            'reopenSubmissionId' => ['required', 'integer'],
+            'reopenSubmissionReason' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'reopenSubmissionReason.required' => 'Indica el motivo de la reapertura.',
+            'reopenSubmissionReason.min' => 'El motivo debe tener al menos 10 caracteres.',
+        ]);
+
+        $submission = DB::transaction(function (): CalificacionEntrega {
+            $submission = CalificacionEntrega::query()
+                ->lockForUpdate()
+                ->findOrFail((int) $this->reopenSubmissionId);
+
+            abort_unless($submission->estado === 'confirmada', 409, 'La entrega ya no se encuentra confirmada.');
+
+            $submission->forceFill([
+                'estado' => 'reabierta',
+                'reabierta_por' => auth()->id(),
+                'reabierta_at' => now(),
+                'motivo_reapertura' => trim($this->reopenSubmissionReason),
+            ])->save();
+
+            return $submission;
+        }, 3);
+
+        $audit->record('grade_submission_reopened', 'calificaciones', [
+            'calificacion_entrega_id' => $submission->id,
+            'folio' => $submission->folio,
+            'motivo' => $submission->motivo_reapertura,
+        ]);
+
+        $this->cancelGradeSubmissionReopen();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Entrega reabierta',
+            'text' => 'El profesor puede corregir y generar una nueva versión. El PDF anterior se conserva como evidencia.',
             'position' => 'top-end',
         ]);
     }
@@ -368,6 +543,34 @@ class SystemControlCenter extends Component
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'apellido_paterno', 'apellido_materno']);
+
+        $eligibleTeachers = Persona::query()
+            ->with('usuario:id,persona_id,email')
+            ->where('status', true)
+            ->whereDoesntHave('usuario')
+            ->where(function ($query): void {
+                $query->whereHas('rolesPersona', fn ($role) => $role->where('es_docente', true))
+                    ->orWhereHas('asignacionMaterias')
+                    ->orWhereHas('tallerSesiones')
+                    ->orWhereHas('docenteGrupos', fn ($group) => $group->where('status', true));
+            })
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'apellido_paterno', 'apellido_materno', 'curp']);
+
+        $gradeSubmissions = Schema::hasTable('calificacion_entregas')
+            ? CalificacionEntrega::query()
+                ->with([
+                    'nivel:id,nombre',
+                    'grado:id,nombre',
+                    'grupo.asignacionGrupo:id,nombre',
+                ])
+                ->latest('confirmada_at')
+                ->limit(30)
+                ->get()
+            : collect();
+
         $workflows = Schema::hasTable('workflow_states')
             ? collect(['calificaciones', 'documentos', 'cierre_ciclo'])->mapWithKeys(function (string $module): array {
                 $state = app(WorkflowService::class)->state($module);
@@ -382,7 +585,9 @@ class SystemControlCenter extends Component
             'users' => $users,
             'personas' => $personas,
             'trash' => $this->trashRows(),
-            'roles' => config('system_permissions.roles', []),
+            'roles' => collect(config('system_permissions.roles', []))->only(['administrador', 'profesor'])->all(),
+            'eligibleTeachers' => $eligibleTeachers,
+            'gradeSubmissions' => $gradeSubmissions,
             'permissions' => config('system_permissions.permissions', []),
             'workflows' => $workflows,
             'unreadNotifications' => $notifications->whereNull('read_at')->count(),

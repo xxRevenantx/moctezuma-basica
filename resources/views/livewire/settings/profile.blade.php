@@ -93,10 +93,27 @@
 
 
 
+            @if (auth()->user()->isProfessor())
+                <div class="rounded-2xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/60 dark:bg-sky-950/30">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white">
+                            <x-flux::icon name="shield-check" class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identidad institucional protegida</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                                Tu nombre y usuario institucional están vinculados al expediente docente y solo pueden ser modificados por administración.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus
-                autocomplete="name" />
+                autocomplete="name" :readonly="auth()->user()->isProfessor()" />
             <div>
-                <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />
+                <flux:input wire:model="email" :label="auth()->user()->isProfessor() ? __('Usuario institucional') : __('Email')"
+                    type="email" required autocomplete="email" :readonly="auth()->user()->isProfessor()" />
 
                 @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && !auth()->user()->hasVerifiedEmail())
                     <div>

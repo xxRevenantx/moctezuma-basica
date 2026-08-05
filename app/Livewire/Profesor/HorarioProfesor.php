@@ -7,6 +7,7 @@ use App\Models\CicloEscolar;
 use App\Models\Persona;
 use App\Models\AsignacionMateria;
 use App\Models\TallerSesion;
+use App\Services\TeacherAcademicScopeService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,16 @@ class HorarioProfesor extends Component
 
     public string $diaKey = '';
     public string $busqueda = '';
+
+    public function boot(): void
+    {
+        $user = auth()->user();
+        abort_unless($user?->canAccess('horarios.consultar'), 403);
+
+        if ($user->isProfessor()) {
+            app(TeacherAcademicScopeService::class)->personaIdOrFail($user);
+        }
+    }
 
     public function mount(): void
     {
@@ -56,26 +67,35 @@ class HorarioProfesor extends Component
                 });
             })
             ->where('personas.status', true)
+            ->when(auth()->user()?->isProfessor(), fn ($query) => $query->whereKey((int) auth()->user()->persona_id))
             ->orderBy('personas.apellido_paterno')
             ->orderBy('personas.apellido_materno')
             ->orderBy('personas.nombre');
 
-        $profesorSolicitado = request()->integer('profesor_id');
-
-        $this->profesorId = $profesorSolicitado > 0
-            && (clone $profesoresQuery)->whereKey($profesorSolicitado)->exists()
-            ? $profesorSolicitado
-            : $profesoresQuery->value('personas.id');
+        if (auth()->user()?->isProfessor()) {
+            $this->profesorId = (int) auth()->user()->persona_id;
+            abort_unless((clone $profesoresQuery)->whereKey($this->profesorId)->exists(), 403, 'No tienes horarios asignados.');
+        } else {
+            $profesorSolicitado = request()->integer('profesor_id');
+            $this->profesorId = $profesorSolicitado > 0
+                && (clone $profesoresQuery)->whereKey($profesorSolicitado)->exists()
+                ? $profesorSolicitado
+                : $profesoresQuery->value('personas.id');
+        }
     }
 
     public function updatedProfesorId(): void
     {
+        if (auth()->user()?->isProfessor()) {
+            $this->profesorId = (int) auth()->user()->persona_id;
+        }
+
         $this->limpiarFiltros(false);
     }
 
     public function limpiarFiltros(bool $limpiarProfesor = false): void
     {
-        if ($limpiarProfesor) {
+        if ($limpiarProfesor && ! auth()->user()?->isProfessor()) {
             $this->profesorId = null;
         }
 
@@ -89,6 +109,12 @@ class HorarioProfesor extends Component
 
     public function render()
     {
+        if (auth()->user()?->isProfessor()) {
+            // Nunca se utiliza el ID hidratado desde el navegador para una cuenta
+            // docente. La identidad efectiva siempre procede de la sesión.
+            $this->profesorId = (int) auth()->user()->persona_id;
+        }
+
         $profesores = $this->obtenerProfesores();
         $ciclosEscolares = CicloEscolar::query()->orderByDesc('id')->get();
 
@@ -114,7 +140,7 @@ class HorarioProfesor extends Component
             ])
             : null;
 
-        $todosPdfUrl = route('profesores.horarios.todos.pdf', array_filter([
+        $todosPdfUrl = auth()->user()?->isProfessor() ? null : route('profesores.horarios.todos.pdf', array_filter([
             'nivel_id' => $this->nivelId,
             'materia_id' => $this->materiaId,
             'grado_id' => $this->gradoId,
@@ -166,6 +192,7 @@ class HorarioProfesor extends Component
                 });
             })
             ->where('personas.status', true)
+            ->when(auth()->user()?->isProfessor(), fn ($query) => $query->whereKey((int) auth()->user()->persona_id))
             ->orderBy('personas.apellido_paterno')
             ->orderBy('personas.apellido_materno')
             ->orderBy('personas.nombre')
@@ -184,7 +211,11 @@ class HorarioProfesor extends Component
 
     private function obtenerHorarios(bool $aplicarFiltros): Collection
     {
-        if (!$this->profesorId) {
+        $profesorId = auth()->user()?->isProfessor()
+            ? (int) auth()->user()->persona_id
+            : (int) ($this->profesorId ?? 0);
+
+        if (! $profesorId) {
             return collect();
         }
 
@@ -206,16 +237,20 @@ class HorarioProfesor extends Component
                 'tallerSesion.grupos.grado:id,nombre,orden',
                 'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
-            ->where(function ($query) {
-                $query->whereHas('asignacionMateria', function ($subQuery) {
-                    $subQuery->where('profesor_id', $this->profesorId)
+            ->where(function ($query) use ($profesorId) {
+                $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId)
                         ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
-                })->orWhereHas('tallerSesion', function ($subQuery) {
-                    $subQuery->where('profesor_id', $this->profesorId)
+                })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId)
                         ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
                 });
             })
             ->when($this->cicloEscolarId, fn($query) => $query->where('ciclo_escolar_id', $this->cicloEscolarId))
+            ->when(
+                auth()->user()?->isProfessor(),
+                fn ($query) => $query->whereHas('version', fn ($version) => $version->where('estado', 'publicada'))
+            )
             ->when($aplicarFiltros && $this->nivelId, function ($query) {
                 $query->where('nivel_id', $this->nivelId);
             })

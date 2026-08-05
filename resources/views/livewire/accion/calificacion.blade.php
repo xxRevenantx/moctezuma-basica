@@ -1,3 +1,5 @@
+@php($esProfesor = auth()->user()?->isProfessor())
+
 <div x-data="{
     insIds: @js(collect($inscripcionesTabla)->pluck('inscripcion_id')->values()->all()),
     asigIds: @js(collect($materias)->pluck('id')->values()->all()),
@@ -253,9 +255,10 @@
         }
     }
 }" x-init="iniciarFiltrosGuardados();
-iniciarHerramientasAcademicas()" class="w-full">
+iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($event.detail.url, '_blank', 'noopener')" class="w-full">
 
     {{-- Niveles --}}
+    @unless ($this->esProfesorAutenticado)
     <div class="overflow-hidden">
         <div class="-mx-1 overflow-x-auto pb-1">
             <div class="flex min-w-max items-center justify-center gap-2 px-1">
@@ -289,8 +292,22 @@ iniciarHerramientasAcademicas()" class="w-full">
             </div>
         </div>
     </div>
+    @endunless
+
+    @if ($this->esProfesorAutenticado && $this->entregaConfirmadaActual)
+        <div class="mt-4 flex flex-col gap-4 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm font-black text-emerald-900 dark:text-emerald-100">Entrega confirmada y bloqueada</p>
+                <p class="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">Folio {{ $this->entregaConfirmadaActual->folio }} · {{ $this->entregaConfirmadaActual->confirmada_at?->format('d/m/Y H:i') }}. Solo administración puede reabrir esta captura.</p>
+            </div>
+            <a href="{{ route('docente.entregas.pdf', $this->entregaConfirmadaActual) }}" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-800">
+                <flux:icon.document-arrow-down class="size-4" /> Descargar comprobante
+            </a>
+        </div>
+    @endif
 
     {{-- Navegación entre captura vigente e historial --}}
+    @unless ($this->esProfesorAutenticado)
     <div class="mt-4 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
         <div class="inline-flex rounded-2xl bg-slate-100 p-1 dark:bg-neutral-800">
             <button type="button" wire:click="seleccionarModoConsulta('actual')"
@@ -309,6 +326,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                 : 'Captura ordinaria del ciclo escolar vigente.' }}
         </p>
     </div>
+    @endunless
 
     {{-- Filtros principales --}}
     <div
@@ -649,6 +667,7 @@ iniciarHerramientasAcademicas()" class="w-full">
     @endif
 
 
+    @unless ($esProfesor)
     {{-- Acordeón: importación, indicadores y análisis académico --}}
     <section
         class="mt-6 overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-xl shadow-slate-200/50 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
@@ -1600,6 +1619,8 @@ iniciarHerramientasAcademicas()" class="w-full">
         </div>
     </section>
 
+    @endunless
+
     {{-- Tabla --}}
     <div
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -1627,7 +1648,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                             placeholder="Escribe nombre o matrícula..."
                             class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
 
-                        @if (filled($busqueda))
+                        @if (!$esProfesor && filled($busqueda))
                             <a href="{{ route('misrutas.matricula.historial.pdf', [
                                 'slug_nivel' => $slug_nivel,
                                 'historial_completo' => 1,
@@ -1688,6 +1709,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                         </flux:select>
                     </div>
                 </div>
+                @unless ($esProfesor)
                 <div
                     class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3 dark:border-sky-900/40 dark:bg-sky-950/20">
                     <div class="flex items-start gap-3">
@@ -1864,6 +1886,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                         </div>
                     </div>
                 </div>
+                @endunless
 
 
 
@@ -2079,7 +2102,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                         </div>
 
                         <div class="flex flex-wrap items-center justify-end gap-3">
-                            @if ($this->mostrarBotonBitacora)
+                            @if (! $this->esProfesorAutenticado && $this->mostrarBotonBitacora)
                                 <button type="button" wire:click="abrirModalBitacora" wire:loading.attr="disabled"
                                     wire:target="abrirModalBitacora"
                                     class="inline-flex items-center justify-center gap-2 rounded-2xl border border-fuchsia-200 bg-white px-5 py-3 text-sm font-semibold text-fuchsia-700 shadow-sm transition hover:bg-fuchsia-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-fuchsia-900/40 dark:bg-neutral-900 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/20">
@@ -2093,6 +2116,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 </button>
                             @endif
 
+                            @unless ($this->esProfesorAutenticado)
                             <button type="button" wire:click="exportarCalificaciones" wire:loading.attr="disabled"
                                 wire:target="exportarCalificaciones"
                                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900/40 dark:bg-neutral-900 dark:text-emerald-300 dark:hover:bg-emerald-950/20">
@@ -2127,9 +2151,21 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 PDF
                             </button>
 
+                            @endunless
+
+                            @if ($this->esProfesorAutenticado)
+                                <button type="button" wire:click="guardarBorrador" wire:loading.attr="disabled" wire:target="guardarBorrador"
+                                    @if (!$this->puedeGuardar || !$hayCambios) disabled @endif
+                                    class="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-5 py-3 text-sm font-black text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-900/50 dark:bg-neutral-900 dark:text-sky-300">
+                                    <flux:icon.cloud-arrow-up class="size-4" />
+                                    <span wire:loading.remove wire:target="guardarBorrador">Guardar borrador</span>
+                                    <span wire:loading wire:target="guardarBorrador">Guardando...</span>
+                                </button>
+                            @endif
+
                             <button type="button" wire:click="abrirRevisionGuardado"
                                 @if (!$this->puedeGuardar) disabled @endif class="{{ $this->claseGuardar }}">
-                                Revisar y guardar
+                                {{ $this->esProfesorAutenticado ? 'Revisar y entregar' : 'Revisar y guardar' }}
                             </button>
                         </div>
                     </div>
@@ -2381,10 +2417,8 @@ iniciarHerramientasAcademicas()" class="w-full">
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h3 class="text-xl font-black text-neutral-900 dark:text-white">Revisión antes de guardar
-                            </h3>
-                            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Verifica los cambios
-                                detectados antes de guardar las calificaciones.</p>
+                            <h3 class="text-xl font-black text-neutral-900 dark:text-white">{{ $this->esProfesorAutenticado ? 'Confirmación de entrega' : 'Revisión antes de guardar' }}</h3>
+                            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ $this->esProfesorAutenticado ? 'Revisa la captura, acepta la declaración y confirma con tu contraseña.' : 'Verifica los cambios detectados antes de guardar las calificaciones.' }}</p>
                         </div>
                         <button type="button" wire:click="cerrarRevisionGuardado"
                             class="rounded-xl p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-white"><flux:icon.x-mark
@@ -2424,6 +2458,7 @@ iniciarHerramientasAcademicas()" class="w-full">
                         </div>
                     </div>
 
+                    @unless ($this->esProfesorAutenticado)
                     <div class="mt-5">
                         <label class="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                             {{ $this->esConsultaHistorica ? 'Motivo de la corrección histórica' : 'Motivo del guardado' }}
@@ -2439,6 +2474,34 @@ iniciarHerramientasAcademicas()" class="w-full">
                                 placeholder="Ejemplo: Captura de calificaciones del periodo, corrección administrativa, revisión final..."></textarea>
                         @endif
                     </div>
+                    @endunless
+
+                    @if ($this->esProfesorAutenticado)
+                        <div class="mt-5 rounded-[22px] border border-sky-200 bg-sky-50 p-5 dark:border-sky-900/50 dark:bg-sky-950/20">
+                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div><p class="text-[10px] font-black uppercase tracking-wider text-sky-600">Usuario ID</p><p class="mt-1 text-sm font-black text-sky-950 dark:text-sky-100">#{{ auth()->id() }}</p></div>
+                                <div><p class="text-[10px] font-black uppercase tracking-wider text-sky-600">Nombre completo</p><p class="mt-1 text-sm font-black text-sky-950 dark:text-sky-100">{{ auth()->user()->name }}</p></div>
+                                <div><p class="text-[10px] font-black uppercase tracking-wider text-sky-600">CURP</p><p class="mt-1 text-sm font-black text-sky-950 dark:text-sky-100">{{ auth()->user()->persona?->curp }}</p></div>
+                                <div><p class="text-[10px] font-black uppercase tracking-wider text-sky-600">Usuario institucional</p><p class="mt-1 break-all text-sm font-black text-sky-950 dark:text-sky-100">{{ auth()->user()->email }}</p></div>
+                            </div>
+
+                            <label class="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-200 bg-white p-4 dark:border-sky-900/60 dark:bg-neutral-900">
+                                <input type="checkbox" wire:model="acepta_conformidad" class="mt-1 size-5 rounded border-sky-300 text-[#006492] focus:ring-[#006492]">
+                                <span class="text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{{ $this->declaracionConformidad }}</span>
+                            </label>
+                            @error('acepta_conformidad')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+
+                            <label class="mt-4 block">
+                                <span class="text-xs font-black uppercase tracking-wider text-slate-500">Contraseña actual</span>
+                                <input type="password" wire:model="password_confirmacion" autocomplete="current-password" class="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-[#006492] focus:ring-2 focus:ring-[#006492]/20 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white" placeholder="Confirma tu identidad para realizar la entrega">
+                            </label>
+                            @error('password_confirmacion')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+
+                            @unless ($this->capturaCompleta)
+                                <p class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">La entrega definitiva requiere todas las calificaciones. Puedes cerrar este cuadro y usar “Guardar borrador” para continuar después.</p>
+                            @endunless
+                        </div>
+                    @endif
 
                     <div
                         class="mt-5 max-h-[45vh] overflow-auto rounded-2xl border border-neutral-200 dark:border-neutral-800">
@@ -2488,10 +2551,10 @@ iniciarHerramientasAcademicas()" class="w-full">
                         <button type="button" wire:click="cerrarRevisionGuardado"
                             class="rounded-2xl border border-neutral-200 px-5 py-3 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">Cancelar</button>
                         <button type="button" wire:click="guardarCalificaciones" wire:loading.attr="disabled"
-                            wire:target="guardarCalificaciones"
+                            wire:target="guardarCalificaciones" @if ($this->esProfesorAutenticado && !$this->capturaCompleta) disabled @endif
                             class="rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/20 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60">
-                            <span wire:loading.remove wire:target="guardarCalificaciones">Confirmar y guardar</span>
-                            <span wire:loading wire:target="guardarCalificaciones">Guardando...</span>
+                            <span wire:loading.remove wire:target="guardarCalificaciones">{{ $this->esProfesorAutenticado ? 'Confirmar, entregar y generar PDF' : 'Confirmar y guardar' }}</span>
+                            <span wire:loading wire:target="guardarCalificaciones">{{ $this->esProfesorAutenticado ? 'Generando comprobante...' : 'Guardando...' }}</span>
                         </button>
                     </div>
                 </div>
@@ -2499,6 +2562,7 @@ iniciarHerramientasAcademicas()" class="w-full">
         </div>
     </div>
 
+    @unless ($this->esProfesorAutenticado)
     {{-- Modal bitácora --}}
     <div x-data="{ show: @entangle('mostrarModalBitacora').live }" x-cloak>
         <div x-show="show" x-transition.opacity.duration.200ms
@@ -2568,6 +2632,7 @@ iniciarHerramientasAcademicas()" class="w-full">
             </div>
         </div>
     </div>
+    @endunless
 
     @once
 

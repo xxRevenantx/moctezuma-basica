@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -30,7 +31,10 @@ class Profile extends Component
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
-        $this->photo = Auth::user()->photo;
+        // El archivo existente se presenta desde el modelo; este campo solo
+        // conserva una carga temporal nueva. Evita validar un nombre de archivo
+        // persistido como si fuera una imagen subida por Livewire.
+        $this->photo = null;
     }
 
     /**
@@ -38,42 +42,58 @@ class Profile extends Component
      */
     public function updateProfileInformation(): void
     {
+        /** @var User $user */
         $user = Auth::user();
 
+        if ($user->isProfessor()) {
+            // El nombre y el identificador institucional de una cuenta docente son
+            // administrados desde el expediente de personal. No se confía en los
+            // valores públicos enviados por Livewire.
+            if ($this->name !== $user->name || mb_strtolower($this->email) !== mb_strtolower($user->email)) {
+                $this->name = (string) $user->name;
+                $this->email = (string) $user->email;
 
-
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-
-            'photo' => ['nullable', 'image', 'max:2048', 'mimes:jpeg,jpg,png'],
-
-            'email' => [
-                'required',
-                'string',
-                'lowercase',
-                'email',
-                'max:255',
-                Rule::unique(User::class)->ignore($user->id),
-            ],
-        ]);
-
-        // Si se sube una nueva foto...
-        if ($this->photo) {
-            // Elimina la imagen anterior si no es la default
-            if ($user->photo && $user->photo !== 'default.jpg') {
-                Storage::delete('profile-photos/' . $user->photo);
+                throw ValidationException::withMessages([
+                    'email' => 'El nombre y el acceso institucional del profesor solo pueden modificarse desde administración.',
+                ]);
             }
 
-            // Guarda la nueva imagen
-            $path = $this->photo->store('profile-photos');
+            $validated = $this->validate([
+                'photo' => ['nullable', 'image', 'max:2048', 'mimes:jpeg,jpg,png'],
+            ]);
+        } else {
+            $validated = $this->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'photo' => ['nullable', 'image', 'max:2048', 'mimes:jpeg,jpg,png'],
+                'email' => [
+                    'required',
+                    'string',
+                    'lowercase',
+                    'email',
+                    'max:255',
+                    Rule::unique(User::class)->ignore($user->id),
+                ],
+            ]);
+        }
+
+        if ($this->photo) {
+            if ($user->photo && $user->photo !== 'default.jpg') {
+                Storage::disk('public')->delete('profile-photos/'.$user->photo);
+            }
+
+            $path = $this->photo->store('profile-photos', 'public');
             $validated['photo'] = str_replace('profile-photos/', '', $path);
         } else {
             unset($validated['photo']);
         }
 
+        if ($user->isProfessor()) {
+            unset($validated['name'], $validated['email']);
+        }
+
         $user->fill($validated);
 
-        if ($user->isDirty('email')) {
+        if (! $user->isProfessor() && $user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
@@ -81,7 +101,6 @@ class Profile extends Component
 
         $this->dispatch('refreshHeader');
         $this->dispatch('refreshProfile');
-
         $this->dispatch('profile-updated', name: $user->name);
     }
 
@@ -90,7 +109,9 @@ class Profile extends Component
     {
         // Borra el archivo físico si existe
         if (auth()->user()->photo) {
-            Storage::disk('public')->delete('profile-photos/' . auth()->user()->photo);
+            if (auth()->user()->photo !== 'default.jpg') {
+                Storage::disk('public')->delete('profile-photos/' . auth()->user()->photo);
+            }
             auth()->user()->update(['photo' => null]);
         }
 

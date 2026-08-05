@@ -13,7 +13,9 @@ class EnsureUserIsActive
     {
         $user = $request->user();
 
-        if ($user && ! ($user->activo ?? true)) {
+        $personaInactiva = $user?->isProfessor() && (! $user->persona_id || ! $user->persona?->status || in_array(mb_strtolower((string) $user->persona?->estado_laboral), ['baja', 'inactivo', 'suspendido'], true));
+
+        if ($user && (! ($user->activo ?? true) || $personaInactiva)) {
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

@@ -481,6 +481,117 @@
     @endif
 
     @if ($tab === 'permisos')
+        <section class="mb-5 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <span class="inline-flex rounded-full bg-[#006492]/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-[#006492] dark:text-sky-300">Accesos docentes</span>
+                    <h2 class="mt-3 text-2xl font-black text-slate-950 dark:text-white">Crear cuenta institucional interna</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-500">El identificador se genera como <strong>nombre.apellido@profesor.moctezuma.local</strong>. Es exclusivo para iniciar sesión y no funciona como buzón de correo.</p>
+                </div>
+                <div class="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_auto] lg:max-w-2xl">
+                    <select wire:model="newTeacherPersonaId" class="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950">
+                        <option value="">Selecciona un profesor activo</option>
+                        @foreach ($eligibleTeachers as $teacher)
+                            <option value="{{ $teacher->id }}">{{ trim($teacher->apellido_paterno.' '.$teacher->apellido_materno.' '.$teacher->nombre) }} · {{ $teacher->curp ?: 'CURP pendiente' }}</option>
+                        @endforeach
+                    </select>
+                    <button type="button" wire:click="createTeacherAccount" wire:loading.attr="disabled" wire:target="createTeacherAccount" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#006492] px-5 text-sm font-black text-white transition hover:bg-[#00547a] disabled:opacity-60">
+                        <flux:icon.user-plus class="size-4" /> Crear acceso
+                    </button>
+                    @error('newTeacherPersonaId')<p class="text-xs font-bold text-red-600 sm:col-span-2">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            @if (!empty($temporaryCredential))
+                <div class="mt-5 grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/20 md:grid-cols-3">
+                    <div><p class="text-[11px] font-black uppercase tracking-wider text-emerald-700">Profesor</p><p class="mt-1 font-bold text-emerald-950 dark:text-emerald-100">{{ $temporaryCredential['name'] ?? '' }}</p></div>
+                    <div><p class="text-[11px] font-black uppercase tracking-wider text-emerald-700">Usuario institucional</p><p class="mt-1 break-all font-mono text-sm font-bold text-emerald-950 dark:text-emerald-100">{{ $temporaryCredential['email'] ?? '' }}</p></div>
+                    <div><p class="text-[11px] font-black uppercase tracking-wider text-emerald-700">Contraseña temporal</p><p class="mt-1 break-all font-mono text-lg font-black text-emerald-950 dark:text-emerald-100">{{ $temporaryCredential['password'] ?? '' }}</p></div>
+                    <p class="text-xs font-semibold text-emerald-800 md:col-span-3 dark:text-emerald-200">Esta contraseña se muestra únicamente en esta sesión. El profesor deberá cambiarla al ingresar.</p>
+                </div>
+            @endif
+        </section>
+
+        @if ($gradeSubmissions->isNotEmpty())
+            <section class="mb-5 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <div class="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 dark:border-neutral-800 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-black text-slate-950 dark:text-white">Entregas docentes recientes</h3>
+                        <p class="mt-1 text-sm text-slate-500">Los comprobantes anteriores nunca se eliminan. Al reabrir, la siguiente confirmación crea una versión nueva.</p>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 dark:bg-neutral-800 dark:text-slate-300">Últimas {{ $gradeSubmissions->count() }}</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-neutral-800">
+                        <thead class="bg-slate-50 text-left text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-neutral-950/40">
+                            <tr>
+                                <th class="px-6 py-3">Folio / docente</th>
+                                <th class="px-6 py-3">Contexto</th>
+                                <th class="px-6 py-3">Confirmación</th>
+                                <th class="px-6 py-3">Estado</th>
+                                <th class="px-6 py-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                            @foreach ($gradeSubmissions as $submission)
+                                <tr wire:key="grade-submission-{{ $submission->id }}" class="align-top">
+                                    <td class="px-6 py-4">
+                                        <p class="font-mono text-xs font-black text-[#006492] dark:text-sky-300">{{ $submission->folio }}</p>
+                                        <p class="mt-1 font-bold text-slate-900 dark:text-white">{{ $submission->docente_nombre }}</p>
+                                        <p class="text-xs text-slate-500">{{ $submission->docente_curp }}</p>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-600 dark:text-slate-300">
+                                        <p class="font-bold">{{ $submission->nivel?->nombre }} · {{ $submission->grado?->nombre }}</p>
+                                        <p class="mt-1 text-xs">Grupo {{ $submission->grupo?->asignacionGrupo?->nombre ?? $submission->grupo_id }} · Versión {{ $submission->version }}</p>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-600 dark:text-slate-300">
+                                        <p>{{ $submission->confirmada_at?->format('d/m/Y H:i') }}</p>
+                                        <p class="mt-1 text-xs text-slate-400">Usuario #{{ $submission->user_id }}</p>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-black {{ $submission->estado === 'confirmada' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' }}">
+                                            {{ $submission->estado === 'confirmada' ? 'Confirmada' : 'Reabierta' }}
+                                        </span>
+                                        @if ($submission->estado === 'reabierta' && $submission->motivo_reapertura)
+                                            <p class="mt-2 max-w-xs text-xs leading-5 text-slate-500">{{ $submission->motivo_reapertura }}</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-wrap justify-end gap-2">
+                                            @if ($submission->pdf_path)
+                                                <a href="{{ route('docente.entregas.pdf', $submission) }}" target="_blank" rel="noopener" class="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800">PDF</a>
+                                            @endif
+                                            @if ($submission->estado === 'confirmada')
+                                                <button type="button" wire:click="prepareGradeSubmissionReopen({{ $submission->id }})" class="inline-flex items-center rounded-xl border border-amber-300 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-50 dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950/20">Reabrir</button>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                                @if ($reopenSubmissionId === $submission->id)
+                                    <tr wire:key="grade-submission-reopen-{{ $submission->id }}" class="bg-amber-50/70 dark:bg-amber-950/10">
+                                        <td colspan="5" class="px-6 py-4">
+                                            <div class="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                                                <label class="grid gap-1.5 text-sm font-black text-amber-900 dark:text-amber-200">
+                                                    Motivo obligatorio de reapertura
+                                                    <textarea wire:model="reopenSubmissionReason" rows="2" maxlength="1000" placeholder="Describe por qué el profesor podrá corregir esta entrega..." class="w-full resize-none rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 dark:border-amber-900 dark:bg-neutral-950 dark:text-white dark:focus:ring-amber-950"></textarea>
+                                                    @error('reopenSubmissionReason')<span class="text-xs font-bold text-red-600">{{ $message }}</span>@enderror
+                                                </label>
+                                                <div class="flex gap-2">
+                                                    <button type="button" wire:click="cancelGradeSubmissionReopen" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 dark:border-neutral-700 dark:text-slate-200">Cancelar</button>
+                                                    <button type="button" wire:click="reopenGradeSubmission" wire:loading.attr="disabled" wire:target="reopenGradeSubmission" class="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 disabled:opacity-60">Confirmar reapertura</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+
         <section class="grid gap-5 xl:grid-cols-[340px_1fr]">
             <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                 <h2 class="text-xl font-black text-slate-900 dark:text-white">Usuarios</h2>
@@ -503,7 +614,9 @@
                             </select>
                         </label>
                         <div class="grid gap-3 rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
-                            <label class="flex items-center justify-between gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>Administrador total</span><input type="checkbox" wire:model="selectedIsAdmin" class="size-5 rounded border-slate-300 text-sky-600"></label>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold leading-5 text-slate-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
+                                El rol seleccionado define el acceso total. Las cuentas de profesor conservan una identidad institucional protegida.
+                            </div>
                             <label class="flex items-center justify-between gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>Cuenta activa</span><input type="checkbox" wire:model="selectedActive" class="size-5 rounded border-slate-300 text-sky-600"></label>
                         </div>
                         <label class="grid gap-1.5 text-sm font-black text-slate-700 dark:text-slate-200 md:col-span-2">Persona vinculada para acceso docente
@@ -517,21 +630,31 @@
                             @error('selectedPersonaId')<span class="text-xs font-bold text-red-600">{{ $message }}</span>@enderror
                         </label>
                     </div>
-                    @error('selectedIsAdmin')<p class="mt-3 text-sm font-bold text-red-600">{{ $message }}</p>@enderror
 
-                    <div class="mt-6">
-                        <h3 class="font-black text-slate-900 dark:text-white">Permisos adicionales</h3>
-                        <p class="mt-1 text-sm text-slate-500">Se suman al rol base. El administrador total siempre tiene todos los permisos.</p>
-                        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            @foreach ($permissions as $permission => $label)
-                                <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-neutral-700">
-                                    <input type="checkbox" wire:model="selectedPermissions" value="{{ $permission }}" class="mt-0.5 size-4 rounded border-slate-300 text-sky-600">
-                                    <span><strong class="block text-slate-800 dark:text-slate-100">{{ $label }}</strong><small class="text-slate-400">{{ $permission }}</small></span>
-                                </label>
-                            @endforeach
+                    @if ($selectedRole !== 'profesor')
+                        <div class="mt-6">
+                            <h3 class="font-black text-slate-900 dark:text-white">Permisos adicionales</h3>
+                            <p class="mt-1 text-sm text-slate-500">Se suman al rol base. El administrador total siempre tiene todos los permisos.</p>
+                            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($permissions as $permission => $label)
+                                    <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-neutral-700">
+                                        <input type="checkbox" wire:model="selectedPermissions" value="{{ $permission }}" class="mt-0.5 size-4 rounded border-slate-300 text-sky-600">
+                                        <span><strong class="block text-slate-800 dark:text-slate-100">{{ $label }}</strong><small class="text-slate-400">{{ $permission }}</small></span>
+                                    </label>
+                                @endforeach
+                            </div>
                         </div>
+                    @else
+                        <div class="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold leading-6 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+                            El rol Profesor tiene un alcance cerrado: Mi horario, Calificaciones propias y Fichas descriptivas únicamente cuando tenga grupos de preescolar. No admite permisos manuales adicionales.
+                        </div>
+                    @endif
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        <button type="button" wire:click="saveUserAccess" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar accesos</button>
+                        @if ($selectedRole === 'profesor')
+                            <button type="button" wire:click="resetTeacherPassword" class="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 dark:border-neutral-700 dark:text-slate-200 dark:hover:bg-neutral-800"><flux:icon name="key" class="size-4" /> Nueva contraseña temporal</button>
+                        @endif
                     </div>
-                    <button type="button" wire:click="saveUserAccess" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-black text-white hover:bg-sky-700"><flux:icon name="arrow-down-on-square" class="size-4" /> Guardar accesos</button>
                 @else
                     <div class="flex min-h-80 flex-col items-center justify-center text-center"><flux:icon name="user-circle" class="size-12 text-slate-300" /><h3 class="mt-4 text-xl font-black text-slate-900 dark:text-white">Selecciona un usuario</h3><p class="mt-2 text-sm text-slate-500">Elige una cuenta para configurar su rol y permisos.</p></div>
                 @endif

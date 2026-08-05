@@ -11,6 +11,8 @@
     @php
         $user = auth()->user();
         $isAdmin = (bool) ($user?->is_admin ?? false);
+        $isProfessor = (bool) $user?->isProfessor();
+        $teacherLevels = $isProfessor ? app(\App\Services\TeacherAcademicScopeService::class)->assignedLevels($user) : collect();
         $canAccessAdministration = (bool) $user?->canAccess('administracion.acceder');
         $canAccessIntegrity = (bool) $user?->canAccess('integridad.consultar');
         $canAccessTracking = (bool) $user?->canAccess('seguimiento.consultar');
@@ -115,12 +117,21 @@
         </div>
 
         {{-- Acción principal --}}
-        <a href="{{ route('misrutas.inscripcion') }}"
-            class="sidebar-primary-action inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#006492] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00547a] focus:outline-none focus:ring-2 focus:ring-[#006492]/40 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 in-data-flux-sidebar-collapsed-desktop:w-10 in-data-flux-sidebar-collapsed-desktop:px-0"
-            wire:navigate aria-label="Registrar un nuevo alumno" title="Nuevo alumno">
-            <flux:icon name="user-plus" class="size-4 shrink-0" />
-            <span class="in-data-flux-sidebar-collapsed-desktop:hidden">Nuevo alumno</span>
-        </a>
+        @if ($isProfessor)
+            <a href="{{ route('docente.horario') }}"
+                class="sidebar-primary-action inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#006492] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00547a] focus:outline-none focus:ring-2 focus:ring-[#006492]/40 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 in-data-flux-sidebar-collapsed-desktop:w-10 in-data-flux-sidebar-collapsed-desktop:px-0"
+                wire:navigate aria-label="Consultar mi horario" title="Mi horario">
+                <flux:icon name="calendar-days" class="size-4 shrink-0" />
+                <span class="in-data-flux-sidebar-collapsed-desktop:hidden">Mi horario</span>
+            </a>
+        @else
+            <a href="{{ route('misrutas.inscripcion') }}"
+                class="sidebar-primary-action inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#006492] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00547a] focus:outline-none focus:ring-2 focus:ring-[#006492]/40 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 in-data-flux-sidebar-collapsed-desktop:w-10 in-data-flux-sidebar-collapsed-desktop:px-0"
+                wire:navigate aria-label="Registrar un nuevo alumno" title="Nuevo alumno">
+                <flux:icon name="user-plus" class="size-4 shrink-0" />
+                <span class="in-data-flux-sidebar-collapsed-desktop:hidden">Nuevo alumno</span>
+            </a>
+        @endif
 
         {{-- Buscador de módulos --}}
         <div class="relative in-data-flux-sidebar-collapsed-desktop:hidden">
@@ -159,6 +170,30 @@
                     x-show="itemMatches($el)">
                     Inicio
                 </flux:sidebar.item>
+
+                @if ($isProfessor)
+                    <flux:sidebar.item icon="calendar-days" :href="route('docente.horario')"
+                        :current="request()->routeIs('docente.horario')" wire:navigate data-sidebar-search-item
+                        data-sidebar-search="mi horario clases talleres docente" x-show="itemMatches($el)">
+                        Mi horario
+                    </flux:sidebar.item>
+
+                    @foreach ($teacherLevels as $teacherLevel)
+                        @if ($teacherLevel->slug === 'preescolar')
+                            <flux:sidebar.item icon="document-text" :href="route('docente.fichas')"
+                                :current="request()->routeIs('docente.fichas')" wire:navigate data-sidebar-search-item
+                                data-sidebar-search="fichas descriptivas preescolar" x-show="itemMatches($el)">
+                                Fichas descriptivas
+                            </flux:sidebar.item>
+                        @else
+                            <flux:sidebar.item icon="pencil-square" :href="route('docente.calificaciones', $teacherLevel->slug)"
+                                :current="request()->routeIs('docente.calificaciones') && request()->route('slug_nivel') === $teacherLevel->slug" wire:navigate data-sidebar-search-item
+                                data-sidebar-search="calificaciones {{ $teacherLevel->nombre }} captura" x-show="itemMatches($el)">
+                                Calificaciones · {{ $teacherLevel->nombre }}
+                            </flux:sidebar.item>
+                        @endif
+                    @endforeach
+                @else
 
                 {{-- Gestión escolar --}}
                 <flux:sidebar.group expandable icon="graduation-cap" heading="Gestión escolar"
@@ -435,6 +470,7 @@
 
                 {{-- Accesos operativos por nivel --}}
                 <livewire:nav-niveles />
+                @endif
             </flux:sidebar.nav>
 
             <div x-cloak x-show="searching && !hasResults()"

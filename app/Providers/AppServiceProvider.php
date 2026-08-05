@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\AsignacionMateria;
 use App\Models\Calificacion;
+use App\Models\CalificacionEntrega;
 use App\Models\Constancia;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoPersonal;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use PhpOffice\PhpWord\Settings;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,6 +48,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configurarDirectorioTemporalPhpWord();
 
+        Livewire::addPersistentMiddleware([
+            \App\Http\Middleware\EnsureUserIsActive::class,
+            \App\Http\Middleware\EnsureRoleRouteScope::class,
+            \App\Http\Middleware\EnsurePasswordChanged::class,
+        ]);
+
         Gate::before(fn (User $user): ?bool => $user->is_admin ? true : null);
 
         Gate::define('configurar-firmas-documentales',
@@ -55,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             Inscripcion::class, InscripcionTutor::class, Tutor::class, Persona::class, Grupo::class, Materia::class,
             AsignacionMateria::class, Horario::class, HorarioVersion::class,
-            HorarioDocenteConfiguracion::class, HorarioAsignacionRegla::class, Calificacion::class,
+            HorarioDocenteConfiguracion::class, HorarioAsignacionRegla::class, Calificacion::class, CalificacionEntrega::class,
             DocumentoAlumno::class, DocumentoPersonal::class, Constancia::class, Oficio::class,
             User::class,
         ] as $model) {

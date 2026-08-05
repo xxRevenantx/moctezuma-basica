@@ -16,11 +16,13 @@ use App\Services\GroqFichaGrupoService;
 use App\Services\HtmlSanitizerService;
 use App\Services\CicloNivelGateService;
 use App\Services\ContextoEscolarService;
+use App\Services\TeacherAcademicScopeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\Attributes\Locked;
 use Livewire\WithPagination;
 
 use App\Exports\FichaDescriptivaPlantillaImportacionExport;
@@ -36,7 +38,12 @@ class Ficha extends Component
 
     public function boot(): void
     {
-        abort_unless(auth()->user()?->canAccess('fichas.capturar'), 403);
+        $user = auth()->user();
+        abort_unless($user?->canAccess('fichas.capturar'), 403);
+
+        if ($user->isProfessor()) {
+            app(TeacherAcademicScopeService::class)->personaIdOrFail($user);
+        }
     }
 
     public string $descripcion = '';
@@ -60,9 +67,11 @@ class Ficha extends Component
 
     public $archivo_fichas = null;
 
+    #[Locked]
     public string $slug_nivel = 'preescolar';
     public ?string $slug_grado = null;
 
+    #[Locked]
     public ?int $nivel_id = null;
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
@@ -94,6 +103,8 @@ class Ficha extends Component
 
     public function descargarPlantillaImportacion()
     {
+        $this->assertAdministrativeToolAccess();
+        $this->assertTeacherContext();
         $this->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'grado_id' => ['required', 'integer', 'exists:grados,id'],
@@ -119,6 +130,8 @@ class Ficha extends Component
 
     public function importarPlantillaFichas(): void
     {
+        $this->assertAdministrativeToolAccess();
+        $this->assertTeacherContext();
         $this->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'grado_id' => ['required', 'integer', 'exists:grados,id'],
@@ -168,6 +181,10 @@ class Ficha extends Component
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
             ->value('id');
+
+        if (auth()->user()?->isProfessor()) {
+            abort_unless($this->teacherGroupIds()->isNotEmpty(), 403, 'No tienes grupos de preescolar asignados.');
+        }
 
         $this->fecha_lugar = 'CD. ALTAMIRANO, GRO., A ' . mb_strtoupper(Carbon::now()->translatedFormat('d \\d\\e F \\d\\e\\l Y'));
     }
@@ -238,6 +255,8 @@ class Ficha extends Component
             return;
         }
 
+        $this->authorizedStudentOrFail($inscripcionId);
+
         $this->inscripcion_id = $inscripcionId;
         $this->campo = $campo;
         $this->observaciones_ia = '';
@@ -271,6 +290,7 @@ class Ficha extends Component
 
     public function verificarGroq(GroqFichaService $groq): void
     {
+        $this->assertAdministrativeToolAccess();
         $estado = $groq->estado();
 
         $this->groq_disponible = $estado['disponible'];
@@ -281,6 +301,7 @@ class Ficha extends Component
 
     public function generarDescripcionIA(GroqFichaService $groq): void
     {
+        $this->assertAdministrativeToolAccess();
         $this->validate([
             'inscripcion_id' => ['required', 'integer', 'exists:inscripciones,id'],
             'campo' => ['required', 'string', 'in:' . implode(',', array_keys($this->campos))],
@@ -291,9 +312,8 @@ class Ficha extends Component
             'descripcion.max' => 'La descripción no puede superar los 5000 caracteres.',
         ]);
 
-        $alumno = Inscripcion::query()
-            ->with('grado:id,nombre')
-            ->findOrFail($this->inscripcion_id);
+        $alumno = $this->authorizedStudentOrFail((int) $this->inscripcion_id)
+            ->load('grado:id,nombre');
 
         $contexto = (bool) config('groq.include_context', false)
             ? $this->obtenerContextoParaIA()
@@ -378,7 +398,7 @@ class Ficha extends Component
             'descripcion.max' => 'La descripción no puede superar los 5000 caracteres.',
         ]);
 
-        $alumno = Inscripcion::query()->findOrFail($this->inscripcion_id);
+        $alumno = $this->authorizedStudentOrFail((int) $this->inscripcion_id);
         $gate->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
         $periodoOficialId = $this->resolverPeriodoOficialId((int) $alumno->nivel_id);
 
@@ -420,6 +440,9 @@ class Ficha extends Component
 
     public function generarInformeGrupoIa(GroqFichaGrupoService $groq): void
     {
+        $this->assertAdministrativeToolAccess();
+        $this->assertTeacherContext();
+
         $this->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'grado_id' => ['required', 'integer', 'exists:grados,id'],
@@ -533,6 +556,7 @@ class Ficha extends Component
         $alumnos = Inscripcion::query()
             ->visiblesEnListas()
             ->where('nivel_id', $this->nivel_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('grado_id', $this->grado_id)
             ->where('grupo_id', $this->grupo_id)
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
@@ -746,10 +770,18 @@ class Ficha extends Component
             return collect();
         }
 
-        return app(ContextoEscolarService::class)->generaciones(
+        $items = app(ContextoEscolarService::class)->generaciones(
             nivelId: (int) $this->nivel_id,
             cicloEscolarId: (int) $this->ciclo_escolar_id,
         );
+
+        if (! auth()->user()?->isProfessor()) {
+            return $items;
+        }
+
+        $ids = Grupo::query()->whereIn('id', $this->teacherGroupIds())->pluck('generacion_id')->unique();
+
+        return $items->whereIn('id', $ids)->values();
     }
 
     public function getGradosProperty()
@@ -758,11 +790,19 @@ class Ficha extends Component
             return collect();
         }
 
-        return app(ContextoEscolarService::class)->grados(
+        $items = app(ContextoEscolarService::class)->grados(
             nivelId: (int) $this->nivel_id,
             cicloEscolarId: (int) $this->ciclo_escolar_id,
             generacionId: $this->generacion_id,
         );
+
+        if (! auth()->user()?->isProfessor()) {
+            return $items;
+        }
+
+        $ids = Grupo::query()->whereIn('id', $this->teacherGroupIds())->pluck('grado_id')->unique();
+
+        return $items->whereIn('id', $ids)->values();
     }
 
     public function getGruposProperty()
@@ -771,18 +811,23 @@ class Ficha extends Component
             return collect();
         }
 
-        return app(ContextoEscolarService::class)->grupos(
+        $items = app(ContextoEscolarService::class)->grupos(
             nivelId: (int) $this->nivel_id,
             cicloEscolarId: (int) $this->ciclo_escolar_id,
             generacionId: $this->generacion_id,
             gradoId: $this->grado_id,
             bachillerato: false,
         );
+
+        return auth()->user()?->isProfessor()
+            ? $items->whereIn('id', $this->teacherGroupIds())->values()
+            : $items;
     }
 
     public function getCiclosEscolaresProperty()
     {
         return CicloEscolar::query()
+            ->when(auth()->user()?->isProfessor(), fn ($query) => $query->where('es_actual', true)->whereNull('cerrado_at'))
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
@@ -791,11 +836,20 @@ class Ficha extends Component
 
     public function getAlumnoModalProperty(): ?Inscripcion
     {
-        if (!$this->inscripcion_id) {
+        if (! $this->inscripcion_id) {
             return null;
         }
 
-        return Inscripcion::query()->find($this->inscripcion_id);
+        $query = Inscripcion::query()
+            ->whereKey((int) $this->inscripcion_id)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
+
+        if (auth()->user()?->isProfessor()) {
+            $query->visiblesEnListas()->whereIn('grupo_id', $this->teacherGroupIds());
+        }
+
+        return $query->first();
     }
 
     public function alumnoNombre(?Inscripcion $alumno = null): string
@@ -868,6 +922,7 @@ class Ficha extends Component
             ->with(['nivel:id,nombre,slug', 'grado:id,nombre', 'grupo.asignacionGrupo:id,nombre', 'generacion:id,nivel_id,anio_ingreso,anio_egreso'])
             ->where('nivel_id', $this->nivel_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->when(auth()->user()?->isProfessor(), fn ($query) => $query->whereIn('grupo_id', $this->teacherGroupIds()))
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
             ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
             ->when($this->grupo_id, fn($q) => $q->where('grupo_id', $this->grupo_id))
@@ -965,6 +1020,72 @@ class Ficha extends Component
             ->map(fn(string $parrafo) => '<p>' . e(trim($parrafo)) . '</p>')
             ->filter(fn(string $parrafo) => $parrafo !== '<p></p>')
             ->implode('');
+    }
+
+    private function assertAdministrativeToolAccess(): void
+    {
+        abort_if(
+            auth()->user()?->isProfessor(),
+            403,
+            'Las cuentas docentes no tienen acceso a plantillas, importaciones ni herramientas de inteligencia artificial.'
+        );
+    }
+
+    private function teacherGroupIds(): \Illuminate\Support\Collection
+    {
+        if (! auth()->user()?->isProfessor()) {
+            return collect();
+        }
+
+        $currentCycleId = CicloEscolar::query()
+            ->where('es_actual', true)
+            ->whereNull('cerrado_at')
+            ->orderByDesc('id')
+            ->value('id');
+        $preescolarId = Nivel::query()->where('slug', 'preescolar')->value('id');
+
+        if (
+            ! $currentCycleId
+            || ! $preescolarId
+            || (int) $this->ciclo_escolar_id !== (int) $currentCycleId
+            || (int) $this->nivel_id !== (int) $preescolarId
+        ) {
+            return collect();
+        }
+
+        return app(TeacherAcademicScopeService::class)
+            ->preschoolHomeroomGroupIds(auth()->user(), (int) $currentCycleId);
+    }
+
+    private function assertTeacherContext(): void
+    {
+        if (! auth()->user()?->isProfessor()) {
+            return;
+        }
+
+        abort_unless(
+            $this->grupo_id && $this->teacherGroupIds()->contains((int) $this->grupo_id),
+            403,
+            'Selecciona uno de tus grupos activos de preescolar.'
+        );
+    }
+
+    private function authorizedStudentOrFail(int $inscripcionId): Inscripcion
+    {
+        $query = Inscripcion::query()
+            ->visiblesEnListas()
+            ->whereKey($inscripcionId)
+            ->where('nivel_id', $this->nivel_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
+
+        if (auth()->user()?->isProfessor()) {
+            $query->whereIn('grupo_id', $this->teacherGroupIds());
+        }
+
+        $student = $query->first();
+        abort_unless($student, 403, 'El alumno no pertenece a uno de tus grupos autorizados.');
+
+        return $student;
     }
 
     public function render()

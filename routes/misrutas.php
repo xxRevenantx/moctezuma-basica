@@ -14,6 +14,8 @@ use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
 use App\Http\Controllers\DirectorController;
+use App\Http\Controllers\DocenteController;
+use App\Http\Controllers\CalificacionEntregaPdfController;
 use App\Http\Controllers\DirectorioTutoresController;
 use App\Http\Controllers\DistribucionEscolarController;
 use App\Http\Controllers\DocumentosController;
@@ -69,6 +71,14 @@ use App\Livewire\Admin\RevisionCiclosAcademicos;
 use App\Livewire\Admin\CorreccionesCalificaciones;
 use App\Livewire\Admin\CentroIntegridadAcademica;
 
+
+// PORTAL DOCENTE (rutas cerradas por rol y alcance académico)
+Route::prefix('docente')->group(function (): void {
+    Route::get('/mi-horario', [DocenteController::class, 'horario'])->name('docente.horario');
+    Route::get('/calificaciones/{slug_nivel}', [DocenteController::class, 'calificaciones'])->name('docente.calificaciones');
+    Route::get('/fichas-descriptivas', [DocenteController::class, 'fichas'])->name('docente.fichas');
+    Route::get('/entregas/{entrega}/pdf', CalificacionEntregaPdfController::class)->name('docente.entregas.pdf');
+});
 
 // CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS
 Route::get('/centro-control', [SystemControlCenterController::class, 'index'])
