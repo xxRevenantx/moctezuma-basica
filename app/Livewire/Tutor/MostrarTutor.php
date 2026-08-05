@@ -200,7 +200,7 @@ class MostrarTutor extends Component
                     ->orderBy('orden_contacto')
                     ->orderByDesc('id'),
                 'relaciones.inscripcion' => fn($inscripcion) => $inscripcion->withTrashed(),
-                'relaciones.inscripcion.nivel:id,nombre',
+                'relaciones.inscripcion.nivel:id,nombre,slug',
                 'relaciones.inscripcion.grado:id,nombre',
                 'relaciones.inscripcion.grupo:id,clave',
                 'relaciones.inscripcion.semestre:id,numero',

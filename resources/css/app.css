@@ -93,3 +93,78 @@ input:checked + label{
 
 
 [x-cloak] { display: none !important; }
+
+/* Sidebar principal de Moctezuma */
+.app-sidebar {
+    width: 18rem !important;
+    gap: 0.75rem !important;
+    overflow: hidden !important;
+    padding: 0.75rem !important;
+}
+
+.app-sidebar[data-flux-sidebar-collapsed-desktop] {
+    width: 4rem !important;
+    padding-inline: 0.75rem !important;
+}
+
+.app-sidebar-scroll {
+    scrollbar-color: rgb(161 161 170 / 0.55) transparent;
+    scrollbar-width: thin;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgb(161 161 170 / 0.45);
+    border-radius: 999px;
+}
+
+.app-sidebar [data-flux-sidebar-item] {
+    min-height: 2.5rem;
+    border-radius: 0.75rem;
+}
+
+.app-sidebar [data-flux-sidebar-group] > button {
+    min-height: 2.5rem;
+    border-radius: 0.75rem;
+}
+
+.app-sidebar [data-flux-sidebar-item][data-current] {
+    border-color: rgb(0 100 146 / 0.18) !important;
+    background: rgb(0 100 146 / 0.09) !important;
+    color: #006492 !important;
+    box-shadow: inset 3px 0 0 #006492;
+}
+
+.app-sidebar [data-flux-sidebar-item][data-current] [data-content] {
+    font-weight: 650;
+}
+
+.app-sidebar [data-flux-sidebar-item]:hover,
+.app-sidebar [data-flux-sidebar-group] > button:hover {
+    background-color: rgb(0 100 146 / 0.055);
+}
+
+.dark .app-sidebar [data-flux-sidebar-item][data-current] {
+    border-color: rgb(136 172 46 / 0.24) !important;
+    background: rgb(0 100 146 / 0.22) !important;
+    color: rgb(186 230 253) !important;
+    box-shadow: inset 3px 0 0 #88AC2E;
+}
+
+.dark .app-sidebar [data-flux-sidebar-item]:hover,
+.dark .app-sidebar [data-flux-sidebar-group] > button:hover {
+    background-color: rgb(255 255 255 / 0.07);
+}
+
+@media (max-width: 1023px) {
+    .app-sidebar {
+        width: min(18rem, calc(100vw - 2rem)) !important;
+    }
+}

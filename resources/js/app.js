@@ -20,6 +20,51 @@ Livewire.on('swal', (data) => {
 
 
 document.addEventListener('alpine:init', () => {
+    Alpine.data('sidebarNavigation', () => ({
+        query: '',
+
+        get searching() {
+            return this.query.trim().length > 0;
+        },
+
+        normalize(value) {
+            return String(value ?? '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        },
+
+        matches(value) {
+            if (!this.searching) return true;
+
+            return this.normalize(value).includes(this.normalize(this.query));
+        },
+
+        itemMatches(element) {
+            return this.matches(element?.dataset?.sidebarSearch);
+        },
+
+        groupMatches(element) {
+            if (!this.searching) return true;
+
+            return Array.from(element?.querySelectorAll?.('[data-sidebar-search-item]') ?? [])
+                .some((item) => this.itemMatches(item));
+        },
+
+        hasResults() {
+            if (!this.searching) return true;
+
+            return Array.from(this.$root.querySelectorAll('[data-sidebar-search-item]'))
+                .some((item) => this.itemMatches(item));
+        },
+
+        clearSearch() {
+            this.query = '';
+            this.$nextTick(() => this.$refs.sidebarSearch?.focus());
+        },
+    }));
+
     Alpine.data('firmaDocumentalEditor', (modelo, aspecto = 'firma') => ({
         abierto: false,
         imagen: null,
