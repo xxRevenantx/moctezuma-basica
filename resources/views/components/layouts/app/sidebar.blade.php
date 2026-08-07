@@ -17,6 +17,7 @@
         $canAccessIntegrity = (bool) $user?->canAccess('integridad.consultar');
         $canAccessTracking = (bool) $user?->canAccess('seguimiento.consultar');
         $canAccessAnalytics = (bool) $user?->canAccess('analitica.consultar');
+        $canAccessCalendar = (bool) $user?->canAccess('calendario.consultar');
 
         $systemUnread = $canAccessAdministration
             ? app(\App\Services\SystemNotificationService::class)->unreadCount($user?->id)
@@ -38,6 +39,8 @@
             'misrutas.alumnos',
             'misrutas.inscripcion',
             'misrutas.tutores',
+            'misrutas.alumnos.expediente-360',
+            'misrutas.calendario',
         );
 
         $academicaExpanded = request()->routeIs(
@@ -178,6 +181,14 @@
                         Mi horario
                     </flux:sidebar.item>
 
+                    @if ($canAccessCalendar)
+                        <flux:sidebar.item icon="calendar" :href="route('misrutas.calendario')"
+                            :current="request()->routeIs('misrutas.calendario')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="calendario institucional agenda fechas evaluaciones reuniones" x-show="itemMatches($el)">
+                            Calendario institucional
+                        </flux:sidebar.item>
+                    @endif
+
                     @foreach ($teacherLevels as $teacherLevel)
                         @if ($teacherLevel->slug === 'preescolar')
                             <flux:sidebar.item icon="document-text" :href="route('docente.fichas')"
@@ -201,7 +212,7 @@
                     x-bind:open="searching || @js($gestionEscolarExpanded)"
                     x-show="groupMatches($el)">
                     <flux:sidebar.item icon="users" :href="route('misrutas.alumnos')"
-                        :current="request()->routeIs('misrutas.alumnos')" wire:navigate data-sidebar-search-item
+                        :current="request()->routeIs('misrutas.alumnos*')" wire:navigate data-sidebar-search-item
                         data-sidebar-search="alumnos estudiantes matrícula listado escolar"
                         x-show="itemMatches($el)">
                         Alumnos
@@ -220,6 +231,16 @@
                         x-show="itemMatches($el)">
                         Tutores y responsables
                     </flux:sidebar.item>
+
+
+                    @if ($canAccessCalendar)
+                        <flux:sidebar.item icon="calendar" :href="route('misrutas.calendario')"
+                            :current="request()->routeIs('misrutas.calendario')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="calendario institucional agenda operativa fechas evaluaciones reuniones cierres"
+                            x-show="itemMatches($el)">
+                            Calendario institucional
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
 
                 {{-- Herramientas académicas --}}

@@ -12,7 +12,7 @@ return [
                 'administracion.acceder', 'integridad.consultar', 'integridad.gestionar', 'seguimiento.consultar', 'seguimiento.gestionar', 'analitica.consultar', 'analitica.exportar', 'analitica.gestionar', 'auditoria.consultar',
                 'notificaciones.gestionar', 'respaldos.gestionar', 'papelera.gestionar',
                 'flujos.gestionar', 'alumnos.*', 'personal.*', 'academico.*',
-                'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*',
+                'calificaciones.*', 'documentos.*', 'horarios.*', 'fichas.*', 'calendario.*',
             ],
         ],
         'direccion' => [
@@ -22,7 +22,7 @@ return [
                 'notificaciones.gestionar', 'flujos.gestionar', 'alumnos.consultar',
                 'personal.consultar', 'academico.consultar', 'calificaciones.consultar',
                 'calificaciones.autorizar', 'documentos.consultar', 'documentos.autorizar',
-                'horarios.consultar', 'fichas.consultar',
+                'horarios.consultar', 'fichas.consultar', 'calendario.consultar', 'calendario.gestionar',
             ],
         ],
         'profesor' => [
@@ -33,6 +33,7 @@ return [
                 'calificaciones.capturar',
                 'fichas.consultar',
                 'fichas.capturar',
+                'calendario.consultar',
             ],
         ],
         'consulta' => [
@@ -40,7 +41,7 @@ return [
             'permissions' => [
                 'alumnos.consultar', 'personal.consultar', 'academico.consultar',
                 'calificaciones.consultar', 'documentos.consultar', 'horarios.consultar',
-                'fichas.consultar',
+                'fichas.consultar', 'calendario.consultar',
             ],
         ],
     ],
@@ -87,11 +88,14 @@ return [
         'horarios.publicar' => 'Publicar y programar versiones de horarios',
         'fichas.consultar' => 'Consultar fichas descriptivas',
         'fichas.capturar' => 'Capturar fichas descriptivas',
+        'calendario.consultar' => 'Consultar el calendario operativo institucional',
+        'calendario.gestionar' => 'Crear, editar, completar y archivar eventos institucionales',
     ],
 
     'policy_modules' => [
         'Accion' => 'academico',
         'AsignacionMateria' => 'academico',
+        'CalendarioEvento' => 'calendario',
         'CicloEscolar' => 'academico',
         'Ciclo' => 'academico',
         'Director' => 'personal',

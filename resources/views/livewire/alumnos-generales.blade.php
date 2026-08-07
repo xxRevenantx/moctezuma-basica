@@ -792,6 +792,13 @@
                                     </button>
 
                                     @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                        <a href="{{ route('misrutas.alumnos.expediente-360', ['inscripcion' => $alumno->id]) }}"
+                                            wire:navigate
+                                            class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-white shadow-sm transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                                            title="Abrir expediente 360°">
+                                            <flux:icon.identification class="h-4 w-4" />
+                                        </a>
+
                                         <button type="button" wire:click="verTrayectoria({{ $alumno->id }})"
                                             wire:loading.attr="disabled" wire:target="verTrayectoria({{ $alumno->id }})"
                                             class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-3 py-2 text-white shadow-sm transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
@@ -1213,6 +1220,13 @@
                             </button>
 
                             @if (auth()->user()?->canAccess('alumnos.consultar'))
+                                <a href="{{ route('misrutas.alumnos.expediente-360', ['inscripcion' => $alumno->id]) }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-white dark:bg-white dark:text-slate-900"
+                                    title="Abrir expediente 360°">
+                                    <flux:icon.identification class="h-4 w-4" />
+                                </a>
+
                                 <button type="button" wire:click="verTrayectoria({{ $alumno->id }})"
                                     wire:loading.attr="disabled" wire:target="verTrayectoria({{ $alumno->id }})"
                                     class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-3 py-2 text-white disabled:opacity-70"

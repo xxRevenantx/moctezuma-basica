@@ -288,14 +288,14 @@
                                         <flux:field>
                                             <flux:label badge="Requerido">Nombre *</flux:label>
                                             <flux:input wire:model="nombre" class="uppercase"
-                                                placeholder="Ej. CARLOS ALBERTO" />
+                                                placeholder="Ej. JUAN" />
                                             <flux:error name="nombre" />
                                         </flux:field>
 
                                         <flux:field>
                                             <flux:label badge="Requerido">Apellido paterno *</flux:label>
                                             <flux:input wire:model="apellido_paterno" class="uppercase"
-                                                placeholder="Ej. NÚÑEZ" />
+                                                placeholder="Ej. PÉREZ" />
                                             <flux:error name="apellido_paterno" />
                                         </flux:field>
 

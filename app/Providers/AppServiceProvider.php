@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\AsignacionMateria;
 use App\Models\Calificacion;
 use App\Models\CalificacionEntrega;
+use App\Models\CalendarioEvento;
 use App\Models\Constancia;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoPersonal;
@@ -64,7 +65,7 @@ class AppServiceProvider extends ServiceProvider
             Inscripcion::class, InscripcionTutor::class, Tutor::class, Persona::class, Grupo::class, Materia::class,
             AsignacionMateria::class, Horario::class, HorarioVersion::class,
             HorarioDocenteConfiguracion::class, HorarioAsignacionRegla::class, Calificacion::class, CalificacionEntrega::class,
-            DocumentoAlumno::class, DocumentoPersonal::class, Constancia::class, Oficio::class,
+            DocumentoAlumno::class, DocumentoPersonal::class, Constancia::class, Oficio::class, CalendarioEvento::class,
             User::class,
         ] as $model) {
             $model::observe(SystemAuditObserver::class);

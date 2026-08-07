@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.venv
+/.venv-*
+/storage/fonts/*.ufm
+/storage/fonts/*.ufm.json

@@ -11,6 +11,7 @@ return [
         'misrutas.matricula.editar' => 'alumnos.editar',
         'misrutas.alumnos*' => 'alumnos.consultar',
         'misrutas.tutores*' => 'alumnos.consultar',
+        'misrutas.calendario*' => 'calendario.consultar',
 
         'misrutas.personal*' => 'personal.consultar',
         'misrutas.autoridades*' => 'personal.consultar',

@@ -173,6 +173,71 @@
     @endif
 
 
+    @if (auth()->user()?->canAccess('calendario.consultar'))
+        <section class="overflow-hidden rounded-3xl border border-sky-200 bg-white shadow-sm dark:border-sky-900/40 dark:bg-neutral-900">
+            <div class="flex flex-col gap-4 border-b border-sky-200 bg-gradient-to-r from-sky-50 via-white to-emerald-50 px-5 py-5 dark:border-sky-900/40 dark:from-sky-950/20 dark:via-neutral-900 dark:to-emerald-950/10 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#006492] text-white shadow-sm">
+                        <flux:icon.calendar-days class="h-6 w-6" />
+                    </span>
+                    <div>
+                        <h3 class="font-black text-neutral-900 dark:text-white">Agenda operativa · próximos 30 días</h3>
+                        <p class="text-sm text-neutral-500 dark:text-neutral-400">Fechas críticas, evaluaciones, cierres, reuniones y pendientes institucionales.</p>
+                    </div>
+                </div>
+
+                <a href="{{ route('misrutas.calendario') }}" wire:navigate
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#006492] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#00547a]">
+                    Abrir calendario
+                    <flux:icon.arrow-right class="h-4 w-4" />
+                </a>
+            </div>
+
+            <div class="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+                @forelse ($eventosCalendario as $eventoCalendario)
+                    <article class="relative overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
+                        <span class="absolute inset-y-0 left-0 w-1.5 {{ $eventoCalendario['prioridad'] === 'critica' ? 'bg-rose-500' : ($eventoCalendario['prioridad'] === 'alta' ? 'bg-amber-500' : 'bg-emerald-500') }}"></span>
+                        <div class="pl-2">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-black text-[#006492] dark:bg-sky-950/40 dark:text-sky-300">{{ $eventoCalendario['tipo'] }}</span>
+                                        @if ($eventoCalendario['origen'] === 'sistema')
+                                            <span class="rounded-full bg-[#88AC2E]/15 px-2.5 py-1 text-[10px] font-black text-[#66851d] dark:text-[#b9d963]">Automático</span>
+                                        @endif
+                                    </div>
+                                    <h4 class="mt-3 line-clamp-2 text-sm font-black leading-5 text-neutral-900 dark:text-white">{{ $eventoCalendario['titulo'] }}</h4>
+                                </div>
+                                <span class="shrink-0 rounded-xl px-2.5 py-1.5 text-[10px] font-black {{ $eventoCalendario['es_hoy'] ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' : 'bg-white text-neutral-600 shadow-sm dark:bg-neutral-900 dark:text-neutral-300' }}">
+                                    @if ($eventoCalendario['es_hoy'])
+                                        Hoy
+                                    @elseif ($eventoCalendario['dias'] === 1)
+                                        Mañana
+                                    @elseif ($eventoCalendario['dias'] > 1)
+                                        En {{ $eventoCalendario['dias'] }} días
+                                    @else
+                                        En curso
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3 text-xs dark:border-neutral-800">
+                                <span class="font-bold text-neutral-700 dark:text-neutral-300">{{ $eventoCalendario['fecha'] }}</span>
+                                <span class="truncate text-neutral-500">{{ $eventoCalendario['contexto'] }}</span>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 p-8 text-center dark:border-emerald-900/50 dark:bg-emerald-950/10 md:col-span-2 xl:col-span-3">
+                        <flux:icon.check-circle class="mx-auto h-9 w-9 text-emerald-500" />
+                        <p class="mt-3 font-black text-emerald-700 dark:text-emerald-300">Sin eventos pendientes para los próximos 30 días.</p>
+                        <p class="mt-1 text-xs text-emerald-600/80 dark:text-emerald-400">Puedes registrar reuniones, cierres o tareas desde el calendario institucional.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+    @endif
+
+
     {{-- Resumen por nivel --}}
     <section
         class="overflow-hidden rounded-3xl border border-neutral-200/70 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">

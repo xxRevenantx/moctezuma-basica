@@ -2,6 +2,8 @@
 
 use App\Livewire\Academico\SeguimientoAcademico;
 use App\Livewire\Academico\AnaliticaInstitucional;
+use App\Livewire\Alumno\Expediente360;
+use App\Livewire\Calendario\CalendarioOperativo;
 
 use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
@@ -126,10 +128,20 @@ Route::get('/escuela', [EscuelaController::class, 'index'])->name('misrutas.escu
 
 // RUTA ALUMNOS
 Route::get('/alumnos', [InscripcionController::class, 'alumnos'])->name('misrutas.alumnos');
+Route::get('/alumnos/{inscripcion}/expediente-360', Expediente360::class)
+    ->whereNumber('inscripcion')
+    ->middleware('permission:alumnos.consultar')
+    ->name('misrutas.alumnos.expediente-360');
 Route::post('/alumnos/lista-seleccionados/pdf', [ListaAlumnosSeleccionadosController::class, 'pdf'])
     ->name('misrutas.alumnos.lista.pdf');
 Route::post('/alumnos/lista-seleccionados/word', [ListaAlumnosSeleccionadosController::class, 'word'])
     ->name('misrutas.alumnos.lista.word');
+
+
+// CALENDARIO OPERATIVO INSTITUCIONAL
+Route::get('/calendario-institucional', CalendarioOperativo::class)
+    ->middleware('permission:calendario.consultar')
+    ->name('misrutas.calendario');
 
 
 // RESPALDOS ACADÉMICOS

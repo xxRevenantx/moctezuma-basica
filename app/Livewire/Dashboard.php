@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Models\Inscripcion;
+use App\Services\CalendarioOperativoService;
 use App\Services\ExpedienteDigitalService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +24,7 @@ class Dashboard extends Component
     public array $alumnosDocumentosPendientes = [];
     public array $gruposSinHorario = [];
     public array $graficaAlumnosNivel = [];
+    public array $eventosCalendario = [];
 
     public function mount(): void
     {
@@ -47,6 +50,72 @@ class Dashboard extends Component
         $this->gruposSinHorario = $this->obtenerGruposSinHorario();
         $this->alertas = $this->obtenerAlertas();
         $this->graficaAlumnosNivel = $this->obtenerDatosGraficaAlumnosNivel();
+        $this->eventosCalendario = $this->obtenerEventosCalendario();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function obtenerEventosCalendario(): array
+    {
+        $usuario = auth()->user();
+        if (! $usuario?->canAccess('calendario.consultar')) {
+            return [];
+        }
+
+        $desde = CarbonImmutable::now()->startOfDay();
+        $hasta = $desde->addDays(30)->endOfDay();
+        $eventos = app(CalendarioOperativoService::class)->eventos(
+            $desde,
+            $hasta,
+            [
+                'tipo' => 'todos',
+                'estado' => 'todos',
+                'nivel_id' => $this->nivel_id,
+                'ciclo_escolar_id' => '',
+                'buscar' => '',
+            ],
+            $usuario,
+            true,
+        );
+
+        return $eventos
+            ->filter(fn (array $evento): bool => ! in_array($evento['estado'], ['completado', 'cancelado'], true))
+            ->filter(function (array $evento) use ($desde): bool {
+                $fin = CarbonImmutable::instance($evento['termina_at'] ?? $evento['inicia_at']);
+
+                return $fin->greaterThanOrEqualTo($desde);
+            })
+            ->sortBy(function (array $evento): string {
+                $criticidad = match ($evento['prioridad']) {
+                    'critica' => '0',
+                    'alta' => '1',
+                    default => '2',
+                };
+
+                return CarbonImmutable::instance($evento['inicia_at'])->format('YmdHis').$criticidad;
+            })
+            ->take(6)
+            ->map(function (array $evento) use ($desde): array {
+                $inicio = CarbonImmutable::instance($evento['inicia_at']);
+                $fin = CarbonImmutable::instance($evento['termina_at'] ?? $evento['inicia_at']);
+                $dias = $desde->diffInDays($inicio->startOfDay(), false);
+
+                return [
+                    'key' => $evento['key'],
+                    'titulo' => $evento['titulo'],
+                    'tipo' => $evento['tipo_etiqueta'],
+                    'prioridad' => $evento['prioridad'],
+                    'estado' => $evento['estado_etiqueta'],
+                    'fecha' => $inicio->isSameDay($fin)
+                        ? $inicio->translatedFormat('d M Y')
+                        : $inicio->translatedFormat('d M').' – '.$fin->translatedFormat('d M Y'),
+                    'contexto' => collect([$evento['nivel'], $evento['grado'], $evento['grupo']])->filter()->implode(' · ') ?: 'Institucional',
+                    'dias' => $dias,
+                    'es_hoy' => $inicio->isToday() || ($inicio->isPast() && $fin->isFuture()),
+                    'origen' => $evento['origen'],
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function tablaExiste(string $tabla): bool
