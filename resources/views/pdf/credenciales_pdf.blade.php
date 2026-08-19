@@ -187,8 +187,7 @@
                 {{-- Foto del alumno --}}
                 @php($fotoDataUri = $alumno->foto_data_uri)
                 @if ($fotoDataUri)
-                    <img class="fotoAlumno" src="{{ $fotoDataUri }}"
-                        alt="Foto del alumno">
+                    <img class="fotoAlumno" src="{{ $fotoDataUri }}" alt="Foto del alumno">
                 @else
                     <div class="sinFoto">
                         FOTO + SELLO
@@ -246,7 +245,7 @@
 
 
                 </div>
-                <span class="director">{{ $nombreDirector }}<br>FIRMA Y SELLO</span>
+                <span class="director"><br>FIRMA Y SELLO</span>
             </div>
 
 

@@ -226,7 +226,7 @@ class PDFController extends Controller
                 'mesesBachillerato',
             ])
             ->where('nivel_id', $nivel->id)
-            ->when($cicloEscolarId, fn ($q) => $q->where('ciclo_escolar_id', $cicloEscolarId));
+            ->when($cicloEscolarId, fn($q) => $q->where('ciclo_escolar_id', $cicloEscolarId));
 
         if (Schema::hasColumn('periodos', 'ciclo_escolar_id')) {
             $periodosQuery->where('ciclo_escolar_id', $cicloEscolar->id);
@@ -2867,10 +2867,10 @@ class PDFController extends Controller
                 usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
                 incluirTodaGeneracionBachillerato: $esBachillerato,
             )
-            ->sortBy(fn ($alumno) => mb_strtolower(trim(
+            ->sortBy(fn($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
             )))
             ->values()
             ->map(function ($item) use ($grado, $grupo, $semestre) {
@@ -3478,7 +3478,7 @@ class PDFController extends Controller
         $filtroEstatusHistorico = trim((string) $request->input('filtro_estatus_historico', ''));
         if ($filtroEstatusHistorico !== '') {
             $alumnos = $alumnos->filter(
-                fn ($alumno): bool => (string) $alumno->getAttribute('estatus_historico') === $filtroEstatusHistorico
+                fn($alumno): bool => (string) $alumno->getAttribute('estatus_historico') === $filtroEstatusHistorico
             )->values();
         }
 
@@ -3492,8 +3492,8 @@ class PDFController extends Controller
                     'matricula' => $item->matricula ?: '—',
                     'alumno' => trim(
                         ($item->nombre ?? '') . ' ' .
-                        ($item->apellido_paterno ?? '') . ' ' .
-                        ($item->apellido_materno ?? '')
+                            ($item->apellido_paterno ?? '') . ' ' .
+                            ($item->apellido_materno ?? '')
                     ) ?: '—',
                     'grado' => $grado->nombre ?? '—',
                     'grupo' => $this->nombreGrupo($grupo),
@@ -3578,9 +3578,9 @@ class PDFController extends Controller
                 ->all();
         } elseif (in_array($filtroRegistros, ['con_calificaciones', 'sin_calificaciones'], true)) {
             $idsConCalificacion = collect($calificaciones)
-                ->filter(fn ($valor) => $valor !== null && trim((string) $valor) !== '')
+                ->filter(fn($valor) => $valor !== null && trim((string) $valor) !== '')
                 ->keys()
-                ->map(fn ($clave) => (int) explode('-', (string) $clave)[0])
+                ->map(fn($clave) => (int) explode('-', (string) $clave)[0])
                 ->unique()
                 ->all();
 
@@ -4500,10 +4500,10 @@ class PDFController extends Controller
                 usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
                 incluirTodaGeneracionBachillerato: $esBachillerato,
             )
-            ->sortBy(fn ($alumno) => mb_strtolower(trim(
+            ->sortBy(fn($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
             )))
             ->values()
             ->map(function ($item) use ($grado, $grupo, $semestre) {
@@ -5219,10 +5219,10 @@ class PDFController extends Controller
                 usarActualComoRespaldo: (bool) $periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at),
                 incluirTodaGeneracionBachillerato: $esBachillerato,
             )
-            ->sortBy(fn ($alumno) => mb_strtolower(trim(
+            ->sortBy(fn($alumno) => mb_strtolower(trim(
                 ($alumno->apellido_paterno ?? '') . ' ' .
-                ($alumno->apellido_materno ?? '') . ' ' .
-                ($alumno->nombre ?? '')
+                    ($alumno->apellido_materno ?? '') . ' ' .
+                    ($alumno->nombre ?? '')
             )))
             ->values()
             ->map(function ($item) use ($grado, $grupo, $semestre) {
@@ -5548,10 +5548,10 @@ class PDFController extends Controller
         $modoDescarga = $request->get('modo_descarga', 'grupo');
         $cicloEscolarId = $request->integer('ciclo_escolar_id')
             ?: CicloEscolar::query()
-                ->orderByDesc('es_actual')
-                ->orderByDesc('inicio_anio')
-                ->orderByDesc('id')
-                ->value('id');
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->value('id');
 
         $query = Inscripcion::query()
             ->visiblesEnListas()
@@ -5874,8 +5874,8 @@ class PDFController extends Controller
     {
         $valor = $request->input('alumnos', '');
         $valores = collect(is_array($valor) ? $valor : explode(',', (string) $valor))
-            ->map(fn ($id): string => trim((string) $id))
-            ->filter(fn (string $id): bool => $id !== '')
+            ->map(fn($id): string => trim((string) $id))
+            ->filter(fn(string $id): bool => $id !== '')
             ->values();
 
         if ($valores->isEmpty()) {
@@ -6133,7 +6133,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId)
             ->when(
                 $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
-                fn ($query) => $query->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+                fn($query) => $query->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
             )
             ->where('materias.calificable', 1);
 
@@ -6330,7 +6330,7 @@ class PDFController extends Controller
         if ($alumnosSeleccionadosIds !== []) {
             $idsEncontrados = $alumnos
                 ->pluck('id')
-                ->map(fn ($id): int => (int) $id)
+                ->map(fn($id): int => (int) $id)
                 ->unique()
                 ->values()
                 ->all();
@@ -6342,7 +6342,7 @@ class PDFController extends Controller
             }
 
             $alumnos = $alumnos
-                ->filter(fn ($alumno): bool => in_array((int) $alumno->id, $alumnosSeleccionadosIds, true))
+                ->filter(fn($alumno): bool => in_array((int) $alumno->id, $alumnosSeleccionadosIds, true))
                 ->values();
         }
 
