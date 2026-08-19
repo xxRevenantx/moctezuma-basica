@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8">
@@ -29,7 +29,6 @@
     body {
         font-family: 'ARIAL', sans-serif;
         text-transform: uppercase;
-
     }
 
     table {
@@ -37,10 +36,8 @@
         height: 1cm;
         margin: 10px auto;
         border-collapse: collapse;
-
         font-size: 11px;
         color: #000;
-
     }
 
     table th,
@@ -52,19 +49,40 @@
 </style>
 
 <body>
-
     @php
+        $modoGlobalActivo = (bool) ($modoGlobal ?? false);
 
         $nombreGrado = $grado->nombre ?? ($grado->grado ?? '');
-        $nombreNivel = strtoupper($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL'));
-        $nombreGrupo = $grupo->asignacionGrupo->nombre ?? '';
-
+        $nombreNivel = mb_strtoupper((string) ($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL')), 'UTF-8');
+        $nombreGrupo = $grupo?->asignacionGrupo?->nombre ?? '';
     @endphp
-
-
 
     <table>
         @forelse ($alumnos as $alumno)
+            @php
+                if ($modoGlobalActivo) {
+                    $nivelAlumno = $alumno->nivel;
+                    $gradoAlumno = $alumno->grado;
+                    $grupoAlumno = $alumno->grupo;
+                    $generacionAlumno = $alumno->generacion;
+
+                    $nivelTexto = mb_strtoupper((string) ($nivelAlumno?->nombre ?? 'SIN NIVEL'), 'UTF-8');
+                    $gradoTexto = (string) ($gradoAlumno?->nombre ?? 'SIN GRADO');
+                    $grupoTexto = (string) ($grupoAlumno?->asignacionGrupo?->nombre ?? 'SIN GRUPO');
+                    $esBachilleratoAlumno = (int) ($nivelAlumno?->id ?? 0) === 4 || $nivelAlumno?->slug === 'bachillerato';
+                    $generacionTexto = $generacionAlumno
+                        ? trim((string) $generacionAlumno->anio_ingreso . ' - ' . (string) $generacionAlumno->anio_egreso)
+                        : 'SIN GENERACIÓN';
+                } else {
+                    $nivelTexto = $nombreNivel;
+                    $gradoTexto = $nombreGrado;
+                    $grupoTexto = $nombreGrupo;
+                    $esBachilleratoAlumno = (bool) ($esBachillerato ?? false);
+                    $generacionTexto = $generacion
+                        ? trim((string) $generacion->anio_ingreso . ' - ' . (string) $generacion->anio_egreso)
+                        : 'SIN GENERACIÓN';
+                }
+            @endphp
 
             <tr>
                 <td style="width:260px">
@@ -72,16 +90,15 @@
                 </td>
 
                 <td>
-                    @if ($esBachillerato)
-                        {{ $nombreNivel }}, GRUPO: {{ $nombreGrupo }}
+                    @if ($esBachilleratoAlumno)
+                        {{ $nivelTexto }}, GRUPO: {{ $grupoTexto }}
                     @else
-                        {{ $nombreGrado }}° DE {{ $nombreNivel }}, GRUPO: {{ $nombreGrupo }}
+                        {{ $gradoTexto }}° DE {{ $nivelTexto }}, GRUPO: {{ $grupoTexto }}
                     @endif
-
-
                 </td>
+
                 <td>
-                    GEN: {{ $generacion->anio_ingreso }} - {{ $generacion->anio_egreso }}
+                    GEN: {{ $generacionTexto }}
                 </td>
             </tr>
         @empty
@@ -90,10 +107,8 @@
                     <p>No hay alumnos registrados.</p>
                 </td>
             </tr>
-        @endempty
-</table>
-
-
+        @endforelse
+    </table>
 </body>
 
 </html>

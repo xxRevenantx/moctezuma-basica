@@ -50,6 +50,7 @@ use App\Http\Controllers\HorariosVaciosPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\ListaGeneracionesHistoricasController;
 use App\Http\Controllers\ListaAlumnosSeleccionadosController;
+use App\Http\Controllers\ListasGeneralesFormatosController;
 use App\Http\Controllers\LiberacionSueldosController;
 use App\Http\Controllers\MateriaController;
 use App\Http\Controllers\PeriodosBachilleratoController;
@@ -72,6 +73,8 @@ use App\Models\PersonaNivel;
 use App\Livewire\Admin\RevisionCiclosAcademicos;
 use App\Livewire\Admin\CorreccionesCalificaciones;
 use App\Livewire\Admin\CentroIntegridadAcademica;
+use App\Livewire\ListasGenerales;
+use App\Livewire\DirectorioTutores;
 
 
 // PORTAL DOCENTE (rutas cerradas por rol y alcance académico)
@@ -136,6 +139,25 @@ Route::post('/alumnos/lista-seleccionados/pdf', [ListaAlumnosSeleccionadosContro
     ->name('misrutas.alumnos.lista.pdf');
 Route::post('/alumnos/lista-seleccionados/word', [ListaAlumnosSeleccionadosController::class, 'word'])
     ->name('misrutas.alumnos.lista.word');
+
+// LISTAS GENERALES GLOBALES
+Route::get('/listas-generales', ListasGenerales::class)
+    ->middleware('admin')
+    ->name('misrutas.listas-generales');
+
+Route::get('/listas-generales/formatos/pdf', ListasGeneralesFormatosController::class)
+    ->middleware('admin')
+    ->name('listas-generales.formatos.pdf');
+
+// DIRECTORIO GLOBAL DE PADRES Y TUTORES
+Route::get('/directorio-padres-tutores', DirectorioTutores::class)
+    ->middleware('admin')
+    ->name('misrutas.directorio-tutores');
+
+Route::get('/directorio-padres-tutores/descargar/{formato}', DirectorioTutoresController::class)
+    ->middleware('admin')
+    ->whereIn('formato', ['pdf', 'word', 'zip-pdf', 'zip-word'])
+    ->name('directorio-tutores.descargar');
 
 
 // CALENDARIO OPERATIVO INSTITUCIONAL
@@ -419,13 +441,9 @@ Route::get('/profesores/horarios/todos/pdf', TodosHorariosProfesoresPdfControlle
     ->name('profesores.horarios.todos.pdf');
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
+    ->middleware('admin')
     ->name('accion.generales.listas.pdf');
 
-
-Route::get('/generales/directorio-tutores/{formato}', DirectorioTutoresController::class)
-    ->middleware('admin')
-    ->whereIn('formato', ['pdf', 'word', 'zip-pdf', 'zip-word'])
-    ->name('generales.directorio-tutores.descargar');
 
 Route::get('/generales/{slug_nivel}/generaciones-historicas/{formato}', ListaGeneracionesHistoricasController::class)
     ->middleware('admin')

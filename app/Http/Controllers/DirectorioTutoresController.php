@@ -25,10 +25,14 @@ class DirectorioTutoresController extends Controller
 {
     public function __invoke(Request $request, string $formato, DirectorioTutoresService $servicio)
     {
-        abort_unless(auth()->check() && auth()->user()->is_admin, 403);
+        abort_unless(auth()->check() && (bool) auth()->user()->is_admin, 403);
         abort_unless(in_array($formato, ['pdf', 'word', 'zip-pdf', 'zip-word'], true), 404);
 
         $datos = $this->prepararDatos($request, $servicio);
+
+        if (str_starts_with($formato, 'zip-')) {
+            abort_unless($datos['vista'] === 'alumnos', 422, 'La descarga por grupos está disponible únicamente en la vista por alumnos.');
+        }
 
         return match ($formato) {
             'pdf' => $this->descargarPdf($datos),
@@ -41,53 +45,82 @@ class DirectorioTutoresController extends Controller
     private function prepararDatos(Request $request, DirectorioTutoresService $servicio): array
     {
         $validados = $request->validate([
-            'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
+            'nivel_id' => ['nullable', 'integer', 'exists:niveles,id'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
             'ciclo_escolar_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
             'grado_id' => ['nullable', 'integer', 'exists:grados,id'],
             'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
             'grupo_id' => ['nullable', 'integer', 'exists:grupos,id'],
+            'estado_alumno' => ['nullable', 'string', 'in:activos,egresados,no_reinscritos,todos'],
             'modo_responsables' => ['nullable', 'string', 'in:principal,todos'],
             'parentesco' => ['nullable', 'string', 'max:50'],
             'buscar' => ['nullable', 'string', 'max:120'],
             'orden' => ['nullable', 'string', 'in:academico_alumno,alumno,tutor'],
+            'vista' => ['nullable', 'string', 'in:familias,alumnos'],
+            'pestana' => ['nullable', 'string', 'in:todos,multinivel,duplicados,incompletos'],
+            'tipo_familia' => ['nullable', 'string', 'in:todas,uno,varios,multinivel'],
+            'filtro_rapido' => ['nullable', 'string', 'in:sin_tutor,sin_telefono,sin_domicilio,sin_curp,varios_hijos,multinivel,duplicados'],
             'salto_grupo' => ['nullable', 'boolean'],
         ]);
 
         $filtros = $servicio->normalizarFiltros($validados);
-        $nivel = Nivel::query()->with('director')->findOrFail($filtros['nivel_id']);
+        $nivel = $filtros['nivel_id']
+            ? Nivel::query()->with('director')->findOrFail($filtros['nivel_id'])
+            : null;
+
         $this->validarDependenciasAcademicas($filtros, $nivel);
 
-        $filas = $servicio->filas($filtros);
-        abort_if($filas->isEmpty(), 404, 'No hay alumnos activos que coincidan con los filtros seleccionados.');
+        $resultado = $servicio->directorio($filtros);
+        $vista = $filtros['vista'];
+        $filas = $vista === 'familias' ? $resultado['familias'] : $resultado['filas'];
 
-        $secciones = $this->numerarSecciones($servicio->secciones($filas));
+        abort_if($filas->isEmpty(), 404, 'No hay registros que coincidan con los filtros seleccionados.');
+
+        $secciones = $vista === 'familias'
+            ? $servicio->seccionesFamilias($filas)
+            : $servicio->secciones($filas);
+        $secciones = $this->numerarSecciones($secciones);
+
         $escuela = Escuela::query()->first();
+        $nivelNombre = $nivel?->nombre ?? 'Todos los niveles';
+        $cct = $nivel?->cct ?: ($nivel ? 'SIN C.C.T.' : 'DIRECTORIO INSTITUCIONAL');
+        $cargoDirector = $nivel ? 'Dirección del nivel' : 'Dirección General';
 
         return [
             'titulo' => 'Directorio de padres y tutores',
+            'subtitulo' => $vista === 'familias' ? 'Directorio consolidado de familias' : 'Directorio por alumno',
+            'vista' => $vista,
             'nivel' => $nivel,
+            'nivel_nombre' => $nivelNombre,
+            'cct' => $cct,
             'escuela' => $escuela,
             'direccion_escuela' => $this->direccionEscuela($escuela),
             'logo_institucional' => $this->logoInstitucional(),
-            'logo_nivel' => $this->logoNivel($nivel),
-            'director' => $this->nombreDirector($nivel),
+            'logo_nivel' => $nivel ? $this->logoNivel($nivel) : $this->logoInstitucional(),
+            'director' => $nivel ? $this->nombreDirector($nivel) : 'Dirección General',
+            'cargo_director' => $cargoDirector,
             'elaborado_por' => auth()->user()->name ?: 'Responsable de control escolar',
             'fecha_emision' => now()->format('d/m/Y H:i'),
             'filtros' => $filtros,
             'resumen_filtros' => $this->resumenFiltros($filtros, $nivel),
             'filas' => $filas,
             'secciones' => $secciones,
-            'metricas' => $servicio->metricas($filas),
-            'salto_grupo' => (bool) $filtros['salto_grupo'],
-            'nombre_archivo' => 'directorio-padres-tutores-' . Str::slug($nivel->nombre) . '-' . now()->format('Y-m-d'),
+            'metricas' => $resultado['metricas'],
+            'duplicados' => $resultado['duplicados'],
+            'salto_grupo' => $vista === 'alumnos' && (bool) $filtros['salto_grupo'],
+            'nombre_archivo' => implode('-', [
+                'directorio-padres-tutores',
+                $nivel ? Str::slug($nivel->nombre) : 'todos-los-niveles',
+                $vista,
+                now()->format('Y-m-d'),
+            ]),
         ];
     }
 
     private function descargarPdf(array $datos)
     {
         return Pdf::loadView('pdf.directorio-tutores', $datos)
-            ->setPaper('letter', 'portrait')
+            ->setPaper('letter', 'landscape')
             ->setOption('isRemoteEnabled', false)
             ->setOption('isHtml5ParserEnabled', true)
             ->stream($datos['nombre_archivo'] . '.pdf');
@@ -118,20 +151,14 @@ class DirectorioTutoresController extends Controller
         abort_unless($zip->open($rutaZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true, 500, 'No fue posible crear el ZIP.');
 
         $temporales = [];
+        $servicio = app(DirectorioTutoresService::class);
 
         foreach ($datos['secciones'] as $indice => $seccion) {
             $seccion = $this->renumerarSeccion($seccion);
             $datosGrupo = $datos;
             $datosGrupo['secciones'] = collect([$seccion]);
             $datosGrupo['filas'] = $seccion['filas'];
-            $datosGrupo['metricas'] = [
-                'filas' => $seccion['filas']->count(),
-                'alumnos' => $seccion['filas']->pluck('alumno_id')->unique()->count(),
-                'responsables' => $seccion['filas']->pluck('tutor_id')->filter()->unique()->count(),
-                'sin_tutor' => $seccion['filas']->where('sin_tutor', true)->pluck('alumno_id')->unique()->count(),
-                'sin_telefono' => $seccion['filas']->where('sin_telefono', true)->count(),
-                'sin_domicilio' => $seccion['filas']->where('sin_domicilio', true)->count(),
-            ];
+            $datosGrupo['metricas'] = $servicio->metricas($seccion['filas']);
             $datosGrupo['salto_grupo'] = false;
 
             $nombreBase = sprintf(
@@ -142,7 +169,7 @@ class DirectorioTutoresController extends Controller
 
             if ($tipo === 'pdf') {
                 $contenido = Pdf::loadView('pdf.directorio-tutores', $datosGrupo)
-                    ->setPaper('letter', 'portrait')
+                    ->setPaper('letter', 'landscape')
                     ->setOption('isRemoteEnabled', false)
                     ->setOption('isHtml5ParserEnabled', true)
                     ->output();
@@ -194,7 +221,7 @@ class DirectorioTutoresController extends Controller
         $phpWord->addTableStyle('TablaDirectorio', [
             'borderSize' => 4,
             'borderColor' => '94A3B8',
-            'cellMargin' => 35,
+            'cellMargin' => 30,
             'alignment' => 'center',
         ]);
         $phpWord->addTableStyle('FirmasDirectorio', [
@@ -206,23 +233,23 @@ class DirectorioTutoresController extends Controller
         $sectionStyle = [
             'paperSize' => 'Letter',
             'orientation' => 'landscape',
-            'marginTop' => 390,
-            'marginBottom' => 390,
-            'marginLeft' => 420,
-            'marginRight' => 420,
+            'marginTop' => 360,
+            'marginBottom' => 360,
+            'marginLeft' => 380,
+            'marginRight' => 380,
         ];
 
         $secciones = collect($datos['secciones'])->values();
         $sectionActual = null;
 
-        if ($datos['salto_grupo']) {
+        if ($datos['salto_grupo'] && $datos['vista'] === 'alumnos') {
             foreach ($secciones as $indice => $seccion) {
                 $sectionActual = $phpWord->addSection($sectionStyle);
                 $this->agregarEncabezadoWord($sectionActual, $datos);
                 if ($indice === 0) {
                     $this->agregarResumenWord($sectionActual, $datos['metricas']);
                 }
-                $this->agregarTablaWord($sectionActual, $seccion);
+                $this->agregarTablaWord($sectionActual, $seccion, $datos['vista']);
                 $this->agregarPieWord($sectionActual);
             }
         } else {
@@ -234,7 +261,7 @@ class DirectorioTutoresController extends Controller
                 if ($indice > 0) {
                     $sectionActual->addTextBreak(1);
                 }
-                $this->agregarTablaWord($sectionActual, $seccion);
+                $this->agregarTablaWord($sectionActual, $seccion, $datos['vista']);
             }
 
             $this->agregarPieWord($sectionActual);
@@ -268,8 +295,9 @@ class DirectorioTutoresController extends Controller
             ['alignment' => 'center', 'spaceAfter' => 0]
         );
         $centro->addText($datos['titulo'], ['bold' => true, 'size' => 10], ['alignment' => 'center', 'spaceAfter' => 0]);
+        $centro->addText($datos['subtitulo'], ['bold' => true, 'size' => 7.5, 'color' => '475569'], ['alignment' => 'center', 'spaceAfter' => 0]);
         $centro->addText(
-            $datos['nivel']->nombre . ' · C.C.T. ' . ($datos['nivel']->cct ?: 'SIN C.C.T.'),
+            $datos['nivel_nombre'] . ' · ' . ($datos['nivel'] ? 'C.C.T. ' : '') . $datos['cct'],
             ['bold' => true, 'size' => 7.5, 'color' => '88AC2E'],
             ['alignment' => 'center', 'spaceAfter' => 0]
         );
@@ -294,22 +322,22 @@ class DirectorioTutoresController extends Controller
         $tabla->addRow();
 
         foreach ([
-            'Alumnos' => $metricas['alumnos'],
-            'Responsables' => $metricas['responsables'],
-            'Filas' => $metricas['filas'],
-            'Sin tutor' => $metricas['sin_tutor'],
-            'Sin teléfono' => $metricas['sin_telefono'],
-            'Sin domicilio' => $metricas['sin_domicilio'],
+            'Alumnos' => $metricas['alumnos'] ?? 0,
+            'Familias' => $metricas['familias'] ?? 0,
+            'Responsables' => $metricas['responsables'] ?? 0,
+            'Varios hijos' => $metricas['varios_hijos'] ?? 0,
+            'Multinivel' => $metricas['multinivel'] ?? 0,
+            'Posibles duplicados' => $metricas['duplicados'] ?? 0,
         ] as $etiqueta => $valor) {
             $celda = $tabla->addCell(2000, ['bgColor' => 'F8FAFC', 'valign' => 'center']);
-            $celda->addText($etiqueta, ['bold' => true, 'size' => 6.5, 'color' => '64748B'], ['alignment' => 'center', 'spaceAfter' => 0]);
-            $celda->addText((string) $valor, ['bold' => true, 'size' => 9, 'color' => '0F172A'], ['alignment' => 'center']);
+            $celda->addText($etiqueta, ['bold' => true, 'size' => 6.1, 'color' => '64748B'], ['alignment' => 'center', 'spaceAfter' => 0]);
+            $celda->addText((string) $valor, ['bold' => true, 'size' => 8.5, 'color' => '0F172A'], ['alignment' => 'center']);
         }
 
         $section->addTextBreak(1);
     }
 
-    private function agregarTablaWord($section, array $seccion): void
+    private function agregarTablaWord($section, array $seccion, string $vista): void
     {
         $section->addText(
             $seccion['titulo'],
@@ -317,7 +345,7 @@ class DirectorioTutoresController extends Controller
             ['alignment' => 'left', 'spaceAfter' => 70]
         );
         $section->addText(
-            'Generación: ' . $seccion['generacion'] . ' · Ciclo escolar: ' . $seccion['ciclo_escolar'],
+            'Generación: ' . $seccion['generacion'] . ' · Ciclo escolar: ' . ($seccion['ciclo_escolar'] ?: 'Según filtros'),
             ['size' => 6.5, 'color' => '64748B'],
             ['alignment' => 'left', 'spaceAfter' => 70]
         );
@@ -325,42 +353,86 @@ class DirectorioTutoresController extends Controller
         $tabla = $section->addTable('TablaDirectorio');
         $tabla->addRow(360, ['tblHeader' => true, 'cantSplit' => true]);
 
-        $columnas = [
-            ['label' => 'N.º', 'width' => 430],
-            ['label' => 'Padre o tutor', 'width' => 1750],
-            ['label' => 'Parentesco', 'width' => 900],
-            ['label' => 'Teléfono', 'width' => 1300],
-            ['label' => 'Domicilio', 'width' => 2600],
-            ['label' => 'Alumno', 'width' => 1800],
-            ['label' => 'Nivel', 'width' => 900],
-            ['label' => 'Grado / semestre', 'width' => 1050],
-            ['label' => 'Grupo', 'width' => 650],
-        ];
+        if ($vista === 'familias') {
+            $columnas = [
+                ['label' => 'N.º', 'width' => 420],
+                ['label' => 'Padre o tutor', 'width' => 1750],
+                ['label' => 'Parentesco', 'width' => 900],
+                ['label' => 'Teléfono', 'width' => 1250],
+                ['label' => 'INE', 'width' => 1050],
+                ['label' => 'Domicilio', 'width' => 2250],
+                ['label' => 'Alumnos relacionados', 'width' => 3000],
+                ['label' => 'Niveles', 'width' => 1250],
+            ];
+        } else {
+            $columnas = [
+                ['label' => 'N.º', 'width' => 420],
+                ['label' => 'Padre o tutor', 'width' => 1600],
+                ['label' => 'Parentesco', 'width' => 820],
+                ['label' => 'Teléfono', 'width' => 1180],
+                ['label' => 'INE', 'width' => 1000],
+                ['label' => 'Domicilio', 'width' => 2200],
+                ['label' => 'Alumno', 'width' => 1650],
+                ['label' => 'Nivel', 'width' => 850],
+                ['label' => 'Grado / semestre', 'width' => 1000],
+                ['label' => 'Grupo', 'width' => 600],
+            ];
+        }
 
         foreach ($columnas as $columna) {
             $celda = $tabla->addCell($columna['width'], ['bgColor' => '006492', 'valign' => 'center']);
-            $celda->addText($columna['label'], ['bold' => true, 'size' => 6.5, 'color' => 'FFFFFF'], ['alignment' => 'center', 'spaceAfter' => 0]);
+            $celda->addText($columna['label'], ['bold' => true, 'size' => 6.2, 'color' => 'FFFFFF'], ['alignment' => 'center', 'spaceAfter' => 0]);
         }
 
         foreach ($seccion['filas'] as $fila) {
             $tabla->addRow(430, ['cantSplit' => true]);
-            $gradoSemestre = collect([$fila['grado'], $fila['semestre']])->filter()->join(' · ');
 
-            $valores = [
-                [(string) $fila['numero'], 'center'],
-                [$fila['responsable'] . ($fila['es_principal'] ? ' (Principal)' : ''), 'left'],
-                [$fila['parentesco'], 'center'],
-                [$fila['telefono'], 'left'],
-                [$fila['domicilio'], 'left'],
-                [$fila['alumno'], 'left'],
-                [$fila['nivel'], 'center'],
-                [$gradoSemestre, 'center'],
-                [$fila['grupo'], 'center'],
-            ];
+            if ($vista === 'familias') {
+                $alumnos = collect($fila['alumnos'])->map(function (array $alumno): string {
+                    $contexto = collect([
+                        $alumno['nivel'] ?? null,
+                        $alumno['grado'] ?? null,
+                        $alumno['semestre'] ?? null,
+                        ! empty($alumno['grupo']) ? 'Grupo ' . $alumno['grupo'] : null,
+                    ])->filter()->join(' · ');
+
+                    return ($alumno['nombre'] ?? '') . ($contexto !== '' ? ' (' . $contexto . ')' : '');
+                })->join('; ');
+
+                $niveles = $fila['niveles_texto'] ?: '';
+                if ($fila['multinivel']) {
+                    $niveles .= ($niveles !== '' ? ' · ' : '') . 'MULTINIVEL';
+                }
+
+                $valores = [
+                    [(string) $fila['numero'], 'center'],
+                    [$fila['responsable'], 'left'],
+                    [$fila['parentesco'], 'center'],
+                    [$fila['telefono'], 'left'],
+                    [$fila['ine'] ?? '', 'center'],
+                    [$fila['domicilio'], 'left'],
+                    [$alumnos, 'left'],
+                    [$niveles, 'center'],
+                ];
+            } else {
+                $gradoSemestre = collect([$fila['grado'], $fila['semestre']])->filter()->join(' · ');
+                $valores = [
+                    [(string) $fila['numero'], 'center'],
+                    [$fila['responsable'] . ($fila['es_principal'] ? ' (Principal)' : ''), 'left'],
+                    [$fila['parentesco'], 'center'],
+                    [$fila['telefono'], 'left'],
+                    [$fila['ine'] ?? '', 'center'],
+                    [$fila['domicilio'], 'left'],
+                    [$fila['alumno'], 'left'],
+                    [$fila['nivel'], 'center'],
+                    [$gradoSemestre, 'center'],
+                    [$fila['grupo'], 'center'],
+                ];
+            }
 
             foreach ($valores as $indice => [$texto, $alineacion]) {
                 $celda = $tabla->addCell($columnas[$indice]['width'], ['valign' => 'center']);
-                $celda->addText((string) $texto, ['size' => 6.2], ['alignment' => $alineacion, 'spaceAfter' => 0]);
+                $celda->addText((string) $texto, ['size' => 6], ['alignment' => $alineacion, 'spaceAfter' => 0]);
             }
         }
     }
@@ -374,7 +446,7 @@ class DirectorioTutoresController extends Controller
         $director = $tabla->addCell(6000, ['valign' => 'bottom']);
         $director->addText('____________________________________________', ['size' => 7], ['alignment' => 'center', 'spaceAfter' => 0]);
         $director->addText($datos['director'], ['bold' => true, 'size' => 7.5], ['alignment' => 'center', 'spaceAfter' => 0]);
-        $director->addText('Dirección del nivel', ['size' => 6.5, 'color' => '64748B'], ['alignment' => 'center']);
+        $director->addText($datos['cargo_director'], ['size' => 6.5, 'color' => '64748B'], ['alignment' => 'center']);
 
         $elaboro = $tabla->addCell(6000, ['valign' => 'bottom']);
         $elaboro->addText('____________________________________________', ['size' => 7], ['alignment' => 'center', 'spaceAfter' => 0]);
@@ -399,6 +471,7 @@ class DirectorioTutoresController extends Controller
         return $secciones->map(function (array $seccion) use (&$numero): array {
             $seccion['filas'] = $seccion['filas']->map(function (array $fila) use (&$numero): array {
                 $fila['numero'] = $numero++;
+
                 return $fila;
             })->values();
 
@@ -410,14 +483,25 @@ class DirectorioTutoresController extends Controller
     {
         $seccion['filas'] = $seccion['filas']->values()->map(function (array $fila, int $indice): array {
             $fila['numero'] = $indice + 1;
+
             return $fila;
         });
 
         return $seccion;
     }
 
-    private function validarDependenciasAcademicas(array $filtros, Nivel $nivel): void
+    private function validarDependenciasAcademicas(array $filtros, ?Nivel $nivel): void
     {
+        if (! $nivel) {
+            abort_if(
+                $filtros['generacion_id'] || $filtros['grado_id'] || $filtros['semestre_id'] || $filtros['grupo_id'],
+                422,
+                'Selecciona un nivel antes de aplicar generación, grado, semestre o grupo.'
+            );
+
+            return;
+        }
+
         if ($filtros['generacion_id']) {
             abort_unless(Generacion::query()->whereKey($filtros['generacion_id'])->where('nivel_id', $nivel->id)->exists(), 422, 'La generación no pertenece al nivel seleccionado.');
         }
@@ -440,7 +524,7 @@ class DirectorioTutoresController extends Controller
         }
     }
 
-    private function resumenFiltros(array $filtros, Nivel $nivel): array
+    private function resumenFiltros(array $filtros, ?Nivel $nivel): array
     {
         $generacion = $filtros['generacion_id'] ? Generacion::find($filtros['generacion_id']) : null;
         $ciclo = $filtros['ciclo_escolar_id'] ? CicloEscolar::find($filtros['ciclo_escolar_id']) : null;
@@ -448,15 +532,31 @@ class DirectorioTutoresController extends Controller
         $semestre = $filtros['semestre_id'] ? Semestre::find($filtros['semestre_id']) : null;
         $grupo = $filtros['grupo_id'] ? Grupo::with('asignacionGrupo:id,nombre')->find($filtros['grupo_id']) : null;
 
+        $estados = [
+            'activos' => 'Activos',
+            'egresados' => 'Egresados',
+            'no_reinscritos' => 'No reinscritos / pendientes',
+            'todos' => 'Todos',
+        ];
+        $tiposFamilia = [
+            'todas' => 'Todas',
+            'uno' => 'Un alumno',
+            'varios' => 'Varios alumnos',
+            'multinivel' => 'Multinivel',
+        ];
+
         return [
-            'Nivel' => $nivel->nombre,
-            'Generación' => $generacion?->etiqueta ?? 'Todas',
+            'Nivel' => $nivel?->nombre ?? 'Todos los niveles',
             'Ciclo escolar' => $ciclo ? $ciclo->inicio_anio . '-' . $ciclo->fin_anio : 'Todos',
+            'Estado' => $estados[$filtros['estado_alumno']] ?? 'Activos',
+            'Generación' => $generacion?->etiqueta ?? 'Todas',
             'Grado' => $grado?->nombre ?? 'Todos',
             'Semestre' => $semestre?->numero ? 'Semestre ' . $semestre->numero : 'Todos',
             'Grupo' => $grupo?->asignacionGrupo?->nombre ?? 'Todos',
             'Responsables' => $filtros['modo_responsables'] === 'todos' ? 'Todos los responsables activos' : 'Tutor principal',
             'Parentesco' => $filtros['parentesco'] !== '' ? Str::headline($filtros['parentesco']) : 'Todos',
+            'Vista' => $filtros['vista'] === 'familias' ? 'Familias' : 'Alumnos',
+            'Tipo de familia' => $tiposFamilia[$filtros['tipo_familia']] ?? 'Todas',
         ];
     }
 

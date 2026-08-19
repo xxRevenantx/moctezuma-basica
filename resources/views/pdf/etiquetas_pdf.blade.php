@@ -54,7 +54,6 @@
             page-break-after: always;
         }
 
-        /* UNA SOLA IMAGEN DE FONDO POR TODA LA HOJA */
         .fondo-hoja {
             position: absolute;
             top: 0;
@@ -67,7 +66,6 @@
 
         .bloque-alumno {
             position: absolute;
-            /* right: 0.85cm; */
             left: 0.85cm;
             width: 90%;
             margin: 0 auto;
@@ -76,21 +74,12 @@
             z-index: 2;
         }
 
-        /* Ajusta estas posiciones según tu plantilla */
         .bloque-alumno.alumno-1 {
             top: 3.15cm;
         }
 
         .bloque-alumno.alumno-2 {
             top: 17.10cm;
-        }
-
-        .leyenda {
-            margin: 0 0 0.18cm 0;
-            font-size: 60px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            color: #6b7788;
         }
 
         .nombre-alumno {
@@ -119,7 +108,6 @@
             color: #4a9f00;
         }
 
-
         .sin-alumnos {
             margin: 2cm auto;
             padding: 1cm;
@@ -134,49 +122,63 @@
 
 <body>
     @php
+        $modoGlobalActivo = (bool) ($modoGlobal ?? false);
         $coleccionAlumnos = collect($alumnos ?? [])->values();
-
         $paginas = $coleccionAlumnos->chunk(2)->map(fn($pagina) => $pagina->values())->values();
 
-        $nombreNivel = mb_strtoupper((string) ($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL')), 'UTF-8');
-        $nombreGrado = mb_strtoupper((string) ($grado->nombre ?? ($grado->grado ?? 'SIN GRADO')), 'UTF-8');
-        $nombreGeneracion = mb_strtoupper(
-            (string) ($generacion->anio_ingreso . ' ' . $generacion->anio_egreso ??
-                ($generacion->anio_ingreso ?? 'SIN GENERACION')),
-            'UTF-8',
-        );
+        $nombreNivelFijo = mb_strtoupper((string) ($nivel->nombre ?? ($nivel->nivel ?? 'NIVEL')), 'UTF-8');
+        $nombreGeneracionFija = $generacion
+            ? mb_strtoupper(trim((string) $generacion->anio_ingreso . ' - ' . (string) $generacion->anio_egreso), 'UTF-8')
+            : 'SIN GENERACIÓN';
 
         $fondoPersonalizador =
             $imagenPersonalizador ??
             (file_exists(public_path('imagenes/personalizador.jpg'))
                 ? public_path('imagenes/personalizador.jpg')
                 : null);
+
+        $datosAlumno = function ($alumno) use ($modoGlobalActivo, $nombreNivelFijo, $nombreGeneracionFija) {
+            if (!$alumno) {
+                return [
+                    'nombre' => '',
+                    'nivel' => '',
+                    'generacion' => '',
+                ];
+            }
+
+            $nombre = trim(
+                (string) ($alumno->nombre ?? '') . ' ' .
+                (string) ($alumno->apellido_paterno ?? '') . ' ' .
+                (string) ($alumno->apellido_materno ?? '')
+            );
+
+            if (!$modoGlobalActivo) {
+                return [
+                    'nombre' => $nombre,
+                    'nivel' => $nombreNivelFijo,
+                    'generacion' => $nombreGeneracionFija,
+                ];
+            }
+
+            $nivelTexto = mb_strtoupper((string) ($alumno->nivel?->nombre ?? 'SIN NIVEL'), 'UTF-8');
+            $generacionTexto = $alumno->generacion
+                ? mb_strtoupper(trim((string) $alumno->generacion->anio_ingreso . ' - ' . (string) $alumno->generacion->anio_egreso), 'UTF-8')
+                : 'SIN GENERACIÓN';
+
+            return [
+                'nombre' => $nombre,
+                'nivel' => $nivelTexto,
+                'generacion' => $generacionTexto,
+            ];
+        };
     @endphp
 
     @forelse ($paginas as $pagina)
         @php
             $alumno1 = $pagina->get(0);
             $alumno2 = $pagina->get(1);
-
-            $nombreAlumno1 = $alumno1
-                ? trim(
-                    (string) ($alumno1->nombre ?? '') .
-                        ' ' .
-                        (string) ($alumno1->apellido_paterno ?? '') .
-                        ' ' .
-                        (string) ($alumno1->apellido_materno ?? ''),
-                )
-                : '';
-
-            $nombreAlumno2 = $alumno2
-                ? trim(
-                    (string) ($alumno2->nombre ?? '') .
-                        ' ' .
-                        (string) ($alumno2->apellido_paterno ?? '') .
-                        ' ' .
-                        (string) ($alumno2->apellido_materno ?? ''),
-                )
-                : '';
+            $datos1 = $datosAlumno($alumno1);
+            $datos2 = $datosAlumno($alumno2);
         @endphp
 
         <div class="pagina-etiquetas {{ !$loop->last ? 'salto-pagina-etiquetas' : '' }}">
@@ -187,12 +189,12 @@
             @if ($alumno1)
                 <div class="bloque-alumno alumno-1">
                     <p class="nombre-alumno">
-                        {{ $nombreAlumno1 !== '' ? $nombreAlumno1 : 'ALUMNO' }}
+                        {{ $datos1['nombre'] !== '' ? $datos1['nombre'] : 'ALUMNO' }}
                     </p>
 
                     <div class="datos-escolares">
-                        <span class="dato-nivel">{{ $nombreNivel }}</span> |
-                        <span class="dato-generacion">GEN: {{ $nombreGeneracion }}</span>
+                        <span class="dato-nivel">{{ $datos1['nivel'] }}</span> |
+                        <span class="dato-generacion">GEN: {{ $datos1['generacion'] }}</span>
                     </div>
                 </div>
             @endif
@@ -200,12 +202,12 @@
             @if ($alumno2)
                 <div class="bloque-alumno alumno-2">
                     <p class="nombre-alumno">
-                        {{ $nombreAlumno2 !== '' ? $nombreAlumno2 : 'ALUMNO' }}
+                        {{ $datos2['nombre'] !== '' ? $datos2['nombre'] : 'ALUMNO' }}
                     </p>
 
                     <div class="datos-escolares">
-                        <span class="dato-nivel">{{ $nombreNivel }}</span> |
-                        <span class="dato-generacion">GEN: {{ $nombreGeneracion }}</span>
+                        <span class="dato-nivel">{{ $datos2['nivel'] }}</span> |
+                        <span class="dato-generacion">GEN: {{ $datos2['generacion'] }}</span>
                     </div>
                 </div>
             @endif

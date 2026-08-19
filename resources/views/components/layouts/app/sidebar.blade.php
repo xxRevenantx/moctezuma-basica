@@ -39,6 +39,7 @@
             'misrutas.alumnos',
             'misrutas.inscripcion',
             'misrutas.tutores',
+            'misrutas.listas-generales',
             'misrutas.alumnos.expediente-360',
             'misrutas.calendario',
         );
@@ -231,6 +232,22 @@
                         x-show="itemMatches($el)">
                         Tutores y responsables
                     </flux:sidebar.item>
+
+                    @if ($isAdmin)
+                        <flux:sidebar.item icon="user-group" :href="route('misrutas.directorio-tutores')"
+                            :current="request()->routeIs('misrutas.directorio-tutores')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="directorio padres tutores responsables familias multinivel duplicados teléfonos ine"
+                            x-show="itemMatches($el)">
+                            Directorio de padres y tutores
+                        </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="clipboard-document-list" :href="route('misrutas.listas-generales')"
+                            :current="request()->routeIs('misrutas.listas-generales')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="listas generales formatos personalizadores etiquetas evaluación asistencia sece alumnos"
+                            x-show="itemMatches($el)">
+                            Listas generales
+                        </flux:sidebar.item>
+                    @endif
 
 
                     @if ($canAccessCalendar)

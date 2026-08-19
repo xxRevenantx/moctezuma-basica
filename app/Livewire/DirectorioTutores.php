@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Accion\Generales;
+namespace App\Livewire;
 
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
@@ -23,8 +23,6 @@ class DirectorioTutores extends Component
 {
     use WithPagination;
 
-    public string $slug_nivel = '';
-
     public ?int $nivel_id = null;
     public ?int $generacion_id = null;
     public ?int $ciclo_escolar_id = null;
@@ -32,10 +30,15 @@ class DirectorioTutores extends Component
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
 
+    public string $estado_alumno = 'activos';
     public string $modo_responsables = 'principal';
     public string $parentesco = '';
     public string $buscar = '';
     public string $orden = 'academico_alumno';
+    public string $vista = 'familias';
+    public string $pestana = 'todos';
+    public string $tipo_familia = 'todas';
+    public string $filtro_rapido = '';
     public bool $salto_grupo = true;
     public int $perPage = 20;
 
@@ -49,12 +52,9 @@ class DirectorioTutores extends Component
 
     protected $paginationTheme = 'tailwind';
 
-    public function mount(string $slug_nivel): void
+    public function mount(): void
     {
         $this->autorizar();
-        $this->slug_nivel = $slug_nivel;
-
-        $nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
         $this->niveles = Nivel::query()
             ->orderBy('id')
@@ -75,21 +75,30 @@ class DirectorioTutores extends Component
                 'es_actual' => (bool) $ciclo->es_actual,
             ])->all();
 
-        $this->nivel_id = (int) $nivel->id;
-        $this->ciclo_escolar_id = collect($this->ciclosEscolares)->firstWhere('es_actual', true)['id']
-            ?? collect($this->ciclosEscolares)->first()['id']
-            ?? null;
+        $ciclo = collect($this->ciclosEscolares)->firstWhere('es_actual', true)
+            ?? collect($this->ciclosEscolares)->first();
+        $this->ciclo_escolar_id = isset($ciclo['id']) ? (int) $ciclo['id'] : null;
 
+        // El módulo inicia en modo institucional: todos los niveles, ciclo actual.
+        $this->nivel_id = null;
         $this->cargarCatalogosDependientes();
     }
 
     public function updatedNivelId(mixed $value): void
     {
-        $this->nivel_id = $this->enteroValido($value)
-            && collect($this->niveles)->contains('id', (int) $value)
-                ? (int) $value
-                : collect($this->niveles)->firstWhere('slug', $this->slug_nivel)['id'] ?? null;
+        $id = $this->enteroValido($value) ? (int) $value : null;
+        $this->nivel_id = $id && collect($this->niveles)->contains('id', $id) ? $id : null;
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->cargarCatalogosDependientes();
+        $this->resetPage('directorioPage');
+    }
 
+    public function updatedCicloEscolarId(mixed $value): void
+    {
+        $this->ciclo_escolar_id = $this->enteroValido($value) ? (int) $value : null;
         $this->generacion_id = null;
         $this->grado_id = null;
         $this->semestre_id = null;
@@ -107,17 +116,6 @@ class DirectorioTutores extends Component
         $this->cargarGrados();
         $this->cargarSemestres();
         $this->cargarGrupos();
-        $this->resetPage('directorioPage');
-    }
-
-    public function updatedCicloEscolarId(mixed $value): void
-    {
-        $this->ciclo_escolar_id = $this->enteroValido($value) ? (int) $value : null;
-        $this->generacion_id = null;
-        $this->grado_id = null;
-        $this->semestre_id = null;
-        $this->grupo_id = null;
-        $this->cargarCatalogosDependientes();
         $this->resetPage('directorioPage');
     }
 
@@ -142,6 +140,16 @@ class DirectorioTutores extends Component
     public function updatedGrupoId(mixed $value): void
     {
         $this->grupo_id = $this->enteroValido($value) ? (int) $value : null;
+        $this->resetPage('directorioPage');
+    }
+
+    public function updatedEstadoAlumno(): void
+    {
+        if (! in_array($this->estado_alumno, DirectorioTutoresService::ESTADOS_ALUMNO, true)) {
+            $this->estado_alumno = 'activos';
+        }
+
+        $this->cargarParentescos();
         $this->resetPage('directorioPage');
     }
 
@@ -175,6 +183,34 @@ class DirectorioTutores extends Component
         $this->resetPage('directorioPage');
     }
 
+    public function updatedVista(): void
+    {
+        if (! in_array($this->vista, DirectorioTutoresService::VISTAS, true)) {
+            $this->vista = 'familias';
+        }
+
+        $this->resetPage('directorioPage');
+    }
+
+    public function updatedPestana(): void
+    {
+        if (! in_array($this->pestana, DirectorioTutoresService::PESTANAS, true)) {
+            $this->pestana = 'todos';
+        }
+
+        $this->filtro_rapido = '';
+        $this->resetPage('directorioPage');
+    }
+
+    public function updatedTipoFamilia(): void
+    {
+        if (! in_array($this->tipo_familia, DirectorioTutoresService::TIPOS_FAMILIA, true)) {
+            $this->tipo_familia = 'todas';
+        }
+
+        $this->resetPage('directorioPage');
+    }
+
     public function updatedPerPage(mixed $value): void
     {
         $valor = (int) $value;
@@ -182,22 +218,58 @@ class DirectorioTutores extends Component
         $this->resetPage('directorioPage');
     }
 
+    public function cambiarPestana(string $pestana): void
+    {
+        if (! in_array($pestana, DirectorioTutoresService::PESTANAS, true)) {
+            return;
+        }
+
+        $this->pestana = $pestana;
+        $this->filtro_rapido = '';
+        $this->resetPage('directorioPage');
+    }
+
+    public function cambiarVista(string $vista): void
+    {
+        if (! in_array($vista, DirectorioTutoresService::VISTAS, true)) {
+            return;
+        }
+
+        $this->vista = $vista;
+        $this->resetPage('directorioPage');
+    }
+
+    public function aplicarFiltroRapido(string $filtro): void
+    {
+        if (! in_array($filtro, DirectorioTutoresService::FILTROS_RAPIDOS, true)) {
+            return;
+        }
+
+        $this->pestana = 'todos';
+        $this->filtro_rapido = $this->filtro_rapido === $filtro ? '' : $filtro;
+        $this->resetPage('directorioPage');
+    }
+
     public function limpiarFiltros(): void
     {
-        $nivel = collect($this->niveles)->firstWhere('slug', $this->slug_nivel);
         $ciclo = collect($this->ciclosEscolares)->firstWhere('es_actual', true)
             ?? collect($this->ciclosEscolares)->first();
 
-        $this->nivel_id = isset($nivel['id']) ? (int) $nivel['id'] : null;
+        $this->nivel_id = null;
         $this->generacion_id = null;
         $this->ciclo_escolar_id = isset($ciclo['id']) ? (int) $ciclo['id'] : null;
         $this->grado_id = null;
         $this->semestre_id = null;
         $this->grupo_id = null;
+        $this->estado_alumno = 'activos';
         $this->modo_responsables = 'principal';
         $this->parentesco = '';
         $this->buscar = '';
         $this->orden = 'academico_alumno';
+        $this->vista = 'familias';
+        $this->pestana = 'todos';
+        $this->tipo_familia = 'todas';
+        $this->filtro_rapido = '';
         $this->salto_grupo = true;
         $this->perPage = 20;
         $this->cargarCatalogosDependientes();
@@ -205,55 +277,69 @@ class DirectorioTutores extends Component
     }
 
     /**
-     * Restaura preferencias provenientes exclusivamente del localStorage del
-     * navegador. Todas las llaves vuelven a validarse contra la base de datos.
+     * Restaura únicamente valores válidos provenientes de localStorage.
      */
     public function restaurarVistaGuardada(array $estado): void
     {
         $this->autorizar();
 
         $nivelId = $this->enteroValido($estado['nivel_id'] ?? null) ? (int) $estado['nivel_id'] : null;
-        if (! collect($this->niveles)->contains('id', $nivelId)) {
-            $nivelId = collect($this->niveles)->firstWhere('slug', $this->slug_nivel)['id'] ?? null;
+        $this->nivel_id = $nivelId && collect($this->niveles)->contains('id', $nivelId) ? $nivelId : null;
+        $this->ciclo_escolar_id = $this->idRelacionadoValido(CicloEscolar::class, $estado['ciclo_escolar_id'] ?? null);
+
+        if ($this->nivel_id) {
+            $this->generacion_id = $this->idRelacionadoValido(
+                Generacion::class,
+                $estado['generacion_id'] ?? null,
+                ['nivel_id' => $this->nivel_id]
+            );
+            $this->grado_id = $this->idRelacionadoValido(
+                Grado::class,
+                $estado['grado_id'] ?? null,
+                ['nivel_id' => $this->nivel_id]
+            );
+            $this->semestre_id = $this->idRelacionadoValido(
+                Semestre::class,
+                $estado['semestre_id'] ?? null,
+                $this->grado_id ? ['grado_id' => $this->grado_id] : []
+            );
+            $this->grupo_id = $this->idRelacionadoValido(
+                Grupo::class,
+                $estado['grupo_id'] ?? null,
+                collect([
+                    'nivel_id' => $this->nivel_id,
+                    'generacion_id' => $this->generacion_id,
+                    'grado_id' => $this->grado_id,
+                    'semestre_id' => $this->semestre_id,
+                    'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                ])->filter(fn ($valor): bool => $valor !== null)->all()
+            );
+        } else {
+            $this->generacion_id = null;
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
         }
 
-        $this->nivel_id = $nivelId;
-        $this->generacion_id = $this->idRelacionadoValido(
-            Generacion::class,
-            $estado['generacion_id'] ?? null,
-            ['nivel_id' => $this->nivel_id]
-        );
-        $this->ciclo_escolar_id = $this->idRelacionadoValido(CicloEscolar::class, $estado['ciclo_escolar_id'] ?? null);
-        $this->grado_id = $this->idRelacionadoValido(
-            Grado::class,
-            $estado['grado_id'] ?? null,
-            ['nivel_id' => $this->nivel_id]
-        );
-        $this->semestre_id = $this->idRelacionadoValido(
-            Semestre::class,
-            $estado['semestre_id'] ?? null,
-            $this->grado_id ? ['grado_id' => $this->grado_id] : []
-        );
-        $this->grupo_id = $this->idRelacionadoValido(
-            Grupo::class,
-            $estado['grupo_id'] ?? null,
-            collect([
-                'nivel_id' => $this->nivel_id,
-                'generacion_id' => $this->generacion_id,
-                'grado_id' => $this->grado_id,
-                'semestre_id' => $this->semestre_id,
-                'ciclo_escolar_id' => $this->ciclo_escolar_id,
-            ])->filter(fn ($valor): bool => $valor !== null)->all()
-        );
-
+        $servicio = DirectorioTutoresService::class;
+        $estadoAlumno = (string) ($estado['estado_alumno'] ?? 'activos');
         $modo = (string) ($estado['modo_responsables'] ?? 'principal');
         $orden = (string) ($estado['orden'] ?? 'academico_alumno');
+        $vista = (string) ($estado['vista'] ?? 'familias');
+        $pestana = (string) ($estado['pestana'] ?? 'todos');
+        $tipoFamilia = (string) ($estado['tipo_familia'] ?? 'todas');
+        $filtroRapido = (string) ($estado['filtro_rapido'] ?? '');
         $porPagina = (int) ($estado['perPage'] ?? 20);
 
-        $this->modo_responsables = in_array($modo, DirectorioTutoresService::MODOS_RESPONSABLES, true) ? $modo : 'principal';
+        $this->estado_alumno = in_array($estadoAlumno, $servicio::ESTADOS_ALUMNO, true) ? $estadoAlumno : 'activos';
+        $this->modo_responsables = in_array($modo, $servicio::MODOS_RESPONSABLES, true) ? $modo : 'principal';
         $this->parentesco = Str::upper(Str::limit(trim((string) ($estado['parentesco'] ?? '')), 50, ''));
         $this->buscar = Str::limit(trim((string) ($estado['buscar'] ?? '')), 120, '');
-        $this->orden = in_array($orden, DirectorioTutoresService::ORDENES, true) ? $orden : 'academico_alumno';
+        $this->orden = in_array($orden, $servicio::ORDENES, true) ? $orden : 'academico_alumno';
+        $this->vista = in_array($vista, $servicio::VISTAS, true) ? $vista : 'familias';
+        $this->pestana = in_array($pestana, $servicio::PESTANAS, true) ? $pestana : 'todos';
+        $this->tipo_familia = in_array($tipoFamilia, $servicio::TIPOS_FAMILIA, true) ? $tipoFamilia : 'todas';
+        $this->filtro_rapido = in_array($filtroRapido, $servicio::FILTROS_RAPIDOS, true) ? $filtroRapido : '';
         $this->salto_grupo = filter_var($estado['salto_grupo'] ?? true, FILTER_VALIDATE_BOOL);
         $this->perPage = in_array($porPagina, [20, 40, 80], true) ? $porPagina : 20;
 
@@ -268,16 +354,14 @@ class DirectorioTutores extends Component
         $this->autorizar();
 
         $servicio = app(DirectorioTutoresService::class);
-        $filtros = $this->filtros();
-        $filas = $servicio->filas($filtros);
-        $metricas = $servicio->metricas($filas);
-        $secciones = $servicio->secciones($filas);
-        $paginadas = $this->paginar($filas);
+        $resultado = $servicio->directorio($this->filtros());
+        $coleccion = $this->vista === 'familias' ? $resultado['familias'] : $resultado['filas'];
+        $registros = $this->paginar($coleccion);
 
-        return view('livewire.accion.generales.directorio-tutores', [
-            'filas' => $paginadas,
-            'metricas' => $metricas,
-            'secciones' => $secciones,
+        return view('livewire.directorio-tutores', [
+            'registros' => $registros,
+            'metricas' => $resultado['metricas'],
+            'duplicados' => $resultado['duplicados'],
             'urlsDescarga' => [
                 'pdf' => $this->urlDescarga('pdf'),
                 'word' => $this->urlDescarga('word'),
@@ -422,22 +506,39 @@ class DirectorioTutores extends Component
         $parentescos = collect();
 
         if (Schema::hasTable('inscripcion_tutor')) {
-            $parentescos = DB::table('inscripcion_tutor')
+            $query = DB::table('inscripcion_tutor')
                 ->join('inscripciones', 'inscripciones.id', '=', 'inscripcion_tutor.inscripcion_id')
                 ->where('inscripcion_tutor.activo', true)
                 ->whereNull('inscripcion_tutor.fecha_fin')
-                ->where('inscripciones.nivel_id', $this->nivel_id)
-                ->where('inscripciones.activo', true)
-                ->where('inscripciones.estatus', 'activo')
                 ->whereNull('inscripciones.deleted_at')
-                ->whereNotNull('inscripcion_tutor.parentesco')
-                ->pluck('inscripcion_tutor.parentesco');
+                ->whereNotNull('inscripcion_tutor.parentesco');
+
+            $query->when($this->nivel_id, fn ($q, int $id) => $q->where('inscripciones.nivel_id', $id));
+            $query->when($this->ciclo_escolar_id, fn ($q, int $id) => $q->where('inscripciones.ciclo_escolar_id', $id));
+
+            match ($this->estado_alumno) {
+                'activos' => $query->where('inscripciones.activo', true)->where('inscripciones.estatus', 'activo'),
+                'egresados' => $query->where('inscripciones.estatus', 'egresado'),
+                'no_reinscritos' => $query->whereIn('inscripciones.estatus', ['no_reinscrito', 'pendiente_reinscripcion']),
+                default => null,
+            };
+
+            $parentescos = $query->pluck('inscripcion_tutor.parentesco');
         }
 
         $legados = Tutor::query()
-            ->whereHas('inscripciones', fn ($query) => $query
-                ->where('nivel_id', $this->nivel_id)
-                ->visiblesEnListas())
+            ->whereHas('inscripciones', function ($query): void {
+                $query->whereNull('deleted_at')
+                    ->when($this->nivel_id, fn ($q, int $id) => $q->where('nivel_id', $id))
+                    ->when($this->ciclo_escolar_id, fn ($q, int $id) => $q->where('ciclo_escolar_id', $id));
+
+                match ($this->estado_alumno) {
+                    'activos' => $query->where('activo', true)->where('estatus', 'activo'),
+                    'egresados' => $query->where('estatus', 'egresado'),
+                    'no_reinscritos' => $query->whereIn('estatus', ['no_reinscrito', 'pendiente_reinscripcion']),
+                    default => null,
+                };
+            })
             ->whereNotNull('parentesco')
             ->pluck('parentesco');
 
@@ -464,23 +565,28 @@ class DirectorioTutores extends Component
             'grado_id' => $this->grado_id,
             'semestre_id' => $this->semestre_id,
             'grupo_id' => $this->grupo_id,
+            'estado_alumno' => $this->estado_alumno,
             'modo_responsables' => $this->modo_responsables,
             'parentesco' => $this->parentesco,
             'buscar' => $this->buscar,
             'orden' => $this->orden,
+            'vista' => $this->vista,
+            'pestana' => $this->pestana,
+            'tipo_familia' => $this->tipo_familia,
+            'filtro_rapido' => $this->filtro_rapido,
             'salto_grupo' => $this->salto_grupo,
         ];
     }
 
-    private function paginar(Collection $filas): LengthAwarePaginator
+    private function paginar(Collection $registros): LengthAwarePaginator
     {
         $paginaActual = LengthAwarePaginator::resolveCurrentPage('directorioPage');
-        $total = $filas->count();
+        $total = $registros->count();
         $ultimaPagina = max((int) ceil($total / max($this->perPage, 1)), 1);
         $paginaActual = min(max($paginaActual, 1), $ultimaPagina);
 
         return new LengthAwarePaginator(
-            $filas->forPage($paginaActual, $this->perPage)->values(),
+            $registros->forPage($paginaActual, $this->perPage)->values(),
             $total,
             $this->perPage,
             $paginaActual,
@@ -494,7 +600,7 @@ class DirectorioTutores extends Component
 
     private function urlDescarga(string $formato): string
     {
-        return route('generales.directorio-tutores.descargar', ['formato' => $formato])
+        return route('directorio-tutores.descargar', ['formato' => $formato])
             . '?' . http_build_query($this->filtros());
     }
 
