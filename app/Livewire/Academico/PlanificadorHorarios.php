@@ -658,7 +658,7 @@ class PlanificadorHorarios extends Component
         $ids = AsignacionMateria::query()
             ->where('ciclo_escolar_id', $this->cicloEscolarId)
             ->where('nivel_id', $this->nivelId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->whereNotNull('profesor_id')
             ->pluck('profesor_id')->unique();
         $this->profesorId = $this->profesorId && $ids->contains($this->profesorId) ? $this->profesorId : $ids->first();
@@ -704,7 +704,7 @@ class PlanificadorHorarios extends Component
         $asignaciones = AsignacionMateria::query()
             ->where('ciclo_escolar_id', $this->cicloEscolarId)
             ->where('nivel_id', $this->nivelId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->withCount('horarios')
             ->get();
         foreach ($asignaciones as $asignacion) {
@@ -766,7 +766,7 @@ class PlanificadorHorarios extends Component
         $asignaciones = AsignacionMateria::query()->with(['materia', 'grupo.grado', 'grupo.asignacionGrupo', 'profesor'])
             ->where('ciclo_escolar_id', $this->cicloEscolarId)
             ->where('nivel_id', $this->nivelId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->orderBy('grupo_id')->orderBy('orden')->get();
         $reglas = HorarioRegla::query()->orderBy('orden')->get();
         $versiones = HorarioVersion::query()->withCount('detalles')

@@ -74,7 +74,7 @@ class HorarioTallerService
                 $query->where(function ($normal) {
                     $normal->whereNull('taller_sesion_id')
                         ->whereHas('asignacionMateria', fn($subQuery) => $subQuery
-                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA));
+                            ->configurables());
                 })->orWhereHas('tallerSesion', fn($subQuery) => $subQuery
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
             })
@@ -88,7 +88,7 @@ class HorarioTallerService
                 $query->whereIn('grupo_id', $grupoIds)
                     ->orWhereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
                         $subQuery->where('profesor_id', $profesorId)
-                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                            ->configurables();
                     })
                     ->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
                         $subQuery->where('profesor_id', $profesorId)

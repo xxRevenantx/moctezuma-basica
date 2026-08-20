@@ -700,7 +700,7 @@ class ReasignacionDocenteMasivaService
                 $query->where('profesor_id', $profesorDestinoId)
                     ->orWhereHas('asignacionMateria', fn ($sub) => $sub
                         ->where('profesor_id', $profesorDestinoId)
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                        ->configurables())
                     ->orWhereHas('tallerSesion', fn ($sub) => $sub->where('profesor_id', $profesorDestinoId));
             })
             ->get()

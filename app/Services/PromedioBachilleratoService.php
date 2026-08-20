@@ -453,7 +453,7 @@ class PromedioBachilleratoService
             ->join('grupos', 'grupos.id', '=', 'asignacion_materias.grupo_id')
             ->whereIn('asignacion_materias.grupo_id', $idsGrupos->all())
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId)
-            ->where('asignacion_materias.estado', '!=', 'archivada')
+            ->whereIn('asignacion_materias.estado', ['activa', 'cerrada'])
             ->where('grupos.nivel_id', $nivelId)
             ->whereNotNull('grupos.semestre_id')
             ->where('materias.nivel_id', $nivelId);

@@ -44,10 +44,13 @@ class TodosHorariosProfesoresPdfController extends Controller
                 'tallerSesion.grupos.asignacionGrupo:id,nombre',
             ])
             ->where(function ($query) {
-                $query->whereNotNull('profesor_id')
-                    ->orWhereHas('asignacionMateria', fn($subQuery) => $subQuery
-                        ->whereNotNull('profesor_id')
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                $query->where(function ($legacy) {
+                    $legacy->whereNotNull('profesor_id')
+                        ->whereNull('asignacion_materia_id')
+                        ->whereNull('taller_sesion_id');
+                })->orWhereHas('asignacionMateria', fn($subQuery) => $subQuery
+                    ->whereNotNull('profesor_id')
+                    ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
                     ->orWhereHas('tallerSesion', fn($subQuery) => $subQuery
                         ->whereNotNull('profesor_id')
                         ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));

@@ -140,7 +140,7 @@ class PromedioSecundariaService
             ->join('campos_formativos', 'campos_formativos.id', '=', 'materias.campo_formativo_id')
             ->whereIn('asignacion_materias.grupo_id', $grupoIds->all())
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId)
-            ->where('asignacion_materias.estado', '!=', 'archivada')
+            ->whereIn('asignacion_materias.estado', ['activa', 'cerrada'])
             ->where('materias.nivel_id', $nivelId)
             ->when($gradoId, fn ($query) => $query->where('materias.grado_id', $gradoId))
             ->where('materias.calificable', true)

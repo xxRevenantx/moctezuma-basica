@@ -57,7 +57,7 @@ class ProfesorHorarioPdfController extends Controller
             ->where(function ($query) use ($profesorId) {
                 $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
                     $subQuery->where('profesor_id', $profesorId)
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]);
                 })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
                     $subQuery->where('profesor_id', $profesorId)
                         ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);

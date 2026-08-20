@@ -1255,6 +1255,386 @@ class CierreGeneracionContinuidadService
     }
 
     /**
+     * Cambia una decisión previa de "No continuará" a "Continuará".
+     *
+     * - Si la proyección fue cancelada antes de formalizar el destino, reutiliza
+     *   el flujo normal de confirmación y conserva la auditoría de la cancelación.
+     * - Si la proyección ya había sido confirmada y después retirada por no
+     *   inicio, reactiva el mismo historial destino anulado en lugar de crear un
+     *   segundo registro histórico.
+     */
+    public function reactivarProyeccionNoContinuara(
+        int $proyeccionId,
+        array $datos,
+        string $motivo,
+        string $fecha,
+        int $usuarioId
+    ): ProyeccionContinuidad {
+        $motivo = trim($motivo);
+
+        if (mb_strlen($motivo) < 10) {
+            throw ValidationException::withMessages([
+                'motivo_reactivacion' => 'Escribe un motivo de reactivación de al menos 10 caracteres.',
+            ]);
+        }
+
+        try {
+            $fecha = CarbonImmutable::parse($fecha)->toDateString();
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'fecha_reactivacion' => 'La fecha de reactivación no es válida.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($proyeccionId, $datos, $motivo, $fecha, $usuarioId): ProyeccionContinuidad {
+            $proyeccion = ProyeccionContinuidad::query()
+                ->with([
+                    'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
+                    'inscripcionCicloOrigen.cicloEscolar',
+                    'inscripcionCicloDestino.cicloEscolar',
+                    'detalleCierre',
+                ])
+                ->lockForUpdate()
+                ->findOrFail($proyeccionId);
+
+            if (! in_array($proyeccion->estado, ['cancelada', 'revertida'], true)) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'Solo se puede cambiar a Continuará una proyección marcada como No continuará.',
+                ]);
+            }
+
+            $estadoAnterior = (string) $proyeccion->estado;
+            $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($proyeccion->inscripcion_id);
+            if ($alumno->trashed()) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'El expediente del alumno está eliminado. Restáuralo antes de reactivar la continuidad.',
+                ]);
+            }
+
+            $grupoId = (int) ($datos['grupo_destino_id'] ?? $proyeccion->grupo_destino_id ?? 0);
+            $matricula = filled($datos['matricula'] ?? null)
+                ? mb_strtoupper(trim((string) $datos['matricula']))
+                : (string) ($proyeccion->matricula_sugerida ?: $alumno->matricula);
+
+            $destinoDatos = [
+                'ciclo_escolar_id' => (int) $proyeccion->ciclo_destino_id,
+                'nivel_id' => (int) $proyeccion->nivel_destino_id,
+                'generacion_id' => (int) $proyeccion->generacion_destino_id,
+                'grado_id' => (int) $proyeccion->grado_destino_id,
+                'semestre_id' => filled($proyeccion->semestre_destino_id) ? (int) $proyeccion->semestre_destino_id : null,
+                'grupo_id' => $grupoId,
+                'matricula' => $matricula,
+            ];
+            $this->validarDestinoGrupo($destinoDatos);
+
+            $antesAlumno = $this->snapshotAlumno($alumno);
+            $antesProyeccion = [
+                'estado' => $estadoAnterior,
+                'cancelada_at' => $proyeccion->cancelada_at?->toIso8601String(),
+                'motivo_cancelacion' => $proyeccion->motivo_cancelacion,
+                'revertida_at' => $proyeccion->revertida_at?->toIso8601String(),
+                'motivo_reversion' => $proyeccion->motivo_reversion,
+                'inscripcion_ciclo_destino_id' => $proyeccion->inscripcion_ciclo_destino_id,
+            ];
+
+            if ($estadoAnterior === 'cancelada') {
+                if ($proyeccion->inscripcion_ciclo_destino_id) {
+                    throw ValidationException::withMessages([
+                        'reactivacion_proyeccion' => 'La proyección cancelada ya tiene un historial destino asociado. Revisa la trayectoria antes de continuar.',
+                    ]);
+                }
+
+                $origen = $proyeccion->inscripcionCicloOrigen;
+                if (! $origen || (int) $alumno->ciclo_escolar_id !== (int) $origen->ciclo_escolar_id) {
+                    throw ValidationException::withMessages([
+                        'reactivacion_proyeccion' => 'El alumno ya tiene otra ubicación académica vigente. Revisa su trayectoria antes de cambiar la decisión.',
+                    ]);
+                }
+
+                // Se conserva cancelada_at durante esta llamada para que la
+                // confirmación permita el estatus no_reinscrito generado por la
+                // cancelación. El flujo normal limpia esos campos al confirmar.
+                $proyeccion->forceFill(['estado' => 'pendiente'])->save();
+
+                $confirmada = $this->confirmarProyeccionBloqueada(
+                    $proyeccion->fresh(['inscripcionCicloOrigen']),
+                    [
+                        'grupo_destino_id' => $grupoId,
+                        'matricula' => $matricula,
+                    ],
+                    $motivo,
+                    $fecha,
+                    $usuarioId,
+                );
+
+                CambioAcademico::query()->create([
+                    'inscripcion_id' => $alumno->id,
+                    'inscripcion_ciclo_id' => $confirmada->inscripcion_ciclo_destino_id,
+                    'generacion_id' => $confirmada->generacion_destino_id,
+                    'tipo' => 'cambio_no_continuara_a_continuara',
+                    'motivo' => $motivo,
+                    'datos_anteriores' => [
+                        'alumno' => $antesAlumno,
+                        'proyeccion' => $antesProyeccion,
+                    ],
+                    'datos_nuevos' => [
+                        'alumno' => $this->snapshotAlumno($alumno->fresh()),
+                        'proyeccion' => 'confirmada',
+                    ],
+                    'realizado_por' => $usuarioId,
+                    'realizado_at' => now(),
+                ]);
+
+                return $confirmada->fresh([
+                    'inscripcion',
+                    'inscripcionCicloOrigen',
+                    'inscripcionCicloDestino',
+                ]);
+            }
+
+            $origen = InscripcionCiclo::query()->lockForUpdate()->find($proyeccion->inscripcion_ciclo_origen_id);
+            $destino = InscripcionCiclo::query()->lockForUpdate()->find($proyeccion->inscripcion_ciclo_destino_id);
+
+            if (! $origen || ! $destino) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'No se encontró el historial de origen o el historial destino que fue retirado.',
+                ]);
+            }
+            if ($destino->estado !== 'anulado' || (string) $destino->resultado_final !== 'no_iniciado') {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'El historial destino ya cambió después del retiro. No se puede reactivar automáticamente.',
+                ]);
+            }
+            if ((int) $alumno->ciclo_escolar_id !== (int) $origen->ciclo_escolar_id) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'El alumno ya tiene otra ubicación académica vigente. Revisa su trayectoria antes de reactivar el destino.',
+                ]);
+            }
+
+            $otroCicloVigente = InscripcionCiclo::query()
+                ->where('inscripcion_id', $alumno->id)
+                ->whereNotIn('id', [$origen->id, $destino->id])
+                ->where('estado', 'en_curso')
+                ->exists();
+            if ($otroCicloVigente) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => 'Existe otro ciclo vigente para el alumno. No se puede reactivar esta continuidad.',
+                ]);
+            }
+
+            if ($destino->cicloEscolar) {
+                $posterior = InscripcionCiclo::query()
+                    ->where('inscripcion_id', $alumno->id)
+                    ->whereNotIn('id', [$origen->id, $destino->id])
+                    ->whereHas('cicloEscolar', fn ($query) => $query->where('inicio_anio', '>', (int) $destino->cicloEscolar->inicio_anio))
+                    ->exists();
+                if ($posterior) {
+                    throw ValidationException::withMessages([
+                        'reactivacion_proyeccion' => 'Existe un historial en un ciclo posterior. No se puede reactivar esta continuidad de forma aislada.',
+                    ]);
+                }
+            }
+
+            $bloqueosActividad = [];
+            foreach ([
+                'alertas_academicas' => 'alertas académicas',
+                'calificaciones' => 'calificaciones',
+                'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
+                'ficha_descriptivas' => 'fichas descriptivas',
+                'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
+                'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
+                'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
+                'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
+                'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
+                'integridad_academica_casos' => 'casos de integridad académica',
+                'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
+                'seguimiento_academico_casos' => 'casos de seguimiento académico',
+                'seguimiento_academico_eventos' => 'eventos de seguimiento académico',
+            ] as $tabla => $etiqueta) {
+                if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
+                    continue;
+                }
+                $cantidad = (int) DB::table($tabla)->where('inscripcion_ciclo_id', $destino->id)->count();
+                if ($cantidad > 0) {
+                    $bloqueosActividad[] = "Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino.";
+                }
+            }
+            if (Schema::hasTable('documentos_alumnos')
+                && Schema::hasColumn('documentos_alumnos', 'ciclo_escolar_id')) {
+                $documentosDestino = (int) DB::table('documentos_alumnos')
+                    ->where('inscripcion_id', $destino->inscripcion_id)
+                    ->where('ciclo_escolar_id', $destino->ciclo_escolar_id)
+                    ->when(Schema::hasColumn('documentos_alumnos', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
+                    ->count();
+
+                if ($documentosDestino > 0) {
+                    $bloqueosActividad[] = "Tiene {$documentosDestino} documento(s) emitido(s) o asociado(s) al ciclo destino.";
+                }
+            }
+
+            if ($bloqueosActividad !== []) {
+                throw ValidationException::withMessages([
+                    'reactivacion_proyeccion' => "No se puede reactivar automáticamente porque el historial destino recibió actividad después del retiro:\n- ".implode("\n- ", $bloqueosActividad),
+                ]);
+            }
+
+            if ($destino->fecha_ingreso && CarbonImmutable::parse($fecha)->lessThan(CarbonImmutable::parse($destino->fecha_ingreso))) {
+                throw ValidationException::withMessages([
+                    'fecha_reactivacion' => 'La fecha efectiva no puede ser anterior a la fecha de ingreso registrada originalmente en el ciclo destino.',
+                ]);
+            }
+
+            $antesOrigen = $this->snapshotHistorialParaFirma($origen);
+            $antesDestino = $this->snapshotHistorialParaFirma($destino);
+
+            $destino->forceFill([
+                'matricula' => $matricula,
+                'nivel_id' => (int) $proyeccion->nivel_destino_id,
+                'grado_id' => (int) $proyeccion->grado_destino_id,
+                'generacion_id' => (int) $proyeccion->generacion_destino_id,
+                'grupo_id' => $grupoId,
+                'semestre_id' => filled($proyeccion->semestre_destino_id) ? (int) $proyeccion->semestre_destino_id : null,
+                'estado' => 'en_curso',
+                'fecha_salida' => null,
+                'estatus_ingreso' => 'activo',
+                'estatus_actual_ciclo' => 'activo',
+                'resultado_final' => null,
+                'promovido' => false,
+                'cerrado_at' => null,
+                'cerrado_por' => null,
+                'motivo_cierre' => null,
+                'inscripcion_ciclo_destino_id' => null,
+                'snapshot_cierre' => null,
+                'origen' => 'continuidad_reactivada',
+            ])->save();
+
+            $destino->asignaciones()->create([
+                'nivel_id' => (int) $proyeccion->nivel_destino_id,
+                'grado_id' => (int) $proyeccion->grado_destino_id,
+                'generacion_id' => (int) $proyeccion->generacion_destino_id,
+                'grupo_id' => $grupoId,
+                'semestre_id' => filled($proyeccion->semestre_destino_id) ? (int) $proyeccion->semestre_destino_id : null,
+                'fecha_inicio' => $fecha,
+                'fecha_fin' => null,
+                'tipo' => 'reactivacion_continuidad',
+                'motivo' => $motivo,
+                'es_actual' => true,
+                'registrado_por' => $usuarioId,
+                'snapshot' => [
+                    'ciclo_escolar_id' => (int) $proyeccion->ciclo_destino_id,
+                    'nivel_id' => (int) $proyeccion->nivel_destino_id,
+                    'grado_id' => (int) $proyeccion->grado_destino_id,
+                    'generacion_id' => (int) $proyeccion->generacion_destino_id,
+                    'grupo_id' => $grupoId,
+                    'semestre_id' => filled($proyeccion->semestre_destino_id) ? (int) $proyeccion->semestre_destino_id : null,
+                    'matricula' => $matricula,
+                    'estatus' => 'activo',
+                ],
+            ]);
+
+            $origen->forceFill([
+                'estatus_actual_ciclo' => (string) ($proyeccion->estatus_pendiente ?: $origen->estatus_actual_ciclo),
+                'inscripcion_ciclo_destino_id' => $destino->id,
+            ])->save();
+
+            $alumno->forceFill([
+                'matricula' => $matricula,
+                'ciclo_escolar_id' => (int) $proyeccion->ciclo_destino_id,
+                'nivel_id' => (int) $proyeccion->nivel_destino_id,
+                'grado_id' => (int) $proyeccion->grado_destino_id,
+                'generacion_id' => (int) $proyeccion->generacion_destino_id,
+                'grupo_id' => $grupoId,
+                'semestre_id' => filled($proyeccion->semestre_destino_id) ? (int) $proyeccion->semestre_destino_id : null,
+                'estatus' => 'activo',
+                'activo' => true,
+                'fecha_estatus' => $fecha,
+                'motivo_estatus' => $motivo,
+                'fecha_baja' => null,
+                'motivo_baja' => null,
+                'observaciones_baja' => null,
+                'indicador_reingreso' => false,
+                'documentacion_reingreso_pendiente' => false,
+                'usuario_acceso_activo' => true,
+            ])->save();
+            $alumno = $alumno->fresh();
+            $this->matriculas->asegurarVigente($alumno, 'reactivacion_continuidad', $usuarioId, $fecha);
+
+            $proyeccion->forceFill([
+                'grupo_destino_id' => $grupoId,
+                'matricula_sugerida' => $matricula,
+                'estado' => 'confirmada',
+                'confirmada_at' => now(),
+                'confirmada_por' => $usuarioId,
+                'inscripcion_ciclo_destino_id' => $destino->id,
+                'snapshot_confirmacion' => $this->snapshotAlumno($alumno),
+                'cancelada_at' => null,
+                'cancelada_por' => null,
+                'motivo_cancelacion' => null,
+                'snapshot_cancelacion' => null,
+                'revertida_at' => null,
+                'revertida_por' => null,
+                'fecha_reversion' => null,
+                'tipo_reversion' => null,
+                'motivo_reversion' => null,
+                'snapshot_reversion' => null,
+            ])->save();
+
+            $proyeccion->detalleCierre?->update([
+                'inscripcion_ciclo_destino_id' => $destino->id,
+                'observacion' => 'La decisión administrativa cambió de No continuará a Continuará. Se reactivó el ciclo destino previamente anulado y se conservó el historial de cambios.',
+                'estado_nuevo' => $this->snapshotAlumno($alumno),
+            ]);
+
+            CambioAcademico::query()->create([
+                'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $destino->id,
+                'generacion_id' => $destino->generacion_id,
+                'tipo' => 'cambio_no_continuara_a_continuara',
+                'motivo' => $motivo,
+                'datos_anteriores' => [
+                    'alumno' => $antesAlumno,
+                    'origen' => $antesOrigen,
+                    'destino' => $antesDestino,
+                    'proyeccion' => $antesProyeccion,
+                ],
+                'datos_nuevos' => [
+                    'alumno' => $this->snapshotAlumno($alumno),
+                    'origen' => $this->snapshotHistorialParaFirma($origen->fresh()),
+                    'destino' => $this->snapshotHistorialParaFirma($destino->fresh()),
+                    'proyeccion' => 'confirmada',
+                ],
+                'realizado_por' => $usuarioId,
+                'realizado_at' => now(),
+            ]);
+
+            MovimientoAlumno::query()->create([
+                'inscripcion_id' => $alumno->id,
+                'inscripcion_ciclo_id' => $destino->id,
+                'ciclo_escolar_id' => $destino->ciclo_escolar_id,
+                'ciclo_id' => $alumno->ciclo_id,
+                'nivel_anterior_id' => $origen->nivel_id,
+                'nivel_nuevo_id' => $destino->nivel_id,
+                'resultado_continuidad' => 'continuidad_reactivada',
+                'usuario_acceso_activo' => true,
+                'tipo' => 'reactivacion_ciclo_destino',
+                'fecha' => $fecha,
+                'motivo' => $motivo,
+                'observaciones' => 'Cambio administrativo de No continuará a Continuará. Se reactivó el mismo historial destino que había quedado como no iniciado.',
+                'estado_anterior' => $antesAlumno,
+                'estado_nuevo' => $this->snapshotAlumno($alumno),
+                'registrado_por' => $usuarioId,
+            ]);
+
+            return $proyeccion->fresh([
+                'inscripcion',
+                'inscripcionCicloOrigen',
+                'inscripcionCicloDestino',
+                'usuarioConfirmo',
+            ]);
+        });
+    }
+
+    /**
      * Revisa si una continuidad ya confirmada puede anularse de forma
      * individual porque el alumno finalmente no inició el ciclo destino.
      *
@@ -2845,6 +3225,7 @@ class CierreGeneracionContinuidadService
             $proyeccion->estatus_pendiente,
             'egresado',
             'pendiente_reinscripcion',
+            $proyeccion->cancelada_at ? 'no_reinscrito' : null,
         ])));
         if (! in_array((string) ($alumno->estatus ?? ''), $estatusEsperados, true)) {
             throw ValidationException::withMessages([

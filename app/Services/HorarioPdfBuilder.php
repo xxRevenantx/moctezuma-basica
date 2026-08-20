@@ -9,6 +9,7 @@ use App\Models\Horario;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
 use App\Models\CicloEscolar;
+use App\Models\AsignacionMateria;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -70,11 +71,15 @@ class HorarioPdfBuilder
 
         $horariosQuery->where(function ($actividadQuery) use ($grupo) {
             $actividadQuery
-                ->where(function ($materiaQuery) {
+                ->where(function ($materiaQuery) use ($cicloEscolar) {
                     $materiaQuery
                         ->whereNull('taller_sesion_id')
                         ->whereNotNull('asignacion_materia_id')
-                        ->whereHas('asignacionMateria');
+                        ->whereHas('asignacionMateria', function ($asignacionQuery) use ($cicloEscolar): void {
+                            if ($cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
+                                $asignacionQuery->where('estado', AsignacionMateria::ESTADO_ACTIVA);
+                            }
+                        });
                 })
                 ->orWhere(function ($tallerQuery) use ($grupo) {
                     $tallerQuery

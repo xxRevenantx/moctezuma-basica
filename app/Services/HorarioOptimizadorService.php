@@ -222,7 +222,7 @@ class HorarioOptimizadorService
         AsignacionMateria::query()
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('nivel_id', $nivelId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->withCount('horarios')
             ->each(function (AsignacionMateria $asignacion): void {
                 HorarioAsignacionRegla::query()->firstOrCreate(
@@ -251,7 +251,7 @@ class HorarioOptimizadorService
             ->with(['materia', 'grupo', 'profesor'])
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->where('nivel_id', $nivelId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->whereHas('materia', fn ($q) => $q->where('receso', false))
             ->whereNotNull('grupo_id')
             ->orderBy('grupo_id')

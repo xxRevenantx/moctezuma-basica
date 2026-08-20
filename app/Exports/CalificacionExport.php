@@ -1272,7 +1272,7 @@ class CalificacionExport implements FromArray, ShouldAutoSize, WithEvents, WithT
 
         // Las asignaciones archivadas siguen siendo evidencia válida en ciclos cerrados.
         if ($this->ciclo_escolar_id && $this->cicloSeleccionadoEsActual()) {
-            $query->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $query->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         /*

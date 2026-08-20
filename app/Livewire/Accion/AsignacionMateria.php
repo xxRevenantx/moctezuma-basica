@@ -92,10 +92,7 @@ class AsignacionMateria extends Component
             ?? CicloEscolar::query()->orderByDesc('inicio_anio')->first();
 
         $this->ciclo_escolar_id = $actual?->id;
-        $this->ciclo_origen_id = CicloEscolar::query()
-            ->when($actual, fn($q) => $q->where('id', '!=', $actual->id)->where('inicio_anio', '<=', $actual->inicio_anio))
-            ->orderByDesc('inicio_anio')
-            ->value('id');
+        $this->sincronizarCicloOrigen();
     }
 
     public function getEsBachilleratoProperty(): bool
@@ -116,6 +113,68 @@ class AsignacionMateria extends Component
         return $this->ciclo_escolar_id
             ? CicloEscolar::query()->find($this->ciclo_escolar_id)
             : null;
+    }
+
+    /**
+     * Solo permite usar como origen ciclos ANTERIORES que realmente tengan
+     * cargas confirmadas para el nivel actual. Así evitamos sugerir un ciclo
+     * futuro o uno vacío al preparar el ciclo de trabajo.
+     */
+    public function getCiclosOrigenDisponiblesProperty(): Collection
+    {
+        $destino = $this->cicloSeleccionado;
+
+        if (! $destino || ! $this->nivel?->id) {
+            return collect();
+        }
+
+        $idsConCargas = AsignacionMateriaModel::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->confirmadas()
+            ->whereNotNull('ciclo_escolar_id')
+            ->distinct()
+            ->pluck('ciclo_escolar_id');
+
+        return CicloEscolar::query()
+            ->whereIn('id', $idsConCargas)
+            ->where('inicio_anio', '<', $destino->inicio_anio)
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get();
+    }
+
+    public function getCargasOrigenSeleccionadoProperty(): int
+    {
+        if (! $this->ciclo_origen_id || ! $this->nivel?->id) {
+            return 0;
+        }
+
+        return AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_origen_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->confirmadas()
+            ->count();
+    }
+
+    public function getCicloSeleccionadoSinCargasProperty(): bool
+    {
+        if (! $this->ciclo_escolar_id || ! $this->nivel?->id) {
+            return false;
+        }
+
+        return ! $this->consultaAsignacionesBase()->exists();
+    }
+
+    private function sincronizarCicloOrigen(): void
+    {
+        $disponibles = $this->ciclosOrigenDisponibles;
+        $ids = $disponibles->pluck('id')->map(fn ($id) => (int) $id);
+
+        if ($this->ciclo_origen_id && $ids->contains((int) $this->ciclo_origen_id)) {
+            return;
+        }
+
+        $this->ciclo_origen_id = $disponibles->first()?->id;
     }
 
     public function getGruposProperty(): Collection
@@ -464,6 +523,17 @@ class AsignacionMateria extends Component
             && $this->consultaAsignacionesFiltradas()
                 ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
                 ->exists();
+    }
+
+    public function getTotalBorradoresProperty(): int
+    {
+        if (! $this->ciclo_escolar_id || ! $this->nivel?->id) {
+            return 0;
+        }
+
+        return $this->consultaAsignacionesBase()
+            ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
+            ->count();
     }
 
     public function getTieneFiltrosActivosProperty(): bool
@@ -1017,7 +1087,14 @@ class AsignacionMateria extends Component
         $this->resetEstadoReasignacion();
         $this->limpiarSeleccionTabla();
         $this->limpiarFiltros();
+        $this->sincronizarCicloOrigen();
+        $this->resetValidation('ciclo_origen_id');
         $this->resetPage('materiasPage');
+    }
+
+    public function updatedCicloOrigenId(): void
+    {
+        $this->resetValidation('ciclo_origen_id');
     }
 
     public function updatedBuscar(): void
@@ -1155,9 +1232,13 @@ class AsignacionMateria extends Component
         });
 
         $this->limpiarFormularioDespuesDeGuardar();
+        $this->filtro_estado = AsignacionMateriaModel::ESTADO_BORRADOR;
+        $this->limpiarSeleccionTabla();
+        $this->resetPage('materiasPage');
+
         $this->dispatch('swal', [
             'title' => 'Carga académica registrada',
-            'text' => 'Se guardó dentro del ciclo seleccionado sin modificar ciclos anteriores.',
+            'text' => 'Se guardó como borrador. Puedes prepararla y revisarla, pero no llegará a docentes, listas ni calificaciones hasta confirmarla.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -1170,6 +1251,16 @@ class AsignacionMateria extends Component
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('nivel_id', $this->nivel->id)
             ->findOrFail($id);
+
+        if (! $asignacion->esEditableEstructuralmente()) {
+            $this->dispatch('swal', [
+                'title' => 'Carga protegida',
+                'text' => 'Las cargas cerradas o archivadas son históricas. Reactívala antes de modificar grupo, materia o docente.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
 
         $this->resetValidation([
             'editar_grupo_id',
@@ -1203,6 +1294,17 @@ class AsignacionMateria extends Component
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('nivel_id', $this->nivel->id)
             ->findOrFail($this->editandoId);
+
+        if (! $asignacion->esEditableEstructuralmente()) {
+            $this->cerrarModalEdicion();
+            $this->dispatch('swal', [
+                'title' => 'Carga protegida',
+                'text' => 'El estado de la carga cambió y ya no permite edición estructural. Reactívala si necesitas modificarla.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
 
         if (
             $asignacion->tieneHistorial()
@@ -1315,30 +1417,38 @@ class AsignacionMateria extends Component
     public function confirmar(int $id): void
     {
         $this->cambiarEstado(
-            $id,
-            AsignacionMateriaModel::ESTADO_ACTIVA,
-            'Carga confirmada',
-            'La carga quedó activa y disponible para los procesos académicos.'
+            id: $id,
+            estado: AsignacionMateriaModel::ESTADO_ACTIVA,
+            titulo: 'Carga confirmada',
+            texto: 'La carga quedó activa y disponible para horarios publicados, docentes, listas y calificaciones.',
+            estadosOrigen: [AsignacionMateriaModel::ESTADO_BORRADOR],
+            registrarConfirmacion: true,
         );
     }
 
     public function cerrar(int $id): void
     {
         $this->cambiarEstado(
-            $id,
-            AsignacionMateriaModel::ESTADO_CERRADA,
-            'Carga cerrada',
-            'Se conservan sus horarios, calificaciones y registros históricos.'
+            id: $id,
+            estado: AsignacionMateriaModel::ESTADO_CERRADA,
+            titulo: 'Carga cerrada',
+            texto: 'La carga salió de la operación vigente y conserva sus horarios, calificaciones y registros históricos.',
+            estadosOrigen: [AsignacionMateriaModel::ESTADO_ACTIVA],
         );
     }
 
     public function archivar(int $id): void
     {
         $this->cambiarEstado(
-            $id,
-            AsignacionMateriaModel::ESTADO_ARCHIVADA,
-            'Carga archivada',
-            'La carga dejó de estar activa, pero todo su historial permanece disponible.'
+            id: $id,
+            estado: AsignacionMateriaModel::ESTADO_ARCHIVADA,
+            titulo: 'Carga archivada',
+            texto: 'La carga quedó fuera de operación, pero todo su historial permanece disponible.',
+            estadosOrigen: [
+                AsignacionMateriaModel::ESTADO_BORRADOR,
+                AsignacionMateriaModel::ESTADO_ACTIVA,
+                AsignacionMateriaModel::ESTADO_CERRADA,
+            ],
         );
 
         if ((int) $this->editandoId === $id) {
@@ -1348,11 +1458,52 @@ class AsignacionMateria extends Component
 
     public function reactivar(int $id): void
     {
+        $this->autorizarAdministracion();
+
+        $asignacion = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->findOrFail($id);
+
+        if (! in_array($asignacion->estado, [
+            AsignacionMateriaModel::ESTADO_CERRADA,
+            AsignacionMateriaModel::ESTADO_ARCHIVADA,
+        ], true)) {
+            $this->dispatch('swal', [
+                'title' => 'Reactivación no permitida',
+                'text' => 'Solo una carga cerrada o archivada puede restaurarse.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        // Una carga archivada antes de ser confirmada debe volver a borrador;
+        // nunca debe saltarse la aprobación administrativa al restaurarla.
+        if ($asignacion->estado === AsignacionMateriaModel::ESTADO_ARCHIVADA && blank($asignacion->confirmada_at)) {
+            $asignacion->update([
+                'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
+                'fecha_fin' => null,
+            ]);
+
+            $this->dispatch('swal', [
+                'title' => 'Carga restaurada como borrador',
+                'text' => 'La carga volvió a revisión. Debes confirmarla antes de que participe en los procesos académicos.',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
         $this->cambiarEstado(
-            $id,
-            AsignacionMateriaModel::ESTADO_ACTIVA,
-            'Carga reactivada',
-            'La carga volvió a estar disponible sin perder información histórica.'
+            id: $id,
+            estado: AsignacionMateriaModel::ESTADO_ACTIVA,
+            titulo: 'Carga reactivada',
+            texto: 'La carga volvió a la operación sin alterar su fecha ni usuario de confirmación original.',
+            estadosOrigen: [
+                AsignacionMateriaModel::ESTADO_CERRADA,
+                AsignacionMateriaModel::ESTADO_ARCHIVADA,
+            ],
         );
     }
 
@@ -1395,22 +1546,51 @@ class AsignacionMateria extends Component
     {
         $this->autorizarAdministracion();
 
-        AsignacionMateriaModel::query()
+        $query = AsignacionMateriaModel::query()
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('nivel_id', $this->nivel->id)
-            ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR)
-            ->update([
-                'estado' => AsignacionMateriaModel::ESTADO_ACTIVA,
-                'confirmada_at' => now(),
-                'confirmada_por' => auth()->id(),
-                'fecha_inicio' => DB::raw('COALESCE(fecha_inicio, CURRENT_DATE)'),
-            ]);
+            ->where('estado', AsignacionMateriaModel::ESTADO_BORRADOR);
 
-        $this->dispatch('swal', ['title' => 'Cargas confirmadas', 'icon' => 'success', 'position' => 'top-end']);
+        $total = (clone $query)->count();
+
+        if ($total === 0) {
+            $this->dispatch('swal', [
+                'title' => 'Sin borradores pendientes',
+                'text' => 'Todas las cargas de este nivel ya fueron confirmadas o tienen otro estado.',
+                'icon' => 'info',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $query->update([
+            'estado' => AsignacionMateriaModel::ESTADO_ACTIVA,
+            'confirmada_at' => now(),
+            'confirmada_por' => auth()->id(),
+            'fecha_inicio' => DB::raw('COALESCE(fecha_inicio, CURRENT_DATE)'),
+            'fecha_fin' => null,
+        ]);
+
+        $this->filtro_estado = AsignacionMateriaModel::ESTADO_ACTIVA;
+        $this->limpiarSeleccionTabla();
+        $this->resetPage('materiasPage');
+
+        $this->dispatch('swal', [
+            'title' => 'Cargas confirmadas',
+            'text' => "Se activaron {$total} carga(s). Desde este momento pueden participar en los procesos académicos operativos.",
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
     }
 
-    private function cambiarEstado(int $id, string $estado, string $titulo, string $texto): void
-    {
+    private function cambiarEstado(
+        int $id,
+        string $estado,
+        string $titulo,
+        string $texto,
+        array $estadosOrigen,
+        bool $registrarConfirmacion = false,
+    ): void {
         $this->autorizarAdministracion();
 
         $asignacion = AsignacionMateriaModel::query()
@@ -1418,17 +1598,30 @@ class AsignacionMateria extends Component
             ->where('nivel_id', $this->nivel->id)
             ->findOrFail($id);
 
+        if (! in_array($asignacion->estado, $estadosOrigen, true)) {
+            $this->dispatch('swal', [
+                'title' => 'Cambio de estado no permitido',
+                'text' => 'La carga cambió de estado o la transición solicitada no corresponde al flujo Borrador → Activa → Cerrada/Archivada.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
         $datos = ['estado' => $estado];
 
-        if ($estado === AsignacionMateriaModel::ESTADO_ACTIVA) {
+        if ($registrarConfirmacion) {
             $datos['confirmada_at'] = now();
             $datos['confirmada_por'] = auth()->id();
             $datos['fecha_inicio'] = $asignacion->fecha_inicio ?: now()->toDateString();
             $datos['fecha_fin'] = null;
+        } elseif ($estado === AsignacionMateriaModel::ESTADO_ACTIVA) {
+            // Reactivar no debe reescribir quién/cuándo confirmó originalmente.
+            $datos['fecha_fin'] = null;
         }
 
         if (in_array($estado, [AsignacionMateriaModel::ESTADO_CERRADA, AsignacionMateriaModel::ESTADO_ARCHIVADA], true)) {
-            $datos['fecha_fin'] = now()->toDateString();
+            $datos['fecha_fin'] = $asignacion->fecha_fin ?: now()->toDateString();
         }
 
         $asignacion->update($datos);
@@ -1454,6 +1647,25 @@ class AsignacionMateria extends Component
             'ciclo_origen_id' => ['required', 'integer', 'exists:ciclo_escolares,id', Rule::notIn([(int) $this->ciclo_escolar_id])],
         ]);
 
+        $destino = CicloEscolar::query()->findOrFail($this->ciclo_escolar_id);
+        $origen = CicloEscolar::query()->findOrFail($this->ciclo_origen_id);
+
+        if ((int) $origen->inicio_anio >= (int) $destino->inicio_anio) {
+            $this->addError('ciclo_origen_id', 'El ciclo origen debe ser anterior al ciclo de trabajo.');
+            return;
+        }
+
+        $totalOrigen = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_origen_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->confirmadas()
+            ->count();
+
+        if ($totalOrigen === 0) {
+            $this->addError('ciclo_origen_id', 'El ciclo seleccionado no tiene cargas confirmadas para este nivel.');
+            return;
+        }
+
         $creadas = 0;
         $omitidas = 0;
         $horariosCopiados = 0;
@@ -1463,7 +1675,7 @@ class AsignacionMateria extends Component
                 ->with(['grupo', 'horarios' => fn($q) => $q->where('ciclo_escolar_id', $this->ciclo_origen_id)])
                 ->where('ciclo_escolar_id', $this->ciclo_origen_id)
                 ->where('nivel_id', $this->nivel->id)
-                ->where('estado', '!=', AsignacionMateriaModel::ESTADO_ARCHIVADA)
+                ->confirmadas()
                 ->get();
 
             foreach ($origenes as $origen) {
@@ -1533,9 +1745,15 @@ class AsignacionMateria extends Component
             }
         });
 
+        if ($creadas > 0) {
+            $this->filtro_estado = AsignacionMateriaModel::ESTADO_BORRADOR;
+            $this->limpiarSeleccionTabla();
+            $this->resetPage('materiasPage');
+        }
+
         $this->dispatch('swal', [
             'title' => 'Preparación del ciclo terminada',
-            'text' => "Nuevas: {$creadas}. Omitidas: {$omitidas}. Horarios copiados: {$horariosCopiados}. Revisa y confirma las cargas.",
+            'text' => "Nuevas en borrador: {$creadas}. Omitidas: {$omitidas}. Horarios copiados para revisión: {$horariosCopiados}. Confirma las cargas cuando estén listas.",
             'icon' => 'success',
             'position' => 'top-end',
         ]);
@@ -1546,7 +1764,7 @@ class AsignacionMateria extends Component
         $origen->loadMissing('grupo');
         $grupoOrigen = $origen->grupo;
 
-        if (!$grupoOrigen) {
+        if (! $grupoOrigen || ! $this->ciclo_escolar_id) {
             return null;
         }
 
@@ -1559,19 +1777,45 @@ class AsignacionMateria extends Component
             ->pluck('grupo_id')
             ->unique();
 
-        return Grupo::query()
+        $base = Grupo::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $grupoOrigen->grado_id)
             ->where('asignacion_grupo_id', $grupoOrigen->asignacion_grupo_id)
+            ->where('estado', 'activo')
             ->when(
                 $grupoOrigen->semestre_id,
                 fn($q) => $q->where('semestre_id', $grupoOrigen->semestre_id),
                 fn($q) => $q->whereNull('semestre_id')
-            )
-            ->when($idsVigentes->isNotEmpty(), fn($q) => $q->whereIn('id', $idsVigentes))
+            );
+
+        // Si la matrícula vigente ya apunta a un grupo del ciclo destino, ese
+        // contexto tiene prioridad. Nunca se reutiliza el grupo del ciclo origen.
+        if ($idsVigentes->isNotEmpty()) {
+            $grupoVigente = (clone $base)
+                ->whereIn('id', $idsVigentes)
+                ->orderByDesc('generacion_id')
+                ->first();
+
+            if ($grupoVigente) {
+                return $grupoVigente;
+            }
+        }
+
+        return $base
             ->orderByDesc('generacion_id')
-            ->first()
-            ?? Grupo::query()->find($grupoOrigen->id);
+            ->first();
+    }
+
+    public function filtrarEstado(string $estado): void
+    {
+        if (! in_array($estado, AsignacionMateriaModel::ESTADOS, true)) {
+            return;
+        }
+
+        $this->filtro_estado = $this->filtro_estado === $estado ? '' : $estado;
+        $this->limpiarSeleccionTabla();
+        $this->resetPage('materiasPage');
     }
 
     public function limpiarFiltros(): void

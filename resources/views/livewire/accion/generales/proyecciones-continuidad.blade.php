@@ -20,7 +20,7 @@
                     <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Confirmación de alumnos para el ciclo destino</h3>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                         Cada alumno conserva el resultado académico del ciclo de origen: promoción de grado, repetición pendiente o egreso.
-                        Todavía no está activo en el destino. Confirma a quienes se reinscribieron. Si después una familia informa que el alumno no continuará y nunca inició actividades, podrás retirarlo individualmente del ciclo destino sin borrar la promoción ni el historial del grado concluido.
+                        Todavía no está activo en el destino. Confirma a quienes se reinscribieron. La decisión puede corregirse después: de No continuará a Continuará, o de Continuará a No continuará cuando el alumno no haya iniciado actividades en el ciclo destino. Todos los cambios quedan auditados y el historial de origen se conserva.
                     </p>
                 </div>
                 <div class="grid min-w-[420px] grid-cols-4 gap-2 text-center">
@@ -34,7 +34,7 @@
                         class="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
                         <p class="text-2xl font-black text-emerald-700 dark:text-emerald-300">
                             {{ $conteosProyeccion['confirmada'] }}</p>
-                        <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700">Confirmados</p>
+                        <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700">Continuarán</p>
                     </div>
                     <div
                         class="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-neutral-700 dark:bg-neutral-800">
@@ -59,9 +59,9 @@
                 <flux:select wire:model.live="filtro_estado" label="Estado de la proyección">
                     <flux:select.option value="">Todos</flux:select.option>
                     <flux:select.option value="pendiente">Pendiente de confirmar</flux:select.option>
-                    <flux:select.option value="confirmada">Proyección confirmada</flux:select.option>
-                    <flux:select.option value="cancelada">No continuará</flux:select.option>
-                    <flux:select.option value="revertida">Retirado del ciclo destino</flux:select.option>
+                    <flux:select.option value="confirmada">Continuará</flux:select.option>
+                    <flux:select.option value="cancelada">No continuará · sin formalizar</flux:select.option>
+                    <flux:select.option value="revertida">No continuará · retirado del destino</flux:select.option>
                 </flux:select>
                 <flux:select wire:model.live="filtro_ciclo_destino_id" label="Ciclo destino">
                     <flux:select.option value="">Todos</flux:select.option>
@@ -235,14 +235,14 @@
                                     </div>
                                 @elseif ($proyeccion->estado === 'confirmada')
                                     <div class="flex flex-col items-end gap-2">
-                                        <p class="text-xs font-semibold text-emerald-700">Confirmada
+                                        <p class="text-xs font-semibold text-emerald-700">Continuará · confirmado
                                             {{ $proyeccion->confirmada_at?->format('d/m/Y H:i') }}</p>
                                         <flux:button wire:key="retirar-proyeccion-{{ $proyeccion->id }}" size="sm"
                                             variant="danger" :loading="false"
                                             wire:click="prepararRetiro({{ $proyeccion->id }})"
                                             wire:target="prepararRetiro({{ $proyeccion->id }})" wire:loading.attr="disabled">
                                             <span wire:loading.remove wire:target="prepararRetiro({{ $proyeccion->id }})">
-                                                Retirar del ciclo destino
+                                                Cambiar a No continuará
                                             </span>
                                             <span wire:loading wire:target="prepararRetiro({{ $proyeccion->id }})"
                                                 class="inline-flex items-center gap-1.5">
@@ -252,12 +252,42 @@
                                         </flux:button>
                                     </div>
                                 @elseif ($proyeccion->estado === 'revertida')
-                                    <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">Retirado
-                                        {{ $proyeccion->revertida_at?->format('d/m/Y H:i') }}</p>
-                                    <p class="mt-1 text-xs text-slate-500">El destino quedó como no iniciado; el origen se conserva.</p>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">No continuará · retirado
+                                            {{ $proyeccion->revertida_at?->format('d/m/Y H:i') }}</p>
+                                        <p class="max-w-xs text-right text-xs text-slate-500">El destino quedó como no iniciado; el origen se conserva.</p>
+                                        <flux:button wire:key="reactivar-revertida-{{ $proyeccion->id }}" size="sm"
+                                            variant="primary" :loading="false"
+                                            wire:click="prepararReactivacion({{ $proyeccion->id }})"
+                                            wire:target="prepararReactivacion({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            <span wire:loading.remove wire:target="prepararReactivacion({{ $proyeccion->id }})">
+                                                Cambiar a Continuará
+                                            </span>
+                                            <span wire:loading wire:target="prepararReactivacion({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                <flux:icon name="loading" class="size-4" />
+                                                Revisando...
+                                            </span>
+                                        </flux:button>
+                                    </div>
                                 @else
-                                    <p class="text-xs font-semibold text-slate-500">Cancelada
-                                        {{ $proyeccion->cancelada_at?->format('d/m/Y H:i') }}</p>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <p class="text-xs font-semibold text-slate-500">No continuará
+                                            {{ $proyeccion->cancelada_at?->format('d/m/Y H:i') }}</p>
+                                        <flux:button wire:key="reactivar-cancelada-{{ $proyeccion->id }}" size="sm"
+                                            variant="primary" :loading="false"
+                                            wire:click="prepararReactivacion({{ $proyeccion->id }})"
+                                            wire:target="prepararReactivacion({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            <span wire:loading.remove wire:target="prepararReactivacion({{ $proyeccion->id }})">
+                                                Cambiar a Continuará
+                                            </span>
+                                            <span wire:loading wire:target="prepararReactivacion({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                <flux:icon name="loading" class="size-4" />
+                                                Revisando...
+                                            </span>
+                                        </flux:button>
+                                    </div>
                                 @endif
                             </td>
                         </tr>
@@ -326,8 +356,8 @@
             <div class="my-6 w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Reversión individual protegida</p>
-                        <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Retirar del ciclo destino</h3>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Cambio protegido de continuidad</p>
+                        <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Cambiar a No continuará</h3>
                     </div>
                     <flux:button variant="ghost" wire:click="$set('modalRetirar', false)">Cerrar</flux:button>
                 </div>
@@ -399,7 +429,71 @@
                     <flux:button variant="danger" wire:click="retirarDelCicloDestino"
                         spinner="retirarDelCicloDestino"
                         :disabled="! data_get($diagnostico_retiro, 'puede_retirar', false)">
-                        Confirmar retiro individual
+                        Confirmar No continuará
+                    </flux:button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($modalReactivar)
+        <div wire:key="modal-reactivar-continuidad"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm">
+            <div class="my-6 w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-600">Corrección administrativa auditada</p>
+                        <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Cambiar a Continuará</h3>
+                    </div>
+                    <flux:button variant="ghost" wire:click="$set('modalReactivar', false)">Cerrar</flux:button>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
+                    @if ($estado_reactivacion_origen === 'revertida')
+                        El alumno había sido confirmado y después retirado por no inicio. Se reactivará <b>el mismo historial del ciclo destino</b>; no se creará un ciclo duplicado.
+                    @else
+                        La reinscripción fue marcada previamente como No continuará antes de formalizarse. Ahora se confirmará el destino y el alumno volverá a quedar activo.
+                    @endif
+                    El cambio anterior permanecerá en la auditoría.
+                </div>
+
+                @error('reactivacion_proyeccion')
+                    <div class="mt-4 whitespace-pre-line rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:bg-rose-950/20 dark:text-rose-300">{{ $message }}</div>
+                @enderror
+                @error('destino')
+                    <div class="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:bg-rose-950/20 dark:text-rose-300">{{ $message }}</div>
+                @enderror
+                @error('grupo_id')
+                    <div class="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:bg-rose-950/20 dark:text-rose-300">{{ $message }}</div>
+                @enderror
+
+                <div class="mt-5 grid gap-4 md:grid-cols-2">
+                    <flux:select wire:model="datos_reactivacion.grupo_destino_id" label="Grupo destino">
+                        <flux:select.option value="">Selecciona grupo</flux:select.option>
+                        @foreach ($grupos_reactivacion as $grupo)
+                            <flux:select.option value="{{ data_get($grupo, 'id') }}">{{ data_get($grupo, 'label') }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:input type="text" wire:model="datos_reactivacion.matricula" label="Matrícula destino"
+                        class:input="uppercase" placeholder="Se conservará o generará la matrícula" />
+                    <flux:input type="date" wire:model="fecha_reactivacion" label="Fecha efectiva" />
+                    <flux:input type="password" wire:model="password_reactivacion_proyeccion"
+                        label="Contraseña del usuario" autocomplete="current-password" />
+                </div>
+                @error('datos_reactivacion.grupo_destino_id')
+                    <p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>
+                @enderror
+
+                <div class="mt-4">
+                    <flux:textarea wire:model="motivo_reactivacion" label="Motivo del cambio" rows="4"
+                        placeholder="Ejemplo: La familia confirmó que el alumno sí continuará en la institución." />
+                </div>
+
+                <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <flux:button wire:click="$set('modalReactivar', false)">Cancelar</flux:button>
+                    <flux:button variant="primary" wire:click="reactivarComoContinuara"
+                        spinner="reactivarComoContinuara">
+                        Confirmar Continuará
                     </flux:button>
                 </div>
             </div>

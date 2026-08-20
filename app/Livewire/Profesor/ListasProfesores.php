@@ -138,7 +138,7 @@ class ListasProfesores extends Component
             ->withCount([
                 'asignacionMaterias as cargas_materias_count' => fn ($q) => $q
                     ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-                    ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA),
+                    ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]),
                 'tallerSesiones as cargas_talleres_count' => fn ($q) => $q
                     ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA),
@@ -168,7 +168,7 @@ class ListasProfesores extends Component
                     })
                     ->orWhereHas('asignacionMaterias', fn ($q) => $q
                         ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                        ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
                     ->orWhereHas('tallerSesiones', fn ($q) => $q
                         ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
                         ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
@@ -227,7 +227,7 @@ class ListasProfesores extends Component
             ])
             ->where('profesor_id', $this->profesor_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA])
             ->whereHas('materia', fn ($q) => $q->where(function ($sub) {
                 $sub->whereNull('receso')->orWhere('receso', false);
             }))

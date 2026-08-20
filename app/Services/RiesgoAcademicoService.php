@@ -206,7 +206,7 @@ class RiesgoAcademicoService
                 ->where('grado_id', $historial->grado_id)
                 ->where('grupo_id', $historial->grupo_id)
                 ->when($historial->semestre_id, fn (Builder $q, $id) => $q->where('semestre_id', $id))
-                ->where('estado', '!=', 'archivada')
+                ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA])
                 ->whereHas('materia', fn (Builder $q) => $q->where('calificable', true)->where('extra', false)->where('participa_en_calificacion_oficial', true))
                 ->count();
         }

@@ -107,9 +107,9 @@ class ProyeccionContinuidad extends Model
     public function getEtiquetaEstadoAttribute(): string
     {
         return match ($this->estado) {
-            'confirmada' => 'Proyección confirmada',
+            'confirmada' => 'Continuará',
             'cancelada' => 'No continuará',
-            'revertida' => 'Retirado del ciclo destino',
+            'revertida' => 'No continuará (retirado)',
             default => 'Pendiente de confirmar',
         };
     }

@@ -403,7 +403,7 @@ class Dashboard extends Component
         $this->aplicarCicloActual($query, 'asignacion_materias');
 
         if (Schema::hasColumn('asignacion_materias', 'estado')) {
-            $query->where('asignacion_materias.estado', '!=', 'archivada');
+            $query->where('asignacion_materias.estado', 'activa');
         }
 
         if ($this->nivel_id && $this->tablaExiste('grupos') && $this->columnaExiste('grupos', 'nivel_id')) {
@@ -427,7 +427,7 @@ class Dashboard extends Component
         $this->aplicarCicloActual($query, 'asignacion_materias');
 
         if (Schema::hasColumn('asignacion_materias', 'estado')) {
-            $query->where('asignacion_materias.estado', '!=', 'archivada');
+            $query->where('asignacion_materias.estado', 'activa');
         }
 
         return $query->count();
@@ -487,7 +487,7 @@ class Dashboard extends Component
         $this->aplicarCicloActual($query, 'asignacion_materias');
 
         if (Schema::hasColumn('asignacion_materias', 'estado')) {
-            $query->where('asignacion_materias.estado', '!=', 'archivada');
+            $query->where('asignacion_materias.estado', 'activa');
         }
 
         if ($this->nivel_id && $this->tablaExiste('grupos')) {

@@ -57,7 +57,7 @@ class HorarioProfesor extends Component
                         ->from('asignacion_materias')
                         ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
                         ->whereNotNull('asignacion_materias.profesor_id')
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->whereIn('asignacion_materias.estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]);
                 })->orWhereExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('taller_sesiones')
@@ -182,7 +182,7 @@ class HorarioProfesor extends Component
                         ->from('asignacion_materias')
                         ->whereColumn('asignacion_materias.profesor_id', 'personas.id')
                         ->whereNotNull('asignacion_materias.profesor_id')
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->whereIn('asignacion_materias.estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]);
                 })->orWhereExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('taller_sesiones')
@@ -240,7 +240,7 @@ class HorarioProfesor extends Component
             ->where(function ($query) use ($profesorId) {
                 $query->whereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
                     $subQuery->where('profesor_id', $profesorId)
-                        ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]);
                 })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
                     $subQuery->where('profesor_id', $profesorId)
                         ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);

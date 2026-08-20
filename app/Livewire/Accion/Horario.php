@@ -358,7 +358,7 @@ class Horario extends Component
             ])
             ->where('id', $asignacionMateriaId)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->where('grupo_id', $this->grupo_id)
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel->id)
@@ -450,8 +450,23 @@ class Horario extends Component
         ?string $motivoSesionCompartida = null,
     ): void {
         $asignacion = AsignacionMateria::query()
-            ->select(['id', 'profesor_id'])
+            ->select(['id', 'profesor_id', 'grupo_id', 'ciclo_escolar_id', 'estado'])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('grupo_id', $this->grupo_id)
+            ->configurables()
             ->find($asignacionMateriaId);
+
+        if (! $asignacion) {
+            $this->dispatch('swal', [
+                'title' => 'La carga ya no está disponible para programación',
+                'text' => 'La materia fue cerrada, archivada o cambió de contexto. Actualiza la pantalla antes de continuar.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            $this->cargarHorariosGuardados();
+            $this->sincronizarSeleccionesHorario();
+            return;
+        }
 
         $datosBusqueda = [
             'nivel_id' => $this->nivel->id,
@@ -531,14 +546,17 @@ class Horario extends Component
                 $query->where('id', '!=', $horarioActualId);
             })
             ->where(function ($query) use ($profesorId) {
-                $query->where('profesor_id', $profesorId)
-                    ->orWhereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
-                        $subQuery->where('profesor_id', $profesorId)
-                            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
-                    })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
-                        $subQuery->where('profesor_id', $profesorId)
-                            ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
-                    });
+                $query->where(function ($legacy) use ($profesorId) {
+                    $legacy->where('profesor_id', $profesorId)
+                        ->whereNull('asignacion_materia_id')
+                        ->whereNull('taller_sesion_id');
+                })->orWhereHas('asignacionMateria', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId)
+                        ->configurables();
+                })->orWhereHas('tallerSesion', function ($subQuery) use ($profesorId) {
+                    $subQuery->where('profesor_id', $profesorId)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA);
+                });
             })
             ->whereHas('hora', function ($query) use ($horaInicio, $horaFin) {
                 $query->where('hora_inicio', '<', $horaFin)
@@ -740,7 +758,7 @@ class Horario extends Component
 
         $asignacion = AsignacionMateria::query()
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->find($asignacionMateriaId);
 
         if (!$asignacion?->profesor_id) {
@@ -803,7 +821,7 @@ class Horario extends Component
         $asignacion = AsignacionMateria::query()
             ->with('materia:id,materia')
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->find((int) ($this->pendienteHorario['asignacion_materia_id'] ?? 0));
 
         $dia = Dia::query()->find((int) ($this->pendienteHorario['dia_id'] ?? 0));
@@ -961,9 +979,13 @@ class Horario extends Component
                 ->where('dia_id', (int) $this->pendienteHorario['dia_id'])
                 ->where('hora_id', (int) $this->pendienteHorario['hora_id'])
                 ->where(function (Builder $q) use ($asignacion): void {
-                    $q->where('profesor_id', $asignacion->profesor_id)
-                        ->orWhereHas('asignacionMateria', fn (Builder $materia) => $materia
-                            ->where('profesor_id', $asignacion->profesor_id));
+                    $q->where(function (Builder $legacy) use ($asignacion): void {
+                        $legacy->where('profesor_id', $asignacion->profesor_id)
+                            ->whereNull('asignacion_materia_id')
+                            ->whereNull('taller_sesion_id');
+                    })->orWhereHas('asignacionMateria', fn (Builder $materia) => $materia
+                        ->where('profesor_id', $asignacion->profesor_id)
+                        ->configurables());
                 })
                 ->update([
                     'sesion_compartida' => true,
@@ -1624,7 +1646,7 @@ class Horario extends Component
             ])
             ->where('grupo_id', $this->grupo_id)
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->configurables()
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel->id)
                     ->where('grado_id', $this->grado_id);
@@ -1739,7 +1761,7 @@ class Horario extends Component
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->whereNull('taller_sesion_id')
             ->whereHas('asignacionMateria', fn($query) => $query
-                ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                ->configurables())
             ->when(
                 $this->esBachillerato,
                 fn($query) => $query->where('semestre_id', $this->semestre_id),

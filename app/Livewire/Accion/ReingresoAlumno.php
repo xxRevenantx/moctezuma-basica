@@ -377,7 +377,7 @@ class ReingresoAlumno extends Component
             ->where('generacion_id', $alumno->generacion_id)
             ->where('grupo_id', $alumno->grupo_id)
             ->when($alumno->semestre_id, fn (Builder $query) => $query->where('semestre_id', $alumno->semestre_id), fn (Builder $query) => $query->whereNull('semestre_id'))
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->confirmadas()
             ->orderBy('orden')
             ->get();
     }

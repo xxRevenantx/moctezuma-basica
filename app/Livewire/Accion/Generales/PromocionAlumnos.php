@@ -462,6 +462,7 @@ class PromocionAlumnos extends Component
             ->where('grado_id', $this->grado_origen_id)
             ->where('semestre_id', $this->semestre_origen_id)
             ->where('grupo_id', $this->grupo_origen_id)
+            ->confirmadas()
             ->whereHas('materia', function (Builder $query): void {
                 ReglasMateriaBachillerato::aplicarPromediables($query, '');
             })

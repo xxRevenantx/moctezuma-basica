@@ -51,7 +51,7 @@ class TeacherAcademicScopeService
 
         return AsignacionMateria::query()
             ->where('profesor_id', $personaId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->confirmadas()
             ->when($cicloEscolarId, fn (Builder $query) => $query->where('ciclo_escolar_id', $cicloEscolarId))
             ->when($nivelId, fn (Builder $query) => $query->where('nivel_id', $nivelId))
             ->when($generacionId, fn (Builder $query) => $query->where('generacion_id', $generacionId))
@@ -71,7 +71,10 @@ class TeacherAcademicScopeService
         $porMaterias = AsignacionMateria::query()
             ->join('niveles', 'niveles.id', '=', 'asignacion_materias.nivel_id')
             ->where('asignacion_materias.profesor_id', $personaId)
-            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereIn('asignacion_materias.estado', [
+                AsignacionMateria::ESTADO_ACTIVA,
+                AsignacionMateria::ESTADO_CERRADA,
+            ])
             ->select('niveles.id', 'niveles.nombre', 'niveles.slug')
             ->distinct()
             ->get();
@@ -320,18 +323,20 @@ class TeacherAcademicScopeService
             gradoId: $gradoId,
             grupoId: $grupoId,
             semestreId: $semestreId,
-        )->whereHas('materia', function (Builder $query) use ($nivelId, $gradoId, $semestreId): void {
-            $query->where('nivel_id', $nivelId)
-                ->where('grado_id', $gradoId);
+        )
+            ->operativas()
+            ->whereHas('materia', function (Builder $query) use ($nivelId, $gradoId, $semestreId): void {
+                $query->where('nivel_id', $nivelId)
+                    ->where('grado_id', $gradoId);
 
-            if ($semestreId) {
-                $query->where('semestre_id', $semestreId);
-                ReglasMateriaBachillerato::aplicarCapturables($query, '');
-                return;
-            }
+                if ($semestreId) {
+                    $query->where('semestre_id', $semestreId);
+                    ReglasMateriaBachillerato::aplicarCapturables($query, '');
+                    return;
+                }
 
-            $query->whereNull('semestre_id')
-                ->where('calificable', true);
-        });
+                $query->whereNull('semestre_id')
+                    ->where('calificable', true);
+            });
     }
 }

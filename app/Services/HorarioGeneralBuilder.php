@@ -8,6 +8,7 @@ use App\Models\Hora;
 use App\Models\Horario;
 use App\Models\Nivel;
 use App\Models\CicloEscolar;
+use App\Models\AsignacionMateria;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -85,9 +86,16 @@ class HorarioGeneralBuilder
             ])
             ->where('nivel_id', $nivel->id)
             ->whereIn('grupo_id', $idsGrupo)
-            ->where(function ($query) {
+            ->where(function ($query) use ($cicloEscolar) {
                 $query
-                    ->whereNotNull('asignacion_materia_id')
+                    ->where(function ($materiaQuery) use ($cicloEscolar): void {
+                        $materiaQuery->whereNotNull('asignacion_materia_id')
+                            ->whereHas('asignacionMateria', function ($asignacionQuery) use ($cicloEscolar): void {
+                                if ($cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
+                                    $asignacionQuery->where('estado', AsignacionMateria::ESTADO_ACTIVA);
+                                }
+                            });
+                    })
                     ->orWhereNotNull('taller_sesion_id');
             });
 

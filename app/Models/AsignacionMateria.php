@@ -151,9 +151,61 @@ class AsignacionMateria extends Model
         return $query->where('estado', '!=', self::ESTADO_ARCHIVADA);
     }
 
+    /**
+     * Cargas que el administrador todavía puede preparar: borradores y activas.
+     * Las cerradas/archivadas ya forman parte del historial y no deben entrar
+     * nuevamente al planificador salvo que se reactiven de forma explícita.
+     */
+    public function scopeConfigurables(Builder $query): Builder
+    {
+        return $query->whereIn('estado', [self::ESTADO_BORRADOR, self::ESTADO_ACTIVA]);
+    }
+
+    /**
+     * Cargas que ya pasaron por confirmación administrativa.
+     * Sirve para consultas históricas sin permitir que un borrador se filtre a
+     * listas docentes, promedios, reportes o captura de calificaciones.
+     */
+    public function scopeConfirmadas(Builder $query): Builder
+    {
+        return $query->whereIn('estado', [self::ESTADO_ACTIVA, self::ESTADO_CERRADA]);
+    }
+
+    /**
+     * Cargas disponibles para procesos operativos del ciclo vigente.
+     */
+    public function scopeOperativas(Builder $query): Builder
+    {
+        return $query->where('estado', self::ESTADO_ACTIVA);
+    }
+
+    /**
+     * Compatibilidad con módulos de preparación administrativa que requieren
+     * visualizar borradores y activas antes de publicar el ciclo.
+     */
     public function scopeUtilizables(Builder $query): Builder
     {
-        return $query->whereIn('estado', [self::ESTADO_BORRADOR, self::ESTADO_ACTIVA, self::ESTADO_CERRADA]);
+        return $query->configurables();
+    }
+
+    public function estaBorrador(): bool
+    {
+        return $this->estado === self::ESTADO_BORRADOR;
+    }
+
+    public function estaActiva(): bool
+    {
+        return $this->estado === self::ESTADO_ACTIVA;
+    }
+
+    public function estaConfirmada(): bool
+    {
+        return in_array($this->estado, [self::ESTADO_ACTIVA, self::ESTADO_CERRADA], true);
+    }
+
+    public function esEditableEstructuralmente(): bool
+    {
+        return in_array($this->estado, [self::ESTADO_BORRADOR, self::ESTADO_ACTIVA], true);
     }
 
     public function estaCerrada(): bool

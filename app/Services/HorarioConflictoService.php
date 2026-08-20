@@ -51,7 +51,7 @@ class HorarioConflictoService
             ->whereHas('asignacionMateria', fn ($query) => $query
                 ->where('ciclo_escolar_id', $version->ciclo_escolar_id)
                 ->where('nivel_id', $version->nivel_id)
-                ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA))
+                ->configurables())
             ->get()
             ->keyBy('asignacion_materia_id');
 

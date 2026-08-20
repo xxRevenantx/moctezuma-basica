@@ -617,7 +617,7 @@ class Calificacion extends Component
                             ->whereColumn('asignacion_materias.ciclo_escolar_id', 'ciclo_escolares.id')
                             ->where('asignacion_materias.profesor_id', $personaId)
                             ->where('asignacion_materias.nivel_id', $this->nivel_id)
-                            ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                            ->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
                     });
             })
             ->orderByDesc('es_actual')
@@ -688,7 +688,7 @@ class Calificacion extends Component
                         ->where('asignacion_materias.ciclo_escolar_id', $cicloId)
                         ->where('asignacion_materias.nivel_id', $this->nivel_id)
                         ->where('asignacion_materias.profesor_id', $personaId)
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
                 });
             })
             ->orderByDesc('anio_ingreso')
@@ -1068,7 +1068,7 @@ class Calificacion extends Component
                         ->where('asignacion_materias.nivel_id', $this->nivel_id)
                         ->where('asignacion_materias.generacion_id', $generacionId)
                         ->where('asignacion_materias.profesor_id', $personaId)
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
                 });
             })
             ->orderBy('orden')
@@ -1147,7 +1147,7 @@ class Calificacion extends Component
                         ->where('asignacion_materias.generacion_id', $generacionId)
                         ->where('asignacion_materias.grado_id', $gradoId)
                         ->where('asignacion_materias.profesor_id', $personaId)
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
                 });
             })
             ->orderBy('numero')
@@ -1260,7 +1260,7 @@ class Calificacion extends Component
                             fn ($inner) => $inner->whereNull('asignacion_materias.semestre_id')
                         )
                         ->where('asignacion_materias.profesor_id', $personaId)
-                        ->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+                        ->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
                 });
             })
             ->orderBy('asignacion_grupos.nombre')
@@ -1558,7 +1558,7 @@ class Calificacion extends Component
             )
             ->when(
                 $this->cicloSeleccionadoEsActual(),
-                fn ($query) => $query->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+                fn ($query) => $query->operativas()
             )
             ->whereHas('materia', function ($query) {
                 $query->where('nivel_id', $this->nivel_id)

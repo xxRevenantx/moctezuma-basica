@@ -30,6 +30,7 @@ class ProyeccionesContinuidad extends Component
     public bool $modalConfirmar = false;
     public bool $modalCancelar = false;
     public bool $modalRetirar = false;
+    public bool $modalReactivar = false;
     public string $motivo_confirmacion = '';
     public string $fecha_confirmacion = '';
     public string $password_confirmacion_proyeccion = '';
@@ -41,6 +42,14 @@ class ProyeccionesContinuidad extends Component
     public string $motivo_retiro = '';
     public string $password_retiro_proyeccion = '';
     public array $diagnostico_retiro = [];
+
+    public ?int $proyeccion_reactivacion_id = null;
+    public string $fecha_reactivacion = '';
+    public string $motivo_reactivacion = '';
+    public string $password_reactivacion_proyeccion = '';
+    public array $datos_reactivacion = [];
+    public array $grupos_reactivacion = [];
+    public string $estado_reactivacion_origen = '';
 
     public function mount(string $slug_nivel): void
     {
@@ -100,6 +109,75 @@ class ProyeccionesContinuidad extends Component
         $this->prepararCancelacion();
     }
 
+    public function prepararReactivacion(int $proyeccionId, CierreGeneracionContinuidadService $service): void
+    {
+        $this->resetValidation();
+
+        $proyeccion = ProyeccionContinuidad::query()
+            ->whereKey($proyeccionId)
+            ->whereIn('estado', ['cancelada', 'revertida'])
+            ->whereHas('inscripcionCicloOrigen', fn ($query) => $query->where('nivel_id', $this->nivel->id))
+            ->firstOrFail();
+
+        $grupos = $service->gruposParaProyeccion($proyeccion)->values();
+        $grupoActual = filled($proyeccion->grupo_destino_id)
+            && $grupos->contains(fn ($grupo) => (int) data_get($grupo, 'id') === (int) $proyeccion->grupo_destino_id)
+                ? (int) $proyeccion->grupo_destino_id
+                : null;
+
+        if (! $grupoActual && $grupos->count() === 1) {
+            $grupoActual = (int) data_get($grupos->first(), 'id');
+        }
+
+        $this->proyeccion_reactivacion_id = $proyeccion->id;
+        $this->fecha_reactivacion = now()->toDateString();
+        $this->motivo_reactivacion = 'La familia confirmó que el alumno sí continuará en la institución durante el ciclo escolar destino.';
+        $this->password_reactivacion_proyeccion = '';
+        $this->datos_reactivacion = [
+            'grupo_destino_id' => $grupoActual,
+            'matricula' => (string) ($proyeccion->matricula_sugerida ?? ''),
+        ];
+        $this->grupos_reactivacion = $grupos->all();
+        $this->estado_reactivacion_origen = (string) $proyeccion->estado;
+        $this->modalReactivar = true;
+    }
+
+    public function reactivarComoContinuara(CierreGeneracionContinuidadService $service): void
+    {
+        $this->validate([
+            'proyeccion_reactivacion_id' => ['required', 'integer', 'min:1'],
+            'fecha_reactivacion' => ['required', 'date'],
+            'motivo_reactivacion' => ['required', 'string', 'min:10', 'max:1500'],
+            'password_reactivacion_proyeccion' => ['required', 'string'],
+            'datos_reactivacion.grupo_destino_id' => ['required', 'integer', 'min:1'],
+            'datos_reactivacion.matricula' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        if (! Hash::check($this->password_reactivacion_proyeccion, (string) auth()->user()?->password)) {
+            $this->addError('password_reactivacion_proyeccion', 'La contraseña no es correcta.');
+            return;
+        }
+
+        $proyeccion = $service->reactivarProyeccionNoContinuara(
+            (int) $this->proyeccion_reactivacion_id,
+            $this->datos_reactivacion,
+            trim($this->motivo_reactivacion),
+            $this->fecha_reactivacion,
+            (int) auth()->id(),
+        );
+
+        $this->modalReactivar = false;
+        $this->filtro_estado = 'confirmada';
+        $this->resetOperacion();
+        $this->inicializarDatos();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Continuidad reactivada',
+            'text' => 'El alumno quedó nuevamente marcado como Continuará y activo en el ciclo destino.',
+            'position' => 'top-end',
+        ]);
+    }
+
     public function prepararRetiro(int $proyeccionId, CierreGeneracionContinuidadService $service): void
     {
         $this->resetValidation();
@@ -137,11 +215,12 @@ class ProyeccionesContinuidad extends Component
             : 'no reinscrito en el último grado concluido';
 
         $this->modalRetirar = false;
+        $this->filtro_estado = 'revertida';
         $this->resetOperacion();
         $this->inicializarDatos();
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Alumno retirado del ciclo destino',
+            'title' => 'Marcado como No continuará',
             'text' => "La activación fue anulada sin borrar el historial. El alumno quedó {$estatus}.",
             'position' => 'top-end',
         ]);
@@ -352,6 +431,13 @@ class ProyeccionesContinuidad extends Component
         $this->motivo_retiro = '';
         $this->password_retiro_proyeccion = '';
         $this->diagnostico_retiro = [];
+        $this->proyeccion_reactivacion_id = null;
+        $this->fecha_reactivacion = '';
+        $this->motivo_reactivacion = '';
+        $this->password_reactivacion_proyeccion = '';
+        $this->datos_reactivacion = [];
+        $this->grupos_reactivacion = [];
+        $this->estado_reactivacion_origen = '';
         $this->resetValidation();
     }
 

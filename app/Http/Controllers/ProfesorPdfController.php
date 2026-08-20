@@ -202,7 +202,7 @@ class ProfesorPdfController extends Controller
             ->whereKey($asignacionId)
             ->where('profesor_id', $profesorId)
             ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA])
             ->firstOrFail();
 
         abort_if((bool) $asignacion->materia?->receso, 422, 'El receso no genera listas.');

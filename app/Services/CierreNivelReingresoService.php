@@ -218,7 +218,7 @@ class CierreNivelReingresoService
                     fn ($query) => $query->where('semestre_id', $alumno->semestre_id),
                     fn ($query) => $query->whereNull('semestre_id')
                 )
-                ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+                ->confirmadas()
                 ->firstOrFail();
 
             $periodo = Periodos::query()

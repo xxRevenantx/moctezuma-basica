@@ -166,8 +166,10 @@ class DocumentosOficialesService
             ->where('grupo_id', $grupoId)
             ->where('nivel_id', $this->nivel()->id)
             ->where(function (Builder $estado): void {
-                $estado->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-                    ->orWhereHas('calificaciones');
+                $estado->whereIn('estado', [
+                    AsignacionMateria::ESTADO_ACTIVA,
+                    AsignacionMateria::ESTADO_CERRADA,
+                ])->orWhereHas('calificaciones');
             })
             ->when($semestreId, fn(Builder $q) => $q->where('semestre_id', $semestreId));
 
@@ -396,7 +398,7 @@ class DocumentosOficialesService
                 ->where('nivel_id', $nivel->id)
                 ->where('grupo_id', $alumno->grupo_id)
                 ->where('semestre_id', $alumno->semestre_id)
-                ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+                ->operativas()
                 ->orderByDesc('ciclo_escolar_id')
                 ->orderByDesc('id')
                 ->first(['ciclo_escolar_id', 'grupo_id', 'semestre_id']);
@@ -434,8 +436,10 @@ class DocumentosOficialesService
                     ReglasMateriaBachillerato::aplicarCapturables($materia, '');
                 })
                 ->where(function (Builder $query) use ($alumno): void {
-                    $query->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
-                        ->orWhereHas('calificaciones', fn(Builder $calificacion) => $calificacion
+                    $query->whereIn('estado', [
+                        AsignacionMateria::ESTADO_ACTIVA,
+                        AsignacionMateria::ESTADO_CERRADA,
+                    ])->orWhereHas('calificaciones', fn(Builder $calificacion) => $calificacion
                             ->where('inscripcion_id', $alumno->id));
                 })
                 ->get()

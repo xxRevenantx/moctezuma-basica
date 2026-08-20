@@ -645,7 +645,7 @@ class DocumentosPDFController extends Controller
             ->join('materias', 'materias.id', '=', 'asignacion_materias.materia_id')
             ->where('asignacion_materias.grupo_id', $alumno->grupo_id)
             ->when($cicloEscolarId, fn($consulta) => $consulta->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId))
-            ->where('asignacion_materias.estado', '!=', \App\Models\AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereIn('asignacion_materias.estado', [\App\Models\AsignacionMateria::ESTADO_ACTIVA, \App\Models\AsignacionMateria::ESTADO_CERRADA])
             ->where('materias.calificable', true)
             ->where('materias.extra', false)
             ->where('materias.receso', false)

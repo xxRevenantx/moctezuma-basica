@@ -137,7 +137,7 @@
                     <p class="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">Estado
                         inicial</p>
                     <p class="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        Las nuevas cargas quedan como borrador hasta que el administrador las confirme.
+                        Las nuevas cargas quedan como borrador. Se pueden preparar y revisar, pero no participan en procesos operativos hasta confirmarlas.
                     </p>
                 </div>
             </div>
@@ -157,18 +157,37 @@
                     </p>
                 </div>
 
+                @if ($this->cicloSeleccionadoSinCargas && $this->cargasOrigenSeleccionado > 0)
+                    <div class="xl:max-w-xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                        <p class="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">Ciclo sin preparar</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            Este ciclo todavía no tiene cargas. Se detectó automáticamente el ciclo anterior con
+                            <strong>{{ $this->cargasOrigenSeleccionado }}</strong> carga(s) confirmada(s). Usa <strong>Preparar cargas</strong> y aparecerán como borrador para revisión.
+                        </p>
+                    </div>
+                @endif
+
                 <div class="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-4">
                     <flux:field>
                         <flux:label>Ciclo origen</flux:label>
-                        <flux:select wire:model="ciclo_origen_id">
-                            <flux:select.option value="">Selecciona</flux:select.option>
-                            @foreach ($this->ciclosEscolares as $ciclo)
-                                @if ((int) $ciclo->id !== (int) $ciclo_escolar_id)
+                        <flux:select wire:model.live="ciclo_origen_id"
+                            wire:key="ciclo-origen-{{ $ciclo_escolar_id }}"
+                            :disabled="$this->ciclosOrigenDisponibles->isEmpty()">
+                            @if ($this->ciclosOrigenDisponibles->isEmpty())
+                                <flux:select.option value="">Sin ciclo anterior disponible</flux:select.option>
+                            @else
+                                @foreach ($this->ciclosOrigenDisponibles as $ciclo)
                                     <flux:select.option value="{{ $ciclo->id }}">
-                                        {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
-                                @endif
-                            @endforeach
+                                        {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}
+                                    </flux:select.option>
+                                @endforeach
+                            @endif
                         </flux:select>
+                        @if ($this->cargasOrigenSeleccionado > 0)
+                            <p class="mt-1 text-xs font-bold text-indigo-600 dark:text-indigo-300">
+                                {{ $this->cargasOrigenSeleccionado }} carga(s) confirmada(s) disponibles para copiar.
+                            </p>
+                        @endif
                         <flux:error name="ciclo_origen_id" />
                     </flux:field>
 
@@ -187,10 +206,13 @@
                     </label>
 
                     <button type="button" wire:click="copiarDesdeCiclo" wire:loading.attr="disabled"
-                        wire:confirm="Se crearán cargas nuevas para este nivel y ciclo. No se modificará el ciclo origen. ¿Continuar?"
-                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 disabled:opacity-60">
+                        @disabled(!$ciclo_origen_id || $this->cargasOrigenSeleccionado === 0)
+                        wire:confirm="Se crearán cargas nuevas EN BORRADOR para este nivel y ciclo. El ciclo origen no se modificará. Después deberás revisar y confirmar las cargas. ¿Continuar?"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500">
                         <flux:icon.document-duplicate class="h-5 w-5" />
-                        <span wire:loading.remove wire:target="copiarDesdeCiclo">Preparar ciclo</span>
+                        <span wire:loading.remove wire:target="copiarDesdeCiclo">
+                            {{ $this->cargasOrigenSeleccionado > 0 ? 'Preparar ' . $this->cargasOrigenSeleccionado . ' cargas' : 'Preparar ciclo' }}
+                        </span>
                         <span wire:loading wire:target="copiarDesdeCiclo">Copiando…</span>
                     </button>
                 </div>
@@ -404,14 +426,15 @@
                                 <span class="rounded-full bg-white/20 px-2 py-0.5">{{ count($seleccionados) }}</span>
                             @endif
                         </button>
-                        @if ($this->hayBorradoresFiltrados)
-                            <button type="button" wire:click="confirmarTodas"
-                                wire:confirm="¿Confirmar todas las cargas en borrador de este nivel?"
-                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700">
-                                <flux:icon.check-circle class="h-4 w-4" />
-                                Confirmar borradores
-                            </button>
-                        @endif
+                        <button type="button" wire:click="confirmarTodas"
+                            @disabled($this->totalBorradores === 0)
+                            @if ($this->totalBorradores > 0)
+                                wire:confirm="¿Confirmar las {{ $this->totalBorradores }} carga(s) en borrador de este nivel? Desde ese momento estarán disponibles para los procesos académicos operativos."
+                            @endif
+                            class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black shadow-sm transition {{ $this->totalBorradores > 0 ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500' }}">
+                            <flux:icon.check-circle class="h-4 w-4" />
+                            Confirmar borradores ({{ $this->totalBorradores }})
+                        </button>
                     </div>
                 @endif
             </div>
@@ -423,20 +446,22 @@
                     <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
                         {{ $this->resumenCargas['total'] }}</p>
                 </div>
-                <div
-                    class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <button type="button" wire:click="filtrarEstado('activa')"
+                    class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/50 dark:bg-emerald-950/20 {{ $filtro_estado === 'activa' ? 'ring-2 ring-emerald-400 ring-offset-2 dark:ring-offset-slate-950' : '' }}">
                     <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                         Activas</p>
                     <p class="mt-1 text-2xl font-black text-emerald-800 dark:text-emerald-200">
                         {{ $this->resumenCargas['activas'] }}</p>
-                </div>
-                <div
-                    class="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <p class="mt-1 text-[10px] font-bold text-emerald-700/70 dark:text-emerald-300/70">Clic para filtrar</p>
+                </button>
+                <button type="button" wire:click="filtrarEstado('borrador')"
+                    class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/50 dark:bg-amber-950/20 {{ $filtro_estado === 'borrador' ? 'ring-2 ring-amber-400 ring-offset-2 dark:ring-offset-slate-950' : '' }}">
                     <p class="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
                         Borradores</p>
                     <p class="mt-1 text-2xl font-black text-amber-800 dark:text-amber-200">
                         {{ $this->resumenCargas['borradores'] }}</p>
-                </div>
+                    <p class="mt-1 text-[10px] font-bold text-amber-700/70 dark:text-amber-300/70">Pendientes de confirmar</p>
+                </button>
                 <div
                     class="rounded-2xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/50 dark:bg-orange-950/20">
                     <p class="text-[11px] font-black uppercase tracking-wide text-orange-700 dark:text-orange-300">Sin
@@ -611,9 +636,16 @@
                     <flux:icon.inbox class="h-8 w-8 text-slate-400" />
                 </div>
                 <p class="mt-4 font-black text-slate-800 dark:text-white">No hay cargas que coincidan.</p>
-                <p class="mt-1 text-sm text-slate-500">
-                    {{ $this->tieneFiltrosActivos ? 'Ajusta o limpia los filtros para ampliar la consulta.' : 'Puedes capturarlas manualmente o prepararlas desde otro ciclo.' }}
-                </p>
+                @if ($this->tieneFiltrosActivos)
+                    <p class="mt-1 text-sm text-slate-500">Ajusta o limpia los filtros para ampliar la consulta.</p>
+                @elseif ($this->cicloSeleccionadoSinCargas && $this->cargasOrigenSeleccionado > 0)
+                    <p class="mt-1 text-sm text-slate-500">
+                        El ciclo seleccionado todavía no ha sido preparado. Arriba ya quedó seleccionado el ciclo anterior con
+                        {{ $this->cargasOrigenSeleccionado }} carga(s); pulsa <strong>Preparar cargas</strong> para crearlas como borrador.
+                    </p>
+                @else
+                    <p class="mt-1 text-sm text-slate-500">Puedes capturarlas manualmente o prepararlas desde un ciclo anterior disponible.</p>
+                @endif
             </div>
         @else
             <div class="overflow-x-auto">
@@ -725,15 +757,24 @@
                                 </td>
                                 <td class="px-4 py-4">
                                     <div class="flex flex-wrap justify-end gap-1.5">
-                                        <button type="button" wire:click="editar({{ $asignacion->id }})"
-                                            wire:loading.attr="disabled" wire:target="editar"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60">
-                                            <flux:icon.pencil-square class="h-3.5 w-3.5" />
-                                            Editar
-                                        </button>
+                                        @if ($asignacion->esEditableEstructuralmente())
+                                            <button type="button" wire:click="editar({{ $asignacion->id }})"
+                                                wire:loading.attr="disabled" wire:target="editar"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-black text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60">
+                                                <flux:icon.pencil-square class="h-3.5 w-3.5" />
+                                                Editar
+                                            </button>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-black text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
+                                                title="Reactiva la carga para editar su estructura">
+                                                <flux:icon.lock-closed class="h-3.5 w-3.5" />
+                                                Protegida
+                                            </span>
+                                        @endif
 
                                         @if (auth()->user()?->is_admin && $asignacion->estado === 'borrador')
                                             <button type="button" wire:click="confirmar({{ $asignacion->id }})"
+                                                wire:confirm="¿Confirmar esta carga? Dejará de ser borrador y quedará disponible para los procesos académicos operativos."
                                                 class="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-emerald-700">
                                                 Confirmar
                                             </button>

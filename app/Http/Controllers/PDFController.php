@@ -27,6 +27,7 @@ use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -304,7 +305,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolar->id);
 
         if ($cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
-            $queryMaterias->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $queryMaterias->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         /*
@@ -1906,11 +1907,17 @@ class PDFController extends Controller
          */
         $horariosQuery->where(function ($actividadQuery) use ($grupo) {
             $actividadQuery
-                ->where(function ($materiaQuery) {
+                ->where(function ($materiaQuery) use ($cicloEscolar) {
                     $materiaQuery
                         ->whereNull('taller_sesion_id')
                         ->whereNotNull('asignacion_materia_id')
-                        ->whereHas('asignacionMateria');
+                        ->whereHas('asignacionMateria', function (Builder $asignacionQuery) use ($cicloEscolar): void {
+                            // En el ciclo abierto solo se publica lo confirmado. En
+                            // ciclos históricos se conserva el horario tal como quedó.
+                            if ($cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
+                                $asignacionQuery->where('estado', AsignacionMateria::ESTADO_ACTIVA);
+                            }
+                        });
                 })
                 ->orWhere(function ($tallerQuery) use ($grupo) {
                     $tallerQuery
@@ -2565,7 +2572,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id);
 
         if ($periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at)) {
-            $queryMaterias->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $queryMaterias->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         if ($esBachillerato) {
@@ -3379,7 +3386,7 @@ class PDFController extends Controller
 
         // En ciclos cerrados, una asignación archivada sigue formando parte del historial.
         if ($cicloEscolarSeleccionado?->es_actual && blank($cicloEscolarSeleccionado?->cerrado_at)) {
-            $queryMaterias->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $queryMaterias->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         if ($esBachillerato) {
@@ -4171,7 +4178,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id);
 
         if ($periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at)) {
-            $queryMaterias->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $queryMaterias->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         if ($esBachillerato) {
@@ -4979,7 +4986,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $periodo->ciclo_escolar_id);
 
         if ($periodo->cicloEscolar?->es_actual && blank($periodo->cicloEscolar?->cerrado_at)) {
-            $queryMaterias->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA);
+            $queryMaterias->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA);
         }
 
         if ($esBachillerato) {
@@ -6164,7 +6171,7 @@ class PDFController extends Controller
             ->where('asignacion_materias.ciclo_escolar_id', $cicloEscolarId)
             ->when(
                 $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
-                fn($query) => $query->where('asignacion_materias.estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+                fn($query) => $query->where('asignacion_materias.estado', AsignacionMateria::ESTADO_ACTIVA)
             )
             ->where('materias.calificable', 1);
 
