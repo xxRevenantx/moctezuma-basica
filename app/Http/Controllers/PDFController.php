@@ -5542,6 +5542,7 @@ class PDFController extends Controller
     public function credenciales_pdf(Request $request)
     {
         $nivel = Nivel::query()
+            ->with('director')
             ->where('slug', $request->slug_nivel)
             ->firstOrFail();
 
@@ -5633,6 +5634,34 @@ class PDFController extends Controller
             ? CicloEscolar::query()->find($cicloEscolarId)
             : null;
 
+        if (! $cicloEscolar) {
+            $cicloEscolar = CicloEscolar::query()
+                ->orderByDesc('es_actual')
+                ->orderByDesc('inicio_anio')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if (! $cicloEscolar) {
+            abort(404, 'No se encontró un ciclo escolar para generar las credenciales.');
+        }
+
+        $director = $nivel->director;
+        $nombreDirector = $director
+            ? mb_strtoupper(trim(implode(' ', array_filter([
+                $director->titulo,
+                $director->nombre,
+                $director->apellido_paterno,
+                $director->apellido_materno,
+            ]))), 'UTF-8')
+            : 'DIRECTOR(A)';
+
+        // La foto se resuelve una sola vez por alumno para evitar lecturas repetidas
+        // del disco desde la vista PDF.
+        $fotosDataUri = $alumnos->mapWithKeys(
+            fn (Inscripcion $alumno): array => [$alumno->id => $alumno->foto_data_uri]
+        );
+
         $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';
 
         return Pdf::loadView('pdf.credenciales_pdf', [
@@ -5640,6 +5669,8 @@ class PDFController extends Controller
             'nivel' => $nivel,
             'cicloEscolar' => $cicloEscolar,
             'modoDescarga' => $modoDescarga,
+            'nombreDirector' => $nombreDirector,
+            'fotosDataUri' => $fotosDataUri,
         ])
             ->setPaper('letter', 'portrait')
             ->stream($nombreArchivo);

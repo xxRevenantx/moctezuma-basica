@@ -167,11 +167,11 @@
                 <img class="credenciales" src="{{ public_path('imagenes/credencial.jpg') }}" alt="Credencial">
 
 
-                <img class="logo" src="{{ public_path('storage/logos/' . $nivel->logo ?? 'logo.png') }}"
+                <img class="logo" src="{{ public_path('storage/logos/' . ($nivel->logo ?: 'logo.png')) }}"
                     alt="Logo del nivel">
 
 
-                <img class="logo2" src="{{ public_path('storage/logos/' . $nivel->logo ?? 'logo.png') }}"
+                <img class="logo2" src="{{ public_path('storage/logos/' . ($nivel->logo ?: 'logo.png')) }}"
                     alt="Logo del nivel">
 
 
@@ -185,9 +185,8 @@
 
 
                 {{-- Foto del alumno --}}
-                @php($fotoDataUri = $alumno->foto_data_uri)
-                @if ($fotoDataUri)
-                    <img class="fotoAlumno" src="{{ $fotoDataUri }}" alt="Foto del alumno">
+                @if ($fotosDataUri->get($alumno->id))
+                    <img class="fotoAlumno" src="{{ $fotosDataUri->get($alumno->id) }}" alt="Foto del alumno">
                 @else
                     <div class="sinFoto">
                         FOTO + SELLO
@@ -227,25 +226,12 @@
                     <b>Vigencia:</b> Agosto {{ $cicloEscolar->fin_anio }}
 
 
-                    @php
-                        $nombreDirector = $nivel->director
-                            ? mb_strtoupper(
-                                $nivel->director->titulo .
-                                    ' ' .
-                                    $nivel->director->nombre .
-                                    ' ' .
-                                    $nivel->director->apellido_paterno .
-                                    ' ' .
-                                    $nivel->director->apellido_materno,
-                                'UTF-8',
-                            )
-                            : 'No especificado';
-                    @endphp
+
                     <br>
 
 
                 </div>
-                <span class="director"><br>FIRMA Y SELLO</span>
+                <span class="director">{{ $nombreDirector }}<br>FIRMA Y SELLO</span>
             </div>
 
 
