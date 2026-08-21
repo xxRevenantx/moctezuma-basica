@@ -112,7 +112,7 @@
                         <th class="p-3 text-left">Grupo para confirmar</th>
                         <th class="p-3 text-left">Matrícula sugerida</th>
                         <th class="p-3 text-center">Estado</th>
-                        <th class="p-3 text-right">Acciones</th>
+                        <th class="min-w-[190px] p-3 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
@@ -203,7 +203,7 @@
                                         {{ $proyeccion->motivo_reversion }}</p>
                                 @endif
                             </td>
-                            <td class="p-3 text-right">
+                            <td class="min-w-[190px] p-3 text-right">
                                 @if ($esPendiente)
                                     <div class="flex justify-end gap-2">
                                         <flux:button wire:key="confirmar-proyeccion-{{ $proyeccion->id }}" size="sm"
@@ -252,42 +252,45 @@
                                         </flux:button>
                                     </div>
                                 @elseif ($proyeccion->estado === 'revertida')
-                                    <div class="flex flex-col items-end gap-2">
+                                    <div class="flex min-w-[175px] flex-col items-end gap-2">
                                         <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">No continuará · retirado
                                             {{ $proyeccion->revertida_at?->format('d/m/Y H:i') }}</p>
                                         <p class="max-w-xs text-right text-xs text-slate-500">El destino quedó como no iniciado; el origen se conserva.</p>
-                                        <flux:button wire:key="reactivar-revertida-{{ $proyeccion->id }}" size="sm"
-                                            variant="primary" :loading="false"
+                                        <button type="button"
+                                            wire:key="reactivar-revertida-{{ $proyeccion->id }}"
                                             wire:click="prepararReactivacion({{ $proyeccion->id }})"
-                                            wire:target="prepararReactivacion({{ $proyeccion->id }})" wire:loading.attr="disabled">
+                                            wire:target="prepararReactivacion({{ $proyeccion->id }})"
+                                            wire:loading.attr="disabled"
+                                            class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
                                             <span wire:loading.remove wire:target="prepararReactivacion({{ $proyeccion->id }})">
                                                 Cambiar a Continuará
                                             </span>
                                             <span wire:loading wire:target="prepararReactivacion({{ $proyeccion->id }})"
                                                 class="inline-flex items-center gap-1.5">
-                                                <flux:icon name="loading" class="size-4" />
                                                 Revisando...
                                             </span>
-                                        </flux:button>
+                                        </button>
+                                    </div>
+                                @elseif ($proyeccion->estado === 'cancelada')
+                                    <div class="flex min-w-[175px] flex-col items-end gap-2">
+                                        <p class="text-xs font-semibold text-slate-500">No continuará · {{ $proyeccion->cancelada_at?->format('d/m/Y H:i') }}</p>
+                                        <button type="button"
+                                            wire:key="reactivar-cancelada-{{ $proyeccion->id }}"
+                                            wire:click="prepararReactivacion({{ $proyeccion->id }})"
+                                            wire:target="prepararReactivacion({{ $proyeccion->id }})"
+                                            wire:loading.attr="disabled"
+                                            class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
+                                            <span wire:loading.remove wire:target="prepararReactivacion({{ $proyeccion->id }})">
+                                                Cambiar a Continuará
+                                            </span>
+                                            <span wire:loading wire:target="prepararReactivacion({{ $proyeccion->id }})"
+                                                class="inline-flex items-center gap-1.5">
+                                                Revisando...
+                                            </span>
+                                        </button>
                                     </div>
                                 @else
-                                    <div class="flex flex-col items-end gap-2">
-                                        <p class="text-xs font-semibold text-slate-500">No continuará
-                                            {{ $proyeccion->cancelada_at?->format('d/m/Y H:i') }}</p>
-                                        <flux:button wire:key="reactivar-cancelada-{{ $proyeccion->id }}" size="sm"
-                                            variant="primary" :loading="false"
-                                            wire:click="prepararReactivacion({{ $proyeccion->id }})"
-                                            wire:target="prepararReactivacion({{ $proyeccion->id }})" wire:loading.attr="disabled">
-                                            <span wire:loading.remove wire:target="prepararReactivacion({{ $proyeccion->id }})">
-                                                Cambiar a Continuará
-                                            </span>
-                                            <span wire:loading wire:target="prepararReactivacion({{ $proyeccion->id }})"
-                                                class="inline-flex items-center gap-1.5">
-                                                <flux:icon name="loading" class="size-4" />
-                                                Revisando...
-                                            </span>
-                                        </flux:button>
-                                    </div>
+                                    <span class="text-xs font-semibold text-slate-400">Sin acciones disponibles</span>
                                 @endif
                             </td>
                         </tr>
