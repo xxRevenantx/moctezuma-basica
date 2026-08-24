@@ -10,7 +10,7 @@ class AccionSeeder extends Seeder
     public function run(): void
     {
         $acciones = [
-            ['accion' => 'Generales', 'slug' => 'generales', 'orden' => 1],
+            ['accion' => 'Resumen', 'slug' => 'generales', 'orden' => 1],
             ['accion' => 'Matrícula', 'slug' => 'matricula', 'orden' => 2],
             ['accion' => 'Alumnos no vigentes', 'slug' => 'alumnos-no-vigentes', 'orden' => 3],
             ['accion' => 'Asignación de materias', 'slug' => 'asignacion-de-materias', 'orden' => 4],

@@ -27,6 +27,7 @@ class AlumnosNoVigentes extends Component
     use WithPagination;
 
     public string $slug_nivel = '';
+    public bool $mostrarSelectorNiveles = true;
     public ?string $slug_grado = null;
     public ?Nivel $nivel = null;
 

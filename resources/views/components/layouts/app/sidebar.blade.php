@@ -40,11 +40,17 @@
             'misrutas.inscripcion',
             'misrutas.tutores',
             'misrutas.listas-generales',
+            'misrutas.movimientos-escolares',
+            'misrutas.cierre-continuidad',
+            'misrutas.archivo-escolar',
             'misrutas.alumnos.expediente-360',
             'misrutas.calendario',
         );
 
         $academicaExpanded = request()->routeIs(
+            'misrutas.carga-academica',
+            'misrutas.horarios-institucionales',
+            'misrutas.resultados-academicos',
             'misrutas.integridad-academica',
             'misrutas.seguimiento-academico',
             'misrutas.analitica-institucional',
@@ -74,6 +80,7 @@
         $documentacionExpanded = request()->routeIs(
             'misrutas.expedientes',
             'misrutas.expedientes.*',
+            'misrutas.credenciales-institucionales',
             'misrutas.constancias*',
             'misrutas.oficios*',
         );
@@ -241,11 +248,32 @@
                             Directorio de padres y tutores
                         </flux:sidebar.item>
 
+                        <flux:sidebar.item icon="arrows-right-left" :href="route('misrutas.movimientos-escolares')"
+                            :current="request()->routeIs('misrutas.movimientos-escolares')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="movimientos escolares bajas traslados suspensiones reingresos no vigentes"
+                            x-show="itemMatches($el)">
+                            Movimientos escolares
+                        </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="academic-cap" :href="route('misrutas.cierre-continuidad')"
+                            :current="request()->routeIs('misrutas.cierre-continuidad')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="cierre continuidad promoción grado nivel egreso reinscripción repetición"
+                            x-show="itemMatches($el)">
+                            Cierre y continuidad
+                        </flux:sidebar.item>
+
                         <flux:sidebar.item icon="clipboard-document-list" :href="route('misrutas.listas-generales')"
                             :current="request()->routeIs('misrutas.listas-generales')" wire:navigate data-sidebar-search-item
                             data-sidebar-search="listas generales formatos personalizadores etiquetas evaluación asistencia sece alumnos"
                             x-show="itemMatches($el)">
                             Listas generales
+                        </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="archive-box" :href="route('misrutas.archivo-escolar')"
+                            :current="request()->routeIs('misrutas.archivo-escolar')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="archivo escolar historial generaciones egresadas matrícula histórica"
+                            x-show="itemMatches($el)">
+                            Archivo escolar
                         </flux:sidebar.item>
                     @endif
 
@@ -261,11 +289,34 @@
                 </flux:sidebar.group>
 
                 {{-- Herramientas académicas --}}
-                @if ($canAccessIntegrity || $canAccessTracking || $canAccessAnalytics)
+                @if ($isAdmin || $canAccessIntegrity || $canAccessTracking || $canAccessAnalytics)
                     <flux:sidebar.group expandable icon="book-open" heading="Académica"
                         :expanded="$academicaExpanded"
                         x-bind:open="searching || @js($academicaExpanded)"
                         x-show="groupMatches($el)">
+                        @if ($isAdmin)
+                            <flux:sidebar.item icon="book-open" :href="route('misrutas.carga-academica')"
+                                :current="request()->routeIs('misrutas.carga-academica')" wire:navigate data-sidebar-search-item
+                                data-sidebar-search="carga académica materias asignación docente profesor cambio masivo"
+                                x-show="itemMatches($el)">
+                                Carga académica
+                            </flux:sidebar.item>
+
+                            <flux:sidebar.item icon="calendar-days" :href="route('misrutas.horarios-institucionales')"
+                                :current="request()->routeIs('misrutas.horarios-institucionales')" wire:navigate data-sidebar-search-item
+                                data-sidebar-search="horarios institucionales grupos docentes vacíos generales planificador"
+                                x-show="itemMatches($el)">
+                                Horarios institucionales
+                            </flux:sidebar.item>
+
+                            <flux:sidebar.item icon="chart-bar" :href="route('misrutas.resultados-academicos')"
+                                :current="request()->routeIs('misrutas.resultados-academicos')" wire:navigate data-sidebar-search-item
+                                data-sidebar-search="resultados académicos promedios concentrados materias cuadro honor reconocimientos"
+                                x-show="itemMatches($el)">
+                                Resultados académicos
+                            </flux:sidebar.item>
+                        @endif
+
                         @if ($canAccessIntegrity)
                             <flux:sidebar.item icon="shield-check" :href="route('misrutas.integridad-academica')"
                                 :current="request()->routeIs('misrutas.integridad-academica')" wire:navigate
@@ -429,6 +480,14 @@
                             data-sidebar-search="expedientes digitales documentación alumnos archivos"
                             x-show="itemMatches($el)">
                             Expedientes digitales
+                        </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="identification" :href="route('misrutas.credenciales-institucionales')"
+                            :current="request()->routeIs('misrutas.credenciales-institucionales')" wire:navigate
+                            data-sidebar-search-item
+                            data-sidebar-search="credenciales institucionales alumnos profesores personal identificación"
+                            x-show="itemMatches($el)">
+                            Credenciales institucionales
                         </flux:sidebar.item>
 
                         <flux:sidebar.item icon="file-check" :href="route('misrutas.constancias')"

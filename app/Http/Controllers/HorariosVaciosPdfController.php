@@ -8,10 +8,14 @@ use App\Models\Dia;
 use App\Models\Escuela;
 use App\Models\Grupo;
 use App\Models\Hora;
-use App\Models\Horario;
 use App\Models\Nivel;
+use App\Models\Persona;
+use App\Models\PersonaNivel;
 use App\Models\PersonaNivelDetalle;
+use App\Models\TallerSesion;
+use App\Services\HorarioRecesoService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -22,49 +26,26 @@ class HorariosVaciosPdfController extends Controller
     {
         $datos = $request->validate([
             'slug_nivel' => ['required', 'string'],
+            'tipo_formato' => ['nullable', 'in:grupos,profesores'],
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
-            'alcance' => ['required', 'in:nivel,grado,grupos'],
+            'alcance' => ['nullable', 'in:nivel,grado,grupos'],
             'generacion_id' => ['nullable', 'integer', 'exists:generaciones,id'],
             'grado_id' => ['nullable', 'integer', 'exists:grados,id'],
             'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
             'grupos_seleccionados' => ['nullable', 'array'],
             'grupos_seleccionados.*' => ['integer', 'exists:grupos,id'],
+            'profesores_seleccionados' => ['nullable', 'array'],
+            'profesores_seleccionados.*' => ['integer', 'exists:personas,id'],
             'hora_inicio_id' => ['required', 'integer', 'exists:horas,id'],
             'hora_fin_id' => ['required', 'integer', 'exists:horas,id'],
             'estilo_celda' => ['required', 'in:vacia,lineas,campos'],
         ]);
 
+        $tipoFormato = $datos['tipo_formato'] ?? 'grupos';
+        $alcance = $datos['alcance'] ?? 'nivel';
         $nivel = Nivel::query()->where('slug', $datos['slug_nivel'])->firstOrFail();
         $cicloEscolar = CicloEscolar::query()->findOrFail($datos['ciclo_escolar_id']);
         $esBachillerato = (int) $nivel->id === 4 || $nivel->slug === 'bachillerato';
-
-        if (in_array($datos['alcance'], ['grado', 'grupos'], true)) {
-            abort_unless(
-                !empty($datos['generacion_id']) && !empty($datos['grado_id']),
-                422,
-                'Para imprimir por grado o grupos debes seleccionar generación y grado.'
-            );
-
-            if ($esBachillerato) {
-                abort_unless(!empty($datos['semestre_id']), 422, 'Para bachillerato debes seleccionar un semestre.');
-            }
-        }
-
-        if ($datos['alcance'] === 'grupos') {
-            abort_unless(!empty($datos['grupos_seleccionados']), 422, 'Debes seleccionar al menos un grupo.');
-        }
-
-        $grupos = $this->consultarGrupos(
-            nivel: $nivel,
-            cicloEscolar: $cicloEscolar,
-            alcance: $datos['alcance'],
-            generacionId: isset($datos['generacion_id']) ? (int) $datos['generacion_id'] : null,
-            gradoId: isset($datos['grado_id']) ? (int) $datos['grado_id'] : null,
-            semestreId: isset($datos['semestre_id']) ? (int) $datos['semestre_id'] : null,
-            gruposSeleccionados: collect($datos['grupos_seleccionados'] ?? [])->map(fn($id) => (int) $id)->all(),
-        );
-
-        abort_if($grupos->isEmpty(), 404, 'No se encontraron grupos para los filtros seleccionados.');
 
         $dias = Dia::query()
             ->where('nivel_id', $nivel->id)
@@ -84,7 +65,51 @@ class HorariosVaciosPdfController extends Controller
         $horas = $this->filtrarHoras($horasNivel, (int) $datos['hora_inicio_id'], (int) $datos['hora_fin_id']);
         abort_if($horas->isEmpty(), 404, 'No se pudo determinar el rango de horas a imprimir.');
 
-        $recesosPorGrupo = $this->obtenerHorasDeRecesoPorGrupo(
+        if ($tipoFormato === 'profesores') {
+            return $this->generarHorariosProfesores(
+                nivel: $nivel,
+                cicloEscolar: $cicloEscolar,
+                dias: $dias,
+                horas: $horas,
+                profesoresSeleccionados: collect($datos['profesores_seleccionados'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all(),
+                estiloCelda: $datos['estilo_celda'],
+            );
+        }
+
+        if (in_array($alcance, ['grado', 'grupos'], true)) {
+            abort_unless(
+                !empty($datos['generacion_id']) && !empty($datos['grado_id']),
+                422,
+                'Para imprimir por grado o grupos debes seleccionar generación y grado.'
+            );
+
+            if ($esBachillerato) {
+                abort_unless(!empty($datos['semestre_id']), 422, 'Para bachillerato debes seleccionar un semestre.');
+            }
+        }
+
+        if ($alcance === 'grupos') {
+            abort_unless(!empty($datos['grupos_seleccionados']), 422, 'Debes seleccionar al menos un grupo.');
+        }
+
+        $grupos = $this->consultarGrupos(
+            nivel: $nivel,
+            cicloEscolar: $cicloEscolar,
+            alcance: $alcance,
+            generacionId: isset($datos['generacion_id']) ? (int) $datos['generacion_id'] : null,
+            gradoId: isset($datos['grado_id']) ? (int) $datos['grado_id'] : null,
+            semestreId: isset($datos['semestre_id']) ? (int) $datos['semestre_id'] : null,
+            gruposSeleccionados: collect($datos['grupos_seleccionados'] ?? [])->map(fn ($id) => (int) $id)->all(),
+        );
+
+        abort_if($grupos->isEmpty(), 404, 'No se encontraron grupos para los filtros seleccionados.');
+
+        $recesosPorGrupo = app(HorarioRecesoService::class)->porGrupo(
             $nivel->id,
             $cicloEscolar->id,
             $grupos,
@@ -110,7 +135,7 @@ class HorariosVaciosPdfController extends Controller
                 'etiqueta_grupo' => $this->etiquetaGrupo($grupo),
                 'generacion' => $grupo->generacion?->etiqueta,
                 'receso_hora_ids' => collect($recesosPorGrupo->get((int) $grupo->id, []))
-                    ->map(fn($id) => (int) $id)
+                    ->map(fn ($id) => (int) $id)
                     ->values()
                     ->all(),
             ];
@@ -137,8 +162,8 @@ class HorariosVaciosPdfController extends Controller
             'logoIzquierdo' => $this->imagenBase64Publica('imagenes/logo-letra.png'),
             'logoDerecho' => $this->imagenBase64Publica(
                 !empty($nivel->logo)
-                ? 'storage/logos/' . $nivel->logo
-                : 'imagenes/logo-letra.png'
+                    ? 'storage/logos/' . $nivel->logo
+                    : 'imagenes/logo-letra.png'
             ),
             'imagenNivel' => $this->imagenBase64Publica(match ((string) $nivel->slug) {
                 'preescolar' => 'imagenes/personajes_preescolar.png',
@@ -150,6 +175,221 @@ class HorariosVaciosPdfController extends Controller
         ])
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
+    }
+
+    private function generarHorariosProfesores(
+        Nivel $nivel,
+        CicloEscolar $cicloEscolar,
+        Collection $dias,
+        Collection $horas,
+        array $profesoresSeleccionados,
+        string $estiloCelda,
+    ) {
+        abort_if(empty($profesoresSeleccionados), 422, 'Debes seleccionar al menos un profesor.');
+
+        $profesores = $this->consultarProfesoresActivos(
+            nivel: $nivel,
+            cicloEscolar: $cicloEscolar,
+            profesoresSeleccionados: $profesoresSeleccionados,
+        );
+
+        abort_if($profesores->isEmpty(), 404, 'No se encontraron profesores activos para la selección realizada.');
+
+        $idsValidos = $profesores->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $idsSolicitados = collect($profesoresSeleccionados)->map(fn ($id) => (int) $id)->sort()->values();
+
+        abort_unless(
+            $idsValidos->all() === $idsSolicitados->all(),
+            422,
+            'Uno o más profesores seleccionados ya no están activos en la plantilla de este nivel y ciclo.'
+        );
+
+        $gruposNivel = $this->consultarGrupos(
+            nivel: $nivel,
+            cicloEscolar: $cicloEscolar,
+            alcance: 'nivel',
+            generacionId: null,
+            gradoId: null,
+            semestreId: null,
+            gruposSeleccionados: [],
+        );
+
+        $recesoOficial = app(HorarioRecesoService::class)->oficialNivel(
+            $nivel->id,
+            $cicloEscolar->id,
+            $gruposNivel,
+            $horas,
+        );
+
+        $paginas = $profesores
+            ->map(function (Persona $profesor) use ($nivel, $cicloEscolar) {
+                $carga = $this->obtenerCargaAcademicaProfesor(
+                    nivelId: (int) $nivel->id,
+                    cicloEscolarId: (int) $cicloEscolar->id,
+                    profesorId: (int) $profesor->id,
+                );
+
+                return [
+                    'profesor' => $profesor,
+                    'profesor_nombre' => $this->nombrePersona($profesor),
+                    'carga' => $carga,
+                    'sin_carga' => $carga->isEmpty(),
+                ];
+            })
+            ->sortBy(fn (array $pagina) => Str::lower(Str::ascii($pagina['profesor_nombre'])))
+            ->values();
+
+        $escuela = Escuela::query()->first();
+        abort_if(!$escuela, 404, 'No se encontró la información de la escuela.');
+
+        $nombreArchivo = sprintf(
+            'HORARIOS_INDIVIDUALES_DOCENTES_%s_%s-%s.pdf',
+            mb_strtoupper(Str::slug((string) $nivel->nombre, '_'), 'UTF-8'),
+            $cicloEscolar->inicio_anio,
+            $cicloEscolar->fin_anio,
+        );
+
+        return Pdf::loadView('pdf.horarios-vacios-profesores', [
+            'escuela' => $escuela,
+            'nivel' => $nivel,
+            'cicloEscolar' => $cicloEscolar,
+            'dias' => $dias,
+            'horas' => $horas,
+            'paginas' => $paginas,
+            'estiloCelda' => $estiloCelda,
+            'recesoHoraIds' => collect($recesoOficial['hora_ids'] ?? [])->map(fn ($id) => (int) $id)->values(),
+            'recesoInconsistente' => (bool) ($recesoOficial['inconsistente'] ?? false),
+            'recesoVariantes' => (int) ($recesoOficial['variantes'] ?? 0),
+            'gruposEvaluadosReceso' => (int) ($recesoOficial['grupos_evaluados'] ?? 0),
+            'logoIzquierdo' => $this->imagenBase64Publica('imagenes/logo-letra.png'),
+            'logoDerecho' => $this->imagenBase64Publica(
+                !empty($nivel->logo)
+                    ? 'storage/logos/' . $nivel->logo
+                    : 'imagenes/logo-letra.png'
+            ),
+        ])
+            ->setPaper('letter', 'landscape')
+            ->stream($nombreArchivo);
+    }
+
+    private function consultarProfesoresActivos(
+        Nivel $nivel,
+        CicloEscolar $cicloEscolar,
+        array $profesoresSeleccionados,
+    ): Collection {
+        $ids = PersonaNivelDetalle::query()
+            ->with('cabecera:id,persona_id,nivel_id,estado')
+            ->vigenteEnCiclo((int) $cicloEscolar->id)
+            ->whereHas('personaRole.rolePersona', fn (Builder $q) => $q
+                ->where('status', true)
+                ->where('es_docente', true))
+            ->whereHas('cabecera', fn (Builder $q) => $q
+                ->where('nivel_id', $nivel->id)
+                ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                ->whereHas('persona', fn (Builder $p) => $p
+                    ->where('status', true)
+                    ->where('estado_laboral', 'activo')))
+            ->get()
+            ->pluck('cabecera.persona_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->intersect($profesoresSeleccionados)
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return Persona::query()
+            ->whereIn('id', $ids)
+            ->where('status', true)
+            ->where('estado_laboral', 'activo')
+            ->get(['id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno'])
+            ->sortBy(fn (Persona $persona) => Str::lower(Str::ascii($this->nombrePersona($persona))))
+            ->values();
+    }
+
+    private function obtenerCargaAcademicaProfesor(
+        int $nivelId,
+        int $cicloEscolarId,
+        int $profesorId,
+    ): Collection {
+        $materias = AsignacionMateria::query()
+            ->with([
+                'materia:id,materia,orden,receso',
+                'grupo:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'grupo.asignacionGrupo:id,nombre',
+                'grupo.grado:id,nombre,orden',
+                'grupo.semestre:id,numero,orden_global',
+            ])
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('nivel_id', $nivelId)
+            ->where('profesor_id', $profesorId)
+            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereHas('materia', fn (Builder $q) => $q->where('receso', false))
+            ->get()
+            ->map(function (AsignacionMateria $asignacion) {
+                if (!$asignacion->materia || !$asignacion->grupo) {
+                    return null;
+                }
+
+                return [
+                    'tipo' => 'Materia',
+                    'materia' => trim((string) $asignacion->materia->materia),
+                    'grupo' => $this->etiquetaGrupo($asignacion->grupo),
+                    'orden' => (int) ($asignacion->orden ?? $asignacion->materia->orden ?? 999999),
+                ];
+            })
+            ->filter();
+
+        $talleres = TallerSesion::query()
+            ->with([
+                'taller:id,nivel_id,nombre,clave',
+                'grupos:id,asignacion_grupo_id,nivel_id,grado_id,generacion_id,semestre_id',
+                'grupos.asignacionGrupo:id,nombre',
+                'grupos.grado:id,nombre,orden',
+                'grupos.semestre:id,numero,orden_global',
+            ])
+            ->where('ciclo_escolar_id', $cicloEscolarId)
+            ->where('profesor_id', $profesorId)
+            ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
+            ->whereHas('taller', fn (Builder $q) => $q->where('nivel_id', $nivelId))
+            ->get()
+            ->map(function (TallerSesion $sesion) {
+                if (!$sesion->taller) {
+                    return null;
+                }
+
+                $grupos = $sesion->grupos
+                    ->map(fn (Grupo $grupo) => $this->etiquetaGrupo($grupo))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->implode(', ');
+
+                return [
+                    'tipo' => 'Taller',
+                    'materia' => trim((string) $sesion->taller->nombre) ?: 'Taller',
+                    'grupo' => $grupos !== '' ? $grupos : 'Varios grupos',
+                    'orden' => 999998,
+                ];
+            })
+            ->filter();
+
+        return $materias
+            ->concat($talleres)
+            ->unique(fn (array $item) => Str::lower(Str::ascii(
+                $item['tipo'] . '|' . $item['materia'] . '|' . $item['grupo']
+            )))
+            ->sortBy(fn (array $item) => sprintf(
+                '%06d-%s-%s',
+                (int) $item['orden'],
+                Str::lower(Str::ascii($item['materia'])),
+                Str::lower(Str::ascii($item['grupo'])),
+            ))
+            ->values();
     }
 
     private function consultarGrupos(
@@ -202,8 +442,8 @@ class HorariosVaciosPdfController extends Controller
 
     private function filtrarHoras(Collection $horasNivel, int $horaInicioId, int $horaFinId): Collection
     {
-        $indiceInicio = $horasNivel->search(fn(Hora $hora) => (int) $hora->id === $horaInicioId);
-        $indiceFin = $horasNivel->search(fn(Hora $hora) => (int) $hora->id === $horaFinId);
+        $indiceInicio = $horasNivel->search(fn (Hora $hora) => (int) $hora->id === $horaInicioId);
+        $indiceFin = $horasNivel->search(fn (Hora $hora) => (int) $hora->id === $horaFinId);
 
         if ($indiceInicio === false || $indiceFin === false) {
             return collect();
@@ -213,40 +453,6 @@ class HorariosVaciosPdfController extends Controller
         $fin = max($indiceInicio, $indiceFin);
 
         return $horasNivel->slice($inicio, $fin - $inicio + 1)->values();
-    }
-
-    private function obtenerHorasDeRecesoPorGrupo(
-        int $nivelId,
-        int $cicloEscolarId,
-        Collection $grupos,
-        Collection $horas,
-    ): Collection {
-        $grupoIds = $grupos->pluck('id')->all();
-        $horaIds = $horas->pluck('id')->all();
-
-        if (empty($grupoIds) || empty($horaIds)) {
-            return collect();
-        }
-
-        return Horario::query()
-            ->with('asignacionMateria.materia:id,receso')
-            ->where('nivel_id', $nivelId)
-            ->where('ciclo_escolar_id', $cicloEscolarId)
-            ->whereIn('grupo_id', $grupoIds)
-            ->whereIn('hora_id', $horaIds)
-            ->get(['id', 'grupo_id', 'hora_id', 'asignacion_materia_id', 'taller_sesion_id'])
-            ->filter(function (Horario $horario) {
-                return !$horario->taller_sesion_id
-                    && (int) ($horario->asignacionMateria?->materia?->receso ?? 0) === 1;
-            })
-            ->groupBy(fn(Horario $horario) => (int) $horario->grupo_id)
-            ->map(function (Collection $horariosGrupo) {
-                return $horariosGrupo
-                    ->pluck('hora_id')
-                    ->map(fn($id) => (int) $id)
-                    ->unique()
-                    ->values();
-            });
     }
 
     /**
@@ -269,7 +475,7 @@ class HorariosVaciosPdfController extends Controller
             ->vigenteEnCiclo($cicloEscolarId)
             ->where('grado_id', $grupo->grado_id)
             ->where('grupo_id', $grupo->id)
-            ->whereHas('cabecera', fn($query) => $query->where('nivel_id', $nivelId))
+            ->whereHas('cabecera', fn ($query) => $query->where('nivel_id', $nivelId))
             ->titularReconocido()
             ->orderByRaw("CASE WHEN es_titular_principal = 1 THEN 0 WHEN es_titular = 1 THEN 1 ELSE 2 END")
             ->orderByRaw("CASE WHEN estado = 'activo' THEN 0 ELSE 1 END")
@@ -283,12 +489,7 @@ class HorariosVaciosPdfController extends Controller
             return null;
         }
 
-        $nombre = trim(collect([
-            $persona->titulo,
-            $persona->nombre,
-            $persona->apellido_paterno,
-            $persona->apellido_materno,
-        ])->filter()->implode(' '));
+        $nombre = $this->nombrePersona($persona);
 
         if ($nombre === '') {
             return null;
@@ -326,20 +527,20 @@ class HorariosVaciosPdfController extends Controller
             ->where('grupo_id', $grupo->id)
             ->when(
                 $grupo->generacion_id,
-                fn($query) => $query->where('generacion_id', $grupo->generacion_id)
+                fn ($query) => $query->where('generacion_id', $grupo->generacion_id)
             )
             ->when(
                 $grupo->semestre_id,
-                fn($query) => $query->where('semestre_id', $grupo->semestre_id),
-                fn($query) => $query->whereNull('semestre_id')
+                fn ($query) => $query->where('semestre_id', $grupo->semestre_id),
+                fn ($query) => $query->whereNull('semestre_id')
             )
-            ->whereHas('materia', fn($query) => $query->where('receso', false))
+            ->whereHas('materia', fn ($query) => $query->where('receso', false))
             ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
             ->orderBy('orden')
             ->orderBy('materia_id')
             ->get(['id', 'materia_id', 'profesor_id', 'orden'])
-            ->filter(fn(AsignacionMateria $asignacion) => filled($asignacion->materia?->materia))
-            ->unique(fn(AsignacionMateria $asignacion) => implode('-', [
+            ->filter(fn (AsignacionMateria $asignacion) => filled($asignacion->materia?->materia))
+            ->unique(fn (AsignacionMateria $asignacion) => implode('-', [
                 (int) $asignacion->materia_id,
                 (int) ($asignacion->profesor_id ?? 0),
             ]))
@@ -372,12 +573,7 @@ class HorariosVaciosPdfController extends Controller
         $filas = $asignacionesVisibles
             ->map(function (AsignacionMateria $asignacion) {
                 $profesor = $asignacion->profesor;
-                $nombreProfesor = trim(collect([
-                    $profesor?->titulo,
-                    $profesor?->nombre,
-                    $profesor?->apellido_paterno,
-                    $profesor?->apellido_materno,
-                ])->filter()->implode(' '));
+                $nombreProfesor = $this->nombrePersona($profesor);
 
                 return [
                     'profesor_id' => $profesor?->id ? (int) $profesor->id : null,
@@ -387,7 +583,7 @@ class HorariosVaciosPdfController extends Controller
                     'sin_docente' => !$profesor?->id,
                 ];
             })
-            ->groupBy(fn(array $item) => $item['profesor_id'] !== null
+            ->groupBy(fn (array $item) => $item['profesor_id'] !== null
                 ? 'profesor-' . $item['profesor_id']
                 : 'sin-docente')
             ->map(function (Collection $items) {
@@ -406,7 +602,7 @@ class HorariosVaciosPdfController extends Controller
                     'materias' => $itemsOrdenados
                         ->pluck('materia')
                         ->filter()
-                        ->unique(fn($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
+                        ->unique(fn ($materia) => mb_strtoupper(trim((string) $materia), 'UTF-8'))
                         ->values()
                         ->all(),
                     'orden' => (int) $itemsOrdenados->min('orden'),
@@ -432,6 +628,20 @@ class HorariosVaciosPdfController extends Controller
             $grupo->semestre ? 'Semestre ' . $grupo->semestre->numero : null,
             $grupo->asignacionGrupo?->nombre,
         ])->filter()->implode(' · '));
+    }
+
+    private function nombrePersona(?Persona $persona): string
+    {
+        if (!$persona) {
+            return '';
+        }
+
+        return trim(collect([
+            $persona->titulo,
+            $persona->nombre,
+            $persona->apellido_paterno,
+            $persona->apellido_materno,
+        ])->filter()->implode(' '));
     }
 
     private function imagenBase64Publica(?string $rutaRelativa): ?string

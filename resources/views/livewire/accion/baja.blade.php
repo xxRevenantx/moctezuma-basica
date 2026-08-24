@@ -106,23 +106,25 @@
     </div>
 
     {{-- Navegación por nivel --}}
-    <div class="overflow-x-auto pb-1">
-        <div class="flex min-w-max justify-center gap-2">
-            @foreach ($niveles as $item)
-                @php($activoNivel = $slug_nivel === $item->slug)
+    @if ($mostrarSelectorNiveles)
+        <div class="overflow-x-auto pb-1">
+            <div class="flex min-w-max justify-center gap-2">
+                @foreach ($niveles as $item)
+                    @php($activoNivel = $slug_nivel === $item->slug)
 
-                <a wire:navigate
-                    href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'bajas']) }}"
-                    class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition duration-200
-                        {{ $activoNivel
-                            ? 'border-rose-600 bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-lg shadow-rose-600/20'
-                            : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-rose-300 hover:text-rose-700 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:border-rose-800' }}">
-                    <flux:icon.user-minus class="h-4 w-4" />
-                    {{ $item->nombre }}
-                </a>
-            @endforeach
+                    <a wire:navigate
+                        href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'bajas']) }}"
+                        class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition duration-200
+                            {{ $activoNivel
+                                ? 'border-rose-600 bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-lg shadow-rose-600/20'
+                                : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-rose-300 hover:text-rose-700 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:border-rose-800' }}">
+                        <flux:icon.user-minus class="h-4 w-4" />
+                        {{ $item->nombre }}
+                    </a>
+                @endforeach
+            </div>
         </div>
-    </div>
+    @endif
 
     {{-- Encabezado principal --}}
     <section

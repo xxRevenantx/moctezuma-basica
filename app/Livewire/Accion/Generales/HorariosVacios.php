@@ -2,16 +2,20 @@
 
 namespace App\Livewire\Accion\Generales;
 
+use App\Models\AsignacionMateria;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Hora;
 use App\Models\Nivel;
+use App\Models\PersonaNivel;
+use App\Models\PersonaNivelDetalle;
 use App\Models\Semestre;
+use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -28,12 +32,19 @@ class HorariosVacios extends Component
     public Collection $semestres;
     public Collection $horas;
 
+    /**
+     * grupos = formatos por grupo / nivel / grado
+     * profesores = formatos individuales por docente
+     */
+    public string $tipo_formato = 'grupos';
+
     public ?int $ciclo_escolar_id = null;
     public string $alcance = 'nivel';
     public ?int $generacion_id = null;
     public ?int $grado_id = null;
     public ?int $semestre_id = null;
     public array $grupos_seleccionados = [];
+    public array $profesores_seleccionados = [];
 
     public ?int $hora_inicio_id = null;
     public ?int $hora_fin_id = null;
@@ -72,6 +83,23 @@ class HorariosVacios extends Component
         $this->cargarGeneraciones();
     }
 
+    public function updatedTipoFormato(): void
+    {
+        $this->grupos_seleccionados = [];
+        $this->profesores_seleccionados = [];
+    }
+
+    public function cambiarTipoFormato(string $tipo): void
+    {
+        if (!in_array($tipo, ['grupos', 'profesores'], true)) {
+            return;
+        }
+
+        $this->tipo_formato = $tipo;
+        $this->grupos_seleccionados = [];
+        $this->profesores_seleccionados = [];
+    }
+
     public function updatedAlcance(): void
     {
         $this->grupos_seleccionados = [];
@@ -93,6 +121,7 @@ class HorariosVacios extends Component
         $this->grados = collect();
         $this->semestres = collect();
         $this->grupos_seleccionados = [];
+        $this->profesores_seleccionados = [];
         $this->cargarGeneraciones();
     }
 
@@ -130,6 +159,20 @@ class HorariosVacios extends Component
     public function limpiarSeleccionGrupos(): void
     {
         $this->grupos_seleccionados = [];
+    }
+
+    public function seleccionarTodosLosProfesores(): void
+    {
+        $this->profesores_seleccionados = $this->profesoresDisponibles
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    public function limpiarSeleccionProfesores(): void
+    {
+        $this->profesores_seleccionados = [];
     }
 
     private function cargarGeneraciones(): void
@@ -177,6 +220,10 @@ class HorariosVacios extends Component
     #[Computed]
     public function gruposDisponibles(): Collection
     {
+        if (!$this->nivel || !$this->ciclo_escolar_id) {
+            return collect();
+        }
+
         $filtrarContexto = $this->alcance !== 'nivel';
 
         return app(ContextoEscolarService::class)->grupos(
@@ -187,6 +234,97 @@ class HorariosVacios extends Component
             semestreId: $filtrarContexto ? $this->semestre_id : null,
             bachillerato: $this->esBachillerato,
         );
+    }
+
+    #[Computed]
+    public function profesoresDisponibles(): Collection
+    {
+        if (!$this->nivel || !$this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        /*
+         * Se toma la plantilla de personal del mismo ciclo y nivel. Solo se
+         * muestran personas activas con un rol docente vigente. Un docente sin
+         * carga todavía puede generar su formato individual; se identifica en
+         * la interfaz para que el administrador sepa que la hoja quedará vacía.
+         */
+        $profesores = PersonaNivelDetalle::query()
+            ->with('cabecera.persona:id,titulo,nombre,apellido_paterno,apellido_materno,status,estado_laboral')
+            ->vigenteEnCiclo((int) $this->ciclo_escolar_id)
+            ->whereHas('personaRole.rolePersona', fn (Builder $q) => $q
+                ->where('status', true)
+                ->where('es_docente', true))
+            ->whereHas('cabecera', fn (Builder $q) => $q
+                ->where('nivel_id', $this->nivel->id)
+                ->where('estado', PersonaNivel::ESTADO_ACTIVO)
+                ->whereHas('persona', fn (Builder $p) => $p
+                    ->where('status', true)
+                    ->where('estado_laboral', 'activo')))
+            ->get()
+            ->map(function (PersonaNivelDetalle $detalle) {
+                $persona = $detalle->cabecera?->persona;
+
+                if (!$persona) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $persona->id,
+                    'nombre' => trim(collect([
+                        $persona->titulo,
+                        $persona->nombre,
+                        $persona->apellido_paterno,
+                        $persona->apellido_materno,
+                    ])->filter()->implode(' ')),
+                ];
+            })
+            ->filter(fn ($item) => is_array($item) && $item['id'] > 0 && filled($item['nombre']))
+            ->unique('id')
+            ->values();
+
+        if ($profesores->isEmpty()) {
+            return collect();
+        }
+
+        $profesorIds = $profesores->pluck('id')->all();
+
+        $cargasMateria = AsignacionMateria::query()
+            ->selectRaw('profesor_id, COUNT(*) AS total')
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('nivel_id', $this->nivel->id)
+            ->whereIn('profesor_id', $profesorIds)
+            ->where('estado', '!=', AsignacionMateria::ESTADO_ARCHIVADA)
+            ->whereHas('materia', fn (Builder $q) => $q->where('receso', false))
+            ->groupBy('profesor_id')
+            ->pluck('total', 'profesor_id');
+
+        $cargasTaller = TallerSesion::query()
+            ->selectRaw('profesor_id, COUNT(*) AS total')
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->whereIn('profesor_id', $profesorIds)
+            ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
+            ->whereHas('taller', fn (Builder $q) => $q->where('nivel_id', $this->nivel->id))
+            ->groupBy('profesor_id')
+            ->pluck('total', 'profesor_id');
+
+        return $profesores
+            ->map(function (array $profesor) use ($cargasMateria, $cargasTaller) {
+                $total = (int) ($cargasMateria[$profesor['id']] ?? 0)
+                    + (int) ($cargasTaller[$profesor['id']] ?? 0);
+
+                return $profesor + [
+                    'carga_total' => $total,
+                    'sin_carga' => $total === 0,
+                ];
+            })
+            // Prioriza docentes con carga y, dentro de cada grupo, orden alfabético.
+            ->sortBy(fn (array $profesor) => sprintf(
+                '%d-%s',
+                $profesor['sin_carga'] ? 1 : 0,
+                mb_strtolower($profesor['nombre'], 'UTF-8')
+            ))
+            ->values();
     }
 
     #[Computed]
@@ -212,10 +350,22 @@ class HorariosVacios extends Component
     #[Computed]
     public function cantidadSeleccionada(): int
     {
-        return collect($this->grupos_seleccionados)
+        $seleccion = $this->tipo_formato === 'profesores'
+            ? $this->profesores_seleccionados
+            : $this->grupos_seleccionados;
+
+        return collect($seleccion)
             ->filter()
             ->unique()
             ->count();
+    }
+
+    #[Computed]
+    public function cantidadVisible(): int
+    {
+        return $this->tipo_formato === 'profesores'
+            ? $this->profesoresDisponibles->count()
+            : $this->gruposDisponibles->count();
     }
 
     #[Computed]
@@ -223,6 +373,10 @@ class HorariosVacios extends Component
     {
         if (!$this->nivel || !$this->ciclo_escolar_id || $this->horasRango->isEmpty()) {
             return false;
+        }
+
+        if ($this->tipo_formato === 'profesores') {
+            return $this->cantidadSeleccionada > 0;
         }
 
         if ($this->alcance === 'nivel') {
@@ -249,16 +403,32 @@ class HorariosVacios extends Component
     {
         return route('generales.horarios-vacios.pdf', [
             'slug_nivel' => $this->slug_nivel,
+            'tipo_formato' => $this->tipo_formato,
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'alcance' => $this->alcance,
             'generacion_id' => $this->generacion_id,
             'grado_id' => $this->grado_id,
             'semestre_id' => $this->semestre_id,
             'grupos_seleccionados' => $this->grupos_seleccionados,
+            'profesores_seleccionados' => $this->profesores_seleccionados,
             'hora_inicio_id' => $this->hora_inicio_id,
             'hora_fin_id' => $this->hora_fin_id,
             'estilo_celda' => $this->estilo_celda,
         ]);
+    }
+
+    #[Computed]
+    public function textoBotonVistaPrevia(): string
+    {
+        if ($this->tipo_formato !== 'profesores') {
+            return 'Vista previa PDF';
+        }
+
+        $cantidad = $this->cantidadSeleccionada;
+
+        return $cantidad <= 1
+            ? 'Vista previa PDF'
+            : "Vista previa de {$cantidad} profesores";
     }
 
     public function etiquetaGrupo(Grupo $grupo): string

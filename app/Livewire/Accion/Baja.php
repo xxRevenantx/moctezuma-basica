@@ -20,6 +20,7 @@ class Baja extends Component
     use WithPagination;
 
     public string $slug_nivel = '';
+    public bool $mostrarSelectorNiveles = true;
     public ?Nivel $nivel = null;
     public Collection $niveles;
     public Collection $generaciones;

@@ -75,6 +75,13 @@ use App\Livewire\Admin\CorreccionesCalificaciones;
 use App\Livewire\Admin\CentroIntegridadAcademica;
 use App\Livewire\ListasGenerales;
 use App\Livewire\DirectorioTutores;
+use App\Livewire\Institucional\ArchivoEscolar;
+use App\Livewire\Institucional\CargaAcademica;
+use App\Livewire\Institucional\CierreContinuidad;
+use App\Livewire\Institucional\CredencialesInstitucionales;
+use App\Livewire\Institucional\HorariosInstitucionales;
+use App\Livewire\Institucional\MovimientosEscolares;
+use App\Livewire\Institucional\ResultadosAcademicos;
 
 
 // PORTAL DOCENTE (rutas cerradas por rol y alcance académico)
@@ -148,6 +155,30 @@ Route::get('/listas-generales', ListasGenerales::class)
 Route::get('/listas-generales/formatos/pdf', ListasGeneralesFormatosController::class)
     ->middleware('admin')
     ->name('listas-generales.formatos.pdf');
+
+// MÓDULOS INSTITUCIONALES GLOBALES
+Route::middleware('admin')->group(function (): void {
+    Route::get('/movimientos-escolares', MovimientosEscolares::class)
+        ->name('misrutas.movimientos-escolares');
+
+    Route::get('/cierre-continuidad-escolar', CierreContinuidad::class)
+        ->name('misrutas.cierre-continuidad');
+
+    Route::get('/archivo-escolar', ArchivoEscolar::class)
+        ->name('misrutas.archivo-escolar');
+
+    Route::get('/carga-academica', CargaAcademica::class)
+        ->name('misrutas.carga-academica');
+
+    Route::get('/horarios-institucionales', HorariosInstitucionales::class)
+        ->name('misrutas.horarios-institucionales');
+
+    Route::get('/resultados-academicos', ResultadosAcademicos::class)
+        ->name('misrutas.resultados-academicos');
+
+    Route::get('/credenciales-institucionales', CredencialesInstitucionales::class)
+        ->name('misrutas.credenciales-institucionales');
+});
 
 // DIRECTORIO GLOBAL DE PADRES Y TUTORES
 Route::get('/directorio-padres-tutores', DirectorioTutores::class)

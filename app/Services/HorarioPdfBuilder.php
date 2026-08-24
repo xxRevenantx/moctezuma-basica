@@ -69,7 +69,7 @@ class HorarioPdfBuilder
                 : $horariosQuery->whereNull('semestre_id');
         }
 
-        $horariosQuery->where(function ($actividadQuery) use ($grupo) {
+        $horariosQuery->where(function ($actividadQuery) use ($grupo, $cicloEscolar) {
             $actividadQuery
                 ->where(function ($materiaQuery) use ($cicloEscolar) {
                     $materiaQuery

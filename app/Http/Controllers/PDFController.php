@@ -1905,7 +1905,7 @@ class PDFController extends Controller
          * Se excluyen filas incompletas. Para los talleres se comprueba que la
          * sesión todavía incluya al grupo mediante la tabla pivote.
          */
-        $horariosQuery->where(function ($actividadQuery) use ($grupo) {
+        $horariosQuery->where(function ($actividadQuery) use ($grupo, $cicloEscolar) {
             $actividadQuery
                 ->where(function ($materiaQuery) use ($cicloEscolar) {
                     $materiaQuery

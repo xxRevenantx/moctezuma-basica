@@ -398,21 +398,20 @@ class PromedioBachilleratoService
             ->where('inscripciones.activo', true)
             ->where('inscripciones.estatus', Inscripcion::ESTATUS_VISIBLE_LISTAS)
             ->where('calificaciones.ciclo_escolar_id', $cicloEscolarId)
-            ->where('nivel_id', $nivelId)
-            ->whereNotNull('semestre_id')
-            ->when($generacionId, fn ($query) => $query->where('generacion_id', $generacionId))
-            ->when($gradoId, fn ($query) => $query->where('grado_id', $gradoId))
-            ->when($grupoId, fn ($query) => $query->where('grupo_id', $grupoId))
-            ->when($semestreId, fn ($query) => $query->where('semestre_id', $semestreId))
+            ->where('calificaciones.nivel_id', $nivelId)
+            ->whereNotNull('calificaciones.semestre_id')
+            ->when($generacionId, fn ($query) => $query->where('calificaciones.generacion_id', $generacionId))
+            ->when($gradoId, fn ($query) => $query->where('calificaciones.grado_id', $gradoId))
+            ->when($grupoId, fn ($query) => $query->where('calificaciones.grupo_id', $grupoId))
+            ->when($semestreId, fn ($query) => $query->where('calificaciones.semestre_id', $semestreId))
             ->select([
-                'id',
-                'inscripcion_id',
-                'generacion_id',
-                'grado_id',
-                'grupo_id',
-                'semestre_id',
+                'calificaciones.inscripcion_id',
+                'calificaciones.generacion_id',
+                'calificaciones.grado_id',
+                'calificaciones.grupo_id',
+                'calificaciones.semestre_id',
             ])
-            ->orderBy('id')
+            ->orderBy('calificaciones.id')
             ->get()
             ->map(fn ($item) => [
                 'inscripcion_id' => (int) $item->inscripcion_id,

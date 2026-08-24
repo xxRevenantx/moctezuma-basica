@@ -7,7 +7,7 @@
                 'icon' =>
                     'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3H4V5Zm0 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9Zm3 3v2h4v-2H7Z',
                 'gradient' => 'from-blue-500 to-cyan-500',
-                'descripcion' => 'Información general del nivel',
+                'descripcion' => 'Resumen ejecutivo del nivel',
             ],
             'matricula' => [
                 'icon' =>
@@ -237,7 +237,7 @@
                             $theme['accent'] => $isActive,
                             'text-slate-400 group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300' => !$isActive,
                         ])>
-                            {{ $a->accion }}
+                            {{ $a->slug === 'generales' ? 'Resumen' : $a->accion }}
                         </span>
 
                         @if ($isActive)
@@ -289,7 +289,7 @@
 
                         <div>
                             <p class="text-sm font-black text-neutral-800 dark:text-white">
-                                {{ $accionActiva->accion }}
+                                {{ $accionActiva->slug === 'generales' ? 'Resumen' : $accionActiva->accion }}
                             </p>
                             <p class="text-xs text-neutral-500 dark:text-neutral-400">
                                 {{ $cfgActiva['descripcion'] ?? 'Módulo del sistema escolar' }}

@@ -31,6 +31,9 @@ class Horario extends Component
 {
     public string $mensajeActualizacionHorario = '';
     public string $slug_nivel;
+    public bool $mostrarSelectorNiveles = true;
+    public bool $mostrarPlanificador = true;
+    public bool $mostrarTalleres = true;
 
     public ?Nivel $nivel = null;
 

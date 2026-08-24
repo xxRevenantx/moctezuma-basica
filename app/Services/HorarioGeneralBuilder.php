@@ -464,8 +464,7 @@ class HorarioGeneralBuilder
 
     private function esReceso(Horario $horario): bool
     {
-        return !$horario->taller_sesion_id
-            && (int) ($horario->asignacionMateria?->materia?->receso ?? 0) === 1;
+        return app(HorarioRecesoService::class)->esReceso($horario);
     }
 
     private function construirEtiquetaReceso(Collection $registrosHora, Collection $dias): string

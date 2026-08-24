@@ -56,22 +56,24 @@
         </div>
     </div>
 
-    <div class="overflow-x-auto pb-1">
-        <div class="flex min-w-max justify-center gap-2">
-            @foreach ($niveles as $item)
-                @php $activoNivel = $slug_nivel === $item->slug; @endphp
-                <a wire:navigate
-                    href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'alumnos-no-vigentes']) }}"
-                    class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition
-                        {{ $activoNivel
-                            ? 'border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-600/20'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200' }}">
-                    <flux:icon.user-group class="h-4 w-4" />
-                    {{ $item->nombre }}
-                </a>
-            @endforeach
+    @if ($mostrarSelectorNiveles)
+        <div class="overflow-x-auto pb-1">
+            <div class="flex min-w-max justify-center gap-2">
+                @foreach ($niveles as $item)
+                    @php $activoNivel = $slug_nivel === $item->slug; @endphp
+                    <a wire:navigate
+                        href="{{ route('submodulos.accion', ['slug_nivel' => $item->slug, 'accion' => 'alumnos-no-vigentes']) }}"
+                        class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition
+                            {{ $activoNivel
+                                ? 'border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200' }}">
+                        <flux:icon.user-group class="h-4 w-4" />
+                        {{ $item->nombre }}
+                    </a>
+                @endforeach
+            </div>
         </div>
-    </div>
+    @endif
 
     <section class="overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/40 dark:bg-neutral-900">
         <div class="bg-gradient-to-r from-violet-700 via-indigo-700 to-sky-700 p-5 text-white sm:p-6">

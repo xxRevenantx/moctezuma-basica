@@ -472,11 +472,29 @@
                                 $horaFin = !empty($hora->hora_fin)
                                     ? \Carbon\Carbon::parse($hora->hora_fin)->format('g:i a')
                                     : '';
+
+                                $horaInicio24 = !empty($hora->hora_inicio)
+                                    ? \Carbon\Carbon::parse($hora->hora_inicio)->format('H:i')
+                                    : '';
+
+                                $horaFin24 = !empty($hora->hora_fin)
+                                    ? \Carbon\Carbon::parse($hora->hora_fin)->format('H:i')
+                                    : '';
+
+                                $esRecesoSecundariaBachillerato =
+                                    (!empty($esSecundaria) || !empty($esBachillerato))
+                                    && $horaInicio24 === '09:00'
+                                    && $horaFin24 === '09:30';
                             @endphp
 
                             {{ $horaInicio }}-{{ $horaFin }}
                         </td>
 
+                        @if ($esRecesoSecundariaBachillerato)
+                            <td class="celda-receso" colspan="{{ max(1, $diasOrdenados->count()) }}">
+                                RECESO
+                            </td>
+                        @else
                         @foreach ($diasOrdenados as $dia)
                             @php
                                 $claveCelda = $hora->id . '-' . $dia->id;
@@ -542,6 +560,7 @@
                                 @endif
                             </td>
                         @endforeach
+                        @endif
                     </tr>
                 @empty
                     <tr>
