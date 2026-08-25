@@ -14,6 +14,7 @@ use App\Models\PersonaNivelDetalle;
 use App\Models\Semestre;
 use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -64,7 +65,7 @@ class HorariosVacios extends Component
         $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
-            ->get(['id', 'inicio_anio', 'fin_anio']);
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
         $this->generaciones = collect();
         $this->grados = collect();
@@ -76,7 +77,7 @@ class HorariosVacios extends Component
             ->orderBy('hora_inicio')
             ->get(['id', 'nivel_id', 'hora_inicio', 'hora_fin', 'orden']);
 
-        $this->ciclo_escolar_id = $this->ciclosEscolares->first()?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
         $this->hora_inicio_id = $this->horas->first()?->id;
         $this->hora_fin_id = $this->horas->last()?->id;
 
@@ -114,6 +115,7 @@ class HorariosVacios extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = null;
         $this->grado_id = null;
         $this->semestre_id = null;

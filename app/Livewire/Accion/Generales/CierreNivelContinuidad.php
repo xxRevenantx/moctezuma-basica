@@ -13,6 +13,7 @@ use App\Models\Semestre;
 use App\Services\AsignacionEscolarService;
 use App\Services\CierreGeneracionContinuidadService;
 use App\Services\GestionAcademicaService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -101,8 +102,7 @@ class CierreNivelContinuidad extends Component
         $this->generaciones = collect();
         $this->gruposOrigen = collect();
         $this->fecha_efectiva = now()->toDateString();
-        $this->ciclo_origen_id = $this->ciclos->firstWhere('es_actual', true)?->id
-            ?? $this->ciclos->first()?->id;
+        $this->ciclo_origen_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclos);
 
         $this->cargarGeneracionesOrigen();
         $this->refrescarProcesos();
@@ -111,6 +111,7 @@ class CierreNivelContinuidad extends Component
     public function updatedCicloOrigenId(): void
     {
         $this->ciclo_origen_id = filled($this->ciclo_origen_id) ? (int) $this->ciclo_origen_id : null;
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_origen_id);
         $this->generacion_id = null;
         $this->grupo_origen_id = null;
         $this->cargarGeneracionesOrigen();

@@ -12,6 +12,7 @@ use App\Models\RiesgoAcademicoEvaluacion;
 use App\Models\Semestre;
 use App\Services\DistribucionEscolarService;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -46,7 +47,7 @@ class DistribucionHistorial extends Component
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
         $this->ciclos = CicloEscolar::query()->orderByDesc('inicio_anio')->get();
-        $this->ciclo_escolar_id = (string) ($this->ciclos->firstWhere('es_actual', true)?->id ?? $this->ciclos->first()?->id ?? '');
+        $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->ciclos) ?? '');
 
         $this->generaciones = collect();
         $this->grados = collect();
@@ -57,6 +58,7 @@ class DistribucionHistorial extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = '';
         $this->grado_id = '';
         $this->semestre_id = '';

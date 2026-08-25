@@ -15,6 +15,7 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\AlumnosNoVigentesService;
 use App\Services\GestionAcademicaService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -66,8 +67,7 @@ class AlumnosNoVigentes extends Component
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
-        $this->ciclo_escolar_id = $this->ciclosEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->ciclosEscolares->first()?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
         $this->generaciones = $this->cargarGeneraciones();
         $this->grados = Grado::query()
             ->where('nivel_id', $this->nivel->id)
@@ -104,6 +104,7 @@ class AlumnosNoVigentes extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->reset(['generacion_id', 'grado_id', 'semestre_id', 'grupo_id']);
         $this->generaciones = $this->cargarGeneraciones();
         $this->semestres = collect();

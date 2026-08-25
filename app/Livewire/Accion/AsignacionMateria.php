@@ -19,6 +19,7 @@ use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
 use App\Services\PlantillaDocenteService;
 use App\Services\ReasignacionDocenteMasivaService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -98,10 +99,13 @@ class AsignacionMateria extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
-        $actual = CicloEscolar::query()->where('es_actual', true)->first()
-            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->first();
+        $ciclos = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
-        $this->ciclo_escolar_id = $actual?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($ciclos);
         $this->sincronizarCicloOrigen();
     }
 

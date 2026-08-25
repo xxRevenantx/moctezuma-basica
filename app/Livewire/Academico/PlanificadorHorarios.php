@@ -17,6 +17,7 @@ use App\Models\Nivel;
 use App\Models\Persona;
 use App\Services\HorarioOptimizadorService;
 use App\Services\HorarioVersionService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -89,8 +90,12 @@ class PlanificadorHorarios extends Component
 
         $nivel = Nivel::query()->where('slug', $this->slugNivel)->firstOrFail();
         $this->nivelId = (int) $nivel->id;
-        $this->cicloEscolarId ??= CicloEscolar::query()->where('es_actual', true)->value('id')
-            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->value('id');
+        $ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
+        $this->cicloEscolarId ??= app(ContextoCicloEscolarSesion::class)->resolver($ciclosEscolares);
         $this->publicacionFecha = now()->format('Y-m-d\TH:i');
         $this->excepcionFecha = today()->toDateString();
 
@@ -99,6 +104,7 @@ class PlanificadorHorarios extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->cicloEscolarId);
         $this->versionSeleccionadaId = null;
         $this->profesorId = null;
         $this->editorGrupoId = '';

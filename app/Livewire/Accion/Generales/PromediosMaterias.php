@@ -14,6 +14,7 @@ use App\Services\PromediosTresPeriodosService;
 use App\Services\ContextoEscolarService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -64,13 +65,13 @@ class PromediosMaterias extends Component
             ->get();
 
         $this->grupos = collect();
-        $actual = $this->cicloEscolares->firstWhere('es_actual', true) ?? $this->cicloEscolares->first();
-        $this->ciclo_escolar_id = (string) ($actual?->id ?? '');
+        $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->cicloEscolares) ?? '');
         $this->cargarGeneraciones();
     }
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = '';
         $this->grado_id = '';
         $this->grupo_id = '';

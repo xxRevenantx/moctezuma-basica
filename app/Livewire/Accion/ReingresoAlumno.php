@@ -16,6 +16,7 @@ use App\Models\Semestre;
 use App\Models\TipoDocumento;
 use App\Services\AsignacionEscolarService;
 use App\Services\CierreNivelReingresoService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -77,8 +78,7 @@ class ReingresoAlumno extends Component
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->ciclos = Ciclo::query()->orderBy('id')->get(['id', 'ciclo']);
 
-        $actual = $this->ciclosEscolares->firstWhere('es_actual', true) ?: $this->ciclosEscolares->first();
-        $this->ciclo_escolar_id = $actual?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
         $this->ciclo_id = $this->ciclos->first()?->id;
         $this->nivel_destino_id = $this->niveles->firstWhere('slug', $slug_nivel)?->id;
         $this->fecha_ingreso = now()->toDateString();
@@ -91,6 +91,7 @@ class ReingresoAlumno extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_destino_id = null;
         $this->generacion_sugerida_id = null;
         $this->generacion_sugerida_label = null;

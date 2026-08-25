@@ -19,6 +19,7 @@ use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
 use App\Services\PlantillaDocenteService;
 use App\Services\ReasignacionDocenteMasivaService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -41,6 +42,7 @@ trait GestionaAsignacionesAcademicas
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->limpiarFormulario();
         $this->cerrarModalEdicion();
         $this->modalReasignacionAbierto = false;

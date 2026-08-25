@@ -18,6 +18,7 @@ use App\Models\TallerSesion;
 use App\Services\CicloNivelGateService;
 use App\Services\ContextoEscolarService;
 use App\Services\GroqHorarioService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
@@ -30,6 +31,7 @@ trait GestionaContextoHorario
 {
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = null;
         $this->grado_id = null;
         $this->semestre_id = null;

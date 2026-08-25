@@ -8,6 +8,7 @@ use App\Models\Inscripcion;
 use App\Models\MovimientoAlumno;
 use App\Models\Nivel;
 use App\Services\GestionAcademicaService;
+use App\Services\ContextoCicloEscolarSesion;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -56,10 +57,7 @@ class Baja extends Component
             ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
-        $cicloPredeterminado = $this->ciclosEscolares->firstWhere('es_actual', true)
-            ?? $this->ciclosEscolares->first();
-
-        $this->ciclo_escolar_id = $cicloPredeterminado?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
         $this->generaciones = collect();
         $this->cargarGeneraciones(false);
 
@@ -78,6 +76,7 @@ class Baja extends Component
     public function updatedCicloEscolarId($value): void
     {
         $this->ciclo_escolar_id = filled($value) ? (int) $value : null;
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->cargarGeneraciones(false);
         $this->reiniciarSeleccionYPaginacion();
     }

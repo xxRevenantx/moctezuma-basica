@@ -12,6 +12,7 @@ use App\Models\Persona;
 use App\Models\Taller;
 use App\Models\TallerSesion;
 use App\Services\HorarioTallerService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -48,14 +49,18 @@ class TallerConjunto extends Component
     {
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
-        $this->ciclo_escolar_id = CicloEscolar::query()
-            ->where('es_actual', true)
-            ->value('id') ?: CicloEscolar::query()->max('id');
+        $ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($ciclosEscolares);
     }
 
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->grupos_seleccionados = [];
         $this->dia_id = null;
         $this->hora_id = null;

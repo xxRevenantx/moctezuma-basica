@@ -17,6 +17,7 @@ use App\Services\PromedioAnualBachilleratoService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Support\PromedioExcel;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -72,11 +73,7 @@ class PromediosGenerales extends Component
         $this->grupos = collect();
         $this->semestres = collect();
 
-        $this->ciclo_escolar_id = (string) (
-            $this->cicloEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->cicloEscolares->first()?->id
-            ?? ''
-        );
+        $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->cicloEscolares) ?? '');
 
         $this->cargarGeneraciones();
         $this->cargarGrupos();
@@ -108,6 +105,7 @@ class PromediosGenerales extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = '';
         $this->grado_id = '';
         $this->grupo_id = '';

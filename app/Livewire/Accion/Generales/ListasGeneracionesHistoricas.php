@@ -8,6 +8,7 @@ use App\Models\Grupo;
 use App\Models\InscripcionCiclo;
 use App\Models\Nivel;
 use App\Services\ListaGeneracionesHistoricasService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -38,9 +39,7 @@ class ListasGeneracionesHistoricas extends Component
         $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
-        $this->ciclo_escolar_id = (int) ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->ciclosEscolares->first()?->id
-            ?? 0) ?: null;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
         $this->nivel = Nivel::query()
             ->where('slug', $slug_nivel)
             ->firstOrFail();
@@ -78,6 +77,7 @@ class ListasGeneracionesHistoricas extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->grupo_id = null;
         $this->cargarGrupos();
         unset($this->resumenSeleccion);

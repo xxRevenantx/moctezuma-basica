@@ -8,6 +8,7 @@ use App\Models\Persona;
 use App\Models\AsignacionMateria;
 use App\Models\TallerSesion;
 use App\Services\TeacherAcademicScopeService;
+use App\Services\ContextoCicloEscolarSesion;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,16 +39,13 @@ class HorarioProfesor extends Component
 
     public function mount(): void
     {
-        $cicloPredeterminado = CicloEscolar::query()
-            ->where('es_actual', true)
-            ->value('id') ?: CicloEscolar::query()->orderByDesc('id')->value('id');
+        $ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('id')
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
-        $cicloSolicitado = request()->integer('ciclo_escolar_id');
-
-        $this->cicloEscolarId = $cicloSolicitado > 0
-            && CicloEscolar::query()->whereKey($cicloSolicitado)->exists()
-            ? $cicloSolicitado
-            : $cicloPredeterminado;
+        $this->cicloEscolarId = app(ContextoCicloEscolarSesion::class)->resolver($ciclosEscolares);
 
         $profesoresQuery = Persona::query()
             ->select('personas.id')
@@ -82,6 +80,12 @@ class HorarioProfesor extends Component
                 ? $profesorSolicitado
                 : $profesoresQuery->value('personas.id');
         }
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->cicloEscolarId);
+        $this->limpiarFiltros(false);
     }
 
     public function updatedProfesorId(): void

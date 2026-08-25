@@ -18,6 +18,7 @@ use App\Models\TallerSesion;
 use App\Services\CicloNivelGateService;
 use App\Services\ContextoEscolarService;
 use App\Services\GroqHorarioService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
@@ -120,12 +121,7 @@ class Horario extends Component
             ->orderByDesc('id')
             ->get();
 
-        $cicloSolicitado = request()->integer('ciclo_escolar');
-        $this->ciclo_escolar_id = $cicloSolicitado > 0
-            && $this->ciclosEscolares->contains('id', $cicloSolicitado)
-            ? $cicloSolicitado
-            : ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
-                ?? $this->ciclosEscolares->first()?->id);
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
 
         $this->cargarGeneraciones();
 

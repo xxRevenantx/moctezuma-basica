@@ -10,6 +10,7 @@ use App\Models\Semestre;
 use App\Models\CicloEscolar;
 use App\Services\HorarioGeneralBuilder;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -57,9 +58,9 @@ class HorariosGenerales extends Component
         $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
-            ->get(['id', 'inicio_anio', 'fin_anio']);
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
-        $this->ciclo_escolar_id = $this->ciclosEscolares->first()?->id;
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares);
 
         $this->generaciones = collect();
         $this->grados = collect();
@@ -81,6 +82,7 @@ class HorariosGenerales extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = null;
         $this->grado_id = null;
         $this->semestre_id = null;

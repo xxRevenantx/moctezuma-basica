@@ -10,6 +10,7 @@ use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use App\Models\Nivel;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -61,7 +62,7 @@ class LugaresPreescolar extends Component
         $this->cicloEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
-            ->get(['id', 'inicio_anio', 'fin_anio']);
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
 
         // Inicializa todas las colecciones públicas antes del primer render.
         // Livewire expone como null las propiedades tipadas que aún no han sido
@@ -75,7 +76,7 @@ class LugaresPreescolar extends Component
             ->orderByDesc('orden')
             ->value('id');
 
-        $this->ciclo_escolar_id = (string) ($this->cicloEscolares->first()?->id ?? '');
+        $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->cicloEscolares) ?? '');
 
         $this->cargarGeneraciones();
         $this->cargarAsignaciones();
@@ -105,6 +106,7 @@ class LugaresPreescolar extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = '';
         $this->grado_id = '';
         $this->grupo_id = '';

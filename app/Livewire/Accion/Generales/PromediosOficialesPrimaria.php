@@ -11,6 +11,7 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Services\CalificacionOficialPrimariaService;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -41,9 +42,7 @@ class PromediosOficialesPrimaria extends Component
         $this->ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('inicio_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
-        $this->ciclo_escolar_id = (string) ($this->ciclosEscolares->firstWhere('es_actual', true)?->id
-            ?? $this->ciclosEscolares->first()?->id
-            ?? '');
+        $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares) ?? '');
 
         $this->generaciones = collect();
         $this->grados = collect();
@@ -53,6 +52,7 @@ class PromediosOficialesPrimaria extends Component
 
     public function updatedCicloEscolarId(): void
     {
+        app(ContextoCicloEscolarSesion::class)->recordar($this->ciclo_escolar_id);
         $this->generacion_id = '';
         $this->grado_id = '';
         $this->grupo_id = '';

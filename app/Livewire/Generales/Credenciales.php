@@ -10,6 +10,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\ContextoEscolarService;
+use App\Services\ContextoCicloEscolarSesion;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -48,11 +49,12 @@ class Credenciales extends Component
             ->where('slug', $slug_nivel)
             ->firstOrFail();
 
-        $this->ciclo_escolar_id = CicloEscolar::query()
+        $ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->orderByDesc('id')
-            ->value('id');
+            ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual', 'cerrado_at']);
+        $this->ciclo_escolar_id = app(ContextoCicloEscolarSesion::class)->resolver($ciclosEscolares);
 
         $this->generaciones = collect();
         $this->grados = collect();
