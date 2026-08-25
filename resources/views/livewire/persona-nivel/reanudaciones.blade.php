@@ -178,6 +178,136 @@
         </div>
     </section>
 
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="border-b border-slate-200 bg-gradient-to-r from-sky-50 via-white to-lime-50 p-5 dark:border-neutral-800 dark:from-sky-950/30 dark:via-neutral-900 dark:to-lime-950/20">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex items-start gap-3">
+                    <div class="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#006492]/10 text-[#006492] dark:bg-sky-400/10 dark:text-sky-300">
+                        <flux:icon.photo class="size-5" />
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[.22em] text-[#006492]">Membretes institucionales</p>
+                        <h3 class="mt-1 text-lg font-black text-slate-950 dark:text-white">Hoja membretada por nivel y ciclo escolar</h3>
+                        <p class="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
+                            Sube una hoja membretada completa tamaño carta. Se usa como fondo en PDF, ZIP y Word, y cada cambio crea una versión histórica.
+                        </p>
+                    </div>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-right shadow-sm dark:border-neutral-700 dark:bg-neutral-950/70">
+                    <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Ciclo configurado</p>
+                    <p class="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">
+                        {{ optional($ciclos->firstWhere('id', (int) $cicloEscolarId))->nombre ?: 'Sin ciclo' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        @if ($nivelesSinMembrete->isNotEmpty())
+            <div class="border-b border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <div class="flex items-start gap-2">
+                    <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0" />
+                    <p>
+                        <b>Sin membrete activo:</b> {{ $nivelesSinMembrete->implode(', ') }}. Puedes generar los oficios de todos modos; esos niveles saldrán sin imagen de fondo.
+                    </p>
+                </div>
+            </div>
+        @endif
+
+        <div class="grid gap-4 p-5 xl:grid-cols-2">
+            @foreach ($niveles as $nivel)
+                @php
+                    $membrete = $membretesActivos->get($nivel->id);
+                    $nuevoMembrete = $membretesNuevos[$nivel->id] ?? null;
+                    $tamanoKb = $membrete?->size_bytes ? number_format($membrete->size_bytes / 1024, 0) . ' KB' : null;
+                @endphp
+
+                <article wire:key="membrete-reanudacion-{{ $cicloEscolarId }}-{{ $nivel->id }}"
+                    class="overflow-hidden rounded-3xl border {{ $membrete ? 'border-emerald-200 dark:border-emerald-900' : 'border-slate-200 dark:border-neutral-700' }} bg-white dark:bg-neutral-950">
+                    <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-neutral-800">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h4 class="font-black text-slate-950 dark:text-white">{{ $nivel->nombre }}</h4>
+                                @if ($membrete)
+                                    <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Activo · v{{ $membrete->version }}</span>
+                                @else
+                                    <span class="rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-black uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Sin membrete</span>
+                                @endif
+                            </div>
+                            <p class="mt-1 text-[11px] text-slate-500">PNG, JPG, JPEG o WebP · máximo 5 MB.</p>
+                        </div>
+                        @if ($membrete)
+                            <span class="text-[10px] font-bold text-slate-400">Actualizado {{ $membrete->updated_at?->format('d/m/Y H:i') }}</span>
+                        @endif
+                    </div>
+
+                    <div class="grid gap-4 p-4 lg:grid-cols-[190px_1fr]">
+                        <div>
+                            <div class="flex aspect-[8.5/11] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-2 dark:border-neutral-700 dark:bg-neutral-900">
+                                @if ($nuevoMembrete)
+                                    <img src="{{ $nuevoMembrete->temporaryUrl() }}" class="h-full w-full object-contain" alt="Vista previa del nuevo membrete de {{ $nivel->nombre }}">
+                                @elseif ($membrete)
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($membrete->archivo_path) }}" class="h-full w-full object-contain" alt="Membrete de {{ $nivel->nombre }}">
+                                @else
+                                    <div class="px-3 text-center">
+                                        <flux:icon.document class="mx-auto size-8 text-slate-300" />
+                                        <p class="mt-2 text-[11px] font-bold text-slate-400">Sin imagen configurada</p>
+                                    </div>
+                                @endif
+                            </div>
+                            @if ($membrete)
+                                <div class="mt-2 space-y-1 text-[10px] text-slate-500">
+                                    <p class="truncate" title="{{ $membrete->nombre_original }}"><b>Archivo:</b> {{ $membrete->nombre_original }}</p>
+                                    @if ($tamanoKb)<p><b>Tamaño:</b> {{ $tamanoKb }}</p>@endif
+                                    <p><b>Versión:</b> {{ $membrete->version }}</p>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="flex min-w-0 flex-col gap-3">
+                            <flux:field>
+                                <flux:label>{{ $membrete ? 'Cambiar imagen' : 'Subir membrete' }}</flux:label>
+                                <flux:input type="file" wire:model="membretesNuevos.{{ $nivel->id }}" accept="image/png,image/jpeg,image/webp" />
+                                <flux:error name="membretesNuevos.{{ $nivel->id }}" />
+                            </flux:field>
+
+                            <flux:field>
+                                <flux:label>Margen superior del contenido (mm)</flux:label>
+                                <flux:input type="number" min="0" max="80" step="0.5" wire:model="margenesMembrete.{{ $nivel->id }}" />
+                                <flux:description>Recomendado: 32 mm. Ajusta este valor si el encabezado del membrete ocupa más o menos espacio.</flux:description>
+                                <flux:error name="margenesMembrete.{{ $nivel->id }}" />
+                            </flux:field>
+
+                            <div class="mt-auto rounded-2xl border {{ $membrete ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/25' : 'border-slate-200 bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900' }} p-3 text-[11px]">
+                                @if ($membrete)
+                                    <p class="font-black text-emerald-800 dark:text-emerald-300">Este membrete se usará al generar el oficio.</p>
+                                    <p class="mt-1 text-emerald-700/80 dark:text-emerald-300/70">Las versiones anteriores no se eliminan y siguen disponibles para documentos históricos.</p>
+                                @else
+                                    <p class="font-black text-slate-600 dark:text-slate-300">El oficio se generará sin imagen de fondo.</p>
+                                @endif
+                            </div>
+
+                            <div class="flex flex-wrap justify-end gap-2">
+                                @if ($membrete)
+                                    <button type="button"
+                                        @click="Swal.fire({title:'¿Quitar membrete activo?',text:'La versión histórica se conservará y los nuevos oficios saldrán sin fondo hasta que subas otro.',icon:'warning',showCancelButton:true,confirmButtonText:'Sí, quitar',cancelButtonText:'Cancelar',confirmButtonColor:'#dc2626'}).then(r => r.isConfirmed && $wire.eliminarMembrete({{ $nivel->id }}))"
+                                        class="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-white px-4 text-xs font-black text-rose-700 transition hover:bg-rose-50 dark:border-rose-900 dark:bg-neutral-950 dark:text-rose-300">
+                                        Eliminar membrete
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="guardarMembrete({{ $nivel->id }})" wire:loading.attr="disabled"
+                                    wire:target="guardarMembrete({{ $nivel->id }}),membretesNuevos.{{ $nivel->id }}"
+                                    class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#006492] px-5 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-800 hover:shadow-md disabled:opacity-50">
+                                    <flux:icon.check class="size-4" />
+                                    {{ $membrete ? 'Guardar cambios' : 'Guardar membrete' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
     @if ($nivelesSinPlantillaPublicada->isNotEmpty())
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
             <div class="flex items-start gap-3">

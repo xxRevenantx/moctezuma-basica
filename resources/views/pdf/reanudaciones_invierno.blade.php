@@ -97,6 +97,8 @@
 
 <body>
 
+    @include('pdf.partials.reanudacion-membrete', ['membrete' => $membrete ?? null])
+
     @php
         // El servicio ya entrega el orden exacto de la Plantilla de personal por ciclo.
         // orden_pdf_plantilla es temporal; `orden` queda como respaldo para el flujo legado.
@@ -226,10 +228,7 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <img class="fondo_preescolar" src="{{ public_path('imagenes/reanudacion_preescolar.jpg') }}" alt="fondo"
-                style="width: 100%;">
-
-            <div class="contenedor_preescolar" style="padding: 30px 115px 0">
+            <div class="contenedor_preescolar" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '30px' }} 115px 0">
 
 
                 <p style="text-align: right; text-transform: uppercase; font-size:16px">
@@ -459,10 +458,7 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, false);
             @endphp
 
-            <img class="fondo_primaria" src="{{ public_path('imagenes/membrete_reanudacion_primaria.png') }}"
-                alt="fondo" style="width: 100%; ">
-
-            <div class="contenedor_primaria" style="padding: 100px 60px 0">
+            <div class="contenedor_primaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
 
                 <p style="text-align: right; font-size: 17px; line-height: 25px;">
                     <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
@@ -711,10 +707,7 @@
                 $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
 
-            <img class="fondo_secundaria" src="{{ public_path('imagenes/membrete_reanudacion_secundaria.png') }}"
-                alt="fondo" style="width: 100%;">
-
-            <div class="contenedor_secundaria" style="padding: 100px 60px 0">
+            <div class="contenedor_secundaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
 
                 <p style="text-align: right; font-size: 17px; line-height: 25px; text-transform: uppercase;">
                     <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>

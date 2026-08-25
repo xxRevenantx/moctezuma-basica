@@ -10,18 +10,24 @@ use App\Models\PersonaNivelHistorial;
 use App\Models\PlantillaPersonalNivel;
 use App\Models\ReanudacionCcpPlantilla;
 use App\Models\ReanudacionLaboral;
+use App\Models\ReanudacionMembrete;
 use App\Models\RolePersona;
 use App\Services\ReanudacionesArchivoService;
 use App\Services\ReanudacionesService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Throwable;
 
 class Reanudaciones extends Component
 {
+    use WithFileUploads;
+
     public string $search = '';
     /** @var array<int,int|string> */
     public array $nivelesSeleccionados = [];
@@ -40,6 +46,12 @@ class Reanudaciones extends Component
 
     public string $ccpPlantillaId = '';
     public string $ccpNombreNueva = '';
+
+    /** @var array<int, mixed> */
+    public array $membretesNuevos = [];
+
+    /** @var array<int, float|int|string> */
+    public array $margenesMembrete = [];
 
     public string $historialSearch = '';
     public string $historialNivel = '';
@@ -78,6 +90,8 @@ class Reanudaciones extends Component
             $this->ccpPlantillaId = (string) $plantilla->id;
             $this->copias = (string) $plantilla->contenido;
         }
+
+        $this->cargarConfiguracionMembretes();
     }
 
     public function updatedCicloEscolarId(ReanudacionesService $service): void
@@ -88,6 +102,8 @@ class Reanudaciones extends Component
             $this->fechaDirector = $service->fechaSugerida($ciclo, $this->tipoReanudacion);
             $this->fechaDocente = $this->fechaDirector;
         }
+
+        $this->cargarConfiguracionMembretes();
     }
 
     public function updatedTipoReanudacion(ReanudacionesService $service): void
@@ -161,6 +177,137 @@ class Reanudaciones extends Component
         $this->ccpPlantillaId = '';
         $this->copias = '';
         $this->dispatch('notificar', tipo: 'success', mensaje: 'Plantilla de C.C.P. eliminada.');
+    }
+
+    public function guardarMembrete(int $nivelId): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $ciclo = CicloEscolar::query()->find((int) $this->cicloEscolarId);
+        $nivel = Nivel::query()
+            ->whereKey($nivelId)
+            ->whereIn('slug', ['preescolar', 'primaria', 'secundaria', 'bachillerato'])
+            ->first();
+
+        if (! $ciclo || ! $nivel) {
+            throw ValidationException::withMessages([
+                'cicloEscolarId' => 'Selecciona un ciclo escolar y un nivel válidos.',
+            ]);
+        }
+
+        $campoArchivo = "membretesNuevos.{$nivelId}";
+        $campoMargen = "margenesMembrete.{$nivelId}";
+        $activo = ReanudacionMembrete::query()
+            ->where('ciclo_escolar_id', $ciclo->id)
+            ->where('nivel_id', $nivel->id)
+            ->where('activo', true)
+            ->latest('version')
+            ->first();
+
+        $reglas = [
+            $campoArchivo => [$activo ? 'nullable' : 'required', 'image', 'mimes:png,jpg,jpeg,webp', 'max:5120'],
+            $campoMargen => ['required', 'numeric', 'between:0,80'],
+        ];
+
+        $this->validate($reglas, [
+            "{$campoArchivo}.required" => 'Selecciona una imagen de membrete.',
+            "{$campoArchivo}.image" => 'El membrete debe ser una imagen válida.',
+            "{$campoArchivo}.mimes" => 'El membrete debe ser PNG, JPG, JPEG o WebP.',
+            "{$campoArchivo}.max" => 'El membrete no debe superar los 5 MB.',
+            "{$campoMargen}.required" => 'Indica el margen superior del contenido.',
+            "{$campoMargen}.between" => 'El margen superior debe estar entre 0 y 80 mm.',
+        ]);
+
+        $archivo = $this->membretesNuevos[$nivelId] ?? null;
+        $margen = round((float) ($this->margenesMembrete[$nivelId] ?? 32), 2);
+
+        if (! $archivo && ! $activo) {
+            return;
+        }
+
+        $version = (int) ReanudacionMembrete::query()
+            ->where('ciclo_escolar_id', $ciclo->id)
+            ->where('nivel_id', $nivel->id)
+            ->max('version') + 1;
+
+        $ruta = (string) ($activo?->archivo_path ?? '');
+        $nombreOriginal = (string) ($activo?->nombre_original ?? 'membrete');
+        $mimeType = $activo?->mime_type;
+        $sizeBytes = $activo?->size_bytes;
+        $archivoNuevoGuardado = false;
+
+        if ($archivo) {
+            $extension = strtolower((string) $archivo->getClientOriginalExtension());
+            $nombreArchivo = 'v' . $version . '-' . Str::uuid() . '.' . $extension;
+            $directorio = 'reanudaciones/membretes/' . Str::slug($ciclo->nombre) . '/' . Str::slug($nivel->slug ?: $nivel->nombre);
+            $ruta = $archivo->storeAs($directorio, $nombreArchivo, 'public');
+            $nombreOriginal = $archivo->getClientOriginalName();
+            $mimeType = $archivo->getMimeType();
+            $sizeBytes = $archivo->getSize();
+            $archivoNuevoGuardado = true;
+        }
+
+        try {
+            DB::transaction(function () use ($ciclo, $nivel, $version, $ruta, $nombreOriginal, $mimeType, $sizeBytes, $margen): void {
+                ReanudacionMembrete::query()
+                    ->where('ciclo_escolar_id', $ciclo->id)
+                    ->where('nivel_id', $nivel->id)
+                    ->where('activo', true)
+                    ->update([
+                        'activo' => false,
+                        'actualizado_por' => auth()->id(),
+                        'updated_at' => now(),
+                    ]);
+
+                ReanudacionMembrete::query()->create([
+                    'ciclo_escolar_id' => $ciclo->id,
+                    'nivel_id' => $nivel->id,
+                    'version' => $version,
+                    'nombre_original' => $nombreOriginal,
+                    'archivo_path' => $ruta,
+                    'mime_type' => $mimeType,
+                    'size_bytes' => $sizeBytes,
+                    'margen_superior_mm' => $margen,
+                    'activo' => true,
+                    'creado_por' => auth()->id(),
+                    'actualizado_por' => auth()->id(),
+                ]);
+            });
+        } catch (Throwable $e) {
+            if ($archivoNuevoGuardado) {
+                Storage::disk('public')->delete($ruta);
+            }
+            throw $e;
+        }
+
+        unset($this->membretesNuevos[$nivelId]);
+        $this->cargarConfiguracionMembretes();
+        $this->dispatch('notificar', tipo: 'success', mensaje: "Membrete de {$nivel->nombre} guardado como versión {$version}.");
+    }
+
+    public function eliminarMembrete(int $nivelId): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+
+        $activo = ReanudacionMembrete::query()
+            ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
+            ->where('nivel_id', $nivelId)
+            ->where('activo', true)
+            ->latest('version')
+            ->first();
+
+        if (! $activo) {
+            return;
+        }
+
+        $activo->forceFill([
+            'activo' => false,
+            'actualizado_por' => auth()->id(),
+        ])->save();
+
+        unset($this->membretesNuevos[$nivelId]);
+        $this->margenesMembrete[$nivelId] = 32;
+        $this->dispatch('notificar', tipo: 'success', mensaje: 'El membrete dejó de estar activo. Su versión histórica se conserva.');
     }
 
     public function seleccionarVisibles(array $ids): void
@@ -405,6 +552,7 @@ class Reanudaciones extends Component
             ->all();
 
         $this->editandoLote = null;
+        $this->cargarConfiguracionMembretes();
         $this->resetValidation();
     }
 
@@ -443,6 +591,29 @@ class Reanudaciones extends Component
             fechaDocente: $data['fechaDocente'],
             copias: $data['copias'],
         );
+    }
+
+    private function cargarConfiguracionMembretes(): void
+    {
+        $cicloId = (int) $this->cicloEscolarId;
+        $niveles = Nivel::query()
+            ->whereIn('slug', ['preescolar', 'primaria', 'secundaria', 'bachillerato'])
+            ->pluck('id');
+
+        $activos = $cicloId > 0
+            ? ReanudacionMembrete::query()
+                ->where('ciclo_escolar_id', $cicloId)
+                ->whereIn('nivel_id', $niveles)
+                ->where('activo', true)
+                ->get()
+                ->keyBy('nivel_id')
+            : collect();
+
+        foreach ($niveles as $nivelId) {
+            $this->margenesMembrete[(int) $nivelId] = (float) ($activos->get($nivelId)?->margen_superior_mm ?? 32);
+        }
+
+        $this->membretesNuevos = [];
     }
 
     private function reiniciarDependencias(): void
@@ -526,6 +697,19 @@ class Reanudaciones extends Component
 
         $ccpPlantillas = ReanudacionCcpPlantilla::query()->where('activo', true)->orderBy('orden')->orderBy('nombre')->get();
 
+        $membretesActivos = ReanudacionMembrete::query()
+            ->with(['creador:id,name'])
+            ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
+            ->where('activo', true)
+            ->get()
+            ->keyBy('nivel_id');
+
+        $nivelesSinMembrete = $niveles
+            ->whereIn('id', array_map('intval', $this->nivelesSeleccionados))
+            ->filter(fn (Nivel $nivel) => ! $membretesActivos->has($nivel->id))
+            ->pluck('nombre')
+            ->values();
+
         $plantillasDocumento = PlantillaPersonalNivel::query()
             ->with('nivel:id,nombre')
             ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
@@ -557,6 +741,8 @@ class Reanudaciones extends Component
             'excluidos' => $resultado['excluidos'],
             'historial' => $historial,
             'ccpPlantillas' => $ccpPlantillas,
+            'membretesActivos' => $membretesActivos,
+            'nivelesSinMembrete' => $nivelesSinMembrete,
             'tipos' => ReanudacionesService::TIPOS,
             'plantillasDocumento' => $plantillasDocumento,
             'nivelesSinPlantillaPublicada' => $nivelesSinPlantillaPublicada,

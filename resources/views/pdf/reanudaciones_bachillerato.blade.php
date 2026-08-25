@@ -27,6 +27,7 @@
     </style>
 </head>
 <body>
+@include('pdf.partials.reanudacion-membrete', ['membrete' => $membrete ?? null])
 @foreach ($documentos as $documento)
     @php
         $snapshot = $documento['snapshot'] ?? [];
@@ -43,14 +44,18 @@
         };
     @endphp
     <section class="pagina">
-        <div class="barra-superior"></div>
-        <div class="barra-verde"></div>
-        <div class="marca"></div>
-        <div class="contenido">
-            <header class="encabezado">
-                <div class="institucion">{{ $escuela }}</div>
-                <div class="nivel">Bachillerato{{ $cct ? ' · C.C.T. ' . $cct : '' }} · Ciclo escolar {{ data_get($snapshot, 'ciclo.nombre') }}</div>
-            </header>
+        @unless ($membrete)
+            <div class="barra-superior"></div>
+            <div class="barra-verde"></div>
+            <div class="marca"></div>
+        @endunless
+        <div class="contenido" style="padding-top: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '34px' }};">
+            @unless ($membrete)
+                <header class="encabezado">
+                    <div class="institucion">{{ $escuela }}</div>
+                    <div class="nivel">Bachillerato{{ $cct ? ' · C.C.T. ' . $cct : '' }} · Ciclo escolar {{ data_get($snapshot, 'ciclo.nombre') }}</div>
+                </header>
+            @endunless
 
             <div class="asunto">
                 <b>ASUNTO:</b> REANUDACIÓN DE LABORES<br>
@@ -89,7 +94,9 @@
                 </div>
             @endif
         </div>
-        <div class="pie"></div>
+        @unless ($membrete)
+            <div class="pie"></div>
+        @endunless
     </section>
 @endforeach
 </body>

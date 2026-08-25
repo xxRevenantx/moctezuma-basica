@@ -11,11 +11,13 @@ use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaNivelHistorial;
 use App\Models\PlantillaPersonalNivel;
 use App\Models\ReanudacionLaboral;
+use App\Models\ReanudacionMembrete;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -344,6 +346,7 @@ class ReanudacionesService
                 ],
                 'autoridades' => $autoridades,
                 'escuela' => $this->escuelaSnapshot(),
+                'membrete' => $this->membreteSnapshot($ciclo, $nivel),
             ];
 
             return [
@@ -363,6 +366,7 @@ class ReanudacionesService
                 'grupo_resumen' => implode(', ', $snapshot['grupos']),
                 'destinatario_nombre' => $autoridades['destinatario_nombre'],
                 'destinatario_cargo' => $autoridades['destinatario_cargo'],
+                'membrete' => $snapshot['membrete'],
                 'snapshot' => $snapshot,
             ];
         })->all();
@@ -400,11 +404,13 @@ class ReanudacionesService
         $primero = $documentos[0];
         /** @var Nivel $nivel */
         $nivel = $primero['nivel'];
+        $membrete = $this->membreteRenderData($primero['membrete'] ?? data_get($primero, 'snapshot.membrete'));
 
         if ($nivel->slug === 'bachillerato') {
             return Pdf::loadView('pdf.reanudaciones_bachillerato', [
                 'documentos' => $documentos,
                 'tipoLabel' => self::TIPOS[$primero['tipo']] ?? 'Reanudación de labores',
+                'membrete' => $membrete,
             ])->setPaper('letter', 'portrait');
         }
 
@@ -426,6 +432,7 @@ class ReanudacionesService
             'copias' => $primero['copias'],
             'directorAdministracion' => Director::query()->where('identificador', 'director-general-administracion')->first(),
             'directorMagisterio' => Director::query()->where('identificador', 'director-magisterio-estatal')->first(),
+            'membrete' => $membrete,
         ])->setPaper('letter', 'portrait')->setOption([
                     'fontDir' => public_path('/fonts'),
                     'fontCache' => public_path('/fonts'),
@@ -501,7 +508,58 @@ class ReanudacionesService
             copias: $registro->copias,
         );
 
-        return $documentos[0];
+        $documento = $documentos[0];
+        $snapshotHistorico = is_array($registro->snapshot) ? $registro->snapshot : [];
+
+        if (array_key_exists('membrete', $snapshotHistorico)) {
+            $documento['membrete'] = $snapshotHistorico['membrete'];
+            $documento['snapshot']['membrete'] = $snapshotHistorico['membrete'];
+        }
+
+        return $documento;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function membreteSnapshot(CicloEscolar $ciclo, ?Nivel $nivel): ?array
+    {
+        if (! $nivel) {
+            return null;
+        }
+
+        $membrete = ReanudacionMembrete::query()
+            ->where('ciclo_escolar_id', $ciclo->id)
+            ->where('nivel_id', $nivel->id)
+            ->where('activo', true)
+            ->latest('version')
+            ->first();
+
+        if (! $membrete) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $membrete->id,
+            'version' => (int) $membrete->version,
+            'archivo_path' => (string) $membrete->archivo_path,
+            'nombre_original' => (string) $membrete->nombre_original,
+            'mime_type' => $membrete->mime_type,
+            'size_bytes' => $membrete->size_bytes,
+            'margen_superior_mm' => (float) $membrete->margen_superior_mm,
+        ];
+    }
+
+    /** @param array<string,mixed>|null $membrete */
+    private function membreteRenderData(?array $membrete): ?array
+    {
+        $ruta = trim((string) ($membrete['archivo_path'] ?? ''));
+        if ($ruta === '' || ! Storage::disk('public')->exists($ruta)) {
+            return null;
+        }
+
+        return array_merge($membrete, [
+            'ruta_absoluta' => Storage::disk('public')->path($ruta),
+            'margen_superior_mm' => (float) ($membrete['margen_superior_mm'] ?? 32),
+        ]);
     }
 
     public function fechaSugerida(CicloEscolar $ciclo, string $tipo): string

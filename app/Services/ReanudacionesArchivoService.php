@@ -99,27 +99,42 @@ class ReanudacionesArchivoService
             $nivel = $registro->nivel_nombre ?: 'NIVEL EDUCATIVO';
             $escuela = data_get($snapshot, 'escuela.nombre', 'CENTRO UNIVERSITARIO MOCTEZUMA');
             $cct = data_get($snapshot, 'nivel.cct');
+            $membrete = $this->membreteDesdeRegistro($registro);
+            $margenSuperiorCm = $membrete
+                ? max(0.5, min(8.0, ((float) $membrete['margen_superior_mm']) / 10))
+                : 1.7;
 
             $section = $word->addSection([
                 'paperSize' => 'Letter',
-                'marginTop' => Converter::cmToTwip(1.7),
+                'marginTop' => Converter::cmToTwip($margenSuperiorCm),
                 'marginBottom' => Converter::cmToTwip(1.5),
                 'marginLeft' => Converter::cmToTwip(2.3),
                 'marginRight' => Converter::cmToTwip(2.3),
             ]);
 
-            $logo = public_path('logo.png');
-            if (is_file($logo)) {
-                $section->addImage($logo, [
-                    'width' => 145,
-                    'alignment' => 'center',
-                    'wrappingStyle' => 'inline',
+            if ($membrete) {
+                $header = $section->addHeader();
+                $header->addWatermark($membrete['ruta_absoluta'], [
+                    'width' => 816,
+                    'height' => 1056,
+                    'marginTop' => 0,
+                    'marginLeft' => 0,
+                    'wrappingStyle' => 'behind',
                 ]);
-            }
+            } else {
+                $logo = public_path('logo.png');
+                if (is_file($logo)) {
+                    $section->addImage($logo, [
+                        'width' => 145,
+                        'alignment' => 'center',
+                        'wrappingStyle' => 'inline',
+                    ]);
+                }
 
-            $section->addText(Str::upper((string) $escuela), ['bold' => true, 'size' => 12], 'centrado');
-            $subtitulo = Str::upper($nivel) . ($cct ? ' · C.C.T. ' . $cct : '');
-            $section->addText($subtitulo, ['bold' => true, 'size' => 10], 'centrado');
+                $section->addText(Str::upper((string) $escuela), ['bold' => true, 'size' => 12], 'centrado');
+                $subtitulo = Str::upper($nivel) . ($cct ? ' · C.C.T. ' . $cct : '');
+                $section->addText($subtitulo, ['bold' => true, 'size' => 10], 'centrado');
+            }
             $section->addText('ASUNTO: REANUDACIÓN DE LABORES', ['bold' => true, 'size' => 10], 'derecha');
             $section->addText(
                 'CIUDAD ALTAMIRANO, GRO., A ' . Str::upper($this->fechaLarga($registro->fecha_documento)) . '.',
@@ -186,6 +201,27 @@ class ReanudacionesArchivoService
     private function rutaBase(ReanudacionLaboral $registro): string
     {
         return 'reanudaciones-laborales/' . Str::slug($registro->ciclo_nombre ?: 'sin-ciclo') . '/' . $registro->lote_uuid;
+    }
+
+    /** @return array{ruta_absoluta:string,margen_superior_mm:float}|null */
+    private function membreteDesdeRegistro(ReanudacionLaboral $registro): ?array
+    {
+        $snapshot = is_array($registro->snapshot) ? $registro->snapshot : [];
+        $membrete = data_get($snapshot, 'membrete');
+
+        if (! is_array($membrete)) {
+            return null;
+        }
+
+        $ruta = trim((string) ($membrete['archivo_path'] ?? ''));
+        if ($ruta === '' || ! Storage::disk('public')->exists($ruta)) {
+            return null;
+        }
+
+        return [
+            'ruta_absoluta' => Storage::disk('public')->path($ruta),
+            'margen_superior_mm' => (float) ($membrete['margen_superior_mm'] ?? 32),
+        ];
     }
 
     private function fechaLarga($fecha): string
