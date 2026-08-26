@@ -50,6 +50,7 @@
             @if ($slug_nivel === 'secundaria')
                 <livewire:accion.taller-conjunto
                     :slug_nivel="$slug_nivel"
+                    :modo-pagina="true"
                     :key="'talleres-global-' . $slug_nivel" />
             @endif
         @break

@@ -25,6 +25,7 @@ class TallerConjunto extends Component
     public ?Nivel $nivel = null;
 
     public bool $mostrarPanel = false;
+    public bool $modoPagina = false;
     public bool $mostrarCatalogo = false;
     public ?int $editandoSesionId = null;
 
@@ -45,10 +46,13 @@ class TallerConjunto extends Component
     public string $nuevo_taller_clave = '';
     public string $nuevo_taller_descripcion = '';
 
-    public function mount(string $slug_nivel): void
+    public function mount(string $slug_nivel, bool $modoPagina = false): void
     {
         $this->slug_nivel = $slug_nivel;
+        $this->modoPagina = $modoPagina;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
+        $this->mostrarPanel = $this->modoPagina;
+
         $ciclosEscolares = CicloEscolar::query()
             ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
@@ -225,7 +229,7 @@ class TallerConjunto extends Component
 
     public function cerrar(): void
     {
-        $this->mostrarPanel = false;
+        $this->mostrarPanel = $this->modoPagina;
         $this->limpiarFormulario(false);
     }
 

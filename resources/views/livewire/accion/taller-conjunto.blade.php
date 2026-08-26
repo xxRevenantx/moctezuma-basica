@@ -34,11 +34,13 @@
                         </div>
                     </div>
 
-                    <button type="button" wire:click="cerrar"
-                        class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:bg-neutral-800">
-                        <flux:icon.x-mark class="h-4 w-4" />
-                        Cerrar
-                    </button>
+                    @unless ($modoPagina)
+                        <button type="button" wire:click="cerrar"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:bg-neutral-800">
+                            <flux:icon.x-mark class="h-4 w-4" />
+                            Cerrar
+                        </button>
+                    @endunless
                 </div>
             </div>
 
