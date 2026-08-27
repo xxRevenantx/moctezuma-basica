@@ -198,6 +198,8 @@ trait GestionaCapturaHorario
             $this->analisisConflictoIa = null;
             $this->mostrarModalTraslapeProfesor = true;
 
+            // La selección se restaura mientras el usuario revisa el detalle del traslape.
+            // El modal muestra exactamente dónde está ocupado el docente y permite decidir.
             $this->restaurarCeldaDesdeHorarioGuardado($claveCelda);
 
             return;
@@ -219,6 +221,8 @@ trait GestionaCapturaHorario
         bool $sesionCompartida = false,
         ?string $claveSesionCompartida = null,
         ?string $motivoSesionCompartida = null,
+        bool $traslapeExcepcional = false,
+        ?string $motivoTraslapeExcepcional = null,
     ): void {
         $asignacion = AsignacionMateria::query()
             ->select(['id', 'profesor_id', 'grupo_id', 'ciclo_escolar_id', 'estado'])
@@ -259,6 +263,8 @@ trait GestionaCapturaHorario
                 'sesion_compartida' => $sesionCompartida,
                 'clave_sesion_compartida' => $sesionCompartida ? $claveSesionCompartida : null,
                 'motivo_sesion_compartida' => $sesionCompartida ? $motivoSesionCompartida : null,
+                'traslape_excepcional' => $traslapeExcepcional,
+                'motivo_traslape_excepcional' => $traslapeExcepcional ? $motivoTraslapeExcepcional : null,
             ]);
         } else {
             HorarioModel::query()->create([
@@ -268,6 +274,8 @@ trait GestionaCapturaHorario
                 'sesion_compartida' => $sesionCompartida,
                 'clave_sesion_compartida' => $sesionCompartida ? $claveSesionCompartida : null,
                 'motivo_sesion_compartida' => $sesionCompartida ? $motivoSesionCompartida : null,
+                'traslape_excepcional' => $traslapeExcepcional,
+                'motivo_traslape_excepcional' => $traslapeExcepcional ? $motivoTraslapeExcepcional : null,
             ]);
         }
 

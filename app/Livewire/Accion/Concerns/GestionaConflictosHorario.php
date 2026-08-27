@@ -28,6 +28,92 @@ use Maatwebsite\Excel\Facades\Excel;
 
 trait GestionaConflictosHorario
 {
+    protected function detectarTraslapesHorariosGuardados(): void
+    {
+        $this->traslapesHorario = [];
+
+        if ($this->horariosGuardados->isEmpty() || !$this->ciclo_escolar_id) {
+            return;
+        }
+
+        $profesorIdHorario = static fn(HorarioModel $horario): int => (int) (
+            $horario->profesor_id
+            ?: $horario->asignacionMateria?->profesor_id
+            ?: $horario->tallerSesion?->profesor_id
+            ?: 0
+        );
+
+        $profesorIds = $this->horariosGuardados
+            ->map($profesorIdHorario)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($profesorIds->isEmpty()) {
+            return;
+        }
+
+        $horariosProfesor = HorarioModel::query()
+            ->with([
+                'hora:id,hora_inicio,hora_fin',
+                'dia:id,dia',
+                'asignacionMateria:id,profesor_id,estado',
+                'profesorAsignado:id',
+                'tallerSesion:id,profesor_id,estado',
+            ])
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where(function (Builder $query) use ($profesorIds): void {
+                $query->whereIn('profesor_id', $profesorIds)
+                    ->orWhereHas('asignacionMateria', fn(Builder $asignacion) => $asignacion
+                        ->whereIn('profesor_id', $profesorIds)
+                        ->configurables())
+                    ->orWhereHas('tallerSesion', fn(Builder $taller) => $taller
+                        ->whereIn('profesor_id', $profesorIds)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
+            })
+            ->get();
+
+        $porProfesor = $horariosProfesor
+            ->groupBy($profesorIdHorario);
+
+        foreach ($this->horariosGuardados as $claveCelda => $horario) {
+            $profesorId = $profesorIdHorario($horario);
+
+            if (!$profesorId || !$horario->hora || !$horario->dia) {
+                $this->traslapesHorario[$claveCelda] = false;
+                continue;
+            }
+
+            $diaActual = mb_strtolower(trim((string) $horario->dia->dia));
+            $inicioActual = (string) $horario->hora->hora_inicio;
+            $finActual = (string) $horario->hora->hora_fin;
+
+            $hayTraslape = $porProfesor
+                ->get($profesorId, collect())
+                ->contains(function (HorarioModel $otro) use ($horario, $diaActual, $inicioActual, $finActual): bool {
+                    if ((int) $otro->id === (int) $horario->id || !$otro->hora || !$otro->dia) {
+                        return false;
+                    }
+
+                    if (
+                        filled($horario->taller_sesion_id)
+                        && (int) $horario->taller_sesion_id === (int) $otro->taller_sesion_id
+                    ) {
+                        return false;
+                    }
+
+                    if (mb_strtolower(trim((string) $otro->dia->dia)) !== $diaActual) {
+                        return false;
+                    }
+
+                    return (string) $otro->hora->hora_inicio < $finActual
+                        && (string) $otro->hora->hora_fin > $inicioActual;
+                });
+
+            $this->traslapesHorario[$claveCelda] = $hayTraslape;
+        }
+    }
+
     protected function buscarConflictosProfesor(
         int $profesorId,
         int $diaId,

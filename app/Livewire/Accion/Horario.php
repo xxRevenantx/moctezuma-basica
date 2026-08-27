@@ -72,6 +72,9 @@ class Horario extends Component
 
     public array $seleccionesHorario = [];
 
+    /** @var array<string, bool> */
+    public array $traslapesHorario = [];
+
     public bool $mostrarModalTraslapeProfesor = false;
     public string $motivoSesionCompartida = 'Sesión compartida entre varios grados o grupos.';
 

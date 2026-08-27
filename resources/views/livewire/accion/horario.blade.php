@@ -433,6 +433,13 @@
                                                                 <p class="mt-1 text-[11px] font-semibold opacity-90">
                                                                     {{ $nombreProfesor }}
                                                                 </p>
+
+                                                                @if ($traslapesHorario[$claveCelda] ?? false)
+                                                                    <span
+                                                                        class="mt-1.5 inline-flex rounded-full bg-rose-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-sm">
+                                                                        Traslape
+                                                                    </span>
+                                                                @endif
                                                             </div>
                                                         @endif
 

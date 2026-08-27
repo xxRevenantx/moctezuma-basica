@@ -121,6 +121,7 @@ trait GestionaContextoHorario
         $this->horariosGuardados = collect();
         $this->talleresGuardados = collect();
         $this->seleccionesHorario = [];
+        $this->traslapesHorario = [];
         $this->invalidarAnalisisHorarioIa();
         $this->resetEstadoTraslapeProfesor();
     }
@@ -376,6 +377,7 @@ trait GestionaContextoHorario
     {
         if (!$this->filtrosCompletos()) {
             $this->horariosGuardados = collect();
+            $this->traslapesHorario = [];
             return;
         }
 
@@ -384,6 +386,8 @@ trait GestionaContextoHorario
                 'asignacionMateria.materia',
                 'asignacionMateria.profesor',
                 'profesorAsignado',
+                'hora:id,hora_inicio,hora_fin',
+                'dia:id,dia',
             ])
             ->where('nivel_id', $this->nivel->id)
             ->where('grado_id', $this->grado_id)
@@ -403,6 +407,8 @@ trait GestionaContextoHorario
         $this->horariosGuardados = $horarios->keyBy(function ($horario) {
             return $horario->hora_id . '-' . $horario->dia_id;
         });
+
+        $this->detectarTraslapesHorariosGuardados();
     }
 
     protected function cargarTalleresGuardados(): void
