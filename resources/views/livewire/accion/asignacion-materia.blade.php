@@ -268,11 +268,19 @@
                 <div class="xl:col-span-3">
                     <flux:field>
                         <flux:label>Materia</flux:label>
-                        <flux:select wire:model="materia_id" :disabled="blank($grupo_id)">
-                            <flux:select.option value="">Selecciona una materia</flux:select.option>
+                        <flux:select wire:model="materia_id" :disabled="blank($grupo_id) || $this->materiasDisponibles->isEmpty()">
+                            <flux:select.option value="">
+                                @if (blank($grupo_id))
+                                    Selecciona primero un grupo
+                                @elseif ($this->materiasDisponibles->isEmpty())
+                                    Todas las materias ya tienen carga
+                                @else
+                                    Selecciona una materia pendiente
+                                @endif
+                            </flux:select.option>
                             @foreach ($this->materiasDisponibles as $materia)
                                 <flux:select.option value="{{ $materia->id }}">
-                                    {{ $materia->materia }}{{ $materia->clave ? ' · ' . $materia->clave : '' }}
+                                    {{ $materia->orden ? '#' . $materia->orden . ' · ' : '' }}{{ $materia->materia }}{{ $materia->clave ? ' · ' . $materia->clave : '' }}
                                 </flux:select.option>
                             @endforeach
                         </flux:select>
@@ -328,12 +336,171 @@
                             class="text-violet-700 dark:text-violet-300">{{ $this->grupoSeleccionado->semestre->numero }}°
                             semestre</span>
                     @endif
-                    <span class="ml-auto text-slate-500">{{ $this->materiasDisponibles->count() }} materia(s)
-                        disponibles</span>
+                    <span @class([
+                        'ml-auto rounded-full px-2.5 py-1',
+                        'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' => $this->materiasDisponibles->isNotEmpty(),
+                        'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' => $this->materiasDisponibles->isEmpty(),
+                    ])>
+                        @if ($this->materiasDisponibles->isEmpty())
+                            Carga completa
+                        @else
+                            {{ $this->materiasDisponibles->count() }} materia(s) pendiente(s) de carga
+                        @endif
+                    </span>
                 </div>
             @endif
         </div>
     </section>
+
+
+    @if ($this->conflictosOrdenMaterias->isNotEmpty() || $this->ordenesDesincronizados->isNotEmpty())
+        <section class="overflow-hidden rounded-[1.75rem] border border-indigo-200 bg-white shadow-sm dark:border-indigo-900/50 dark:bg-slate-950">
+            <div class="h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"></div>
+            <div class="p-5 sm:p-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/20">
+                            <flux:icon.arrows-up-down class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-lg font-black text-slate-900 dark:text-white">Integridad del orden académico</h3>
+                                @if ($this->ordenesDesincronizados->isNotEmpty())
+                                    <span class="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                                        {{ $this->ordenesDesincronizados->count() }} carga(s) por sincronizar
+                                    </span>
+                                @endif
+                                @if ($this->conflictosOrdenMaterias->isNotEmpty())
+                                    <span class="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-black text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+                                        {{ $this->conflictosOrdenMaterias->count() }} conflicto(s) en Materias
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
+                                El orden oficial siempre proviene del catálogo de Materias. Las cargas no manejan un orden manual independiente.
+                            </p>
+                        </div>
+                    </div>
+
+                    @if (auth()->user()?->is_admin && $this->ordenesDesincronizados->isNotEmpty())
+                        <button type="button" wire:click="sincronizarOrdenesCicloNivel" wire:loading.attr="disabled" wire:target="sincronizarOrdenesCicloNivel"
+                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">
+                            <flux:icon.arrow-path class="h-4 w-4" />
+                            Sincronizar orden
+                        </button>
+                    @endif
+                </div>
+
+                @if ($this->conflictosOrdenMaterias->isNotEmpty())
+                    <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50/70 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+                        <p class="text-xs font-black uppercase tracking-wide text-rose-700 dark:text-rose-300">Corrige primero estos órdenes duplicados en Materias</p>
+                        <div class="mt-3 space-y-2">
+                            @foreach ($this->conflictosOrdenMaterias->take(6) as $conflictoOrden)
+                                <div class="flex flex-wrap items-center gap-2 text-sm text-rose-900 dark:text-rose-100">
+                                    <span class="font-black">{{ $conflictoOrden['grado'] ?: 'Grado' }}{{ $conflictoOrden['semestre'] ? ' · ' . $conflictoOrden['semestre'] . '° semestre' : '' }}</span>
+                                    <span>· Orden {{ $conflictoOrden['orden'] }}</span>
+                                    <span>·</span>
+                                    <span class="font-semibold">{{ $conflictoOrden['materias']->pluck('materia')->implode(' / ') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </section>
+    @endif
+
+
+    @if ($this->cargasIncompletas->isNotEmpty())
+        {{-- Integridad de la carga: solo muestra grupos parcialmente cargados. --}}
+        <section
+            class="overflow-hidden rounded-[1.75rem] border border-amber-200 bg-white shadow-sm dark:border-amber-900/60 dark:bg-slate-950">
+            <div class="h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500"></div>
+            <div class="border-b border-amber-100 bg-amber-50/70 px-5 py-5 dark:border-amber-900/40 dark:bg-amber-950/20 sm:px-6">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/20">
+                            <flux:icon.exclamation-triangle class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-lg font-black text-slate-900 dark:text-white">Carga académica incompleta</h3>
+                                <span
+                                    class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                                    {{ $this->totalMateriasPendientes }} materia(s) pendiente(s)
+                                </span>
+                            </div>
+                            <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
+                                Se detectaron materias del plan que faltan dentro de grupos cuya carga ya fue iniciada. Los grupos completamente vacíos no se marcan para evitar falsos avisos de semestres aún no preparados.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-amber-100 dark:divide-amber-900/30">
+                @foreach ($this->cargasIncompletas as $incidencia)
+                    @php($grupoPendiente = $incidencia['grupo'])
+                    <div class="p-5 sm:p-6" wire:key="carga-incompleta-{{ $grupoPendiente->id }}">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                        {{ $grupoPendiente->grado?->nombre ?? 'Sin grado' }}
+                                    </span>
+                                    <span class="text-sm font-black text-slate-900 dark:text-white">
+                                        Grupo {{ $grupoPendiente->asignacionGrupo?->nombre ?? '—' }}
+                                    </span>
+                                    <span class="text-xs font-bold text-slate-500">
+                                        Generación {{ $grupoPendiente->generacion?->anio_ingreso ?? '—' }}-{{ $grupoPendiente->generacion?->anio_egreso ?? '—' }}
+                                    </span>
+                                    @if ($grupoPendiente->semestre)
+                                        <span
+                                            class="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-black text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+                                            {{ $grupoPendiente->semestre->numero }}° semestre
+                                        </span>
+                                    @endif
+                                </div>
+                                <p class="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                    Faltan {{ $incidencia['total'] }} materia(s) del plan en este contexto.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                            @foreach ($incidencia['materias'] as $materiaPendiente)
+                                <div
+                                    class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/10 sm:flex-row sm:items-center sm:justify-between"
+                                    wire:key="materia-pendiente-{{ $grupoPendiente->id }}-{{ $materiaPendiente->id }}">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-black text-slate-900 dark:text-white">{{ $materiaPendiente->materia }}</p>
+                                        <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
+                                            <span>{{ $materiaPendiente->clave ?: 'Sin clave' }}</span>
+                                            <span>•</span>
+                                            <span>Orden {{ $materiaPendiente->orden ?: '—' }}</span>
+                                        </div>
+                                    </div>
+
+                                    @if (auth()->user()?->is_admin)
+                                        <button type="button"
+                                            wire:click="crearCargaPendiente({{ $grupoPendiente->id }}, {{ $materiaPendiente->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="crearCargaPendiente"
+                                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-600 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-60">
+                                            <flux:icon.plus class="h-4 w-4" />
+                                            Crear borrador
+                                        </button>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
 
     {{-- Configuración del número de materias a promediar --}}
@@ -417,6 +584,14 @@
                             class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                             <flux:icon.clock class="h-4 w-4" />
                             Historial de cambios
+                        </button>
+                        <button type="button" wire:click="sincronizarOrdenesCicloNivel" wire:loading.attr="disabled" wire:target="sincronizarOrdenesCicloNivel"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-300">
+                            <flux:icon.arrows-up-down class="h-4 w-4" />
+                            Sincronizar orden
+                            @if ($this->ordenesDesincronizados->isNotEmpty())
+                                <span class="rounded-full bg-indigo-600 px-2 py-0.5 text-white">{{ $this->ordenesDesincronizados->count() }}</span>
+                            @endif
                         </button>
                         <button type="button" wire:click="abrirReasignacionMasiva"
                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#006492] to-[#88AC2E] px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5">
@@ -700,9 +875,15 @@
                                             class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                             {{ $asignacion->materia?->clave ?: 'Sin clave' }}
                                         </span>
-                                        @if ($asignacion->orden)
+                                        @if ($asignacion->materia?->orden)
                                             <span class="text-[11px] font-semibold text-slate-400">Orden
-                                                {{ $asignacion->orden }}</span>
+                                                {{ $asignacion->materia->orden }}</span>
+                                        @endif
+                                        @if ($asignacion->materia && (int) $asignacion->orden !== (int) $asignacion->materia->orden)
+                                            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                                title="La carga guarda orden {{ $asignacion->orden }} y Materias define orden {{ $asignacion->materia->orden }}">
+                                                Orden desincronizado
+                                            </span>
                                         @endif
                                     </div>
                                 </td>

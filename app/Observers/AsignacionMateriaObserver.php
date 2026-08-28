@@ -3,6 +3,8 @@
 namespace App\Observers;
 
 use App\Models\AsignacionMateria;
+use App\Models\Materia;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
 
 class AsignacionMateriaObserver
 {
@@ -11,12 +13,7 @@ class AsignacionMateriaObserver
         $asignacionMateria->sincronizarContextoDesdeGrupo();
         $asignacionMateria->estado ??= AsignacionMateria::ESTADO_BORRADOR;
 
-        if (blank($asignacionMateria->orden)) {
-            $asignacionMateria->orden = ((int) AsignacionMateria::query()
-                ->where('grupo_id', $asignacionMateria->grupo_id)
-                ->where('ciclo_escolar_id', $asignacionMateria->ciclo_escolar_id)
-                ->max('orden')) + 1;
-        }
+        $this->aplicarOrdenOficial($asignacionMateria);
     }
 
     public function updating(AsignacionMateria $asignacionMateria): void
@@ -24,6 +21,12 @@ class AsignacionMateriaObserver
         if ($asignacionMateria->isDirty('grupo_id')) {
             $asignacionMateria->unsetRelation('grupo');
             $asignacionMateria->sincronizarContextoDesdeGrupo();
+        }
+
+        // El orden de la carga nunca es manual: incluso si algún flujo intenta
+        // escribir asignacion_materias.orden, se vuelve a tomar materias.orden.
+        if ($asignacionMateria->isDirty('materia_id') || $asignacionMateria->isDirty('orden')) {
+            $this->aplicarOrdenOficial($asignacionMateria);
         }
     }
 
@@ -36,10 +39,21 @@ class AsignacionMateriaObserver
 
     public function deleted(AsignacionMateria $asignacionMateria): void
     {
-        AsignacionMateria::query()
-            ->where('grupo_id', $asignacionMateria->grupo_id)
-            ->where('ciclo_escolar_id', $asignacionMateria->ciclo_escolar_id)
-            ->where('orden', '>', $asignacionMateria->orden)
-            ->decrement('orden');
+        // No se compacta el orden de las cargas. El número oficial pertenece al
+        // catálogo de Materias y puede contener huecos si una materia no está cargada.
+    }
+
+    private function aplicarOrdenOficial(AsignacionMateria $asignacionMateria): void
+    {
+        $materia = Materia::query()->find($asignacionMateria->materia_id);
+
+        if (! $materia) {
+            return;
+        }
+
+        app(SincronizadorOrdenCargaAcademicaService::class)
+            ->asegurarContextoSinDuplicados($materia);
+
+        $asignacionMateria->orden = (int) $materia->orden;
     }
 }

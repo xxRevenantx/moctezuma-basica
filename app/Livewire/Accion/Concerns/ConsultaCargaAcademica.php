@@ -19,6 +19,7 @@ use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
 use App\Services\PlantillaDocenteService;
 use App\Services\ReasignacionDocenteMasivaService;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -161,7 +162,127 @@ trait ConsultaCargaAcademica
 
     public function getMateriasDisponiblesProperty(): Collection
     {
-        return $this->materiasParaGrupo($this->grupoSeleccionado);
+        $grupo = $this->grupoSeleccionado;
+
+        if (! $grupo) {
+            return collect();
+        }
+
+        $asignadas = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('grupo_id', $grupo->id)
+            ->pluck('materia_id')
+            ->map(fn ($id) => (int) $id);
+
+        return $this->materiasParaGrupo($grupo)
+            ->reject(fn (Materia $materia) => $asignadas->contains((int) $materia->id))
+            ->values();
+    }
+
+    /**
+     * Detecta contextos que ya tienen al menos una carga académica, pero a los
+     * que les falta una o más materias del plan del mismo grado/semestre.
+     *
+     * Los grupos completamente vacíos no se consideran "incompletos" porque
+     * pueden corresponder a semestres todavía no preparados. De esta forma la
+     * alerta señala omisiones reales dentro de una carga que ya fue iniciada.
+     */
+    public function getCargasIncompletasProperty(): Collection
+    {
+        if (! $this->ciclo_escolar_id || ! $this->nivel?->id) {
+            return collect();
+        }
+
+        $asignacionesPorGrupo = $this->consultaAsignacionesBase()
+            ->whereNotNull('grupo_id')
+            ->get(['grupo_id', 'materia_id'])
+            ->groupBy('grupo_id');
+
+        if ($asignacionesPorGrupo->isEmpty()) {
+            return collect();
+        }
+
+        $grupos = Grupo::query()
+            ->with([
+                'asignacionGrupo:id,nombre',
+                'grado:id,nombre,nivel_id,orden',
+                'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
+                'semestre:id,numero,orden_global',
+            ])
+            ->whereIn('id', $asignacionesPorGrupo->keys())
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
+            ->get()
+            ->sortBy(fn (Grupo $grupo) => sprintf(
+                '%04d|%03d|%03d|%s',
+                9999 - (int) ($grupo->generacion?->anio_ingreso ?? 0),
+                (int) ($grupo->semestre?->orden_global ?? $grupo->semestre?->numero ?? 999),
+                (int) ($grupo->grado?->orden ?? 999),
+                mb_strtolower((string) ($grupo->asignacionGrupo?->nombre ?? '')),
+            ))
+            ->values();
+
+        return $grupos
+            ->map(function (Grupo $grupo) use ($asignacionesPorGrupo) {
+                $idsAsignados = $asignacionesPorGrupo
+                    ->get($grupo->id, collect())
+                    ->pluck('materia_id')
+                    ->map(fn ($id) => (int) $id);
+
+                $pendientes = $this->materiasParaGrupo($grupo)
+                    ->reject(fn (Materia $materia) => $idsAsignados->contains((int) $materia->id))
+                    ->values();
+
+                if ($pendientes->isEmpty()) {
+                    return null;
+                }
+
+                return [
+                    'grupo' => $grupo,
+                    'materias' => $pendientes,
+                    'total' => $pendientes->count(),
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    public function getTotalMateriasPendientesProperty(): int
+    {
+        return (int) $this->cargasIncompletas->sum('total');
+    }
+
+    /**
+     * Cargas cuyo orden almacenado todavía no coincide con materias.orden.
+     * La tabla ya se muestra con el orden oficial, pero esta incidencia permite
+     * detectar y reparar datos históricos antes de que otros módulos los usen.
+     */
+    public function getOrdenesDesincronizadosProperty(): Collection
+    {
+        if (! $this->ciclo_escolar_id || ! $this->nivel?->id) {
+            return collect();
+        }
+
+        return $this->consultaAsignacionesBase()
+            ->with('materia:id,materia,clave,orden,receso')
+            ->get(['id', 'materia_id', 'grupo_id', 'orden'])
+            ->filter(fn (AsignacionMateriaModel $asignacion) =>
+                $asignacion->materia
+                && ! $asignacion->materia->receso
+                && (int) $asignacion->orden !== (int) $asignacion->materia->orden
+            )
+            ->values();
+    }
+
+    public function getConflictosOrdenMateriasProperty(): Collection
+    {
+        if (! $this->nivel?->id) {
+            return collect();
+        }
+
+        return app(SincronizadorOrdenCargaAcademicaService::class)
+            ->conflictosNivel((int) $this->nivel->id);
     }
 
     public function getGrupoEdicionSeleccionadoProperty(): ?Grupo
@@ -408,8 +529,14 @@ trait ConsultaCargaAcademica
             ->orderBy('grado_id')
             ->orderByRaw('CASE WHEN semestre_id IS NULL THEN 999 ELSE semestre_id END')
             ->orderBy('grupo_id')
-            ->orderByRaw('CASE WHEN orden IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('orden')
+            // La vista siempre usa el catálogo Materias como fuente oficial,
+            // incluso antes de reparar un registro histórico desincronizado.
+            ->orderBy(
+                Materia::query()
+                    ->select('orden')
+                    ->whereColumn('materias.id', 'asignacion_materias.materia_id')
+                    ->limit(1)
+            )
             ->orderBy('materia_id')
             ->paginate($this->porPaginaMaterias, ['*'], 'materiasPage');
     }

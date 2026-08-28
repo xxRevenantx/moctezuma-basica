@@ -3,7 +3,9 @@
 namespace App\Observers;
 
 use App\Models\Materia;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
 use App\Support\ReglasMateriaBachillerato;
+use DomainException;
 
 class MateriaObserver
 {
@@ -30,17 +32,36 @@ class MateriaObserver
     }
 
     /**
-     * Evita combinaciones incompatibles al crear o editar materias.
+     * Evita combinaciones incompatibles y órdenes oficiales ambiguos.
      */
     public function updating(Materia $materia): void
     {
         if (ReglasMateriaBachillerato::esBachillerato($materia->nivel_id)) {
             ReglasMateriaBachillerato::normalizarModelo($materia);
         }
+
+        if ($materia->isDirty(['nivel_id', 'grado_id', 'semestre_id', 'orden'])) {
+            app(SincronizadorOrdenCargaAcademicaService::class)
+                ->asegurarContextoSinDuplicados($materia);
+        }
     }
 
     /**
-     * Reacomoda el orden cuando se elimina una materia del mismo contexto.
+     * Si cambia el orden oficial, se propaga de inmediato a todas las cargas
+     * existentes de esa materia, sin importar ciclo, grupo o generación.
+     */
+    public function updated(Materia $materia): void
+    {
+        if (! $materia->wasChanged(['nivel_id', 'grado_id', 'semestre_id', 'orden'])) {
+            return;
+        }
+
+        app(SincronizadorOrdenCargaAcademicaService::class)
+            ->sincronizarMateria($materia);
+    }
+
+    /**
+     * Reacomoda el catálogo cuando se elimina una materia del mismo contexto.
      */
     public function deleted(Materia $materia): void
     {
@@ -54,5 +75,18 @@ class MateriaObserver
             )
             ->where('orden', '>', $materia->orden)
             ->decrement('orden');
+
+        try {
+            app(SincronizadorOrdenCargaAcademicaService::class)
+                ->sincronizarContextoCatalogo(
+                    (int) $materia->nivel_id,
+                    (int) $materia->grado_id,
+                    $materia->semestre_id ? (int) $materia->semestre_id : null,
+                );
+        } catch (DomainException $e) {
+            // No se fuerza un desempate automático. El diagnóstico aparecerá
+            // en Asignación de materias para que el catálogo se corrija primero.
+            report($e);
+        }
     }
 }

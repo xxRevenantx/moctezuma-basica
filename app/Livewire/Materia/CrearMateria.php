@@ -9,7 +9,10 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Support\CampoFormativoClassifier;
 use App\Support\ReglasMateriaBachillerato;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
+use DomainException;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use App\Imports\MateriasImport;
@@ -510,15 +513,22 @@ class CrearMateria extends Component
             'participa_en_calificacion_oficial' => $this->participa_en_calificacion_oficial ? 1 : 0,
         ];
 
-        if ($this->editandoId) {
-            $materia = Materia::query()->findOrFail($this->editandoId);
-            $materia->update($datos);
+        try {
+            $mensaje = DB::transaction(function () use ($datos): string {
+                if ($this->editandoId) {
+                    $materia = Materia::query()->findOrFail($this->editandoId);
+                    $materia->update($datos);
 
-            $mensaje = '¡Materia actualizada correctamente!';
-        } else {
-            Materia::query()->create($datos);
+                    return '¡Materia actualizada correctamente!';
+                }
 
-            $mensaje = '¡Materia creada correctamente!';
+                Materia::query()->create($datos);
+
+                return '¡Materia creada correctamente!';
+            });
+        } catch (DomainException $e) {
+            $this->addError('materia', $e->getMessage());
+            return;
         }
 
         $this->limpiarFormulario();
@@ -657,16 +667,24 @@ class CrearMateria extends Component
             return;
         }
 
-        foreach ($ids as $index => $id) {
-            Materia::query()
-                ->where('id', $id)
-                ->update([
-                    'orden' => $index + 1,
-                ]);
+        try {
+            $actualizadas = app(SincronizadorOrdenCargaAcademicaService::class)
+                ->reordenarCatalogo($ids);
+        } catch (DomainException $e) {
+            $this->dispatch('swal', [
+                'title' => 'No se pudo cambiar el orden',
+                'text' => $e->getMessage(),
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
         }
 
         $this->dispatch('swal', [
             'title' => '¡Orden actualizado!',
+            'text' => $actualizadas > 0
+                ? "También se sincronizaron {$actualizadas} carga(s) académica(s) existentes."
+                : 'Las cargas académicas ya estaban sincronizadas con este orden.',
             'icon' => 'success',
             'position' => 'top-end',
         ]);

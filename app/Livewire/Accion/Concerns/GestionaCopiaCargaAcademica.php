@@ -19,6 +19,8 @@ use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
 use App\Services\PlantillaDocenteService;
 use App\Services\ReasignacionDocenteMasivaService;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
+use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -60,16 +62,31 @@ trait GestionaCopiaCargaAcademica
         $creadas = 0;
         $omitidas = 0;
         $horariosCopiados = 0;
+        $conflictosOrden = 0;
 
-        DB::transaction(function () use (&$creadas, &$omitidas, &$horariosCopiados) {
+        DB::transaction(function () use (&$creadas, &$omitidas, &$horariosCopiados, &$conflictosOrden) {
             $origenes = AsignacionMateriaModel::query()
-                ->with(['grupo', 'horarios' => fn($q) => $q->where('ciclo_escolar_id', $this->ciclo_origen_id)])
+                ->with(['grupo', 'materia', 'horarios' => fn($q) => $q->where('ciclo_escolar_id', $this->ciclo_origen_id)])
                 ->where('ciclo_escolar_id', $this->ciclo_origen_id)
                 ->where('nivel_id', $this->nivel->id)
                 ->confirmadas()
                 ->get();
 
             foreach ($origenes as $origen) {
+                if (! $origen->materia) {
+                    $omitidas++;
+                    continue;
+                }
+
+                try {
+                    app(SincronizadorOrdenCargaAcademicaService::class)
+                        ->asegurarContextoSinDuplicados($origen->materia);
+                } catch (DomainException) {
+                    $omitidas++;
+                    $conflictosOrden++;
+                    continue;
+                }
+
                 $grupoDestino = $this->resolverGrupoDestino($origen);
 
                 if (!$grupoDestino) {
@@ -97,7 +114,6 @@ trait GestionaCopiaCargaAcademica
                     'grado_id' => $grupoDestino->grado_id,
                     'generacion_id' => $grupoDestino->generacion_id,
                     'semestre_id' => $grupoDestino->semestre_id,
-                    'orden' => $origen->orden,
                     'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
                     'asignacion_origen_id' => $origen->id,
                 ]);
@@ -142,10 +158,14 @@ trait GestionaCopiaCargaAcademica
             $this->resetPage('materiasPage');
         }
 
+        $detalleOrden = $conflictosOrden > 0
+            ? " {$conflictosOrden} carga(s) se omitieron porque el catálogo de Materias tiene órdenes duplicados."
+            : '';
+
         $this->dispatch('swal', [
             'title' => 'Preparación del ciclo terminada',
-            'text' => "Nuevas en borrador: {$creadas}. Omitidas: {$omitidas}. Horarios copiados para revisión: {$horariosCopiados}. Confirma las cargas cuando estén listas.",
-            'icon' => 'success',
+            'text' => "Nuevas en borrador: {$creadas}. Omitidas: {$omitidas}. Horarios copiados para revisión: {$horariosCopiados}.{$detalleOrden} Confirma las cargas cuando estén listas.",
+            'icon' => $conflictosOrden > 0 ? 'warning' : 'success',
             'position' => 'top-end',
         ]);
     }

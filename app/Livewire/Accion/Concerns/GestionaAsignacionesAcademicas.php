@@ -19,7 +19,9 @@ use App\Models\Inscripcion;
 use App\Services\CicloNivelGateService;
 use App\Services\PlantillaDocenteService;
 use App\Services\ReasignacionDocenteMasivaService;
+use App\Services\SincronizadorOrdenCargaAcademicaService;
 use App\Services\ContextoCicloEscolarSesion;
+use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -163,6 +165,13 @@ trait GestionaAsignacionesAcademicas
             return;
         }
 
+        try {
+            app(SincronizadorOrdenCargaAcademicaService::class)->asegurarContextoSinDuplicados($materia);
+        } catch (DomainException $e) {
+            $this->addError('materia_id', $e->getMessage());
+            return;
+        }
+
         $duplicada = AsignacionMateriaModel::query()
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('grupo_id', $grupo->id)
@@ -178,17 +187,7 @@ trait GestionaAsignacionesAcademicas
         app(PlantillaDocenteService::class)->validar($profesorId, (int) $this->ciclo_escolar_id, (int) $this->nivel->id);
 
         DB::transaction(function () use ($grupo, $materia, $profesorId) {
-            $asignacion = AsignacionMateriaModel::query()->create([
-                'materia_id' => $materia->id,
-                'grupo_id' => $grupo->id,
-                'profesor_id' => $profesorId,
-                'ciclo_escolar_id' => $this->ciclo_escolar_id,
-                'nivel_id' => $grupo->nivel_id,
-                'grado_id' => $grupo->grado_id,
-                'generacion_id' => $grupo->generacion_id,
-                'semestre_id' => $grupo->semestre_id,
-                'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
-            ]);
+            $asignacion = $this->crearAsignacionBorradorOrdenada($grupo, $materia, $profesorId);
 
             $this->ultimoRegistroId = $asignacion->id;
             $this->ultimoMovimiento = 'registrada';
@@ -205,6 +204,153 @@ trait GestionaAsignacionesAcademicas
             'icon' => 'success',
             'position' => 'top-end',
         ]);
+    }
+
+    public function crearCargaPendiente(int $grupoId, int $materiaId): void
+    {
+        $this->autorizarAdministracion();
+
+        app(CicloNivelGateService::class)->asegurar(
+            (int) $this->ciclo_escolar_id,
+            (int) $this->nivel->id,
+            'asignacion_materias'
+        );
+
+        $grupo = Grupo::query()
+            ->whereKey($grupoId)
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('estado', 'activo')
+            ->first();
+
+        if (! $grupo) {
+            $this->dispatch('swal', [
+                'title' => 'Contexto no disponible',
+                'text' => 'El grupo cambió de estado o ya no pertenece al ciclo seleccionado.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $materia = $this->materiasParaGrupo($grupo)
+            ->first(fn (Materia $item) => (int) $item->id === $materiaId);
+
+        if (! $materia) {
+            $this->dispatch('swal', [
+                'title' => 'Materia no válida',
+                'text' => 'La materia ya no corresponde al grado o semestre de este grupo.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        try {
+            app(SincronizadorOrdenCargaAcademicaService::class)->asegurarContextoSinDuplicados($materia);
+        } catch (DomainException $e) {
+            $this->dispatch('swal', [
+                'title' => 'Orden académico ambiguo',
+                'text' => $e->getMessage(),
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $yaExiste = AsignacionMateriaModel::query()
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('grupo_id', $grupo->id)
+            ->where('materia_id', $materia->id)
+            ->exists();
+
+        if ($yaExiste) {
+            $this->dispatch('swal', [
+                'title' => 'La carga ya existe',
+                'text' => 'La materia ya fue agregada a este grupo. La alerta se actualizará automáticamente.',
+                'icon' => 'info',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $asignacionCreada = DB::transaction(function () use ($grupo, $materia) {
+            // Revalidar bajo bloqueo para evitar duplicados si dos administradores
+            // intentan reparar la misma omisión al mismo tiempo.
+            AsignacionMateriaModel::query()
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->where('grupo_id', $grupo->id)
+                ->lockForUpdate()
+                ->get(['id']);
+
+            $duplicada = AsignacionMateriaModel::query()
+                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                ->where('grupo_id', $grupo->id)
+                ->where('materia_id', $materia->id)
+                ->exists();
+
+            if ($duplicada) {
+                return null;
+            }
+
+            $asignacion = $this->crearAsignacionBorradorOrdenada($grupo, $materia, null);
+            $this->ultimoRegistroId = $asignacion->id;
+            $this->ultimoMovimiento = 'reparada';
+
+            return $asignacion;
+        });
+
+        if (! $asignacionCreada) {
+            $this->dispatch('swal', [
+                'title' => 'La carga ya fue creada',
+                'text' => 'Otro proceso agregó la materia antes de completar esta acción. No se generó un duplicado.',
+                'icon' => 'info',
+                'position' => 'top-end',
+            ]);
+            return;
+        }
+
+        $this->filtro_estado = AsignacionMateriaModel::ESTADO_BORRADOR;
+        $this->limpiarSeleccionTabla();
+        $this->resetPage('materiasPage');
+
+        $this->dispatch('swal', [
+            'title' => 'Carga pendiente creada',
+            'text' => $materia->materia . ' se agregó como borrador, respetando el orden académico. El docente puede asignarse desde Editar.',
+            'icon' => 'success',
+            'position' => 'top-end',
+        ]);
+    }
+
+    /**
+     * Crea una carga como borrador usando directamente materias.orden.
+     * El orden de asignacion_materias no tiene una secuencia independiente.
+     */
+    private function crearAsignacionBorradorOrdenada(Grupo $grupo, Materia $materia, ?int $profesorId): AsignacionMateriaModel
+    {
+        $asignacion = AsignacionMateriaModel::query()->create([
+            'materia_id' => $materia->id,
+            'grupo_id' => $grupo->id,
+            'profesor_id' => $profesorId,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'nivel_id' => $grupo->nivel_id,
+            'grado_id' => $grupo->grado_id,
+            'generacion_id' => $grupo->generacion_id,
+            'semestre_id' => $grupo->semestre_id,
+            'orden' => (int) $materia->orden,
+            'estado' => AsignacionMateriaModel::ESTADO_BORRADOR,
+        ]);
+
+        app(SincronizadorOrdenCargaAcademicaService::class)
+            ->sincronizarGrupo((int) $grupo->id, (int) $this->ciclo_escolar_id);
+
+        return $asignacion->refresh();
+    }
+
+    private function normalizarOrdenAcademicoGrupo(int $grupoId): void
+    {
+        app(SincronizadorOrdenCargaAcademicaService::class)
+            ->sincronizarGrupo($grupoId, (int) $this->ciclo_escolar_id);
     }
 
     public function editar(int $id): void
@@ -306,6 +452,13 @@ trait GestionaAsignacionesAcademicas
             return;
         }
 
+        try {
+            app(SincronizadorOrdenCargaAcademicaService::class)->asegurarContextoSinDuplicados($materia);
+        } catch (DomainException $e) {
+            $this->addError('editar_materia_id', $e->getMessage());
+            return;
+        }
+
         $duplicada = AsignacionMateriaModel::query()
             ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
             ->where('grupo_id', $grupo->id)
@@ -325,8 +478,11 @@ trait GestionaAsignacionesAcademicas
         app(PlantillaDocenteService::class)->validar($profesorId, (int) $this->ciclo_escolar_id, (int) $this->nivel->id);
 
         $profesorAnteriorId = $asignacion->profesor_id ? (int) $asignacion->profesor_id : null;
+        $grupoAnteriorId = (int) $asignacion->grupo_id;
+        $estructuraCambio = $grupoAnteriorId !== (int) $grupo->id
+            || (int) $asignacion->materia_id !== (int) $materia->id;
 
-        DB::transaction(function () use ($asignacion, $grupo, $materia, $profesorId, $profesorAnteriorId) {
+        DB::transaction(function () use ($asignacion, $grupo, $materia, $profesorId, $profesorAnteriorId, $grupoAnteriorId, $estructuraCambio) {
             $asignacion->update([
                 'materia_id' => $materia->id,
                 'grupo_id' => $grupo->id,
@@ -343,6 +499,14 @@ trait GestionaAsignacionesAcademicas
                 profesorNuevoId: $profesorId,
                 usuarioId: auth()->id(),
             );
+
+            if ($estructuraCambio) {
+                $this->normalizarOrdenAcademicoGrupo($grupoAnteriorId);
+
+                if ($grupoAnteriorId !== (int) $grupo->id) {
+                    $this->normalizarOrdenAcademicoGrupo((int) $grupo->id);
+                }
+            }
 
             $this->ultimoRegistroId = $asignacion->id;
             $this->ultimoMovimiento = 'actualizada';
@@ -638,19 +802,38 @@ trait GestionaAsignacionesAcademicas
         $this->resetValidation(['grupo_id', 'materia_id', 'profesor_id']);
     }
 
-    public function ordenarMateriasPorGrupoJs($grupoId, $ids): void
+    public function sincronizarOrdenesCicloNivel(): void
     {
-        if (!is_array($ids)) {
+        $this->autorizarAdministracion();
+
+        if (! $this->ciclo_escolar_id || ! $this->nivel?->id) {
             return;
         }
 
-        foreach ($ids as $index => $id) {
-            AsignacionMateriaModel::query()
-                ->whereKey($id)
-                ->where('grupo_id', $grupoId)
-                ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-                ->update(['orden' => $index + 1]);
+        $resultado = app(SincronizadorOrdenCargaAcademicaService::class)
+            ->sincronizarNivelCiclo((int) $this->nivel->id, (int) $this->ciclo_escolar_id);
+
+        $conflictos = $resultado['conflictos'];
+
+        if ($conflictos->isNotEmpty()) {
+            $this->dispatch('swal', [
+                'title' => 'Sincronización parcial',
+                'text' => 'Se corrigieron los contextos válidos, pero existen órdenes duplicados en Materias. Corrige primero el catálogo para sincronizar los contextos pendientes.',
+                'icon' => 'warning',
+                'position' => 'top-end',
+            ]);
+        } else {
+            $this->dispatch('swal', [
+                'title' => 'Orden académico sincronizado',
+                'text' => $resultado['actualizadas'] > 0
+                    ? "Se corrigieron {$resultado['actualizadas']} carga(s) usando el orden oficial de Materias."
+                    : 'Todas las cargas ya respetan el orden oficial de Materias.',
+                'icon' => 'success',
+                'position' => 'top-end',
+            ]);
         }
+
+        $this->resetPage('materiasPage');
     }
 
 }
