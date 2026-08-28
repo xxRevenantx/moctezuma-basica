@@ -78,7 +78,9 @@
     </style>
 </head>
 <body>
-    @php($consecutivo = 1)
+    @php
+        $consecutivo = 1;
+    @endphp
 
     @foreach ($grupos as $grupo)
         <section class="grupo-pagina">
@@ -199,6 +201,9 @@
                                         @case('ciclo')
                                             {{ $alumno->ciclo?->ciclo ?? '—' }}
                                             @break
+                                        @case('fecha_inscripcion')
+                                            {{ $alumno->fecha_inscripcion?->format('d/m/Y') ?? '—' }}
+                                            @break
                                         @case('estatus')
                                             {{ $alumno->trashed() ? 'Archivado' : $alumno->etiqueta_estatus }}
                                             @break
@@ -212,7 +217,9 @@
                                 </td>
                             @endforeach
                         </tr>
-                        @php($consecutivo++)
+                        @php
+                            $consecutivo++;
+                        @endphp
                     @endforeach
                 </tbody>
             </table>

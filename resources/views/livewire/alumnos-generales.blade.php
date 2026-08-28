@@ -368,6 +368,7 @@
                                     'grupo' => ['Grupo', true],
                                     'generacion' => ['Generación', true],
                                     'ciclo' => ['Ciclo escolar', false],
+                                    'fecha_inscripcion' => ['Fecha de inscripción', false],
                                     'estatus' => ['Estatus', false],
                                     'firma' => ['Espacio para firma', true],
                                     'observaciones' => ['Observaciones', true],
@@ -590,12 +591,24 @@
                 </flux:field>
 
                 <flux:field>
+                    <flux:label>Fecha de inscripción desde</flux:label>
+                    <flux:input type="date" wire:model.live="fecha_desde" max="{{ $fecha_hasta ?: null }}" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>Fecha de inscripción hasta</flux:label>
+                    <flux:input type="date" wire:model.live="fecha_hasta" min="{{ $fecha_desde ?: null }}" />
+                </flux:field>
+
+                <flux:field>
                     <flux:label>Ordenar por</flux:label>
                     <flux:select wire:model.live="orden">
                         <flux:select.option value="apellidos">Apellidos</flux:select.option>
+                        <flux:select.option value="ultimos_inscritos">Últimos inscritos</flux:select.option>
+                        <flux:select.option value="primeros_inscritos">Primeros inscritos</flux:select.option>
                         <flux:select.option value="matricula">Matrícula</flux:select.option>
                         <flux:select.option value="nivel">Nivel</flux:select.option>
-                        <flux:select.option value="recientes">Más recientes</flux:select.option>
+                        <flux:select.option value="recientes">Alta en sistema más reciente</flux:select.option>
                     </flux:select>
                 </flux:field>
 
@@ -612,7 +625,7 @@
 
             <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-slate-500 dark:text-slate-400">
-                    La consulta usa paginación y relaciones ligeras para evitar que se vuelva pesada.
+                    La consulta usa paginación y relaciones ligeras. Los filtros de fecha usan la fecha de inscripción registrada del alumno.
                 </p>
 
                 <flux:button type="button" variant="ghost" wire:click="limpiarFiltros" class="cursor-pointer">
@@ -699,6 +712,7 @@
                         <th class="px-4 py-4 text-center font-black">Sexo</th>
                         <th class="px-4 py-4 text-left font-black">Grado / Semestre</th>
                         <th class="px-4 py-4 text-left font-black">Generación</th>
+                        <th class="px-4 py-4 text-center font-black whitespace-nowrap">Fecha inscripción</th>
                         <th class="px-4 py-4 text-center font-black">Estatus</th>
                         <th class="px-4 py-4 text-right font-black">Acciones</th>
                     </tr>
@@ -770,6 +784,10 @@
 
                             <td class="px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
                                 {{ $this->textoGeneracion($alumno->generacion) }}
+                            </td>
+
+                            <td class="px-4 py-4 text-center text-sm font-semibold whitespace-nowrap text-slate-700 dark:text-slate-300">
+                                {{ $alumno->fecha_inscripcion ? \Carbon\Carbon::parse($alumno->fecha_inscripcion)->format('d/m/Y') : '—' }}
                             </td>
 
                             <td class="px-4 py-4 text-center">
@@ -855,7 +873,7 @@
 
                         {{-- Desplegable detalles --}}
                         <tr x-cloak x-show="detalleAbierto === {{ $alumno->id }}" x-transition>
-                            <td colspan="12" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
+                            <td colspan="13" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
                                 <div
                                     class="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-lg shadow-slate-200/70 dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none">
                                     <div
@@ -1144,7 +1162,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="px-6 py-14 text-center">
+                            <td colspan="13" class="px-6 py-14 text-center">
                                 <div class="mx-auto max-w-sm">
                                     <div
                                         class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">

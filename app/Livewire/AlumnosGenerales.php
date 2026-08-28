@@ -40,6 +40,8 @@ class AlumnosGenerales extends Component
     public string $genero = '';
     public string $estatus = 'todos';
     public string $orden = 'apellidos';
+    public string $fecha_desde = '';
+    public string $fecha_hasta = '';
 
     public int $perPage = 25;
 
@@ -163,6 +165,16 @@ class AlumnosGenerales extends Component
         $this->resetPage();
     }
 
+    public function updatedFechaDesde(): void
+    {
+        $this->actualizarVista();
+    }
+
+    public function updatedFechaHasta(): void
+    {
+        $this->actualizarVista();
+    }
+
     public function updatedPerPage(): void
     {
         $this->resetPage();
@@ -181,6 +193,8 @@ class AlumnosGenerales extends Component
         $this->genero = '';
         $this->estatus = 'todos';
         $this->orden = 'apellidos';
+        $this->fecha_desde = '';
+        $this->fecha_hasta = '';
         $this->perPage = 25;
 
         $this->grados = collect();
@@ -596,6 +610,14 @@ class AlumnosGenerales extends Component
             $consulta->where('genero', $this->genero);
         }
 
+        if ($this->fecha_desde !== '') {
+            $consulta->whereDate('fecha_inscripcion', '>=', $this->fecha_desde);
+        }
+
+        if ($this->fecha_hasta !== '') {
+            $consulta->whereDate('fecha_inscripcion', '<=', $this->fecha_hasta);
+        }
+
         match ($this->estatus) {
             'activos' => $this->aplicarActivos($consulta),
             'preinscritos' => $consulta->where('estatus', 'preinscrito'),
@@ -628,7 +650,21 @@ class AlumnosGenerales extends Component
     private function aplicarOrden(Builder $consulta): void
     {
         match ($this->orden) {
-            'recientes' => $consulta->orderByDesc('created_at'),
+            'ultimos_inscritos' => $consulta
+                ->orderByRaw('fecha_inscripcion IS NULL')
+                ->orderByDesc('fecha_inscripcion')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id'),
+
+            'primeros_inscritos' => $consulta
+                ->orderByRaw('fecha_inscripcion IS NULL')
+                ->orderBy('fecha_inscripcion')
+                ->orderBy('created_at')
+                ->orderBy('id'),
+
+            'recientes' => $consulta
+                ->orderByDesc('created_at')
+                ->orderByDesc('id'),
 
             'matricula' => $consulta
                 ->orderBy('matricula')
