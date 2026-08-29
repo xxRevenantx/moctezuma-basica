@@ -639,7 +639,7 @@
                                               Obligatorio
                                           </span>
                                       </div>
-                                      <flux:input type="date" wire:model="fecha_nacimiento" />
+                                      <flux:input type="date" wire:model.live="fecha_nacimiento" />
                                       @error('fecha_nacimiento')
                                           <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                       @enderror
@@ -933,6 +933,49 @@
                                       @enderror
                                   </div>
                               </div>
+
+                              @if (data_get($edadEscolar, 'disponible'))
+                                  @php
+                                      $situacionEdad = data_get($edadEscolar, 'situacion');
+                                      $esEdadBachillerato = (bool) data_get($edadEscolar, 'es_bachillerato');
+                                      $clasesEdad = match (true) {
+                                          $esEdadBachillerato && $situacionEdad === 'mayor' => 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-200',
+                                          $situacionEdad === 'adecuada' => 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200',
+                                          $situacionEdad === 'mayor' => 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200',
+                                          $situacionEdad === 'extraedad' => 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200',
+                                          $situacionEdad === 'menor' => 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200',
+                                          default => 'border-slate-200 bg-slate-50 text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200',
+                                      };
+                                  @endphp
+                                  <div class="rounded-2xl border px-4 py-4 {{ $clasesEdad }}">
+                                      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                          <div class="flex items-start gap-3">
+                                              <flux:icon :name="$situacionEdad === 'adecuada' ? 'check-circle' : 'information-circle'" class="mt-0.5 h-5 w-5 shrink-0" />
+                                              <div>
+                                                  <p class="text-sm font-black">Edad escolar · {{ data_get($edadEscolar, 'etiqueta') }}</p>
+                                                  <p class="mt-1 text-xs leading-relaxed opacity-90">{{ data_get($edadEscolar, 'descripcion') }}</p>
+                                                  @if ($situacionEdad === 'extraedad')
+                                                      <p class="mt-2 text-xs font-black">Advertencia informativa: la situación no bloquea la inscripción.</p>
+                                                  @endif
+                                              </div>
+                                          </div>
+                                          <div class="grid shrink-0 grid-cols-3 gap-2 text-center text-xs">
+                                              <div class="rounded-xl bg-white/60 px-3 py-2 dark:bg-black/15">
+                                                  <p class="opacity-70">Actual</p>
+                                                  <p class="font-black">{{ data_get($edadEscolar, 'edad_actual') }} años</p>
+                                              </div>
+                                              <div class="rounded-xl bg-white/60 px-3 py-2 dark:bg-black/15">
+                                                  <p class="opacity-70">Al {{ data_get($edadEscolar, 'fecha_corte_texto') }}</p>
+                                                  <p class="font-black">{{ data_get($edadEscolar, 'edad_corte') }} años</p>
+                                              </div>
+                                              <div class="rounded-xl bg-white/60 px-3 py-2 dark:bg-black/15">
+                                                  <p class="opacity-70">{{ $esEdadBachillerato ? 'Típica' : 'Esperada' }}</p>
+                                                  <p class="font-black">{{ data_get($edadEscolar, 'edad_esperada') }} años</p>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              @endif
 
                               @if ($asignacionAdvertencia)
                                   <div

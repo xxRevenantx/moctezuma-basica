@@ -3,12 +3,14 @@
 namespace App\Livewire;
 
 use App\Models\Ciclo;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Semestre;
+use App\Services\EdadEscolarService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\ObservacionInscripcionService;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,6 +26,7 @@ class AlumnosGenerales extends Component
 
     public Collection $niveles;
     public Collection $ciclos;
+    public Collection $ciclosEscolares;
     public Collection $grados;
     public Collection $generaciones;
     public Collection $semestres;
@@ -35,6 +38,7 @@ class AlumnosGenerales extends Component
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
     public ?int $ciclo_id = null;
+    public ?int $ciclo_escolar_id = null;
 
     public string $buscar = '';
     public string $genero = '';
@@ -42,6 +46,7 @@ class AlumnosGenerales extends Component
     public string $orden = 'apellidos';
     public string $fecha_desde = '';
     public string $fecha_hasta = '';
+    public string $situacion_edad = '';
 
     public int $perPage = 25;
 
@@ -57,6 +62,10 @@ class AlumnosGenerales extends Component
     public int $activos = 0;
     public int $egresados = 0;
     public int $bajas = 0;
+    public int $edadAdecuada = 0;
+    public int $edadMayor = 0;
+    public int $extraedad = 0;
+    public int $edadMenor = 0;
 
     protected $paginationTheme = 'tailwind';
 
@@ -70,6 +79,12 @@ class AlumnosGenerales extends Component
         $this->ciclos = Ciclo::query()
             ->select('id', 'ciclo')
             ->orderByDesc('id')
+            ->get();
+
+        $this->ciclosEscolares = CicloEscolar::query()
+            ->select('id', 'inicio_anio', 'fin_anio', 'es_actual')
+            ->orderByDesc('es_actual')
+            ->orderByDesc('inicio_anio')
             ->get();
 
         $this->grados = collect();
@@ -145,6 +160,17 @@ class AlumnosGenerales extends Component
         $this->actualizarVista();
     }
 
+    public function updatedCicloEscolarId($value): void
+    {
+        $this->ciclo_escolar_id = $value ? (int) $value : null;
+        $this->actualizarVista();
+    }
+
+    public function updatedSituacionEdad(): void
+    {
+        $this->actualizarVista();
+    }
+
     public function updatedBuscar(): void
     {
         $this->actualizarVista();
@@ -188,6 +214,7 @@ class AlumnosGenerales extends Component
         $this->semestre_id = null;
         $this->grupo_id = null;
         $this->ciclo_id = null;
+        $this->ciclo_escolar_id = null;
 
         $this->buscar = '';
         $this->genero = '';
@@ -195,6 +222,7 @@ class AlumnosGenerales extends Component
         $this->orden = 'apellidos';
         $this->fecha_desde = '';
         $this->fecha_hasta = '';
+        $this->situacion_edad = '';
         $this->perPage = 25;
 
         $this->grados = collect();
@@ -523,7 +551,7 @@ class AlumnosGenerales extends Component
             ->values();
     }
 
-    private function consultaBase(bool $conRelaciones = true, bool $conOrden = true): Builder
+    private function consultaBase(bool $conRelaciones = true, bool $conOrden = true, bool $aplicarFiltroEdad = true): Builder
     {
         $consulta = Inscripcion::query()
             ->select([
@@ -542,6 +570,7 @@ class AlumnosGenerales extends Component
                 'grupo_id',
                 'semestre_id',
                 'ciclo_id',
+                'ciclo_escolar_id',
                 'foto_path',
                 'activo',
                 'estatus',
@@ -562,6 +591,7 @@ class AlumnosGenerales extends Component
                 'generacion:id,nivel_id,anio_ingreso,anio_egreso,status',
                 'semestre:id,grado_id,numero,orden_global',
                 'ciclo:id,ciclo',
+                'cicloEscolar:id,inicio_anio,fin_anio,es_actual',
                 'grupo' => function ($query) {
                     $query->select([
                         'id',
@@ -606,6 +636,10 @@ class AlumnosGenerales extends Component
             $consulta->where('ciclo_id', $this->ciclo_id);
         }
 
+        if ($this->ciclo_escolar_id) {
+            $consulta->where('ciclo_escolar_id', $this->ciclo_escolar_id);
+        }
+
         if ($this->genero !== '') {
             $consulta->where('genero', $this->genero);
         }
@@ -638,6 +672,10 @@ class AlumnosGenerales extends Component
                     ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
                     ->orWhere('apellido_materno', 'like', "%{$buscar}%");
             });
+        }
+
+        if ($aplicarFiltroEdad && $this->situacion_edad !== '') {
+            $this->aplicarFiltroEdadEscolar($consulta, $this->situacion_edad);
         }
 
         if ($conOrden) {
@@ -709,6 +747,88 @@ class AlumnosGenerales extends Component
         $bajas = clone $base;
         $this->aplicarBajasAdministrativas($bajas);
         $this->bajas = $bajas->count();
+
+        // Los indicadores de edad respetan los demás filtros, pero no se
+        // auto-restringen por el filtro de situación de edad.
+        $baseEdad = $this->consultaBase(false, false, false);
+
+        $adecuada = clone $baseEdad;
+        $this->aplicarFiltroEdadEscolar($adecuada, EdadEscolarService::SITUACION_ADECUADA);
+        $this->edadAdecuada = $adecuada->count();
+
+        $mayor = clone $baseEdad;
+        $this->aplicarFiltroEdadEscolar($mayor, EdadEscolarService::SITUACION_MAYOR);
+        $this->edadMayor = $mayor->count();
+
+        $extraedad = clone $baseEdad;
+        $this->aplicarFiltroEdadEscolar($extraedad, EdadEscolarService::SITUACION_EXTRAEDAD);
+        $this->extraedad = $extraedad->count();
+
+        $menor = clone $baseEdad;
+        $this->aplicarFiltroEdadEscolar($menor, EdadEscolarService::SITUACION_MENOR);
+        $this->edadMenor = $menor->count();
+    }
+
+    private function aplicarFiltroEdadEscolar(Builder $consulta, string $situacion): Builder
+    {
+        $servicio = app(EdadEscolarService::class);
+        $niveles = Nivel::query()
+            ->whereIn('slug', ['preescolar', 'primaria', 'secundaria', 'bachillerato'])
+            ->get(['id', 'slug']);
+        $grados = Grado::query()
+            ->whereIn('nivel_id', $niveles->pluck('id'))
+            ->get(['id', 'nivel_id', 'nombre', 'slug']);
+
+        $reglas = [];
+        foreach ($niveles as $nivel) {
+            foreach ($grados->where('nivel_id', $nivel->id) as $grado) {
+                $esperada = $servicio->edadEsperada((string) $nivel->slug, $servicio->numeroGrado($grado));
+                if ($esperada !== null) {
+                    $reglas[] = [
+                        'nivel_id' => (int) $nivel->id,
+                        'grado_id' => (int) $grado->id,
+                        'slug' => (string) $nivel->slug,
+                        'esperada' => $esperada,
+                    ];
+                }
+            }
+        }
+
+        if ($reglas === []) {
+            return $consulta->whereRaw('1 = 0');
+        }
+
+        $edadSql = "TIMESTAMPDIFF(YEAR, inscripciones.fecha_nacimiento, CONCAT((SELECT ce.inicio_anio FROM ciclo_escolares ce WHERE ce.id = inscripciones.ciclo_escolar_id LIMIT 1), '-12-31'))";
+
+        return $consulta
+            ->whereNotNull('fecha_nacimiento')
+            ->whereNotNull('ciclo_escolar_id')
+            ->where(function (Builder $query) use ($reglas, $situacion, $edadSql): void {
+                foreach ($reglas as $regla) {
+                    $esBasica = in_array($regla['slug'], ['preescolar', 'primaria', 'secundaria'], true);
+                    $operacion = match ($situacion) {
+                        EdadEscolarService::SITUACION_ADECUADA => ['=', $regla['esperada']],
+                        EdadEscolarService::SITUACION_MAYOR => $esBasica
+                            ? ['=', $regla['esperada'] + 1]
+                            : ['>', $regla['esperada']],
+                        EdadEscolarService::SITUACION_EXTRAEDAD => $esBasica
+                            ? ['>=', $regla['esperada'] + 2]
+                            : null,
+                        EdadEscolarService::SITUACION_MENOR => ['<', $regla['esperada']],
+                        default => null,
+                    };
+
+                    if (! $operacion) {
+                        continue;
+                    }
+
+                    $query->orWhere(function (Builder $caso) use ($regla, $edadSql, $operacion): void {
+                        $caso->where('nivel_id', $regla['nivel_id'])
+                            ->where('grado_id', $regla['grado_id'])
+                            ->whereRaw("{$edadSql} {$operacion[0]} ?", [$operacion[1]]);
+                    });
+                }
+            });
     }
 
     private function aplicarActivos(Builder $consulta): Builder
@@ -818,10 +938,32 @@ class AlumnosGenerales extends Component
         };
     }
 
+    public function claseEdadEscolar(Inscripcion $alumno): string
+    {
+        $analisis = (array) ($alumno->edad_escolar ?? []);
+
+        return app(EdadEscolarService::class)->claseBadge(
+            (string) ($analisis['situacion'] ?? EdadEscolarService::SITUACION_SIN_DATOS),
+            (bool) ($analisis['es_bachillerato'] ?? false),
+        );
+    }
+
     public function render()
     {
         $alumnos = $this->consultaBase()
             ->paginate($this->perPage);
+
+        $edadEscolar = app(EdadEscolarService::class);
+        $alumnos->getCollection()->transform(function (Inscripcion $alumno) use ($edadEscolar) {
+            $alumno->setAttribute('edad_escolar', $edadEscolar->analizar(
+                $alumno->fecha_nacimiento,
+                $alumno->nivel,
+                $alumno->grado,
+                $alumno->cicloEscolar,
+            ));
+
+            return $alumno;
+        });
 
         if (auth()->user()?->is_admin) {
             $servicio = app(ExpedienteDigitalService::class);

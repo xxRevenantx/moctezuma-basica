@@ -12,6 +12,8 @@ use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\CierreGeneracionReporteController;
 use App\Http\Controllers\AnaliticaInstitucionalReporteController;
 use App\Http\Controllers\AlumnosNoVigentesPdfController;
+use App\Http\Controllers\EstadisticaAlumnosGruposReporteController;
+use App\Http\Controllers\EdadEscolarReporteController;
 use App\Http\Controllers\CredencialImagenController;
 use App\Http\Controllers\CuadroHonorPromediosController;
 use App\Http\Controllers\ConstanciaTrasladoController;
@@ -146,6 +148,15 @@ Route::post('/alumnos/lista-seleccionados/pdf', [ListaAlumnosSeleccionadosContro
     ->name('misrutas.alumnos.lista.pdf');
 Route::post('/alumnos/lista-seleccionados/word', [ListaAlumnosSeleccionadosController::class, 'word'])
     ->name('misrutas.alumnos.lista.word');
+Route::get('/alumnos/estadistica-911/reporte/{formato}', EstadisticaAlumnosGruposReporteController::class)
+    ->whereIn('formato', ['pdf', 'excel'])
+    ->middleware('permission:alumnos.consultar')
+    ->name('misrutas.alumnos.estadistica-911.reporte');
+
+Route::get('/alumnos/edad-escolar/reporte/{formato}', EdadEscolarReporteController::class)
+    ->whereIn('formato', ['pdf', 'excel'])
+    ->middleware('permission:alumnos.consultar')
+    ->name('misrutas.alumnos.edad-escolar.reporte');
 
 // LISTAS GENERALES GLOBALES
 Route::get('/listas-generales', ListasGenerales::class)

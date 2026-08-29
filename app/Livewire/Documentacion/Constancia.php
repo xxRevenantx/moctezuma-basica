@@ -540,6 +540,14 @@ class Constancia extends Component
 
     public function updatedQuery(): void
     {
+        if ($this->selectedAlumno !== null) {
+            $textoSeleccionado = $this->textoAlumnoSeleccionado($this->selectedAlumno);
+
+            if (trim($this->query) !== $textoSeleccionado) {
+                $this->selectedAlumno = null;
+            }
+        }
+
         $this->buscarAlumnos();
     }
 
@@ -552,6 +560,10 @@ class Constancia extends Component
             return;
         }
 
+        // En modo individual la búsqueda es global: cualquier alumno no archivado
+        // puede seleccionarse sin importar nivel, grado o estatus académico.
+        // Los filtros de matrícula vigente se conservan exclusivamente para
+        // las generaciones masivas por nivel, grado o grupo.
         $consulta = Inscripcion::query()
             ->with([
                 'nivel:id,nombre,cct',
@@ -561,8 +573,6 @@ class Constancia extends Component
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
             ]);
-
-        $this->aplicarFiltroAlumnosDisponibles($consulta);
 
         $this->alumnos = $consulta
             ->where(function (Builder $consulta) use ($texto) {
@@ -576,7 +586,7 @@ class Constancia extends Component
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
-            ->limit(10)
+            ->limit(25)
             ->get()
             ->map(fn($alumno) => $this->formatearAlumno($alumno))
             ->toArray();
@@ -591,7 +601,7 @@ class Constancia extends Component
         }
 
         $this->selectedAlumno = $this->alumnos[$index];
-        $this->query = $this->selectedAlumno['nombre_completo'] . ' - ' . $this->selectedAlumno['nivel'];
+        $this->query = $this->textoAlumnoSeleccionado($this->selectedAlumno);
         $this->alumnos = [];
         $this->selectedIndex = 0;
     }
@@ -785,8 +795,9 @@ class Constancia extends Component
             ])
             ->whereKey($inscripcionId);
 
-        $this->aplicarFiltroAlumnosDisponibles($consulta);
-
+        // La generación individual acepta cualquier alumno no archivado,
+        // incluso si está egresado, no reinscrito, dado de baja o en otro
+        // estado administrativo.
         $alumno = $consulta->firstOrFail();
 
         $alumnoArray = $this->formatearAlumno($alumno);
@@ -826,7 +837,20 @@ class Constancia extends Component
             'ciclo' => $alumno->ciclo?->ciclo ?? '',
             'cct' => $alumno->nivel?->cct ?? '',
             'sexo_original' => $sexo,
+            'estatus' => $alumno->etiqueta_estatus,
+            'estatus_clave' => $alumno->estatusNormalizado(),
         ];
+    }
+
+    private function textoAlumnoSeleccionado(array $alumno): string
+    {
+        $partes = array_filter([
+            trim((string) ($alumno['nombre_completo'] ?? '')),
+            trim((string) ($alumno['matricula'] ?? '')),
+            trim((string) ($alumno['nivel'] ?? '')),
+        ]);
+
+        return implode(' - ', $partes);
     }
 
     private function reemplazarVariablesConAlumno(string $contenido, array $alumno): string

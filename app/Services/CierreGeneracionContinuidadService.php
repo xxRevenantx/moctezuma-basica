@@ -60,6 +60,24 @@ class CierreGeneracionContinuidadService
 
     private const SIMULACION_VIGENCIA_MINUTOS = 30;
 
+    /**
+     * Evidencia académica primaria que sí impide tratar el ciclo destino como
+     * "no iniciado". Los análisis de riesgo, alertas, integridad y seguimiento
+     * son datos derivados y no prueban por sí mismos que el alumno haya iniciado.
+     *
+     * @var array<string, string>
+     */
+    private const TABLAS_ACTIVIDAD_REAL_DESTINO = [
+        'calificaciones' => 'calificaciones',
+        'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
+        'ficha_descriptivas' => 'fichas descriptivas',
+        'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
+        'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
+        'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
+        'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
+        'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
+    ];
+
     public function __construct(
         private readonly GestionAcademicaService $gestionAcademica,
         private readonly HistorialCicloEscolarService $historialCiclos,
@@ -1436,21 +1454,7 @@ class CierreGeneracionContinuidadService
             }
 
             $bloqueosActividad = [];
-            foreach ([
-                'alertas_academicas' => 'alertas académicas',
-                'calificaciones' => 'calificaciones',
-                'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
-                'ficha_descriptivas' => 'fichas descriptivas',
-                'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
-                'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
-                'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
-                'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
-                'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
-                'integridad_academica_casos' => 'casos de integridad académica',
-                'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
-                'seguimiento_academico_casos' => 'casos de seguimiento académico',
-                'seguimiento_academico_eventos' => 'eventos de seguimiento académico',
-            ] as $tabla => $etiqueta) {
+            foreach (self::TABLAS_ACTIVIDAD_REAL_DESTINO as $tabla => $etiqueta) {
                 if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
                     continue;
                 }
@@ -1770,6 +1774,11 @@ class CierreGeneracionContinuidadService
             unset($snapshotDestino['snapshot_cierre']);
             $destino->forceFill(['snapshot_cierre' => $snapshotDestino])->saveQuietly();
 
+            // Los semáforos de riesgo son derivados del historial. Al confirmar
+            // que el alumno no inició el ciclo destino dejan de ser vigentes,
+            // pero se conservan como historial para auditoría.
+            $this->desactivarEvaluacionesRiesgoDestino($destino);
+
             $origen->forceFill([
                 'estatus_actual_ciclo' => $estatusFinal,
                 'inscripcion_ciclo_destino_id' => null,
@@ -1942,23 +1951,7 @@ class CierreGeneracionContinuidadService
         }
 
         if ($destino) {
-            $tablasActividad = [
-                'alertas_academicas' => 'alertas académicas',
-                'calificaciones' => 'calificaciones',
-                'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
-                'ficha_descriptivas' => 'fichas descriptivas',
-                'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
-                'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
-                'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
-                'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
-                'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
-                'integridad_academica_casos' => 'casos de integridad académica',
-                'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
-                'seguimiento_academico_casos' => 'casos de seguimiento académico',
-                'seguimiento_academico_eventos' => 'eventos de seguimiento académico',
-            ];
-
-            foreach ($tablasActividad as $tabla => $etiqueta) {
+            foreach (self::TABLAS_ACTIVIDAD_REAL_DESTINO as $tabla => $etiqueta) {
                 if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
                     continue;
                 }
@@ -2021,6 +2014,23 @@ class CierreGeneracionContinuidadService
                 'estado' => $destino->estado,
             ] : [],
         ];
+    }
+
+    private function desactivarEvaluacionesRiesgoDestino(InscripcionCiclo $destino): void
+    {
+        if (! Schema::hasTable('riesgo_academico_evaluaciones')
+            || ! Schema::hasColumn('riesgo_academico_evaluaciones', 'inscripcion_ciclo_id')
+            || ! Schema::hasColumn('riesgo_academico_evaluaciones', 'es_actual')) {
+            return;
+        }
+
+        DB::table('riesgo_academico_evaluaciones')
+            ->where('inscripcion_ciclo_id', $destino->id)
+            ->where('es_actual', true)
+            ->update([
+                'es_actual' => false,
+                'updated_at' => now(),
+            ]);
     }
 
     private function estatusFinalTrasRetiro(ProyeccionContinuidad $proyeccion): string

@@ -471,6 +471,101 @@
             </div>
         </div>
 
+        {{-- Indicadores de edad escolar --}}
+        <div class="border-b border-slate-200 bg-white px-5 py-5 dark:border-neutral-800 dark:bg-neutral-900">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                            <flux:icon.academic-cap class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <p class="text-sm font-black text-slate-900 dark:text-white">Edad escolar</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Comparación al 31 de diciembre del año de inicio del ciclo escolar. En bachillerato se muestra edad típica, no extraedad de educación básica.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <button type="button" wire:click="$set('situacion_edad', 'adecuada')"
+                        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <p class="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">Adecuada / típica</p>
+                        <p class="mt-1 text-xl font-black text-emerald-800 dark:text-emerald-200">{{ $edadAdecuada }}</p>
+                    </button>
+                    <button type="button" wire:click="$set('situacion_edad', 'mayor')"
+                        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20">
+                        <p class="text-[11px] font-black uppercase text-amber-700 dark:text-amber-300">+1 / mayor típica</p>
+                        <p class="mt-1 text-xl font-black text-amber-800 dark:text-amber-200">{{ $edadMayor }}</p>
+                    </button>
+                    <button type="button" wire:click="$set('situacion_edad', 'extraedad')"
+                        class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/20">
+                        <p class="text-[11px] font-black uppercase text-rose-700 dark:text-rose-300">Extraedad básica</p>
+                        <p class="mt-1 text-xl font-black text-rose-800 dark:text-rose-200">{{ $extraedad }}</p>
+                    </button>
+                    <button type="button" wire:click="$set('situacion_edad', 'menor')"
+                        class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-left transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-950/20">
+                        <p class="text-[11px] font-black uppercase text-sky-700 dark:text-sky-300">Menor</p>
+                        <p class="mt-1 text-xl font-black text-sky-800 dark:text-sky-200">{{ $edadMenor }}</p>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-neutral-800 lg:flex-row lg:items-center lg:justify-between">
+                <details class="group max-w-4xl">
+                    <summary class="cursor-pointer select-none text-xs font-black text-indigo-700 dark:text-indigo-300">
+                        Ver tabla de referencia de edad por nivel y grado
+                    </summary>
+                    <div class="mt-3 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-xl bg-slate-50 p-3 dark:bg-neutral-800/70">
+                            <p class="font-black text-slate-800 dark:text-white">Preescolar</p>
+                            <p class="mt-1 text-slate-600 dark:text-slate-300">1°: 3 · 2°: 4 · 3°: 5 años</p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 p-3 dark:bg-neutral-800/70">
+                            <p class="font-black text-slate-800 dark:text-white">Primaria</p>
+                            <p class="mt-1 text-slate-600 dark:text-slate-300">1°: 6 · 2°: 7 · 3°: 8 · 4°: 9 · 5°: 10 · 6°: 11</p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 p-3 dark:bg-neutral-800/70">
+                            <p class="font-black text-slate-800 dark:text-white">Secundaria</p>
+                            <p class="mt-1 text-slate-600 dark:text-slate-300">1°: 12 · 2°: 13 · 3°: 14 años</p>
+                        </div>
+                        <div class="rounded-xl bg-violet-50 p-3 dark:bg-violet-950/20">
+                            <p class="font-black text-violet-800 dark:text-violet-200">Bachillerato · edad típica</p>
+                            <p class="mt-1 text-violet-700 dark:text-violet-300">1°: 15 · 2°: 16 · 3°: 17 años</p>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                        La comparación escolar se realiza al 31 de diciembre del año de inicio del ciclo. En educación básica el sistema marca extraedad desde +2 años; bachillerato se informa únicamente contra edad típica.
+                    </p>
+                </details>
+
+                @if (auth()->user()?->canAccess('alumnos.consultar'))
+                    @php
+                        $parametrosExtraedad = array_filter([
+                            'situacion' => 'extraedad',
+                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                            'nivel_id' => $nivel_id,
+                            'grado_id' => $grado_id,
+                        ], fn ($valor) => $valor !== null && $valor !== '');
+                    @endphp
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                        <a href="{{ route('misrutas.alumnos.edad-escolar.reporte', array_merge(['formato' => 'pdf'], $parametrosExtraedad)) }}"
+                            target="_blank"
+                            class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-rose-700">
+                            <flux:icon.document-arrow-down class="h-4 w-4" />
+                            Extraedad PDF
+                        </a>
+                        <a href="{{ route('misrutas.alumnos.edad-escolar.reporte', array_merge(['formato' => 'excel'], $parametrosExtraedad)) }}"
+                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-emerald-700">
+                            <flux:icon.table-cells class="h-4 w-4" />
+                            Extraedad Excel
+                        </a>
+                    </div>
+                @endif
+            </div>
+        </div>
+
         {{-- Filtros --}}
         <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-neutral-800 dark:bg-neutral-900/70">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -557,7 +652,7 @@
                 </flux:field>
 
                 <flux:field>
-                    <flux:label>Ciclo</flux:label>
+                    <flux:label>Momento del ciclo</flux:label>
                     <flux:select wire:model.live="ciclo_id">
                         <flux:select.option value="">Todos los ciclos</flux:select.option>
 
@@ -566,6 +661,29 @@
                                 {{ $ciclo->ciclo }}
                             </flux:select.option>
                         @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>Ciclo escolar</flux:label>
+                    <flux:select wire:model.live="ciclo_escolar_id">
+                        <flux:select.option value="">Todos los ciclos escolares</flux:select.option>
+                        @foreach ($ciclosEscolares as $cicloEscolar)
+                            <flux:select.option value="{{ $cicloEscolar->id }}">
+                                {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}{{ $cicloEscolar->es_actual ? ' · actual' : '' }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>Situación de edad</flux:label>
+                    <flux:select wire:model.live="situacion_edad">
+                        <flux:select.option value="">Todas</flux:select.option>
+                        <flux:select.option value="adecuada">Adecuada / edad típica</flux:select.option>
+                        <flux:select.option value="mayor">+1 año / mayor a edad típica</flux:select.option>
+                        <flux:select.option value="extraedad">Extraedad (educación básica)</flux:select.option>
+                        <flux:select.option value="menor">Menor a la esperada</flux:select.option>
                     </flux:select>
                 </flux:field>
 
@@ -710,6 +828,7 @@
                         <th class="px-4 py-4 text-left font-black">CURP</th>
                         <th class="px-4 py-4 text-left font-black">Alumno</th>
                         <th class="px-4 py-4 text-center font-black">Sexo</th>
+                        <th class="px-4 py-4 text-left font-black">Edad escolar</th>
                         <th class="px-4 py-4 text-left font-black">Grado / Semestre</th>
                         <th class="px-4 py-4 text-left font-black">Generación</th>
                         <th class="px-4 py-4 text-center font-black whitespace-nowrap">Fecha inscripción</th>
@@ -772,6 +891,25 @@
 
                             <td class="px-4 py-4 text-center text-sm font-bold text-slate-800 dark:text-white">
                                 {{ $alumno->genero ?: '—' }}
+                            </td>
+
+                            <td class="px-4 py-4">
+                                @php($edadEscolar = (array) ($alumno->edad_escolar ?? []))
+                                @if ($edadEscolar['disponible'] ?? false)
+                                    <div class="min-w-[145px]">
+                                        <p class="text-sm font-black text-slate-900 dark:text-white">
+                                            {{ $edadEscolar['edad_actual'] }} años <span class="font-semibold text-slate-400">actual</span>
+                                        </p>
+                                        <span class="mt-1 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black {{ $this->claseEdadEscolar($alumno) }}">
+                                            {{ $edadEscolar['etiqueta'] }}
+                                        </span>
+                                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                            {{ $edadEscolar['edad_corte'] }} años al {{ $edadEscolar['fecha_corte_texto'] }}
+                                        </p>
+                                    </div>
+                                @else
+                                    <span class="text-xs font-semibold text-slate-400">Sin datos suficientes</span>
+                                @endif
                             </td>
 
                             <td class="px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
@@ -873,7 +1011,7 @@
 
                         {{-- Desplegable detalles --}}
                         <tr x-cloak x-show="detalleAbierto === {{ $alumno->id }}" x-transition>
-                            <td colspan="13" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
+                            <td colspan="14" class="bg-slate-50 px-4 pb-5 dark:bg-neutral-950/70">
                                 <div
                                     class="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-lg shadow-slate-200/70 dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none">
                                     <div
@@ -948,7 +1086,13 @@
                                                         @if ($alumno->fecha_nacimiento)
                                                             <span
                                                                 class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-neutral-800 dark:text-slate-300">
-                                                                Edad: {{ $alumno->fecha_nacimiento->age }}
+                                                                Edad actual: {{ data_get($alumno->edad_escolar, 'edad_actual', $alumno->fecha_nacimiento->age) }}
+                                                            </span>
+                                                        @endif
+
+                                                        @if (data_get($alumno->edad_escolar, 'disponible'))
+                                                            <span class="rounded-full px-3 py-1 text-xs font-black {{ $this->claseEdadEscolar($alumno) }}">
+                                                                {{ data_get($alumno->edad_escolar, 'etiqueta') }}
                                                             </span>
                                                         @endif
                                                     </div>
@@ -1078,6 +1222,29 @@
                                                     </span>
                                                 </div>
 
+                                                @php($detalleEdad = (array) ($alumno->edad_escolar ?? []))
+                                                @if ($detalleEdad['disponible'] ?? false)
+                                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-neutral-700 dark:bg-neutral-950/60">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <span class="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Edad escolar</span>
+                                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-black {{ $this->claseEdadEscolar($alumno) }}">
+                                                                {{ $detalleEdad['etiqueta'] }}
+                                                            </span>
+                                                        </div>
+                                                        <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                                                            <dt class="text-slate-500 dark:text-slate-400">Edad actual</dt>
+                                                            <dd class="text-right font-black text-slate-800 dark:text-white">{{ $detalleEdad['edad_actual'] }} años</dd>
+                                                            <dt class="text-slate-500 dark:text-slate-400">Edad al corte</dt>
+                                                            <dd class="text-right font-black text-slate-800 dark:text-white">{{ $detalleEdad['edad_corte'] }} años</dd>
+                                                            <dt class="text-slate-500 dark:text-slate-400">Edad esperada</dt>
+                                                            <dd class="text-right font-black text-slate-800 dark:text-white">{{ $detalleEdad['edad_esperada'] }} años</dd>
+                                                            <dt class="text-slate-500 dark:text-slate-400">Fecha de corte</dt>
+                                                            <dd class="text-right font-black text-slate-800 dark:text-white">{{ $detalleEdad['fecha_corte_texto'] }}</dd>
+                                                        </dl>
+                                                        <p class="mt-3 text-xs leading-5 text-slate-600 dark:text-slate-300">{{ $detalleEdad['descripcion'] }}</p>
+                                                    </div>
+                                                @endif
+
                                                 <div class="flex items-center justify-between gap-4">
                                                     <span class="text-slate-500 dark:text-slate-400">Fecha
                                                         inscripción</span>
@@ -1162,7 +1329,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="13" class="px-6 py-14 text-center">
+                            <td colspan="14" class="px-6 py-14 text-center">
                                 <div class="mx-auto max-w-sm">
                                     <div
                                         class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-neutral-800">
@@ -1225,6 +1392,12 @@
                                         class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 dark:bg-neutral-800 dark:text-slate-300">
                                         {{ $alumno->genero ?: '—' }}
                                     </span>
+
+                                    @if (data_get($alumno->edad_escolar, 'disponible'))
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-black {{ $this->claseEdadEscolar($alumno) }}">
+                                            {{ data_get($alumno->edad_escolar, 'edad_actual') }} años · {{ data_get($alumno->edad_escolar, 'etiqueta') }}
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -1313,8 +1486,16 @@
                             <p><span class="font-bold">Ciclo:</span> {{ $alumno->ciclo?->ciclo ?? '—' }}</p>
                             <p><span class="font-bold">Fecha nac.:</span>
                                 {{ $alumno->fecha_nacimiento ? $alumno->fecha_nacimiento->format('d/m/Y') : '—' }}</p>
-                            <p><span class="font-bold">Edad:</span>
-                                {{ $alumno->fecha_nacimiento ? $alumno->fecha_nacimiento->age : '—' }}</p>
+                            <p><span class="font-bold">Edad actual:</span>
+                                {{ data_get($alumno->edad_escolar, 'edad_actual', '—') }}</p>
+                            <p><span class="font-bold">Edad al corte escolar:</span>
+                                {{ data_get($alumno->edad_escolar, 'edad_corte', '—') }}
+                                @if (data_get($alumno->edad_escolar, 'fecha_corte_texto'))
+                                    ({{ data_get($alumno->edad_escolar, 'fecha_corte_texto') }})
+                                @endif
+                            </p>
+                            <p><span class="font-bold">Edad esperada:</span> {{ data_get($alumno->edad_escolar, 'edad_esperada', '—') }}</p>
+                            <p><span class="font-bold">Situación:</span> {{ data_get($alumno->edad_escolar, 'etiqueta', 'Sin datos') }}</p>
                         </div>
                     </div>
                 </article>

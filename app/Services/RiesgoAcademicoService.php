@@ -31,6 +31,13 @@ class RiesgoAcademicoService
         $query = InscripcionCiclo::query()
             ->with(['inscripcion', 'nivel', 'cicloEscolar'])
             ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
+            // Una continuidad puede quedar preparada como "en_curso" antes de la
+            // fecha real de ingreso. Esos ciclos futuros todavía no representan
+            // actividad del alumno y no deben generar evaluaciones automáticas.
+            ->where(function (Builder $q): void {
+                $q->whereNull('fecha_ingreso')
+                    ->orWhereDate('fecha_ingreso', '<=', today());
+            })
             ->when($filtros['ciclo_escolar_id'] ?? null, fn (Builder $q, $id) => $q->where('ciclo_escolar_id', $id))
             ->when($filtros['nivel_id'] ?? null, fn (Builder $q, $id) => $q->where('nivel_id', $id))
             ->when($filtros['inscripcion_id'] ?? null, fn (Builder $q, $id) => $q->where('inscripcion_id', $id))

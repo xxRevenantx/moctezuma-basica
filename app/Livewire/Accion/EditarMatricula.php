@@ -15,6 +15,7 @@ use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\AnulacionIngresoNoIniciadoService;
 use App\Services\CurpService;
+use App\Services\EdadEscolarService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\GestionAcademicaService;
 use App\Services\ImagenPersonalService;
@@ -116,6 +117,8 @@ class EditarMatricula extends Component
     public array $diagnostico_anulacion_ingreso = [];
 
     public ?string $observaciones = null;
+    /** @var array<string,mixed> */
+    public array $edadEscolar = [];
     public ?int $observacion_ciclo_escolar_id = null;
 
     /** @var array<int, string|null> */
@@ -214,6 +217,7 @@ class EditarMatricula extends Component
         $this->cargarObservacionCiclo();
 
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function prepararAnulacionIngreso(AnulacionIngresoNoIniciadoService $service): void
@@ -592,6 +596,7 @@ class EditarMatricula extends Component
         ]);
         $this->niveles = $this->loadNivelesFromGrupos();
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedNivelId($value): void
@@ -603,6 +608,7 @@ class EditarMatricula extends Component
         $this->grupo_id = null;
         $this->resetValidation(['nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'grupo_id']);
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedGradoId($value): void
@@ -613,6 +619,7 @@ class EditarMatricula extends Component
         $this->grupo_id = null;
         $this->resetValidation(['grado_id', 'generacion_id', 'semestre_id', 'grupo_id']);
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedGeneracionId($value): void
@@ -627,6 +634,7 @@ class EditarMatricula extends Component
 
         $this->resetValidation(['generacion_id', 'semestre_id', 'grupo_id']);
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedSemestreId($value): void
@@ -635,11 +643,13 @@ class EditarMatricula extends Component
         $this->grupo_id = null;
 
         if ($this->esBachillerato()) {
-            $this->grado_id = null;
+            $semestre = $this->semestre_id ? Semestre::query()->find($this->semestre_id) : null;
+            $this->grado_id = $semestre?->grado_id ? (int) $semestre->grado_id : null;
         }
 
         $this->resetValidation(['semestre_id', 'grupo_id']);
         $this->recargarOpcionesAsignacionEscolar();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedGrupoId($value): void
@@ -656,6 +666,27 @@ class EditarMatricula extends Component
 
             $this->grado_id = $grupo?->grado_id ? (int) $grupo->grado_id : null;
         }
+
+        $this->actualizarEdadEscolar();
+    }
+
+    public function updatedFechaNacimiento(): void
+    {
+        $this->actualizarEdadEscolar();
+    }
+
+    private function actualizarEdadEscolar(): void
+    {
+        $nivel = $this->nivel_id ? Nivel::query()->find($this->nivel_id) : null;
+        $grado = $this->grado_id ? Grado::query()->find($this->grado_id) : null;
+        $cicloEscolar = $this->ciclo_escolar_id ? CicloEscolar::query()->find($this->ciclo_escolar_id) : null;
+
+        $this->edadEscolar = app(EdadEscolarService::class)->analizar(
+            $this->fecha_nacimiento,
+            $nivel,
+            $grado,
+            $cicloEscolar,
+        );
     }
 
     #[On('usar-domicilio-responsable')]
@@ -751,6 +782,7 @@ class EditarMatricula extends Component
         $this->estado_nacimiento = $datos['estado_nacimiento'] ?: $this->estado_nacimiento;
         $this->lugar_nacimiento = $datos['lugar_nacimiento'] ?: $this->lugar_nacimiento;
         $this->curpSuccess = 'Los datos de la CURP se actualizaron en el formulario.';
+        $this->actualizarEdadEscolar();
     }
 
     public function quitarFotoTemporal(): void

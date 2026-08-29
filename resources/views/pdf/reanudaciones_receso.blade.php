@@ -35,6 +35,34 @@
         src: url('{{ public_path('fonts/times_new_roman.ttf') }}') format('truetype');
     }
 
+    /* @font-face {
+        font-family: 'calibri';
+        font-style: normal;
+        src: url('{{ public_path('fonts/calibri-regular.ttf') }}') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'calibri';
+        font-style: bold;
+        src: url('{{ public_path('fonts/calibri-bold.ttf') }}') format('truetype');
+    } */
+
+
+    @font-face {
+        font-family: 'ARIAL';
+        font-style: normal;
+        src: url('{{ storage_path('fonts/ARIAL.ttf') }}') format('truetype');
+
+    }
+
+    /* arial bold */
+    @font-face {
+        font-family: 'ARIAL';
+        font-style: bold;
+        font-weight: 700;
+        src: url('{{ storage_path('fonts/ARIALBD.ttf') }}') format('truetype');
+    }
+
     .fila-dato {
         display: flex;
         align-items: baseline;
@@ -53,11 +81,12 @@
         padding-bottom: 2px;
         font-weight: 700;
         text-transform: uppercase;
-        line-height: 1.1;
+        /* line-height: 1.1; */
     }
 
     .contenedor_preescolar {
         font-size: 14px;
+        font-family: 'ARIAL', sans-serif;
     }
 
     .contenedor_primaria {
@@ -102,10 +131,12 @@
         // El servicio ya entrega el orden exacto de la Plantilla de personal por ciclo.
         // orden_pdf_plantilla es temporal; `orden` queda como respaldo para el flujo legado.
         $asignacionesNivel = collect($asignacionesNivel ?? [])
-            ->sortBy(fn($personal) => [
-                (int) ($personal->orden_pdf_plantilla ?? $personal->orden ?? 999999),
-                (int) ($personal->id ?? 0),
-            ])
+            ->sortBy(
+                fn($personal) => [
+                    (int) ($personal->orden_pdf_plantilla ?? ($personal->orden ?? 999999)),
+                    (int) ($personal->id ?? 0),
+                ],
+            )
             ->values();
 
         // =========================
@@ -235,24 +266,28 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <div class="contenedor_preescolar" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '10px' }} 60px 0">
+            <div class="contenedor_preescolar"
+                style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '10px' }} 60px 0">
 
-                <p style="text-align: right; font-family:Arial, Helvetica, sans-serif;">
-                    ASUNTO: <b> REANUDACIÓN DE LABORES</b>
+                <p style="margin-top:30px; text-align: right; font-family:Arial, Helvetica, sans-serif;">
+                    ASUNTO: REANUDACIÓN DE LABORES
+                </p>
+
+                <p style="text-align: right; margin-top:-10px">
+                    @if (empty(trim($escuela->lema ?? '')))
+                    @else
+                        "{{ $escuela->lema }}".
+                    @endif
+
                 </p>
 
                 <p style="text-align: right; margin-right:100px; text-transform: uppercase;">
                     CIUDAD ALTAMIRANO, GRO. A {{ $fechaCarta }}.
                 </p>
 
-                <p style="text-align: right"><b>
-                        @if (empty(trim($escuela->lema ?? '')))
-                        @else
-                            "{{ $escuela->lema }}"
-                        @endif
-                    </b></p>
 
-                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 15px;">
+
+                <div class="delegado" style="margin-top: 10px; text-transform: uppercase; font-size: 14px;">
                     <p style="width: 400px;">
                         <b>
                             {{ $delegado->titulo }} {{ $delegado->nombre }} {{ $delegado->apellido_paterno }}
@@ -260,18 +295,18 @@
                         </b>
                     </p>
                     <p style="margin-top:-15px; width:320px">
-                        {{ $delegado->cargo }}
+                        <b> {{ $delegado->cargo }}</b>
                     </p>
-                    <p><b>P R E S E N T E</b></p>
+                    {{-- <p>P R E S E N T E</p> --}}
                 </div>
 
                 <div>
-                    <p style="text-transform: uppercase; text-align: justify; line-height: 20px;">
-                        EL (A) QUE SUSCRIBE C. <b><u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u></b>,
+                    <p style="text-transform: uppercase; text-align: justify; line-height: 15px;">
+                        EL (A) QUE SUSCRIBE C.<u>{{ $personal->persona->titulo }} {{ $nombreCompleto }}</u>,
                         SE DIRIGE A USTED PARA INFORMARLE QUE, CON FECHA ARRIBA SEÑALADA, ME PRESENTÉ A REANUDAR
-                        LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>EL RECESO ESCOLAR</u></b>,
+                        LABORES, DESPUÉS DE HABER DISFRUTADO <u>EL RECESO ESCOLAR</u>,
                         CORRESPONDIENTE AL CICLO ESCOLAR
-                        <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                        {{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}.
                     </p>
                 </div>
 
@@ -310,9 +345,9 @@
                             <div class="label">
                                 {{ $key }}:
                                 @if ($key === 'CARGO QUE DESEMPEÑA')
-                                    <b><u>{!! $dato !!}{!! $espacioBlanco !!}</u></b>
+                                    <u>{!! $dato !!}{!! $espacioBlanco !!}</u>
                                 @else
-                                    <b><u>{{ $dato }}{!! $espacioBlanco !!}</u></b>
+                                    <u>{{ $dato }}{!! $espacioBlanco !!}</u>
                                 @endif
                             </div>
                         </div>
@@ -370,6 +405,8 @@
                         'Q.B.P.',
                         'Q.F.B.',
                         'C.P.',
+                        'C.p.',
+                        'c.p.',
                         'Téc.',
                         'Tec.',
                         'DCE.',
@@ -397,7 +434,7 @@
 
                 <div class="ccp" style="margin-top: 8px;">
                     <p style="font-size: 9px; margin:0;">
-                        <b>{!! $copiasIndentado !!}</b>
+                        {!! $copiasIndentado !!}
                     </p>
                 </div>
 
@@ -439,7 +476,8 @@
                 $cargosLinea = $resolverCargosDesdeDetalles($personal, false);
             @endphp
 
-            <div class="contenedor_primaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
+            <div class="contenedor_primaria"
+                style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
 
                 <p style="text-align: right; font-size: 17px; line-height: 25px; ">
                     <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
@@ -665,7 +703,8 @@
                 $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
             @endphp
 
-            <div class="contenedor_secundaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
+            <div class="contenedor_secundaria"
+                style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
 
                 <p style="text-align: right; font-size: 17px; line-height: 25px; ">
                     <b>ASUNTO: REANUDACIÓN DE LABORES</b> <br>

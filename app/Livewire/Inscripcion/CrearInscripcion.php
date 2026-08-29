@@ -18,6 +18,7 @@ use App\Rules\CurpMexicana;
 use App\Services\AsignacionEscolarService;
 use App\Services\CurpLocalLookupService;
 use App\Services\CurpService;
+use App\Services\EdadEscolarService;
 use App\Services\GestionAcademicaService;
 use App\Services\GestionResponsablesAlumnoService;
 use App\Services\ImagenPersonalService;
@@ -79,6 +80,8 @@ class CrearInscripcion extends Component
     public ?string $motivo_captura_historica = null;
     public ?string $generacionAutomaticaLabel = null;
     public ?string $asignacionAdvertencia = null;
+    /** @var array<string,mixed> */
+    public array $edadEscolar = [];
 
     public ?string $fecha_baja = null;
     public ?string $motivo_baja = null;
@@ -178,6 +181,7 @@ class CrearInscripcion extends Component
             ?: $this->cicloEscolaresOptions->first()?->id;
 
         $this->fecha_inscripcion = now()->toDateString();
+        $this->actualizarEdadEscolar();
         $this->ciclo_escolar_id = $this->ciclo_escolar_id ?: $this->cicloEscolaresOptions->first()?->id;
         $this->fecha_baja = null;
         $this->motivo_baja = null;
@@ -1472,6 +1476,7 @@ class CrearInscripcion extends Component
         $this->ciclo_escolar_id = $value ? (int) $value : null;
         $this->reiniciarAsignacionDependiente(false);
         $this->normalizarTipoIngresoPorCiclo();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedCicloId($value): void
@@ -1481,6 +1486,8 @@ class CrearInscripcion extends Component
         if ($this->esBachillerato) {
             $this->proponerSemestreBachillerato();
         }
+
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedTipoIngreso(string $value): void
@@ -1497,6 +1504,8 @@ class CrearInscripcion extends Component
         } elseif ($this->grado_id) {
             $this->resolverGeneracionAutomatica();
         }
+
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedNivelId($value): void
@@ -1513,6 +1522,7 @@ class CrearInscripcion extends Component
 
         if (!$nivel) {
             $this->refrescarMatriculaSiPosible();
+            $this->actualizarEdadEscolar();
             return;
         }
 
@@ -1524,6 +1534,7 @@ class CrearInscripcion extends Component
         }
 
         $this->refrescarMatriculaSiPosible();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedGradoId($value): void
@@ -1543,6 +1554,7 @@ class CrearInscripcion extends Component
         }
 
         $this->refrescarMatriculaSiPosible();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedSemestreId($value): void
@@ -1563,6 +1575,7 @@ class CrearInscripcion extends Component
         }
 
         $this->refrescarMatriculaSiPosible();
+        $this->actualizarEdadEscolar();
     }
 
     public function updatedGrupoId($value): void
@@ -1687,6 +1700,25 @@ class CrearInscripcion extends Component
         if (empty($this->gruposOptions)) {
             $this->asignacionAdvertencia = 'No existe un grupo activo compatible con el ciclo, nivel, grado y generación calculados.';
         }
+    }
+
+    public function updatedFechaNacimiento(): void
+    {
+        $this->actualizarEdadEscolar();
+    }
+
+    private function actualizarEdadEscolar(): void
+    {
+        $nivel = $this->nivel_id ? Nivel::query()->find($this->nivel_id) : null;
+        $grado = $this->grado_id ? Grado::query()->find($this->grado_id) : null;
+        $cicloEscolar = $this->ciclo_escolar_id ? CicloEscolar::query()->find($this->ciclo_escolar_id) : null;
+
+        $this->edadEscolar = app(EdadEscolarService::class)->analizar(
+            $this->fecha_nacimiento,
+            $nivel,
+            $grado,
+            $cicloEscolar,
+        );
     }
 
     public function updated($property): void
@@ -2169,6 +2201,7 @@ class CrearInscripcion extends Component
             'motivo_captura_historica',
             'generacionAutomaticaLabel',
             'asignacionAdvertencia',
+            'edadEscolar',
             'matriculaEditadaManual',
 
             'fecha_baja',

@@ -291,11 +291,16 @@
                     @endif
                 </div>
 
-                @if ($this->esConstanciaTerminoSeleccionada())
+                @if ($modo_descarga === 'alumno')
+                    <div
+                        class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200">
+                        La búsqueda individual es global: puedes seleccionar cualquier alumno registrado, sin importar
+                        nivel, grado o estatus académico. Los alumnos archivados no aparecen hasta que sean restaurados.
+                    </div>
+                @elseif ($this->esConstanciaTerminoSeleccionada())
                     <div
                         class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
-                        La constancia de término permite seleccionar alumnos activos y egresados. Las bajas,
-                        traslados, suspendidos e inactivos quedan excluidos.
+                        En generación masiva, la constancia de término incluye alumnos activos y egresados.
                     </div>
                 @endif
 
@@ -326,8 +331,12 @@
                                 class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
                                 <p class="font-semibold">{{ $selectedAlumno['nombre_completo'] }}</p>
                                 <p class="text-xs">
-                                    {{ $selectedAlumno['matricula'] }} · {{ $selectedAlumno['nivel'] }} ·
-                                    {{ $selectedAlumno['grado'] }} · Grupo {{ $selectedAlumno['grupo'] }}
+                                    {{ $selectedAlumno['matricula'] ?: 'Sin matrícula' }} · {{ $selectedAlumno['nivel'] ?: 'Sin nivel' }} ·
+                                    {{ $selectedAlumno['grado'] ?: 'Sin grado' }}
+                                    @if ($selectedAlumno['grupo'])
+                                        · Grupo {{ $selectedAlumno['grupo'] }}
+                                    @endif
+                                    · {{ $selectedAlumno['estatus'] ?? 'Sin estatus' }}
                                 </p>
 
                                 <div class="mt-2">
@@ -349,8 +358,12 @@
                                             {{ $alumno['nombre_completo'] }}
                                         </p>
                                         <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                            {{ $alumno['matricula'] }} · {{ $alumno['nivel'] }} ·
-                                            {{ $alumno['grado'] }} · Grupo {{ $alumno['grupo'] }}
+                                            {{ $alumno['matricula'] ?: 'Sin matrícula' }} · {{ $alumno['nivel'] ?: 'Sin nivel' }} ·
+                                            {{ $alumno['grado'] ?: 'Sin grado' }}
+                                            @if ($alumno['grupo'])
+                                                · Grupo {{ $alumno['grupo'] }}
+                                            @endif
+                                            · {{ $alumno['estatus'] ?? 'Sin estatus' }}
                                         </p>
                                     </li>
                                 @endforeach

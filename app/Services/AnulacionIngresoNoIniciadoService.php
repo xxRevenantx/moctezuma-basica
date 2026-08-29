@@ -19,9 +19,10 @@ use Illuminate\Validation\ValidationException;
 class AnulacionIngresoNoIniciadoService
 {
     /**
-     * Registros que prueban que el alumno sí tuvo actividad en el ciclo.
-     * Las tablas de auditoría no se incluyen porque no representan asistencia
-     * ni evaluación académica.
+     * Registros primarios que prueban actividad académica real en el ciclo.
+     * No se incluyen semáforos de riesgo, alertas, integridad ni seguimiento:
+     * son artefactos derivados/administrativos y pueden generarse automáticamente
+     * incluso antes de que el alumno inicie actividades.
      *
      * @var array<string, string>
      */
@@ -34,10 +35,6 @@ class AnulacionIngresoNoIniciadoService
         'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
         'bitacora_calificaciones' => 'movimientos de calificaciones',
         'calificacion_correcciones' => 'solicitudes de corrección de calificaciones',
-        'alertas_academicas' => 'alertas académicas',
-        'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
-        'seguimiento_academico_casos' => 'casos de seguimiento académico',
-        'integridad_academica_casos' => 'casos de integridad académica',
         'constancias_traslado' => 'constancias de traslado del ciclo',
     ];
 
