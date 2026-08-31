@@ -36,6 +36,7 @@
         $destinatario = $documento['destinatario_nombre'] ?: data_get($snapshot, 'autoridades.destinatario_nombre', 'AUTORIDAD EDUCATIVA');
         $cargoDestinatario = $documento['destinatario_cargo'] ?: data_get($snapshot, 'autoridades.destinatario_cargo', 'PRESENTE');
         $fecha = \Carbon\Carbon::parse($documento['fecha_documento'])->locale('es')->isoFormat('D [de] MMMM [de] YYYY');
+        $cicloCitado = data_get($snapshot, 'ciclo_citado.nombre', data_get($snapshot, 'ciclo.nombre'));
         $periodo = match($documento['tipo']) {
             'receso' => 'el receso escolar',
             'invierno' => 'las vacaciones de invierno',
@@ -71,7 +72,8 @@
             <div class="cuerpo">
                 <p>
                     Por este conducto, me permito informar que con fecha arriba señalada me presenté a reanudar mis labores,
-                    después de haber disfrutado <b><u>{{ mb_strtoupper($periodo) }}</u></b>, incorporándome a las actividades
+                    después de haber disfrutado <b><u>{{ mb_strtoupper($periodo) }}</u></b>, correspondiente al ciclo escolar
+                    <b>{{ $cicloCitado }}</b>, incorporándome a las actividades
                     correspondientes del nivel Bachillerato del {{ $escuela }}.
                 </p>
                 <p>Sin otro particular, reciba un cordial saludo.</p>

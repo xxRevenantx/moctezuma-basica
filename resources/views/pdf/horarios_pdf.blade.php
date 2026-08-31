@@ -294,19 +294,18 @@
         }
 
         .tabla-docentes th {
-            padding: 4px;
             border: 1px solid #7f96a8;
             background: #b9d0e2;
             color: #0f172a;
             border: 1px solid #7f96a8;
-            padding: 6px;
+            padding: 2px;
             text-transform: uppercase;
         }
 
         .tabla-docentes td {
             padding: 3px 6px;
             border: 1px solid #7f96a8;
-            padding: 5px 7px;
+            padding: 2.5px;
             text-align: center;
             vertical-align: middle;
         }
@@ -482,9 +481,9 @@
                                     : '';
 
                                 $esRecesoSecundariaBachillerato =
-                                    (!empty($esSecundaria) || !empty($esBachillerato))
-                                    && $horaInicio24 === '09:00'
-                                    && $horaFin24 === '09:30';
+                                    (!empty($esSecundaria) || !empty($esBachillerato)) &&
+                                    $horaInicio24 === '09:00' &&
+                                    $horaFin24 === '09:30';
                             @endphp
 
                             {{ $horaInicio }}-{{ $horaFin }}
@@ -495,71 +494,71 @@
                                 RECESO
                             </td>
                         @else
-                        @foreach ($diasOrdenados as $dia)
-                            @php
-                                $claveCelda = $hora->id . '-' . $dia->id;
+                            @foreach ($diasOrdenados as $dia)
+                                @php
+                                    $claveCelda = $hora->id . '-' . $dia->id;
 
-                                $registro = $horarioPorCelda->get($claveCelda);
+                                    $registro = $horarioPorCelda->get($claveCelda);
 
-                                $talleresCelda = collect($talleresPorCelda->get($claveCelda, collect()))
-                                    ->unique('taller_sesion_id')
-                                    ->values();
+                                    $talleresCelda = collect($talleresPorCelda->get($claveCelda, collect()))
+                                        ->unique('taller_sesion_id')
+                                        ->values();
 
-                                $asignacion = $registro?->asignacionMateria;
-                                $materia = $asignacion?->materia;
+                                    $asignacion = $registro?->asignacionMateria;
+                                    $materia = $asignacion?->materia;
 
-                                $textoMateria = trim((string) ($materia?->materia ?? ''));
-                                $calificable = (int) ($materia?->calificable ?? 0);
-                                $extra = (int) ($materia?->extra ?? 0);
-                                $receso = (int) ($materia?->receso ?? 0);
+                                    $textoMateria = trim((string) ($materia?->materia ?? ''));
+                                    $calificable = (int) ($materia?->calificable ?? 0);
+                                    $extra = (int) ($materia?->extra ?? 0);
+                                    $receso = (int) ($materia?->receso ?? 0);
 
-                                $hayMateria = $textoMateria !== '';
-                                $hayTalleres = $talleresCelda->isNotEmpty();
-                                $esReceso = $receso === 1;
+                                    $hayMateria = $textoMateria !== '';
+                                    $hayTalleres = $talleresCelda->isNotEmpty();
+                                    $esReceso = $receso === 1;
 
-                                $claseCelda = 'celda-materia';
+                                    $claseCelda = 'celda-materia';
 
-                                if ($hayTalleres) {
-                                    $claseCelda = 'celda-taller';
-                                } elseif ($esReceso) {
-                                    $claseCelda = 'celda-receso';
-                                } elseif (!empty($esPrimaria) && $calificable === 0) {
-                                    $claseCelda = 'celda-no-calificable';
-                                } elseif ($extra === 1 && $calificable === 1) {
-                                    $claseCelda = 'celda-extra';
-                                }
-                            @endphp
+                                    if ($hayTalleres) {
+                                        $claseCelda = 'celda-taller';
+                                    } elseif ($esReceso) {
+                                        $claseCelda = 'celda-receso';
+                                    } elseif (!empty($esPrimaria) && $calificable === 0) {
+                                        $claseCelda = 'celda-no-calificable';
+                                    } elseif ($extra === 1 && $calificable === 1) {
+                                        $claseCelda = 'celda-extra';
+                                    }
+                                @endphp
 
-                            <td class="{{ $claseCelda }}">
-                                @if ($hayMateria)
-                                    @if ($hayTalleres)
-                                        <div class="actividad-normal">
+                                <td class="{{ $claseCelda }}">
+                                    @if ($hayMateria)
+                                        @if ($hayTalleres)
+                                            <div class="actividad-normal">
+                                                {{ $esReceso ? mb_strtoupper($textoMateria, 'UTF-8') : $textoMateria }}
+                                            </div>
+                                        @else
                                             {{ $esReceso ? mb_strtoupper($textoMateria, 'UTF-8') : $textoMateria }}
-                                        </div>
-                                    @else
-                                        {{ $esReceso ? mb_strtoupper($textoMateria, 'UTF-8') : $textoMateria }}
+                                        @endif
                                     @endif
-                                @endif
 
-                                @foreach ($talleresCelda as $tallerHorario)
-                                    @php
-                                        $sesionTaller = $tallerHorario?->tallerSesion;
-                                    @endphp
+                                    @foreach ($talleresCelda as $tallerHorario)
+                                        @php
+                                            $sesionTaller = $tallerHorario?->tallerSesion;
+                                        @endphp
 
-                                    <div class="bloque-taller">
-                                        <span class="nombre-taller">
-                                            {{ $sesionTaller?->taller?->nombre ?? 'Taller' }}
+                                        <div class="bloque-taller">
+                                            <span class="nombre-taller">
+                                                {{ $sesionTaller?->taller?->nombre ?? 'Taller' }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+
+                                    @if (!$hayMateria && !$hayTalleres)
+                                        <span class="sin-registro">
+                                            ---
                                         </span>
-                                    </div>
-                                @endforeach
-
-                                @if (!$hayMateria && !$hayTalleres)
-                                    <span class="sin-registro">
-                                        ---
-                                    </span>
-                                @endif
-                            </td>
-                        @endforeach
+                                    @endif
+                                </td>
+                            @endforeach
                         @endif
                     </tr>
                 @empty

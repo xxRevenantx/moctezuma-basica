@@ -93,7 +93,7 @@
     <style>
         @page {
             size: letter portrait;
-            margin: 30px 20px;
+            margin: 30px 20px 5px;
         }
 
         @font-face {
@@ -766,7 +766,7 @@
                     </td>
                 </tr>
             </table>
-
+            {{--
             <table class="fechas">
                 <tr>
                     <td style="text-align: center;">
@@ -778,7 +778,7 @@
 
 
                 </tr>
-            </table>
+            </table> --}}
 
 
 

@@ -155,6 +155,44 @@
                 </flux:field>
             </div>
 
+            @if ($cicloSeleccionado && $tipoReanudacion === 'receso')
+                <div class="mt-5 rounded-2xl border p-4 {{ $cicloCitado ? 'border-sky-200 bg-sky-50/80 dark:border-sky-900 dark:bg-sky-950/30' : 'border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30' }}">
+                    <div class="flex items-start gap-3">
+                        @if ($cicloCitado)
+                            <flux:icon.information-circle class="mt-0.5 size-5 shrink-0 text-sky-700 dark:text-sky-300" />
+                        @else
+                            <flux:icon.exclamation-triangle class="mt-0.5 size-5 shrink-0 text-rose-700 dark:text-rose-300" />
+                        @endif
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-black uppercase tracking-[.16em] {{ $cicloCitado ? 'text-sky-700 dark:text-sky-300' : 'text-rose-700 dark:text-rose-300' }}">
+                                Regla especial del receso escolar de agosto
+                            </p>
+                            @if ($cicloCitado)
+                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <div class="rounded-xl border border-white/80 bg-white/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Ciclo de plantilla</p>
+                                        <p class="mt-1 text-base font-black text-slate-950 dark:text-white">{{ $cicloSeleccionado->nombre }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">Personal, cargos, funciones, fechas y membrete.</p>
+                                    </div>
+                                    <div class="rounded-xl border border-white/80 bg-white/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                                        <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">Ciclo que aparecerá en el oficio</p>
+                                        <p class="mt-1 text-base font-black text-slate-950 dark:text-white">{{ $cicloCitado->nombre }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">Solo se usa para la redacción del receso escolar.</p>
+                                    </div>
+                                </div>
+                                <p class="mt-3 text-xs text-slate-600 dark:text-slate-300">
+                                    El personal se obtiene exclusivamente de la plantilla {{ $cicloSeleccionado->nombre }}; no se recuperan profesores del ciclo {{ $cicloCitado->nombre }}.
+                                </p>
+                            @else
+                                <p class="mt-2 text-sm font-bold text-rose-800 dark:text-rose-200">
+                                    No se encontró el ciclo escolar anterior a {{ $cicloSeleccionado->nombre }}. Regístralo antes de previsualizar o generar estos oficios.
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="mt-5 border-t border-slate-200 pt-5 dark:border-neutral-800">
                 <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div>
@@ -527,20 +565,24 @@
 
             <div class="mt-5 grid gap-2">
                 <button type="button" wire:click="previsualizar" wire:loading.attr="disabled"
-                    class="inline-flex items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm font-black text-blue-700 shadow-sm hover:bg-blue-50 dark:border-blue-900 dark:bg-neutral-900 dark:text-blue-300">
+                    @disabled($tipoReanudacion === 'receso' && ! $cicloCitado)
+                    class="inline-flex items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm font-black text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-blue-900 dark:bg-neutral-900 dark:text-blue-300">
                     <span wire:loading.remove wire:target="previsualizar">Vista previa</span>
                     <span wire:loading wire:target="previsualizar">Preparando...</span>
                 </button>
                 <button type="button" wire:click="generar('pdf')" wire:loading.attr="disabled"
-                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#006492] px-4 py-3 text-sm font-black text-white shadow hover:bg-sky-800">
+                    @disabled($tipoReanudacion === 'receso' && ! $cicloCitado)
+                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#006492] px-4 py-3 text-sm font-black text-white shadow hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-40">
                     PDF individual
                 </button>
                 <button type="button" wire:click="generar('zip')" wire:loading.attr="disabled"
-                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow hover:bg-blue-800">
+                    @disabled($tipoReanudacion === 'receso' && ! $cicloCitado)
+                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40">
                     ZIP masivo · PDF por persona
                 </button>
                 <button type="button" wire:click="generar('word')" wire:loading.attr="disabled"
-                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-4 py-3 text-sm font-black text-white shadow hover:bg-violet-800">
+                    @disabled($tipoReanudacion === 'receso' && ! $cicloCitado)
+                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-4 py-3 text-sm font-black text-white shadow hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40">
                     Word masivo
                 </button>
             </div>
@@ -583,7 +625,13 @@
                             </div>
                             <div>
                                 <p class="font-black text-slate-900 dark:text-white">{{ $lote['tipo'] }}</p>
-                                <p class="text-xs text-slate-500">{{ $lote['ciclo'] }} · {{ $lote['niveles'] }} · {{ $lote['fecha']->format('d/m/Y H:i') }} · {{ $lote['usuario'] }}</p>
+                                @if ($lote['tipo_slug'] === 'receso')
+                                    <p class="text-xs text-slate-500">
+                                        Ciclo de plantilla: <b>{{ $lote['ciclo'] }}</b> · Receso correspondiente a: <b>{{ $lote['ciclo_citado'] }}</b> · {{ $lote['niveles'] }} · {{ $lote['fecha']->format('d/m/Y H:i') }} · {{ $lote['usuario'] }}
+                                    </p>
+                                @else
+                                    <p class="text-xs text-slate-500">Ciclo: {{ $lote['ciclo'] }} · {{ $lote['niveles'] }} · {{ $lote['fecha']->format('d/m/Y H:i') }} · {{ $lote['usuario'] }}</p>
+                                @endif
                             </div>
                         </button>
 

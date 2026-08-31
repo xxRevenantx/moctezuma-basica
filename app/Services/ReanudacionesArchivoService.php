@@ -99,6 +99,7 @@ class ReanudacionesArchivoService
             $nivel = $registro->nivel_nombre ?: 'NIVEL EDUCATIVO';
             $escuela = data_get($snapshot, 'escuela.nombre', 'CENTRO UNIVERSITARIO MOCTEZUMA');
             $cct = data_get($snapshot, 'nivel.cct');
+            $cicloCitado = (string) data_get($snapshot, 'ciclo_citado.nombre', $registro->ciclo_nombre);
             $membrete = $this->membreteDesdeRegistro($registro);
             $margenSuperiorCm = $membrete
                 ? max(0.5, min(8.0, ((float) $membrete['margen_superior_mm']) / 10))
@@ -156,7 +157,9 @@ class ReanudacionesArchivoService
                 default => 'el periodo correspondiente',
             };
 
-            $texto = 'Por este conducto, me permito informar que con fecha arriba señalada me presenté a reanudar mis labores, después de haber disfrutado ' . $tipo . ', en el ' . Str::upper($nivel) . ' del ' . $escuela . '.';
+            $texto = 'Por este conducto, me permito informar que con fecha arriba señalada me presenté a reanudar mis labores, después de haber disfrutado ' . $tipo
+                . ', correspondiente al ciclo escolar ' . $cicloCitado
+                . ', en el ' . Str::upper($nivel) . ' del ' . $escuela . '.';
             $section->addText($texto, [], 'justificado');
             $section->addText('Sin otro particular, reciba un cordial saludo.', [], 'justificado');
             $section->addTextBreak(2);

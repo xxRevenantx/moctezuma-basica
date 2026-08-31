@@ -644,6 +644,9 @@ class Reanudaciones extends Component
             ->orderBy('nivel_id')->orderBy('grado_id')->orderBy('asignacion_grupo_id')->get();
 
         $ciclo = $ciclos->firstWhere('id', (int) $this->cicloEscolarId);
+        $cicloCitado = $ciclo
+            ? ($this->tipoReanudacion === 'receso' ? $service->cicloAnterior($ciclo) : $ciclo)
+            : null;
         $resultado = $ciclo
             ? $service->plantilla(
                 ciclo: $ciclo,
@@ -682,11 +685,13 @@ class Reanudaciones extends Component
 
         $historial = $historialQuery->groupBy('lote_uuid')->map(function (Collection $items, string $lote) {
             $primero = $items->first();
+            $cicloCitado = (string) data_get($primero->snapshot, 'ciclo_citado.nombre', $primero->ciclo_nombre);
             return [
                 'lote' => $lote,
                 'tipo' => $primero->tipo_label,
                 'tipo_slug' => $primero->tipo_reanudacion,
                 'ciclo' => $primero->ciclo_nombre,
+                'ciclo_citado' => $cicloCitado,
                 'niveles' => $items->pluck('nivel_nombre')->unique()->values()->implode(', '),
                 'cantidad' => $items->count(),
                 'fecha' => $primero->created_at,
@@ -746,6 +751,8 @@ class Reanudaciones extends Component
             'tipos' => ReanudacionesService::TIPOS,
             'plantillasDocumento' => $plantillasDocumento,
             'nivelesSinPlantillaPublicada' => $nivelesSinPlantillaPublicada,
+            'cicloSeleccionado' => $ciclo,
+            'cicloCitado' => $cicloCitado,
         ]);
     }
 }

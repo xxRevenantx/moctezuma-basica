@@ -277,11 +277,17 @@ class ReanudacionesService
         string $tipo,
         string $fechaDirector,
         string $fechaDocente,
-        ?string $copias = null
+        ?string $copias = null,
+        ?CicloEscolar $cicloCitadoForzado = null
     ): array {
         if (!array_key_exists($tipo, self::TIPOS)) {
             throw ValidationException::withMessages(['tipoReanudacion' => 'El tipo de reanudación no es válido.']);
         }
+
+        // El ciclo seleccionado siempre gobierna la plantilla, las fechas, el membrete
+        // y el historial. Únicamente en el receso de agosto la redacción cita el ciclo
+        // inmediato anterior, porque el receso pertenece al ciclo que acaba de cerrar.
+        $cicloCitado = $cicloCitadoForzado ?: $this->cicloCitado($ciclo, $tipo);
 
         $ids = collect($ids)->map(fn($id) => (int) $id)->filter()->unique()->values();
         if ($ids->isEmpty()) {
@@ -310,7 +316,7 @@ class ReanudacionesService
             ]);
         }
 
-        return $filas->map(function (array $fila) use ($ciclo, $tipo, $fechaDirector, $fechaDocente, $copias) {
+        return $filas->map(function (array $fila) use ($ciclo, $cicloCitado, $tipo, $fechaDirector, $fechaDocente, $copias) {
             /** @var PersonaNivel $asignacion */
             $asignacion = $fila['modelo'];
             $nivel = $asignacion->nivel;
@@ -344,6 +350,12 @@ class ReanudacionesService
                     'fin_anio' => $ciclo->fin_anio,
                     'nombre' => $ciclo->nombre,
                 ],
+                'ciclo_citado' => [
+                    'id' => $cicloCitado->id,
+                    'inicio_anio' => $cicloCitado->inicio_anio,
+                    'fin_anio' => $cicloCitado->fin_anio,
+                    'nombre' => $cicloCitado->nombre,
+                ],
                 'autoridades' => $autoridades,
                 'escuela' => $this->escuelaSnapshot(),
                 'membrete' => $this->membreteSnapshot($ciclo, $nivel),
@@ -353,6 +365,7 @@ class ReanudacionesService
                 'asignacion' => $asignacion,
                 'nivel' => $nivel,
                 'ciclo' => $ciclo,
+                'ciclo_citado' => $cicloCitado,
                 'tipo' => $tipo,
                 'fecha_director' => $fechaDirector,
                 'fecha_docente' => $fechaDocente,
@@ -429,6 +442,7 @@ class ReanudacionesService
             'escuela' => Escuela::query()->first(),
             'delegado' => Director::query()->where('identificador', 'delegado-servicios-educativos-tierra-caliente')->first(),
             'cicloEscolar' => $primero['ciclo'],
+            'cicloEscolarTexto' => $primero['ciclo_citado'] ?? $primero['ciclo'],
             'copias' => $primero['copias'],
             'directorAdministracion' => Director::query()->where('identificador', 'director-general-administracion')->first(),
             'directorMagisterio' => Director::query()->where('identificador', 'director-magisterio-estatal')->first(),
@@ -485,6 +499,7 @@ class ReanudacionesService
                 'reanudacion_laboral_id' => $registro->id,
                 'lote_uuid' => $loteUuid,
                 'ciclo_escolar' => $ciclo->nombre,
+                'ciclo_citado' => data_get($documento, 'snapshot.ciclo_citado.nombre', $ciclo->nombre),
                 'fecha_documento' => $documento['fecha_documento'],
             ],
             'usuario_id' => auth()->id(),
@@ -499,6 +514,16 @@ class ReanudacionesService
         $ciclo = $registro->cicloEscolar;
         abort_unless($ciclo, 422, 'El ciclo escolar del historial ya no está disponible.');
 
+        $snapshotHistorico = is_array($registro->snapshot) ? $registro->snapshot : [];
+
+        // Los registros creados con esta versión conservan el ciclo citado dentro del
+        // snapshot. Al regenerarlos se usa ese valor histórico incluso si posteriormente
+        // cambia la configuración de ciclos. Para registros antiguos sin esa clave se
+        // conserva el comportamiento con el que fueron generados: citar el ciclo operativo.
+        $cicloCitadoHistorico = array_key_exists('ciclo_citado', $snapshotHistorico)
+            ? $this->cicloDesdeSnapshot(data_get($snapshotHistorico, 'ciclo_citado'))
+            : $ciclo;
+
         $documentos = $this->construirDocumentos(
             ids: [(int) $registro->persona_nivel_id],
             ciclo: $ciclo,
@@ -506,17 +531,68 @@ class ReanudacionesService
             fechaDirector: $registro->fecha_director->format('Y-m-d'),
             fechaDocente: $registro->fecha_docente->format('Y-m-d'),
             copias: $registro->copias,
+            cicloCitadoForzado: $cicloCitadoHistorico,
         );
 
         $documento = $documentos[0];
-        $snapshotHistorico = is_array($registro->snapshot) ? $registro->snapshot : [];
 
         if (array_key_exists('membrete', $snapshotHistorico)) {
             $documento['membrete'] = $snapshotHistorico['membrete'];
             $documento['snapshot']['membrete'] = $snapshotHistorico['membrete'];
         }
 
+        if (array_key_exists('ciclo_citado', $snapshotHistorico) && is_array($snapshotHistorico['ciclo_citado'])) {
+            $documento['snapshot']['ciclo_citado'] = $snapshotHistorico['ciclo_citado'];
+        }
+
         return $documento;
+    }
+
+    public function cicloAnterior(CicloEscolar $ciclo): ?CicloEscolar
+    {
+        return CicloEscolar::query()
+            ->where('inicio_anio', (int) $ciclo->inicio_anio - 1)
+            ->where('fin_anio', (int) $ciclo->inicio_anio)
+            ->first();
+    }
+
+    public function cicloCitado(CicloEscolar $ciclo, string $tipo): CicloEscolar
+    {
+        if ($tipo !== 'receso') {
+            return $ciclo;
+        }
+
+        $anterior = $this->cicloAnterior($ciclo);
+
+        if (! $anterior) {
+            throw ValidationException::withMessages([
+                'cicloEscolarId' => "No se encontró el ciclo escolar anterior a {$ciclo->nombre}. Regístralo antes de generar la reanudación por receso escolar.",
+            ]);
+        }
+
+        return $anterior;
+    }
+
+    /** @param array<string,mixed>|null $snapshot */
+    private function cicloDesdeSnapshot(?array $snapshot): ?CicloEscolar
+    {
+        if (! is_array($snapshot)) {
+            return null;
+        }
+
+        $inicio = filter_var($snapshot['inicio_anio'] ?? null, FILTER_VALIDATE_INT);
+        $fin = filter_var($snapshot['fin_anio'] ?? null, FILTER_VALIDATE_INT);
+
+        if (! $inicio || ! $fin) {
+            return null;
+        }
+
+        $ciclo = new CicloEscolar();
+        $ciclo->setAttribute('id', filter_var($snapshot['id'] ?? null, FILTER_VALIDATE_INT) ?: null);
+        $ciclo->setAttribute('inicio_anio', $inicio);
+        $ciclo->setAttribute('fin_anio', $fin);
+
+        return $ciclo;
     }
 
     /** @return array<string,mixed>|null */

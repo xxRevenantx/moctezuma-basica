@@ -287,7 +287,7 @@
                 LABORES, DESPUÉS DE HABER DISFRUTADO <b style="font-family: 'Times New Roman', Times, serif"><u>EL
                         PERIODO VACACIONAL DE PRIMAVERA,</u></b>
                 CORRESPONDIENTE AL CICLO ESCOLAR
-                <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>. PARA LO CUAL PROPORCIONO LOS
+                <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}</b>. PARA LO CUAL PROPORCIONO LOS
                 SIGUIENTES DATOS:
             </p>
         </div>
@@ -513,7 +513,7 @@
                     ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
                     MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
                     CORRESPONDIENTE AL CICLO ESCOLAR
-                    <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}.</b>
+                    <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}.</b>
                 </p>
             </div>
 
@@ -756,7 +756,7 @@
                     LABORES, DESPUÉS DE HABER DISFRUTADO <b style="font-family: 'Times New Roman', Times, serif"><u>EL
                             PERIODO VACACIONAL DE PRIMAVERA</u></b>,
                     CORRESPONDIENTE AL CICLO ESCOLAR
-                    <b>{{ $cicloEscolar->inicio_anio }}-{{ $cicloEscolar->fin_anio }}</b>.
+                    <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}</b>.
                     PARA LO CUAL PROPORCIONO LOS SIGUIENTES DATOS:
                 </p>
             </div>
