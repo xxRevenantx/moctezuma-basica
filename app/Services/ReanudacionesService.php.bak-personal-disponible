@@ -7,7 +7,6 @@ use App\Models\Director;
 use App\Models\Escuela;
 use App\Models\Nivel;
 use App\Models\PersonaNivel;
-use App\Models\PersonaNivelCiclo;
 use App\Models\PersonaNivelDetalle;
 use App\Models\PersonaNivelHistorial;
 use App\Models\PlantillaPersonalNivel;
@@ -31,56 +30,34 @@ class ReanudacionesService
     ];
 
     /**
-     * Obtiene el personal que pertenece a la plantilla del ciclo seleccionado.
-     *
-     * La fecha de reanudación NO participa en esta consulta. Se conserva
-     * $fechaReferencia como parámetro opcional únicamente por compatibilidad
-     * con llamadas anteriores; las fechas se usan para imprimir los oficios.
-     *
-     * La fuente de verdad es:
-     * - plantillas_personal_nivel: ciclo + nivel;
-     * - persona_nivel_ciclos: membresía ACTIVA dentro de esa plantilla;
-     * - persona_nivel_detalles: funciones ACTIVAS y no archivadas.
-     *
-     * Retorna una fila única por persona y nivel. Si una persona tiene varias
-     * funciones, grados o grupos dentro de la misma plantilla, se consolidan.
+     * Obtiene la plantilla vigente en una fecha del ciclo seleccionado.
+     * Retorna una fila única por persona y nivel; si existen cabeceras duplicadas,
+     * combina sus funciones y conserva la primera según el orden configurado.
      *
      * @param array<int, int|string> $niveles
      * @return array{listos: Collection<int, array<string,mixed>>, advertencias: Collection<int, array<string,mixed>>, excluidos: Collection<int, array<string,mixed>>}
      */
     public function plantilla(
         CicloEscolar $ciclo,
-        ?string $fechaReferencia = null,
+        string $fechaReferencia,
         array $niveles = [],
         ?int $gradoId = null,
         ?int $grupoId = null,
         ?int $rolId = null,
         string $busqueda = ''
     ): array {
-        $niveles = collect($niveles)
-            ->map(fn($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values();
+        $fecha = Carbon::parse($fechaReferencia)->toDateString();
+        $niveles = collect($niveles)->map(fn($id) => (int) $id)->filter()->unique()->values();
 
-        // No se exige publicada/cerrada: si existe una plantilla del ciclo,
-        // el personal asignado debe reflejarse inmediatamente en Reanudaciones.
         $plantillas = PlantillaPersonalNivel::query()
             ->where('ciclo_escolar_id', $ciclo->id)
             ->when($niveles->isNotEmpty(), fn (Builder $q) => $q->whereIn('nivel_id', $niveles))
+            ->whereIn('estado', [PlantillaPersonalNivel::ESTADO_PUBLICADA, PlantillaPersonalNivel::ESTADO_CERRADA])
             ->get(['id', 'nivel_id']);
 
-        $plantillaIds = $plantillas
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
+        $plantillaIds = $plantillas->pluck('id')->map(fn ($id) => (int) $id)->all();
         if ($plantillaIds === []) {
-            return [
-                'listos' => collect(),
-                'advertencias' => collect(),
-                'excluidos' => collect(),
-            ];
+            return ['listos' => collect(), 'advertencias' => collect(), 'excluidos' => collect()];
         }
 
         $query = PersonaNivel::query()
@@ -90,16 +67,18 @@ class ReanudacionesService
                 'nivel.supervisor',
                 'ciclos' => fn (Relation $membresia) => $membresia
                     ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
-                    ->where('estado', PersonaNivelCiclo::ESTADO_ACTIVO)
+                    ->whereDate('fecha_inicio', '<=', $fecha)
+                    ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha))
                     ->orderBy('orden'),
-                'detalles' => fn (Relation $detalle) => $detalle
-                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds) {
+                'detalles' => fn(Relation $detalle) => $this->aplicarFechaDetalle($detalle, $fecha)
+                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $fecha) {
                         $sub->select('id')
                             ->from('persona_nivel_ciclos')
                             ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
-                            ->where('estado', PersonaNivelCiclo::ESTADO_ACTIVO);
+                            ->whereDate('fecha_inicio', '<=', $fecha)
+                            ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
                     })
-                    ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+                    ->where('confirmado', true)
                     ->whereNull('archivado_at')
                     ->with([
                         'personaRole.rolePersona',
@@ -111,25 +90,35 @@ class ReanudacionesService
                     ->orderBy('orden')
                     ->orderBy('id'),
             ])
-            ->whereHas('ciclos', function (Builder $membresia) use ($plantillaIds) {
-                $membresia
-                    ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
-                    ->where('estado', PersonaNivelCiclo::ESTADO_ACTIVO);
+            ->whereHas('ciclos', function (Builder $membresia) use ($plantillaIds, $fecha) {
+                $membresia->whereIn('plantilla_personal_nivel_id', $plantillaIds)
+                    ->whereDate('fecha_inicio', '<=', $fecha)
+                    ->where(fn (Builder $q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
             })
-            ->when($niveles->isNotEmpty(), fn (Builder $q) => $q->whereIn('nivel_id', $niveles))
-            ->whereHas('detalles', function (Builder $detalle) use ($gradoId, $grupoId, $rolId, $plantillaIds) {
-                $detalle
-                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds) {
+            ->whereHas('persona', function (Builder $persona) use ($ciclo) {
+                if ($ciclo->es_actual) {
+                    $persona->where('status', true);
+                }
+            })
+            ->whereDate('fecha_inicio', '<=', $fecha)
+            ->where(function (Builder $q) use ($fecha) {
+                $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha);
+            })
+            ->when($niveles->isNotEmpty(), fn(Builder $q) => $q->whereIn('nivel_id', $niveles))
+            ->whereHas('detalles', function (Builder $detalle) use ($fecha, $gradoId, $grupoId, $rolId, $plantillaIds) {
+                $this->aplicarFechaDetalle($detalle, $fecha)
+                    ->whereIn('persona_nivel_ciclo_id', function ($sub) use ($plantillaIds, $fecha) {
                         $sub->select('id')
                             ->from('persona_nivel_ciclos')
                             ->whereIn('plantilla_personal_nivel_id', $plantillaIds)
-                            ->where('estado', PersonaNivelCiclo::ESTADO_ACTIVO);
+                            ->whereDate('fecha_inicio', '<=', $fecha)
+                            ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', $fecha));
                     })
-                    ->where('estado', PersonaNivelDetalle::ESTADO_ACTIVO)
+                    ->where('confirmado', true)
                     ->whereNull('archivado_at')
-                    ->when($gradoId, fn (Builder $q) => $q->where('grado_id', $gradoId))
-                    ->when($grupoId, fn (Builder $q) => $q->where('grupo_id', $grupoId))
-                    ->when($rolId, fn (Builder $q) => $q->where('persona_role_id', $rolId));
+                    ->when($gradoId, fn(Builder $q) => $q->where('grado_id', $gradoId))
+                    ->when($grupoId, fn(Builder $q) => $q->where('grupo_id', $grupoId))
+                    ->when($rolId, fn(Builder $q) => $q->where('persona_role_id', $rolId));
             })
             ->when(trim($busqueda) !== '', function (Builder $q) use ($busqueda) {
                 $termino = '%' . trim($busqueda) . '%';
@@ -151,10 +140,10 @@ class ReanudacionesService
         $advertencias = collect();
         $excluidos = collect();
 
-        $query->groupBy(fn (PersonaNivel $item) => $item->persona_id . ':' . $item->nivel_id)
+        $query->groupBy(fn(PersonaNivel $item) => $item->persona_id . ':' . $item->nivel_id)
             ->each(function (Collection $duplicados) use ($listos, $advertencias, $excluidos) {
                 /** @var PersonaNivel|null $principal */
-                $principal = $duplicados->sortBy(fn (PersonaNivel $item) => [
+                $principal = $duplicados->sortBy(fn(PersonaNivel $item) => [
                     $this->ordenPlantilla($item),
                     is_null($item->orden) ? 1 : 0,
                     (int) ($item->orden ?? PHP_INT_MAX),
@@ -170,9 +159,9 @@ class ReanudacionesService
                 }
 
                 $detalles = $duplicados
-                    ->flatMap(fn (PersonaNivel $item) => $item->detalles)
+                    ->flatMap(fn(PersonaNivel $item) => $item->detalles)
                     ->unique('id')
-                    ->sortBy(fn (PersonaNivelDetalle $detalle) => [
+                    ->sortBy(fn(PersonaNivelDetalle $detalle) => [
                         is_null($detalle->orden) ? 1 : 0,
                         (int) ($detalle->orden ?? PHP_INT_MAX),
                         (int) $detalle->id,
@@ -181,7 +170,7 @@ class ReanudacionesService
 
                 if ($detalles->isEmpty() || $this->cargos($detalles)->isEmpty()) {
                     $excluidos->push([
-                        'motivo' => 'No tiene una función válida en la plantilla del ciclo seleccionado.',
+                        'motivo' => 'No tiene una función válida en la fecha seleccionada.',
                         'modelo' => $principal,
                     ]);
                     return;
@@ -192,17 +181,14 @@ class ReanudacionesService
 
                 if ($duplicados->count() > 1) {
                     $fila['advertencias'][] = 'Se combinaron ' . $duplicados->count() . ' asignaciones generales duplicadas del mismo nivel.';
-                }
-
-                if (($fila['advertencias'] ?? []) !== []) {
                     $advertencias->push($fila);
                 } else {
                     $listos->push($fila);
                 }
             });
 
-        $ordenar = fn (Collection $filas) => $filas
-            ->sortBy(fn (array $fila) => [
+        $ordenar = fn(Collection $filas) => $filas
+            ->sortBy(fn(array $fila) => [
                 (int) ($fila['nivel_id'] ?? PHP_INT_MAX),
                 (int) ($fila['orden_plantilla'] ?? PHP_INT_MAX),
                 (int) ($fila['id'] ?? PHP_INT_MAX),
@@ -214,6 +200,7 @@ class ReanudacionesService
 
         return compact('listos', 'advertencias', 'excluidos');
     }
+
     /**
      * Devuelve el mismo orden visible en "Plantilla de personal por nivel".
      *
@@ -276,9 +263,7 @@ class ReanudacionesService
             'grados' => $grados->all(),
             'grupos' => $grupos->all(),
             'es_directivo' => $this->esDirectivo($detalles),
-            'advertencias' => $detalles->contains(fn (PersonaNivelDetalle $detalle) => ! $detalle->confirmado)
-                ? ['Tiene una o más funciones pendientes de confirmar en la plantilla.']
-                : [],
+            'advertencias' => [],
         ];
     }
 
@@ -311,6 +296,7 @@ class ReanudacionesService
 
         $resultado = $this->plantilla(
             ciclo: $ciclo,
+            fechaReferencia: $fechaDocente,
         );
 
         $filas = $resultado['listos']
@@ -326,7 +312,7 @@ class ReanudacionesService
         $faltantes = $ids->diff($filas->pluck('id')->map(fn($id) => (int) $id));
         if ($faltantes->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'seleccionados' => 'Una o más asignaciones ya no pertenecen a la plantilla del ciclo seleccionado. Actualiza la lista.',
+                'seleccionados' => 'Una o más asignaciones ya no están vigentes para la fecha y ciclo seleccionados. Actualiza la lista.',
             ]);
         }
 

@@ -116,6 +116,10 @@ class Reanudaciones extends Component
         }
     }
 
+    public function updatedFechaDocente(): void
+    {
+        $this->seleccionados = [];
+    }
 
     public function updatedNivelesSeleccionados(): void
     {
@@ -323,7 +327,7 @@ class Reanudaciones extends Component
 
     public function previsualizar(ReanudacionesService $service): void
     {
-        // Construir primero valida que todas las asignaciones sigan perteneciendo a la plantilla seleccionada.
+        // Construir primero valida que todas las asignaciones sigan vigentes.
         $this->documentos($service);
         $token = (string) Str::uuid();
 
@@ -541,18 +545,6 @@ class Reanudaciones extends Component
 
         $this->seleccionados = \App\Models\PersonaNivel::query()
             ->whereIn('id', $ids)
-            ->whereHas('ciclos', function ($membresia) {
-                $membresia
-                    ->where('estado', \App\Models\PersonaNivelCiclo::ESTADO_ACTIVO)
-                    ->whereHas('plantilla', function ($plantilla) {
-                        $plantilla
-                            ->where('ciclo_escolar_id', (int) $this->cicloEscolarId)
-                            ->when(
-                                $this->nivelesSeleccionados !== [],
-                                fn ($q) => $q->whereIn('nivel_id', array_map('intval', $this->nivelesSeleccionados))
-                            );
-                    });
-            })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->sortBy(fn (int $id) => $ids->search($id))
@@ -658,6 +650,7 @@ class Reanudaciones extends Component
         $resultado = $ciclo
             ? $service->plantilla(
                 ciclo: $ciclo,
+                fechaReferencia: $this->fechaDocente ?: now()->toDateString(),
                 niveles: $this->nivelesSeleccionados,
                 gradoId: $this->gradoFiltro !== '' ? (int) $this->gradoFiltro : null,
                 grupoId: $this->grupoFiltro !== '' ? (int) $this->grupoFiltro : null,
@@ -728,9 +721,16 @@ class Reanudaciones extends Component
             ->whereIn('nivel_id', array_map('intval', $this->nivelesSeleccionados))
             ->get()
             ->keyBy('nivel_id');
-        $nivelesSinPlantilla = $niveles
+        $nivelesSinPlantillaPublicada = $niveles
             ->whereIn('id', array_map('intval', $this->nivelesSeleccionados))
-            ->filter(fn (Nivel $nivel) => !$plantillasDocumento->has($nivel->id))
+            ->filter(function (Nivel $nivel) use ($plantillasDocumento) {
+                $plantilla = $plantillasDocumento->get($nivel->id);
+
+                return !$plantilla || !in_array($plantilla->estado, [
+                    PlantillaPersonalNivel::ESTADO_PUBLICADA,
+                    PlantillaPersonalNivel::ESTADO_CERRADA,
+                ], true);
+            })
             ->pluck('nombre')
             ->values();
 
@@ -750,7 +750,7 @@ class Reanudaciones extends Component
             'nivelesSinMembrete' => $nivelesSinMembrete,
             'tipos' => ReanudacionesService::TIPOS,
             'plantillasDocumento' => $plantillasDocumento,
-            'nivelesSinPlantilla' => $nivelesSinPlantilla,
+            'nivelesSinPlantillaPublicada' => $nivelesSinPlantillaPublicada,
             'cicloSeleccionado' => $ciclo,
             'cicloCitado' => $cicloCitado,
         ]);

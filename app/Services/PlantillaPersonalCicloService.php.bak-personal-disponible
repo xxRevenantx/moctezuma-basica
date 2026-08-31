@@ -226,7 +226,7 @@ class PlantillaPersonalCicloService
         $this->asegurarEditable($plantilla);
         $plantilla->loadMissing('cicloEscolar');
 
-        $membresia = PersonaNivelCiclo::query()->firstOrCreate([
+        return PersonaNivelCiclo::query()->firstOrCreate([
             'plantilla_personal_nivel_id' => $plantilla->id,
             'persona_nivel_id' => $personaNivel->id,
         ], [
@@ -234,23 +234,6 @@ class PlantillaPersonalCicloService
             'orden' => ((int) $plantilla->membresias()->max('orden')) + 1,
             'fecha_inicio' => $plantilla->cicloEscolar?->inicio_anio . '-07-01',
         ]);
-
-        // Si la persona estuvo antes en la misma plantilla y fue dada de baja,
-        // al volver a asignarle una función debe regresar inmediatamente a la
-        // plantilla activa. Las fechas históricas dejan de gobernar la visibilidad.
-        if ($membresia->estado !== PersonaNivelCiclo::ESTADO_ACTIVO
-            || $membresia->fecha_fin
-            || $membresia->fecha_baja
-            || filled($membresia->motivo_baja)) {
-            $membresia->forceFill([
-                'estado' => PersonaNivelCiclo::ESTADO_ACTIVO,
-                'fecha_fin' => null,
-                'fecha_baja' => null,
-                'motivo_baja' => null,
-            ])->save();
-        }
-
-        return $membresia;
     }
 
     public function validarAsignacion(

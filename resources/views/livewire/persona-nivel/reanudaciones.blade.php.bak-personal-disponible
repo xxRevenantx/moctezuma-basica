@@ -103,7 +103,7 @@
                     <p class="text-xs font-black uppercase tracking-[.2em] text-[#006492] dark:text-sky-300">Oficios laborales</p>
                     <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Reanudaciones de labores</h2>
                     <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-                        Genera oficios individuales o masivos con la plantilla de personal del ciclo y los niveles seleccionados.
+                        Genera oficios individuales o masivos con la plantilla de personal vigente en el ciclo y fecha seleccionados.
                         Una persona con varias funciones recibe un solo oficio con sus cargos reunidos.
                     </p>
                 </div>
@@ -143,14 +143,14 @@
                 <flux:field>
                     <flux:label>Fecha de personal directivo</flux:label>
                     <flux:input wire:model.live="fechaDirector" type="date" icon="calendar-days" />
-                    <flux:description>Fecha que se imprimirá para el personal directivo. No filtra la plantilla.</flux:description>
+                    <flux:description>Director, directora, subdirección, rectoría o coordinación académica.</flux:description>
                     <flux:error name="fechaDirector" />
                 </flux:field>
 
                 <flux:field>
                     <flux:label>Fecha del personal</flux:label>
                     <flux:input wire:model.live="fechaDocente" type="date" icon="calendar-days" />
-                    <flux:description>Fecha que se imprimirá en los oficios del personal. No filtra quién aparece en la plantilla.</flux:description>
+                    <flux:description>También determina la fotografía histórica de la plantilla.</flux:description>
                     <flux:error name="fechaDocente" />
                 </flux:field>
             </div>
@@ -346,13 +346,13 @@
         </div>
     </section>
 
-    @if ($nivelesSinPlantilla->isNotEmpty())
+    @if ($nivelesSinPlantillaPublicada->isNotEmpty())
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
             <div class="flex items-start gap-3">
                 <flux:icon.exclamation-triangle class="mt-0.5 size-5 shrink-0" />
                 <div>
-                    <p class="font-black">Hay niveles sin plantilla de personal</p>
-                    <p class="mt-1">{{ $nivelesSinPlantilla->implode(', ') }}. Crea la plantilla del ciclo seleccionado para mostrar personal y generar reanudaciones.</p>
+                    <p class="font-black">Hay niveles sin plantilla disponible para documentos</p>
+                    <p class="mt-1">{{ $nivelesSinPlantillaPublicada->implode(', ') }}. Publica la plantilla del ciclo seleccionado o consulta un ciclo cerrado para generar reanudaciones.</p>
                 </div>
             </div>
         </div>
@@ -450,7 +450,7 @@
         <div class="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800">
             <div>
                 <h3 class="text-lg font-black text-slate-950 dark:text-white">Personal disponible</h3>
-                <p class="text-xs text-slate-500">Se muestra el personal asignado en la plantilla del ciclo escolar y de los niveles seleccionados.</p>
+                <p class="text-xs text-slate-500">Solo aparecen asignaciones vigentes en la fecha seleccionada. Cupo ilimitado.</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
@@ -471,6 +471,7 @@
                         <th class="px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide text-slate-500">Nivel</th>
                         <th class="px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide text-slate-500">Funciones</th>
                         <th class="px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide text-slate-500">Grado / grupo</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide text-slate-500">Fecha aplicada</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
@@ -484,6 +485,8 @@
                                 <div class="mt-1 flex flex-wrap gap-1">
                                     @if ($fila['es_directivo'])
                                         <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">PERSONAL DIRECTIVO</span>
+                                    @else
+                                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">ACTIVO EN LA FECHA</span>
                                     @endif
                                     @foreach ($fila['advertencias'] as $advertencia)
                                         <span title="{{ $advertencia }}" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-300">ADVERTENCIA</span>
@@ -496,9 +499,10 @@
                                 <p>{{ $fila['grados'] ? implode(', ', $fila['grados']) : 'General' }}</p>
                                 <p class="font-bold">{{ $fila['grupos'] ? implode(', ', $fila['grupos']) : 'Sin grupo específico' }}</p>
                             </td>
+                            <td class="px-4 py-3 align-top text-xs text-slate-500">{{ \Carbon\Carbon::parse($fila['es_directivo'] ? $fechaDirector : $fechaDocente)->format('d/m/Y') }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-5 py-14 text-center text-slate-500">No existe personal asignado en la plantilla que coincida con los filtros, ciclo y niveles seleccionados.</td></tr>
+                        <tr><td colspan="6" class="px-5 py-14 text-center text-slate-500">No existe personal compatible con los filtros, ciclo y fecha seleccionados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
