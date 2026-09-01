@@ -130,179 +130,48 @@ class Generales extends Component
         return (bool) ($ciclo?->es_actual && blank($ciclo?->cerrado_at));
     }
 
-        public function getResumenProperty(): array
+    public function getResumenProperty(): array
     {
         $registros = $this->registrosFiltrados();
 
-        $vigentes = $registros
-            ->filter(fn (InscripcionCiclo $registro): bool => $this->esActivoEnCiclo($registro))
-            ->values();
-
         return [
-            // Total histórico/administrativo del ciclo: todos los registros no anulados.
             'total' => $registros->count(),
-
-            // Matrícula vigente: solo registros realmente operativos en el ciclo.
-            'activos' => $vigentes->count(),
-            'no_vigentes' => max(0, $registros->count() - $vigentes->count()),
-
-            // H/M se muestran sobre matrícula vigente para que H + M = Activos.
-            'hombres' => $vigentes
-                ->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'H')
-                ->count(),
-
-            'mujeres' => $vigentes
-                ->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'M')
-                ->count(),
-
-            'bajas' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'baja')
-                ->count(),
-
-            'trasladados' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'traslado')
-                ->count(),
-
-            'suspendidos' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'suspendido')
-                ->count(),
-
-            'egresados' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'egresado')
-                ->count(),
-
-            'inactivos' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'inactivo')
-                ->count(),
-
-            'reingresos' => $registros
-                ->filter(fn (InscripcionCiclo $registro): bool => $this->estadoRegistro($registro) === 'reingreso')
-                ->count(),
+            'hombres' => $registros->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'H')->count(),
+            'mujeres' => $registros->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'M')->count(),
+            'activos' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->esActivoEnCiclo($registro))->count(),
+            'bajas' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'baja')->count(),
+            'trasladados' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'traslado')->count(),
+            'suspendidos' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'suspendido')->count(),
+            'egresados' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'egresado')->count(),
+            'inactivos' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'inactivo')->count(),
+            'reingresos' => $registros->filter(fn (InscripcionCiclo $registro): bool => $this->estadoRegistro($registro) === 'reingreso')->count(),
         ];
     }
 
-        public function getDistribucionEscolarProperty(): Collection
+    public function getDistribucionEscolarProperty(): Collection
     {
         return $this->registrosFiltrados()
-            ->groupBy(
-                fn (InscripcionCiclo $registro): string =>
-                    ($registro->grado_id ?: 0)
-                    . '|'
-                    . ($registro->semestre_id ?: 0)
-                    . '|'
-                    . ($registro->grupo_id ?: 0)
-            )
+            ->groupBy(fn (InscripcionCiclo $registro): string => ($registro->grado_id ?: 0) . '|' . ($registro->semestre_id ?: 0) . '|' . ($registro->grupo_id ?: 0))
             ->map(function (Collection $grupo): array {
                 /** @var InscripcionCiclo $primero */
                 $primero = $grupo->first();
-
-                $vigentes = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->esActivoEnCiclo($registro))
-                    ->values();
-
-                $inactivos = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'inactivo')
-                    ->count();
-
-                $bajas = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'baja')
-                    ->count();
-
-                $traslados = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'traslado')
-                    ->count();
-
-                $suspendidos = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'suspendido')
-                    ->count();
-
-                $egresados = $grupo
-                    ->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'egresado')
-                    ->count();
 
                 return [
                     'grado' => $primero->grado?->nombre ?? 'Sin grado',
                     'semestre' => $primero->semestre?->numero,
                     'grupo' => $primero->grupo?->asignacionGrupo?->nombre ?? '—',
-
-                    // H/M corresponden solo a matrícula vigente.
-                    'hombres' => $vigentes
-                        ->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'H')
-                        ->count(),
-
-                    'mujeres' => $vigentes
-                        ->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'M')
-                        ->count(),
-
+                    'hombres' => $grupo->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'H')->count(),
+                    'mujeres' => $grupo->filter(fn (InscripcionCiclo $registro): bool => $registro->inscripcion?->genero === 'M')->count(),
                     'total' => $grupo->count(),
-                    'activos' => $vigentes->count(),
-                    'no_vigentes' => max(0, $grupo->count() - $vigentes->count()),
-                    'inactivos' => $inactivos,
-                    'bajas' => $bajas,
-                    'traslados' => $traslados,
-                    'suspendidos' => $suspendidos,
-                    'egresados' => $egresados,
-
+                    'activos' => $grupo->filter(fn (InscripcionCiclo $registro): bool => $this->esActivoEnCiclo($registro))->count(),
+                    'bajas' => $grupo->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'baja')->count(),
+                    'egresados' => $grupo->filter(fn (InscripcionCiclo $registro): bool => $this->categoriaRegistro($registro) === 'egresado')->count(),
                     'orden' => (int) ($primero->grado?->orden ?? 999),
-                    'semestre_orden' => (int) (
-                        $primero->semestre?->orden_global
-                        ?? $primero->semestre?->numero
-                        ?? 0
-                    ),
+                    'semestre_orden' => (int) ($primero->semestre?->orden_global ?? $primero->semestre?->numero ?? 0),
                 ];
             })
-            ->sortBy(
-                fn (array $fila): string =>
-                    sprintf(
-                        '%04d|%04d|%s',
-                        $fila['orden'],
-                        $fila['semestre_orden'],
-                        $fila['grupo']
-                    )
-            )
+            ->sortBy(fn (array $fila): string => sprintf('%04d|%04d|%s', $fila['orden'], $fila['semestre_orden'], $fila['grupo']))
             ->values();
-    }
-
-public function getTotalesDistribucionProperty(): array
-    {
-        $filas = $this->distribucionEscolar;
-
-        return [
-            'hombres' => (int) $filas->sum('hombres'),
-            'mujeres' => (int) $filas->sum('mujeres'),
-            'total' => (int) $filas->sum('total'),
-            'activos' => (int) $filas->sum('activos'),
-            'no_vigentes' => (int) $filas->sum('no_vigentes'),
-            'inactivos' => (int) $filas->sum('inactivos'),
-            'bajas' => (int) $filas->sum('bajas'),
-            'traslados' => (int) $filas->sum('traslados'),
-            'suspendidos' => (int) $filas->sum('suspendidos'),
-            'egresados' => (int) $filas->sum('egresados'),
-        ];
-    }
-
-    public function getDistribucionPdfUrlProperty(): string
-    {
-        return route('generales.distribucion.pdf', array_filter([
-            'slug_nivel' => $this->slug_nivel,
-            'ciclo_escolar_id' => $this->enteroFiltro($this->ciclo_escolar_id),
-            'generacion_id' => $this->enteroFiltro($this->generacion_id),
-            'grado_id' => $this->enteroFiltro($this->grado_id),
-            'semestre_id' => $this->enteroFiltro($this->semestre_id),
-            'grupo_id' => $this->enteroFiltro($this->grupo_id),
-        ], static fn ($valor): bool => $valor !== null && $valor !== ''));
-    }
-
-    public function getDistribucionWordUrlProperty(): string
-    {
-        return route('generales.distribucion.word', array_filter([
-            'slug_nivel' => $this->slug_nivel,
-            'ciclo_escolar_id' => $this->enteroFiltro($this->ciclo_escolar_id),
-            'generacion_id' => $this->enteroFiltro($this->generacion_id),
-            'grado_id' => $this->enteroFiltro($this->grado_id),
-            'semestre_id' => $this->enteroFiltro($this->semestre_id),
-            'grupo_id' => $this->enteroFiltro($this->grupo_id),
-        ], static fn ($valor): bool => $valor !== null && $valor !== ''));
     }
 
     public function exportarEstadisticaExcel()

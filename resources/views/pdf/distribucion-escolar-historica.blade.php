@@ -3,12 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-
-    <title>Distribución escolar histórica</title>
+    <title>Distribución escolar · Centro Universitario Moctezuma</title>
 
     <style>
         @page {
-            margin: 18px 20px 24px;
+            margin: 22px 24px 30px;
         }
 
         * {
@@ -18,131 +17,195 @@
         body {
             margin: 0;
             font-family: DejaVu Sans, sans-serif;
-            color: #1f2937;
-            font-size: 10px;
+            color: #172033;
+            font-size: 8.4px;
+            line-height: 1.35;
+        }
+
+        .top-line {
+            height: 5px;
+            margin-bottom: 10px;
+            background: #006492;
         }
 
         .header {
             width: 100%;
-            border-bottom: 3px solid #88AC2E;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
+            margin-bottom: 9px;
+            border-collapse: collapse;
         }
 
         .header td {
             vertical-align: middle;
         }
 
-        .logo {
-            width: 115px;
+        .logo-cell {
+            width: 150px;
         }
 
-        .title {
+        .logo {
+            max-width: 130px;
+            max-height: 60px;
+        }
+
+        .title-cell {
             text-align: center;
         }
 
-        .title h1 {
+        .institution {
             margin: 0;
             color: #006492;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: .7px;
+        }
+
+        .title {
+            margin: 3px 0 0;
+            color: #101827;
             font-size: 18px;
-            letter-spacing: .4px;
-        }
-
-        .title h2 {
-            margin: 4px 0 0;
-            color: #88AC2E;
-            font-size: 12px;
-        }
-
-        .meta {
-            width: 185px;
-            text-align: right;
-            color: #6b7280;
-            line-height: 1.5;
-        }
-
-        .block {
-            margin-bottom: 15px;
-            page-break-inside: avoid;
-        }
-
-        .block-title {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 0;
-        }
-
-        .block-title td {
-            background: #006492;
-            color: white;
-            padding: 6px 8px;
             font-weight: bold;
         }
 
-        .block-title .cycle {
-            font-size: 11px;
+        .subtitle {
+            margin: 3px 0 0;
+            color: #88AC2E;
+            font-size: 10px;
+            font-weight: bold;
         }
 
-        .block-title .totals {
+        .meta {
+            width: 190px;
             text-align: right;
+            color: #667085;
             font-size: 7px;
+            line-height: 1.55;
         }
 
-        table.data {
+        .scope {
+            margin: 0 0 10px;
+            padding: 7px 9px;
+            border: 1px solid #dce5ea;
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        .scope strong {
+            color: #006492;
+        }
+
+        .metrics {
+            width: 100%;
+            margin: 0 0 12px;
+            border-collapse: separate;
+            border-spacing: 4px 0;
+        }
+
+        .metric {
+            padding: 7px 7px;
+            border: 1px solid #dce5ea;
+            background: #ffffff;
+            vertical-align: top;
+        }
+
+        .metric.primary {
+            border-color: #006492;
+            background: #006492;
+            color: #ffffff;
+        }
+
+        .metric.warning {
+            border-color: #f1c96c;
+            background: #fff8e8;
+        }
+
+        .metric .label {
+            color: #64748b;
+            font-size: 5.8px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .metric.primary .label {
+            color: #dff5ff;
+        }
+
+        .metric .value {
+            margin-top: 2px;
+            color: #111827;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .metric.primary .value {
+            color: #ffffff;
+        }
+
+        .metric.warning .value {
+            color: #9a6700;
+        }
+
+        .block {
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+
+        .block-head {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .block-head td {
+            padding: 6px 8px;
+            background: #006492;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .block-head .right {
+            color: #e8f7fc;
+            font-size: 6.5px;
+            text-align: right;
+        }
+
+        .data {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
         }
 
-        table.data th {
-            background: #88AC2E;
-            color: white;
+        .data th {
+            padding: 5px 3px;
             border: 1px solid #ffffff;
-            padding: 3px 2px;
+            background: #101827;
+            color: #ffffff;
+            font-size: 6.4px;
             text-align: center;
-            font-size: 5.4px;
-            line-height: 1.12;
         }
 
-        table.data td {
-            border: 1px solid #d1d5db;
-            padding: 3px 2px;
+        .data th.total-head {
+            background: #88AC2E;
+        }
+
+        .data td {
+            padding: 5px 3px;
+            border: 1px solid #d9e1e7;
             text-align: center;
             vertical-align: middle;
-            line-height: 1.15;
-            word-wrap: break-word;
         }
 
-        table.data tbody tr:nth-child(even) td {
+        .data tbody tr:nth-child(even) td {
             background: #f8fafc;
         }
 
-        table.data.bachillerato th {
-            font-size: 6.2px;
-            padding: 4px 3px;
-        }
-
-        table.data.bachillerato td {
-            font-size: 10px;
-            padding: 4px 3px;
-        }
-
-        table.data tfoot td {
-            background: #e5e7eb;
-            font-weight: bold;
-        }
-
-        .left {
-            text-align: left !important;
-        }
-
         .active {
-            color: #047857;
+            color: #006492;
             font-weight: bold;
         }
 
         .inactive {
-            color: #475569;
+            color: #a16207;
             font-weight: bold;
         }
 
@@ -152,11 +215,6 @@
         }
 
         .transfer {
-            color: #b45309;
-            font-weight: bold;
-        }
-
-        .suspended {
             color: #c2410c;
             font-weight: bold;
         }
@@ -166,326 +224,255 @@
             font-weight: bold;
         }
 
-        .footer {
-            position: fixed;
-            bottom: -16px;
-            left: 0;
-            right: 0;
-            border-top: 1px solid #d1d5db;
-            padding-top: 4px;
-            color: #6b7280;
-            font-size: 6px;
-            text-align: center;
+        .total {
+            background: #edf7df !important;
+            color: #42650a;
+            font-weight: bold;
         }
 
-        .empty {
-            padding: 30px;
+        .data tfoot td {
+            border-top: 2px solid #006492;
+            background: #e9eef2;
+            font-weight: bold;
+        }
+
+        .data tfoot td.total {
+            background: #88AC2E !important;
+            color: #ffffff;
+        }
+
+        .note {
+            margin-top: 8px;
+            padding: 7px 9px;
+            border-left: 4px solid #88AC2E;
+            background: #f7faef;
+            color: #475569;
+            font-size: 7px;
+        }
+
+        .note strong {
+            color: #006492;
+        }
+
+        .footer {
+            position: fixed;
+            right: 0;
+            bottom: -18px;
+            left: 0;
+            padding-top: 4px;
+            border-top: 1px solid #d8e0e5;
+            color: #7a8694;
+            font-size: 6px;
             text-align: center;
-            border: 1px dashed #9ca3af;
-            color: #6b7280;
         }
     </style>
 </head>
 
 <body>
     @php
-        $esBachillerato =
-            ($nivel->slug ?? null) === 'bachillerato' ||
-            str_contains(mb_strtolower(($nivel->nombre ?? '') . ' ' . ($nivel->slug ?? '')), 'bachillerato');
+        $filasGlobales = collect($bloques)
+            ->flatMap(fn ($bloque) => collect($bloque['filas'] ?? []));
+
+        $totalesGlobales = [
+            'hombres' => (int) collect($bloques)->sum(
+                fn ($bloque) => $bloque['totales']['hombres_vigentes'] ?? 0
+            ),
+            'mujeres' => (int) collect($bloques)->sum(
+                fn ($bloque) => $bloque['totales']['mujeres_vigentes'] ?? 0
+            ),
+            'total' => (int) collect($bloques)->sum(
+                fn ($bloque) => $bloque['totales']['total_historico'] ?? 0
+            ),
+            'activos' => (int) collect($bloques)->sum(
+                fn ($bloque) => $bloque['totales']['activos'] ?? 0
+            ),
+            'no_vigentes' => (int) collect($bloques)->sum(
+                fn ($bloque) => $bloque['totales']['no_vigentes'] ?? 0
+            ),
+        ];
+
+        $ciclosTexto = collect($listado)
+            ->pluck('ciclo')
+            ->filter()
+            ->unique()
+            ->implode(' · ');
+
+        $generacionesTexto = collect($listado)
+            ->pluck('generacion')
+            ->filter()
+            ->unique()
+            ->take(5)
+            ->implode(' · ');
+
+        $esBachillerato = ($nivel->slug ?? null) === 'bachillerato';
     @endphp
 
-    {{-- Encabezado principal --}}
+    <div class="top-line"></div>
+
     <table class="header">
         <tr>
-            <td class="logo">
+            <td class="logo-cell">
                 @if ($logo)
-                    <img src="{{ $logo }}" style="max-width: 105px; max-height: 58px;" alt="Logo">
+                    <img src="{{ $logo }}" class="logo" alt="Centro Universitario Moctezuma">
                 @endif
             </td>
 
-            <td class="title">
-                <h1>DISTRIBUCIÓN E HISTORIAL ESCOLAR</h1>
-
-                <h2>
+            <td class="title-cell">
+                <p class="institution">CENTRO UNIVERSITARIO MOCTEZUMA</p>
+                <h1 class="title">DISTRIBUCIÓN ESCOLAR</h1>
+                <p class="subtitle">
                     {{ mb_strtoupper($nivel->nombre) }}
-
                     @if ($subtitulo)
                         · {{ mb_strtoupper($subtitulo) }}
                     @endif
-                </h2>
+                </p>
             </td>
 
             <td class="meta">
-                <b>Generado:</b>
-                {{ $generadoEn->format('d/m/Y H:i') }}
-                <br>
-
-                <b>Usuario:</b>
-                {{ $generadoPor }}
-                <br>
-
-                <b>Alcance:</b>
-                {{ ($filtros['modo'] ?? 'ciclo') === 'historico' ? 'Historial completo' : 'Ciclo seleccionado' }}
+                <b>CCT:</b> {{ $nivel->cct ?: '—' }}<br>
+                <b>Emisión:</b> {{ $generadoEn->format('d/m/Y H:i') }}<br>
+                <b>Usuario:</b> {{ $generadoPor }}
             </td>
         </tr>
     </table>
 
-    {{-- Bloques por ciclo escolar --}}
-    @forelse ($bloques as $bloque)
-        <div class="block">
+    <div class="scope">
+        <strong>Alcance:</strong>
+        {{ $ciclosTexto ?: 'Ciclo seleccionado' }}
+        ·
+        {{ $generacionesTexto ?: 'Todas las generaciones' }}
+        ·
+        {{ $filasGlobales->count() }} {{ $filasGlobales->count() === 1 ? 'grupo/ubicación' : 'grupos/ubicaciones' }}
+    </div>
 
-            {{-- Título del bloque --}}
-            <table class="block-title">
+    <table class="metrics">
+        <tr>
+            <td class="metric primary">
+                <div class="label">MATRÍCULA VIGENTE</div>
+                <div class="value">{{ $totalesGlobales['activos'] }}</div>
+            </td>
+
+            <td class="metric">
+                <div class="label">REGISTROS DEL CICLO</div>
+                <div class="value">{{ $totalesGlobales['total'] }}</div>
+            </td>
+
+            <td class="metric warning">
+                <div class="label">NO VIGENTES</div>
+                <div class="value">{{ $totalesGlobales['no_vigentes'] }}</div>
+            </td>
+
+            <td class="metric">
+                <div class="label">HOMBRES VIGENTES</div>
+                <div class="value">{{ $totalesGlobales['hombres'] }}</div>
+            </td>
+
+            <td class="metric">
+                <div class="label">MUJERES VIGENTES</div>
+                <div class="value">{{ $totalesGlobales['mujeres'] }}</div>
+            </td>
+
+            <td class="metric">
+                <div class="label">GRUPOS</div>
+                <div class="value">{{ $filasGlobales->count() }}</div>
+            </td>
+        </tr>
+    </table>
+
+    @foreach ($bloques as $bloque)
+        <div class="block">
+            <table class="block-head">
                 <tr>
-                    <td class="cycle">
-                        DISTRIBUCIÓN ESCOLAR · {{ $bloque['ciclo'] }}
+                    <td>
+                        {{ mb_strtoupper($bloque['ciclo']) }}
                     </td>
 
-                    <td class="totals">
-                        Histórico:
-                        {{ $bloque['totales']['total_historico'] }}
-
-                        @unless ($esBachillerato)
-                            · Activos:
-                            {{ $bloque['totales']['activos'] }}
-
-                            · No activos:
-                            {{ $bloque['totales']['inactivos'] +
-                                $bloque['totales']['bajas'] +
-                                $bloque['totales']['traslados'] +
-                                $bloque['totales']['suspendidos'] +
-                                $bloque['totales']['egresados'] }}
-                        @endunless
+                    <td class="right">
+                        Vigentes {{ $bloque['totales']['activos'] }}
+                        · No vigentes {{ $bloque['totales']['no_vigentes'] ?? 0 }}
+                        · Total {{ $bloque['totales']['total_historico'] }}
                     </td>
                 </tr>
             </table>
 
-            {{-- Tabla de distribución --}}
-            <table class="data{{ $esBachillerato ? ' bachillerato' : '' }}">
+            <table class="data">
                 <thead>
                     <tr>
+                        <th>Grado</th>
+
                         @if ($esBachillerato)
-                            {{-- Bachillerato: sin Regional, Semestre ni Inactivos --}}
-                            <th style="width: 8%;">CCT</th>
-                            <th style="width: 22%;">Nombre CT</th>
-                            <th style="width: 9%;">Nivel</th>
-                            <th style="width: 8%;">Turno</th>
-                            <th style="width: 6%;">Grado</th>
-                            <th style="width: 6%;">Grupo</th>
-                            <th style="width: 4%;">H</th>
-                            <th style="width: 4%;">M</th>
-                            <th style="width: 9%;">Total histórico</th>
-                            <th style="width: 10%;">Generación</th>
-                            <th style="width: 14%;">Director</th>
-                        @else
-                            {{-- Otros niveles --}}
-                            <th style="width: 5%;">Regional</th>
-                            <th style="width: 3%;">Zona</th>
-                            <th style="width: 5%;">CCT</th>
-                            <th style="width: 10%;">Nombre CT</th>
-                            <th style="width: 4.5%;">Nivel</th>
-                            <th style="width: 3.5%;">Turno</th>
-                            <th style="width: 3%;">Grado</th>
-                            <th style="width: 3%;">Sem.</th>
-                            <th style="width: 3%;">Grupo</th>
-                            <th style="width: 2%;">H</th>
-                            <th style="width: 2%;">M</th>
-                            <th style="width: 3.5%;">Total histórico</th>
-                            <th style="width: 3%;">Activos</th>
-                            <th style="width: 3.5%;">Inactivos</th>
-                            <th style="width: 3%;">Bajas</th>
-                            <th style="width: 3.5%;">Traslados</th>
-                            <th style="width: 4%;">Suspendidos</th>
-                            <th style="width: 3.5%;">Egresados</th>
-                            <th style="width: 5.5%;">Generación</th>
-                            <th style="width: 12%;">Maestro</th>
-                            <th style="width: 14%;">Director</th>
+                            <th>Sem.</th>
                         @endif
+
+                        <th>Grupo</th>
+                        <th>H</th>
+                        <th>M</th>
+                        <th>Vigentes</th>
+                        <th>Inactivos</th>
+                        <th>Bajas</th>
+                        <th>Trasl.</th>
+                        <th>Susp.</th>
+                        <th>Egres.</th>
+                        <th class="total-head">Total ciclo</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     @foreach ($bloque['filas'] as $fila)
                         <tr>
-                            {{-- Regional y zona solamente para otros niveles --}}
-                            @unless ($esBachillerato)
-                                <td>
-                                    {{ $fila['regional'] }}
-                                </td>
+                            <td><b>{{ $fila['grado'] }}</b></td>
 
-                                <td>
-                                    {{ $fila['zona'] }}
-                                </td>
-                            @endunless
+                            @if ($esBachillerato)
+                                <td>{{ $fila['semestre'] }}</td>
+                            @endif
 
-                            <td>
-                                <b>{{ $fila['cct'] }}</b>
-                            </td>
-
-                            <td class="left">
-                                <b>{{ $fila['nombre_ct'] }}</b>
-                            </td>
-
-                            <td>
-                                {{ $fila['nivel'] }}
-                            </td>
-
-                            <td>
-                                {{ $fila['turno'] }}
-                            </td>
-
-                            <td>
-                                <b>{{ $fila['grado'] }}°</b>
-                            </td>
-
-                            {{-- Semestre solamente para otros niveles --}}
-                            @unless ($esBachillerato)
-                                <td>
-                                    {{ $fila['semestre'] }}
-                                </td>
-                            @endunless
-
-                            <td>
-                                <b>{{ $fila['grupo'] }}</b>
-                            </td>
-
-                            <td>
-                                {{ $fila['hombres'] }}
-                            </td>
-
-                            <td>
-                                {{ $fila['mujeres'] }}
-                            </td>
-
-                            <td>
-                                <b>{{ $fila['total_historico'] }}</b>
-                            </td>
-
-                            {{-- Estados solamente para otros niveles --}}
-                            @unless ($esBachillerato)
-                                <td class="active">
-                                    {{ $fila['activos'] }}
-                                </td>
-
-                                <td class="inactive">
-                                    {{ $fila['inactivos'] }}
-                                </td>
-
-                                <td class="drop">
-                                    {{ $fila['bajas'] }}
-                                </td>
-
-                                <td class="transfer">
-                                    {{ $fila['traslados'] }}
-                                </td>
-
-                                <td class="suspended">
-                                    {{ $fila['suspendidos'] }}
-                                </td>
-
-                                <td class="graduated">
-                                    {{ $fila['egresados'] }}
-                                </td>
-                            @endunless
-
-                            <td>
-                                <b>{{ $fila['generacion'] }}</b>
-                            </td>
-
-                            {{-- Maestro solamente para otros niveles --}}
-                            @unless ($esBachillerato)
-                                <td class="left">
-                                    {{ $fila['maestro'] }}
-                                </td>
-                            @endunless
-
-                            <td class="left">
-                                {{ $fila['director'] }}
-                            </td>
+                            <td><b>{{ $fila['grupo'] }}</b></td>
+                            <td>{{ $fila['hombres_vigentes'] ?? 0 }}</td>
+                            <td>{{ $fila['mujeres_vigentes'] ?? 0 }}</td>
+                            <td class="active">{{ $fila['activos'] }}</td>
+                            <td class="inactive">{{ $fila['inactivos'] }}</td>
+                            <td class="drop">{{ $fila['bajas'] }}</td>
+                            <td class="transfer">{{ $fila['traslados'] }}</td>
+                            <td class="transfer">{{ $fila['suspendidos'] }}</td>
+                            <td class="graduated">{{ $fila['egresados'] }}</td>
+                            <td class="total">{{ $fila['total_historico'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
 
                 <tfoot>
-                    @if ($esBachillerato)
-                        {{-- 11 columnas totales --}}
-                        <tr>
-                            <td colspan="6">
-                                TOTALES
-                            </td>
+                    <tr>
+                        <td>TOTALES</td>
 
-                            <td>
-                                {{ $bloque['totales']['hombres'] }}
-                            </td>
+                        @if ($esBachillerato)
+                            <td>—</td>
+                        @endif
 
-                            <td>
-                                {{ $bloque['totales']['mujeres'] }}
-                            </td>
-
-                            <td>
-                                {{ $bloque['totales']['total_historico'] }}
-                            </td>
-
-                            <td colspan="2"></td>
-                        </tr>
-                    @else
-                        <tr>
-                            <td colspan="9">
-                                TOTALES
-                            </td>
-
-                            <td>
-                                {{ $bloque['totales']['hombres'] }}
-                            </td>
-
-                            <td>
-                                {{ $bloque['totales']['mujeres'] }}
-                            </td>
-
-                            <td>
-                                {{ $bloque['totales']['total_historico'] }}
-                            </td>
-
-                            <td class="active">
-                                {{ $bloque['totales']['activos'] }}
-                            </td>
-
-                            <td class="inactive">
-                                {{ $bloque['totales']['inactivos'] }}
-                            </td>
-
-                            <td class="drop">
-                                {{ $bloque['totales']['bajas'] }}
-                            </td>
-
-                            <td class="transfer">
-                                {{ $bloque['totales']['traslados'] }}
-                            </td>
-
-                            <td class="suspended">
-                                {{ $bloque['totales']['suspendidos'] }}
-                            </td>
-
-                            <td class="graduated">
-                                {{ $bloque['totales']['egresados'] }}
-                            </td>
-
-                            <td colspan="3"></td>
-                        </tr>
-                    @endif
+                        <td>{{ count($bloque['filas']) }} grupos</td>
+                        <td>{{ $bloque['totales']['hombres_vigentes'] ?? 0 }}</td>
+                        <td>{{ $bloque['totales']['mujeres_vigentes'] ?? 0 }}</td>
+                        <td>{{ $bloque['totales']['activos'] }}</td>
+                        <td>{{ $bloque['totales']['inactivos'] }}</td>
+                        <td>{{ $bloque['totales']['bajas'] }}</td>
+                        <td>{{ $bloque['totales']['traslados'] }}</td>
+                        <td>{{ $bloque['totales']['suspendidos'] }}</td>
+                        <td>{{ $bloque['totales']['egresados'] }}</td>
+                        <td class="total">{{ $bloque['totales']['total_historico'] }}</td>
+                    </tr>
                 </tfoot>
             </table>
         </div>
-    @empty
-        <div class="empty">
-            No hay información disponible para los filtros seleccionados.
-        </div>
-    @endforelse
+    @endforeach
 
-    {{-- Pie de página --}}
+    <div class="note">
+        <strong>Criterio de lectura.</strong>
+        H + M corresponde a matrícula vigente.
+        “Registros del ciclo” conserva todos los historiales no anulados.
+        Por ello el total puede ser mayor que la matrícula vigente aun cuando Bajas sea 0.
+    </div>
+
     <div class="footer">
-        Centro Universitario Moctezuma · Reporte administrativo confidencial ·
-        La información conserva matrículas, generaciones y movimientos administrativos.
+        CENTRO UNIVERSITARIO MOCTEZUMA · DISTRIBUCIÓN ESCOLAR INSTITUCIONAL
     </div>
 </body>
 

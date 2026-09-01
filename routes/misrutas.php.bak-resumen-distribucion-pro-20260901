@@ -468,8 +468,6 @@ Route::get('/generales/{slug_nivel}/promedios-materias/pdf', PromediosMateriasPd
 Route::middleware('admin')->prefix('generales/{slug_nivel}/distribucion')->group(function () {
     Route::get('/pdf', [DistribucionEscolarController::class, 'pdf'])
         ->name('generales.distribucion.pdf');
-    Route::get('/word', [DistribucionEscolarController::class, 'word'])
-        ->name('generales.distribucion.word');
 
     Route::get('/excel', [DistribucionEscolarController::class, 'excel'])
         ->name('generales.distribucion.excel');

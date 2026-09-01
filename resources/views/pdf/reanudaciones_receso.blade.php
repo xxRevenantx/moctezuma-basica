@@ -108,6 +108,7 @@
     .contenedor_primaria {
         font-size: 14px;
         margin-top: 20px;
+        font-family: 'ARIAL', sans-serif;
     }
 
     .contenedor_secundaria {
@@ -725,7 +726,7 @@
                         @endphp
 
                         <div class="fila-dato">
-                            <div class="label">
+                            <div class="label" style="line-height: 13.5px;">
 
                                 {{ $key }}:
 

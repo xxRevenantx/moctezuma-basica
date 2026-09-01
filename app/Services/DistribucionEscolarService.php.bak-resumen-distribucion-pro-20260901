@@ -43,13 +43,7 @@ class DistribucionEscolarService
                     ->map(function (Collection $grupo) use ($nivel, $escuela, $director, $generacion): array {
                         /** @var InscripcionCiclo $primero */
                         $primero = $grupo->first();
-                        $categorias = $grupo->countBy(
-                            fn (InscripcionCiclo $registro) => $this->categoriaCiclo($registro)
-                        );
-
-                        $vigentes = $grupo
-                            ->filter(fn (InscripcionCiclo $registro): bool => $this->esVigenteEnCiclo($registro))
-                            ->values();
+                        $categorias = $grupo->countBy(fn (InscripcionCiclo $registro) => $this->categoriaCiclo($registro));
 
                         return [
                             'regional' => $escuela?->regional ?: '—',
@@ -61,25 +55,10 @@ class DistribucionEscolarService
                             'grado' => $primero->grado?->nombre ?: '—',
                             'semestre' => $primero->semestre?->numero ?: '—',
                             'grupo' => $primero->grupo?->asignacionGrupo?->nombre ?: '—',
-                            // Hombres/Mujeres históricos se conservan por compatibilidad con Excel.
-                            'hombres' => $grupo
-                                ->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'H')
-                                ->count(),
-                            'mujeres' => $grupo
-                                ->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'M')
-                                ->count(),
-
-                            // Nuevos conteos vigentes para pantalla, PDF y Word.
-                            'hombres_vigentes' => $vigentes
-                                ->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'H')
-                                ->count(),
-                            'mujeres_vigentes' => $vigentes
-                                ->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'M')
-                                ->count(),
-
+                            'hombres' => $grupo->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'H')->count(),
+                            'mujeres' => $grupo->filter(fn (InscripcionCiclo $r) => $r->inscripcion?->genero === 'M')->count(),
                             'total_historico' => $grupo->unique('inscripcion_id')->count(),
-                            'activos' => $vigentes->count(),
-                            'no_vigentes' => max(0, $grupo->unique('inscripcion_id')->count() - $vigentes->count()),
+                            'activos' => (int) (($categorias['activo'] ?? 0) + ($categorias['reingreso'] ?? 0) + ($categorias['no_promovido'] ?? 0)),
                             'inactivos' => (int) ($categorias['inactivo'] ?? 0),
                             'bajas' => (int) ($categorias['baja'] ?? 0),
                             'traslados' => (int) ($categorias['traslado'] ?? 0),
@@ -208,41 +187,26 @@ class DistribucionEscolarService
                     'traslado' => $q->where('resultado_final', 'trasladado')->orWhereIn('estatus_actual_ciclo', ['trasladado', 'traslado']),
                     'suspendido' => $q->where('estatus_actual_ciclo', 'suspendido'),
                     'egresado' => $q->where('resultado_final', 'egresado')->orWhere('estatus_actual_ciclo', 'egresado'),
-                    'inactivo' => $q->whereIn(
-                        'estatus_actual_ciclo',
-                        ['inactivo', 'no_reinscrito', 'pendiente_reinscripcion', 'no_iniciado']
-                    ),
+                    'inactivo' => $q->where('estatus_actual_ciclo', 'inactivo'),
                     default => null,
                 };
             });
     }
 
-        private function categoriaCiclo(InscripcionCiclo $registro): string
+    private function categoriaCiclo(InscripcionCiclo $registro): string
     {
-        $estado = $registro->resultado_final
-            ?: $registro->estatus_actual_ciclo
-            ?: 'activo';
+        $estado = $registro->resultado_final ?: $registro->estatus_actual_ciclo ?: 'activo';
 
         return match ($estado) {
             'baja_temporal', 'baja_temporal_al_cierre', 'baja_definitiva' => 'baja',
             'trasladado', 'traslado' => 'traslado',
             'suspendido' => 'suspendido',
             'egresado' => 'egresado',
-            'inactivo', 'no_reinscrito', 'pendiente_reinscripcion', 'no_iniciado' => 'inactivo',
+            'inactivo' => 'inactivo',
             'reingreso' => 'reingreso',
             'no_promovido' => 'no_promovido',
-            default => $this->esVigenteEnCiclo($registro) ? 'activo' : 'inactivo',
+            default => $registro->estado === 'en_curso' ? 'activo' : 'inactivo',
         };
-    }
-
-private function esVigenteEnCiclo(InscripcionCiclo $registro): bool
-    {
-        return $registro->estado === InscripcionCiclo::ESTADO_EN_CURSO
-            && in_array(
-                (string) $registro->estatus_actual_ciclo,
-                ['activo', 'reingreso', 'no_promovido'],
-                true
-            );
     }
 
     private function categoriaAlumnoActual(Inscripcion $alumno): string
@@ -264,16 +228,13 @@ private function esVigenteEnCiclo(InscripcionCiclo $registro): bool
         return Str::headline(str_replace('_', ' ', $estatus));
     }
 
-        private function totalesFilas(Collection $filas): array
+    private function totalesFilas(Collection $filas): array
     {
         return [
             'hombres' => (int) $filas->sum('hombres'),
             'mujeres' => (int) $filas->sum('mujeres'),
-            'hombres_vigentes' => (int) $filas->sum('hombres_vigentes'),
-            'mujeres_vigentes' => (int) $filas->sum('mujeres_vigentes'),
             'total_historico' => (int) $filas->sum('total_historico'),
             'activos' => (int) $filas->sum('activos'),
-            'no_vigentes' => (int) $filas->sum('no_vigentes'),
             'inactivos' => (int) $filas->sum('inactivos'),
             'bajas' => (int) $filas->sum('bajas'),
             'traslados' => (int) $filas->sum('traslados'),

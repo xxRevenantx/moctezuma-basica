@@ -1,0 +1,56 @@
+FIX V2 — ParseError de generales.blade.php
+==========================================
+
+ERROR QUE CORRIGE
+-----------------
+ParseError:
+    syntax error, unexpected end of file
+
+Archivo:
+    resources/views/livewire/accion/generales.blade.php
+
+El error apareció después del aplicador de:
+Resumen + Distribución PRO + PDF + Word.
+
+QUÉ HACE ESTE FIX
+-----------------
+1. Conserva el archivo con error como respaldo.
+2. Usa el respaldo exacto creado antes de la modificación anterior:
+   generales.blade.php.bak-resumen-distribucion-pro-20260901
+3. Vuelve a aplicar únicamente la interfaz de Resumen y Distribución.
+4. La nueva versión usa bloques Blade más simples.
+5. Comprueba que @if/@endif, @foreach/@endforeach y @forelse/@endforelse
+   estén balanceados.
+6. Ejecuta:
+       php artisan view:clear
+       php artisan view:cache
+   para que Laravel valide realmente la vista.
+7. Si Laravel no la compila, restaura automáticamente la versión que existía
+   antes de ejecutar este FIX.
+
+CÓMO USAR
+---------
+Copia:
+    corregir_parse_generales_v2.php
+
+en:
+    C:\laragon\www\moctezuma-basica
+
+Ejecuta:
+    php corregir_parse_generales_v2.php
+
+Si muestra:
+    FIX APLICADO Y VALIDADO POR LARAVEL
+
+ejecuta:
+    php artisan optimize:clear
+
+y recarga:
+    /nivel/primaria/generales
+
+IMPORTANTE
+----------
+No necesitas revertir los cambios de Generales.php, el servicio, controller,
+rutas, PDF ni Word.
+
+Este FIX corrige específicamente la vista Blade que está causando el error 500.
