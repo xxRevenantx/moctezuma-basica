@@ -718,15 +718,10 @@
                                     </div>
 
                                     <p class="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-                                        @if (data_get($diagnosticoAnulacionIngreso, 'modo') === 'continuidad_confirmada')
-                                            La inscripción proviene de una continuidad confirmada. Puedes confirmar aquí
-                                            que el alumno no inició el ciclo destino: se anulará únicamente esa activación,
-                                            se conservará la promoción o egreso del ciclo de origen y no se registrará una baja.
-                                        @else
-                                            Utiliza esta acción cuando el alumno fue inscrito administrativamente en el ciclo,
-                                            pero la familia confirmó que nunca comenzó clases. No registra una baja y no
-                                            elimina su expediente.
-                                        @endif
+                                        Utiliza esta acción únicamente cuando el alumno fue inscrito directamente en el
+                                        ciclo,
+                                        pero la familia confirmó que nunca comenzó clases. No registra una baja y no
+                                        elimina su expediente.
                                     </p>
                                 </div>
                             </div>
@@ -809,13 +804,8 @@
                                     <div class="flex gap-2">
                                         <flux:icon.check-circle class="mt-0.5 h-4 w-4 shrink-0" />
                                         <p>
-                                            @if (data_get($diagnosticoAnulacionIngreso, 'modo') === 'continuidad_confirmada')
-                                                No se detectó actividad académica real que impida retirar el ciclo destino.
-                                                La promoción o egreso del ciclo de origen se conservará intacta.
-                                            @else
-                                                No se detectó actividad académica que impida anular el ingreso.
-                                                La confirmación solicitará fecha, motivo y contraseña.
-                                            @endif
+                                            No se detectó actividad académica que impida anular el ingreso.
+                                            La confirmación solicitará fecha, motivo y contraseña.
                                         </p>
                                     </div>
                                 </div>
@@ -1276,13 +1266,8 @@
                                     Confirmar que el alumno no inició el ciclo
                                 </h2>
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    @if (data_get($diagnostico_anulacion_ingreso, 'modo') === 'continuidad_confirmada')
-                                        Esta acción anula únicamente la activación del ciclo destino y conserva la
-                                        promoción o egreso del ciclo de origen, el expediente y la auditoría.
-                                    @else
-                                        Esta acción anula el ingreso del ciclo seleccionado, pero conserva el expediente y
-                                        la evidencia administrativa.
-                                    @endif
+                                    Esta acción anula el ingreso del ciclo seleccionado, pero conserva el expediente y
+                                    la evidencia administrativa.
                                 </p>
                             </div>
                         </div>
@@ -1348,19 +1333,8 @@
                         class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-200">
                         <p class="font-black">Resultado de la operación</p>
                         <ul class="mt-2 space-y-1">
-                            <li>
-                                • Estatus administrativo:
-                                <b>
-                                    {{ data_get($diagnostico_anulacion_ingreso, 'estatus_final') === 'egresado'
-                                        ? 'Egresado del nivel de origen'
-                                        : 'No reinscrito' }}
-                                </b>.
-                            </li>
+                            <li>• Estatus administrativo: <b>No reinscrito</b>.</li>
                             <li>• Historial del ciclo: <b>Anulado / No inició</b>.</li>
-                            @if (data_get($diagnostico_anulacion_ingreso, 'modo') === 'continuidad_confirmada')
-                                <li>• La promoción o egreso del ciclo de origen <b>se conserva</b>.</li>
-                                <li>• La proyección de continuidad queda registrada como <b>revertida por no inicio</b>.</li>
-                            @endif
                             <li>• El alumno deja de aparecer en listas, boletas, evaluaciones y documentos vigentes.
                             </li>
                             <li>• El expediente, documentos y auditoría permanecen disponibles.</li>

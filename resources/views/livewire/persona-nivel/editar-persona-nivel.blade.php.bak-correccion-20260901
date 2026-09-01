@@ -35,51 +35,25 @@
 
                 @if ($rolPermiteGrupo)
                     <section class="rounded-3xl border border-indigo-100 bg-indigo-50/50 p-5 dark:border-indigo-900 dark:bg-indigo-950/20">
-                        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h4 class="font-black text-slate-900 dark:text-white">Ubicación académica</h4>
-                                <p class="text-xs text-slate-500">
-                                    Cuando la función sea opcional puedes dejar esta sección completamente vacía.
-                                    Cambiar o retirar la ubicación conservará el historial de la asignación anterior.
-                                </p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2">
-                                @if (!$rolRequiereGrupo)
-                                    <button type="button" wire:click="limpiarUbicacionAcademica"
-                                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1 text-[10px] font-black uppercase text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-800 dark:bg-neutral-900 dark:text-indigo-300 dark:hover:bg-indigo-950/30">
-                                        <flux:icon.x-mark class="h-3.5 w-3.5" />
-                                        Sin ubicación académica
-                                    </button>
-                                @endif
-
-                                <span class="rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-black uppercase text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{{ $rolRequiereGrupo ? 'Obligatoria' : 'Opcional' }}</span>
-                            </div>
+                        <div class="mb-4 flex items-center justify-between gap-3">
+                            <div><h4 class="font-black text-slate-900 dark:text-white">Ubicación académica</h4><p class="text-xs text-slate-500">Cambiar grupo cerrará la asignación anterior y creará una nueva.</p></div>
+                            <span class="rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-black uppercase text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{{ $rolRequiereGrupo ? 'Obligatoria' : 'Opcional' }}</span>
                         </div>
                         <div class="grid gap-4 md:grid-cols-3">
                             @if ($nivel_id && \App\Models\Nivel::query()->whereKey($nivel_id)->value('slug') === 'bachillerato')
                                 <flux:select wire:model.live="semestre_id" label="Semestre" placeholder="Selecciona semestre">
-                                    @if (!$rolRequiereGrupo)
-                                        <flux:select.option value="">Sin ubicación académica</flux:select.option>
-                                    @endif
                                     @foreach ($semestres as $semestre)
                                         <flux:select.option value="{{ $semestre->id }}">{{ $semestre->orden_global ?: $semestre->numero }}° semestre · {{ $semestre->grado?->nombre }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
                             @else
                                 <flux:select wire:model.live="grado_id" label="Grado" placeholder="Selecciona grado">
-                                    @if (!$rolRequiereGrupo)
-                                        <flux:select.option value="">Sin ubicación académica</flux:select.option>
-                                    @endif
                                     @foreach ($grados as $grado)
                                         <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
                             @endif
                             <flux:select wire:model.live="grupo_id" label="Grupo" placeholder="Selecciona grupo">
-                                @if (!$rolRequiereGrupo)
-                                    <flux:select.option value="">Sin grupo</flux:select.option>
-                                @endif
                                 @foreach ($grupos as $grupo)
                                     <flux:select.option value="{{ $grupo->id }}">{{ $grupo->asignacionGrupo?->nombre }} · {{ $grupo->grado?->nombre }} · {{ $grupo->generacion?->etiqueta }}</flux:select.option>
                                 @endforeach

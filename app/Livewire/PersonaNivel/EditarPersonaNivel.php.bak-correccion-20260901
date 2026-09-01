@@ -128,10 +128,6 @@ class EditarPersonaNivel extends Component
 
     public function updatedSemestreId(): void
     {
-        if (!$this->semestre_id) {
-            $this->grado_id = null;
-        }
-
         $this->grupo_id = null;
         $this->generacionTexto = '';
         $this->cargarGrupos();
@@ -142,11 +138,8 @@ class EditarPersonaNivel extends Component
     {
         $grupo = $value ? $this->grupos->firstWhere('id', (int) $value) : null;
         $this->generacionTexto = (string) ($grupo?->generacion?->etiqueta ?? '');
-
         if ($grupo && $this->esBachillerato()) {
             $this->grado_id = $grupo->grado_id;
-        } elseif (!$grupo && $this->esBachillerato()) {
-            $this->grado_id = null;
         }
 
         $this->sincronizarTitular();
@@ -164,31 +157,6 @@ class EditarPersonaNivel extends Component
         if ($value) {
             $this->es_titular = true;
         }
-    }
-
-    public function limpiarUbicacionAcademica(): void
-    {
-        if ($this->rolRequiereGrupo) {
-            $this->addError(
-                'grupo_id',
-                'La función seleccionada requiere una ubicación académica.'
-            );
-            return;
-        }
-
-        $this->grado_id = null;
-        $this->semestre_id = null;
-        $this->grupo_id = null;
-        $this->generacionTexto = '';
-        $this->grupos = collect();
-
-        $this->sincronizarTitular();
-        $this->resetValidation([
-            'grado_id',
-            'semestre_id',
-            'grupo_id',
-            'es_titular_principal',
-        ]);
     }
 
     private function cargarReglasRol(): void

@@ -14,7 +14,6 @@ use App\Models\ObservacionInscripcion;
 use App\Models\Semestre;
 use App\Models\Tutor;
 use App\Services\AnulacionIngresoNoIniciadoService;
-use App\Services\CierreGeneracionContinuidadService;
 use App\Services\CurpService;
 use App\Services\EdadEscolarService;
 use App\Services\ExpedienteDigitalService;
@@ -27,7 +26,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -114,8 +112,6 @@ class EditarMatricula extends Component
     public string $fecha_anulacion_ingreso = '';
     public string $motivo_anulacion_ingreso = '';
     public string $password_anulacion_ingreso = '';
-    public ?int $proyeccion_continuidad_anulacion_id = null;
-    public string $modo_anulacion_ingreso = 'directo';
 
     /** @var array<string, mixed> */
     public array $diagnostico_anulacion_ingreso = [];
@@ -157,10 +153,11 @@ class EditarMatricula extends Component
             ->orderByDesc('fin_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->cargar($inscripcion);
-        $this->cargarDiagnosticoAnulacionIngreso();
+        $this->diagnostico_anulacion_ingreso = app(AnulacionIngresoNoIniciadoService::class)
+            ->diagnosticar((int) $this->InscripcionId);
 
         if (request()->boolean('anular_ingreso')) {
-            $this->prepararAnulacionIngreso();
+            $this->prepararAnulacionIngreso(app(AnulacionIngresoNoIniciadoService::class));
         }
     }
 
@@ -223,46 +220,7 @@ class EditarMatricula extends Component
         $this->actualizarEdadEscolar();
     }
 
-    private function cargarDiagnosticoAnulacionIngreso(): void
-    {
-        $diagnostico = app(AnulacionIngresoNoIniciadoService::class)
-            ->diagnosticar((int) $this->InscripcionId);
-
-        $proyeccionId = (int) ($diagnostico['proyeccion_confirmada_id'] ?? 0);
-        $this->proyeccion_continuidad_anulacion_id = $proyeccionId > 0 ? $proyeccionId : null;
-        $this->modo_anulacion_ingreso = 'directo';
-
-        if (!$this->proyeccion_continuidad_anulacion_id) {
-            $this->diagnostico_anulacion_ingreso = $diagnostico;
-            return;
-        }
-
-        /*
-         * Una continuidad confirmada no debe pasar por la anulación genérica:
-         * ya existe un flujo auditado específico que conserva la promoción/egreso
-         * del ciclo de origen y anula únicamente la activación del ciclo destino.
-         */
-        $retiro = app(CierreGeneracionContinuidadService::class)
-            ->diagnosticoRetiroProyeccion($this->proyeccion_continuidad_anulacion_id);
-
-        $destino = (array) ($retiro['destino'] ?? []);
-
-        $this->modo_anulacion_ingreso = 'continuidad_confirmada';
-        $this->diagnostico_anulacion_ingreso = array_merge($diagnostico, [
-            'puede_anular' => (bool) ($retiro['puede_retirar'] ?? false),
-            'bloqueos' => (array) ($retiro['bloqueos'] ?? []),
-            'actividad' => (array) ($retiro['actividad'] ?? []),
-            'modo' => 'continuidad_confirmada',
-            'estatus_final' => $retiro['estatus_final'] ?? null,
-            'ciclo' => $destino['ciclo'] ?? ($diagnostico['ciclo'] ?? null),
-            'nivel' => $destino['nivel'] ?? ($diagnostico['nivel'] ?? null),
-            'grado' => $destino['grado'] ?? ($diagnostico['grado'] ?? null),
-            'semestre' => $destino['semestre'] ?? ($diagnostico['semestre'] ?? null),
-            'grupo' => $destino['grupo'] ?? ($diagnostico['grupo'] ?? null),
-        ]);
-    }
-
-    public function prepararAnulacionIngreso(): void
+    public function prepararAnulacionIngreso(AnulacionIngresoNoIniciadoService $service): void
     {
         abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
 
@@ -273,11 +231,9 @@ class EditarMatricula extends Component
             'password_anulacion_ingreso',
         ]);
 
-        $this->cargarDiagnosticoAnulacionIngreso();
+        $this->diagnostico_anulacion_ingreso = $service->diagnosticar((int) $this->InscripcionId);
         $this->fecha_anulacion_ingreso = now()->toDateString();
-        $this->motivo_anulacion_ingreso = $this->modo_anulacion_ingreso === 'continuidad_confirmada'
-            ? 'La familia confirmó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar destino.'
-            : 'La familia informó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar.';
+        $this->motivo_anulacion_ingreso = 'La familia informó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar.';
         $this->password_anulacion_ingreso = '';
         $this->modal_anular_ingreso = true;
     }
@@ -294,10 +250,8 @@ class EditarMatricula extends Component
         ]);
     }
 
-    public function anularIngresoNoIniciado(
-        AnulacionIngresoNoIniciadoService $service,
-        CierreGeneracionContinuidadService $continuidadService
-    ) {
+    public function anularIngresoNoIniciado(AnulacionIngresoNoIniciadoService $service)
+    {
         abort_unless(auth()->user()?->is_admin || auth()->user()?->canAccess('alumnos.editar'), 403);
 
         $this->validate([
@@ -312,69 +266,17 @@ class EditarMatricula extends Component
             return null;
         }
 
-        /*
-         * Refresca el diagnóstico justo antes de escribir para evitar operar con
-         * un estado desactualizado si hubo cambios mientras el modal estaba abierto.
-         */
-        $this->cargarDiagnosticoAnulacionIngreso();
+        $service->anular(
+            (int) $this->InscripcionId,
+            trim($this->motivo_anulacion_ingreso),
+            $this->fecha_anulacion_ingreso,
+            (int) auth()->id(),
+        );
 
-        if (!(bool) ($this->diagnostico_anulacion_ingreso['puede_anular'] ?? false)) {
-            $bloqueos = (array) ($this->diagnostico_anulacion_ingreso['bloqueos'] ?? []);
-            $this->addError(
-                'anulacion_ingreso',
-                "No se puede confirmar que el alumno no inició el ciclo:\n- " .
-                    implode("\n- ", $bloqueos)
-            );
-            return null;
-        }
-
-        if ($this->proyeccion_continuidad_anulacion_id) {
-            try {
-                $proyeccion = $continuidadService->retirarProyeccionConfirmada(
-                    $this->proyeccion_continuidad_anulacion_id,
-                    trim($this->motivo_anulacion_ingreso),
-                    $this->fecha_anulacion_ingreso,
-                    (int) auth()->id(),
-                );
-            } catch (ValidationException $exception) {
-                foreach ($exception->errors() as $campo => $mensajes) {
-                    $campoDestino = match ($campo) {
-                        'motivo_retiro' => 'motivo_anulacion_ingreso',
-                        'fecha_retiro' => 'fecha_anulacion_ingreso',
-                        'retiro_proyeccion' => 'anulacion_ingreso',
-                        default => 'anulacion_ingreso',
-                    };
-
-                    foreach ((array) $mensajes as $mensaje) {
-                        $this->addError($campoDestino, $mensaje);
-                    }
-                }
-
-                $this->cargarDiagnosticoAnulacionIngreso();
-                return null;
-            }
-
-            $estatusFinal = $proyeccion->inscripcion?->estatus === 'egresado'
-                ? 'egresado del nivel de origen'
-                : 'no reinscrito en el último grado concluido';
-
-            session()->flash(
-                'success',
-                "El ciclo destino quedó como “Anulado / No inició”. Se conservó la promoción o egreso del ciclo de origen y el alumno quedó {$estatusFinal}. No se registró una baja."
-            );
-        } else {
-            $service->anular(
-                (int) $this->InscripcionId,
-                trim($this->motivo_anulacion_ingreso),
-                $this->fecha_anulacion_ingreso,
-                (int) auth()->id(),
-            );
-
-            session()->flash(
-                'success',
-                'El ingreso fue anulado como “No inició el ciclo”. El alumno ya no forma parte de las listas, boletas ni calificaciones del ciclo, pero su evidencia administrativa se conservó.'
-            );
-        }
+        session()->flash(
+            'success',
+            'El ingreso fue anulado como “No inició el ciclo”. El alumno ya no forma parte de las listas, boletas ni calificaciones del ciclo, pero su evidencia administrativa se conservó.'
+        );
 
         return redirect()->route('submodulos.accion', [
             'slug_nivel' => $this->slug_nivel,
