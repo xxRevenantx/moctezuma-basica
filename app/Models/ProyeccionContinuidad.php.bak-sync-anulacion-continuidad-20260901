@@ -104,15 +104,8 @@ class ProyeccionContinuidad extends Model
         return $this->belongsTo(User::class, 'revertida_por');
     }
 
-        public function getEtiquetaEstadoAttribute(): string
+    public function getEtiquetaEstadoAttribute(): string
     {
-        if (
-            $this->estado === 'revertida'
-            && $this->tipo_reversion === 'anulacion_administrativa'
-        ) {
-            return 'Anulada administrativamente';
-        }
-
         return match ($this->estado) {
             'confirmada' => 'Continuará',
             'cancelada' => 'No continuará',

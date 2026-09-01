@@ -13,7 +13,6 @@ use App\Models\Nivel;
 use App\Models\ObservacionInscripcion;
 use App\Models\Semestre;
 use App\Models\Tutor;
-use App\Services\AnulacionAdministrativaInscripcionService;
 use App\Services\AnulacionIngresoNoIniciadoService;
 use App\Services\CierreGeneracionContinuidadService;
 use App\Services\CurpService;
@@ -120,14 +119,6 @@ class EditarMatricula extends Component
 
     /** @var array<string, mixed> */
     public array $diagnostico_anulacion_ingreso = [];
-    public bool $modal_anulacion_administrativa = false;
-    public string $fecha_anulacion_administrativa = '';
-    public string $motivo_anulacion_administrativa = '';
-    public string $password_anulacion_administrativa = '';
-    public string $confirmacion_anulacion_administrativa = '';
-
-    /** @var array<string, mixed> */
-    public array $diagnostico_anulacion_administrativa = [];
 
     public ?string $observaciones = null;
     /** @var array<string,mixed> */
@@ -167,7 +158,6 @@ class EditarMatricula extends Component
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->cargar($inscripcion);
         $this->cargarDiagnosticoAnulacionIngreso();
-        $this->cargarDiagnosticoAnulacionAdministrativa();
 
         if (request()->boolean('anular_ingreso')) {
             $this->prepararAnulacionIngreso();
@@ -385,186 +375,6 @@ class EditarMatricula extends Component
                 'El ingreso fue anulado como “No inició el ciclo”. El alumno ya no forma parte de las listas, boletas ni calificaciones del ciclo, pero su evidencia administrativa se conservó.'
             );
         }
-
-        return redirect()->route('submodulos.accion', [
-            'slug_nivel' => $this->slug_nivel,
-            'accion' => 'matricula',
-        ]);
-    }
-
-    private function cargarDiagnosticoAnulacionAdministrativa(): void
-    {
-        if (!$this->InscripcionId) {
-            $this->diagnostico_anulacion_administrativa = [
-                'puede_anular' => false,
-                'bloqueos' => ['No se encontró el alumno.'],
-                'advertencias' => [],
-                'actividad' => [],
-            ];
-
-            return;
-        }
-
-        $this->diagnostico_anulacion_administrativa =
-            app(AnulacionAdministrativaInscripcionService::class)
-                ->diagnosticar((int) $this->InscripcionId);
-    }
-
-    public function prepararAnulacionAdministrativa(): void
-    {
-        abort_unless(auth()->user()?->is_admin, 403);
-
-        $this->resetValidation([
-            'anulacion_administrativa',
-            'fecha_anulacion_administrativa',
-            'motivo_anulacion_administrativa',
-            'password_anulacion_administrativa',
-            'confirmacion_anulacion_administrativa',
-        ]);
-
-        $this->cargarDiagnosticoAnulacionAdministrativa();
-        $this->fecha_anulacion_administrativa = now()->toDateString();
-        $this->motivo_anulacion_administrativa = '';
-        $this->password_anulacion_administrativa = '';
-        $this->confirmacion_anulacion_administrativa = '';
-        $this->modal_anulacion_administrativa = true;
-    }
-
-    public function cerrarModalAnulacionAdministrativa(): void
-    {
-        $this->modal_anulacion_administrativa = false;
-        $this->password_anulacion_administrativa = '';
-        $this->confirmacion_anulacion_administrativa = '';
-
-        $this->resetValidation([
-            'anulacion_administrativa',
-            'fecha_anulacion_administrativa',
-            'motivo_anulacion_administrativa',
-            'password_anulacion_administrativa',
-            'confirmacion_anulacion_administrativa',
-        ]);
-    }
-
-    public function anularInscripcionAdministrativamente(
-        AnulacionAdministrativaInscripcionService $service
-    ) {
-        abort_unless(auth()->user()?->is_admin, 403);
-
-        $this->validate([
-            'fecha_anulacion_administrativa' => [
-                'required',
-                'date',
-                'before_or_equal:today',
-            ],
-            'motivo_anulacion_administrativa' => [
-                'required',
-                'string',
-                'min:20',
-                'max:2000',
-            ],
-            'password_anulacion_administrativa' => [
-                'required',
-                'string',
-            ],
-            'confirmacion_anulacion_administrativa' => [
-                'required',
-                'string',
-            ],
-        ], [
-            'motivo_anulacion_administrativa.required' =>
-                'Describe el error administrativo que originó la anulación.',
-            'motivo_anulacion_administrativa.min' =>
-                'El motivo debe contener al menos 20 caracteres.',
-            'password_anulacion_administrativa.required' =>
-                'Confirma la operación con tu contraseña.',
-            'confirmacion_anulacion_administrativa.required' =>
-                'Escribe la frase de confirmación.',
-        ]);
-
-        if (
-            mb_strtoupper(
-                trim($this->confirmacion_anulacion_administrativa),
-                'UTF-8'
-            ) !== 'ANULAR INSCRIPCION'
-        ) {
-            $this->addError(
-                'confirmacion_anulacion_administrativa',
-                'Escribe exactamente: ANULAR INSCRIPCION'
-            );
-
-            return null;
-        }
-
-        if (
-            !Hash::check(
-                $this->password_anulacion_administrativa,
-                (string) auth()->user()?->password
-            )
-        ) {
-            $this->addError(
-                'password_anulacion_administrativa',
-                'La contraseña no es correcta.'
-            );
-
-            return null;
-        }
-
-        // Revisión final dentro de la misma pantalla antes de escribir.
-        $this->cargarDiagnosticoAnulacionAdministrativa();
-
-        if (
-            !(bool) (
-                $this->diagnostico_anulacion_administrativa['puede_anular']
-                ?? false
-            )
-        ) {
-            $bloqueos = (array) (
-                $this->diagnostico_anulacion_administrativa['bloqueos']
-                ?? []
-            );
-
-            $this->addError(
-                'anulacion_administrativa',
-                "No se puede realizar la anulación administrativa:\n- "
-                    . implode("\n- ", $bloqueos)
-            );
-
-            return null;
-        }
-
-        try {
-            $service->anular(
-                (int) $this->InscripcionId,
-                trim($this->motivo_anulacion_administrativa),
-                $this->fecha_anulacion_administrativa,
-                (int) auth()->id(),
-            );
-        } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $campo => $mensajes) {
-                $campoDestino = match ($campo) {
-                    'motivo_anulacion_administrativa' =>
-                        'motivo_anulacion_administrativa',
-                    'fecha_anulacion_administrativa' =>
-                        'fecha_anulacion_administrativa',
-                    default => 'anulacion_administrativa',
-                };
-
-                foreach ((array) $mensajes as $mensaje) {
-                    $this->addError($campoDestino, $mensaje);
-                }
-            }
-
-            $this->cargarDiagnosticoAnulacionAdministrativa();
-
-            return null;
-        }
-
-        session()->flash(
-            'success',
-            'La inscripción fue anulada por error administrativo. '
-            . 'El ciclo dejó de formar parte de la matrícula vigente, no se registró una baja '
-            . 'y las evidencias académicas/documentales permanecen conservadas para auditoría.'
-        );
 
         return redirect()->route('submodulos.accion', [
             'slug_nivel' => $this->slug_nivel,
@@ -1459,7 +1269,6 @@ class EditarMatricula extends Component
             'esBachillerato' => $this->esBachillerato(),
             'resumenDocumental' => $resumenDocumental,
             'diagnosticoAnulacionIngreso' => $this->diagnostico_anulacion_ingreso,
-            'diagnosticoAnulacionAdministrativa' => $this->diagnostico_anulacion_administrativa,
         ]);
     }
 }

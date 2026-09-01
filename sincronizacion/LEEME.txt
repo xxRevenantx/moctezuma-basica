@@ -1,0 +1,45 @@
+CORRECCIÓN DEL ERROR DE SINCRONIZACIÓN
+======================================
+
+EL ERROR
+--------
+El script temporal se creó dentro de:
+
+    storage/app/sync_anulaciones_continuidad.php
+
+y dentro de ese archivo se utilizó:
+
+    require __DIR__ . '/vendor/autoload.php';
+
+Como __DIR__ era storage/app, PHP intentó abrir:
+
+    storage/app/vendor/autoload.php
+
+pero vendor está en la RAÍZ del proyecto.
+
+IMPORTANTE
+----------
+La captura indica:
+    "El código fue instalado, pero falló la sincronización de datos existentes"
+
+Eso significa que las modificaciones de código ya fueron aplicadas.
+NO necesitas restaurar los .bak y NO necesitas volver a instalar todo.
+
+SOLUCIÓN MÁS SEGURA
+-------------------
+1. Copia:
+       sincronizar_anulaciones_continuidad.php
+
+   a:
+       C:\laragon\www\moctezuma-basica
+
+2. Ejecuta:
+       php sincronizar_anulaciones_continuidad.php
+
+3. Debe mostrar:
+       SINCRONIZACIÓN COMPLETADA
+       Proyecciones reparadas ahora: X
+
+4. Abre nuevamente Cierre y continuidad.
+
+También se incluye una versión corregida del instalador completo para futuros usos.
