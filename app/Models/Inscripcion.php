@@ -17,13 +17,34 @@ class Inscripcion extends Model
         'no_promovido',
     ];
 
-    public const ESTATUS_BAJA_ADMINISTRATIVA = [
+    /**
+     * Bajas escolares propiamente dichas. Se mantienen separadas de los
+     * demás movimientos administrativos para no mezclar documentación de baja
+     * con traslados, suspensiones o inactivaciones.
+     */
+    public const ESTATUS_BAJA = [
         'baja_temporal',
         'baja_definitiva',
+    ];
+
+    /**
+     * Movimientos administrativos que sacan al alumno de la matrícula vigente,
+     * pero NO constituyen una baja escolar.
+     */
+    public const ESTATUS_MOVIMIENTO_ESCOLAR = [
         'traslado',
         'trasladado',
         'suspendido',
         'inactivo',
+    ];
+
+    /**
+     * Agrupación de compatibilidad para reglas históricas que necesitan conocer
+     * cualquier estado administrativo no activo.
+     */
+    public const ESTATUS_BAJA_ADMINISTRATIVA = [
+        ...self::ESTATUS_BAJA,
+        ...self::ESTATUS_MOVIMIENTO_ESCOLAR,
     ];
 
     public const ESTATUS_EGRESADO = 'egresado';

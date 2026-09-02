@@ -21,6 +21,7 @@ class Baja extends Component
     use WithPagination;
 
     public string $slug_nivel = '';
+    public string $modo = 'bajas';
     public bool $mostrarSelectorNiveles = true;
     public ?Nivel $nivel = null;
     public Collection $niveles;
@@ -40,16 +41,16 @@ class Baja extends Component
     public string $observaciones = '';
     public string $fecha_movimiento = '';
 
-    public string $motivo_reingreso = '';
-    public string $fecha_reingreso = '';
-
     protected $paginationTheme = 'tailwind';
 
-    public function mount(string $slug_nivel): void
+    public function mount(string $slug_nivel, string $modo = 'bajas'): void
     {
         abort_unless(auth()->user()?->is_admin, 403);
+        abort_unless(in_array($modo, ['bajas', 'movimientos'], true), 404);
 
         $this->slug_nivel = $slug_nivel;
+        $this->modo = $modo;
+        $this->tipo_movimiento = $this->tipoMovimientoInicial();
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
         $this->niveles = Nivel::query()->orderBy('id')->get(['id', 'nombre', 'slug']);
         $this->ciclosEscolares = CicloEscolar::query()
@@ -62,7 +63,6 @@ class Baja extends Component
         $this->cargarGeneraciones(false);
 
         $this->fecha_movimiento = now()->toDateString();
-        $this->fecha_reingreso = now()->toDateString();
         $this->search = trim((string) request('buscar', ''));
     }
 
@@ -112,7 +112,7 @@ class Baja extends Component
             'generacion_id' => ['required', 'exists:generaciones,id'],
             'selected' => ['required', 'array', 'min:1'],
             'selected.*' => ['integer', 'exists:inscripciones,id'],
-            'tipo_movimiento' => ['required', 'in:baja_temporal,baja_definitiva,trasladado,suspendido,inactivo'],
+            'tipo_movimiento' => ['required', 'in:' . implode(',', $this->tiposMovimientoPermitidos())],
             'motivo' => ['required', 'string', 'min:5', 'max:1000'],
             'observaciones' => ['nullable', 'string', 'max:1000'],
             'fecha_movimiento' => ['required', 'date'],
@@ -158,7 +158,7 @@ class Baja extends Component
 
         $this->selected = [];
         $this->selectPage = false;
-        $this->tipo_movimiento = 'baja_definitiva';
+        $this->tipo_movimiento = $this->tipoMovimientoInicial();
         $this->motivo = '';
         $this->observaciones = '';
         $this->fecha_movimiento = now()->toDateString();
@@ -168,50 +168,12 @@ class Baja extends Component
 
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => $cantidad === 1 ? 'Movimiento registrado' : "{$cantidad} movimientos registrados",
-            'text' => 'Los alumnos conservan su generación y ahora aparecen en bajas o movimientos administrativos.',
-            'position' => 'top-end',
-        ]);
-    }
-
-    public function reactivarAlumno(int $inscripcionId): void
-    {
-        $datos = $this->validate([
-            'fecha_reingreso' => ['required', 'date'],
-            'motivo_reingreso' => ['required', 'string', 'min:5', 'max:1000'],
-        ], [
-            'fecha_reingreso.required' => 'Selecciona la fecha de reincorporación.',
-            'motivo_reingreso.required' => 'Escribe el motivo de la reincorporación.',
-            'motivo_reingreso.min' => 'El motivo debe contener al menos 5 caracteres.',
-        ]);
-
-        $alumno = $this->inactivosQuery()->whereKey($inscripcionId)->firstOrFail();
-
-        $actualizado = app(GestionAcademicaService::class)->cambiarEstatus(
-            $alumno,
-            'activo',
-            trim($datos['motivo_reingreso']),
-            auth()->id(),
-            $datos['fecha_reingreso']
-        );
-
-        $actualizado->forceFill([
-            'indicador_reingreso' => true,
-            'tipo_ultimo_ingreso' => 'reingreso',
-            'fecha_ultimo_ingreso' => $datos['fecha_reingreso'],
-            'observaciones_baja' => null,
-        ])->save();
-
-        $this->motivo_reingreso = '';
-        $this->fecha_reingreso = now()->toDateString();
-        $this->resetPage();
-        $this->resetPage('inactivosPage');
-        $this->resetPage('historialPage');
-
-        $this->dispatch('swal', [
-            'icon' => 'success',
-            'title' => 'Reincorporación registrada',
-            'text' => 'El alumno conserva su generación original y vuelve a la matrícula activa.',
+            'title' => $this->modo === 'bajas'
+                ? ($cantidad === 1 ? 'Baja registrada' : "{$cantidad} bajas registradas")
+                : ($cantidad === 1 ? 'Movimiento registrado' : "{$cantidad} movimientos registrados"),
+            'text' => $this->modo === 'bajas'
+                ? 'La baja quedó documentada y separada de los demás movimientos escolares.'
+                : 'El movimiento administrativo quedó registrado sin mezclarse con la documentación de bajas.',
             'position' => 'top-end',
         ]);
     }
@@ -362,21 +324,21 @@ class Baja extends Component
     private function activosQuery(): Builder
     {
         return $this->baseQuery()
-            ->visiblesEnListas();
+            ->visiblesEnListas()
+            ->when(
+                filled($this->filtro_estatus),
+                fn (Builder $query) => $query->where('estatus', $this->filtro_estatus)
+            );
     }
 
     private function inactivosQuery(): Builder
     {
+        $estatus = $this->modo === 'bajas'
+            ? Inscripcion::ESTATUS_BAJA
+            : Inscripcion::ESTATUS_MOVIMIENTO_ESCOLAR;
+
         return $this->baseQuery()
-            ->where(function (Builder $query): void {
-                $query->whereIn('estatus', Inscripcion::ESTATUS_BAJA_ADMINISTRATIVA)
-                    ->orWhere(function (Builder $legado): void {
-                        $legado->where('activo', false)
-                            ->where(function (Builder $sinEstatus): void {
-                                $sinEstatus->whereNull('estatus')->orWhere('estatus', '');
-                            });
-                    });
-            });
+            ->whereIn('estatus', $estatus);
     }
 
     private function activos(): LengthAwarePaginator
@@ -403,6 +365,7 @@ class Baja extends Component
         return MovimientoAlumno::query()
             ->with(['inscripcion.generacion', 'cicloEscolar', 'usuario'])
             ->whereHas('inscripcion', fn (Builder $query) => $query->where('nivel_id', $this->nivel?->id))
+            ->whereIn('tipo', $this->tiposMovimientoPermitidos())
             ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when($this->generacion_id, function (Builder $query): void {
                 $query->whereHas('inscripcion', fn (Builder $alumno) => $alumno->where('generacion_id', $this->generacion_id));
@@ -419,6 +382,24 @@ class Baja extends Component
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->paginate(12, ['*'], 'historialPage');
+    }
+
+    public function esModoBajas(): bool
+    {
+        return $this->modo === 'bajas';
+    }
+
+    /** @return array<int, string> */
+    public function tiposMovimientoPermitidos(): array
+    {
+        return $this->modo === 'bajas'
+            ? ['baja_definitiva', 'baja_temporal']
+            : ['trasladado', 'suspendido', 'inactivo'];
+    }
+
+    private function tipoMovimientoInicial(): string
+    {
+        return $this->modo === 'bajas' ? 'baja_definitiva' : 'trasladado';
     }
 
     public function render()

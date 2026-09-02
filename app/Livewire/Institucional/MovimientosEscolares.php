@@ -9,7 +9,7 @@ class MovimientosEscolares extends Component
 {
     use SeleccionaNivel;
 
-    public string $tab = 'bajas';
+    public string $tab = 'movimientos';
 
     public function mount(): void
     {
@@ -18,7 +18,7 @@ class MovimientosEscolares extends Component
 
     public function seleccionarTab(string $tab): void
     {
-        abort_unless(in_array($tab, ['bajas', 'no-vigentes', 'reingreso'], true), 404);
+        abort_unless(in_array($tab, ['movimientos', 'no-vigentes', 'reingreso'], true), 404);
         $this->tab = $tab;
     }
 

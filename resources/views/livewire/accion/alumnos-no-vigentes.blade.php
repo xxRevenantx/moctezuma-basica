@@ -86,7 +86,7 @@
                         </span>
                     </div>
                     <p class="mt-1 max-w-4xl text-sm text-violet-100">
-                        Separa preinscritos, no reinscritos, alumnos que no iniciaron, egresados y casos pendientes de regularización. Las bajas y traslados permanecen exclusivamente en su módulo.
+                        Separa preinscritos, no reinscritos, alumnos que no iniciaron, egresados y casos pendientes de regularización. Las bajas escolares permanecen en su módulo documental. Traslados, suspensiones e inactivaciones se gestionan en Movimientos escolares.
                     </p>
                 </div>
 

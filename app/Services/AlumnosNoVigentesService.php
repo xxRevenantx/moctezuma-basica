@@ -24,10 +24,18 @@ class AlumnosNoVigentesService
     public const ESTATUS_BAJAS = [
         'baja_temporal',
         'baja_definitiva',
+    ];
+
+    public const ESTATUS_MOVIMIENTOS = [
         'traslado',
         'trasladado',
         'suspendido',
         'inactivo',
+    ];
+
+    public const ESTATUS_EXCLUIDOS = [
+        ...self::ESTATUS_BAJAS,
+        ...self::ESTATUS_MOVIMIENTOS,
     ];
 
     public const ESTATUS_NO_VIGENTES = [
@@ -125,7 +133,7 @@ class AlumnosNoVigentesService
                 $registro
                     ->whereHas('ciclosEscolaresHistorial', function (Builder $historial) use ($contextoHistorial): void {
                         $contextoHistorial($historial);
-                        $this->excluirBajasDelHistorial($historial);
+                        $this->excluirBajasYMovimientosDelHistorial($historial);
                     })
                     ->orWhereHas('preinscripcionesCiclos', $contextoPreinscripcion);
 
@@ -156,7 +164,7 @@ class AlumnosNoVigentesService
             $query->where(function (Builder $clasificacion) use ($contextoHistorial, $contextoPreinscripcion, $categoria, $esCicloActual): void {
                 $clasificacion->whereHas('ciclosEscolaresHistorial', function (Builder $historial) use ($contextoHistorial, $categoria): void {
                     $contextoHistorial($historial);
-                    $this->excluirBajasDelHistorial($historial);
+                    $this->excluirBajasYMovimientosDelHistorial($historial);
                     $this->aplicarCategoriaAlHistorial($historial, $categoria);
                 });
 
@@ -366,18 +374,18 @@ class AlumnosNoVigentesService
         };
     }
 
-    private function excluirBajasDelHistorial(Builder $historial): void
+    private function excluirBajasYMovimientosDelHistorial(Builder $historial): void
     {
         $historial
             ->where(function (Builder $estado): void {
                 $estado
                     ->whereNull('estatus_actual_ciclo')
-                    ->orWhereNotIn('estatus_actual_ciclo', self::ESTATUS_BAJAS);
+                    ->orWhereNotIn('estatus_actual_ciclo', self::ESTATUS_EXCLUIDOS);
             })
             ->where(function (Builder $resultado): void {
                 $resultado
                     ->whereNull('resultado_final')
-                    ->orWhereNotIn('resultado_final', self::ESTATUS_BAJAS);
+                    ->orWhereNotIn('resultado_final', self::ESTATUS_EXCLUIDOS);
             });
     }
 

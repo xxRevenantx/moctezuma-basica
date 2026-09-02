@@ -9,7 +9,7 @@
             ],
             [
                 'titulo' => 'Movimientos escolares',
-                'descripcion' => 'Bajas, suspensiones, no vigentes y reingresos.',
+                'descripcion' => 'Traslados, suspensiones, inactivos, no vigentes y reingresos.',
                 'ruta' => route('misrutas.movimientos-escolares', ['nivel' => $slug_nivel]),
                 'icono' => 'arrows-right-left',
             ],

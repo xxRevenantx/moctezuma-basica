@@ -1,5 +1,6 @@
 <div x-data="{
     tipoMovimiento: $wire.entangle('tipo_movimiento'),
+    modo: @js($modo),
 
     confirmarMovimiento(cantidad) {
         const etiquetas = {
@@ -15,7 +16,7 @@
             Swal.fire({
                 icon: 'warning',
                 title: 'Selecciona alumnos',
-                text: 'Marca al menos un alumno antes de aplicar el movimiento.',
+                text: this.modo === 'bajas' ? 'Marca al menos un alumno antes de registrar la baja.' : 'Marca al menos un alumno antes de aplicar el movimiento.',
                 confirmButtonText: 'Entendido',
                 confirmButtonColor: '#e11d48'
             });
@@ -25,7 +26,7 @@
 
         Swal.fire({
             icon: 'warning',
-            title: 'Confirmar movimiento',
+            title: this.modo === 'bajas' ? 'Confirmar baja' : 'Confirmar movimiento',
             html: `
                     <div style='text-align:left'>
                         <p>
@@ -39,7 +40,7 @@
                     </div>
                 `,
             showCancelButton: true,
-            confirmButtonText: 'Sí, aplicar movimiento',
+            confirmButtonText: this.modo === 'bajas' ? 'Sí, registrar baja' : 'Sí, aplicar movimiento',
             cancelButtonText: 'Cancelar',
             confirmButtonColor: '#e11d48',
             cancelButtonColor: '#64748b',
@@ -52,33 +53,10 @@
         });
     },
 
-    confirmarReincorporacion(id, nombre) {
-        Swal.fire({
-            icon: 'question',
-            title: 'Registrar reincorporación',
-            html: `
-                    Se reincorporará a <b>${nombre}</b>.
-                    <br>
-                    <span style='color:#64748b;font-size:13px'>
-                        Conservará su generación y ubicación académica actual.
-                    </span>
-                `,
-            showCancelButton: true,
-            confirmButtonText: 'Reincorporar alumno',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#7c3aed',
-            cancelButtonColor: '#64748b',
-            reverseButtons: true
-        }).then((resultado) => {
-            if (resultado.isConfirmed) {
-                this.$wire.call('reactivarAlumno', id);
-            }
-        });
-    }
 }" class="space-y-6">
     {{-- Loader general --}}
     <div wire:loading.flex
-        wire:target="ciclo_escolar_id,generacion_id,filtro_estatus,search,clearSearch,limpiarFiltros,aplicarMovimiento,reactivarAlumno,gotoPage,nextPage,previousPage"
+        wire:target="ciclo_escolar_id,generacion_id,filtro_estatus,search,clearSearch,limpiarFiltros,aplicarMovimiento,gotoPage,nextPage,previousPage"
         class="fixed inset-0 z-[9998] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
         <div
             class="w-full max-w-sm overflow-hidden rounded-[30px] border border-white/20 bg-white/95 shadow-2xl shadow-rose-950/20 dark:bg-neutral-900/95">
@@ -144,7 +122,7 @@
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
                             <h1 class="text-2xl font-black tracking-tight sm:text-3xl">
-                                Bajas y control de estatus
+                                {{ $this->esModoBajas() ? 'Documentación de bajas escolares' : 'Movimientos administrativos' }}
                             </h1>
 
                             <span
@@ -156,8 +134,9 @@
                         </div>
 
                         <p class="mt-2 max-w-3xl text-sm leading-6 text-rose-100/80">
-                            Registra bajas, traslados, suspensiones e inactividad sin eliminar al alumno ni cambiar su
-                            generación. También puedes reincorporarlo conservando su información académica.
+                            {{ $this->esModoBajas()
+                                ? 'Registra únicamente bajas temporales o definitivas. Traslados, suspensiones e inactivaciones se gestionan por separado en Movimientos escolares.'
+                                : 'Registra traslados, suspensiones e inactivaciones sin mezclarlos con la documentación de bajas escolares.' }}
                         </p>
                     </div>
                 </div>
@@ -222,7 +201,9 @@
             <div class="bg-white p-4 sm:p-5 dark:bg-neutral-900">
                 <div class="flex items-center justify-between gap-3">
                     <div>
-                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500">Bajas / movimientos</p>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                            {{ $this->esModoBajas() ? 'Bajas documentadas' : 'Movimientos registrados' }}
+                        </p>
                         <p class="mt-1 text-2xl font-black text-slate-900 dark:text-white">
                             {{ number_format($totalBajas) }}</p>
                     </div>
@@ -337,10 +318,13 @@
                         <flux:icon.exclamation-triangle class="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 class="text-lg font-black text-slate-900 dark:text-white">Registrar movimiento
-                            administrativo</h2>
+                        <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                            {{ $this->esModoBajas() ? 'Registrar baja escolar' : 'Registrar movimiento administrativo' }}
+                        </h2>
                         <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                            Selecciona alumnos activos, define el movimiento y confirma. Ningún registro será eliminado.
+                            {{ $this->esModoBajas()
+                                ? 'Selecciona alumnos activos y documenta la baja. Este módulo no registra traslados, suspensiones ni inactivaciones.'
+                                : 'Selecciona alumnos activos y registra el movimiento correspondiente. Las bajas se documentan en su módulo independiente.' }}
                         </p>
                     </div>
                 </div>
@@ -358,23 +342,26 @@
             <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <div class="mb-1.5 flex items-center gap-2">
-                        <flux:label>Tipo de movimiento</flux:label>
+                        <flux:label>{{ $this->esModoBajas() ? 'Tipo de baja' : 'Tipo de movimiento' }}</flux:label>
                         <span
                             class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Obligatorio</span>
                     </div>
 
                     <flux:select wire:model.live="tipo_movimiento">
-                        <flux:select.option value="baja_definitiva">Baja definitiva</flux:select.option>
-                        <flux:select.option value="baja_temporal">Baja temporal</flux:select.option>
-                        <flux:select.option value="trasladado">Traslado / cambio de escuela</flux:select.option>
-                        <flux:select.option value="inactivo">Inactivo</flux:select.option>
-                        <flux:select.option value="suspendido">Suspendido</flux:select.option>
+                        @if ($this->esModoBajas())
+                            <flux:select.option value="baja_definitiva">Baja definitiva</flux:select.option>
+                            <flux:select.option value="baja_temporal">Baja temporal</flux:select.option>
+                        @else
+                            <flux:select.option value="trasladado">Traslado / cambio de escuela</flux:select.option>
+                            <flux:select.option value="suspendido">Suspendido</flux:select.option>
+                            <flux:select.option value="inactivo">Inactivo</flux:select.option>
+                        @endif
                     </flux:select>
                 </div>
 
                 <div>
                     <div class="mb-1.5 flex items-center gap-2">
-                        <flux:label>Fecha del movimiento</flux:label>
+                        <flux:label>{{ $this->esModoBajas() ? 'Fecha de la baja' : 'Fecha del movimiento' }}</flux:label>
                         <span
                             class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Obligatorio</span>
                     </div>
@@ -392,7 +379,7 @@
                             class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Obligatorio</span>
                     </div>
 
-                    <flux:input wire:model="motivo" placeholder="Describe el motivo del movimiento" />
+                    <flux:input wire:model="motivo" :placeholder="$this->esModoBajas() ? 'Describe el motivo de la baja' : 'Describe el motivo del movimiento'" />
                     @error('motivo')
                         <p class="mt-1.5 text-xs font-bold text-rose-600">{{ $message }}</p>
                     @enderror
@@ -420,7 +407,7 @@
                         <span wire:loading.remove wire:target="aplicarMovimiento"
                             class="inline-flex items-center gap-2">
                             <flux:icon.user-minus class="h-4 w-4" />
-                            Aplicar movimiento
+                            {{ $this->esModoBajas() ? 'Registrar baja' : 'Aplicar movimiento' }}
                         </span>
                         <span wire:loading wire:target="aplicarMovimiento" class="inline-flex items-center gap-2">
                             <span
@@ -573,49 +560,6 @@
         @endif
     </section>
 
-    {{-- Reincorporación --}}
-    <section
-        class="overflow-hidden rounded-[28px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-indigo-50 shadow-lg shadow-violet-100/40 dark:border-violet-900/50 dark:from-violet-950/25 dark:via-neutral-900 dark:to-indigo-950/20 dark:shadow-none">
-        <div class="grid grid-cols-1 gap-5 p-5 lg:grid-cols-[1.1fr_1fr_1.4fr] lg:items-end sm:p-6">
-            <div class="flex items-start gap-3">
-                <div
-                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-600/20">
-                    <flux:icon.arrow-path class="h-5 w-5" />
-                </div>
-                <div>
-                    <h2 class="font-black text-slate-900 dark:text-white">Datos para reincorporación</h2>
-                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        Se utilizarán al presionar “Reincorporar” en la tabla inferior.
-                    </p>
-                </div>
-            </div>
-
-            <div>
-                <div class="mb-1.5 flex items-center gap-2">
-                    <flux:label>Fecha de reincorporación</flux:label>
-                    <span
-                        class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">Obligatorio</span>
-                </div>
-                <flux:input wire:model="fecha_reingreso" type="date" />
-                @error('fecha_reingreso')
-                    <p class="mt-1.5 text-xs font-bold text-rose-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <div>
-                <div class="mb-1.5 flex items-center gap-2">
-                    <flux:label>Motivo o nota</flux:label>
-                    <span
-                        class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">Obligatorio</span>
-                </div>
-                <flux:input wire:model="motivo_reingreso" placeholder="Escribe el motivo de la reincorporación" />
-                @error('motivo_reingreso')
-                    <p class="mt-1.5 text-xs font-bold text-rose-600">{{ $message }}</p>
-                @enderror
-            </div>
-        </div>
-    </section>
-
     {{-- Tabla de estados no activos --}}
     <section
         class="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-lg shadow-slate-200/40 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/10">
@@ -627,9 +571,14 @@
                     <flux:icon.user-minus class="h-5 w-5" />
                 </div>
                 <div>
-                    <h2 class="font-black text-slate-900 dark:text-white">Bajas y movimientos administrativos</h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Los alumnos permanecen vinculados a su
-                        generación original.</p>
+                    <h2 class="font-black text-slate-900 dark:text-white">
+                        {{ $this->esModoBajas() ? 'Bajas escolares documentadas' : 'Movimientos administrativos registrados' }}
+                    </h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ $this->esModoBajas()
+                            ? 'Aquí solo se muestran bajas temporales y definitivas.'
+                            : 'Aquí solo se muestran traslados, suspensiones e inactivaciones.' }}
+                    </p>
                 </div>
             </div>
 
@@ -650,7 +599,6 @@
                         <th class="px-4 py-3">Estatus</th>
                         <th class="px-4 py-3">Fecha</th>
                         <th class="px-4 py-3">Motivo / observaciones</th>
-                        <th class="px-4 py-3 text-right">Acciones</th>
                     </tr>
                 </thead>
 
@@ -719,41 +667,24 @@
                                     @endif
                                 </td>
 
-                                <td class="px-4 py-4">
-                                    <div class="flex justify-end">
-                                        <button type="button"
-                                            x-on:click.prevent="confirmarReincorporacion(
-                                                {{ $alumnoInactivo->id }},
-                                                @js($this->nombreCompleto($alumnoInactivo))
-                                            )"
-                                            wire:loading.attr="disabled"
-                                            wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                            class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-neutral-900">
-                                            <flux:icon.arrow-path wire:loading.remove
-                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                                class="h-4 w-4" />
-                                            <flux:icon.arrow-path wire:loading
-                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})"
-                                                class="h-4 w-4 animate-spin" />
-                                            <span wire:loading.remove
-                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Reincorporar</span>
-                                            <span wire:loading
-                                                wire:target="reactivarAlumno({{ $alumnoInactivo->id }})">Procesando…</span>
-                                        </button>
-                                    </div>
-                                </td>
+
                             </tr>
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="7" class="px-6 py-16 text-center">
+                            <td colspan="6" class="px-6 py-16 text-center">
                                 <div
                                     class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-300">
                                     <flux:icon.check-circle class="h-6 w-6" />
                                 </div>
-                                <p class="mt-3 font-black text-slate-700 dark:text-slate-200">No hay movimientos
-                                    registrados</p>
-                                <p class="mt-1 text-sm text-slate-500">Esta generación no tiene bajas, traslados, suspensiones ni alumnos inactivos.</p>
+                                <p class="mt-3 font-black text-slate-700 dark:text-slate-200">
+                                    {{ $this->esModoBajas() ? 'No hay bajas documentadas' : 'No hay movimientos registrados' }}
+                                </p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    {{ $this->esModoBajas()
+                                        ? 'Esta generación no tiene bajas temporales ni definitivas.'
+                                        : 'Esta generación no tiene traslados, suspensiones ni inactivaciones.' }}
+                                </p>
                             </td>
                         </tr>
                     @endif
@@ -771,11 +702,17 @@
     <section class="overflow-hidden rounded-[28px] border border-sky-200 bg-white shadow-sm dark:border-sky-900/50 dark:bg-neutral-900">
         <div class="flex items-center justify-between border-b border-slate-100 p-5 dark:border-neutral-800">
             <div>
-                <h2 class="font-black text-slate-900 dark:text-white">Historial de movimientos del ciclo</h2>
-                <p class="text-sm text-slate-500">Consulta bajas, traslados, suspensiones y reingresos sin depender del estado actual del alumno.</p>
+                <h2 class="font-black text-slate-900 dark:text-white">
+                    {{ $this->esModoBajas() ? 'Historial documental de bajas' : 'Historial de movimientos administrativos' }}
+                </h2>
+                <p class="text-sm text-slate-500">
+                    {{ $this->esModoBajas()
+                        ? 'Consulta únicamente bajas temporales y definitivas del ciclo seleccionado.'
+                        : 'Consulta únicamente traslados, suspensiones e inactivaciones del ciclo seleccionado.' }}
+                </p>
             </div>
             <span class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
-                {{ $historialMovimientos->total() }} movimiento(s)
+                {{ $historialMovimientos->total() }} {{ $this->esModoBajas() ? 'baja(s)' : 'movimiento(s)' }}
             </span>
         </div>
         <div class="overflow-x-auto">
@@ -802,7 +739,7 @@
                             <td class="px-4 py-3 text-slate-500">{{ $movimiento->usuario?->name ?: 'Sistema' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No existen movimientos para los filtros seleccionados.</td></tr>
+                        <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">{{ $this->esModoBajas() ? 'No existen bajas para los filtros seleccionados.' : 'No existen movimientos para los filtros seleccionados.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

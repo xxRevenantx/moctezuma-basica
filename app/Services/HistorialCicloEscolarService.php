@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class HistorialCicloEscolarService
 {
@@ -241,6 +242,49 @@ class HistorialCicloEscolarService
         return DB::transaction(function () use ($alumno, $estatus, $motivo, $usuarioId, $fecha): InscripcionCiclo {
             $fecha = $this->fecha($fecha);
             $ciclo = $this->asegurarCicloFormal($alumno, 'cambio_estatus', $usuarioId, $fecha);
+
+            if (
+                $ciclo->fecha_ingreso
+                && CarbonImmutable::parse($fecha)->lessThan(CarbonImmutable::parse($ciclo->fecha_ingreso))
+            ) {
+                $campoFecha = in_array($estatus, ['activo', 'reingreso', 'no_promovido'], true)
+                    ? 'fecha_reingreso'
+                    : 'fecha_movimiento';
+
+                throw ValidationException::withMessages([
+                    $campoFecha => 'La fecha del movimiento no puede ser anterior al ingreso del alumno en el ciclo escolar.',
+                ]);
+            }
+
+            $esReactivacion = in_array($estatus, ['activo', 'reingreso', 'no_promovido'], true)
+                && $ciclo->estado === 'cerrado';
+
+            if ($esReactivacion) {
+                $ciclo->forceFill([
+                    'estado' => 'en_curso',
+                    'fecha_salida' => null,
+                    'estatus_actual_ciclo' => $estatus,
+                    'resultado_final' => null,
+                    'promovido' => false,
+                    'cerrado_at' => null,
+                    'cerrado_por' => null,
+                    'motivo_cierre' => null,
+                    'snapshot_cierre' => null,
+                ])->save();
+
+                if (! $ciclo->asignaciones()->where('es_actual', true)->exists()) {
+                    $this->crearAsignacion(
+                        $ciclo,
+                        $this->snapshot($alumno),
+                        'reactivacion',
+                        $motivo,
+                        $usuarioId,
+                        $fecha
+                    );
+                }
+
+                return $ciclo->refresh();
+            }
 
             $ciclo->update([
                 'estatus_actual_ciclo' => $estatus,

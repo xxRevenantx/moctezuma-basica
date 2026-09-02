@@ -2,11 +2,11 @@
     <x-institucional.encabezado-modulo
         eyebrow="Gestión escolar"
         title="Movimientos escolares"
-        description="Reúne bajas, traslados, suspensiones, alumnos no vigentes y reingresos para consultar la trayectoria administrativa sin cambiar de módulo." />
+        description="Reúne traslados, suspensiones, inactivaciones, alumnos no vigentes y reingresos. Las bajas escolares se mantienen separadas en su módulo documental." />
 
     <x-institucional.selector-nivel :niveles="$niveles" :slug-nivel="$slug_nivel" />
     <x-institucional.pestanas
-        :tabs="['bajas' => 'Bajas y movimientos', 'no-vigentes' => 'Alumnos no vigentes', 'reingreso' => 'Reingresos']"
+        :tabs="['movimientos' => 'Movimientos administrativos', 'no-vigentes' => 'Alumnos no vigentes', 'reingreso' => 'Reingresos']"
         :active="$tab" />
 
     @switch($tab)
@@ -26,7 +26,8 @@
         @default
             <livewire:accion.baja
                 :slug_nivel="$slug_nivel"
+                modo="movimientos"
                 :mostrar-selector-niveles="false"
-                :key="'movimientos-bajas-' . $slug_nivel" />
+                :key="'movimientos-administrativos-' . $slug_nivel" />
     @endswitch
 </div>

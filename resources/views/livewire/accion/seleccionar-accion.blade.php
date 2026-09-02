@@ -42,7 +42,7 @@
                 'icon' =>
                     'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.3 13.7L12 11.4 7.7 15.7 6.3 14.3 10.6 10 6.3 5.7 7.7 4.3 12 8.6l4.3-4.3 1.4 1.4L13.4 10l4.3 4.3-1.4 1.4Z',
                 'gradient' => 'from-rose-500 to-red-500',
-                'descripcion' => 'Control de bajas escolares',
+                'descripcion' => 'Documentación de bajas escolares',
             ],
             'fichas' => [
                 'icon' =>
