@@ -52,6 +52,7 @@ use App\Http\Controllers\HorariosVaciosPdfController;
 use App\Http\Controllers\LugarPreescolarPDFController;
 use App\Http\Controllers\ListaGeneracionesHistoricasController;
 use App\Http\Controllers\ListaAlumnosSeleccionadosController;
+use App\Http\Controllers\ListaAlumnosInstitucionalController;
 use App\Http\Controllers\ListasGeneralesFormatosController;
 use App\Http\Controllers\LiberacionSueldosController;
 use App\Http\Controllers\MateriaController;
@@ -166,6 +167,15 @@ Route::get('/listas-generales', ListasGenerales::class)
 Route::get('/listas-generales/formatos/pdf', ListasGeneralesFormatosController::class)
     ->middleware('admin')
     ->name('listas-generales.formatos.pdf');
+
+
+Route::get('/listas-generales/alumnos-institucional/{slug_nivel}/pdf', [ListaAlumnosInstitucionalController::class, 'pdf'])
+    ->middleware('admin')
+    ->name('listas-generales.alumnos-institucional.pdf');
+
+Route::get('/listas-generales/alumnos-institucional/{slug_nivel}/word', [ListaAlumnosInstitucionalController::class, 'word'])
+    ->middleware('admin')
+    ->name('listas-generales.alumnos-institucional.word');
 
 // MÓDULOS INSTITUCIONALES GLOBALES
 Route::middleware('admin')->group(function (): void {

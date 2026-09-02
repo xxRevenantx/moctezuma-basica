@@ -422,6 +422,7 @@ class ListasGenerales extends Component
             'evaluacion' => 'Lista de evaluación',
             'asistencia' => 'Lista de asistencia',
             'grupo' => 'Lista de grupo',
+            'alumnos_institucional' => 'Lista de alumnos Word institucional',
             'formatos' => 'Formatos',
         ];
 
@@ -441,7 +442,7 @@ class ListasGenerales extends Component
             ];
         }
 
-        if ($this->esBachillerato() && $this->tipo_descarga !== 'formatos') {
+        if ($this->esBachillerato() && !in_array($this->tipo_descarga, ['formatos', 'alumnos_institucional'], true)) {
             return $this->parciales
                 ->mapWithKeys(fn ($parcial): array => [
                     'parcial_' . $parcial->id => $this->textoParcial($parcial),
@@ -454,6 +455,9 @@ class ListasGenerales extends Component
                 'primer_periodo' => 'PRIMER PERIODO',
                 'segundo_periodo' => 'SEGUNDO PERIODO',
                 'tercer_periodo' => 'TERCER PERIODO',
+            ],
+            'alumnos_institucional' => [
+                'formato_sep' => 'FORMATO INSTITUCIONAL SEP',
             ],
             'formatos' => [
                 'sece' => 'SECE',
@@ -493,6 +497,11 @@ class ListasGenerales extends Component
     {
         return $this->tipo_descarga === 'formatos'
             && in_array($this->opcion_descarga, ['personalizadores', 'etiquetas'], true);
+    }
+
+    public function esListaAlumnosInstitucional(): bool
+    {
+        return $this->tipo_descarga === 'alumnos_institucional';
     }
 
     public function esBachillerato(): bool
@@ -783,6 +792,21 @@ class ListasGenerales extends Component
             return null;
         }
 
+        if ($this->esListaAlumnosInstitucional()) {
+            return route('listas-generales.alumnos-institucional.pdf', [
+                'slug_nivel' => $this->nivelSeleccionado?->slug,
+                'modo_descarga' => $this->modo_descarga,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
+                'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
+                'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
+                'grupo_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grupo_id : null,
+                'alumnos' => $this->modo_descarga === 'seleccionados'
+                    ? implode(',', $this->idsAlumnosSeleccionadosValidos)
+                    : null,
+            ]);
+        }
+
         if ($this->esFormatoGlobal()) {
             return route('listas-generales.formatos.pdf', [
                 'modo_descarga' => $this->modo_descarga,
@@ -814,6 +838,39 @@ class ListasGenerales extends Component
             'opcion_descarga' => $this->opcion_descarga,
             'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
         ]);
+    }
+
+    #[Computed]
+    public function urlWord(): ?string
+    {
+        if (!$this->puedeDescargar || !$this->esListaAlumnosInstitucional()) {
+            return null;
+        }
+
+        return route('listas-generales.alumnos-institucional.word', [
+            'slug_nivel' => $this->nivelSeleccionado?->slug,
+            'modo_descarga' => $this->modo_descarga,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
+            'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
+            'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
+            'grupo_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grupo_id : null,
+            'alumnos' => $this->modo_descarga === 'seleccionados'
+                ? implode(',', $this->idsAlumnosSeleccionadosValidos)
+                : null,
+        ]);
+    }
+
+    #[Computed]
+    public function textoBotonWord(): string
+    {
+        if ($this->modo_descarga === 'seleccionados') {
+            return 'Descargar Word (' . $this->totalAlumnosSeleccionados . ' alumnos)';
+        }
+
+        return $this->modo_descarga === 'nivel'
+            ? 'Descargar Word del nivel'
+            : 'Descargar Word';
     }
 
     #[Computed]
@@ -853,6 +910,26 @@ class ListasGenerales extends Component
 
         if (!$this->nivel_id) {
             return 'Selecciona un nivel para habilitar los documentos académicos exclusivos de ese nivel.';
+        }
+
+        if ($this->esListaAlumnosInstitucional()) {
+            if ($this->modo_descarga === 'nivel') {
+                return 'Se generará un documento institucional con una página por grupo activo del nivel. Cada lista incluye hasta 30 espacios, firmas y concentrado H/M/Total.';
+            }
+
+            if (!$this->contextoGrupoCompleto()) {
+                return $this->esBachillerato()
+                    ? 'Selecciona generación, grado, semestre y grupo para generar la lista institucional.'
+                    : 'Selecciona generación, grado y grupo para generar la lista institucional.';
+            }
+
+            if ($this->modo_descarga === 'seleccionados' && $this->totalAlumnosSeleccionados === 0) {
+                return 'Selecciona al menos un alumno activo del grupo para generar la lista institucional.';
+            }
+
+            return $this->modo_descarga === 'seleccionados'
+                ? 'Se generará la lista institucional únicamente con los alumnos seleccionados.'
+                : 'Se generará la lista institucional con la matrícula vigente del grupo seleccionado.';
         }
 
         if ($this->modo_descarga === 'nivel') {
@@ -924,7 +1001,7 @@ class ListasGenerales extends Component
 
     public function etiquetaOpcionDescarga(): string
     {
-        if ($this->tipo_descarga === 'formatos') {
+        if (in_array($this->tipo_descarga, ['formatos', 'alumnos_institucional'], true)) {
             return 'Formato';
         }
 

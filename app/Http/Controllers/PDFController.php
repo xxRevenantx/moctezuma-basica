@@ -13,6 +13,7 @@ use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\InscripcionCiclo;
 use App\Models\Nivel;
 use App\Models\Parcial;
 use App\Models\Periodos;
@@ -35,6 +36,9 @@ use App\Models\Calificacion;
 use App\Models\MateriaPromediar;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Settings as PhpWordSettings;
 
 
 class PDFController extends Controller
@@ -5906,6 +5910,620 @@ class PDFController extends Controller
 
 
     /**
+     * Genera las listas académicas en Word reutilizando exactamente el mismo
+     * contexto y las mismas reglas de matrícula que la descarga PDF.
+     */
+    public function lista_word(Request $request, string $slug_nivel)
+    {
+        $cicloEscolar = CicloEscolar::query()
+            ->when($request->integer('ciclo_escolar_id'), fn ($q) => $q->whereKey($request->integer('ciclo_escolar_id')))
+            ->when(!$request->integer('ciclo_escolar_id'), fn ($q) => $q->where('es_actual', true))
+            ->first()
+            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->firstOrFail();
+
+        if (!$cicloEscolar->es_actual) {
+            abort_unless(auth()->user()?->is_admin, 403, 'Solo administración puede consultar listas históricas.');
+        }
+
+        $request->merge(['ciclo_escolar_id' => $cicloEscolar->id]);
+
+        $modoDescarga = (string) $request->input('modo_descarga', 'grupo');
+        $alumnosSeleccionadosIds = $modoDescarga === 'seleccionados'
+            ? $this->idsAlumnosSeleccionadosLista($request)
+            : [];
+
+        $generacionId = $request->integer('generacion_id');
+        $gradoId = $request->integer('grado_id');
+        $grupoId = $request->integer('grupo_id');
+        $semestreId = $request->integer('semestre_id');
+
+        $tipoDescarga = (string) $request->input('tipo_descarga', 'grupo');
+        $opcionDescarga = (string) $request->input('opcion_descarga', 'primer_periodo');
+
+        $nivel = Nivel::query()->where('slug', $slug_nivel)->first();
+
+        if (!$nivel) {
+            abort(404, 'Nivel no encontrado.');
+        }
+
+        $esBachillerato = $this->esBachillerato($nivel);
+        $esSecundaria = $this->esSecundaria($nivel);
+
+        $tiposPermitidos = ($esBachillerato || $esSecundaria)
+            ? ['grupo']
+            : ['evaluacion', 'asistencia', 'grupo'];
+
+        if (!in_array($tipoDescarga, $tiposPermitidos, true)) {
+            abort(404, 'Este tipo de documento no está disponible en Word para el nivel seleccionado.');
+        }
+
+        $parcialSeleccionado = null;
+        $parcialId = null;
+
+        if ($esBachillerato) {
+            $parcialId = $this->parcialIdDesdeOpcion($opcionDescarga);
+
+            if (!$parcialId) {
+                abort(404, 'El parcial seleccionado no es válido.');
+            }
+
+            $parcialSeleccionado = Parcial::query()->find($parcialId);
+
+            if (!$parcialSeleccionado) {
+                abort(404, 'Parcial no encontrado.');
+            }
+
+            $opcionesPermitidas = Parcial::query()
+                ->pluck('id')
+                ->map(fn ($id) => 'parcial_' . $id)
+                ->all();
+        } else {
+            $opcionesPermitidas = [
+                'primer_periodo',
+                'segundo_periodo',
+                'tercer_periodo',
+            ];
+        }
+
+        if (!in_array($opcionDescarga, $opcionesPermitidas, true)) {
+            abort(404, 'La opción de descarga no es válida.');
+        }
+
+        if (!in_array($modoDescarga, ['grupo', 'seleccionados', 'nivel'], true)) {
+            abort(422, 'El modo de descarga no es válido.');
+        }
+
+        $contextos = [];
+
+        if (in_array($modoDescarga, ['grupo', 'seleccionados'], true)) {
+            if (blank($generacionId) || blank($gradoId) || blank($grupoId)) {
+                abort(422, 'Los parámetros generacion_id, grado_id y grupo_id son obligatorios.');
+            }
+
+            if ($esBachillerato && blank($semestreId)) {
+                abort(422, 'El parámetro semestre_id es obligatorio para bachillerato.');
+            }
+
+            $grupo = $this->obtenerGrupoListaPdf(
+                nivel: $nivel,
+                generacionId: $generacionId,
+                gradoId: $gradoId,
+                grupoId: $grupoId,
+                semestreId: $semestreId,
+                esBachillerato: $esBachillerato
+            );
+
+            $contextos[] = $this->construirContextoListaPdf(
+                request: $request,
+                nivel: $nivel,
+                grupo: $grupo,
+                tipoDescarga: $tipoDescarga,
+                opcionDescarga: $opcionDescarga,
+                parcialSeleccionado: $parcialSeleccionado,
+                parcialId: $parcialId,
+                alumnosSeleccionadosIds: $alumnosSeleccionadosIds,
+            );
+        } else {
+            $grupos = $this->obtenerGruposListaNivelPdf(
+                nivel: $nivel,
+                generacionId: $generacionId,
+                esBachillerato: $esBachillerato,
+                cicloEscolarId: (int) $cicloEscolar->id,
+            );
+
+            if ($grupos->isEmpty()) {
+                abort(404, 'No se encontraron grupos para generar las listas del nivel.');
+            }
+
+            foreach ($grupos as $grupo) {
+                $contextos[] = $this->construirContextoListaPdf(
+                    request: $request,
+                    nivel: $nivel,
+                    grupo: $grupo,
+                    tipoDescarga: $tipoDescarga,
+                    opcionDescarga: $opcionDescarga,
+                    parcialSeleccionado: $parcialSeleccionado,
+                    parcialId: $parcialId,
+                );
+            }
+        }
+
+        return $this->descargarListasWord(
+            contextos: $contextos,
+            nivel: $nivel,
+            tipoDescarga: $tipoDescarga,
+            opcionDescarga: $opcionDescarga,
+            modoDescarga: $modoDescarga,
+        );
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $contextos
+     */
+    private function descargarListasWord(
+        array $contextos,
+        Nivel $nivel,
+        string $tipoDescarga,
+        string $opcionDescarga,
+        string $modoDescarga,
+    ) {
+        if ($contextos === []) {
+            abort(404, 'No se pudo preparar la información para Word.');
+        }
+
+        $carpetaPhpWordTemp = storage_path('app/phpword-temp');
+        $carpetaSalida = storage_path('app/temp');
+
+        foreach ([$carpetaPhpWordTemp, $carpetaSalida] as $carpeta) {
+            if (!is_dir($carpeta)) {
+                mkdir($carpeta, 0755, true);
+            }
+        }
+
+        PhpWordSettings::setTempDir($carpetaPhpWordTemp);
+
+        $phpWord = new PhpWord();
+        $phpWord->setDefaultFontName('Arial');
+        $phpWord->setDefaultFontSize(9);
+
+        $phpWord->addTableStyle('CUMTabla', [
+            'borderSize' => 6,
+            'borderColor' => '334155',
+            'cellMargin' => 50,
+        ], [
+            'bgColor' => '006492',
+        ]);
+
+        $phpWord->addTableStyle('CUMDatos', [
+            'borderSize' => 4,
+            'borderColor' => 'CBD5E1',
+            'cellMargin' => 70,
+        ]);
+
+        foreach ($contextos as $contexto) {
+            $data = $contexto['data'] ?? [];
+
+            $section = $phpWord->addSection([
+                'paperSize' => 'Letter',
+                'orientation' => in_array($tipoDescarga, ['evaluacion', 'asistencia'], true)
+                    ? 'landscape'
+                    : 'portrait',
+                'marginTop' => 360,
+                'marginBottom' => 420,
+                'marginLeft' => 420,
+                'marginRight' => 420,
+                'headerHeight' => 200,
+                'footerHeight' => 200,
+            ]);
+
+            $this->agregarEncabezadoListaWord($section, $data, $tipoDescarga);
+
+            match ($tipoDescarga) {
+                'evaluacion' => $this->agregarEvaluacionWord($section, $data),
+                'asistencia' => $this->agregarAsistenciaWord($section, $data),
+                'grupo' => $this->agregarGrupoWord($section, $data),
+                default => null,
+            };
+
+            $this->agregarPieListaWord($section, $data);
+        }
+
+        $nombreAlcance = $modoDescarga === 'nivel'
+            ? 'nivel-completo'
+            : ($modoDescarga === 'seleccionados' ? 'seleccionados' : 'grupo');
+
+        $nombreArchivo = 'listas-'
+            . Str::slug($nivel->slug ?: $nivel->nombre, '-')
+            . '-' . Str::slug($tipoDescarga, '-')
+            . '-' . Str::slug($opcionDescarga, '-')
+            . '-' . $nombreAlcance
+            . '-' . now()->format('Ymd-His')
+            . '.docx';
+
+        $rutaTemporal = $carpetaSalida . DIRECTORY_SEPARATOR . $nombreArchivo;
+
+        IOFactory::createWriter($phpWord, 'Word2007')->save($rutaTemporal);
+
+        return response()
+            ->download($rutaTemporal, $nombreArchivo)
+            ->deleteFileAfterSend(true);
+    }
+
+    private function agregarEncabezadoListaWord($section, array $data, string $tipoDescarga): void
+    {
+        $nivel = $data['nivel'] ?? null;
+        $escuela = $data['escuela'] ?? null;
+
+        $tabla = $section->addTable([
+            'borderSize' => 0,
+            'cellMargin' => 0,
+            'width' => 100 * 50,
+            'unit' => 'pct',
+        ]);
+
+        $tabla->addRow();
+        $izquierda = $tabla->addCell(1800, ['valign' => 'center']);
+        $centro = $tabla->addCell(7600, ['valign' => 'center']);
+        $derecha = $tabla->addCell(1800, ['valign' => 'center']);
+
+        $logoNivel = !empty($nivel?->logo)
+            ? public_path('storage/logos/' . $nivel->logo)
+            : public_path('imagenes/logo-letra.png');
+        $logoInstitucional = public_path('imagenes/logo-letra.png');
+
+        if (is_file($logoNivel)) {
+            $izquierda->addImage($logoNivel, [
+                'width' => 70,
+                'height' => 70,
+                'alignment' => 'center',
+            ]);
+        }
+
+        $centro->addText(
+            mb_strtoupper((string) ($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA A.C.')),
+            ['bold' => true, 'size' => 17, 'color' => '4B5563'],
+            ['alignment' => 'center', 'spaceAfter' => 20]
+        );
+
+        $titulo = match ($tipoDescarga) {
+            'evaluacion' => 'LISTA DE EVALUACIÓN',
+            'asistencia' => 'LISTA DE ASISTENCIA',
+            default => 'LISTA DE GRUPO',
+        };
+
+        $centro->addText(
+            $titulo,
+            ['bold' => true, 'size' => 16, 'color' => '006492'],
+            ['alignment' => 'center', 'spaceAfter' => 20]
+        );
+
+        $direccion = trim(implode(' ', array_filter([
+            $escuela->calle ?? null,
+            filled($escuela->no_exterior ?? null) ? 'No. ' . $escuela->no_exterior : null,
+            filled($escuela->colonia ?? null) ? 'Col. ' . $escuela->colonia : null,
+            $escuela->ciudad ?? null,
+            $escuela->estado ?? null,
+        ])));
+
+        if ($direccion !== '') {
+            $centro->addText(
+                $direccion,
+                ['size' => 8, 'color' => '475569'],
+                ['alignment' => 'center', 'spaceAfter' => 20]
+            );
+        }
+
+        if (is_file($logoInstitucional)) {
+            $derecha->addImage($logoInstitucional, [
+                'width' => 70,
+                'height' => 70,
+                'alignment' => 'center',
+            ]);
+        }
+
+        $this->agregarDatosContextoWord($section, $data);
+    }
+
+    private function agregarDatosContextoWord($section, array $data): void
+    {
+        $nivel = $data['nivel'] ?? null;
+        $grado = $data['grado'] ?? null;
+        $grupo = $data['grupo'] ?? null;
+        $semestre = $data['semestre'] ?? null;
+        $ciclo = $data['cicloEscolar'] ?? null;
+        $nombreDocente = (string) ($data['nombreDocente'] ?? 'DOCENTE');
+        $periodo = $this->textoPeriodoListaWord($data);
+        $grupoTexto = $grupo?->asignacionGrupo?->nombre ?? $grupo?->nombre ?? '—';
+
+        $tabla = $section->addTable('CUMDatos');
+        $tabla->addRow(280);
+
+        $this->celdaDatoWord($tabla->addCell(4700), 'Docente', $nombreDocente);
+        $this->celdaDatoWord(
+            $tabla->addCell(4700),
+            'Ciclo escolar',
+            (string) ($ciclo->nombre ?? $ciclo->ciclo_escolar ?? '—')
+        );
+
+        $tabla->addRow(280);
+        $ubicacion = trim(implode(' · ', array_filter([
+            $nivel?->nombre,
+            $grado?->nombre,
+            $semestre ? 'Sem. ' . $semestre->numero : null,
+            'Grupo ' . $grupoTexto,
+        ])));
+
+        $this->celdaDatoWord($tabla->addCell(4700), 'Ubicación', $ubicacion ?: '—');
+        $this->celdaDatoWord($tabla->addCell(4700), 'Periodo', $periodo);
+
+        $section->addTextBreak(1);
+    }
+
+    private function celdaDatoWord($cell, string $label, string $value): void
+    {
+        $texto = $cell->addTextRun(['spaceAfter' => 0]);
+        $texto->addText($label . ': ', ['bold' => true, 'size' => 8, 'color' => '64748B']);
+        $texto->addText(mb_strtoupper($value), ['bold' => true, 'size' => 9, 'color' => '0F172A']);
+    }
+
+    private function agregarAsistenciaWord($section, array $data): void
+    {
+        $alumnos = collect($data['alumnos'] ?? []);
+        $mes = trim((string) ($data['mesAsistencia'] ?? ''));
+
+        $section->addText(
+            'Mes: ' . ($mes !== '' ? mb_strtoupper($mes) : '____________________________'),
+            ['bold' => true, 'size' => 10, 'color' => '0F172A'],
+            ['alignment' => 'center', 'spaceAfter' => 80]
+        );
+
+        $tabla = $section->addTable('CUMTabla');
+        $tabla->addRow(360);
+
+        $headers = ['#', 'Nombre y apellidos'];
+        $dias = ['L', 'M', 'M', 'J', 'V'];
+
+        for ($i = 1; $i <= 20; $i++) {
+            $headers[] = $i . ' ' . $dias[($i - 1) % 5];
+        }
+
+        $headers = array_merge($headers, ['A', 'I', 'R', 'J', 'P', 'Obs.']);
+
+        foreach ($headers as $indice => $header) {
+            $ancho = match (true) {
+                $indice === 0 => 350,
+                $indice === 1 => 2800,
+                $indice === count($headers) - 1 => 900,
+                $indice >= count($headers) - 6 => 430,
+                default => 300,
+            };
+
+            $celda = $tabla->addCell($ancho, [
+                'bgColor' => $indice === 1 ? '88AC2E' : '006492',
+                'valign' => 'center',
+            ]);
+            $celda->addText(
+                $header,
+                ['bold' => true, 'size' => $indice >= 2 ? 6 : 7, 'color' => 'FFFFFF'],
+                ['alignment' => 'center', 'spaceAfter' => 0]
+            );
+        }
+
+        foreach ($alumnos as $index => $alumno) {
+            $tabla->addRow(300);
+            $tabla->addCell(350)->addText((string) ($index + 1), ['size' => 7], ['alignment' => 'center']);
+            $tabla->addCell(2800)->addText(
+                $this->nombreAlumnoListaWord($alumno),
+                ['size' => 7],
+                ['spaceAfter' => 0]
+            );
+
+            for ($i = 1; $i <= 20; $i++) {
+                $tabla->addCell(300)->addText('');
+            }
+
+            foreach ([430, 430, 430, 430, 430, 900] as $ancho) {
+                $tabla->addCell($ancho)->addText('');
+            }
+        }
+
+        $section->addTextBreak(1);
+
+        $resumen = $section->addTable('CUMDatos');
+        $resumen->addRow(260);
+        foreach (['Total alumnos', 'Asistencias', 'Inasistencias', 'Retardos', 'Justificantes', 'Permisos'] as $titulo) {
+            $cell = $resumen->addCell(1550, ['bgColor' => 'EAF4D7']);
+            $cell->addText($titulo, ['bold' => true, 'size' => 7, 'color' => '365314'], ['alignment' => 'center']);
+        }
+        $resumen->addRow(260);
+        $valores = [(string) $alumnos->count(), '________', '________', '________', '________', '________'];
+        foreach ($valores as $valor) {
+            $resumen->addCell(1550)->addText($valor, ['size' => 8], ['alignment' => 'center']);
+        }
+
+        $section->addText(
+            'Nota: A = asistencia, F = falta, R = retardo, J = justificante y P = permiso.',
+            ['italic' => true, 'size' => 7, 'color' => '64748B'],
+            ['spaceBefore' => 80, 'spaceAfter' => 0]
+        );
+    }
+
+    private function agregarEvaluacionWord($section, array $data): void
+    {
+        $alumnos = collect($data['alumnos'] ?? []);
+        $materias = collect($data['materias'] ?? []);
+        $esPrimaria = (bool) ($data['esPrimaria'] ?? false);
+
+        if ($esPrimaria) {
+            $promediables = collect($data['materiasPromediables'] ?? []);
+            $cualitativas = collect($data['materiasCualitativas'] ?? []);
+            $materias = $promediables->merge($cualitativas)->values();
+        }
+
+        if ($materias->isEmpty()) {
+            $section->addText(
+                'No hay materias calificables asignadas para este grupo.',
+                ['bold' => true, 'size' => 10, 'color' => '991B1B'],
+                ['alignment' => 'center']
+            );
+            return;
+        }
+
+        $tabla = $section->addTable('CUMTabla');
+        $tabla->addRow(420);
+
+        $headers = ['#', 'Nombre del alumno'];
+        foreach ($materias as $materia) {
+            $nombre = (string) ($materia->materia ?? 'Materia');
+            if ($esPrimaria && in_array((string) ($materia->slug ?? ''), ['calculo-mental', 'caligrafia', 'lectura'], true)) {
+                $nombre .= ' (AC/ED/RA)';
+            }
+            $headers[] = $nombre;
+        }
+        $headers = array_merge($headers, ['Promedio', 'Estatus', 'Observaciones']);
+
+        foreach ($headers as $indice => $header) {
+            $ancho = match (true) {
+                $indice === 0 => 350,
+                $indice === 1 => 2500,
+                $indice === count($headers) - 1 => 1500,
+                $indice >= count($headers) - 3 => 700,
+                default => 700,
+            };
+            $bg = $indice === 1 ? '88AC2E' : '006492';
+            $tabla->addCell($ancho, ['bgColor' => $bg, 'valign' => 'center'])
+                ->addText(
+                    mb_strtoupper($header),
+                    ['bold' => true, 'size' => 6, 'color' => 'FFFFFF'],
+                    ['alignment' => 'center', 'spaceAfter' => 0]
+                );
+        }
+
+        foreach ($alumnos as $index => $alumno) {
+            $tabla->addRow(320);
+            $tabla->addCell(350)->addText((string) ($index + 1), ['size' => 7], ['alignment' => 'center']);
+            $tabla->addCell(2500)->addText($this->nombreAlumnoListaWord($alumno), ['size' => 7]);
+
+            foreach ($materias as $materia) {
+                $tabla->addCell(700)->addText('');
+            }
+
+            $tabla->addCell(700)->addText('');
+            $tabla->addCell(700)->addText('');
+            $tabla->addCell(1500)->addText('');
+        }
+
+        $section->addText(
+            'Escala cualitativa en materias especiales de Primaria: AC = alcanzado, ED = en desarrollo, RA = requiere apoyo.',
+            ['italic' => true, 'size' => 7, 'color' => '64748B'],
+            ['spaceBefore' => 80, 'spaceAfter' => 0]
+        );
+    }
+
+    private function agregarGrupoWord($section, array $data): void
+    {
+        $alumnos = collect($data['alumnos'] ?? []);
+        $mostrarMotivo = (bool) ($data['mostrarMotivo'] ?? false);
+
+        $tabla = $section->addTable('CUMTabla');
+        $tabla->addRow(360);
+
+        $headers = ['No.', 'Nombre', 'Apellido paterno', 'Apellido materno'];
+        if ($mostrarMotivo) {
+            $headers[] = 'Observaciones';
+        }
+
+        $anchos = $mostrarMotivo
+            ? [650, 2400, 2200, 2200, 3000]
+            : [700, 3000, 2800, 2800];
+
+        foreach ($headers as $i => $header) {
+            $tabla->addCell($anchos[$i], [
+                'bgColor' => $i === 1 ? '88AC2E' : '006492',
+                'valign' => 'center',
+            ])->addText(
+                $header,
+                ['bold' => true, 'size' => 8, 'color' => 'FFFFFF'],
+                ['alignment' => 'center', 'spaceAfter' => 0]
+            );
+        }
+
+        foreach ($alumnos as $index => $alumno) {
+            $tabla->addRow(520);
+            $tabla->addCell($anchos[0])->addText((string) ($index + 1), ['size' => 9], ['alignment' => 'center']);
+            $tabla->addCell($anchos[1])->addText(mb_strtoupper((string) ($alumno->nombre ?? '')), ['size' => 9]);
+            $tabla->addCell($anchos[2])->addText(mb_strtoupper((string) ($alumno->apellido_paterno ?? '')), ['size' => 9]);
+            $tabla->addCell($anchos[3])->addText(mb_strtoupper((string) ($alumno->apellido_materno ?? '')), ['size' => 9]);
+            if ($mostrarMotivo) {
+                $tabla->addCell($anchos[4])->addText('');
+            }
+        }
+
+        $section->addTextBreak(2);
+
+        $firmas = $section->addTable([
+            'borderSize' => 0,
+            'width' => 100 * 50,
+            'unit' => 'pct',
+        ]);
+        $firmas->addRow();
+
+        $docente = $this->nombrePersona($data['docente'] ?? null) ?: '____________________________';
+        $director = $this->nombrePersona($data['director']?->director ?? null) ?: '____________________________';
+
+        $firmas->addCell(4700)->addText(
+            mb_strtoupper($docente) . "\nFirma del docente",
+            ['size' => 8],
+            ['alignment' => 'center']
+        );
+        $firmas->addCell(4700)->addText(
+            mb_strtoupper($director) . "\nVo. Bo. Dirección",
+            ['size' => 8],
+            ['alignment' => 'center']
+        );
+    }
+
+    private function agregarPieListaWord($section, array $data): void
+    {
+        $escuela = $data['escuela'] ?? null;
+        $nivel = $data['nivel'] ?? null;
+
+        $footer = $section->addFooter();
+        $footer->addText(
+            mb_strtoupper((string) ($escuela->nombre ?? 'CENTRO UNIVERSITARIO MOCTEZUMA'))
+                . ' · C.C.T. ' . (string) ($nivel?->cct ?? '—')
+                . ' · Generado: ' . now()->format('d/m/Y H:i'),
+            ['size' => 7, 'color' => '64748B'],
+            ['alignment' => 'center']
+        );
+    }
+
+    private function nombreAlumnoListaWord($alumno): string
+    {
+        return mb_strtoupper(trim(implode(' ', array_filter([
+            $alumno->apellido_paterno ?? null,
+            $alumno->apellido_materno ?? null,
+            $alumno->nombre ?? null,
+        ]))));
+    }
+
+    private function textoPeriodoListaWord(array $data): string
+    {
+        $texto = $data['nombrePeriodo']
+            ?? $data['periodoTexto']
+            ?? $data['parcialSeleccionado']?->descripcion
+            ?? $data['parcialSeleccionado']?->parcial
+            ?? null;
+
+        if (filled($texto)) {
+            return (string) $texto;
+        }
+
+        return mb_strtoupper(str_replace('_', ' ', (string) ($data['opcion_descarga'] ?? 'periodo')));
+    }
+
+
+    /**
      * @return array<int, int>
      */
     private function idsAlumnosSeleccionadosLista(Request $request): array
@@ -6364,6 +6982,41 @@ class PDFController extends Controller
             usarActualComoRespaldo: (bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
             incluirTodaGeneracionBachillerato: $esBachillerato,
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Matrícula operativa vigente
+        |--------------------------------------------------------------------------
+        | En el ciclo actual, Listas Generales está rotulado como "Solo alumnos
+        | activos". Por ello, la reconstrucción histórica no puede reincorporar
+        | alumnos anulados, no reinscritos, trasladados o cerrados.
+        | Los ciclos históricos conservan la reconstrucción por fecha.
+        */
+        if ((bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
+            $idsVigentes = InscripcionCiclo::query()
+                ->where('ciclo_escolar_id', $cicloEscolarId)
+                ->where('nivel_id', $nivel->id)
+                ->where('grado_id', $grado->id)
+                ->where('generacion_id', $generacion->id)
+                ->where('grupo_id', $grupo->id)
+                ->when(
+                    $esBachillerato,
+                    fn (Builder $query) => $query->where('semestre_id', $semestre?->id),
+                    fn (Builder $query) => $query->whereNull('semestre_id')
+                )
+                ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
+                ->where('estatus_actual_ciclo', 'activo')
+                ->whereHas('inscripcion', fn (Builder $query) => $query->visiblesEnListas())
+                ->pluck('inscripcion_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $alumnos = $alumnos
+                ->filter(fn ($alumno): bool => in_array((int) $alumno->id, $idsVigentes, true))
+                ->values();
+        }
 
         if ($alumnosSeleccionadosIds !== []) {
             $idsEncontrados = $alumnos

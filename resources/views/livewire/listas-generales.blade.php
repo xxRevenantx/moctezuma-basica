@@ -85,7 +85,7 @@
                         <div>
                             <p class="text-sm font-black text-amber-900 dark:text-amber-100">Selecciona un nivel</p>
                             <p class="mt-1 text-xs font-semibold leading-5 text-amber-700 dark:text-amber-300">
-                                Las listas de evaluación, asistencia, grupo, SECE y SECE interna son exclusivas del nivel seleccionado.
+                                Las listas de evaluación, asistencia, grupo, la lista institucional de alumnos, SECE y SECE interna son exclusivas del nivel seleccionado.
                             </p>
                         </div>
                     </div>
@@ -207,6 +207,23 @@
                     <flux:error name="grupo_id" />
                 </flux:field>
             </div>
+
+            @if ($tipo_descarga === 'alumnos_institucional')
+                <div class="mt-5 rounded-2xl border border-[#006492]/20 bg-sky-50/70 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#006492] text-white">
+                            <flux:icon.document-text class="h-5 w-5" />
+                        </span>
+                        <div>
+                            <p class="text-sm font-black text-slate-900 dark:text-white">Lista institucional de alumnos</p>
+                            <p class="mt-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
+                                Formato Carta vertical inspirado en el documento oficial: logo de Educación Guerrero, C.C.T., grado, grupo, 30 espacios por página, CURP, fecha de nacimiento, firmas y concentrado H/M/Total.
+                                Solo toma matrícula vigente del ciclo; alumnos anulados, no reinscritos, bajas o traslados no se imprimen.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             @if ($tipo_descarga === 'grupo' && in_array($modo_descarga, ['grupo', 'seleccionados'], true))
                 <div class="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
@@ -433,19 +450,37 @@
                 </div>
             </div>
 
-            @if ($this->urlPdf)
-                <a href="{{ $this->urlPdf }}" target="_blank" rel="noopener"
-                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#006492] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#00547a]">
-                    <flux:icon.arrow-down-tray class="h-5 w-5" />
-                    {{ $this->textoBotonDescarga }}
-                </a>
-            @else
-                <button type="button" disabled
-                    class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-500">
-                    <flux:icon.lock-closed class="h-5 w-5" />
-                    Descargar PDF
-                </button>
-            @endif
+            <div class="flex flex-wrap items-center gap-2">
+                @if ($this->urlPdf)
+                    <a href="{{ $this->urlPdf }}" target="_blank" rel="noopener"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#006492] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#00547a]">
+                        <flux:icon.arrow-down-tray class="h-5 w-5" />
+                        {{ $this->textoBotonDescarga }}
+                    </a>
+                @else
+                    <button type="button" disabled
+                        class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-500">
+                        <flux:icon.lock-closed class="h-5 w-5" />
+                        Descargar PDF
+                    </button>
+                @endif
+
+                @if ($tipo_descarga === 'alumnos_institucional')
+                    @if ($this->urlWord)
+                        <a href="{{ $this->urlWord }}"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#88AC2E] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#759625]">
+                            <flux:icon.document-arrow-down class="h-5 w-5" />
+                            {{ $this->textoBotonWord }}
+                        </a>
+                    @else
+                        <button type="button" disabled
+                            class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-500">
+                            <flux:icon.lock-closed class="h-5 w-5" />
+                            Descargar Word
+                        </button>
+                    @endif
+                @endif
+            </div>
         </div>
 
         @if ($modo_descarga === 'todos_activos')
