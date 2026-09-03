@@ -184,13 +184,23 @@
                             Concentrado institucional
                         </p>
 
-                        <h2 class="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-                            Distribución escolar actual
-                        </h2>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <h2 class="text-xl font-black tracking-tight text-slate-950 dark:text-white">
+                                Distribución escolar por ciclo
+                            </h2>
+
+                            @if ($this->cicloDistribucionSeleccionado)
+                                <span
+                                    class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#006492] dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
+                                    Ciclo {{ $this->cicloDistribucionSeleccionado->nombre }}
+                                </span>
+                            @endif
+                        </div>
 
                         <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                            Concentrado por grado, semestre y grupo de la generación seleccionada, con separación
-                            entre matrícula vigente y registros administrativos no vigentes.
+                            Concentrado histórico por grado, semestre y grupo correspondiente al ciclo escolar
+                            seleccionado. Este selector es independiente del ciclo utilizado por Matrícula y otros
+                            módulos.
                         </p>
                     </div>
                 </div>
@@ -210,11 +220,101 @@
                 </div>
             </div>
 
+            <div
+                class="mt-5 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/80">
+                <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#006492] dark:text-sky-300">
+                            Filtros propios del concentrado
+                        </p>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            Cambiar estos filtros no modifica el ciclo general del sistema.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    <div>
+                        <flux:select wire:model.live="distribucion_ciclo_escolar_id" label="Ciclo escolar">
+                            @foreach ($ciclosEscolares as $ciclo)
+                                <flux:select.option value="{{ $ciclo->id }}">
+                                    {{ $ciclo->nombre }}
+                                    @if ($ciclo->es_actual)
+                                        · actual
+                                    @elseif ($ciclo->cerrado_at)
+                                        · cerrado
+                                    @else
+                                        · histórico
+                                    @endif
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    <div>
+                        <flux:select wire:model.live="distribucion_generacion_id" label="Generación">
+                            <flux:select.option value="">Todas</flux:select.option>
+                            @foreach ($distribucionGeneraciones as $generacion)
+                                <flux:select.option value="{{ $generacion->id }}">
+                                    {{ $generacion->etiqueta }}{{ $generacion->status ? '' : ' · inactiva' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    <div>
+                        <flux:select wire:model.live="distribucion_grado_id" label="Grado">
+                            <flux:select.option value="">Todos</flux:select.option>
+                            @foreach ($distribucionGrados as $grado)
+                                <flux:select.option value="{{ $grado->id }}">
+                                    {{ $grado->nombre }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    @if ($slug_nivel === 'bachillerato')
+                        <div>
+                            <flux:select wire:model.live="distribucion_semestre_id" label="Semestre">
+                                <flux:select.option value="">Todos</flux:select.option>
+                                @foreach ($distribucionSemestres as $semestre)
+                                    <flux:select.option value="{{ $semestre->id }}">
+                                        {{ $semestre->numero }}
+                                    </flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                    @endif
+
+                    <div>
+                        <flux:select wire:model.live="distribucion_grupo_id" label="Grupo">
+                            <flux:select.option value="">Todos</flux:select.option>
+                            @foreach ($distribucionGrupos as $grupo)
+                                <flux:select.option value="{{ $grupo->id }}">
+                                    {{ $grupo->grado?->nombre ?? '—' }}
+                                    @if ($slug_nivel === 'bachillerato' && $grupo->semestre?->numero)
+                                        · Sem. {{ $grupo->semestre->numero }}
+                                    @endif
+                                    · {{ $grupo->asignacionGrupo?->nombre ?? '—' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+
+                    <div class="flex items-end">
+                        <flux:button type="button" wire:click="limpiarFiltrosDistribucion" variant="ghost"
+                            icon="arrow-path" class="w-full justify-center">
+                            Limpiar filtros
+                        </flux:button>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                 <div
                     class="rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/20">
                     <p class="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 dark:text-sky-300">
-                        Matrícula vigente
+                        Matrícula del ciclo
                     </p>
                     <p class="mt-1 text-2xl font-black text-[#006492] dark:text-sky-300">
                         {{ $this->totalesDistribucion['activos'] ?? 0 }}
@@ -234,7 +334,7 @@
                 <div
                     class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                     <p class="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                        Hombres vigentes
+                        Hombres del ciclo
                     </p>
                     <p class="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                         {{ $this->totalesDistribucion['hombres'] ?? 0 }}
@@ -244,7 +344,7 @@
                 <div
                     class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                     <p class="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                        Mujeres vigentes
+                        Mujeres del ciclo
                     </p>
                     <p class="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                         {{ $this->totalesDistribucion['mujeres'] ?? 0 }}
@@ -289,7 +389,7 @@
                         </th>
                         <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em]">H</th>
                         <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em]">M</th>
-                        <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em]">Vigentes
+                        <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em]">Vigentes ciclo
                         </th>
                         <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-[0.08em]">Inactivos
                         </th>
@@ -468,8 +568,9 @@
 
                 <p class="leading-5">
                     <b class="text-slate-700 dark:text-slate-200">Lectura institucional:</b>
-                    H + M corresponde a matrícula vigente.
-                    El total del ciclo incluye también registros administrativos no vigentes.
+                    H + M corresponde a la matrícula vigente del ciclo seleccionado.
+                    En ciclos cerrados se utiliza el resultado histórico guardado para ese ciclo, no el estatus
+                    actual del alumno. El total del ciclo incluye también registros administrativos no vigentes.
                 </p>
             </div>
 

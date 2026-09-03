@@ -73,6 +73,14 @@
             font-weight: bold;
         }
 
+        .cycle {
+            margin: 2px 0 0;
+            color: #475569;
+            font-size: 8px;
+            font-weight: bold;
+            letter-spacing: .35px;
+        }
+
         .meta {
             width: 190px;
             text-align: right;
@@ -319,13 +327,13 @@
 
             <td class="title-cell">
                 <p class="institution">CENTRO UNIVERSITARIO MOCTEZUMA</p>
-                <h1 class="title">DISTRIBUCIÓN ESCOLAR</h1>
+                <h1 class="title">DISTRIBUCIÓN ESCOLAR · {{ mb_strtoupper($nivel->nombre) }}</h1>
                 <p class="subtitle">
-                    {{ mb_strtoupper($nivel->nombre) }}
-                    @if ($subtitulo)
-                        · {{ mb_strtoupper($subtitulo) }}
-                    @endif
+                    CICLO ESCOLAR {{ $cicloSeleccionado ?: ($ciclosTexto ?: 'NO ESPECIFICADO') }}
                 </p>
+                @if ($subtitulo)
+                    <p class="cycle">{{ mb_strtoupper($subtitulo) }}</p>
+                @endif
             </td>
 
             <td class="meta">
@@ -348,7 +356,7 @@
     <table class="metrics">
         <tr>
             <td class="metric primary">
-                <div class="label">MATRÍCULA VIGENTE</div>
+                <div class="label">MATRÍCULA DEL CICLO</div>
                 <div class="value">{{ $totalesGlobales['activos'] }}</div>
             </td>
 
@@ -363,12 +371,12 @@
             </td>
 
             <td class="metric">
-                <div class="label">HOMBRES VIGENTES</div>
+                <div class="label">HOMBRES DEL CICLO</div>
                 <div class="value">{{ $totalesGlobales['hombres'] }}</div>
             </td>
 
             <td class="metric">
-                <div class="label">MUJERES VIGENTES</div>
+                <div class="label">MUJERES DEL CICLO</div>
                 <div class="value">{{ $totalesGlobales['mujeres'] }}</div>
             </td>
 
@@ -407,7 +415,7 @@
                         <th>Grupo</th>
                         <th>H</th>
                         <th>M</th>
-                        <th>Vigentes</th>
+                        <th>Vigentes ciclo</th>
                         <th>Inactivos</th>
                         <th>Bajas</th>
                         <th>Trasl.</th>
@@ -466,9 +474,9 @@
 
     <div class="note">
         <strong>Criterio de lectura.</strong>
-        H + M corresponde a matrícula vigente.
+        H + M corresponde a la matrícula vigente del ciclo seleccionado.
+        En ciclos cerrados se usa el resultado histórico guardado para ese ciclo, no el estatus actual del alumno.
         “Registros del ciclo” conserva todos los historiales no anulados.
-        Por ello el total puede ser mayor que la matrícula vigente aun cuando Bajas sea 0.
     </div>
 
     <div class="footer">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\Distribucion\DistribucionEscolarExport;
+use App\Models\CicloEscolar;
 use App\Models\Nivel;
 use App\Services\DistribucionEscolarService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -235,6 +236,7 @@ public function word(
             'listado' => $listado,
             'filtros' => $filtros,
             'subtitulo' => $subtitulo,
+            'cicloSeleccionado' => $this->etiquetaCiclo($filtros),
             'logo' => $this->imagenBase64(public_path('imagenes/logo-letra.png')),
             'generadoPor' => auth()->user()?->name ?: 'Administración',
             'generadoEn' => now(),
@@ -248,6 +250,7 @@ private function crearWord(
         string $ruta
     ): void {
         $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $cicloSeleccionado = $this->etiquetaCiclo($filtros);
 
         $phpWord->setDefaultFontName('Arial');
         $phpWord->setDefaultFontSize(9);
@@ -296,12 +299,12 @@ private function crearWord(
             ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 40]
         );
         $titleCell->addText(
-            'DISTRIBUCIÓN ESCOLAR',
-            ['bold' => true, 'color' => '111827', 'size' => 17],
-            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 40]
+            'DISTRIBUCIÓN ESCOLAR · ' . mb_strtoupper((string) $nivel->nombre),
+            ['bold' => true, 'color' => '111827', 'size' => 16],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 35]
         );
         $titleCell->addText(
-            mb_strtoupper((string) $nivel->nombre),
+            'CICLO ESCOLAR ' . ($cicloSeleccionado ?: 'NO ESPECIFICADO'),
             ['bold' => true, 'color' => '88AC2E', 'size' => 10],
             ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]
         );
@@ -362,11 +365,11 @@ private function crearWord(
         $metricTable->addRow();
 
         $metricas = [
-            ['MATRÍCULA VIGENTE', $global['activos'], '006492', 'FFFFFF'],
+            ['MATRÍCULA DEL CICLO', $global['activos'], '006492', 'FFFFFF'],
             ['REGISTROS DEL CICLO', $global['total'], 'F8FAFC', '111827'],
             ['NO VIGENTES', $global['no_vigentes'], 'FFF7E6', '9A6700'],
-            ['HOMBRES VIGENTES', $global['hombres'], 'F8FAFC', '111827'],
-            ['MUJERES VIGENTES', $global['mujeres'], 'F8FAFC', '111827'],
+            ['HOMBRES DEL CICLO', $global['hombres'], 'F8FAFC', '111827'],
+            ['MUJERES DEL CICLO', $global['mujeres'], 'F8FAFC', '111827'],
             ['GRUPOS', $grupos, 'F4F8EC', '5F7D16'],
         ];
 
@@ -448,7 +451,7 @@ private function crearWord(
                     'Grupo',
                     'H',
                     'M',
-                    'Vigentes',
+                    'Vigentes ciclo',
                     'Inactivos',
                     'Bajas',
                     'Trasl.',
@@ -564,9 +567,9 @@ private function crearWord(
         }
 
         $section->addText(
-            'Criterio de lectura: H + M corresponde a matrícula vigente. '
-            . '“Registros del ciclo” conserva todos los historiales no anulados; '
-            . 'por ello puede ser mayor que la matrícula vigente aun cuando no existan bajas.',
+            'Criterio de lectura: H + M corresponde a la matrícula vigente del ciclo seleccionado. '
+            . 'En ciclos cerrados se usa el resultado histórico guardado para ese ciclo, no el estatus actual del alumno. '
+            . '“Registros del ciclo” conserva todos los historiales no anulados.',
             ['size' => 7.3, 'color' => '475569'],
             [
                 'spaceBefore' => 40,
@@ -593,10 +596,23 @@ private function crearWord(
             ? 'generacion_' . $filtros['generacion_id']
             : 'todas_las_generaciones';
 
+        $ciclo = $this->etiquetaCiclo($filtros) ?: 'sin_ciclo';
+
         return Str::slug(
-            'distribucion_escolar_' . $nivel->slug . '_' . $alcance . '_' . now()->format('Ymd_His'),
+            'distribucion_escolar_' . $nivel->slug . '_' . $ciclo . '_' . $alcance . '_' . now()->format('Ymd_His'),
             '_'
         );
+    }
+
+    private function etiquetaCiclo(array $filtros): ?string
+    {
+        $cicloId = (int) ($filtros['ciclo_escolar_id'] ?? 0);
+
+        if ($cicloId <= 0) {
+            return null;
+        }
+
+        return CicloEscolar::query()->find($cicloId)?->nombre;
     }
 
     private function imagenBase64(string $ruta): ?string

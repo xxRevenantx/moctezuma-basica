@@ -30,7 +30,7 @@ class DistribucionEscolarService
 
     public function bloques(Nivel $nivel, array $filtros = []): Collection
     {
-        $registros = $this->query($nivel, $filtros)->get();
+        $registros = $this->query($nivel, $filtros)->get()->unique('inscripcion_id')->values();
         $escuela = Escuela::query()->first();
         $director = $this->nombreDirector($nivel);
 
@@ -111,7 +111,11 @@ class DistribucionEscolarService
 
     public function listadoCompleto(Nivel $nivel, array $filtros = []): Collection
     {
-        return $this->query($nivel, $filtros)->get()->map(function (InscripcionCiclo $registro): array {
+        return $this->query($nivel, $filtros)
+            ->get()
+            ->unique('inscripcion_id')
+            ->values()
+            ->map(function (InscripcionCiclo $registro): array {
             $alumno = $registro->inscripcion;
             $categoriaHistorica = $this->categoriaCiclo($registro);
             $estadoHistorico = $this->etiquetaEstatus($registro->resultado_final ?: $registro->estatus_actual_ciclo ?: 'activo');
@@ -184,7 +188,13 @@ class DistribucionEscolarService
     {
         return InscripcionCiclo::query()
             ->with([
-                'inscripcion', 'cicloEscolar', 'nivel', 'generacion', 'grado', 'semestre', 'grupo.asignacionGrupo',
+                'inscripcion',
+                'cicloEscolar',
+                'nivel',
+                'generacion',
+                'grado',
+                'semestre',
+                'grupo' => fn ($query) => $query->withTrashed()->with('asignacionGrupo'),
             ])
             ->where('nivel_id', $nivel->id)
             ->where('estado', '!=', 'anulado')
@@ -237,12 +247,34 @@ class DistribucionEscolarService
 
 private function esVigenteEnCiclo(InscripcionCiclo $registro): bool
     {
-        return $registro->estado === InscripcionCiclo::ESTADO_EN_CURSO
-            && in_array(
+        if ($registro->estado === InscripcionCiclo::ESTADO_ANULADO) {
+            return false;
+        }
+
+        if ($registro->estado === InscripcionCiclo::ESTADO_EN_CURSO) {
+            return in_array(
                 (string) $registro->estatus_actual_ciclo,
                 ['activo', 'reingreso', 'no_promovido'],
                 true
             );
+        }
+
+        // Un ciclo histórico no debe depender del estatus actual del alumno.
+        // Se conserva como matrícula del ciclo a quien lo cursó y concluyó
+        // ordinariamente, incluso si hoy está en otro grado/nivel o egresó.
+        return in_array(
+            (string) $registro->resultado_final,
+            [
+                'promovido',
+                'promovido_grado',
+                'promovido_nivel',
+                'continuidad',
+                'continuidad_interna',
+                'no_promovido',
+                'egresado',
+            ],
+            true
+        );
     }
 
     private function categoriaAlumnoActual(Inscripcion $alumno): string

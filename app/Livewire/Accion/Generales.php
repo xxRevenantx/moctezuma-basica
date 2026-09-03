@@ -27,12 +27,25 @@ class Generales extends Component
     public Collection $semestres;
     public Collection $grupos;
 
+    // Filtros exclusivos de la distribución escolar. No comparten estado
+    // con el ciclo general de la sesión ni con otros módulos del sistema.
+    public Collection $distribucionGeneraciones;
+    public Collection $distribucionGrados;
+    public Collection $distribucionSemestres;
+    public Collection $distribucionGrupos;
+
     public string $slug_nivel = '';
     public string $ciclo_escolar_id = '';
     public string $generacion_id = '';
     public string $grado_id = '';
     public string $semestre_id = '';
     public string $grupo_id = '';
+
+    public string $distribucion_ciclo_escolar_id = '';
+    public string $distribucion_generacion_id = '';
+    public string $distribucion_grado_id = '';
+    public string $distribucion_semestre_id = '';
+    public string $distribucion_grupo_id = '';
 
     public function mount(string $slug_nivel): void
     {
@@ -60,8 +73,18 @@ class Generales extends Component
         $this->semestres = collect();
         $this->grupos = collect();
 
+        $this->distribucionGeneraciones = collect();
+        $this->distribucionGrados = collect();
+        $this->distribucionSemestres = collect();
+        $this->distribucionGrupos = collect();
+
         $this->ciclo_escolar_id = (string) (app(ContextoCicloEscolarSesion::class)->resolver($this->ciclosEscolares) ?? '');
         $this->cargarFiltrosDependientes();
+
+        // La distribución escolar inicia siempre en el ciclo actual, de forma
+        // independiente al ciclo recordado por Matrícula/otros módulos.
+        $this->distribucion_ciclo_escolar_id = $this->resolverCicloDistribucionInicial();
+        $this->cargarFiltrosDistribucion();
     }
 
     public function updatedCicloEscolarId($value): void
@@ -105,6 +128,48 @@ class Generales extends Component
         $this->cargarGrupos();
     }
 
+    public function updatedDistribucionCicloEscolarId($value): void
+    {
+        $this->distribucion_ciclo_escolar_id = $this->cicloValido($value)
+            ? (string) ((int) $value)
+            : $this->resolverCicloDistribucionInicial();
+
+        $this->distribucion_generacion_id = '';
+        $this->distribucion_grado_id = '';
+        $this->distribucion_semestre_id = '';
+        $this->distribucion_grupo_id = '';
+
+        // Intencionalmente NO se llama ContextoCicloEscolarSesion::recordar().
+        // Este selector pertenece solo a la distribución escolar.
+        $this->cargarFiltrosDistribucion();
+    }
+
+    public function updatedDistribucionGeneracionId(): void
+    {
+        $this->distribucion_grado_id = '';
+        $this->distribucion_semestre_id = '';
+        $this->distribucion_grupo_id = '';
+
+        $this->cargarGradosDistribucion();
+        $this->cargarSemestresDistribucion();
+        $this->cargarGruposDistribucion();
+    }
+
+    public function updatedDistribucionGradoId(): void
+    {
+        $this->distribucion_semestre_id = '';
+        $this->distribucion_grupo_id = '';
+
+        $this->cargarSemestresDistribucion();
+        $this->cargarGruposDistribucion();
+    }
+
+    public function updatedDistribucionSemestreId(): void
+    {
+        $this->distribucion_grupo_id = '';
+        $this->cargarGruposDistribucion();
+    }
+
     public function limpiarFiltroEstadistica(): void
     {
         $this->generacion_id = '';
@@ -114,6 +179,15 @@ class Generales extends Component
         $this->cargarFiltrosDependientes();
     }
 
+    public function limpiarFiltrosDistribucion(): void
+    {
+        $this->distribucion_generacion_id = '';
+        $this->distribucion_grado_id = '';
+        $this->distribucion_semestre_id = '';
+        $this->distribucion_grupo_id = '';
+        $this->cargarFiltrosDistribucion();
+    }
+
     public function getCicloSeleccionadoProperty(): ?CicloEscolar
     {
         if ($this->ciclo_escolar_id === '') {
@@ -121,6 +195,15 @@ class Generales extends Component
         }
 
         return $this->ciclosEscolares->firstWhere('id', (int) $this->ciclo_escolar_id);
+    }
+
+    public function getCicloDistribucionSeleccionadoProperty(): ?CicloEscolar
+    {
+        if ($this->distribucion_ciclo_escolar_id === '') {
+            return null;
+        }
+
+        return $this->ciclosEscolares->firstWhere('id', (int) $this->distribucion_ciclo_escolar_id);
     }
 
     public function getEsCicloVigenteProperty(): bool
@@ -183,7 +266,7 @@ class Generales extends Component
 
         public function getDistribucionEscolarProperty(): Collection
     {
-        return $this->registrosFiltrados()
+        return $this->registrosDistribucionFiltrados()
             ->groupBy(
                 fn (InscripcionCiclo $registro): string =>
                     ($registro->grado_id ?: 0)
@@ -285,11 +368,11 @@ public function getTotalesDistribucionProperty(): array
     {
         return route('generales.distribucion.pdf', array_filter([
             'slug_nivel' => $this->slug_nivel,
-            'ciclo_escolar_id' => $this->enteroFiltro($this->ciclo_escolar_id),
-            'generacion_id' => $this->enteroFiltro($this->generacion_id),
-            'grado_id' => $this->enteroFiltro($this->grado_id),
-            'semestre_id' => $this->enteroFiltro($this->semestre_id),
-            'grupo_id' => $this->enteroFiltro($this->grupo_id),
+            'ciclo_escolar_id' => $this->enteroFiltro($this->distribucion_ciclo_escolar_id),
+            'generacion_id' => $this->enteroFiltro($this->distribucion_generacion_id),
+            'grado_id' => $this->enteroFiltro($this->distribucion_grado_id),
+            'semestre_id' => $this->enteroFiltro($this->distribucion_semestre_id),
+            'grupo_id' => $this->enteroFiltro($this->distribucion_grupo_id),
         ], static fn ($valor): bool => $valor !== null && $valor !== ''));
     }
 
@@ -297,11 +380,11 @@ public function getTotalesDistribucionProperty(): array
     {
         return route('generales.distribucion.word', array_filter([
             'slug_nivel' => $this->slug_nivel,
-            'ciclo_escolar_id' => $this->enteroFiltro($this->ciclo_escolar_id),
-            'generacion_id' => $this->enteroFiltro($this->generacion_id),
-            'grado_id' => $this->enteroFiltro($this->grado_id),
-            'semestre_id' => $this->enteroFiltro($this->semestre_id),
-            'grupo_id' => $this->enteroFiltro($this->grupo_id),
+            'ciclo_escolar_id' => $this->enteroFiltro($this->distribucion_ciclo_escolar_id),
+            'generacion_id' => $this->enteroFiltro($this->distribucion_generacion_id),
+            'grado_id' => $this->enteroFiltro($this->distribucion_grado_id),
+            'semestre_id' => $this->enteroFiltro($this->distribucion_semestre_id),
+            'grupo_id' => $this->enteroFiltro($this->distribucion_grupo_id),
         ], static fn ($valor): bool => $valor !== null && $valor !== ''));
     }
 
@@ -474,6 +557,197 @@ public function getTotalesDistribucionProperty(): array
         }
     }
 
+    private function cargarFiltrosDistribucion(): void
+    {
+        $this->cargarGeneracionesDistribucion();
+        $this->cargarGradosDistribucion();
+        $this->cargarSemestresDistribucion();
+        $this->cargarGruposDistribucion();
+    }
+
+    private function cargarGeneracionesDistribucion(): void
+    {
+        if ($this->distribucion_ciclo_escolar_id === '') {
+            $this->distribucionGeneraciones = collect();
+            return;
+        }
+
+        $ids = $this->historialDistribucionBaseQuery()
+            ->whereNotNull('generacion_id')
+            ->distinct()
+            ->pluck('generacion_id');
+
+        $this->distribucionGeneraciones = Generacion::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->whereIn('id', $ids)
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
+            ->orderByDesc('id')
+            ->get();
+
+        if (
+            $this->distribucion_generacion_id !== ''
+            && ! $this->distribucionGeneraciones->contains('id', (int) $this->distribucion_generacion_id)
+        ) {
+            $this->distribucion_generacion_id = '';
+        }
+    }
+
+    private function cargarGradosDistribucion(): void
+    {
+        if ($this->distribucion_ciclo_escolar_id === '') {
+            $this->distribucionGrados = collect();
+            return;
+        }
+
+        $ids = $this->historialDistribucionBaseQuery()
+            ->when(
+                $this->distribucion_generacion_id !== '',
+                fn (Builder $query) => $query->where('generacion_id', (int) $this->distribucion_generacion_id)
+            )
+            ->whereNotNull('grado_id')
+            ->distinct()
+            ->pluck('grado_id');
+
+        $this->distribucionGrados = Grado::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->whereIn('id', $ids)
+            ->orderBy('orden')
+            ->orderBy('nombre')
+            ->get();
+
+        if (
+            $this->distribucion_grado_id !== ''
+            && ! $this->distribucionGrados->contains('id', (int) $this->distribucion_grado_id)
+        ) {
+            $this->distribucion_grado_id = '';
+        }
+    }
+
+    private function cargarSemestresDistribucion(): void
+    {
+        if ($this->slug_nivel !== 'bachillerato' || $this->distribucion_ciclo_escolar_id === '') {
+            $this->distribucionSemestres = collect();
+            $this->distribucion_semestre_id = '';
+            return;
+        }
+
+        $ids = $this->historialDistribucionBaseQuery()
+            ->when(
+                $this->distribucion_generacion_id !== '',
+                fn (Builder $query) => $query->where('generacion_id', (int) $this->distribucion_generacion_id)
+            )
+            ->when(
+                $this->distribucion_grado_id !== '',
+                fn (Builder $query) => $query->where('grado_id', (int) $this->distribucion_grado_id)
+            )
+            ->whereNotNull('semestre_id')
+            ->distinct()
+            ->pluck('semestre_id');
+
+        $this->distribucionSemestres = Semestre::query()
+            ->whereIn('id', $ids)
+            ->orderByRaw('COALESCE(orden_global, 255)')
+            ->orderBy('numero')
+            ->get();
+
+        if (
+            $this->distribucion_semestre_id !== ''
+            && ! $this->distribucionSemestres->contains('id', (int) $this->distribucion_semestre_id)
+        ) {
+            $this->distribucion_semestre_id = '';
+        }
+    }
+
+    private function cargarGruposDistribucion(): void
+    {
+        if ($this->distribucion_ciclo_escolar_id === '') {
+            $this->distribucionGrupos = collect();
+            return;
+        }
+
+        $ids = $this->historialDistribucionBaseQuery()
+            ->when(
+                $this->distribucion_generacion_id !== '',
+                fn (Builder $query) => $query->where('generacion_id', (int) $this->distribucion_generacion_id)
+            )
+            ->when(
+                $this->distribucion_grado_id !== '',
+                fn (Builder $query) => $query->where('grado_id', (int) $this->distribucion_grado_id)
+            )
+            ->when(
+                $this->distribucion_semestre_id !== '',
+                fn (Builder $query) => $query->where('semestre_id', (int) $this->distribucion_semestre_id)
+            )
+            ->whereNotNull('grupo_id')
+            ->distinct()
+            ->pluck('grupo_id');
+
+        $this->distribucionGrupos = Grupo::withTrashed()
+            ->with(['asignacionGrupo:id,nombre', 'grado:id,nombre,orden', 'semestre:id,numero,orden_global'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(fn (Grupo $grupo): string => sprintf(
+                '%04d|%04d|%s',
+                (int) ($grupo->grado?->orden ?? 999),
+                (int) ($grupo->semestre?->orden_global ?? $grupo->semestre?->numero ?? 0),
+                (string) ($grupo->asignacionGrupo?->nombre ?? '')
+            ))
+            ->values();
+
+        if (
+            $this->distribucion_grupo_id !== ''
+            && ! $this->distribucionGrupos->contains('id', (int) $this->distribucion_grupo_id)
+        ) {
+            $this->distribucion_grupo_id = '';
+        }
+    }
+
+    private function historialDistribucionBaseQuery(): Builder
+    {
+        $query = InscripcionCiclo::query()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('estado', '!=', InscripcionCiclo::ESTADO_ANULADO);
+
+        if ($this->distribucion_ciclo_escolar_id === '') {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('ciclo_escolar_id', (int) $this->distribucion_ciclo_escolar_id);
+    }
+
+    private function registrosDistribucionFiltrados(): Collection
+    {
+        return $this->historialDistribucionBaseQuery()
+            ->with([
+                'inscripcion',
+                'generacion',
+                'grado',
+                'semestre',
+                'grupo' => fn ($query) => $query->withTrashed()->with('asignacionGrupo'),
+            ])
+            ->when(
+                $this->distribucion_generacion_id !== '',
+                fn (Builder $query) => $query->where('generacion_id', (int) $this->distribucion_generacion_id)
+            )
+            ->when(
+                $this->distribucion_grado_id !== '',
+                fn (Builder $query) => $query->where('grado_id', (int) $this->distribucion_grado_id)
+            )
+            ->when(
+                $this->distribucion_semestre_id !== '',
+                fn (Builder $query) => $query->where('semestre_id', (int) $this->distribucion_semestre_id)
+            )
+            ->when(
+                $this->distribucion_grupo_id !== '',
+                fn (Builder $query) => $query->where('grupo_id', (int) $this->distribucion_grupo_id)
+            )
+            ->orderByDesc('id')
+            ->get()
+            ->unique('inscripcion_id')
+            ->values();
+    }
+
     private function historialBaseQuery(): Builder
     {
         $query = InscripcionCiclo::query()
@@ -514,8 +788,35 @@ public function getTotalesDistribucionProperty(): array
 
     private function esActivoEnCiclo(InscripcionCiclo $registro): bool
     {
-        return $registro->estado === InscripcionCiclo::ESTADO_EN_CURSO
-            && in_array((string) $registro->estatus_actual_ciclo, ['activo', 'reingreso', 'no_promovido'], true);
+        if ($registro->estado === InscripcionCiclo::ESTADO_ANULADO) {
+            return false;
+        }
+
+        if ($registro->estado === InscripcionCiclo::ESTADO_EN_CURSO) {
+            return in_array(
+                (string) $registro->estatus_actual_ciclo,
+                ['activo', 'reingreso', 'no_promovido'],
+                true
+            );
+        }
+
+        // En ciclos cerrados se cuenta como matrícula histórica vigente a quien
+        // cursó y concluyó el ciclo de forma ordinaria, aunque hoy ya esté en
+        // otro grado/nivel o haya egresado. Así el histórico no depende del
+        // estatus actual de la inscripción.
+        return in_array(
+            (string) $registro->resultado_final,
+            [
+                'promovido',
+                'promovido_grado',
+                'promovido_nivel',
+                'continuidad',
+                'continuidad_interna',
+                'no_promovido',
+                'egresado',
+            ],
+            true
+        );
     }
 
     private function estadoRegistro(InscripcionCiclo $registro): string
@@ -539,6 +840,19 @@ public function getTotalesDistribucionProperty(): array
             'inactivo', 'no_reinscrito', 'pendiente_reinscripcion', 'no_iniciado' => 'inactivo',
             default => $this->esActivoEnCiclo($registro) ? 'activo' : 'inactivo',
         };
+    }
+
+    private function resolverCicloDistribucionInicial(): string
+    {
+        $actualAbierto = $this->ciclosEscolares->first(
+            fn (CicloEscolar $ciclo): bool => (bool) $ciclo->es_actual && blank($ciclo->cerrado_at)
+        );
+
+        $ciclo = $actualAbierto
+            ?? $this->ciclosEscolares->firstWhere('es_actual', true)
+            ?? $this->ciclosEscolares->first();
+
+        return $ciclo ? (string) $ciclo->id : '';
     }
 
     private function cicloValido(mixed $value): bool
