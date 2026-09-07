@@ -19,9 +19,10 @@ class HorarioGeneralBuilder
      * Construye un horario concentrado para varios grupos del mismo nivel.
      *
      * Cada celda reúne las actividades de los grupos visibles y muestra
-     * grado, grupo y materia. Los bloques marcados como receso en la base
-     * de datos se convierten en filas completas; su texto se reconstruye
-     * siguiendo el orden de los días (RE + C + E + S + O = RECESO).
+     * grado, grupo y materia. Los recesos se resuelven mediante
+     * HorarioRecesoService y se convierten en filas completas, por lo que no
+     * dependen de que existan cinco registros RE + C + E + S + O en la tabla
+     * visible ni de horas escritas manualmente en esta clase.
      */
     public function construir(
         Nivel $nivel,
@@ -144,35 +145,48 @@ class HorarioGeneralBuilder
         }
 
         $materiasOpciones = $this->construirOpcionesMaterias($horarios);
+
+        $recesoOficial = app(HorarioRecesoService::class)->oficialNivel(
+            nivelId: (int) $nivel->id,
+            cicloEscolarId: (int) $cicloEscolar->id,
+            grupos: $grupos,
+            horas: $horas,
+        );
+
+        $recesoHoraIds = collect($recesoOficial['hora_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
         $filas = collect();
         $actividadesDocentes = collect();
         $totalActividades = 0;
         $totalRecesos = 0;
 
         foreach ($horas as $hora) {
-            $registrosHora = $horarios
-                ->where('hora_id', $hora->id)
-                ->values();
-
-            if ($registrosHora->isEmpty()) {
-                continue;
-            }
-
-            $esFilaReceso = $this->esFilaCompletaDeReceso($registrosHora);
-
-            if ($esFilaReceso) {
+            /*
+             * El receso oficial se pinta aunque esa hora no tenga filas de
+             * horario en alguno de los grupos. Así los filtros por grado,
+             * grupo, día o materia no hacen desaparecer el bloque institucional.
+             */
+            if ($recesoHoraIds->contains((int) $hora->id)) {
                 $filas->push([
                     'hora' => $hora,
                     'es_receso' => true,
-                    'receso_label' => $this->construirEtiquetaReceso(
-                        $registrosHora,
-                        $diasOpciones
-                    ),
+                    'receso_label' => 'RECESO',
                     'celdas' => collect(),
                     'total_actividades' => 0,
                 ]);
 
                 $totalRecesos++;
+                continue;
+            }
+
+            $registrosHora = $horarios
+                ->where('hora_id', $hora->id)
+                ->values();
+
+            if ($registrosHora->isEmpty()) {
                 continue;
             }
 
@@ -236,6 +250,16 @@ class HorarioGeneralBuilder
             'total_grupos' => $gruposVisibles->count(),
             'total_actividades' => $totalActividades,
             'total_recesos' => $totalRecesos,
+            'receso_hora_ids' => $recesoHoraIds->all(),
+            'receso_inconsistente' => (bool) ($recesoOficial['inconsistente'] ?? false),
+            'receso_variantes' => (int) ($recesoOficial['variantes'] ?? 0),
+            'receso_grupos_evaluados' => (int) ($recesoOficial['grupos_evaluados'] ?? 0),
+            'receso_grupos_sin_configurar' => (int) ($recesoOficial['grupos_sin_receso'] ?? 0),
+            'receso_heredado' => (bool) ($recesoOficial['heredado'] ?? false),
+            'receso_fuente' => (string) ($recesoOficial['fuente'] ?? 'sin_configuracion'),
+            'receso_ciclo_referencia_id' => isset($recesoOficial['ciclo_referencia_id'])
+                ? (int) $recesoOficial['ciclo_referencia_id']
+                : null,
             'filtros' => [
                 'grado_id' => $gradoFiltro,
                 'grupo_id' => $grupoFiltro,
@@ -449,48 +473,6 @@ class HorarioGeneralBuilder
                 Str::lower(Str::ascii($item['docente']))
             ))
             ->values();
-    }
-
-    private function esFilaCompletaDeReceso(Collection $registrosHora): bool
-    {
-        $recesos = $registrosHora->filter(fn (Horario $horario) => $this->esReceso($horario));
-
-        if ($recesos->isEmpty()) {
-            return false;
-        }
-
-        return $registrosHora->every(fn (Horario $horario) => $this->esReceso($horario));
-    }
-
-    private function esReceso(Horario $horario): bool
-    {
-        return app(HorarioRecesoService::class)->esReceso($horario);
-    }
-
-    private function construirEtiquetaReceso(Collection $registrosHora, Collection $dias): string
-    {
-        $partes = $dias
-            ->map(function ($dia) use ($registrosHora) {
-                return $registrosHora
-                    ->where('dia_id', $dia->id)
-                    ->filter(fn (Horario $horario) => $this->esReceso($horario))
-                    ->map(fn (Horario $horario) => trim((string) (
-                        $horario->asignacionMateria?->materia?->materia ?? ''
-                    )))
-                    ->filter()
-                    ->unique(fn ($texto) => Str::lower(Str::ascii($texto)))
-                    ->first();
-            })
-            ->filter()
-            ->values();
-
-        $etiqueta = trim($partes->implode(''));
-
-        if ($etiqueta === '') {
-            return 'RECESO';
-        }
-
-        return mb_strtoupper($etiqueta, 'UTF-8');
     }
 
     private function claveOrdenGrupo(Grupo $grupo): string

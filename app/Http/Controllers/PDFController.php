@@ -23,6 +23,7 @@ use App\Services\ListaAcademicaService;
 use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
+use App\Services\HorarioRecesoService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
@@ -2022,6 +2023,29 @@ class PDFController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Receso oficial del nivel
+        |--------------------------------------------------------------------------
+        |
+        | Se usa la misma fuente de verdad que los horarios generales. Si el
+        | ciclo actual todavía no contiene filas de receso, el servicio puede
+        | recuperar la última configuración disponible en la base de datos.
+        | No se escriben horas fijas para secundaria o bachillerato.
+        */
+
+        $recesoOficial = app(HorarioRecesoService::class)->oficialNivel(
+            nivelId: (int) $nivel->id,
+            cicloEscolarId: (int) $cicloEscolar->id,
+            grupos: collect([$grupo]),
+            horas: $horas,
+        );
+
+        $recesoHoraIds = collect($recesoOficial['hora_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
         | Mapas de celdas
         |--------------------------------------------------------------------------
         |
@@ -2352,6 +2376,7 @@ class PDFController extends Controller
             'esSecundaria' => $esSecundaria,
             'esPreescolar' => $esPreescolar,
             'esPrimaria' => $esPrimaria,
+            'recesoHoraIds' => $recesoHoraIds,
 
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,

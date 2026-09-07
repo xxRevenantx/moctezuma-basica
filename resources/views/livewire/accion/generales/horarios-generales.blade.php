@@ -87,6 +87,43 @@
                 </div>
             </div>
 
+            @if ($tabla && (($tabla['receso_heredado'] ?? false) || ($tabla['receso_inconsistente'] ?? false)))
+                <div
+                    class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200">
+                            <flux:icon.exclamation-triangle class="h-5 w-5" />
+                        </div>
+
+                        <div>
+                            <p class="font-black">Configuración de receso</p>
+
+                            @if ($tabla['receso_heredado'] ?? false)
+                                <p class="mt-1">
+                                    El ciclo seleccionado todavía no tiene filas de receso capturadas para este nivel.
+                                    El horario está usando automáticamente la última configuración de receso disponible
+                                    en la base de datos, sin depender de una hora fija escrita en el código.
+                                </p>
+                            @endif
+
+                            @if ($tabla['receso_inconsistente'] ?? false)
+                                <p class="mt-1">
+                                    Se detectaron <strong>{{ $tabla['receso_variantes'] ?? 0 }} variantes</strong>
+                                    entre <strong>{{ $tabla['receso_grupos_evaluados'] ?? 0 }} grupos</strong>.
+                                    El concentrado usa la configuración predominante del nivel.
+                                    @if (($tabla['receso_grupos_sin_configurar'] ?? 0) > 0)
+                                        {{ $tabla['receso_grupos_sin_configurar'] }}
+                                        {{ ($tabla['receso_grupos_sin_configurar'] ?? 0) === 1 ? 'grupo no tiene' : 'grupos no tienen' }}
+                                        receso capturado.
+                                    @endif
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Filtros principales del alcance --}}
             <div
                 class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-950/30 sm:p-5">

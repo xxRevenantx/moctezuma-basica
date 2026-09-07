@@ -472,18 +472,9 @@
                                     ? \Carbon\Carbon::parse($hora->hora_fin)->format('g:i a')
                                     : '';
 
-                                $horaInicio24 = !empty($hora->hora_inicio)
-                                    ? \Carbon\Carbon::parse($hora->hora_inicio)->format('H:i')
-                                    : '';
-
-                                $horaFin24 = !empty($hora->hora_fin)
-                                    ? \Carbon\Carbon::parse($hora->hora_fin)->format('H:i')
-                                    : '';
-
                                 $esRecesoSecundariaBachillerato =
                                     (!empty($esSecundaria) || !empty($esBachillerato)) &&
-                                    $horaInicio24 === '09:00' &&
-                                    $horaFin24 === '09:30';
+                                    ($recesoHoraIds ?? collect())->contains((int) $hora->id);
                             @endphp
 
                             {{ $horaInicio }}-{{ $horaFin }}

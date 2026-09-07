@@ -114,10 +114,12 @@
         // El servicio ya entrega el orden exacto de la Plantilla de personal por ciclo.
         // orden_pdf_plantilla es temporal; `orden` queda como respaldo para el flujo legado.
         $asignacionesNivel = collect($asignacionesNivel ?? [])
-            ->sortBy(fn($personal) => [
-                (int) ($personal->orden_pdf_plantilla ?? $personal->orden ?? 999999),
-                (int) ($personal->id ?? 0),
-            ])
+            ->sortBy(
+                fn($personal) => [
+                    (int) ($personal->orden_pdf_plantilla ?? ($personal->orden ?? 999999)),
+                    (int) ($personal->id ?? 0),
+                ],
+            )
             ->values();
 
         $formatearNombreCompleto = function ($persona) {
@@ -239,7 +241,8 @@
                 $cargosHtml = $resolverCargosDesdeDetalles($personal, true);
             @endphp
 
-            <div class="contenedor_preescolar" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '145px' }} 100px 0">
+            <div class="contenedor_preescolar"
+                style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '145px' }} 100px 0">
 
                 <p
                     style="text-align: right;  font-size: 13px; line-height: 25px; text-transform: uppercase; font-family: ARIAL;">
@@ -287,7 +290,8 @@
                 LABORES, DESPUÉS DE HABER DISFRUTADO <b style="font-family: 'Times New Roman', Times, serif"><u>EL
                         PERIODO VACACIONAL DE PRIMAVERA,</u></b>
                 CORRESPONDIENTE AL CICLO ESCOLAR
-                <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}</b>. PARA LO CUAL PROPORCIONO LOS
+                <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}</b>.
+                PARA LO CUAL PROPORCIONO LOS
                 SIGUIENTES DATOS:
             </p>
         </div>
@@ -471,7 +475,8 @@
             $cargosHtml = $resolverCargosDesdeDetalles($personal, false);
         @endphp
 
-        <div class="contenedor_primaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
+        <div class="contenedor_primaria"
+            style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '100px' }} 60px 0">
 
             <p style="text-align: right; font-size: 17px; line-height: 25px;">
                 <b>ASUNTO: AVISO DE REANUDACIÓN DE LABORES</b> <br>
@@ -511,9 +516,12 @@
                             @endif{{ $nombreCompleto }}
                         </u></b>,
                     ME PERMITO INFORMAR QUE A PARTIR DE ESTA FECHA, ME PRESENTÉ A REANUDAR
-                    MIS LABORES, DESPUÉS DE HABER DISFRUTADO <b><u>LAS VACACIONES DE PRIMAVERA</u></b>,
-                    CORRESPONDIENTE AL CICLO ESCOLAR
+                    MIS LABORES CORRESPONDIENTES AL CICLO ESCOLAR
                     <b>{{ ($cicloEscolarTexto ?? $cicloEscolar)->inicio_anio }}-{{ ($cicloEscolarTexto ?? $cicloEscolar)->fin_anio }}.</b>
+                    DESPUÉS DE HABER DISFRUTADO EL
+                    <b><u>RECESO DE CLASES</u></b> DEL CICLO ESCOLAR <b>2025-2026</b>.
+
+
                 </p>
             </div>
 
@@ -718,7 +726,8 @@
             $cargosHtml = !empty($cargosDetalles) ? implode('<br />', $cargosDetalles) : '---------';
         @endphp
 
-        <div class="contenedor_secundaria" style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '125px' }} 100px 0">
+        <div class="contenedor_secundaria"
+            style="padding: {{ $membrete ? ($membrete['margen_superior_mm'] ?? 32) . 'mm' : '125px' }} 100px 0">
 
             <p
                 style="text-align: right; font-family:ARIAL; font-size: 15px; line-height: 25px; text-transform: uppercase;">
