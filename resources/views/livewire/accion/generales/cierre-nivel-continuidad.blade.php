@@ -278,6 +278,23 @@
                             @enderror
                         </div>
 
+                        <div>
+                            <flux:input type="date" wire:model="fecha_corte_continuidad"
+                                label="Fecha de corte manual de continuidad"
+                                :disabled="! auth()->user()?->is_admin" />
+                            <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+                                Esta fecha <b>no se calcula automáticamente</b>. Hasta ese día podrá corregirse
+                                <b>Continuará → No continuará</b> cuando no existan calificaciones en el destino.
+                                Después, el flujo normal será Baja o Traslado; una corrección de continuidad requerirá excepción auditada.
+                                @if (! auth()->user()?->is_admin)
+                                    <br><b>Solo un Administrador general puede establecer o modificar esta fecha.</b>
+                                @endif
+                            </div>
+                            @error('fecha_corte_continuidad')
+                                <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         @if (($conteos['continuidad_interna'] ?? 0) > 0)
                             <flux:select wire:model.live="nivel_destino_id" label="Nivel destino">
                                 <flux:select.option value="">Selecciona</flux:select.option>
@@ -481,7 +498,9 @@
             @endif
 
             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
-                La reversión automática solo estará disponible mientras el ciclo destino no tenga calificaciones, fichas, documentos oficiales ni movimientos posteriores.
+                La corrección <b>Continuará → No continuará</b> se rige por la fecha de corte manual del ciclo destino.
+                Las calificaciones o movimientos académicos posteriores bloquean el cambio; fichas, documentos, riesgos y otros registros administrativos se mostrarán como advertencias y se conservarán.
+                Después del corte, el movimiento normal corresponde a <b>Baja o Traslado</b>; solo un administrador podrá autorizar una excepción auditada.
             </div>
 
             <div class="flex justify-between gap-3">

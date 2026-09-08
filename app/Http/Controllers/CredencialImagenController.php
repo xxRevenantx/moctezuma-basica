@@ -7,6 +7,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Persona;
 use App\Services\CredencialImagenService;
+use App\Services\CredencialCopiasService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -20,8 +21,10 @@ use ZipArchive;
 
 class CredencialImagenController extends Controller
 {
-    public function __construct(private readonly CredencialImagenService $imagenes)
-    {
+    public function __construct(
+        private readonly CredencialImagenService $imagenes,
+        private readonly CredencialCopiasService $copias,
+    ) {
     }
 
     public function alumnos(Request $request, string $slug_nivel, string $formato): Response|BinaryFileResponse
@@ -37,8 +40,9 @@ class CredencialImagenController extends Controller
         $this->asegurarResultados($alumnos, 'No se encontraron alumnos para generar credenciales.');
 
         $cicloEscolar = $this->cicloEscolarCredencial($request);
+        $copiasPorAlumno = $this->copias->resolver($alumnos, $request);
 
-        return $this->descargarAlumnos($alumnos, $nivel, $cicloEscolar, $formato);
+        return $this->descargarAlumnos($alumnos, $nivel, $cicloEscolar, $formato, $copiasPorAlumno);
     }
 
     public function previewAlumnos(Request $request, string $slug_nivel): Response
@@ -130,13 +134,19 @@ class CredencialImagenController extends Controller
         ]);
     }
 
+    /**
+     * @param array<int, int> $copiasPorAlumno
+     */
     private function descargarAlumnos(
         Collection $alumnos,
         Nivel $nivel,
         ?CicloEscolar $cicloEscolar,
-        string $formato
+        string $formato,
+        array $copiasPorAlumno,
     ): Response|BinaryFileResponse {
-        if ($alumnos->count() === 1) {
+        $totalCredenciales = array_sum($copiasPorAlumno);
+
+        if ($alumnos->count() === 1 && $totalCredenciales === 1) {
             $alumno = $alumnos->first();
             $contenido = $this->imagenes->renderAlumno($alumno, $nivel, $cicloEscolar, $formato);
 
@@ -147,7 +157,7 @@ class CredencialImagenController extends Controller
             );
         }
 
-        $this->verificarLimite($alumnos->count());
+        $this->verificarLimite($totalCredenciales);
         $zip = $this->crearZip('credenciales-alumnos');
         $sinFoto = [];
 
@@ -159,16 +169,18 @@ class CredencialImagenController extends Controller
                 $grupo = $this->imagenes->normalizarNombreArchivo(
                     'grupo_' . ($alumno->grupo?->asignacionGrupo?->nombre ?: 'sin_grupo')
                 );
-                $nombre = $this->imagenes->nombreArchivoAlumno($alumno, $formato);
-                $rutaInterna = $grado . '/' . $grupo . '/' . $nombre;
+                $nombreBase = $this->imagenes->nombreArchivoAlumno($alumno, $formato);
+                $cantidadCopias = $copiasPorAlumno[(int) $alumno->id] ?? 1;
+                $contenido = $this->imagenes->renderAlumno($alumno, $nivel, $cicloEscolar, $formato);
 
-                $zip['archivo']->addFromString(
-                    $rutaInterna,
-                    $this->imagenes->renderAlumno($alumno, $nivel, $cicloEscolar, $formato)
-                );
+                for ($copia = 1; $copia <= $cantidadCopias; $copia++) {
+                    $nombre = $this->nombreArchivoCopia($nombreBase, $copia, $cantidadCopias);
+                    $rutaInterna = $grado . '/' . $grupo . '/' . $nombre;
+                    $zip['archivo']->addFromString($rutaInterna, $contenido);
+                }
 
                 if (! $alumno->foto_existe) {
-                    $sinFoto[] = $nombre;
+                    $sinFoto[] = $nombreBase;
                 }
             }
 
@@ -297,7 +309,7 @@ class CredencialImagenController extends Controller
             $query->whereKey($request->integer('alumno_id'));
         }
 
-        if ($modo === 'seleccionados') {
+        if ($modo === 'seleccionados' || $request->filled('alumnos')) {
             $ids = collect(explode(',', (string) $request->query('alumnos')))
                 ->map(fn ($id) => (int) trim($id))
                 ->filter()
@@ -309,6 +321,16 @@ class CredencialImagenController extends Controller
             }
 
             $query->whereIn('id', $ids->all());
+        } elseif ($modo !== 'individual' && $request->filled('excluir_alumnos')) {
+            $idsExcluidos = collect(explode(',', (string) $request->query('excluir_alumnos')))
+                ->map(fn ($id) => (int) trim($id))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($idsExcluidos->isNotEmpty()) {
+                $query->whereNotIn('id', $idsExcluidos->all());
+            }
         }
 
         return $query
@@ -395,6 +417,19 @@ class CredencialImagenController extends Controller
             'Content-Length' => (string) strlen($contenido),
             'Cache-Control' => 'private, no-store',
         ]);
+    }
+
+    private function nombreArchivoCopia(string $nombreBase, int $copia, int $cantidadCopias): string
+    {
+        if ($cantidadCopias <= 1) {
+            return $nombreBase;
+        }
+
+        $extension = pathinfo($nombreBase, PATHINFO_EXTENSION);
+        $nombre = pathinfo($nombreBase, PATHINFO_FILENAME);
+        $sufijo = '_copia_' . str_pad((string) $copia, 2, '0', STR_PAD_LEFT);
+
+        return $nombre . $sufijo . ($extension !== '' ? '.' . $extension : '');
     }
 
     private function asegurarResultados(Collection $resultados, string $mensaje): void

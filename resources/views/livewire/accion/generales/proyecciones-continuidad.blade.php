@@ -2,6 +2,11 @@
     @php
         $conteosProyeccion = $this->conteos;
         $gruposDisponibles = $this->gruposDisponibles;
+        $resumenCorte = $this->resumenFechaCorte;
+        $proyeccionesVisibles = $this->proyecciones;
+        $idsSeleccionados = collect($seleccionados)->map(fn ($id) => (int) $id);
+        $pendientesSeleccionados = $proyeccionesVisibles->whereIn('id', $idsSeleccionados)->where('estado', 'pendiente')->count();
+        $confirmadosSeleccionados = $proyeccionesVisibles->whereIn('id', $idsSeleccionados)->where('estado', 'confirmada')->count();
         $estilosEstado = [
             'pendiente' => 'bg-amber-100 text-amber-800',
             'confirmada' => 'bg-emerald-100 text-emerald-800',
@@ -20,7 +25,7 @@
                     <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Confirmación de alumnos para el ciclo destino</h3>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                         Cada alumno conserva el resultado académico del ciclo de origen: promoción de grado, repetición pendiente o egreso.
-                        Todavía no está activo en el destino. Confirma a quienes se reinscribieron. La decisión puede corregirse después: de No continuará a Continuará, o de Continuará a No continuará cuando el alumno no haya iniciado actividades en el ciclo destino. Todos los cambios quedan auditados y el historial de origen se conserva.
+                        Confirma a quienes se reinscribieron. Una continuidad ya confirmada podrá corregirse a <b>No continuará</b> hasta la fecha de corte capturada manualmente para el ciclo, siempre que no existan calificaciones o movimientos académicos que lo bloqueen. Después del corte, el flujo normal será Baja o Traslado; una excepción requerirá autorización expresa, contraseña, motivo y auditoría. El historial de origen nunca se elimina.
                     </p>
                 </div>
                 <div class="grid min-w-[420px] grid-cols-4 gap-2 text-center">
@@ -53,6 +58,57 @@
         </div>
 
         <div class="space-y-4 p-5 sm:p-6">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-neutral-700 dark:bg-neutral-800/60">
+                <div class="grid gap-4 xl:grid-cols-[1fr_1fr_auto] xl:items-end">
+                    <flux:select wire:model.live="ciclo_corte_id" label="Ciclo al que aplica la fecha de corte">
+                        <flux:select.option value="">Selecciona ciclo</flux:select.option>
+                        @foreach ($ciclosDestino as $ciclo)
+                            <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:input type="date" wire:model="fecha_corte_continuidad" label="Fecha de corte manual"
+                        :disabled="! auth()->user()?->is_admin" />
+                    <flux:button variant="primary" wire:click="guardarFechaCorteContinuidad"
+                        spinner="guardarFechaCorteContinuidad" :disabled="! $ciclo_corte_id || ! auth()->user()?->is_admin">
+                        Guardar fecha de corte
+                    </flux:button>
+                </div>
+                @error('fecha_corte_continuidad')
+                    <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                @enderror
+                @error('ciclo_corte_id')
+                    <p class="mt-2 text-xs font-bold text-rose-600">{{ $message }}</p>
+                @enderror
+
+                <div class="mt-3 rounded-xl border px-4 py-3 text-sm leading-6
+                    {{ in_array($resumenCorte['estado'] ?? '', ['vencido', 'sin_configurar', 'sin_migracion'], true)
+                        ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100' }}">
+                    @if (($resumenCorte['estado'] ?? '') === 'abierto')
+                        <b>Periodo de corrección abierto.</b> Corte manual: {{ $resumenCorte['fecha_texto'] }}
+                        · faltan {{ max(0, (int) $resumenCorte['dias_restantes']) }} día(s).
+                    @elseif (($resumenCorte['estado'] ?? '') === 'hoy')
+                        <b>Último día del periodo de corrección.</b> La fecha de corte es hoy, {{ $resumenCorte['fecha_texto'] }}.
+                    @elseif (($resumenCorte['estado'] ?? '') === 'vencido')
+                        <b>Periodo de corrección cerrado.</b> El corte fue {{ $resumenCorte['fecha_texto'] }}.
+                        A partir de ahora corresponden Baja o Traslado; “No continuará” solo podrá aplicarse mediante excepción administrativa auditada.
+                    @elseif (($resumenCorte['estado'] ?? '') === 'sin_configurar')
+                        <b>Sin fecha de corte configurada.</b> Captura manualmente una fecha para el ciclo {{ $resumenCorte['ciclo'] }}.
+                        Mientras esté vacía, no se permitirá cambiar una continuidad confirmada a No continuará.
+                    @elseif (($resumenCorte['estado'] ?? '') === 'sin_migracion')
+                        <b>Falta actualizar la base de datos.</b> Ejecuta la migración antes de configurar la fecha de corte.
+                    @else
+                        Selecciona un ciclo destino para configurar su fecha de corte manual.
+                    @endif
+                </div>
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    La fecha es completamente manual: el sistema no propone, calcula ni modifica una fecha automáticamente.
+                    @if (! auth()->user()?->is_admin)
+                        Solo un Administrador general puede establecerla o cambiarla.
+                    @endif
+                </p>
+            </div>
+
             <div class="grid gap-3 lg:grid-cols-4">
                 <flux:input wire:model.live.debounce.300ms="buscar" label="Buscar alumno"
                     placeholder="Nombre, matrícula o CURP" />
@@ -62,6 +118,9 @@
                     <flux:select.option value="confirmada">Continuará</flux:select.option>
                     <flux:select.option value="cancelada">No continuará · sin formalizar</flux:select.option>
                     <flux:select.option value="revertida">No continuará · retirado del destino</flux:select.option>
+                    <flux:select.option value="cambiables">Pueden cambiarse a No continuará</flux:select.option>
+                    <flux:select.option value="bloqueados">Bloqueados para corrección</flux:select.option>
+                    <flux:select.option value="excepciones">Excepciones posteriores al corte</flux:select.option>
                 </flux:select>
                 <flux:select wire:model.live="filtro_ciclo_destino_id" label="Ciclo destino">
                     <flux:select.option value="">Todos</flux:select.option>
@@ -70,9 +129,9 @@
                         </flux:select.option>
                     @endforeach
                 </flux:select>
-                <div class="flex items-end gap-2">
-                    <flux:button class="flex-1" wire:click="seleccionarPendientesVisibles">Seleccionar pendientes
-                    </flux:button>
+                <div class="flex flex-wrap items-end gap-2">
+                    <flux:button class="flex-1" wire:click="seleccionarPendientesVisibles">Pendientes</flux:button>
+                    <flux:button class="flex-1" wire:click="seleccionarContinuaranVisibles">Continuarán</flux:button>
                     <flux:button variant="ghost" wire:click="limpiarSeleccion">Limpiar</flux:button>
                 </div>
             </div>
@@ -85,17 +144,22 @@
             <div
                 class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
                 <p class="text-sm text-indigo-900 dark:text-indigo-100">
-                    Hay <b>{{ count($seleccionados) }}</b> proyección(es) seleccionada(s). La confirmación crea el ciclo
-                    destino, activa al alumno y formaliza su matrícula.
+                    Hay <b>{{ count($seleccionados) }}</b> seleccionado(s):
+                    <b>{{ $pendientesSeleccionados }}</b> pendiente(s) y <b>{{ $confirmadosSeleccionados }}</b> marcado(s) como Continuará.
+                    Las acciones solo procesarán alumnos compatibles con cada operación.
                 </p>
                 <div class="flex flex-wrap gap-2">
                     <flux:button variant="primary" wire:click="prepararConfirmacion"
-                        :disabled="count($seleccionados) === 0">
+                        :disabled="$pendientesSeleccionados === 0">
                         Confirmar continuidad
                     </flux:button>
                     <flux:button variant="danger" wire:click="prepararCancelacion"
-                        :disabled="count($seleccionados) === 0">
-                        No continuarán
+                        :disabled="$pendientesSeleccionados === 0">
+                        No continuarán · pendientes
+                    </flux:button>
+                    <flux:button variant="danger" wire:click="prepararRetiroMasivo"
+                        :disabled="$confirmadosSeleccionados === 0">
+                        Cambiar Continuarán → No continuarán
                     </flux:button>
                 </div>
             </div>
@@ -116,18 +180,20 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
-                    @forelse ($this->proyecciones as $proyeccion)
+                    @forelse ($proyeccionesVisibles as $proyeccion)
                         @php
                             $alumno = $proyeccion->inscripcion;
                             $origen = $proyeccion->inscripcionCicloOrigen;
                             $esPendiente = $proyeccion->estado === 'pendiente';
+                            $esSeleccionable = in_array($proyeccion->estado, ['pendiente', 'confirmada'], true);
+                            $esHistorica = (bool) data_get($proyeccion->snapshot_confirmacion, 'continuidad_historica_reconstruida', false);
                             $grupos = $gruposDisponibles[$proyeccion->id] ?? [];
                         @endphp
                         <tr wire:key="proyeccion-continuidad-{{ $proyeccion->id }}"
                             class="align-top hover:bg-slate-50/70 dark:hover:bg-neutral-800/40">
                             <td class="p-3">
                                 <flux:checkbox wire:model.live="seleccionados" value="{{ $proyeccion->id }}"
-                                    :disabled="! $esPendiente" />
+                                    :disabled="! $esSeleccionable" />
                             </td>
                             <td class="p-3">
                                 <p class="font-black text-slate-900 dark:text-white">
@@ -156,6 +222,11 @@
                                     {{ $proyeccion->cicloDestino?->inicio_anio }}-{{ $proyeccion->cicloDestino?->fin_anio }}
                                 </p>
                                 <span class="mt-2 inline-flex rounded-full bg-sky-100 px-2 py-1 text-[11px] font-black text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">{{ $proyeccion->etiqueta_tipo }}</span>
+                                @if ($esHistorica)
+                                    <span class="mt-2 inline-flex rounded-full bg-violet-100 px-2 py-1 text-[11px] font-black text-violet-800 dark:bg-violet-950/30 dark:text-violet-200">
+                                        Continuidad histórica · creada por promoción
+                                    </span>
+                                @endif
                             </td>
                             <td class="p-3">
                                 @if ($esPendiente)
@@ -388,14 +459,14 @@
             <div class="my-6 w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Cambio protegido de continuidad</p>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Corrección administrativa protegida</p>
                         <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Cambiar a No continuará</h3>
                     </div>
                     <flux:button variant="ghost" wire:click="$set('modalRetirar', false)">Cerrar</flux:button>
                 </div>
 
                 <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
-                    Esta acción se usa únicamente cuando la promoción fue confirmada administrativamente, pero la familia informó que el alumno no continuará y el alumno <b>no inició actividades</b> en el ciclo destino. No elimina registros ni modifica la promoción o egreso del ciclo de origen.
+                    Esta corrección puede realizarse hasta la <b>fecha de corte manual</b> del ciclo destino, siempre que no existan calificaciones ni movimientos posteriores que la bloqueen. El ciclo destino se conservará como <b>Anulado · No inició</b> y el resultado académico del ciclo de origen permanecerá intacto.
                 </div>
 
                 @if ($diagnostico_retiro !== [])
@@ -411,10 +482,10 @@
                                     · Semestre {{ data_get($diagnostico_retiro, 'origen.semestre') }}
                                 @endif
                             </p>
-                            <p class="mt-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">El resultado académico de este ciclo se conserva sin cambios.</p>
+                            <p class="mt-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">La promoción, repetición o egreso de origen se conserva sin cambios.</p>
                         </div>
                         <div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
-                            <p class="text-xs font-black uppercase tracking-wide text-violet-600">Ciclo que será anulado</p>
+                            <p class="text-xs font-black uppercase tracking-wide text-violet-600">Ciclo destino que quedará no iniciado</p>
                             <p class="mt-2 text-sm font-bold text-violet-950 dark:text-violet-100">
                                 {{ data_get($diagnostico_retiro, 'destino.ciclo', '—') }} ·
                                 {{ data_get($diagnostico_retiro, 'destino.nivel', '—') }} ·
@@ -423,23 +494,65 @@
                                     · Semestre {{ data_get($diagnostico_retiro, 'destino.semestre') }}
                                 @endif
                             </p>
-                            <p class="mt-2 text-xs text-violet-700 dark:text-violet-300">Se conservará como evidencia con estado “Anulado: no inició”.</p>
+                            @if (data_get($diagnostico_retiro, 'es_continuidad_historica', false))
+                                <span class="mt-2 inline-flex rounded-full bg-violet-100 px-2 py-1 text-[11px] font-black text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+                                    Continuidad histórica · creada por promoción
+                                </span>
+                            @endif
+                            <p class="mt-2 text-xs text-violet-700 dark:text-violet-300">No se borrará ningún historial.</p>
                         </div>
                     </div>
 
-                    @if (! data_get($diagnostico_retiro, 'puede_retirar', false))
-                        <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
-                            <p class="font-black text-rose-800 dark:text-rose-200">No puede aplicarse la reversión individual</p>
-                            <p class="mt-1 text-sm text-rose-700 dark:text-rose-300">El sistema encontró actividad o cambios que deben conservarse. En ese caso registra una baja o traslado.</p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 p-4 dark:border-neutral-700">
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Fecha de corte</p>
+                        @if (data_get($diagnostico_retiro, 'fecha_corte_texto'))
+                            <p class="mt-1 font-black text-slate-900 dark:text-white">{{ data_get($diagnostico_retiro, 'fecha_corte_texto') }}</p>
+                            @if (data_get($diagnostico_retiro, 'estado_corte') === 'abierto')
+                                <p class="mt-1 text-sm text-emerald-700 dark:text-emerald-300">Periodo abierto · quedan {{ max(0, (int) data_get($diagnostico_retiro, 'dias_restantes', 0)) }} día(s).</p>
+                            @elseif (data_get($diagnostico_retiro, 'estado_corte') === 'hoy')
+                                <p class="mt-1 text-sm font-bold text-amber-700 dark:text-amber-300">Hoy es el último día del periodo normal de corrección.</p>
+                            @elseif (data_get($diagnostico_retiro, 'estado_corte') === 'vencido')
+                                <p class="mt-1 text-sm font-bold text-rose-700 dark:text-rose-300">La fecha de corte ya venció.</p>
+                            @endif
+                        @else
+                            <p class="mt-1 text-sm font-bold text-rose-700 dark:text-rose-300">El ciclo no tiene una fecha de corte manual configurada.</p>
+                        @endif
+                    </div>
+
+                    @if (! data_get($diagnostico_retiro, 'puede_retirar_con_excepcion', false))
+                        <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
+                            <p class="font-black text-rose-800 dark:text-rose-200">Cambio bloqueado</p>
+                            <p class="mt-1 text-sm text-rose-700 dark:text-rose-300">No puede declararse “No continuará” mediante este flujo. Si corresponde, registra una Baja o Traslado.</p>
                             <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-rose-700 dark:text-rose-300">
                                 @foreach (data_get($diagnostico_retiro, 'bloqueos', []) as $bloqueo)
                                     <li>{{ $bloqueo }}</li>
                                 @endforeach
                             </ul>
                         </div>
+                    @elseif (data_get($diagnostico_retiro, 'requiere_excepcion', false))
+                        <div class="mt-4 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/25">
+                            <p class="font-black text-rose-900 dark:text-rose-100">Excepción posterior a la fecha de corte</p>
+                            <p class="mt-1 text-sm leading-6 text-rose-800 dark:text-rose-200">
+                                El periodo normal ya terminó. A partir de este punto el movimiento correcto es <b>Baja o Traslado</b>. Si continúas aquí, el sistema registrará una excepción administrativa auditada con tu usuario, fecha, motivo y contraseña.
+                                @if (! auth()->user()?->is_admin)
+                                    <b class="mt-2 block">Solo un Administrador general puede autorizar esta excepción.</b>
+                                @endif
+                            </p>
+                        </div>
                     @else
-                        <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
-                            No se encontraron calificaciones, asistencias, fichas, seguimientos ni otros registros académicos en el ciclo destino. La reversión individual está disponible.
+                        <div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+                            No se encontraron bloqueos absolutos de calificación ni movimientos posteriores. La corrección está disponible dentro del periodo de corte.
+                        </div>
+                    @endif
+
+                    @if (count(data_get($diagnostico_retiro, 'advertencias', [])) > 0)
+                        <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                            <p class="font-black text-amber-900 dark:text-amber-100">Advertencias que se conservarán</p>
+                            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800 dark:text-amber-200">
+                                @foreach (data_get($diagnostico_retiro, 'advertencias', []) as $advertencia)
+                                    <li>{{ $advertencia }}</li>
+                                @endforeach
+                            </ul>
                         </div>
                     @endif
                 @endif
@@ -449,19 +562,140 @@
                 @enderror
 
                 <div class="mt-5 grid gap-4">
-                    <flux:input type="date" wire:model="fecha_retiro" label="Fecha en que la familia confirmó que no continuará" />
+                    <flux:input type="date" wire:model="fecha_retiro" label="Fecha efectiva del ajuste administrativo" />
                     <flux:textarea wire:model="motivo_retiro" label="Motivo y observaciones" rows="4"
-                        placeholder="Ejemplo: La madre informó que el alumno se inscribirá en otra institución y no inició clases en el ciclo destino." />
+                        placeholder="Explica por qué debe corregirse la continuidad confirmada." />
                     <flux:input type="password" wire:model="password_retiro_proyeccion"
                         label="Contraseña del usuario" autocomplete="current-password" />
                 </div>
+
+                @if (data_get($diagnostico_retiro, 'requiere_excepcion', false))
+                    <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+                        <input type="checkbox" wire:model.live="confirmar_excepcion_corte"
+                            class="mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-600">
+                        <span class="text-sm leading-6 text-rose-900 dark:text-rose-100">
+                            <b class="block">Sí, autorizo una excepción después de la fecha de corte.</b>
+                            Confirmo que revisé el expediente y que este ajuste debe registrarse como excepción administrativa en lugar de Baja o Traslado.
+                        </span>
+                    </label>
+                    @error('confirmar_excepcion_corte')
+                        <p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>
+                    @enderror
+                @endif
 
                 <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <flux:button wire:click="$set('modalRetirar', false)">Cancelar</flux:button>
                     <flux:button variant="danger" wire:click="retirarDelCicloDestino"
                         spinner="retirarDelCicloDestino"
-                        :disabled="! data_get($diagnostico_retiro, 'puede_retirar', false)">
-                        Confirmar No continuará
+                        :disabled="! data_get($diagnostico_retiro, 'puede_retirar_con_excepcion', false) || (data_get($diagnostico_retiro, 'requiere_excepcion', false) && (! $confirmar_excepcion_corte || ! auth()->user()?->is_admin))">
+                        {{ data_get($diagnostico_retiro, 'requiere_excepcion', false) ? 'Registrar excepción y No continuará' : 'Confirmar No continuará' }}
+                    </flux:button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($modalRetirarMasivo)
+        @php
+            $diagnosticosMasivos = collect($diagnosticos_retiro_masivo);
+            $procesablesMasivos = $diagnosticosMasivos->filter(fn ($d) => (bool) data_get($d, 'puede_retirar_con_excepcion', false));
+            $bloqueadosMasivos = $diagnosticosMasivos->filter(fn ($d) => ! (bool) data_get($d, 'puede_retirar_con_excepcion', false));
+            $excepcionesMasivas = $procesablesMasivos->filter(fn ($d) => (bool) data_get($d, 'requiere_excepcion', false));
+        @endphp
+        <div wire:key="modal-retirar-masivo-ciclo-destino"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm">
+            <div class="my-6 w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Corrección masiva auditada</p>
+                        <h3 class="mt-1 text-xl font-black text-slate-900 dark:text-white">Cambiar Continuarán → No continuarán</h3>
+                    </div>
+                    <flux:button variant="ghost" wire:click="$set('modalRetirarMasivo', false)">Cerrar</flux:button>
+                </div>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                        <p class="text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ $procesablesMasivos->count() }}</p>
+                        <p class="text-xs font-black uppercase text-emerald-700">Procesables</p>
+                    </div>
+                    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center dark:border-rose-900/50 dark:bg-rose-950/20">
+                        <p class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ $bloqueadosMasivos->count() }}</p>
+                        <p class="text-xs font-black uppercase text-rose-700">Bloqueados</p>
+                    </div>
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-900/50 dark:bg-amber-950/20">
+                        <p class="text-2xl font-black text-amber-700 dark:text-amber-300">{{ $excepcionesMasivas->count() }}</p>
+                        <p class="text-xs font-black uppercase text-amber-700">Después del corte</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 max-h-72 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-3 dark:border-neutral-700">
+                    @foreach ($diagnosticosMasivos as $id => $diagnostico)
+                        <div class="rounded-xl border p-3 {{ data_get($diagnostico, 'puede_retirar_con_excepcion', false) ? 'border-slate-200 bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800' : 'border-rose-200 bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/20' }}">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <p class="font-black text-slate-900 dark:text-white">{{ data_get($diagnostico, 'alumno', 'Alumno') }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Destino {{ data_get($diagnostico, 'destino.ciclo', '—') }} · corte {{ data_get($diagnostico, 'fecha_corte_texto', 'sin configurar') }}
+                                    </p>
+                                </div>
+                                @if (! data_get($diagnostico, 'puede_retirar_con_excepcion', false))
+                                    <span class="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-black text-rose-700">Bloqueado</span>
+                                @elseif (data_get($diagnostico, 'requiere_excepcion', false))
+                                    <span class="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-black text-amber-700">Requiere excepción</span>
+                                @else
+                                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-700">Disponible</span>
+                                @endif
+                            </div>
+                            @if (count(data_get($diagnostico, 'bloqueos', [])) > 0)
+                                <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700 dark:text-rose-300">
+                                    @foreach (data_get($diagnostico, 'bloqueos', []) as $bloqueo)
+                                        <li>{{ $bloqueo }}</li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            @if (count(data_get($diagnostico, 'advertencias', [])) > 0)
+                                <p class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">{{ count(data_get($diagnostico, 'advertencias', [])) }} advertencia(s) se conservarán en el historial.</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                @error('retiro_masivo')
+                    <div class="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-700 dark:bg-rose-950/20 dark:text-rose-300">{{ $message }}</div>
+                @enderror
+
+                <div class="mt-5 grid gap-4 md:grid-cols-2">
+                    <flux:input type="date" wire:model="fecha_retiro_masivo" label="Fecha efectiva del ajuste" />
+                    <flux:input type="password" wire:model="password_retiro_masivo" label="Contraseña del usuario" autocomplete="current-password" />
+                    <div class="md:col-span-2">
+                        <flux:textarea wire:model="motivo_retiro_masivo" label="Motivo general del cambio" rows="4"
+                            placeholder="Explica por qué deben corregirse las continuidades seleccionadas." />
+                    </div>
+                </div>
+
+                @if ($excepcionesMasivas->isNotEmpty())
+                    <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+                        <input type="checkbox" wire:model.live="confirmar_excepcion_corte_masivo"
+                            class="mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-600">
+                        <span class="text-sm leading-6 text-rose-900 dark:text-rose-100">
+                            <b class="block">Autorizar excepciones posteriores al corte.</b>
+                            {{ $excepcionesMasivas->count() }} alumno(s) ya están fuera del periodo normal. Para ellos el flujo ordinario es Baja/Traslado; continuar aquí dejará una excepción auditada.
+                            @if (! auth()->user()?->is_admin)
+                                <b class="mt-2 block">Solo un Administrador general puede autorizar excepciones posteriores al corte.</b>
+                            @endif
+                        </span>
+                    </label>
+                    @error('confirmar_excepcion_corte_masivo')
+                        <p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>
+                    @enderror
+                @endif
+
+                <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <flux:button wire:click="$set('modalRetirarMasivo', false)">Cancelar</flux:button>
+                    <flux:button variant="danger" wire:click="retirarSeleccionadasDelCicloDestino"
+                        spinner="retirarSeleccionadasDelCicloDestino"
+                        :disabled="$procesablesMasivos->isEmpty() || ($excepcionesMasivas->isNotEmpty() && (! $confirmar_excepcion_corte_masivo || ! auth()->user()?->is_admin))">
+                        Aplicar a {{ $procesablesMasivos->count() }} alumno(s)
                     </flux:button>
                 </div>
             </div>

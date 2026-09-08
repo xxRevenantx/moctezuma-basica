@@ -11,7 +11,9 @@ use App\Models\Nivel;
 use App\Models\Semestre;
 use App\Services\ContextoEscolarService;
 use App\Services\ContextoCicloEscolarSesion;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -39,6 +41,11 @@ class Credenciales extends Component
     public array $alumnos_seleccionados = [];
 
     public string $buscar_alumno = '';
+
+    public int $copias_por_alumno = 1;
+
+    /** @var array<int|string, int> */
+    public array $copias_por_alumno_individual = [];
 
     public function mount(string $slug_nivel): void
     {
@@ -76,10 +83,12 @@ class Credenciales extends Component
         $this->grupo_id = null;
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
 
         $this->cargarGradosContexto();
         $this->semestres = collect();
         $this->grupos = collect();
+        $this->sincronizarSeleccionConAlcance();
     }
 
     public function updatedGradoId(): void
@@ -88,9 +97,11 @@ class Credenciales extends Component
         $this->grupo_id = null;
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
 
         $this->cargarSemestresPorGrado();
         $this->cargarGrupos();
+        $this->sincronizarSeleccionConAlcance();
     }
 
     public function updatedSemestreId(): void
@@ -98,21 +109,27 @@ class Credenciales extends Component
         $this->grupo_id = null;
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
 
         $this->cargarGrupos();
+        $this->sincronizarSeleccionConAlcance();
     }
 
     public function updatedGrupoId(): void
     {
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
+        $this->sincronizarSeleccionConAlcance();
     }
 
     public function updatedModoDescarga(): void
     {
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
         $this->buscar_alumno = '';
+        $this->sincronizarSeleccionConAlcance();
     }
 
     public function updatedBuscarAlumno(): void
@@ -124,6 +141,44 @@ class Credenciales extends Component
          * Esto permite buscar otro alumno, seleccionarlo y conservar
          * los que ya estaban agregados para descargar.
          */
+    }
+
+    public function updatedAlumnosSeleccionados($valor = null, $clave = null): void
+    {
+        $this->depurarCopiasIndividuales();
+    }
+
+    public function updatedCopiasPorAlumno($valor): void
+    {
+        $this->copias_por_alumno = $this->normalizarCopias($valor);
+
+        // Cambiar la cantidad global equivale a volver a aplicar esa cantidad a todos.
+        $this->copias_por_alumno_individual = [];
+    }
+
+    public function incrementarCopiasAlumno(int $alumnoId): void
+    {
+        if (! in_array($alumnoId, $this->idsAlumnosSeleccionados(), true)) {
+            return;
+        }
+
+        $actual = $this->copiasAlumno($alumnoId);
+        $this->guardarCopiaIndividual($alumnoId, min($this->maxCopiasPorAlumno(), $actual + 1));
+    }
+
+    public function decrementarCopiasAlumno(int $alumnoId): void
+    {
+        if (! in_array($alumnoId, $this->idsAlumnosSeleccionados(), true)) {
+            return;
+        }
+
+        $actual = $this->copiasAlumno($alumnoId);
+        $this->guardarCopiaIndividual($alumnoId, max(1, $actual - 1));
+    }
+
+    public function aplicarCopiasATodosSeleccionados(): void
+    {
+        $this->copias_por_alumno_individual = [];
     }
 
     public function cargarSemestresPorGrado(): void
@@ -271,6 +326,61 @@ class Credenciales extends Component
     }
 
     #[Computed]
+    public function alumnosAlcance(): Collection
+    {
+        if (! $this->alcanceConfigurado || in_array($this->modo_descarga, ['individual', 'seleccionados'], true)) {
+            return collect();
+        }
+
+        $query = $this->queryAlumnosAlcance()
+            ->with([
+                'nivel:id,nombre,slug',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo.asignacionGrupo:id,nombre',
+                'semestre:id',
+            ]);
+
+        $busqueda = trim($this->buscar_alumno);
+
+        if ($busqueda !== '') {
+            $query->where(function ($consulta) use ($busqueda) {
+                $consulta
+                    ->where('matricula', 'like', '%' . $busqueda . '%')
+                    ->orWhere('nombre', 'like', '%' . $busqueda . '%')
+                    ->orWhere('apellido_paterno', 'like', '%' . $busqueda . '%')
+                    ->orWhere('apellido_materno', 'like', '%' . $busqueda . '%')
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?",
+                        ['%' . $busqueda . '%']
+                    )
+                    ->orWhereRaw(
+                        "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?",
+                        ['%' . $busqueda . '%']
+                    );
+            });
+        }
+
+        return $query
+            ->orderBy('grado_id')
+            ->orderBy('grupo_id')
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    #[Computed]
+    public function cantidadAlumnosAlcance(): int
+    {
+        if (! $this->alcanceConfigurado || in_array($this->modo_descarga, ['individual', 'seleccionados'], true)) {
+            return 0;
+        }
+
+        return $this->queryAlumnosAlcance()->count();
+    }
+
+    #[Computed]
     public function alumnosSeleccionadosLista(): Collection
     {
         $ids = collect($this->alumnos_seleccionados)
@@ -312,6 +422,8 @@ class Credenciales extends Component
             ->reject(fn($id) => $id === $alumnoId)
             ->values()
             ->toArray();
+
+        unset($this->copias_por_alumno_individual[$alumnoId]);
     }
 
     public function seleccionarTodosVisibles(): void
@@ -331,16 +443,34 @@ class Credenciales extends Component
 
         if (count($faltantes) === 0) {
             $this->alumnos_seleccionados = array_values(array_diff($seleccionados, $idsVisibles));
+            $this->depurarCopiasIndividuales();
 
             return;
         }
 
         $this->alumnos_seleccionados = array_values(array_unique(array_merge($seleccionados, $idsVisibles)));
+        $this->depurarCopiasIndividuales();
+    }
+
+    public function seleccionarTodosAlcance(): void
+    {
+        if (! $this->alcanceConfigurado || in_array($this->modo_descarga, ['individual', 'seleccionados'], true)) {
+            return;
+        }
+
+        $this->alumnos_seleccionados = $this->queryAlumnosAlcance()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $this->depurarCopiasIndividuales();
     }
 
     public function limpiarSeleccion(): void
     {
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
         $this->alumno_individual_id = null;
     }
 
@@ -352,6 +482,7 @@ class Credenciales extends Component
         $this->grupo_id = null;
         $this->alumno_individual_id = null;
         $this->alumnos_seleccionados = [];
+        $this->copias_por_alumno_individual = [];
         $this->buscar_alumno = '';
 
         $this->grupos = collect();
@@ -371,7 +502,7 @@ class Credenciales extends Component
                 'semestre' => 'Por semestre',
                 'grupo' => 'Por grupo',
                 'individual' => 'Individual',
-                'seleccionados' => 'Seleccionados',
+                'seleccionados' => 'Alumnos específicos',
             ];
         }
 
@@ -381,12 +512,12 @@ class Credenciales extends Component
             'grado' => 'Por grado',
             'grupo' => 'Por grupo',
             'individual' => 'Individual',
-            'seleccionados' => 'Seleccionados',
+            'seleccionados' => 'Alumnos específicos',
         ];
     }
 
     #[Computed]
-    public function puedeDescargar(): bool
+    public function alcanceConfigurado(): bool
     {
         if ($this->modo_descarga === 'nivel') {
             return filled($this->nivel?->id);
@@ -410,7 +541,7 @@ class Credenciales extends Component
         if ($this->modo_descarga === 'grupo') {
             return filled($this->generacion_id)
                 && filled($this->grado_id)
-                && (!$this->esBachillerato() || filled($this->semestre_id))
+                && (! $this->esBachillerato() || filled($this->semestre_id))
                 && filled($this->grupo_id);
         }
 
@@ -419,15 +550,70 @@ class Credenciales extends Component
         }
 
         if ($this->modo_descarga === 'seleccionados') {
-            return count($this->alumnos_seleccionados) > 0;
+            return true;
         }
 
         return false;
     }
 
     #[Computed]
+    public function puedeDescargar(): bool
+    {
+        if (! $this->alcanceConfigurado) {
+            return false;
+        }
+
+        if ($this->modo_descarga === 'individual') {
+            return filled($this->alumno_individual_id);
+        }
+
+        return count($this->idsAlumnosSeleccionados()) > 0;
+    }
+
+    #[Computed]
+    public function cantidadAlumnosDescarga(): int
+    {
+        if (! $this->puedeDescargar) {
+            return 0;
+        }
+
+        return $this->queryAlumnosDescarga()->count();
+    }
+
+    #[Computed]
+    public function totalCredenciales(): int
+    {
+        if (! $this->puedeDescargar) {
+            return 0;
+        }
+
+        if ($this->modo_descarga === 'individual') {
+            return $this->cantidadAlumnosDescarga * $this->copias_por_alumno;
+        }
+
+        return $this->alumnosSeleccionadosLista
+            ->sum(fn ($alumno) => $this->copiasAlumno((int) $alumno->id));
+    }
+
+    #[Computed]
+    public function tieneCopiasPersonalizadas(): bool
+    {
+        if ($this->modo_descarga === 'individual') {
+            return false;
+        }
+
+        return collect($this->copias_por_alumno_individual)
+            ->contains(fn ($cantidad, $id) =>
+                in_array((int) $id, $this->idsAlumnosSeleccionados(), true)
+                && (int) $cantidad !== $this->copias_por_alumno
+            );
+    }
+
+    #[Computed]
     public function parametrosDescarga(): array
     {
+        $seleccion = $this->seleccionDescargaQuery();
+
         return [
             'slug_nivel' => $this->slug_nivel,
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
@@ -437,7 +623,10 @@ class Credenciales extends Component
             'semestre_id' => $this->semestre_id,
             'grupo_id' => $this->grupo_id,
             'alumno_id' => $this->alumno_individual_id,
-            'alumnos' => implode(',', $this->alumnos_seleccionados),
+            'alumnos' => $seleccion['alumnos'],
+            'excluir_alumnos' => $seleccion['excluir_alumnos'],
+            'copias_por_alumno' => $this->copias_por_alumno,
+            'copias_individuales' => $this->copiasIndividualesQuery(),
         ];
     }
 
@@ -554,6 +743,242 @@ class Credenciales extends Component
                 ($alumno->apellido_materno ?? '') . ' ' .
                 ($alumno->nombre ?? '')
         );
+    }
+
+    public function alumnoSeleccionado(int $alumnoId): bool
+    {
+        return in_array($alumnoId, $this->idsAlumnosSeleccionados(), true);
+    }
+
+    public function copiasAlumno(int $alumnoId): int
+    {
+        $cantidad = $this->copias_por_alumno_individual[$alumnoId]
+            ?? $this->copias_por_alumno_individual[(string) $alumnoId]
+            ?? $this->copias_por_alumno;
+
+        return $this->normalizarCopias($cantidad);
+    }
+
+    public function maxCopiasPorAlumno(): int
+    {
+        return max(1, (int) config('credenciales.max_copias_por_alumno', 10));
+    }
+
+    public function umbralConfirmacionCopias(): int
+    {
+        return max(1, (int) config('credenciales.umbral_confirmacion_copias', 100));
+    }
+
+    public function maxImagenesPorZip(): int
+    {
+        return max(1, (int) config('credenciales.max_imagenes_por_zip', 250));
+    }
+
+    private function normalizarCopias(mixed $valor): int
+    {
+        $cantidad = is_numeric($valor) ? (int) $valor : 1;
+
+        return max(1, min($this->maxCopiasPorAlumno(), $cantidad));
+    }
+
+    private function guardarCopiaIndividual(int $alumnoId, int $cantidad): void
+    {
+        $cantidad = $this->normalizarCopias($cantidad);
+
+        if ($cantidad === $this->copias_por_alumno) {
+            unset($this->copias_por_alumno_individual[$alumnoId]);
+            return;
+        }
+
+        $this->copias_por_alumno_individual[$alumnoId] = $cantidad;
+    }
+
+    /** @return array<int> */
+    private function idsAlumnosSeleccionados(): array
+    {
+        return collect($this->alumnos_seleccionados)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function depurarCopiasIndividuales(): void
+    {
+        $ids = $this->idsAlumnosSeleccionados();
+
+        $this->copias_por_alumno_individual = collect($this->copias_por_alumno_individual)
+            ->filter(fn ($cantidad, $id) => in_array((int) $id, $ids, true))
+            ->map(fn ($cantidad) => $this->normalizarCopias($cantidad))
+            ->all();
+    }
+
+    private function copiasIndividualesQuery(): string
+    {
+        if ($this->modo_descarga === 'individual') {
+            return '';
+        }
+
+        $ids = $this->idsAlumnosSeleccionados();
+
+        return collect($this->copias_por_alumno_individual)
+            ->filter(fn ($cantidad, $id) =>
+                in_array((int) $id, $ids, true)
+                && $this->normalizarCopias($cantidad) !== $this->copias_por_alumno
+            )
+            ->map(fn ($cantidad, $id) => (int) $id . ':' . $this->normalizarCopias($cantidad))
+            ->values()
+            ->implode(',');
+    }
+
+    /**
+     * Mantiene compacta la URL: si casi todos los alumnos están seleccionados,
+     * se envían solo los excluidos; si son pocos, se envían solo los incluidos.
+     *
+     * @return array{alumnos:?string, excluir_alumnos:?string}
+     */
+    private function seleccionDescargaQuery(): array
+    {
+        if ($this->modo_descarga === 'individual') {
+            return ['alumnos' => null, 'excluir_alumnos' => null];
+        }
+
+        $seleccionados = $this->idsAlumnosSeleccionados();
+
+        if ($this->modo_descarga === 'seleccionados') {
+            return [
+                'alumnos' => $seleccionados === [] ? null : implode(',', $seleccionados),
+                'excluir_alumnos' => null,
+            ];
+        }
+
+        if (! $this->alcanceConfigurado) {
+            return ['alumnos' => null, 'excluir_alumnos' => null];
+        }
+
+        $idsAlcance = $this->queryAlumnosAlcance()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $seleccionados = array_values(array_intersect($idsAlcance, $seleccionados));
+        $excluidos = array_values(array_diff($idsAlcance, $seleccionados));
+
+        if ($excluidos === []) {
+            return ['alumnos' => null, 'excluir_alumnos' => null];
+        }
+
+        if (count($seleccionados) <= count($excluidos)) {
+            return [
+                'alumnos' => $seleccionados === [] ? null : implode(',', $seleccionados),
+                'excluir_alumnos' => null,
+            ];
+        }
+
+        return [
+            'alumnos' => null,
+            'excluir_alumnos' => implode(',', $excluidos),
+        ];
+    }
+
+    private function queryAlumnosDescarga(): Builder
+    {
+        $query = $this->queryAlumnosAlcance();
+
+        if ($this->modo_descarga !== 'individual') {
+            $ids = $this->idsAlumnosSeleccionados();
+
+            if ($ids === []) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->whereIn('id', $ids);
+        }
+
+        return $query;
+    }
+
+    private function queryAlumnosAlcance(): Builder
+    {
+        $query = Inscripcion::query()
+            ->visiblesEnListas()
+            ->where('nivel_id', $this->nivel->id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id);
+
+        if ($this->modo_descarga === 'generacion') {
+            return $query->where('generacion_id', $this->generacion_id);
+        }
+
+        if ($this->modo_descarga === 'grado') {
+            return $query
+                ->where('generacion_id', $this->generacion_id)
+                ->where('grado_id', $this->grado_id);
+        }
+
+        if ($this->modo_descarga === 'semestre') {
+            $query
+                ->where('generacion_id', $this->generacion_id)
+                ->where('grado_id', $this->grado_id);
+
+            if ($this->esBachillerato() && Schema::hasColumn('inscripciones', 'semestre_id')) {
+                $query->where('semestre_id', $this->semestre_id);
+            }
+
+            return $query;
+        }
+
+        if ($this->modo_descarga === 'grupo') {
+            $query
+                ->where('generacion_id', $this->generacion_id)
+                ->where('grado_id', $this->grado_id)
+                ->where('grupo_id', $this->grupo_id);
+
+            if (
+                $this->esBachillerato()
+                && Schema::hasColumn('inscripciones', 'semestre_id')
+                && $this->semestre_id
+            ) {
+                $query->where('semestre_id', $this->semestre_id);
+            }
+
+            return $query;
+        }
+
+        if ($this->modo_descarga === 'individual') {
+            return $query->whereKey($this->alumno_individual_id);
+        }
+
+        if ($this->modo_descarga === 'seleccionados') {
+            return $query->whereIn('id', $this->idsAlumnosSeleccionados());
+        }
+
+        // modo nivel: solo nivel + ciclo escolar.
+        return $query;
+    }
+
+    private function sincronizarSeleccionConAlcance(): void
+    {
+        if (! in_array($this->modo_descarga, ['nivel', 'generacion', 'grado', 'semestre', 'grupo'], true)) {
+            return;
+        }
+
+        if (! $this->alcanceConfigurado) {
+            $this->alumnos_seleccionados = [];
+            $this->copias_por_alumno_individual = [];
+            return;
+        }
+
+        $this->alumnos_seleccionados = $this->queryAlumnosAlcance()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        // Al cambiar el alcance se parte nuevamente de la cantidad global.
+        $this->copias_por_alumno_individual = [];
     }
 
     public function esBachillerato(): bool

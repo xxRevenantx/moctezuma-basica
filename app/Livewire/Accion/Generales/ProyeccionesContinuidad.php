@@ -6,8 +6,10 @@ use App\Models\CicloEscolar;
 use App\Models\Nivel;
 use App\Models\ProyeccionContinuidad;
 use App\Services\CierreGeneracionContinuidadService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -23,6 +25,9 @@ class ProyeccionesContinuidad extends Component
     public string $buscar = '';
     public string $filtro_estado = 'pendiente';
     public ?int $filtro_ciclo_destino_id = null;
+
+    public ?int $ciclo_corte_id = null;
+    public string $fecha_corte_continuidad = '';
 
     public array $seleccionados = [];
     public array $datos = [];
@@ -41,7 +46,16 @@ class ProyeccionesContinuidad extends Component
     public string $fecha_retiro = '';
     public string $motivo_retiro = '';
     public string $password_retiro_proyeccion = '';
+    public bool $confirmar_excepcion_corte = false;
     public array $diagnostico_retiro = [];
+
+    public bool $modalRetirarMasivo = false;
+    public string $fecha_retiro_masivo = '';
+    public string $motivo_retiro_masivo = '';
+    public string $password_retiro_masivo = '';
+    public bool $confirmar_excepcion_corte_masivo = false;
+    public array $diagnosticos_retiro_masivo = [];
+    public array $retiro_masivo_ids = [];
 
     public ?int $proyeccion_reactivacion_id = null;
     public string $fecha_reactivacion = '';
@@ -58,14 +72,19 @@ class ProyeccionesContinuidad extends Component
         $this->slug_nivel = $slug_nivel;
         $this->nivel = Nivel::query()->where('slug', $slug_nivel)->firstOrFail();
 
-        app(CierreGeneracionContinuidadService::class)
-            ->sincronizarAnulacionesAdministrativas(
-                $this->nivel->id,
-                (int) auth()->id()
-            );
+        $service = app(CierreGeneracionContinuidadService::class);
+        $service->sincronizarAnulacionesAdministrativas(
+            $this->nivel->id,
+            (int) auth()->id()
+        );
+        $service->sincronizarContinuidadesHistoricasSinProyeccion(
+            $this->nivel->id,
+            (int) auth()->id()
+        );
 
         $this->fecha_confirmacion = now()->toDateString();
         $this->cargarCiclosDestino();
+        $this->inicializarCicloCorte();
         $this->inicializarDatos();
     }
 
@@ -75,6 +94,10 @@ class ProyeccionesContinuidad extends Component
             ? (int) $this->filtro_ciclo_destino_id
             : null;
         $this->seleccionados = [];
+        if ($this->filtro_ciclo_destino_id) {
+            $this->ciclo_corte_id = $this->filtro_ciclo_destino_id;
+            $this->cargarFechaCorteContinuidad();
+        }
         $this->inicializarDatos();
     }
 
@@ -83,16 +106,54 @@ class ProyeccionesContinuidad extends Component
         $this->seleccionados = [];
     }
 
+    public function updatedCicloCorteId(): void
+    {
+        $this->ciclo_corte_id = filled($this->ciclo_corte_id) ? (int) $this->ciclo_corte_id : null;
+        $this->cargarFechaCorteContinuidad();
+    }
+
+    public function guardarFechaCorteContinuidad(CierreGeneracionContinuidadService $service): void
+    {
+        $this->validate([
+            'ciclo_corte_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'fecha_corte_continuidad' => ['required', 'date'],
+        ], [
+            'ciclo_corte_id.required' => 'Selecciona el ciclo escolar al que se aplicará la fecha de corte.',
+            'fecha_corte_continuidad.required' => 'Captura manualmente la fecha de corte de continuidad.',
+        ]);
+
+        $ciclo = $service->guardarFechaCorteContinuidad(
+            (int) $this->ciclo_corte_id,
+            $this->fecha_corte_continuidad,
+            (int) auth()->id(),
+        );
+
+        $this->fecha_corte_continuidad = $ciclo->fecha_corte_continuidad?->toDateString() ?? '';
+        $this->cargarCiclosDestino();
+        $this->resetValidation('fecha_corte_continuidad');
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Fecha de corte guardada',
+            'text' => 'La fecha fue configurada manualmente para el ciclo '.$ciclo->nombre.'. No se calcula ni cambia automáticamente.',
+            'position' => 'top-end',
+        ]);
+    }
+
     #[On('proyecciones-actualizadas')]
     public function recargar(): void
     {
-        app(CierreGeneracionContinuidadService::class)
-            ->sincronizarAnulacionesAdministrativas(
-                $this->nivel->id,
-                (int) auth()->id()
-            );
+        $service = app(CierreGeneracionContinuidadService::class);
+        $service->sincronizarAnulacionesAdministrativas(
+            $this->nivel->id,
+            (int) auth()->id()
+        );
+        $service->sincronizarContinuidadesHistoricasSinProyeccion(
+            $this->nivel->id,
+            (int) auth()->id()
+        );
 
         $this->cargarCiclosDestino();
+        $this->inicializarCicloCorte();
         $this->inicializarDatos();
     }
 
@@ -102,6 +163,15 @@ class ProyeccionesContinuidad extends Component
             ->where('estado', 'pendiente')
             ->pluck('id')
             ->map(fn($id): string => (string) $id)
+            ->all();
+    }
+
+    public function seleccionarContinuaranVisibles(): void
+    {
+        $this->seleccionados = $this->proyecciones
+            ->where('estado', 'confirmada')
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
             ->all();
     }
 
@@ -208,8 +278,9 @@ class ProyeccionesContinuidad extends Component
         $this->resetValidation();
         $this->proyeccion_retiro_id = $proyeccionId;
         $this->fecha_retiro = now()->toDateString();
-        $this->motivo_retiro = 'La familia confirmó que el alumno no continuará en la institución y no inició actividades en el ciclo escolar destino.';
+        $this->motivo_retiro = 'La familia confirmó que el alumno no continuará en la institución dentro del periodo administrativo de corrección de continuidad.';
         $this->password_retiro_proyeccion = '';
+        $this->confirmar_excepcion_corte = false;
         $this->diagnostico_retiro = $service->diagnosticoRetiroProyeccion($proyeccionId);
         $this->modalRetirar = true;
     }
@@ -221,10 +292,20 @@ class ProyeccionesContinuidad extends Component
             'fecha_retiro' => ['required', 'date', 'before_or_equal:today'],
             'motivo_retiro' => ['required', 'string', 'min:10', 'max:1500'],
             'password_retiro_proyeccion' => ['required', 'string'],
+            'confirmar_excepcion_corte' => ['boolean'],
         ]);
 
         if (! Hash::check($this->password_retiro_proyeccion, (string) auth()->user()?->password)) {
             $this->addError('password_retiro_proyeccion', 'La contraseña no es correcta.');
+            return;
+        }
+
+        $this->diagnostico_retiro = $service->diagnosticoRetiroProyeccion((int) $this->proyeccion_retiro_id);
+        if (data_get($this->diagnostico_retiro, 'requiere_excepcion', false) && ! $this->confirmar_excepcion_corte) {
+            $this->addError(
+                'confirmar_excepcion_corte',
+                'La fecha de corte ya venció. Debes autorizar expresamente la excepción administrativa para continuar.'
+            );
             return;
         }
 
@@ -233,11 +314,13 @@ class ProyeccionesContinuidad extends Component
             trim($this->motivo_retiro),
             $this->fecha_retiro,
             (int) auth()->id(),
+            $this->confirmar_excepcion_corte,
         );
 
         $estatus = $proyeccion->inscripcion?->estatus === 'egresado'
             ? 'egresado del nivel de origen'
             : 'no reinscrito en el último grado concluido';
+        $fueExcepcion = (bool) data_get($proyeccion->snapshot_reversion, 'excepcion_fecha_corte', false);
 
         $this->modalRetirar = false;
         $this->filtro_estado = 'revertida';
@@ -245,8 +328,94 @@ class ProyeccionesContinuidad extends Component
         $this->inicializarDatos();
         $this->dispatch('swal', [
             'icon' => 'success',
-            'title' => 'Marcado como No continuará',
-            'text' => "La activación fue anulada sin borrar el historial. El alumno quedó {$estatus}.",
+            'title' => $fueExcepcion ? 'Excepción registrada' : 'Marcado como No continuará',
+            'text' => ($fueExcepcion ? 'La excepción posterior al corte quedó auditada. ' : '')
+                ."La activación fue anulada sin borrar el historial. El alumno quedó {$estatus}.",
+            'position' => 'top-end',
+        ]);
+    }
+
+    public function prepararRetiroMasivo(CierreGeneracionContinuidadService $service): void
+    {
+        $this->resetValidation();
+        $ids = $this->proyeccionesSeleccionadasConfirmadas()->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
+
+        if ($ids === []) {
+            $this->addError('seleccion_proyecciones', 'Selecciona al menos un alumno marcado como Continuará.');
+            return;
+        }
+
+        $this->diagnosticos_retiro_masivo = $service->diagnosticosRetiroProyecciones($ids);
+        $this->retiro_masivo_ids = collect($this->diagnosticos_retiro_masivo)
+            ->filter(fn (array $diagnostico): bool => (bool) ($diagnostico['puede_retirar_con_excepcion'] ?? false))
+            ->keys()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+        $this->fecha_retiro_masivo = now()->toDateString();
+        $this->motivo_retiro_masivo = 'La familia confirmó que los alumnos seleccionados no continuarán en la institución dentro del periodo administrativo de corrección de continuidad.';
+        $this->password_retiro_masivo = '';
+        $this->confirmar_excepcion_corte_masivo = false;
+        $this->modalRetirarMasivo = true;
+    }
+
+    public function retirarSeleccionadasDelCicloDestino(CierreGeneracionContinuidadService $service): void
+    {
+        $this->validate([
+            'fecha_retiro_masivo' => ['required', 'date', 'before_or_equal:today'],
+            'motivo_retiro_masivo' => ['required', 'string', 'min:10', 'max:1500'],
+            'password_retiro_masivo' => ['required', 'string'],
+            'confirmar_excepcion_corte_masivo' => ['boolean'],
+        ]);
+
+        if (! Hash::check($this->password_retiro_masivo, (string) auth()->user()?->password)) {
+            $this->addError('password_retiro_masivo', 'La contraseña no es correcta.');
+            return;
+        }
+
+        $idsSeleccionados = $this->proyeccionesSeleccionadasConfirmadas()->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
+        if ($idsSeleccionados === []) {
+            $this->addError('retiro_masivo', 'Ya no hay alumnos confirmados en la selección. Recarga la lista e inténtalo de nuevo.');
+            return;
+        }
+
+        $this->diagnosticos_retiro_masivo = $service->diagnosticosRetiroProyecciones($idsSeleccionados);
+        $procesables = collect($this->diagnosticos_retiro_masivo)
+            ->filter(fn (array $diagnostico): bool => (bool) ($diagnostico['puede_retirar_con_excepcion'] ?? false));
+        $requiereExcepcion = $procesables->contains(fn (array $diagnostico): bool => (bool) ($diagnostico['requiere_excepcion'] ?? false));
+
+        if ($procesables->isEmpty()) {
+            $this->addError('retiro_masivo', 'Ningún alumno seleccionado puede cambiarse a No continuará. Revisa los bloqueos mostrados.');
+            return;
+        }
+
+        if ($requiereExcepcion && ! $this->confirmar_excepcion_corte_masivo) {
+            $this->addError(
+                'confirmar_excepcion_corte_masivo',
+                'Hay alumnos cuya fecha de corte venció. Autoriza expresamente la excepción administrativa para procesarlos.'
+            );
+            return;
+        }
+
+        $idsProcesables = $procesables->keys()->map(fn ($id): int => (int) $id)->values()->all();
+        $cantidad = $service->retirarProyeccionesConfirmadas(
+            $idsProcesables,
+            trim($this->motivo_retiro_masivo),
+            $this->fecha_retiro_masivo,
+            (int) auth()->id(),
+            $this->confirmar_excepcion_corte_masivo,
+        );
+        $omitidos = max(0, count($idsSeleccionados) - $cantidad);
+
+        $this->modalRetirarMasivo = false;
+        $this->filtro_estado = 'revertida';
+        $this->resetOperacion();
+        $this->inicializarDatos();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Cambios de continuidad aplicados',
+            'text' => "{$cantidad} alumno(s) fueron marcados como No continuará."
+                .($omitidos > 0 ? " {$omitidos} quedaron sin cambios por bloqueos detectados." : ''),
             'position' => 'top-end',
         ]);
     }
@@ -355,12 +524,64 @@ class ProyeccionesContinuidad extends Component
 
     public function getProyeccionesProperty(): Collection
     {
-        return app(CierreGeneracionContinuidadService::class)->proyeccionesPorNivelOrigen(
+        $service = app(CierreGeneracionContinuidadService::class);
+        $filtrosDiagnostico = ['cambiables', 'bloqueados', 'excepciones'];
+
+        if (! in_array($this->filtro_estado, $filtrosDiagnostico, true)) {
+            return $service->proyeccionesPorNivelOrigen(
+                $this->nivel->id,
+                $this->filtro_ciclo_destino_id,
+                filled($this->filtro_estado) ? $this->filtro_estado : null,
+                $this->buscar,
+            );
+        }
+
+        return $service->proyeccionesPorNivelOrigen(
             $this->nivel->id,
             $this->filtro_ciclo_destino_id,
-            filled($this->filtro_estado) ? $this->filtro_estado : null,
+            'confirmada',
             $this->buscar,
-        );
+        )->filter(function (ProyeccionContinuidad $proyeccion) use ($service): bool {
+            $diagnostico = $service->diagnosticoRetiroProyeccion((int) $proyeccion->id);
+
+            return match ($this->filtro_estado) {
+                'cambiables' => (bool) ($diagnostico['puede_retirar_normal'] ?? false),
+                'excepciones' => (bool) ($diagnostico['requiere_excepcion'] ?? false)
+                    && (bool) ($diagnostico['puede_retirar_con_excepcion'] ?? false),
+                'bloqueados' => ! (bool) ($diagnostico['puede_retirar_con_excepcion'] ?? false),
+                default => true,
+            };
+        })->values();
+    }
+
+    public function getResumenFechaCorteProperty(): array
+    {
+        $ciclo = $this->ciclo_corte_id ? CicloEscolar::query()->find($this->ciclo_corte_id) : null;
+
+        if (! $ciclo) {
+            return ['estado' => 'sin_ciclo', 'ciclo' => null, 'fecha' => null, 'fecha_texto' => null, 'dias_restantes' => null];
+        }
+
+        if (! Schema::hasColumn('ciclo_escolares', 'fecha_corte_continuidad')) {
+            return ['estado' => 'sin_migracion', 'ciclo' => $ciclo->nombre, 'fecha' => null, 'fecha_texto' => null, 'dias_restantes' => null];
+        }
+
+        if (! $ciclo->fecha_corte_continuidad) {
+            return ['estado' => 'sin_configurar', 'ciclo' => $ciclo->nombre, 'fecha' => null, 'fecha_texto' => null, 'dias_restantes' => null];
+        }
+
+        $fecha = CarbonImmutable::parse($ciclo->fecha_corte_continuidad)->startOfDay();
+        $hoy = CarbonImmutable::today();
+        $estado = $hoy->isAfter($fecha) ? 'vencido' : ($hoy->isSameDay($fecha) ? 'hoy' : 'abierto');
+
+        return [
+            'estado' => $estado,
+            'ciclo' => $ciclo->nombre,
+            'fecha' => $fecha->toDateString(),
+            'fecha_texto' => $fecha->format('d/m/Y'),
+            'dias_restantes' => $hoy->diffInDays($fecha, false),
+            'configurada_at' => $ciclo->fecha_corte_continuidad_at?->format('d/m/Y H:i'),
+        ];
     }
 
     public function getConteosProperty(): array
@@ -398,6 +619,17 @@ class ProyeccionesContinuidad extends Component
         return ProyeccionContinuidad::query()
             ->whereIn('id', $ids)
             ->where('estado', 'pendiente')
+            ->get();
+    }
+
+    private function proyeccionesSeleccionadasConfirmadas(): Collection
+    {
+        $ids = collect($this->seleccionados)->map(fn ($id): int => (int) $id)->filter()->unique();
+
+        return ProyeccionContinuidad::query()
+            ->whereIn('id', $ids)
+            ->where('estado', 'confirmada')
+            ->whereHas('inscripcionCicloOrigen', fn ($query) => $query->where('nivel_id', $this->nivel->id))
             ->get();
     }
 
@@ -444,6 +676,33 @@ class ProyeccionesContinuidad extends Component
             ->get();
     }
 
+    private function inicializarCicloCorte(): void
+    {
+        if ($this->ciclosDestino->isEmpty()) {
+            $this->ciclo_corte_id = null;
+            $this->fecha_corte_continuidad = '';
+            return;
+        }
+
+        if (! $this->ciclo_corte_id || ! $this->ciclosDestino->contains('id', $this->ciclo_corte_id)) {
+            $this->ciclo_corte_id = (int) ($this->ciclosDestino->firstWhere('es_actual', true)?->id
+                ?? $this->ciclosDestino->first()?->id);
+        }
+
+        $this->cargarFechaCorteContinuidad();
+    }
+
+    private function cargarFechaCorteContinuidad(): void
+    {
+        if (! $this->ciclo_corte_id || ! Schema::hasColumn('ciclo_escolares', 'fecha_corte_continuidad')) {
+            $this->fecha_corte_continuidad = '';
+            return;
+        }
+
+        $ciclo = CicloEscolar::query()->find($this->ciclo_corte_id);
+        $this->fecha_corte_continuidad = $ciclo?->fecha_corte_continuidad?->toDateString() ?? '';
+    }
+
     private function resetOperacion(): void
     {
         $this->seleccionados = [];
@@ -455,7 +714,14 @@ class ProyeccionesContinuidad extends Component
         $this->fecha_retiro = '';
         $this->motivo_retiro = '';
         $this->password_retiro_proyeccion = '';
+        $this->confirmar_excepcion_corte = false;
         $this->diagnostico_retiro = [];
+        $this->fecha_retiro_masivo = '';
+        $this->motivo_retiro_masivo = '';
+        $this->password_retiro_masivo = '';
+        $this->confirmar_excepcion_corte_masivo = false;
+        $this->diagnosticos_retiro_masivo = [];
+        $this->retiro_masivo_ids = [];
         $this->proyeccion_reactivacion_id = null;
         $this->fecha_reactivacion = '';
         $this->motivo_reactivacion = '';

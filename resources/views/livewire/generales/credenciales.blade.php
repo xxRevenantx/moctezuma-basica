@@ -32,7 +32,7 @@
                     class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
 
                     <div wire:loading.delay.flex
-                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,modo_descarga,buscar_alumno,alumno_individual_id,alumnos_seleccionados,limpiarFiltros,seleccionarTodosVisibles,limpiarSeleccion,quitarAlumnoSeleccionado"
+                        wire:target="generacion_id,grado_id,semestre_id,grupo_id,modo_descarga,buscar_alumno,alumno_individual_id,alumnos_seleccionados,copias_por_alumno,limpiarFiltros,seleccionarTodosVisibles,seleccionarTodosAlcance,limpiarSeleccion,quitarAlumnoSeleccionado,incrementarCopiasAlumno,decrementarCopiasAlumno,aplicarCopiasATodosSeleccionados"
                         class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-900/70">
                         <div
                             class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
@@ -140,6 +140,27 @@
                                 </flux:select>
 
                                 <flux:error name="modo_descarga" />
+                            </flux:field>
+
+                            <flux:field>
+                                <flux:label>{{ $modo_descarga === 'individual' ? 'Copias del alumno' : 'Copias predeterminadas' }}</flux:label>
+
+                                <flux:select id="copias_por_alumno" wire:model.live="copias_por_alumno"
+                                    x-on:change="guardarScroll()">
+                                    @for ($cantidad = 1; $cantidad <= $this->maxCopiasPorAlumno(); $cantidad++)
+                                        <flux:select.option value="{{ $cantidad }}">
+                                            {{ $cantidad }} {{ $cantidad === 1 ? 'copia' : 'copias' }}
+                                        </flux:select.option>
+                                    @endfor
+                                </flux:select>
+
+                                <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    @if ($modo_descarga === 'individual')
+                                        Cantidad de credenciales que se generarán para este alumno. Máximo {{ $this->maxCopiasPorAlumno() }}.
+                                    @else
+                                        Es la cantidad inicial. En la lista inferior puedes incluir o excluir alumnos y ajustar sus copias de forma individual.
+                                    @endif
+                                </p>
                             </flux:field>
 
                             <flux:field>
@@ -279,6 +300,18 @@
                                 Modo: {{ $this->textoModoDescarga }}
                             </span>
 
+                            <span
+                                class="inline-flex items-center rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-bold text-fuchsia-700 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30 dark:text-fuchsia-300">
+                                Copias por alumno: {{ $copias_por_alumno }}
+                            </span>
+
+                            @if ($this->tieneCopiasPersonalizadas)
+                                <span
+                                    class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                    Con cantidades individuales
+                                </span>
+                            @endif
+
                             @if ($modo_descarga === 'nivel')
                                 <span
                                     class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -319,7 +352,13 @@
                             @if ($modo_descarga === 'seleccionados')
                                 <span
                                     class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-                                    Seleccionados: {{ count($alumnos_seleccionados) }}
+                                    Alumnos específicos: {{ count($alumnos_seleccionados) }}
+                                </span>
+                            @endif
+                            @if (in_array($modo_descarga, ['nivel', 'generacion', 'grado', 'semestre', 'grupo'], true) && $this->alcanceConfigurado)
+                                <span
+                                    class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    Seleccionados: {{ count($alumnos_seleccionados) }} / {{ $this->cantidadAlumnosAlcance }}
                                 </span>
                             @endif
 
@@ -332,8 +371,207 @@
                             @endif
                         </div>
 
+                        @if (in_array($modo_descarga, ['nivel', 'generacion', 'grado', 'semestre', 'grupo'], true) && $this->alcanceConfigurado)
+                            <div class="mt-6 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                <div class="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-emerald-50/60 p-4 dark:border-neutral-800 dark:from-neutral-950 dark:to-emerald-950/20 sm:p-5">
+                                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                                        <div class="flex items-start gap-3">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                <flux:icon.users class="h-5 w-5" />
+                                            </div>
+
+                                            <div>
+                                                <h4 class="text-sm font-black text-slate-900 dark:text-white">
+                                                    Alumnos incluidos en las credenciales
+                                                </h4>
+                                                <p class="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                                                    Se encontraron {{ $this->cantidadAlumnosAlcance }} alumno(s) en el alcance.
+                                                    Marca quiénes deben generar credencial y define las copias de cada alumno.
+                                                    Un alumno desmarcado no se incluirá en el PDF ni en el ZIP.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" wire:click="seleccionarTodosAlcance"
+                                                x-on:click="guardarScroll()"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                <flux:icon.check class="h-4 w-4" />
+                                                Seleccionar todos
+                                            </button>
+
+                                            <button type="button" wire:click="limpiarSeleccion"
+                                                x-on:click="guardarScroll()"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+                                                <flux:icon.x-mark class="h-4 w-4" />
+                                                Quitar todos
+                                            </button>
+
+                                            <button type="button" wire:click="aplicarCopiasATodosSeleccionados"
+                                                x-on:click="guardarScroll()"
+                                                @disabled(count($alumnos_seleccionados) === 0)
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900">
+                                                <flux:icon.squares-2x2 class="h-4 w-4" />
+                                                Aplicar {{ $copias_por_alumno }} a seleccionados
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                                        <span class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
+                                            {{ count($alumnos_seleccionados) }} seleccionado(s)
+                                        </span>
+
+                                        <span class="inline-flex items-center rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-black text-fuchsia-700 dark:border-fuchsia-900/50 dark:bg-fuchsia-950/30 dark:text-fuchsia-300">
+                                            {{ $this->totalCredenciales }} credencial(es)
+                                        </span>
+
+                                        @if (trim($buscar_alumno) !== '')
+                                            <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                                                Mostrando coincidencias de “{{ $buscar_alumno }}”
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="max-h-[520px] overflow-auto">
+                                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-neutral-800">
+                                        <thead class="sticky top-0 z-10 bg-slate-100/95 backdrop-blur dark:bg-neutral-950/95">
+                                            <tr>
+                                                <th class="w-20 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                    Generar
+                                                </th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                    Alumno
+                                                </th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                    Matrícula
+                                                </th>
+                                                <th class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                    Ubicación
+                                                </th>
+                                                <th class="w-44 px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                    Copias
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody class="divide-y divide-slate-100 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
+                                            @forelse ($this->alumnosAlcance as $alumno)
+                                                @php($incluido = $this->alumnoSeleccionado((int) $alumno->id))
+                                                <tr wire:key="alcance-credencial-alumno-{{ $alumno->id }}"
+                                                    class="transition {{ $incluido ? 'hover:bg-emerald-50/50 dark:hover:bg-neutral-800/70' : 'bg-slate-50/70 opacity-70 dark:bg-neutral-950/40' }}">
+                                                    <td class="px-4 py-3 text-center">
+                                                        <input type="checkbox" value="{{ $alumno->id }}"
+                                                            wire:model.live="alumnos_seleccionados"
+                                                            x-on:change="guardarScroll()"
+                                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500 dark:border-neutral-700">
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        <p class="font-black text-slate-900 dark:text-white">
+                                                            {{ $this->nombreAlumno($alumno) }}
+                                                        </p>
+                                                        @if ($alumno->generacion)
+                                                            <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                                Generación {{ $alumno->generacion->anio_ingreso }} - {{ $alumno->generacion->anio_egreso }}
+                                                            </p>
+                                                        @endif
+                                                    </td>
+
+                                                    <td class="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
+                                                        {{ $alumno->matricula ?? 'S/M' }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex flex-wrap gap-1.5">
+                                                            <span class="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40">
+                                                                {{ $alumno->grado?->nombre ?? 'Sin grado' }}
+                                                            </span>
+                                                            <span class="rounded-full bg-cyan-50 px-2.5 py-1 text-[11px] font-black text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-950/30 dark:text-cyan-300 dark:ring-cyan-900/40">
+                                                                Grupo {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                                            </span>
+                                                            @if ($this->esBachillerato() && $alumno->semestre)
+                                                                <span class="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40">
+                                                                    {{ $this->textoSemestre($alumno->semestre) }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="px-4 py-3">
+                                                        @if ($incluido)
+                                                            <div class="flex items-center justify-center gap-1.5">
+                                                                <button type="button"
+                                                                    wire:click="decrementarCopiasAlumno({{ $alumno->id }})"
+                                                                    x-on:click="guardarScroll()"
+                                                                    @disabled($this->copiasAlumno((int) $alumno->id) <= 1)
+                                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                                    <flux:icon.minus class="h-4 w-4" />
+                                                                </button>
+
+                                                                <span class="inline-flex min-w-11 items-center justify-center rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                                    {{ $this->copiasAlumno((int) $alumno->id) }}
+                                                                </span>
+
+                                                                <button type="button"
+                                                                    wire:click="incrementarCopiasAlumno({{ $alumno->id }})"
+                                                                    x-on:click="guardarScroll()"
+                                                                    @disabled($this->copiasAlumno((int) $alumno->id) >= $this->maxCopiasPorAlumno())
+                                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                                    <flux:icon.plus class="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        @else
+                                                            <div class="text-center">
+                                                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-400">
+                                                                    No generar
+                                                                </span>
+                                                            </div>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="px-4 py-12 text-center">
+                                                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-neutral-800 dark:text-slate-300">
+                                                            <flux:icon.magnifying-glass class="h-5 w-5" />
+                                                        </div>
+                                                        <p class="mt-3 font-black text-slate-700 dark:text-slate-200">
+                                                            No hay alumnos que coincidan con la búsqueda.
+                                                        </p>
+                                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                            Limpia el buscador para volver a mostrar todos los alumnos del alcance.
+                                                        </p>
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
                         @if ($modo_descarga === 'seleccionados')
-                            <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-12">
+                            <div class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                        <flux:icon.users class="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-black text-slate-900 dark:text-white">
+                                            Generar solo para alumnos específicos
+                                        </p>
+                                        <p class="mt-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
+                                            Filtra por nivel, generación, grado o grupo y marca únicamente a los alumnos que necesites.
+                                            Los alumnos que no estén marcados no generarán ninguna credencial. A cada seleccionado puedes asignarle
+                                            una cantidad distinta de copias.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
                                 <div
                                     class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 xl:col-span-7">
                                     <div
@@ -446,20 +684,29 @@
                                         <div class="flex items-center justify-between gap-3">
                                             <div>
                                                 <h4 class="text-sm font-black">
-                                                    Alumnos agregados para descargar
+                                                    Alumnos específicos a generar
                                                 </h4>
 
                                                 <p class="mt-1 text-xs font-semibold text-white/80">
-                                                    {{ count($alumnos_seleccionados) }} alumno(s) seleccionado(s).
+                                                    {{ count($alumnos_seleccionados) }} alumno(s) seleccionado(s). Los demás no se incluirán.
                                                 </p>
                                             </div>
 
-                                            <button type="button" wire:click="limpiarSeleccion"
-                                                x-on:click="guardarScroll()"
-                                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs font-black text-white ring-1 ring-white/20 transition hover:bg-white/25">
-                                                <flux:icon.x-mark class="h-4 w-4" />
-                                                Limpiar
-                                            </button>
+                                            <div class="flex flex-wrap items-center justify-end gap-2">
+                                                <button type="button" wire:click="aplicarCopiasATodosSeleccionados"
+                                                    x-on:click="guardarScroll()"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs font-black text-white ring-1 ring-white/20 transition hover:bg-white/25">
+                                                    <flux:icon.squares-plus class="h-4 w-4" />
+                                                    Aplicar {{ $copias_por_alumno }} a seleccionados
+                                                </button>
+
+                                                <button type="button" wire:click="limpiarSeleccion"
+                                                    x-on:click="guardarScroll()"
+                                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs font-black text-white ring-1 ring-white/20 transition hover:bg-white/25">
+                                                    <flux:icon.x-mark class="h-4 w-4" />
+                                                    Limpiar
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -475,6 +722,10 @@
                                                     <th
                                                         class="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                                                         Matrícula
+                                                    </th>
+                                                    <th
+                                                        class="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                                                        Copias
                                                     </th>
                                                     <th class="w-12 px-4 py-3 text-right"></th>
                                                 </tr>
@@ -503,6 +754,31 @@
                                                             {{ $alumno->matricula ?? 'S/M' }}
                                                         </td>
 
+                                                        <td class="px-4 py-3">
+                                                            <div class="flex items-center justify-center gap-1.5">
+                                                                <button type="button"
+                                                                    wire:click="decrementarCopiasAlumno({{ $alumno->id }})"
+                                                                    x-on:click="guardarScroll()"
+                                                                    @disabled($this->copiasAlumno((int) $alumno->id) <= 1)
+                                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                                    <flux:icon.minus class="h-3.5 w-3.5" />
+                                                                </button>
+
+                                                                <span
+                                                                    class="inline-flex min-w-9 items-center justify-center rounded-lg bg-emerald-100 px-2 py-1.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                                    {{ $this->copiasAlumno((int) $alumno->id) }}
+                                                                </span>
+
+                                                                <button type="button"
+                                                                    wire:click="incrementarCopiasAlumno({{ $alumno->id }})"
+                                                                    x-on:click="guardarScroll()"
+                                                                    @disabled($this->copiasAlumno((int) $alumno->id) >= $this->maxCopiasPorAlumno())
+                                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                                    <flux:icon.plus class="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+
                                                         <td class="px-4 py-3 text-right">
                                                             <button type="button"
                                                                 wire:click="quitarAlumnoSeleccionado({{ $alumno->id }})"
@@ -514,7 +790,7 @@
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="3" class="px-4 py-10 text-center">
+                                                        <td colspan="4" class="px-4 py-10 text-center">
                                                             <div
                                                                 class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                                                                 <flux:icon.user-plus class="h-5 w-5" />
@@ -554,12 +830,36 @@
 
                                         @if ($this->puedeDescargar)
                                             <p class="mt-1 text-sm text-emerald-600 dark:text-emerald-400">
-                                                Ya puedes descargar las credenciales.
+                                                Listo para generar: <strong>{{ $this->cantidadAlumnosDescarga }}</strong> alumno(s) ·
+                                                <strong>{{ $this->totalCredenciales }}</strong> credencial(es).
                                             </p>
 
-                                            <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                Alcance seleccionado: {{ $this->textoModoDescarga }}.
-                                            </p>
+                                            @if (! $this->tieneCopiasPersonalizadas)
+                                                <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    {{ $this->cantidadAlumnosDescarga }} alumno(s) × {{ $copias_por_alumno }}
+                                                    {{ $copias_por_alumno === 1 ? 'copia' : 'copias' }} =
+                                                    {{ $this->totalCredenciales }} credencial(es).
+                                                    Alcance: {{ $this->textoModoDescarga }}.
+                                                </p>
+                                            @else
+                                                <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    Alcance: {{ $this->textoModoDescarga }}. Hay cantidades personalizadas por alumno.
+                                                </p>
+                                            @endif
+
+                                            @if ($this->totalCredenciales > $this->umbralConfirmacionCopias())
+                                                <p class="mt-2 text-xs font-bold text-rose-600 dark:text-rose-400">
+                                                    Descarga grande: se generarán {{ $this->totalCredenciales }} credenciales.
+                                                    El sistema pedirá confirmación antes de continuar.
+                                                </p>
+                                            @endif
+
+                                            @if ($this->totalCredenciales > $this->maxImagenesPorZip())
+                                                <p class="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                                    Para PNG/JPG el máximo por ZIP es {{ $this->maxImagenesPorZip() }} credenciales.
+                                                    Puedes generar el PDF completo o dividir la descarga de imágenes.
+                                                </p>
+                                            @endif
 
                                             <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
                                                 Si algún alumno no tiene fotografía, se generará con el espacio “FOTO + SELLO” y el ZIP incluirá una advertencia.
@@ -585,27 +885,36 @@
                                                 x-on:click.outside="formatos = false"
                                                 class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:shadow-xl">
                                                 <flux:icon.document-arrow-down class="h-5 w-5" />
-                                                Descargar
+                                                Descargar {{ $this->totalCredenciales }}
                                                 <flux:icon.chevron-down class="h-4 w-4" />
                                             </button>
 
                                             <div x-cloak x-show="formatos" x-transition
                                                 class="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
                                                 <a href="{{ $this->urlDescarga }}" target="_blank"
+                                                    x-on:click="if ({{ $this->totalCredenciales }} > {{ $this->umbralConfirmacionCopias() }} && !window.confirm('Se generarán {{ $this->totalCredenciales }} credenciales para {{ $this->cantidadAlumnosDescarga }} alumno(s). ¿Deseas continuar?')) { $event.preventDefault(); }"
                                                     class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
                                                     <flux:icon.document-text class="h-5 w-5 text-rose-500" />
                                                     Formato PDF
                                                 </a>
-                                                <a href="{{ $this->urlDescargaPng }}"
-                                                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
-                                                    <flux:icon.photo class="h-5 w-5 text-emerald-500" />
-                                                    Imagen PNG
-                                                </a>
-                                                <a href="{{ $this->urlDescargaJpg }}"
-                                                    class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
-                                                    <flux:icon.photo class="h-5 w-5 text-sky-500" />
-                                                    Imagen JPG · 100%
-                                                </a>
+                                                @if ($this->totalCredenciales <= $this->maxImagenesPorZip())
+                                                    <a href="{{ $this->urlDescargaPng }}"
+                                                        x-on:click="if ({{ $this->totalCredenciales }} > {{ $this->umbralConfirmacionCopias() }} && !window.confirm('Se generarán {{ $this->totalCredenciales }} credenciales para {{ $this->cantidadAlumnosDescarga }} alumno(s). ¿Deseas continuar?')) { $event.preventDefault(); }"
+                                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                        <flux:icon.photo class="h-5 w-5 text-emerald-500" />
+                                                        Imagen PNG
+                                                    </a>
+                                                    <a href="{{ $this->urlDescargaJpg }}"
+                                                        x-on:click="if ({{ $this->totalCredenciales }} > {{ $this->umbralConfirmacionCopias() }} && !window.confirm('Se generarán {{ $this->totalCredenciales }} credenciales para {{ $this->cantidadAlumnosDescarga }} alumno(s). ¿Deseas continuar?')) { $event.preventDefault(); }"
+                                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-neutral-800">
+                                                        <flux:icon.photo class="h-5 w-5 text-sky-500" />
+                                                        Imagen JPG · 100%
+                                                    </a>
+                                                @else
+                                                    <div class="rounded-xl px-3 py-2.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                                        PNG/JPG no disponible: supera {{ $this->maxImagenesPorZip() }} imágenes.
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
 

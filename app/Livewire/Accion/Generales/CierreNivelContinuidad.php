@@ -39,6 +39,7 @@ class CierreNivelContinuidad extends Component
     public ?int $grupo_origen_id = null;
 
     public ?int $ciclo_destino_id = null;
+    public string $fecha_corte_continuidad = '';
     public ?int $nivel_destino_id = null;
     public ?int $grado_destino_id = null;
     public ?int $semestre_destino_id = null;
@@ -148,6 +149,7 @@ class CierreNivelContinuidad extends Component
             $this->resetValidation('ciclo_destino_id');
         }
 
+        $this->cargarFechaCorteContinuidad();
         $this->resolverGeneracionDestino();
         $this->cargarGruposDestino();
     }
@@ -496,7 +498,10 @@ class CierreNivelContinuidad extends Component
 
             if ($requiereDestino && !$this->ciclo_destino_id) {
                 $this->ciclo_destino_id = $this->ciclosDestinoPermitidos->first()?->id;
+                $this->cargarFechaCorteContinuidad();
                 $this->resolverGeneracionDestino();
+            } elseif ($requiereDestino) {
+                $this->cargarFechaCorteContinuidad();
             }
 
             $this->paso = 3;
@@ -506,6 +511,46 @@ class CierreNivelContinuidad extends Component
 
         if ($this->paso === 3) {
             $this->validarDestinos();
+
+            $requiereDestino = collect($this->alumnos)
+                ->where('procesable', true)
+                ->contains(fn (array $alumno): bool => in_array(
+                    $this->decisiones[$alumno['id']]['resultado'] ?? null,
+                    ['continuidad_interna', 'no_promovido'],
+                    true,
+                ));
+
+            if ($requiereDestino) {
+                $this->validate([
+                    'fecha_corte_continuidad' => ['required', 'date'],
+                ], [
+                    'fecha_corte_continuidad.required' => 'Captura manualmente la fecha de corte para corregir Continuará → No continuará.',
+                ]);
+
+                if (auth()->user()?->is_admin) {
+                    $service->guardarFechaCorteContinuidad(
+                        (int) $this->ciclo_destino_id,
+                        $this->fecha_corte_continuidad,
+                        (int) auth()->id(),
+                    );
+                } else {
+                    $cicloDestino = CicloEscolar::query()->find($this->ciclo_destino_id);
+                    $fechaConfigurada = $cicloDestino?->fecha_corte_continuidad?->toDateString();
+
+                    if (! $fechaConfigurada) {
+                        throw ValidationException::withMessages([
+                            'fecha_corte_continuidad' => 'La fecha de corte debe ser configurada previamente por un Administrador general.',
+                        ]);
+                    }
+
+                    if ($fechaConfigurada !== $this->fecha_corte_continuidad) {
+                        throw ValidationException::withMessages([
+                            'fecha_corte_continuidad' => 'Solo un Administrador general puede modificar la fecha de corte de continuidad.',
+                        ]);
+                    }
+                }
+            }
+
             $this->simulacion_cierre = [];
             $this->vista_previa = $this->construirVistaPrevia();
             $this->paso = 4;
@@ -948,6 +993,7 @@ class CierreNivelContinuidad extends Component
         $this->modo_proceso = (string) ($sugerido['modo'] ?? $this->modo_proceso);
         $this->tipo_proyeccion = (string) ($sugerido['tipo_proyeccion'] ?? '');
         $this->ciclo_destino_id = $sugerido['ciclo_destino_id'];
+        $this->cargarFechaCorteContinuidad();
         $this->nivel_destino_id = $sugerido['nivel_destino_id'];
         $this->grado_destino_id = $sugerido['grado_destino_id'];
         $this->semestre_destino_id = $sugerido['semestre_destino_id'];
@@ -962,6 +1008,17 @@ class CierreNivelContinuidad extends Component
             : collect();
         $this->cargarGeneracionesDestino();
         $this->cargarGruposDestino();
+    }
+
+    private function cargarFechaCorteContinuidad(): void
+    {
+        if (! $this->ciclo_destino_id) {
+            $this->fecha_corte_continuidad = '';
+            return;
+        }
+
+        $ciclo = CicloEscolar::query()->find($this->ciclo_destino_id);
+        $this->fecha_corte_continuidad = $ciclo?->fecha_corte_continuidad?->toDateString() ?? '';
     }
 
     private function resolverGeneracionDestino(): void
@@ -1189,6 +1246,7 @@ class CierreNivelContinuidad extends Component
         $this->confirmacion = '';
         $this->password_confirmacion = '';
         $this->fecha_efectiva = now()->toDateString();
+        $this->fecha_corte_continuidad = '';
         if ($volverPasoUno) {
             $this->paso = 1;
         }

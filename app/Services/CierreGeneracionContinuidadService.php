@@ -17,6 +17,7 @@ use App\Models\ProcesoCierreCicloDetalle;
 use App\Models\ProyeccionContinuidad;
 use App\Models\Semestre;
 use App\Models\SimulacionCierreCiclo;
+use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -61,21 +62,33 @@ class CierreGeneracionContinuidadService
     private const SIMULACION_VIGENCIA_MINUTOS = 30;
 
     /**
-     * Evidencia académica primaria que sí impide tratar el ciclo destino como
-     * "no iniciado". Los análisis de riesgo, alertas, integridad y seguimiento
-     * son datos derivados y no prueban por sí mismos que el alumno haya iniciado.
+     * Evidencia de calificación que impide declarar que el alumno no inició el
+     * ciclo destino. Estos registros no se eliminan ni se convierten en una
+     * corrección administrativa de continuidad.
      *
      * @var array<string, string>
      */
-    private const TABLAS_ACTIVIDAD_REAL_DESTINO = [
+    private const TABLAS_BLOQUEO_CALIFICACIONES_DESTINO = [
         'calificaciones' => 'calificaciones',
         'calificaciones_campos_formativos' => 'calificaciones de campos formativos',
+        'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
+        'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
+    ];
+
+    /**
+     * Registros que ameritan una advertencia, pero que por sí solos no prueban
+     * que exista una calificación capturada. Se conservan para auditoría.
+     *
+     * @var array<string, string>
+     */
+    private const TABLAS_ADVERTENCIA_DESTINO = [
         'ficha_descriptivas' => 'fichas descriptivas',
         'asistencias_finales_bachillerato' => 'asistencias finales de bachillerato',
         'decisiones_promocion_oficial' => 'decisiones oficiales de promoción',
         'lugares_preescolar' => 'lugares o reconocimientos de preescolar',
-        'bitacora_calificaciones' => 'movimientos en la bitácora de calificaciones',
-        'calificacion_correcciones' => 'solicitudes o correcciones de calificaciones',
+        'riesgo_academico_evaluaciones' => 'evaluaciones de riesgo académico',
+        'seguimiento_academico_casos' => 'casos de seguimiento académico',
+        'alertas_academicas' => 'alertas académicas',
     ];
 
     public function __construct(
@@ -99,6 +112,60 @@ class CierreGeneracionContinuidadService
             ->where('inicio_anio', (int) $origen->inicio_anio + 1)
             ->where('fin_anio', (int) $origen->fin_anio + 1)
             ->first();
+    }
+
+    /**
+     * Guarda la fecha de corte de continuidad de forma manual para un ciclo.
+     * Una fecha nula elimina la configuración; nunca se calcula una fecha por
+     * defecto ni se infiere a partir del año escolar.
+     */
+    public function guardarFechaCorteContinuidad(
+        int $cicloDestinoId,
+        ?string $fecha,
+        int $usuarioId
+    ): CicloEscolar {
+        if (! User::query()->whereKey($usuarioId)->where('is_admin', true)->exists()) {
+            throw ValidationException::withMessages([
+                'fecha_corte_continuidad' => 'Solo un Administrador general puede establecer o modificar la fecha de corte de continuidad.',
+            ]);
+        }
+
+        if (! Schema::hasColumn('ciclo_escolares', 'fecha_corte_continuidad')) {
+            throw ValidationException::withMessages([
+                'fecha_corte_continuidad' => 'La base de datos no tiene la configuración de fecha de corte. Ejecuta php artisan migrate.',
+            ]);
+        }
+
+        $fechaNormalizada = null;
+        if (filled($fecha)) {
+            try {
+                $fechaNormalizada = CarbonImmutable::parse((string) $fecha)->toDateString();
+            } catch (\Throwable) {
+                throw ValidationException::withMessages([
+                    'fecha_corte_continuidad' => 'La fecha de corte no es válida.',
+                ]);
+            }
+        }
+
+        $ciclo = CicloEscolar::query()->findOrFail($cicloDestinoId);
+        $anterior = $ciclo->fecha_corte_continuidad?->toDateString();
+
+        $ciclo->forceFill([
+            'fecha_corte_continuidad' => $fechaNormalizada,
+            'fecha_corte_continuidad_por' => $usuarioId,
+            'fecha_corte_continuidad_at' => now(),
+        ])->save();
+
+        app(SystemAuditService::class)->record('continuity_cutoff_updated', 'academico', [
+            'ciclo_escolar_id' => $ciclo->id,
+            'ciclo' => $ciclo->nombre,
+            'fecha_anterior' => $anterior,
+            'fecha_nueva' => $fechaNormalizada,
+            'usuario_id' => $usuarioId,
+            'origen' => 'configuracion_manual',
+        ]);
+
+        return $ciclo->fresh();
     }
 
     /**
@@ -1286,7 +1353,8 @@ class CierreGeneracionContinuidadService
         array $datos,
         string $motivo,
         string $fecha,
-        int $usuarioId
+        int $usuarioId,
+        bool $autorizarExcepcionCorte = false
     ): ProyeccionContinuidad {
         $motivo = trim($motivo);
 
@@ -1639,6 +1707,21 @@ class CierreGeneracionContinuidadService
                 'registrado_por' => $usuarioId,
             ]);
 
+            app(SystemAuditService::class)->record(
+                $esExcepcionCorte ? 'continuity_changed_to_no_continue_cutoff_exception' : 'continuity_changed_to_no_continue',
+                'academico',
+                [
+                    'proyeccion_id' => $proyeccion->id,
+                    'inscripcion_id' => $alumno->id,
+                    'inscripcion_ciclo_origen_id' => $origen->id,
+                    'inscripcion_ciclo_destino_id' => $destino->id,
+                    'ciclo_destino_id' => $destino->ciclo_escolar_id,
+                    'fecha_corte_continuidad' => $diagnostico['fecha_corte'] ?? null,
+                    'excepcion_fecha_corte' => $esExcepcionCorte,
+                    'usuario_id' => $usuarioId,
+                ]
+            );
+
             return $proyeccion->fresh([
                 'inscripcion',
                 'inscripcionCicloOrigen',
@@ -1797,6 +1880,161 @@ class CierreGeneracionContinuidadService
         return $sincronizadas;
     }
 
+    /**
+     * Recupera proyecciones antiguas que no existen en
+     * proyecciones_continuidad, pero cuyo historial destino sí fue creado por
+     * una promoción o continuidad. El historial académico no se modifica: solo
+     * se reconstruye la referencia administrativa necesaria para poder aplicar
+     * las mismas reglas de Continuará / No continuará.
+     */
+    public function sincronizarContinuidadesHistoricasSinProyeccion(
+        ?int $nivelOrigenId = null,
+        ?int $usuarioId = null
+    ): int {
+        if (! Schema::hasTable('proyecciones_continuidad')) {
+            return 0;
+        }
+
+        $destinos = InscripcionCiclo::query()
+            ->with([
+                'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
+                'cicloEscolar',
+                'nivel',
+                'grado',
+                'semestre',
+            ])
+            ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
+            ->whereIn('origen', ['promocion_o_continuidad', 'promocion_nivel', 'continuidad_confirmada'])
+            ->orderBy('id')
+            ->get();
+
+        $creadas = 0;
+
+        foreach ($destinos as $destino) {
+            // La tabla tiene una restricción única por alumno + ciclo + nivel.
+            // Respetar exactamente esa llave evita intentar reconstruir una
+            // segunda proyección si ya existe una antigua, aunque le falte el
+            // vínculo directo al historial destino.
+            $yaExiste = ProyeccionContinuidad::query()
+                ->where('inscripcion_id', $destino->inscripcion_id)
+                ->where('ciclo_destino_id', $destino->ciclo_escolar_id)
+                ->where('nivel_destino_id', $destino->nivel_id)
+                ->exists();
+
+            // Estos campos son obligatorios en proyecciones_continuidad. Un
+            // historial legado incompleto debe revisarse manualmente, no
+            // convertirse en una proyección inventando relaciones.
+            $destinoCompleto = filled($destino->ciclo_escolar_id)
+                && filled($destino->nivel_id)
+                && filled($destino->generacion_id)
+                && filled($destino->grado_id);
+
+            if ($yaExiste || ! $destinoCompleto || ! $destino->inscripcion || $destino->inscripcion->trashed()) {
+                continue;
+            }
+
+            $origen = InscripcionCiclo::query()
+                ->with(['cicloEscolar', 'nivel', 'grado', 'semestre'])
+                ->where('inscripcion_ciclo_destino_id', $destino->id)
+                ->where('inscripcion_id', $destino->inscripcion_id)
+                ->orderByDesc('id')
+                ->first();
+
+            if (! $origen && $destino->cicloEscolar) {
+                $inicioDestino = (int) $destino->cicloEscolar->inicio_anio;
+                $origen = InscripcionCiclo::query()
+                    ->with(['cicloEscolar', 'nivel', 'grado', 'semestre'])
+                    ->where('inscripcion_id', $destino->inscripcion_id)
+                    ->where('id', '!=', $destino->id)
+                    ->where('estado', InscripcionCiclo::ESTADO_CERRADO)
+                    ->whereIn('resultado_final', ['promovido', 'promovido_grado', 'promovido_nivel', 'egresado', 'no_promovido'])
+                    ->whereHas('cicloEscolar', fn ($query) => $query->where('inicio_anio', '<', $inicioDestino))
+                    ->get()
+                    ->sortByDesc(fn (InscripcionCiclo $historial): int => (int) ($historial->cicloEscolar?->inicio_anio ?? 0))
+                    ->first();
+            }
+
+            if (! $origen || ($nivelOrigenId && (int) $origen->nivel_id !== $nivelOrigenId)) {
+                continue;
+            }
+
+            $resultadoOrigen = (string) ($origen->resultado_final ?: ($origen->promovido ? 'promovido_grado' : 'promovido'));
+            if (! in_array($resultadoOrigen, ['promovido', 'promovido_grado', 'promovido_nivel', 'egresado', 'no_promovido'], true)) {
+                continue;
+            }
+
+            $tipoProyeccion = (int) $origen->nivel_id !== (int) $destino->nivel_id
+                ? 'siguiente_nivel'
+                : ($resultadoOrigen === 'no_promovido'
+                    ? 'repeticion'
+                    : 'siguiente_grado');
+
+            $actorHistorico = $origen->cerrado_por ?: null;
+            $fechaHistorica = $origen->cerrado_at?->toDateString()
+                ?: $destino->fecha_ingreso?->toDateString()
+                ?: $destino->created_at?->toDateString()
+                ?: now()->toDateString();
+
+            $proyeccion = ProyeccionContinuidad::query()->create([
+                'inscripcion_id' => $destino->inscripcion_id,
+                'inscripcion_ciclo_origen_id' => $origen->id,
+                'proceso_cierre_ciclo_id' => null,
+                'proceso_cierre_ciclo_detalle_id' => null,
+                'ciclo_destino_id' => $destino->ciclo_escolar_id,
+                'nivel_destino_id' => $destino->nivel_id,
+                'generacion_destino_id' => $destino->generacion_id,
+                'grado_destino_id' => $destino->grado_id,
+                'semestre_destino_id' => $destino->semestre_id,
+                'semestre_destino_clave' => (int) ($destino->semestre_id ?: 0),
+                'grupo_destino_id' => $destino->grupo_id,
+                'tipo_proyeccion' => $tipoProyeccion,
+                'resultado_origen' => $resultadoOrigen,
+                'estatus_pendiente' => $tipoProyeccion === 'siguiente_nivel' ? 'egresado' : 'pendiente_reinscripcion',
+                'matricula_sugerida' => $destino->matricula,
+                'estado' => 'confirmada',
+                'fecha_proyeccion' => $fechaHistorica,
+                'motivo' => 'Proyección histórica reconstruida a partir de un historial destino creado por promoción o continuidad.',
+                'proyectada_por' => $actorHistorico,
+                'snapshot_origen' => [
+                    'matricula' => $origen->matricula,
+                    'ciclo_escolar_id' => $origen->ciclo_escolar_id,
+                    'nivel_id' => $origen->nivel_id,
+                    'grado_id' => $origen->grado_id,
+                    'generacion_id' => $origen->generacion_id,
+                    'grupo_id' => $origen->grupo_id,
+                    'semestre_id' => $origen->semestre_id,
+                    'estatus' => $origen->estatus_actual_ciclo,
+                    'resultado_final' => $origen->resultado_final,
+                    'historico_reconstruido' => true,
+                ],
+                'confirmada_at' => $destino->created_at ?: now(),
+                'confirmada_por' => $actorHistorico,
+                'inscripcion_ciclo_destino_id' => $destino->id,
+                'snapshot_confirmacion' => [
+                    'continuidad_historica_reconstruida' => true,
+                    'origen_historial_id' => $origen->id,
+                    'destino_historial_id' => $destino->id,
+                    'destino_origen' => $destino->origen,
+                    'reconstruida_at' => now()->toIso8601String(),
+                    'reconstruida_por' => $usuarioId,
+                ],
+            ]);
+
+            app(SystemAuditService::class)->record('historical_continuity_projection_rebuilt', 'academico', [
+                'proyeccion_id' => $proyeccion->id,
+                'inscripcion_id' => $destino->inscripcion_id,
+                'inscripcion_ciclo_origen_id' => $origen->id,
+                'inscripcion_ciclo_destino_id' => $destino->id,
+                'ciclo_destino_id' => $destino->ciclo_escolar_id,
+                'usuario_id' => $usuarioId,
+            ]);
+
+            $creadas++;
+        }
+
+        return $creadas;
+    }
+
     public function diagnosticoRetiroProyeccion(int $proyeccionId): array
     {
         $proyeccion = ProyeccionContinuidad::query()
@@ -1832,7 +2070,8 @@ class CierreGeneracionContinuidadService
         int $proyeccionId,
         string $motivo,
         string $fecha,
-        int $usuarioId
+        int $usuarioId,
+        bool $autorizarExcepcionCorte = false
     ): ProyeccionContinuidad {
         $motivo = trim($motivo);
 
@@ -1858,7 +2097,7 @@ class CierreGeneracionContinuidadService
             ]);
         }
 
-        return DB::transaction(function () use ($proyeccionId, $motivo, $fecha, $usuarioId): ProyeccionContinuidad {
+        return DB::transaction(function () use ($proyeccionId, $motivo, $fecha, $usuarioId, $autorizarExcepcionCorte): ProyeccionContinuidad {
             $proyeccion = ProyeccionContinuidad::query()
                 ->with([
                     'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
@@ -1877,10 +2116,24 @@ class CierreGeneracionContinuidadService
                 ->findOrFail($proyeccionId);
 
             $diagnostico = $this->evaluarRetiroProyeccion($proyeccion);
-            if (! $diagnostico['puede_retirar']) {
+            if (! $diagnostico['puede_retirar_con_excepcion']) {
                 throw ValidationException::withMessages([
                     'retiro_proyeccion' => "No se puede retirar al alumno del ciclo destino:\n- "
                         .implode("\n- ", $diagnostico['bloqueos']),
+                ]);
+            }
+
+            $esExcepcionCorte = (bool) ($diagnostico['requiere_excepcion'] ?? false);
+            if ($esExcepcionCorte && ! $autorizarExcepcionCorte) {
+                throw ValidationException::withMessages([
+                    'retiro_proyeccion' => 'La fecha de corte de continuidad venció el '
+                        .($diagnostico['fecha_corte_texto'] ?? 'día configurado')
+                        .'. Confirma expresamente la excepción administrativa o registra una Baja/Traslado.',
+                ]);
+            }
+            if ($esExcepcionCorte && ! User::query()->whereKey($usuarioId)->where('is_admin', true)->exists()) {
+                throw ValidationException::withMessages([
+                    'retiro_proyeccion' => 'Solo un administrador puede autorizar una excepción posterior a la fecha de corte.',
                 ]);
             }
 
@@ -1966,13 +2219,16 @@ class CierreGeneracionContinuidadService
                 'revertida_at' => now(),
                 'revertida_por' => $usuarioId,
                 'fecha_reversion' => $fecha,
-                'tipo_reversion' => 'no_inicio_ciclo_destino',
+                'tipo_reversion' => $esExcepcionCorte ? 'no_inicio_excepcion_corte' : 'no_inicio_ciclo_destino',
                 'motivo_reversion' => $motivo,
                 'snapshot_reversion' => [
                     'alumno' => $this->snapshotAlumno($alumno),
                     'origen' => $this->snapshotHistorialParaFirma($origen->fresh()),
                     'destino' => $this->snapshotHistorialParaFirma($destino->fresh()),
                     'resultado' => 'El ciclo destino se conserva como anulado/no iniciado. El resultado del ciclo de origen no fue modificado.',
+                    'fecha_corte_continuidad' => $diagnostico['fecha_corte'] ?? null,
+                    'excepcion_fecha_corte' => $esExcepcionCorte,
+                    'advertencias_conservadas' => $diagnostico['advertencias'] ?? [],
                 ],
             ])->save();
 
@@ -1987,7 +2243,7 @@ class CierreGeneracionContinuidadService
                 'inscripcion_id' => $alumno->id,
                 'inscripcion_ciclo_id' => $destino->id,
                 'generacion_id' => $origen->generacion_id,
-                'tipo' => 'reversion_continuidad_confirmada',
+                'tipo' => $esExcepcionCorte ? 'reversion_continuidad_excepcion_corte' : 'reversion_continuidad_confirmada',
                 'motivo' => $motivo,
                 'datos_anteriores' => [
                     'alumno' => $antesAlumno,
@@ -2000,6 +2256,9 @@ class CierreGeneracionContinuidadService
                     'origen' => $this->snapshotHistorialParaFirma($origen->fresh()),
                     'destino' => $this->snapshotHistorialParaFirma($destino->fresh()),
                     'proyeccion' => 'revertida',
+                    'fecha_corte_continuidad' => $diagnostico['fecha_corte'] ?? null,
+                    'excepcion_fecha_corte' => $esExcepcionCorte,
+                    'advertencias' => $diagnostico['advertencias'] ?? [],
                 ],
                 'realizado_por' => $usuarioId,
                 'realizado_at' => now(),
@@ -2017,7 +2276,9 @@ class CierreGeneracionContinuidadService
                 'tipo' => 'retiro_ciclo_destino',
                 'fecha' => $fecha,
                 'motivo' => $motivo,
-                'observaciones' => 'Retiro individual de una continuidad ya confirmada. No se eliminó el historial y no se modificó el resultado académico del ciclo de origen.',
+                'observaciones' => $esExcepcionCorte
+                    ? 'Excepción administrativa posterior a la fecha de corte. El destino quedó como no iniciado; no se eliminó el historial ni se modificó el resultado académico del ciclo de origen.'
+                    : 'Retiro individual de una continuidad ya confirmada dentro del periodo de corrección. No se eliminó el historial y no se modificó el resultado académico del ciclo de origen.',
                 'estado_anterior' => $antesAlumno,
                 'estado_nuevo' => $this->snapshotAlumno($alumno),
                 'registrado_por' => $usuarioId,
@@ -2032,16 +2293,68 @@ class CierreGeneracionContinuidadService
         });
     }
 
+    public function diagnosticosRetiroProyecciones(array $ids): array
+    {
+        return collect($ids)
+            ->map(fn ($id): int => (int) $id)
+            ->filter()
+            ->unique()
+            ->mapWithKeys(fn (int $id): array => [$id => $this->diagnosticoRetiroProyeccion($id)])
+            ->all();
+    }
+
+    public function retirarProyeccionesConfirmadas(
+        array $ids,
+        string $motivo,
+        string $fecha,
+        int $usuarioId,
+        bool $autorizarExcepcionCorte = false
+    ): int {
+        $ids = collect($ids)->map(fn ($id): int => (int) $id)->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'seleccion_proyecciones' => 'Selecciona al menos un alumno marcado como Continuará.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($ids, $motivo, $fecha, $usuarioId, $autorizarExcepcionCorte): int {
+            $procesados = 0;
+
+            foreach ($ids as $id) {
+                $this->retirarProyeccionConfirmada(
+                    $id,
+                    $motivo,
+                    $fecha,
+                    $usuarioId,
+                    $autorizarExcepcionCorte,
+                );
+                $procesados++;
+            }
+
+            return $procesados;
+        });
+    }
+
     private function evaluarRetiroProyeccion(ProyeccionContinuidad $proyeccion): array
     {
         $proyeccion->loadMissing([
             'inscripcion' => fn ($relacion) => $relacion->withTrashed(),
             'inscripcionCicloOrigen.cicloEscolar',
+            'inscripcionCicloOrigen.nivel',
+            'inscripcionCicloOrigen.grado',
+            'inscripcionCicloOrigen.semestre',
+            'inscripcionCicloOrigen.grupo.asignacionGrupo',
             'inscripcionCicloDestino.cicloEscolar',
+            'inscripcionCicloDestino.nivel',
+            'inscripcionCicloDestino.grado',
+            'inscripcionCicloDestino.semestre',
+            'inscripcionCicloDestino.grupo.asignacionGrupo',
             'cicloDestino',
         ]);
 
         $bloqueos = collect();
+        $advertencias = collect();
         $actividad = collect();
         $alumno = $proyeccion->inscripcion;
         $origen = $proyeccion->inscripcionCicloOrigen;
@@ -2071,7 +2384,7 @@ class CierreGeneracionContinuidadService
                 $bloqueos->push('El alumno ya tiene otra ubicación académica vigente. Revisa su trayectoria antes de retirar la continuidad.');
             }
 
-            if ($destino->estado !== 'en_curso') {
+            if ($destino->estado !== InscripcionCiclo::ESTADO_EN_CURSO) {
                 $bloqueos->push('El ciclo destino ya fue cerrado, anulado o atendido mediante otro proceso.');
             }
 
@@ -2103,51 +2416,106 @@ class CierreGeneracionContinuidadService
         }
 
         if ($destino) {
-            foreach (self::TABLAS_ACTIVIDAD_REAL_DESTINO as $tabla => $etiqueta) {
-                if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
+            foreach (self::TABLAS_BLOQUEO_CALIFICACIONES_DESTINO as $tabla => $etiqueta) {
+                $cantidad = $this->contarRegistrosDestino($tabla, $destino);
+
+                if ($cantidad <= 0) {
                     continue;
                 }
 
-                $cantidad = (int) DB::table($tabla)
-                    ->where('inscripcion_ciclo_id', $destino->id)
-                    ->count();
+                $actividad->push([
+                    'tabla' => $tabla,
+                    'etiqueta' => $etiqueta,
+                    'cantidad' => $cantidad,
+                    'tipo' => 'bloqueo',
+                ]);
+                $bloqueos->push("Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino.");
+            }
 
-                if ($cantidad > 0) {
-                    $actividad->push([
-                        'tabla' => $tabla,
-                        'etiqueta' => $etiqueta,
-                        'cantidad' => $cantidad,
-                    ]);
-                    $bloqueos->push("Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino.");
+            foreach (self::TABLAS_ADVERTENCIA_DESTINO as $tabla => $etiqueta) {
+                $cantidad = $this->contarRegistrosDestino($tabla, $destino);
+
+                if ($cantidad <= 0) {
+                    continue;
                 }
+
+                $actividad->push([
+                    'tabla' => $tabla,
+                    'etiqueta' => $etiqueta,
+                    'cantidad' => $cantidad,
+                    'tipo' => 'advertencia',
+                ]);
+                $advertencias->push("Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino. Se conservarán como historial y no bloquean por sí solos la corrección de continuidad.");
             }
 
             if (Schema::hasTable('documentos_alumnos')
                 && Schema::hasColumn('documentos_alumnos', 'ciclo_escolar_id')) {
-                $documentosDestino = (int) DB::table('documentos_alumnos')
+                $documentosQuery = DB::table('documentos_alumnos')
                     ->where('inscripcion_id', $destino->inscripcion_id)
-                    ->where('ciclo_escolar_id', $destino->ciclo_escolar_id)
-                    ->whereNull('deleted_at')
-                    ->count();
+                    ->where('ciclo_escolar_id', $destino->ciclo_escolar_id);
+
+                if (Schema::hasColumn('documentos_alumnos', 'deleted_at')) {
+                    $documentosQuery->whereNull('deleted_at');
+                }
+
+                $documentosDestino = (int) $documentosQuery->count();
 
                 if ($documentosDestino > 0) {
                     $actividad->push([
                         'tabla' => 'documentos_alumnos',
                         'etiqueta' => 'documentos emitidos o asociados al ciclo destino',
                         'cantidad' => $documentosDestino,
+                        'tipo' => 'advertencia',
                     ]);
-                    $bloqueos->push("Tiene {$documentosDestino} documento(s) emitido(s) o asociado(s) al ciclo destino.");
+                    $advertencias->push("Tiene {$documentosDestino} documento(s) emitido(s) o asociado(s) al ciclo destino. Se conservarán para auditoría.");
+                }
+            }
+        }
+
+        $fechaCorte = null;
+        $requiereExcepcion = false;
+        $estadoCorte = 'sin_configurar';
+        $diasRestantes = null;
+
+        if ($destino && $destino->cicloEscolar) {
+            if (! Schema::hasColumn('ciclo_escolares', 'fecha_corte_continuidad')) {
+                $bloqueos->push('La base de datos no tiene la fecha de corte de continuidad. Ejecuta php artisan migrate antes de usar esta corrección.');
+            } elseif (! $destino->cicloEscolar->fecha_corte_continuidad) {
+                $bloqueos->push('El ciclo destino no tiene una fecha de corte manual configurada para correcciones de continuidad.');
+            } else {
+                $fechaCorte = CarbonImmutable::parse($destino->cicloEscolar->fecha_corte_continuidad)->startOfDay();
+                $hoy = CarbonImmutable::today();
+                $diasRestantes = $hoy->diffInDays($fechaCorte, false);
+
+                if ($hoy->isAfter($fechaCorte)) {
+                    $requiereExcepcion = true;
+                    $estadoCorte = 'vencido';
+                    $advertencias->push('La fecha de corte de continuidad ya venció. La corrección solo puede realizarse como excepción administrativa auditada; de lo contrario corresponde registrar Baja o Traslado.');
+                } elseif ($hoy->isSameDay($fechaCorte)) {
+                    $estadoCorte = 'hoy';
+                } else {
+                    $estadoCorte = 'abierto';
                 }
             }
         }
 
         $estatusFinal = $this->estatusFinalTrasRetiro($proyeccion);
+        $sinBloqueos = $bloqueos->isEmpty();
 
         return [
-            'puede_retirar' => $bloqueos->isEmpty(),
+            'puede_retirar' => $sinBloqueos && ! $requiereExcepcion,
+            'puede_retirar_normal' => $sinBloqueos && ! $requiereExcepcion,
+            'puede_retirar_con_excepcion' => $sinBloqueos,
+            'requiere_excepcion' => $requiereExcepcion,
             'bloqueos' => $bloqueos->unique()->values()->all(),
+            'advertencias' => $advertencias->unique()->values()->all(),
             'actividad' => $actividad->values()->all(),
             'estatus_final' => $estatusFinal,
+            'fecha_corte' => $fechaCorte?->toDateString(),
+            'fecha_corte_texto' => $fechaCorte?->format('d/m/Y'),
+            'estado_corte' => $estadoCorte,
+            'dias_restantes' => $diasRestantes,
+            'es_continuidad_historica' => (bool) data_get($proyeccion->snapshot_confirmacion, 'continuidad_historica_reconstruida', false),
             'alumno' => $alumno ? trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}") : 'Alumno',
             'origen' => $origen ? [
                 'ciclo' => $origen->cicloEscolar ? "{$origen->cicloEscolar->inicio_anio}-{$origen->cicloEscolar->fin_anio}" : 'Ciclo de origen',
@@ -2166,6 +2534,88 @@ class CierreGeneracionContinuidadService
                 'estado' => $destino->estado,
             ] : [],
         ];
+    }
+
+    /**
+     * Cuenta actividad asociada al historial destino. Algunas tablas modernas
+     * tienen inscripcion_ciclo_id; las históricas se vinculan por alumno +
+     * ciclo escolar. Se usa la referencia más precisa disponible.
+     */
+    /**
+     * Cuenta actividad asociada al historial destino. Algunas tablas modernas
+     * tienen inscripcion_ciclo_id; las históricas se vinculan por alumno +
+     * ciclo escolar. Se usa la referencia más precisa disponible y, cuando
+     * existe contexto legado, también se contempla para no ignorar registros
+     * cuyo inscripcion_ciclo_id haya quedado nulo.
+     */
+    private function contarRegistrosDestino(string $tabla, InscripcionCiclo $destino): int
+    {
+        if (! Schema::hasTable($tabla)) {
+            return 0;
+        }
+
+        $tieneHistorial = Schema::hasColumn($tabla, 'inscripcion_ciclo_id');
+        $tieneAlumno = Schema::hasColumn($tabla, 'inscripcion_id');
+        $tieneCiclo = Schema::hasColumn($tabla, 'ciclo_escolar_id');
+
+        if (! $tieneHistorial && (! $tieneAlumno || ! $tieneCiclo)) {
+            return 0;
+        }
+
+        $query = DB::table($tabla)->where(function ($sub) use ($tabla, $destino, $tieneHistorial, $tieneAlumno, $tieneCiclo): void {
+            if ($tieneHistorial) {
+                $sub->where('inscripcion_ciclo_id', $destino->id);
+            }
+
+            if ($tieneAlumno && $tieneCiclo) {
+                $metodo = $tieneHistorial ? 'orWhere' : 'where';
+                $sub->{$metodo}(function ($legado) use ($tabla, $destino): void {
+                    $legado->where('inscripcion_id', $destino->inscripcion_id)
+                        ->where('ciclo_escolar_id', $destino->ciclo_escolar_id);
+
+                    if (Schema::hasColumn($tabla, 'nivel_id') && $destino->nivel_id) {
+                        $legado->where('nivel_id', $destino->nivel_id);
+                    }
+                    if (Schema::hasColumn($tabla, 'grado_id') && $destino->grado_id) {
+                        $legado->where('grado_id', $destino->grado_id);
+                    }
+                    if (Schema::hasColumn($tabla, 'generacion_id') && $destino->generacion_id) {
+                        $legado->where('generacion_id', $destino->generacion_id);
+                    }
+                    if (Schema::hasColumn($tabla, 'semestre_id') && $destino->semestre_id) {
+                        $legado->where('semestre_id', $destino->semestre_id);
+                    }
+                });
+            }
+        });
+
+        // En la tabla principal una fila vacía no equivale a una calificación
+        // capturada. Solo bloquea cuando existe un valor académico real.
+        if ($tabla === 'calificaciones') {
+            $query->where(function ($calificacion): void {
+                $calificacion->whereNotNull('valor_numerico')
+                    ->orWhereNotNull('clave_especial')
+                    ->orWhere(function ($texto): void {
+                        $texto->whereNotNull('calificacion')
+                            ->whereRaw("TRIM(calificacion) <> ''");
+                    });
+            });
+        }
+
+        // Los campos formativos pueden contener sugerencias automáticas. Solo
+        // una calificación oficial/confirmada prueba que el ciclo ya inició.
+        if ($tabla === 'calificaciones_campos_formativos') {
+            $query->where(function ($campo): void {
+                if (Schema::hasColumn('calificaciones_campos_formativos', 'calificacion_oficial')) {
+                    $campo->whereNotNull('calificacion_oficial');
+                }
+                if (Schema::hasColumn('calificaciones_campos_formativos', 'confirmada')) {
+                    $campo->orWhere('confirmada', true);
+                }
+            });
+        }
+
+        return (int) $query->count();
     }
 
     private function desactivarEvaluacionesRiesgoDestino(InscripcionCiclo $destino): void

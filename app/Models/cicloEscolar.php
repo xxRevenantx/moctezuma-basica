@@ -17,11 +17,16 @@ class CicloEscolar extends Model
         'es_actual',
         'cerrado_at',
         'cerrado_por',
+        'fecha_corte_continuidad',
+        'fecha_corte_continuidad_por',
+        'fecha_corte_continuidad_at',
     ];
 
     protected $casts = [
         'es_actual' => 'boolean',
         'cerrado_at' => 'datetime',
+        'fecha_corte_continuidad' => 'date',
+        'fecha_corte_continuidad_at' => 'datetime',
     ];
 
 
@@ -93,6 +98,11 @@ class CicloEscolar extends Model
     public function usuarioQueCerro()
     {
         return $this->belongsTo(User::class, 'cerrado_por');
+    }
+
+    public function usuarioFechaCorteContinuidad()
+    {
+        return $this->belongsTo(User::class, 'fecha_corte_continuidad_por');
     }
 
     public function getNombreAttribute(): string

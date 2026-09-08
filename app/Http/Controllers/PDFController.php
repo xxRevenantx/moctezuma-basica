@@ -24,6 +24,7 @@ use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Services\HorarioRecesoService;
+use App\Services\CredencialCopiasService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
@@ -5599,7 +5600,11 @@ class PDFController extends Controller
                 'grupo.asignacionGrupo',
                 'semestre',
             ])
-            ->where('nivel_id', $nivel->id);
+            ->where('nivel_id', $nivel->id)
+            ->when(
+                $cicloEscolarId,
+                fn (Builder $q, int $cicloId) => $q->where('ciclo_escolar_id', $cicloId)
+            );
 
         if ($modoDescarga === 'nivel') {
             /*
@@ -5644,17 +5649,31 @@ class PDFController extends Controller
             $query->where('id', $request->alumno_id);
         }
 
-        if ($modoDescarga === 'seleccionados') {
+        if ($modoDescarga === 'seleccionados' || $request->filled('alumnos')) {
             $ids = collect(explode(',', (string) $request->alumnos))
                 ->map(fn($id) => (int) $id)
                 ->filter()
                 ->unique()
                 ->values();
 
-            $query->whereIn('id', $ids);
+            if ($ids->isEmpty()) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('id', $ids->all());
+            }
+        } elseif ($modoDescarga !== 'individual' && $request->filled('excluir_alumnos')) {
+            $idsExcluidos = collect(explode(',', (string) $request->excluir_alumnos))
+                ->map(fn($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($idsExcluidos->isNotEmpty()) {
+                $query->whereNotIn('id', $idsExcluidos->all());
+            }
         }
 
-        $alumnos = $query
+        $alumnosBase = $query
             ->orderBy('grado_id')
             ->orderBy('grupo_id')
             ->orderBy('apellido_paterno')
@@ -5662,7 +5681,7 @@ class PDFController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        if ($alumnos->isEmpty()) {
+        if ($alumnosBase->isEmpty()) {
             abort(404, 'No se encontraron alumnos para generar credenciales.');
         }
 
@@ -5694,9 +5713,13 @@ class PDFController extends Controller
 
         // La foto se resuelve una sola vez por alumno para evitar lecturas repetidas
         // del disco desde la vista PDF.
-        $fotosDataUri = $alumnos->mapWithKeys(
+        $fotosDataUri = $alumnosBase->mapWithKeys(
             fn (Inscripcion $alumno): array => [$alumno->id => $alumno->foto_data_uri]
         );
+
+        // Se expande la colección únicamente para el PDF, conservando cada alumno
+        // consecutivamente según la cantidad global o la excepción individual.
+        $alumnos = app(CredencialCopiasService::class)->expandir($alumnosBase, $request);
 
         $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';
 
