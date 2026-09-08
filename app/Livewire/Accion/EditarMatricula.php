@@ -1169,7 +1169,7 @@ class EditarMatricula extends Component
             'municipio' => ['nullable', 'string', 'max:150'],
             'estado_residencia' => ['nullable', 'string', 'max:150'],
             'ciudad_residencia' => ['nullable', 'string', 'max:150'],
-            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
 
@@ -1360,7 +1360,7 @@ class EditarMatricula extends Component
             $fotoPath = $alumno->foto_path;
 
             if ($this->foto) {
-                $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
+                $fotoPath = $imagenes->guardarFotografiaAlumno($this->foto);
                 $imagenes->eliminarRuta($alumno->foto_path);
             }
 

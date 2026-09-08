@@ -1860,7 +1860,7 @@ class CrearInscripcion extends Component
 
         try {
             if ($this->foto) {
-                $fotoPath = $imagenes->guardar($this->foto, 'inscripciones/fotos', 1200, false);
+                $fotoPath = $imagenes->guardarFotografiaAlumno($this->foto);
             }
 
             DB::transaction(function () use ($data, $fotoPath, $observacionesService, $matriculas, $gestionAcademica, $responsablesService, $historialCiclos) {

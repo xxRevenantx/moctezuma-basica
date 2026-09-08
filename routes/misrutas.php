@@ -2,6 +2,7 @@
 
 use App\Livewire\Academico\SeguimientoAcademico;
 use App\Livewire\Academico\AnaliticaInstitucional;
+use App\Livewire\Accion\GestorFotografias;
 use App\Livewire\Alumno\Expediente360;
 use App\Livewire\Calendario\CalendarioOperativo;
 
@@ -384,6 +385,10 @@ Route::get('/periodos', [PeriodosController::class, 'index'])->name('misrutas.pe
 //RUTA MATERIAS
 Route::get('/materias', [MateriaController::class, 'index'])->name('misrutas.materias');
 
+
+Route::get('/matricula/fotografias/{slug_nivel?}', GestorFotografias::class)
+    ->middleware('admin')
+    ->name('misrutas.matricula.fotografias');
 
 Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaController::class, 'editar'])
     ->name('misrutas.matricula.editar');

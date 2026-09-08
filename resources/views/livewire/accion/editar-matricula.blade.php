@@ -1132,7 +1132,7 @@
                             </div>
 
                             <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
-                                La nueva imagen reemplazará la fotografía actual al guardar los cambios.
+                                La nueva imagen reemplazará la fotografía actual al guardar los cambios. Se normalizará a 2.5 × 3 cm (295 × 354 px, proporción 5:6).
                             </p>
 
                             <div class="grid grid-cols-1 gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
@@ -1156,7 +1156,7 @@
                                         </div>
 
                                         <div
-                                            class="group relative h-52 w-52 overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900">
+                                            class="group relative h-[208px] w-[174px] overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900">
                                             <template x-if="preview">
                                                 <img :src="preview" alt="Vista previa de la fotografía"
                                                     class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">

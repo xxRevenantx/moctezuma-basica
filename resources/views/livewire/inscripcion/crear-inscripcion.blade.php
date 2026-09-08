@@ -1381,7 +1381,7 @@
                                       </div>
 
                                       <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
-                                          Sube una imagen clara y reciente en formato JPG, JPEG, PNG o WEBP.
+                                          Sube una imagen clara y reciente en formato JPG, JPEG, PNG o WEBP. Se guardará a 2.5 × 3 cm (295 × 354 px, proporción 5:6).
                                       </p>
 
                                       <div class="grid grid-cols-1 gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
@@ -1412,7 +1412,7 @@
 
                                                   {{-- Preview de la foto --}}
                                                   <div
-                                                      class="group relative h-52 w-52 overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900">
+                                                      class="group relative h-[208px] w-[174px] overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-900">
 
                                                       {{-- Vista previa inmediata con Alpine --}}
                                                       <template x-if="preview">

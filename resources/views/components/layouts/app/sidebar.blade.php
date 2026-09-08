@@ -44,6 +44,7 @@
             'misrutas.cierre-continuidad',
             'misrutas.archivo-escolar',
             'misrutas.alumnos.expediente-360',
+            'misrutas.matricula.fotografias',
             'misrutas.calendario',
         );
 
@@ -225,6 +226,15 @@
                         x-show="itemMatches($el)">
                         Alumnos
                     </flux:sidebar.item>
+
+                    @if ($isAdmin)
+                        <flux:sidebar.item icon="camera" :href="route('misrutas.matricula.fotografias')"
+                            :current="request()->routeIs('misrutas.matricula.fotografias')" wire:navigate data-sidebar-search-item
+                            data-sidebar-search="fotografías fotos alumnos matrícula carga masiva credenciales"
+                            x-show="itemMatches($el)">
+                            Fotografías de alumnos
+                        </flux:sidebar.item>
+                    @endif
 
                     <flux:sidebar.item icon="user-plus" :href="route('misrutas.inscripcion')"
                         :current="request()->routeIs('misrutas.inscripcion')" wire:navigate data-sidebar-search-item

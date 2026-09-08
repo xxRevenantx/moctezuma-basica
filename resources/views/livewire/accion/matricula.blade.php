@@ -257,6 +257,11 @@
 
                 <div class="flex flex-wrap gap-2">
                     <a wire:navigate
+                        href="{{ route('misrutas.matricula.fotografias', ['slug_nivel' => $slug_nivel]) }}"
+                        class="inline-flex items-center gap-2 rounded-xl bg-emerald-500/25 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 transition hover:bg-emerald-500/35">
+                        <flux:icon.camera class="h-4 w-4" /> Fotografías
+                    </a>
+                    <a wire:navigate
                         href="{{ route('submodulos.accion', ['slug_nivel' => $slug_nivel, 'accion' => 'alumnos-no-vigentes']) }}"
                         class="inline-flex items-center gap-2 rounded-xl bg-violet-500/25 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 transition hover:bg-violet-500/35">
                         <flux:icon.user-group class="h-4 w-4" /> No vigentes
