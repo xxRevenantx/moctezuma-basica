@@ -21,13 +21,13 @@
                             </h1>
 
                             <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-zinc-400">
-                                Consulta profesores, revisa sus materias, genera listas académicas y descarga
-                                credenciales institucionales.
+                                Consulta profesores, revisa sus materias, genera listas académicas, credenciales y
+                                documentos institucionales del personal.
                             </p>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center dark:border-zinc-800 dark:bg-zinc-950/60">
                             <p class="text-xs font-bold text-slate-500 dark:text-zinc-400">
@@ -57,13 +57,23 @@
                                 Credenciales
                             </p>
                         </div>
+
+                        <div
+                            class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center dark:border-zinc-800 dark:bg-zinc-950/60">
+                            <p class="text-xs font-bold text-slate-500 dark:text-zinc-400">
+                                Documentación
+                            </p>
+                            <p class="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                                Portadas y archivos
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
         {{-- Accesos rápidos --}}
-        <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <button type="button" x-on:click.prevent="cambiar('lista')"
                 x-bind:style="abierto === 'lista' ?
                     'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff;' : ''"
@@ -136,6 +146,45 @@
 
                     <span class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
                         x-bind:class="abierto === 'credenciales'
+                            ?
+                            'rotate-180 border-white/30 bg-white/20 text-white' :
+                            'border-slate-200 bg-slate-50 text-slate-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400'">
+                        <flux:icon.chevron-down class="h-5 w-5" />
+                    </span>
+                </div>
+            </button>
+
+            <button type="button" x-on:click.prevent="cambiar('documentos')"
+                x-bind:style="abierto === 'documentos' ?
+                    'background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: #ffffff;' : ''"
+                class="group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                x-bind:class="abierto === 'documentos'
+                    ?
+                    'border-cyan-500 bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/20 dark:border-cyan-400 dark:from-cyan-600 dark:to-cyan-700' :
+                    'border-cyan-200 bg-white hover:border-cyan-300 dark:border-cyan-900/40 dark:bg-zinc-900 dark:hover:border-cyan-800'">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl transition"
+                            x-bind:class="abierto === 'documentos'
+                                ?
+                                'bg-white/20 text-white ring-1 ring-white/30' :
+                                'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300'">
+                            <flux:icon.document-text class="h-5 w-5" />
+                        </div>
+
+                        <h2 class="mt-4 text-base font-black transition"
+                            x-bind:class="abierto === 'documentos' ? 'text-white' : 'text-slate-900 dark:text-white'">
+                            Documentos
+                        </h2>
+
+                        <p class="mt-1 text-sm transition"
+                            x-bind:class="abierto === 'documentos' ? 'text-cyan-50' : 'text-slate-500 dark:text-zinc-400'">
+                            Genera portadas y documentos personalizados del personal.
+                        </p>
+                    </div>
+
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                        x-bind:class="abierto === 'documentos'
                             ?
                             'rotate-180 border-white/30 bg-white/20 text-white' :
                             'border-slate-200 bg-slate-50 text-slate-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400'">
@@ -254,6 +303,38 @@
             </div>
 
 
+            {{-- Documentos de profesores --}}
+            <div x-cloak x-show="abierto === 'documentos'" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
+                class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <div
+                    class="border-b border-slate-200 bg-gradient-to-r from-cyan-50 via-white to-sky-50 px-5 py-4 dark:border-zinc-800 dark:from-cyan-950/20 dark:via-zinc-900 dark:to-sky-950/20">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-base font-black text-slate-900 dark:text-white">
+                                Documentos del personal
+                            </h2>
+
+                            <p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                                Administra portadas institucionales, selecciona profesores y genera documentos personalizados.
+                            </p>
+                        </div>
+
+                        <div
+                            class="inline-flex w-fit items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300">
+                            <span class="h-2 w-2 rounded-full bg-cyan-500"></span>
+                            Portadas y documentos
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 sm:p-5">
+                    <livewire:profesor.documentos-profesor wire:key="profesor-documentos" />
+                </div>
+            </div>
+
             {{-- Horario docente --}}
             <div x-cloak x-show="abierto === 'horario'" x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
@@ -292,7 +373,7 @@
     @script
         <script>
             Alpine.data('panelProfesoresPro', (seccionInicial = 'lista') => ({
-                abierto: ['lista', 'credenciales', 'horario'].includes(seccionInicial) ?
+                abierto: ['lista', 'credenciales', 'documentos', 'horario'].includes(seccionInicial) ?
                     seccionInicial : 'lista',
 
                 cambiar(seccion) {

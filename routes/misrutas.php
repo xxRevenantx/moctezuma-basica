@@ -65,6 +65,7 @@ use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\PersonaNivelReporteController;
 use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
+use App\Http\Controllers\ProfesorDocumentoController;
 use App\Http\Controllers\PromediosMateriasPdfController;
 use App\Http\Controllers\RespaldoAcademicoController;
 use App\Http\Controllers\ReanudacionesLaboralesController;
@@ -548,6 +549,9 @@ Route::get('/credenciales/profesores/imagen/{formato}', [CredencialImagenControl
 
 Route::get('/credenciales/profesores/preview', [CredencialImagenController::class, 'previewProfesores'])
     ->name('credenciales.profesores.preview');
+
+Route::get('/profesores/documentos/portadas/pdf', [ProfesorDocumentoController::class, 'portadasPdf'])
+    ->name('profesores.documentos.portadas.pdf');
 
 
 Route::get('/profesor/listas/asistencia/pdf', [ProfesorPdfController::class, 'asistencia'])
