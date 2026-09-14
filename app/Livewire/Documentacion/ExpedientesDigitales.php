@@ -7,9 +7,11 @@ use App\Models\CicloEscolar;
 use App\Models\DocumentoAlumno;
 use App\Models\DocumentoAlumnoFuente;
 use App\Models\DocumentoAlumnoNoAplica;
+use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\Semestre;
 use App\Models\TipoDocumento;
 use App\Services\ExpedienteDigitalService;
 use App\Services\Expedientes\OrganizadorExpedienteService;
@@ -33,7 +35,13 @@ class ExpedientesDigitales extends Component
 
     public string $buscar = '';
     public ?int $nivel_id = null;
+    public ?int $grado_id = null;
+    public ?int $generacion_id = null;
+    public ?int $semestre_id = null;
+    public ?int $grupo_id = null;
+    public ?int $ciclo_escolar_id = null;
     public string $estado_expediente = 'todos';
+    public string $orden = 'apellidos';
     public int $perPage = 20;
 
     public ?int $alumnoSeleccionadoId = null;
@@ -70,6 +78,8 @@ class ExpedientesDigitales extends Component
     public array $tiposDocumentos = [];
     public array $niveles = [];
     public array $grados = [];
+    public array $generaciones = [];
+    public array $semestres = [];
     public array $grupos = [];
     public array $ciclosEscolares = [];
 
@@ -114,9 +124,35 @@ class ExpedientesDigitales extends Component
                 'orden' => $grado->orden,
             ])->all();
 
+        $this->generaciones = Generacion::query()
+            ->select('id', 'nivel_id', 'anio_ingreso', 'anio_egreso', 'nombre', 'status')
+            ->orderByDesc('anio_ingreso')
+            ->orderByDesc('anio_egreso')
+            ->get()
+            ->map(fn(Generacion $generacion) => [
+                'id' => $generacion->id,
+                'nivel_id' => $generacion->nivel_id,
+                'nombre' => $generacion->nombre ?: ($generacion->anio_ingreso . '-' . $generacion->anio_egreso),
+                'anio_ingreso' => $generacion->anio_ingreso,
+                'anio_egreso' => $generacion->anio_egreso,
+                'status' => (bool) $generacion->status,
+            ])->all();
+
+        $this->semestres = Semestre::query()
+            ->select('id', 'grado_id', 'numero', 'orden_global')
+            ->orderBy('orden_global')
+            ->orderBy('numero')
+            ->get()
+            ->map(fn(Semestre $semestre) => [
+                'id' => $semestre->id,
+                'grado_id' => $semestre->grado_id,
+                'numero' => $semestre->numero,
+                'orden_global' => $semestre->orden_global,
+            ])->all();
+
         $this->grupos = Grupo::query()
             ->with('asignacionGrupo:id,nombre')
-            ->select('id', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'asignacion_grupo_id')
+            ->select('id', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'estado', 'asignacion_grupo_id')
             ->orderBy('nivel_id')
             ->orderBy('grado_id')
             ->get()
@@ -125,16 +161,21 @@ class ExpedientesDigitales extends Component
                 'ciclo_escolar_id' => $grupo->ciclo_escolar_id,
                 'nivel_id' => $grupo->nivel_id,
                 'grado_id' => $grupo->grado_id,
+                'generacion_id' => $grupo->generacion_id,
+                'semestre_id' => $grupo->semestre_id,
+                'estado' => $grupo->estado,
                 'nombre' => $grupo->asignacionGrupo?->nombre ?? 'Sin grupo',
             ])->all();
 
         $this->ciclosEscolares = CicloEscolar::query()
-            ->select('id', 'inicio_anio', 'fin_anio')
+            ->select('id', 'inicio_anio', 'fin_anio', 'es_actual')
+            ->orderByDesc('es_actual')
             ->orderByDesc('inicio_anio')
             ->get()
             ->map(fn(CicloEscolar $ciclo) => [
                 'id' => $ciclo->id,
                 'nombre' => $ciclo->inicio_anio . '-' . $ciclo->fin_anio,
+                'es_actual' => (bool) $ciclo->es_actual,
             ])->all();
 
         $this->fecha_documento = now()->format('Y-m-d');
@@ -152,10 +193,54 @@ class ExpedientesDigitales extends Component
     public function updatedNivelId($value): void
     {
         $this->nivel_id = $value ? (int) $value : null;
+        $this->grado_id = null;
+        $this->generacion_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedGradoId($value): void
+    {
+        $this->grado_id = $value ? (int) $value : null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedGeneracionId($value): void
+    {
+        $this->generacion_id = $value ? (int) $value : null;
+        $this->grupo_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedSemestreId($value): void
+    {
+        $this->semestre_id = $value ? (int) $value : null;
+        $this->grupo_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedGrupoId($value): void
+    {
+        $this->grupo_id = $value ? (int) $value : null;
+        $this->resetPage();
+    }
+
+    public function updatedCicloEscolarId($value): void
+    {
+        $this->ciclo_escolar_id = $value ? (int) $value : null;
+        $this->grupo_id = null;
         $this->resetPage();
     }
 
     public function updatedEstadoExpediente(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedOrden(): void
     {
         $this->resetPage();
     }
@@ -165,11 +250,26 @@ class ExpedientesDigitales extends Component
         $this->resetPage();
     }
 
+    public function seleccionarEstadoExpediente(string $estado): void
+    {
+        $permitidos = ['todos', 'activos', 'completos', 'incompletos', 'archivos_faltantes', 'egresados', 'bajas'];
+        abort_unless(in_array($estado, $permitidos, true), 422, 'Filtro de expediente no válido.');
+
+        $this->estado_expediente = $estado;
+        $this->resetPage();
+    }
+
     public function limpiarFiltros(): void
     {
         $this->buscar = '';
         $this->nivel_id = null;
+        $this->grado_id = null;
+        $this->generacion_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->ciclo_escolar_id = null;
         $this->estado_expediente = 'todos';
+        $this->orden = 'apellidos';
         $this->perPage = 20;
         $this->resetPage();
     }
@@ -190,17 +290,68 @@ class ExpedientesDigitales extends Component
             fn (array $nivel): bool => (int) $nivel['id'] === $nivelId
         );
 
+        $gradoId = $this->enteroOpcional($estado['grado_id'] ?? null);
+        $generacionId = $this->enteroOpcional($estado['generacion_id'] ?? null);
+        $semestreId = $this->enteroOpcional($estado['semestre_id'] ?? null);
+        $grupoId = $this->enteroOpcional($estado['grupo_id'] ?? null);
+        $cicloEscolarId = $this->enteroOpcional($estado['ciclo_escolar_id'] ?? null);
+
+        $gradoValido = $gradoId && collect($this->grados)->contains(
+            fn (array $grado): bool => (int) $grado['id'] === $gradoId
+                && (!$nivelValido || (int) $grado['nivel_id'] === $nivelId)
+        );
+        $generacionValida = $generacionId && collect($this->generaciones)->contains(
+            fn (array $generacion): bool => (int) $generacion['id'] === $generacionId
+                && (!$nivelValido || (int) $generacion['nivel_id'] === $nivelId)
+        );
+        $semestreValido = $semestreId && collect($this->semestres)->contains(
+            fn (array $semestre): bool => (int) $semestre['id'] === $semestreId
+                && (!$gradoValido || (int) $semestre['grado_id'] === $gradoId)
+        );
+        $cicloEscolarValido = $cicloEscolarId && collect($this->ciclosEscolares)->contains(
+            fn (array $ciclo): bool => (int) $ciclo['id'] === $cicloEscolarId
+        );
+        $grupoValido = $grupoId && collect($this->grupos)->contains(function (array $grupo) use (
+            $grupoId,
+            $nivelValido,
+            $nivelId,
+            $gradoValido,
+            $gradoId,
+            $generacionValida,
+            $generacionId,
+            $semestreValido,
+            $semestreId,
+            $cicloEscolarValido,
+            $cicloEscolarId
+        ): bool {
+            return (int) $grupo['id'] === $grupoId
+                && (!$nivelValido || (int) $grupo['nivel_id'] === $nivelId)
+                && (!$gradoValido || (int) $grupo['grado_id'] === $gradoId)
+                && (!$generacionValida || (int) $grupo['generacion_id'] === $generacionId)
+                && (!$semestreValido || (int) ($grupo['semestre_id'] ?? 0) === $semestreId)
+                && (!$cicloEscolarValido || (int) ($grupo['ciclo_escolar_id'] ?? 0) === $cicloEscolarId);
+        });
+
         $estadoExpediente = (string) ($estado['estado_expediente'] ?? 'todos');
+        $orden = (string) ($estado['orden'] ?? 'apellidos');
         $porPagina = (int) ($estado['perPage'] ?? 20);
 
         $this->buscar = Str::limit(trim((string) ($estado['buscar'] ?? '')), 120, '');
         $this->nivel_id = $nivelValido ? $nivelId : null;
+        $this->grado_id = $gradoValido ? $gradoId : null;
+        $this->generacion_id = $generacionValida ? $generacionId : null;
+        $this->semestre_id = $semestreValido ? $semestreId : null;
+        $this->ciclo_escolar_id = $cicloEscolarValido ? $cicloEscolarId : null;
+        $this->grupo_id = $grupoValido ? $grupoId : null;
         $this->estado_expediente = in_array(
             $estadoExpediente,
-            ['todos', 'completos', 'incompletos', 'egresados', 'bajas'],
+            ['todos', 'activos', 'completos', 'incompletos', 'archivos_faltantes', 'egresados', 'bajas'],
             true
         ) ? $estadoExpediente : 'todos';
-        $this->perPage = in_array($porPagina, [10, 20, 50], true) ? $porPagina : 20;
+        $this->orden = in_array($orden, ['apellidos', 'ultimos_inscritos', 'matricula', 'ubicacion'], true)
+            ? $orden
+            : 'apellidos';
+        $this->perPage = in_array($porPagina, [10, 20, 50, 100], true) ? $porPagina : 20;
 
         $alumnoId = filter_var($estado['alumnoSeleccionadoId'] ?? null, FILTER_VALIDATE_INT) !== false
             ? (int) $estado['alumnoSeleccionadoId']
@@ -214,6 +365,13 @@ class ExpedientesDigitales extends Component
         $pagina = max(1, min((int) ($estado['page'] ?? 1), 10000));
         $this->setPage($pagina);
         $this->cerrarCarga();
+    }
+
+    private function enteroOpcional(mixed $valor): ?int
+    {
+        $validado = filter_var($valor, FILTER_VALIDATE_INT);
+
+        return $validado !== false && (int) $validado > 0 ? (int) $validado : null;
     }
 
     public function limpiarVistaGuardada(): void
@@ -774,7 +932,7 @@ class ExpedientesDigitales extends Component
 
     private function consultaAlumnos(): Builder
     {
-        return Inscripcion::withTrashed()
+        $consulta = Inscripcion::withTrashed()
             ->select([
                 'id',
                 'matricula',
@@ -804,6 +962,9 @@ class ExpedientesDigitales extends Component
             ->with([
                 'nivel:id,nombre,slug,color',
                 'grado:id,nombre,orden',
+                'generacion:id,nivel_id,anio_ingreso,anio_egreso,nombre',
+                'semestre:id,grado_id,numero',
+                'cicloEscolar:id,inicio_anio,fin_anio,es_actual',
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'tutor:id,nombre,apellido_paterno,apellido_materno,parentesco',
@@ -829,6 +990,11 @@ class ExpedientesDigitales extends Component
                     'documentos.organizacion:id,fuentes_ids',
             ])
             ->when($this->nivel_id, fn(Builder $query) => $query->where('nivel_id', $this->nivel_id))
+            ->when($this->grado_id, fn(Builder $query) => $query->where('grado_id', $this->grado_id))
+            ->when($this->generacion_id, fn(Builder $query) => $query->where('generacion_id', $this->generacion_id))
+            ->when($this->semestre_id, fn(Builder $query) => $query->where('semestre_id', $this->semestre_id))
+            ->when($this->grupo_id, fn(Builder $query) => $query->where('grupo_id', $this->grupo_id))
+            ->when($this->ciclo_escolar_id, fn(Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when(trim($this->buscar) !== '', function (Builder $query) {
                 $buscar = '%' . trim($this->buscar) . '%';
 
@@ -842,15 +1008,43 @@ class ExpedientesDigitales extends Component
                         ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", [$buscar])
                         ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", [$buscar]);
                 });
-            })
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre');
+            });
+
+        return $this->aplicarOrdenConsulta($consulta);
+    }
+
+    private function aplicarOrdenConsulta(Builder $consulta): Builder
+    {
+        return match ($this->orden) {
+            'ultimos_inscritos' => $consulta
+                ->orderByRaw('fecha_inscripcion IS NULL')
+                ->orderByDesc('fecha_inscripcion')
+                ->orderByDesc('id'),
+            'matricula' => $consulta
+                ->orderBy('matricula')
+                ->orderBy('apellido_paterno')
+                ->orderBy('apellido_materno')
+                ->orderBy('nombre'),
+            'ubicacion' => $consulta
+                ->orderBy('nivel_id')
+                ->orderBy('grado_id')
+                ->orderBy('grupo_id')
+                ->orderBy('apellido_paterno')
+                ->orderBy('apellido_materno')
+                ->orderBy('nombre'),
+            default => $consulta
+                ->orderBy('apellido_paterno')
+                ->orderBy('apellido_materno')
+                ->orderBy('nombre'),
+        };
     }
 
     private function aplicarFiltroEstado(Collection $alumnos): Collection
     {
         return match ($this->estado_expediente) {
+            'activos' => $alumnos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+            ),
             'completos' => $alumnos->filter(
                 fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
                     && $alumno->resumen_documental['completo']
@@ -858,6 +1052,9 @@ class ExpedientesDigitales extends Component
             'incompletos' => $alumnos->filter(
                 fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
                     && ! $alumno->resumen_documental['completo']
+            ),
+            'archivos_faltantes' => $alumnos->filter(
+                fn (Inscripcion $alumno) => (int) ($alumno->resumen_documental['archivos_faltantes'] ?? 0) > 0
             ),
             'egresados' => $alumnos->filter(
                 fn (Inscripcion $alumno) => ! $alumno->trashed() && $alumno->esEgresado()
@@ -985,6 +1182,52 @@ class ExpedientesDigitales extends Component
 
         $servicio = app(ExpedienteDigitalService::class);
 
+        $gradosFiltro = collect($this->grados)
+            ->when($this->nivel_id, fn (Collection $items) => $items->where('nivel_id', $this->nivel_id))
+            ->sortBy('orden')
+            ->values();
+
+        $generacionesFiltro = collect($this->generaciones)
+            ->when($this->nivel_id, fn (Collection $items) => $items->where('nivel_id', $this->nivel_id))
+            ->sortByDesc('anio_ingreso')
+            ->values();
+
+        $semestresFiltro = collect($this->semestres)
+            ->when($this->grado_id, fn (Collection $items) => $items->where('grado_id', $this->grado_id))
+            ->sortBy('orden_global')
+            ->values();
+
+        $gruposFiltro = collect($this->grupos)
+            ->when($this->nivel_id, fn (Collection $items) => $items->where('nivel_id', $this->nivel_id))
+            ->when($this->grado_id, fn (Collection $items) => $items->where('grado_id', $this->grado_id))
+            ->when($this->generacion_id, fn (Collection $items) => $items->where('generacion_id', $this->generacion_id))
+            ->when($this->semestre_id, fn (Collection $items) => $items->where('semestre_id', $this->semestre_id))
+            ->when($this->ciclo_escolar_id, fn (Collection $items) => $items->where('ciclo_escolar_id', $this->ciclo_escolar_id))
+            ->filter(fn (array $grupo): bool => ($grupo['estado'] ?? 'activo') !== 'archivado')
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $nivelFiltroSeleccionado = collect($this->niveles)->first(
+            fn (array $nivel): bool => (int) $nivel['id'] === (int) $this->nivel_id
+        );
+        $esBachilleratoFiltro = $nivelFiltroSeleccionado
+            && Str::contains(
+                Str::lower(($nivelFiltroSeleccionado['slug'] ?? '') . ' ' . ($nivelFiltroSeleccionado['nombre'] ?? '')),
+                'bachillerato'
+            );
+
+        $filtrosActivos = collect([
+            trim($this->buscar) !== '' ? 'buscar' : null,
+            $this->nivel_id ? 'nivel' : null,
+            $this->grado_id ? 'grado' : null,
+            $this->generacion_id ? 'generacion' : null,
+            $this->semestre_id ? 'semestre' : null,
+            $this->grupo_id ? 'grupo' : null,
+            $this->ciclo_escolar_id ? 'ciclo' : null,
+            $this->estado_expediente !== 'todos' ? 'estado' : null,
+            $this->orden !== 'apellidos' ? 'orden' : null,
+        ])->filter()->count();
+
         $todos = $this->consultaAlumnos()
             ->get()
             ->map(function (Inscripcion $alumno) use ($servicio) {
@@ -995,6 +1238,9 @@ class ExpedientesDigitales extends Component
 
         $metricas = [
             'total' => $todos->count(),
+            'vigentes' => $todos->filter(
+                fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
+            )->count(),
             'completos' => $todos->filter(
                 fn (Inscripcion $alumno) => $this->esAlumnoVigente($alumno)
                     && $alumno->resumen_documental['completo']
@@ -1124,6 +1370,12 @@ class ExpedientesDigitales extends Component
         return view('livewire.documentacion.expedientes-digitales', [
             'alumnos' => $alumnos,
             'metricas' => $metricas,
+            'gradosFiltro' => $gradosFiltro,
+            'generacionesFiltro' => $generacionesFiltro,
+            'semestresFiltro' => $semestresFiltro,
+            'gruposFiltro' => $gruposFiltro,
+            'filtrosActivos' => $filtrosActivos,
+            'esBachilleratoFiltro' => $esBachilleratoFiltro,
             'alumnoSeleccionado' => $alumnoSeleccionado,
             'resumenSeleccionado' => $resumenSeleccionado,
             'documentosSeleccionados' => $documentosSeleccionados,

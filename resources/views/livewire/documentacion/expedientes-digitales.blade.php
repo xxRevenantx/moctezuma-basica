@@ -24,6 +24,13 @@
             'cancelada' =>
                 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50',
         ];
+
+        $nivelFiltroActual = collect($niveles)->first(fn ($item) => (int) $item['id'] === (int) $nivel_id);
+        $gradoFiltroActual = collect($grados)->first(fn ($item) => (int) $item['id'] === (int) $grado_id);
+        $generacionFiltroActual = collect($generaciones)->first(fn ($item) => (int) $item['id'] === (int) $generacion_id);
+        $semestreFiltroActual = collect($semestres)->first(fn ($item) => (int) $item['id'] === (int) $semestre_id);
+        $grupoFiltroActual = collect($grupos)->first(fn ($item) => (int) $item['id'] === (int) $grupo_id);
+        $cicloFiltroActual = collect($ciclosEscolares)->first(fn ($item) => (int) $item['id'] === (int) $ciclo_escolar_id);
     @endphp
 
     <style>
@@ -50,125 +57,276 @@
     <section
         class="relative overflow-hidden rounded-[30px] border border-slate-200/80 bg-gradient-to-br from-slate-950 via-indigo-950 to-sky-900 p-6 text-white shadow-2xl shadow-indigo-950/20 sm:p-8">
         <div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl"></div>
-        <div class="pointer-events-none absolute -bottom-28 left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl">
-        </div>
+        <div class="pointer-events-none absolute -bottom-28 left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
 
         <div class="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div class="max-w-3xl">
-                <div
-                    class="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-sky-100 backdrop-blur">
+                <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-sky-100 backdrop-blur">
                     <flux:icon name="shield-check" class="size-4" />
                     Acceso autorizado para administración y control escolar
                 </div>
 
                 <h1 class="text-3xl font-black tracking-tight sm:text-4xl">Expedientes digitales</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
-                    Conserva el historial documental del alumno durante preescolar, primaria, secundaria y
-                    bachillerato. Cada reemplazo genera una nueva versión sin eliminar la anterior.
+                    Consulta, filtra y administra el historial documental del alumno desde preescolar hasta bachillerato.
+                    Los reemplazos conservan versiones anteriores para mantener trazabilidad.
                 </p>
+
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <flux:badge rounded color="blue" icon="funnel">{{ $filtrosActivos }} filtro(s) activo(s)</flux:badge>
+                    @if ($cicloFiltroActual)
+                        <flux:badge rounded color="indigo" icon="calendar-days">{{ $cicloFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                    @if ($nivelFiltroActual)
+                        <flux:badge rounded color="cyan" icon="academic-cap">{{ $nivelFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:min-w-[650px] xl:grid-cols-5">
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                    <p class="text-xs font-semibold text-slate-300">Alumnos</p>
-                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['total']) }}</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                    <p class="text-xs font-semibold text-emerald-200">Completos</p>
-                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['completos']) }}</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                    <p class="text-xs font-semibold text-amber-200">Incompletos</p>
-                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['incompletos']) }}</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                    <p class="text-xs font-semibold text-violet-200">Egresados</p>
-                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['egresados']) }}</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                    <p class="text-xs font-semibold text-rose-200">Bajas</p>
-                    <p class="mt-1 text-2xl font-black">{{ number_format($metricas['bajas']) }}</p>
-                </div>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:min-w-[760px] xl:grid-cols-6">
+                @php
+                    $metricCards = [
+                        ['key' => 'todos', 'label' => 'Alumnos', 'value' => $metricas['total'], 'tone' => 'text-slate-200'],
+                        ['key' => 'activos', 'label' => 'Vigentes', 'value' => $metricas['vigentes'], 'tone' => 'text-cyan-200'],
+                        ['key' => 'completos', 'label' => 'Completos', 'value' => $metricas['completos'], 'tone' => 'text-emerald-200'],
+                        ['key' => 'incompletos', 'label' => 'Incompletos', 'value' => $metricas['incompletos'], 'tone' => 'text-amber-200'],
+                        ['key' => 'egresados', 'label' => 'Egresados', 'value' => $metricas['egresados'], 'tone' => 'text-violet-200'],
+                        ['key' => 'bajas', 'label' => 'Bajas', 'value' => $metricas['bajas'], 'tone' => 'text-rose-200'],
+                    ];
+                @endphp
+
+                @foreach ($metricCards as $card)
+                    <button type="button" wire:click="seleccionarEstadoExpediente('{{ $card['key'] }}')"
+                        class="rounded-2xl border p-4 text-left backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/15 hover:shadow-lg {{ $estado_expediente === $card['key'] ? 'border-white/40 bg-white/20 ring-2 ring-white/10' : 'border-white/10 bg-white/10' }}">
+                        <p class="text-xs font-semibold {{ $card['tone'] }}">{{ $card['label'] }}</p>
+                        <p class="mt-1 text-2xl font-black">{{ number_format($card['value']) }}</p>
+                    </button>
+                @endforeach
             </div>
         </div>
     </section>
 
     <section
-        class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div class="lg:col-span-5">
-                <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Buscar alumno
-                </label>
-                <div class="relative">
-                    <flux:icon name="magnifying-glass"
-                        class="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
-                    <input wire:model.live.debounce.350ms="buscar" type="search"
-                        placeholder="Nombre, matrícula, CURP o folio..."
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-indigo-950/40">
+        class="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950/40 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        <flux:icon name="adjustments-horizontal" class="size-4" />
+                    </span>
+                    <div>
+                        <h2 class="font-black text-slate-900 dark:text-white">Filtros del expediente</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Combina ubicación académica, ciclo y estado documental.</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="lg:col-span-3">
-                <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Nivel actual
-                </label>
-                <select wire:model.live="nivel_id"
-                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-indigo-950/40">
-                    <option value="">Todos los niveles</option>
-                    @foreach ($niveles as $nivel)
-                        <option value="{{ $nivel['id'] }}">{{ $nivel['nombre'] }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="lg:col-span-2">
-                <label class="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Expediente
-                </label>
-                <select wire:model.live="estado_expediente"
-                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-indigo-950/40">
-                    <option value="todos">Todos</option>
-                    <option value="completos">Completos</option>
-                    <option value="incompletos">Incompletos</option>
-                    <option value="egresados">Egresados</option>
-                    <option value="bajas">Bajas, traslados y archivados</option>
-                </select>
-            </div>
-
-            <div class="flex items-end gap-2 lg:col-span-2">
-                <select wire:model.live="perPage"
-                    class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                </select>
-
-                <button type="button" wire:click="limpiarFiltros"
-                    class="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-indigo-950/30"
-                    title="Limpiar filtros">
-                    <flux:icon name="arrow-path" class="size-4" />
-                </button>
+            <div class="flex flex-wrap items-center gap-2">
+                @if ($filtrosActivos > 0)
+                    <flux:badge color="indigo" rounded>{{ $filtrosActivos }} activos</flux:badge>
+                @endif
+                <flux:button type="button" wire:click="limpiarFiltros" variant="ghost" size="sm" icon="arrow-path">
+                    Limpiar filtros
+                </flux:button>
             </div>
         </div>
 
-        <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 dark:border-neutral-800 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <flux:icon name="circle-stack" class="size-4" />
-                <span x-text="restoringView ? 'Restaurando la vista guardada…' : (hasStoredView ? 'Filtros, página y expediente guardados durante 7 días en este navegador.' : 'La vista se guardará al modificar filtros o abrir un expediente.')"></span>
+        <div class="p-5 sm:p-6">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
+                <div class="xl:col-span-4">
+                    <flux:field>
+                        <flux:label>Buscar alumno</flux:label>
+                        <flux:input wire:model.live.debounce.350ms="buscar" type="search" icon="magnifying-glass" clearable
+                            placeholder="Nombre, apellidos, matrícula, CURP o folio..." />
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Ciclo escolar</flux:label>
+                        <flux:select wire:model.live="ciclo_escolar_id">
+                            <flux:select.option value="">Todos los ciclos</flux:select.option>
+                            @foreach ($ciclosEscolares as $ciclo)
+                                <flux:select.option value="{{ $ciclo['id'] }}">
+                                    {{ $ciclo['nombre'] }}{{ $ciclo['es_actual'] ? ' · actual' : '' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Estado del expediente</flux:label>
+                        <flux:select wire:model.live="estado_expediente">
+                            <flux:select.option value="todos">Todos</flux:select.option>
+                            <flux:select.option value="activos">Alumnos vigentes</flux:select.option>
+                            <flux:select.option value="completos">Completos</flux:select.option>
+                            <flux:select.option value="incompletos">Incompletos</flux:select.option>
+                            <flux:select.option value="archivos_faltantes">Con archivos físicos faltantes</flux:select.option>
+                            <flux:select.option value="egresados">Egresados</flux:select.option>
+                            <flux:select.option value="bajas">Bajas, traslados y archivados</flux:select.option>
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Ordenar por</flux:label>
+                        <flux:select wire:model.live="orden">
+                            <flux:select.option value="apellidos">Apellidos</flux:select.option>
+                            <flux:select.option value="ultimos_inscritos">Últimos inscritos</flux:select.option>
+                            <flux:select.option value="matricula">Matrícula</flux:select.option>
+                            <flux:select.option value="ubicacion">Nivel, grado y grupo</flux:select.option>
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Resultados por página</flux:label>
+                        <flux:select wire:model.live="perPage">
+                            <flux:select.option value="10">10 alumnos</flux:select.option>
+                            <flux:select.option value="20">20 alumnos</flux:select.option>
+                            <flux:select.option value="50">50 alumnos</flux:select.option>
+                            <flux:select.option value="100">100 alumnos</flux:select.option>
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Nivel</flux:label>
+                        <flux:select wire:model.live="nivel_id">
+                            <flux:select.option value="">Todos los niveles</flux:select.option>
+                            @foreach ($niveles as $nivel)
+                                <flux:select.option value="{{ $nivel['id'] }}">{{ $nivel['nombre'] }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Grado</flux:label>
+                        <flux:select wire:model.live="grado_id" :disabled="!$nivel_id">
+                            <flux:select.option value="">
+                                {{ $nivel_id ? 'Todos los grados' : 'Selecciona un nivel' }}
+                            </flux:select.option>
+                            @foreach ($gradosFiltro as $grado)
+                                <flux:select.option value="{{ $grado['id'] }}">{{ $grado['nombre'] }}°</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                <div class="xl:col-span-2">
+                    <flux:field>
+                        <flux:label>Generación</flux:label>
+                        <flux:select wire:model.live="generacion_id" :disabled="!$nivel_id">
+                            <flux:select.option value="">
+                                {{ $nivel_id ? 'Todas las generaciones' : 'Selecciona un nivel' }}
+                            </flux:select.option>
+                            @foreach ($generacionesFiltro as $generacion)
+                                <flux:select.option value="{{ $generacion['id'] }}">
+                                    {{ $generacion['nombre'] }}{{ $generacion['status'] ? '' : ' · histórica' }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+                </div>
+
+                @if ($esBachilleratoFiltro)
+                    <div class="xl:col-span-2">
+                        <flux:field>
+                            <flux:label>Semestre</flux:label>
+                            <flux:select wire:model.live="semestre_id" :disabled="!$grado_id">
+                                <flux:select.option value="">
+                                    {{ $grado_id ? 'Todos los semestres' : 'Selecciona un grado' }}
+                                </flux:select.option>
+                                @foreach ($semestresFiltro as $semestre)
+                                    <flux:select.option value="{{ $semestre['id'] }}">{{ $semestre['numero'] }}° semestre</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </flux:field>
+                    </div>
+                @endif
+
+                <div class="{{ $esBachilleratoFiltro ? 'xl:col-span-4' : 'xl:col-span-6' }}">
+                    <flux:field>
+                        <flux:label>Grupo</flux:label>
+                        <flux:select wire:model.live="grupo_id" :disabled="!$nivel_id || !$grado_id">
+                            <flux:select.option value="">
+                                {{ $nivel_id && $grado_id ? 'Todos los grupos compatibles' : 'Selecciona nivel y grado' }}
+                            </flux:select.option>
+                            @foreach ($gruposFiltro as $grupo)
+                                @php
+                                    $cicloGrupo = collect($ciclosEscolares)->first(fn ($item) => (int) $item['id'] === (int) ($grupo['ciclo_escolar_id'] ?? 0));
+                                    $generacionGrupo = collect($generaciones)->first(fn ($item) => (int) $item['id'] === (int) ($grupo['generacion_id'] ?? 0));
+                                @endphp
+                                <flux:select.option value="{{ $grupo['id'] }}">
+                                    Grupo {{ $grupo['nombre'] }}
+                                    @if (!$ciclo_escolar_id && $cicloGrupo)
+                                        · {{ $cicloGrupo['nombre'] }}
+                                    @endif
+                                    @if (!$generacion_id && $generacionGrupo)
+                                        · {{ $generacionGrupo['nombre'] }}
+                                    @endif
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </flux:field>
+                </div>
             </div>
 
-            <div class="flex flex-wrap gap-2">
-                <button type="button" @click="restoreStoredView(false)" :disabled="restoringView || !hasStoredView"
-                    class="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-black text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-300">
-                    <flux:icon name="arrow-path" class="size-4" />
-                    Restablecer vista guardada
-                </button>
-                <button type="button" @click="clearStoredView()" :disabled="restoringView"
-                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:border-rose-200 hover:text-rose-600 disabled:opacity-45 dark:border-neutral-700 dark:bg-neutral-800 dark:text-slate-300">
-                    <flux:icon name="trash" class="size-4" />
-                    Limpiar estado guardado
-                </button>
+            @if ($filtrosActivos > 0)
+                <div class="mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                    <span class="mr-1 text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Vista filtrada</span>
+                    @if (trim($buscar) !== '')
+                        <flux:badge rounded icon="magnifying-glass">“{{ \Illuminate\Support\Str::limit($buscar, 28) }}”</flux:badge>
+                    @endif
+                    @if ($cicloFiltroActual)
+                        <flux:badge rounded color="indigo">Ciclo {{ $cicloFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                    @if ($nivelFiltroActual)
+                        <flux:badge rounded color="cyan">{{ $nivelFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                    @if ($gradoFiltroActual)
+                        <flux:badge rounded color="blue">{{ $gradoFiltroActual['nombre'] }}° grado</flux:badge>
+                    @endif
+                    @if ($generacionFiltroActual)
+                        <flux:badge rounded color="purple">Gen. {{ $generacionFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                    @if ($semestreFiltroActual)
+                        <flux:badge rounded color="violet">{{ $semestreFiltroActual['numero'] }}° semestre</flux:badge>
+                    @endif
+                    @if ($grupoFiltroActual)
+                        <flux:badge rounded color="sky">Grupo {{ $grupoFiltroActual['nombre'] }}</flux:badge>
+                    @endif
+                    @if ($estado_expediente !== 'todos')
+                        <flux:badge rounded color="amber">{{ \Illuminate\Support\Str::headline(str_replace('_', ' ', $estado_expediente)) }}</flux:badge>
+                    @endif
+                </div>
+            @endif
+
+            <flux:separator class="my-5" />
+
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <flux:icon name="circle-stack" class="size-4" />
+                    <span x-text="restoringView ? 'Restaurando la vista guardada…' : (hasStoredView ? 'Filtros, página y expediente guardados durante 7 días en este navegador.' : 'La vista se guardará al modificar filtros o abrir un expediente.')"></span>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <flux:button type="button" @click="restoreStoredView(false)" x-bind:disabled="restoringView || !hasStoredView"
+                        variant="filled" size="sm" icon="arrow-path">
+                        Restablecer vista guardada
+                    </flux:button>
+                    <flux:button type="button" @click="clearStoredView()" x-bind:disabled="restoringView"
+                        variant="ghost" size="sm" icon="trash">
+                        Limpiar estado guardado
+                    </flux:button>
+                </div>
             </div>
         </div>
     </section>
@@ -183,11 +341,9 @@
                     Los documentos son opcionales y el indicador funciona como control administrativo.
                 </p>
             </div>
-            <span
-                class="inline-flex items-center gap-2 self-start rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
-                <flux:icon name="document-duplicate" class="size-4" />
-                {{ number_format($alumnos->total()) }} resultados
-            </span>
+            <flux:badge rounded color="indigo" icon="document-duplicate">
+                {{ number_format($alumnos->total()) }} resultado(s)
+            </flux:badge>
         </div>
 
         <div class="hidden overflow-x-auto lg:block">
@@ -247,8 +403,15 @@
                                     {{ $alumno->nivel?->nombre ?? 'Sin nivel' }}
                                 </p>
                                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $alumno->grado?->nombre ?? 'Sin grado' }} ·
-                                    Grupo {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                    {{ $alumno->grado?->nombre ?? 'Sin grado' }}°
+                                    @if ($alumno->semestre)
+                                        · {{ $alumno->semestre->numero }}° semestre
+                                    @endif
+                                    · Grupo {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}
+                                </p>
+                                <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                                    Gen. {{ $alumno->generacion?->nombre ?: (($alumno->generacion?->anio_ingreso && $alumno->generacion?->anio_egreso) ? $alumno->generacion->anio_ingreso . '-' . $alumno->generacion->anio_egreso : '—') }}
+                                    · Ciclo {{ $alumno->cicloEscolar ? $alumno->cicloEscolar->inicio_anio . '-' . $alumno->cicloEscolar->fin_anio : '—' }}
                                 </p>
                                 @if ($etiquetaEstado = $this->etiquetaEstadoExpediente($alumno))
                                     <span
@@ -279,12 +442,10 @@
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <button type="button" @click="openStudentFile({{ $alumno->id }})"
-                                    :disabled="openingStudentFile"
-                                    class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-lg disabled:cursor-wait disabled:opacity-70">
-                                    <flux:icon name="folder-open" class="size-4" />
+                                <flux:button type="button" variant="primary" size="sm" icon="folder-open"
+                                    @click="openStudentFile({{ $alumno->id }})" x-bind:disabled="openingStudentFile">
                                     Abrir expediente
-                                </button>
+                                </flux:button>
                             </td>
                         </tr>
                     @empty
@@ -316,7 +477,11 @@
                             <h3 class="font-black text-slate-900 dark:text-white">{{ $this->nombreCompleto($alumno) }}
                             </h3>
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $alumno->matricula }} ·
-                                {{ $alumno->nivel?->nombre ?? 'Sin nivel' }}</p>
+                                {{ $alumno->nivel?->nombre ?? 'Sin nivel' }} · {{ $alumno->grado?->nombre ?? '—' }}° · Grupo {{ $alumno->grupo?->asignacionGrupo?->nombre ?? '—' }}</p>
+                            <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                                Gen. {{ $alumno->generacion?->nombre ?: (($alumno->generacion?->anio_ingreso && $alumno->generacion?->anio_egreso) ? $alumno->generacion->anio_ingreso . '-' . $alumno->generacion->anio_egreso : '—') }}
+                                · Ciclo {{ $alumno->cicloEscolar ? $alumno->cicloEscolar->inicio_anio . '-' . $alumno->cicloEscolar->fin_anio : '—' }}
+                            </p>
                             @if ($etiquetaEstado = $this->etiquetaEstadoExpediente($alumno))
                                 <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase {{ $this->claseEstadoExpediente($alumno) }}">
                                     {{ $etiquetaEstado }}
@@ -332,12 +497,10 @@
                         <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-sky-500"
                             style="width: {{ $resumen['porcentaje'] }}%"></div>
                     </div>
-                    <button type="button" @click="openStudentFile({{ $alumno->id }})"
-                        :disabled="openingStudentFile"
-                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white disabled:cursor-wait disabled:opacity-70">
-                        <flux:icon name="folder-open" class="size-4" />
+                    <flux:button type="button" variant="primary" icon="folder-open" class="mt-4 w-full"
+                        @click="openStudentFile({{ $alumno->id }})" x-bind:disabled="openingStudentFile">
                         Abrir expediente
-                    </button>
+                    </flux:button>
                 </article>
             @empty
                 <div class="p-12 text-center text-sm text-slate-500">No se encontraron alumnos.</div>
@@ -1851,8 +2014,19 @@
                 },
 
                 bindPersistenceWatchers() {
-                    ['buscar', 'nivel_id', 'estado_expediente', 'perPage', 'alumnoSeleccionadoId']
-                        .forEach(property => this.$wire.$watch(property, () => this.scheduleStoredViewSave()));
+                    [
+                        'buscar',
+                        'nivel_id',
+                        'grado_id',
+                        'generacion_id',
+                        'semestre_id',
+                        'grupo_id',
+                        'ciclo_escolar_id',
+                        'estado_expediente',
+                        'orden',
+                        'perPage',
+                        'alumnoSeleccionadoId',
+                    ].forEach(property => this.$wire.$watch(property, () => this.scheduleStoredViewSave()));
                 },
 
                 observePaginationChanges() {
@@ -1869,7 +2043,13 @@
                     return {
                         buscar: this.$wire.get('buscar'),
                         nivel_id: this.$wire.get('nivel_id'),
+                        grado_id: this.$wire.get('grado_id'),
+                        generacion_id: this.$wire.get('generacion_id'),
+                        semestre_id: this.$wire.get('semestre_id'),
+                        grupo_id: this.$wire.get('grupo_id'),
+                        ciclo_escolar_id: this.$wire.get('ciclo_escolar_id'),
                         estado_expediente: this.$wire.get('estado_expediente'),
+                        orden: this.$wire.get('orden'),
                         perPage: this.$wire.get('perPage'),
                         alumnoSeleccionadoId: this.$wire.get('alumnoSeleccionadoId'),
                         page: this.currentExpedientesPage(),
