@@ -25,6 +25,7 @@ use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
 use App\Services\HorarioRecesoService;
 use App\Services\CredencialCopiasService;
+use App\Services\SeceListaService;
 use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
@@ -7114,6 +7115,17 @@ class PDFController extends Controller
     |--------------------------------------------------------------------------
     */
 
+        $datosSece = null;
+
+        if ($tipoDescarga === 'formatos' && $opcionDescarga === 'sece') {
+            $datosSece = app(SeceListaService::class)->construir(
+                alumnos: $alumnos,
+                nivel: $nivel,
+                grado: $grado,
+                cicloEscolar: $cicloEscolar,
+            );
+        }
+
         $data = [
             'escuela' => $escuela,
             'nivel' => $nivel,
@@ -7167,6 +7179,7 @@ class PDFController extends Controller
             'opcion_descarga' => $opcionDescarga,
 
             'mostrarMotivo' => $mostrarMotivo,
+            'sece' => $datosSece,
         ];
 
         /*
@@ -7235,7 +7248,7 @@ class PDFController extends Controller
             $tipoDescarga === 'asistencia' => 'landscape',
             $tipoDescarga === 'boletas' => 'portrait',
 
-            $tipoDescarga === 'formatos' && $opcionDescarga === 'sece' => 'portrait',
+            $tipoDescarga === 'formatos' && $opcionDescarga === 'sece' => 'landscape',
             $tipoDescarga === 'formatos' && $opcionDescarga === 'sece_interna' => 'portrait',
             $tipoDescarga === 'formatos' && $opcionDescarga === 'personalizadores' => 'portrait',
             $tipoDescarga === 'formatos' && $opcionDescarga === 'etiquetas' => 'portrait',
