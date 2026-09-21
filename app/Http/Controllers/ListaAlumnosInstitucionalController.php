@@ -495,12 +495,13 @@ class ListaAlumnosInstitucionalController extends Controller
             $tabla->addRow(360, ['tblHeader' => true]);
 
             $encabezados = [
-                ['NP', 600],
-                ['APELLIDO P.', 1850],
-                ['APELLIDO M.', 1850],
-                ['NOMBRE', 2050],
-                ['CURP', 2900],
-                ["FECHA DE\nNAC.", 1850],
+                ['NP', 500],
+                ['APELLIDO P.', 1750],
+                ['APELLIDO M.', 1750],
+                ['NOMBRE', 1950],
+                ['SEXO', 650],
+                ['CURP', 2750],
+                ["FECHA DE\nNAC.", 1750],
             ];
 
             foreach ($encabezados as [$texto, $ancho]) {
@@ -532,12 +533,17 @@ class ListaAlumnosInstitucionalController extends Controller
                         mb_strtoupper((string) $alumno->apellido_paterno),
                         mb_strtoupper((string) $alumno->apellido_materno),
                         mb_strtoupper((string) $alumno->nombre),
+                        match (mb_strtoupper(trim((string) $alumno->genero))) {
+                            'H' => 'H',
+                            'M' => 'M',
+                            default => '',
+                        },
                         mb_strtoupper((string) $alumno->curp),
                         $alumno->fecha_nacimiento?->format('d/m/Y') ?? '',
                     ]
-                    : ['', '', '', '', '', ''];
+                    : ['', '', '', '', '', '', ''];
 
-                $anchos = [600, 1850, 1850, 2050, 2900, 1850];
+                $anchos = [500, 1750, 1750, 1950, 650, 2750, 1750];
 
                 foreach ($valores as $columna => $valor) {
                     $celda = $tabla->addCell($anchos[$columna], ['valign' => 'center']);
@@ -545,7 +551,7 @@ class ListaAlumnosInstitucionalController extends Controller
                         'name' => 'Arial',
                         'size' => 7,
                     ], [
-                        'alignment' => $columna === 0 || $columna === 5 ? 'center' : 'left',
+                        'alignment' => in_array($columna, [0, 4, 6], true) ? 'center' : 'left',
                         'spaceAfter' => 0,
                         'spaceBefore' => 0,
                     ]);

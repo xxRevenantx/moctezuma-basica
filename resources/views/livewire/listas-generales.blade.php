@@ -217,7 +217,7 @@
                         <div>
                             <p class="text-sm font-black text-slate-900 dark:text-white">Lista institucional de alumnos</p>
                             <p class="mt-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                                Formato Carta vertical inspirado en el documento oficial: logo de Educación Guerrero, C.C.T., grado, grupo, 30 espacios por página, CURP, fecha de nacimiento, firmas y concentrado H/M/Total.
+                                Formato Carta vertical inspirado en el documento oficial: logo de Educación Guerrero, C.C.T., grado, grupo, 30 espacios por página, sexo (H/M), CURP, fecha de nacimiento, firmas y concentrado H/M/Total.
                                 Solo toma matrícula vigente del ciclo; alumnos anulados, no reinscritos, bajas o traslados no se imprimen.
                             </p>
                         </div>
