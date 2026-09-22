@@ -1353,8 +1353,7 @@ class CierreGeneracionContinuidadService
         array $datos,
         string $motivo,
         string $fecha,
-        int $usuarioId,
-        bool $autorizarExcepcionCorte = false
+        int $usuarioId
     ): ProyeccionContinuidad {
         $motivo = trim($motivo);
 
@@ -1532,11 +1531,9 @@ class CierreGeneracionContinuidadService
             }
 
             $bloqueosActividad = [];
-            foreach (self::TABLAS_ACTIVIDAD_REAL_DESTINO as $tabla => $etiqueta) {
-                if (! Schema::hasTable($tabla) || ! Schema::hasColumn($tabla, 'inscripcion_ciclo_id')) {
-                    continue;
-                }
-                $cantidad = (int) DB::table($tabla)->where('inscripcion_ciclo_id', $destino->id)->count();
+            foreach (self::TABLAS_BLOQUEO_CALIFICACIONES_DESTINO as $tabla => $etiqueta) {
+                $cantidad = $this->contarRegistrosDestino($tabla, $destino);
+
                 if ($cantidad > 0) {
                     $bloqueosActividad[] = "Tiene {$cantidad} registro(s) de {$etiqueta} en el ciclo destino.";
                 }
@@ -1706,21 +1703,6 @@ class CierreGeneracionContinuidadService
                 'estado_nuevo' => $this->snapshotAlumno($alumno),
                 'registrado_por' => $usuarioId,
             ]);
-
-            app(SystemAuditService::class)->record(
-                $esExcepcionCorte ? 'continuity_changed_to_no_continue_cutoff_exception' : 'continuity_changed_to_no_continue',
-                'academico',
-                [
-                    'proyeccion_id' => $proyeccion->id,
-                    'inscripcion_id' => $alumno->id,
-                    'inscripcion_ciclo_origen_id' => $origen->id,
-                    'inscripcion_ciclo_destino_id' => $destino->id,
-                    'ciclo_destino_id' => $destino->ciclo_escolar_id,
-                    'fecha_corte_continuidad' => $diagnostico['fecha_corte'] ?? null,
-                    'excepcion_fecha_corte' => $esExcepcionCorte,
-                    'usuario_id' => $usuarioId,
-                ]
-            );
 
             return $proyeccion->fresh([
                 'inscripcion',
