@@ -95,81 +95,71 @@
         <section class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-end">
                 <div class="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                    <label class="block">
-                        <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Ciclo escolar</span>
-                        <select wire:model.live="ciclo_escolar_id"
-                            class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
+                    <flux:field>
+                        <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Ciclo escolar</flux:label>
+                        <flux:select wire:model.live="ciclo_escolar_id" class="font-semibold">
                             @foreach ($ciclosEscolares as $ciclo)
-                                <option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}{{ $ciclo->es_actual ? ' · Actual' : '' }}</option>
+                                <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}{{ $ciclo->es_actual ? ' · Actual' : '' }}</flux:select.option>
                             @endforeach
-                        </select>
-                    </label>
+                        </flux:select>
+                    </flux:field>
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Generación</span>
-                        <select wire:model.live="generacion_id"
-                            class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                            <option value="">Todas</option>
+                    <flux:field>
+                        <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Generación</flux:label>
+                        <flux:select wire:model.live="generacion_id" class="font-semibold">
+                            <flux:select.option value="">Todas</flux:select.option>
                             @foreach ($generaciones as $generacion)
-                                <option value="{{ $generacion->id }}">{{ $generacion->nombre ?? ($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso) }}</option>
+                                <flux:select.option value="{{ $generacion->id }}">{{ $generacion->nombre ?? ($generacion->anio_ingreso . ' - ' . $generacion->anio_egreso) }}</flux:select.option>
                             @endforeach
-                        </select>
-                    </label>
+                        </flux:select>
+                    </flux:field>
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Grado</span>
-                        <select wire:model.live="grado_id"
-                            class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                            <option value="">Todos</option>
+                    <flux:field>
+                        <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Grado</flux:label>
+                        <flux:select wire:model.live="grado_id" class="font-semibold">
+                            <flux:select.option value="">Todos</flux:select.option>
                             @foreach ($grados as $grado)
-                                <option value="{{ $grado->id }}">{{ $grado->nombre }}</option>
+                                <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
                             @endforeach
-                        </select>
-                    </label>
+                        </flux:select>
+                    </flux:field>
 
                     @if ($this->esBachillerato())
-                        <label class="block">
-                            <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Semestre</span>
-                            <select wire:model.live="semestre_id"
-                                class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                                <option value="">Todos</option>
+                        <flux:field>
+                            <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Semestre</flux:label>
+                            <flux:select wire:model.live="semestre_id" class="font-semibold">
+                                <flux:select.option value="">Todos</flux:select.option>
                                 @foreach ($semestres as $semestre)
-                                    <option value="{{ $semestre->id }}">{{ $semestre->nombre ?? ('Semestre ' . $semestre->numero) }}</option>
+                                    <flux:select.option value="{{ $semestre->id }}">{{ $semestre->nombre ?? ('Semestre ' . $semestre->numero) }}</flux:select.option>
                                 @endforeach
-                            </select>
-                        </label>
+                            </flux:select>
+                        </flux:field>
                     @endif
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Grupo</span>
-                        <select wire:model.live="grupo_id"
-                            class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                            <option value="">Todos</option>
+                    <flux:field>
+                        <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Grupo</flux:label>
+                        <flux:select wire:model.live="grupo_id" class="font-semibold">
+                            <flux:select.option value="">Todos</flux:select.option>
                             @foreach ($grupos as $grupo)
-                                <option value="{{ $grupo->id }}">{{ $grupo->asignacionGrupo?->nombre ?? $grupo->grupo ?? $grupo->nombre ?? ('Grupo ' . $grupo->id) }}</option>
+                                <flux:select.option value="{{ $grupo->id }}">{{ $grupo->asignacionGrupo?->nombre ?? $grupo->grupo ?? $grupo->nombre ?? ('Grupo ' . $grupo->id) }}</flux:select.option>
                             @endforeach
-                        </select>
-                    </label>
+                        </flux:select>
+                    </flux:field>
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-xs font-black uppercase tracking-wider text-slate-500">Fotografía</span>
-                        <select wire:model.live="estado_foto"
-                            class="w-full rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                            <option value="todos">Todos</option>
-                            <option value="sin_foto">Sin fotografía</option>
-                            <option value="con_foto">Con fotografía</option>
-                            <option value="archivo_faltante">Archivo faltante</option>
-                        </select>
-                    </label>
+                    <flux:field>
+                        <flux:label class="text-xs font-black uppercase tracking-wider text-slate-500">Fotografía</flux:label>
+                        <flux:select wire:model.live="estado_foto" class="font-semibold">
+                            <flux:select.option value="todos">Todos</flux:select.option>
+                            <flux:select.option value="sin_foto">Sin fotografía</flux:select.option>
+                            <flux:select.option value="con_foto">Con fotografía</flux:select.option>
+                            <flux:select.option value="archivo_faltante">Archivo faltante</flux:select.option>
+                        </flux:select>
+                    </flux:field>
                 </div>
 
                 <div class="flex flex-col gap-3 sm:flex-row xl:w-[430px]">
-                    <label class="relative flex-1">
-                        <span class="sr-only">Buscar alumno</span>
-                        <flux:icon.magnifying-glass class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input type="search" wire:model.live.debounce.350ms="search" placeholder="Nombre, matrícula, CURP…"
-                            class="w-full rounded-2xl border-slate-200 py-2.5 pl-10 pr-3 text-sm font-semibold shadow-sm focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
-                    </label>
+                    <flux:input class="flex-1 font-semibold" type="search" wire:model.live.debounce.350ms="search"
+                        icon="magnifying-glass" placeholder="Nombre, matrícula, CURP…" aria-label="Buscar alumno" clearable />
                     <button type="button" wire:click="limpiarFiltros"
                         class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:border-sky-300 hover:text-[#006492] dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300">
                         <flux:icon.arrow-path class="h-4 w-4" />
@@ -179,10 +169,9 @@
             </div>
 
             <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-neutral-800">
-                <label class="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 dark:bg-neutral-950/60 dark:text-neutral-300">
-                    <input type="checkbox" wire:model.live="incluir_no_vigentes" class="rounded border-slate-300 text-[#006492] focus:ring-[#006492]">
-                    Incluir alumnos no vigentes del ciclo
-                </label>
+                <div class="rounded-2xl bg-slate-50 px-3 py-2 dark:bg-neutral-950/60">
+                    <flux:checkbox wire:model.live="incluir_no_vigentes" label="Incluir alumnos no vigentes del ciclo" />
+                </div>
                 <span class="text-xs font-semibold text-slate-400">
                     Los activos se muestran por defecto. Esta opción permite consultar bajas, traslados u otros movimientos que sí iniciaron el ciclo.
                 </span>
@@ -259,13 +248,20 @@
                             @endphp
                             <article wire:key="archivo-masivo-{{ $index }}"
                                 class="flex gap-3 rounded-3xl border {{ isset($erroresArchivos[$index]) ? 'border-rose-200 bg-rose-50/50' : ($asignado ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/50') }} p-3 dark:border-neutral-700 dark:bg-neutral-950/40">
-                                <div class="h-[108px] w-[90px] shrink-0 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-black/5 dark:bg-neutral-800">
+                                <button type="button"
+                                    @if ($previewMasivo) @click="abrirVisor(@js($previewMasivo), 'Fotografía pendiente', @js($archivo?->getClientOriginalName() ?? 'Archivo de carga masiva'))" @endif
+                                    @disabled(! $previewMasivo)
+                                    class="group/preview relative h-[108px] w-[90px] shrink-0 overflow-hidden rounded-2xl bg-slate-100 text-left ring-1 ring-black/5 transition enabled:cursor-zoom-in enabled:hover:ring-2 enabled:hover:ring-[#006492] dark:bg-neutral-800"
+                                    aria-label="{{ $previewMasivo ? 'Ampliar fotografía ' . ($archivo?->getClientOriginalName() ?? '') : 'Previsualización no disponible' }}">
                                     @if ($previewMasivo)
                                         <img src="{{ $previewMasivo }}" alt="Previsualización" class="h-full w-full object-cover">
+                                        <span class="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/0 text-white opacity-0 transition group-hover/preview:bg-slate-950/35 group-hover/preview:opacity-100">
+                                            <span class="grid h-9 w-9 place-items-center rounded-full bg-white/20 backdrop-blur"><flux:icon.magnifying-glass-plus class="h-5 w-5" /></span>
+                                        </span>
                                     @else
                                         <div class="grid h-full w-full place-items-center text-slate-400"><flux:icon.photo class="h-7 w-7" /></div>
                                     @endif
-                                </div>
+                                </button>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="min-w-0">
@@ -281,13 +277,12 @@
                                     @if (isset($erroresArchivos[$index]))
                                         <p class="mt-2 text-xs font-bold text-rose-600">{{ $erroresArchivos[$index] }}</p>
                                     @else
-                                        <select wire:model.live="asignacionesMasivas.{{ $index }}"
-                                            class="mt-2 w-full rounded-xl border-slate-200 bg-white py-1.5 text-xs font-semibold text-slate-700 focus:border-[#006492] focus:ring-[#006492] dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
-                                            <option value="">— Seleccionar alumno —</option>
+                                        <flux:select wire:model.live="asignacionesMasivas.{{ $index }}" size="sm" class="mt-2 text-xs font-semibold">
+                                            <flux:select.option value="">— Seleccionar alumno —</flux:select.option>
                                             @foreach ($alumnosAsignables as $opcion)
-                                                <option value="{{ $opcion->id }}">{{ $this->nombreCompleto($opcion) }} · {{ $opcion->matricula ?: $opcion->curp }}</option>
+                                                <flux:select.option value="{{ $opcion->id }}">{{ $this->nombreCompleto($opcion) }} · {{ $opcion->matricula ?: $opcion->curp }}</flux:select.option>
                                             @endforeach
-                                        </select>
+                                        </flux:select>
                                         @if ($asignado && $previewMasivo)
                                             <button type="button"
                                                 @click="abrirEditorUrl(@js($previewMasivo), {{ (int) $asignado }}, @js($alumnosAsignables->firstWhere('id', (int) $asignado) ? $this->nombreCompleto($alumnosAsignables->firstWhere('id', (int) $asignado)) : 'Alumno'))"
@@ -312,16 +307,16 @@
                     <h2 class="text-xl font-black text-slate-900 dark:text-white">Alumnos</h2>
                     <p class="text-sm text-slate-500">Arrastra una foto sobre cualquier tarjeta o usa el botón de selección. Los cambios quedan pendientes hasta que presiones Guardar.</p>
                 </div>
-                <label class="flex items-center gap-2 text-xs font-black text-slate-500">
-                    Mostrar
-                    <select wire:model.live="perPage" class="rounded-xl border-slate-200 py-1.5 text-xs font-bold dark:border-neutral-700 dark:bg-neutral-900">
-                        <option value="12">12</option>
-                        <option value="24">24</option>
-                        <option value="48">48</option>
-                        <option value="96">96</option>
-                    </select>
-                    por página
-                </label>
+                <div class="flex items-center gap-2 text-xs font-black text-slate-500">
+                    <span>Mostrar</span>
+                    <flux:select wire:model.live="perPage" size="sm" class="w-20 text-xs font-bold" aria-label="Alumnos por página">
+                        <flux:select.option value="12">12</flux:select.option>
+                        <flux:select.option value="24">24</flux:select.option>
+                        <flux:select.option value="48">48</flux:select.option>
+                        <flux:select.option value="96">96</flux:select.option>
+                    </flux:select>
+                    <span>por página</span>
+                </div>
             </div>
 
             @if ($alumnos->count() === 0)
@@ -366,19 +361,33 @@
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
                                             <p class="mb-1 text-center text-[9px] font-black uppercase tracking-wider text-slate-400">Actual</p>
-                                            <div class="mx-auto aspect-[5/6] w-full max-w-[118px] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-black/5">
+                                            <button type="button" @click="abrirVisor(@js($alumno->foto_url), @js($nombreAlumno), 'Fotografía actual')"
+                                                class="group/photo relative mx-auto block aspect-[5/6] w-full max-w-[118px] cursor-zoom-in overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-black/5 transition hover:ring-2 hover:ring-[#006492]"
+                                                aria-label="Ampliar fotografía actual de {{ $nombreAlumno }}">
                                                 <img src="{{ $alumno->foto_url }}" alt="Foto actual de {{ $nombreAlumno }}" class="h-full w-full object-cover">
-                                            </div>
+                                                <span class="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/0 text-white opacity-0 transition group-hover/photo:bg-slate-950/35 group-hover/photo:opacity-100"><flux:icon.magnifying-glass-plus class="h-6 w-6" /></span>
+                                            </button>
                                         </div>
                                         <div>
                                             <p class="mb-1 text-center text-[9px] font-black uppercase tracking-wider text-violet-500">Nueva</p>
-                                            <div class="mx-auto aspect-[5/6] w-full max-w-[118px] overflow-hidden rounded-2xl bg-violet-50 ring-2 ring-violet-300">
+                                            <button type="button" @click="abrirVisor(@js($previewPendiente), @js($nombreAlumno), 'Nueva fotografía · cambio pendiente')"
+                                                class="group/photo relative mx-auto block aspect-[5/6] w-full max-w-[118px] cursor-zoom-in overflow-hidden rounded-2xl bg-violet-50 ring-2 ring-violet-300 transition hover:ring-[#006492]"
+                                                aria-label="Ampliar nueva fotografía de {{ $nombreAlumno }}">
                                                 <img src="{{ $previewPendiente }}" alt="Nueva foto de {{ $nombreAlumno }}" class="h-full w-full object-cover">
-                                            </div>
+                                                <span class="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/0 text-white opacity-0 transition group-hover/photo:bg-slate-950/35 group-hover/photo:opacity-100"><flux:icon.magnifying-glass-plus class="h-6 w-6" /></span>
+                                            </button>
                                         </div>
                                     </div>
                                 @else
-                                    <div class="relative mx-auto aspect-[5/6] w-full max-w-[158px] overflow-hidden rounded-[24px] bg-gradient-to-b from-slate-100 to-slate-200 ring-1 ring-black/5 dark:from-neutral-800 dark:to-neutral-950">
+                                    <button type="button"
+                                        @if ($previewPendiente)
+                                            @click="abrirVisor(@js($previewPendiente), @js($nombreAlumno), 'Nueva fotografía · cambio pendiente')"
+                                        @elseif ($alumno->foto_existe && ! $marcadaEliminar)
+                                            @click="abrirVisor(@js($alumno->foto_url), @js($nombreAlumno), 'Fotografía del expediente')"
+                                        @endif
+                                        @disabled(! $previewPendiente && (! $alumno->foto_existe || $marcadaEliminar))
+                                        class="group/photo relative mx-auto block aspect-[5/6] w-full max-w-[158px] overflow-hidden rounded-[24px] bg-gradient-to-b from-slate-100 to-slate-200 text-left ring-1 ring-black/5 transition enabled:cursor-zoom-in enabled:hover:ring-2 enabled:hover:ring-[#006492] dark:from-neutral-800 dark:to-neutral-950"
+                                        aria-label="{{ ($previewPendiente || ($alumno->foto_existe && ! $marcadaEliminar)) ? 'Ampliar fotografía de ' . $nombreAlumno : 'Fotografía no disponible' }}">
                                         @if ($previewPendiente)
                                             <img src="{{ $previewPendiente }}" alt="Nueva foto de {{ $nombreAlumno }}" class="h-full w-full object-cover">
                                         @elseif ($alumno->foto_existe && ! $marcadaEliminar)
@@ -404,7 +413,12 @@
                                         <div class="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl bg-slate-950/55 px-2 py-1.5 text-center text-[9px] font-black uppercase tracking-wider text-white backdrop-blur">
                                             2.5 cm × 3 cm · 5:6
                                         </div>
-                                    </div>
+                                        @if ($previewPendiente || ($alumno->foto_existe && ! $marcadaEliminar))
+                                            <span class="pointer-events-none absolute inset-0 grid place-items-center bg-slate-950/0 text-white opacity-0 transition group-hover/photo:bg-slate-950/25 group-hover/photo:opacity-100">
+                                                <span class="grid h-11 w-11 place-items-center rounded-full bg-slate-950/45 shadow-lg backdrop-blur"><flux:icon.magnifying-glass-plus class="h-6 w-6" /></span>
+                                            </span>
+                                        @endif
+                                    </button>
                                 @endif
 
                                 <div class="mt-4 min-w-0 text-center">
@@ -494,6 +508,62 @@
         </div>
     @endif
 
+    {{-- Visor de fotografía --}}
+    <div x-cloak x-show="viewerOpen" x-transition.opacity
+        class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/85 p-3 backdrop-blur-md sm:p-6"
+        @click.self="cerrarVisor()" @keydown.escape.window="if (viewerOpen) cerrarVisor()" role="dialog" aria-modal="true"
+        aria-labelledby="visor-fotografia-titulo">
+        <div x-show="viewerOpen" x-transition:enter="transition duration-200 ease-out"
+            x-transition:enter-start="scale-95 opacity-0" x-transition:enter-end="scale-100 opacity-100"
+            x-transition:leave="transition duration-150 ease-in" x-transition:leave-start="scale-100 opacity-100"
+            x-transition:leave-end="scale-95 opacity-0"
+            class="relative flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-[30px] border border-white/15 bg-white shadow-2xl shadow-black/40 dark:bg-neutral-900">
+            <div class="relative overflow-hidden bg-gradient-to-r from-[#006492] via-sky-700 to-indigo-800 px-5 py-4 text-white sm:px-6">
+                <div class="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full bg-white/15 blur-2xl"></div>
+                <div class="relative flex items-start justify-between gap-4">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur">
+                            <flux:icon.photo class="h-6 w-6" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-[.2em] text-sky-100">Vista ampliada</p>
+                            <h3 id="visor-fotografia-titulo" class="truncate text-lg font-black" x-text="viewerName"></h3>
+                            <p class="truncate text-xs font-semibold text-sky-100" x-text="viewerDetail"></p>
+                        </div>
+                    </div>
+                    <button type="button" @click="cerrarVisor()"
+                        class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20"
+                        aria-label="Cerrar vista ampliada">
+                        <flux:icon.x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,_#e0f2fe,_#f8fafc_55%,_#e2e8f0)] p-5 dark:bg-[radial-gradient(circle_at_top,_#082f49,_#0a0a0a_55%,_#171717)] sm:p-8">
+                <div class="mx-auto w-fit rounded-[26px] bg-white p-2 shadow-2xl shadow-slate-900/20 ring-1 ring-black/10 dark:bg-neutral-800">
+                    <img :src="viewerUrl" :alt="'Fotografía ampliada de ' + viewerName"
+                        class="max-h-[64vh] w-auto max-w-full rounded-[20px] object-contain" />
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] font-black">
+                    <span class="rounded-full bg-white/90 px-3 py-1.5 text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-neutral-900/90 dark:text-neutral-300 dark:ring-neutral-700">2.5 × 3 cm</span>
+                    <span class="rounded-full bg-white/90 px-3 py-1.5 text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-neutral-900/90 dark:text-neutral-300 dark:ring-neutral-700">Proporción 5:6</span>
+                    <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700 shadow-sm ring-1 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900">Fotografía escolar</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-900 sm:px-6">
+                <a :href="viewerUrl" target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-600 transition hover:border-sky-300 hover:text-[#006492] dark:border-neutral-700 dark:text-neutral-300">
+                    <flux:icon.arrows-pointing-out class="h-4 w-4" /> Abrir original
+                </a>
+                <button type="button" @click="cerrarVisor()"
+                    class="rounded-2xl bg-[#006492] px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-sky-900/15 transition hover:bg-sky-800">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- Editor de recorte --}}
     <div x-cloak x-show="editorOpen" x-transition.opacity
         class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm"
@@ -576,6 +646,10 @@
     @script
         <script>
             Alpine.data('gestorFotografiasPro', () => ({
+                viewerOpen: false,
+                viewerUrl: '',
+                viewerName: '',
+                viewerDetail: '',
                 editorOpen: false,
                 editorStudentId: null,
                 editorName: '',
@@ -588,6 +662,25 @@
                 lastX: 0,
                 lastY: 0,
                 uploadingEditor: false,
+
+                abrirVisor(url, nombre, detalle = '') {
+                    if (!url) return;
+                    this.viewerUrl = url;
+                    this.viewerName = nombre || 'Fotografía del alumno';
+                    this.viewerDetail = detalle;
+                    this.viewerOpen = true;
+                },
+
+                cerrarVisor() {
+                    this.viewerOpen = false;
+                    window.setTimeout(() => {
+                        if (!this.viewerOpen) {
+                            this.viewerUrl = '';
+                            this.viewerName = '';
+                            this.viewerDetail = '';
+                        }
+                    }, 200);
+                },
 
                 cargarMasivos(files) {
                     if (!files || !files.length) return;
