@@ -7,10 +7,25 @@
     <x-institucional.pestanas :tabs="['alumnos' => 'Alumnos', 'personal' => 'Profesores']" :active="$tab" />
 
     @if ($tab === 'alumnos')
+        <div x-data="{ alcance: 'todos' }" class="space-y-5">
+            <div class="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+                <button type="button" @click="alcance = 'todos'" :aria-pressed="alcance === 'todos'"
+                    :class="alcance === 'todos' ? 'bg-sky-700 text-white' : 'text-slate-500 hover:bg-slate-100'"
+                    class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold">Todos los niveles</button>
+                <button type="button" @click="alcance = 'nivel'" :aria-pressed="alcance === 'nivel'"
+                    :class="alcance === 'nivel' ? 'bg-sky-700 text-white' : 'text-slate-500 hover:bg-slate-100'"
+                    class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold">Descargas por nivel</button>
+            </div>
+            <div x-show="alcance === 'todos'">
+                <livewire:institucional.credenciales-combinadas :key="'credenciales-combinadas'" />
+            </div>
+            <div x-show="alcance === 'nivel'" x-cloak class="space-y-5">
         <x-institucional.selector-nivel :niveles="$niveles" :slug-nivel="$slug_nivel" />
         <livewire:generales.credenciales
             :slug_nivel="$slug_nivel"
             :key="'credenciales-alumnos-global-' . $slug_nivel" />
+            </div>
+        </div>
     @else
         <section class="space-y-4 rounded-[1.8rem] border border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/40">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

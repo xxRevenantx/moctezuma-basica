@@ -161,24 +161,37 @@
     <div class="contenedorCredenciales">
 
         @foreach ($alumnos as $index => $alumno)
+            @php
+                $nivelCredencial = ($combinado ?? false) ? $alumno->nivel : $nivel;
+                $directorCredencial = $nombreDirector ?? 'DIRECTOR(A)';
+                if ($combinado ?? false) {
+                    $director = $nivelCredencial?->director;
+                    $directorCredencial = $director
+                        ? mb_strtoupper(trim(implode(' ', array_filter([
+                            $director->titulo, $director->nombre,
+                            $director->apellido_paterno, $director->apellido_materno,
+                        ]))), 'UTF-8')
+                        : 'DIRECTOR(A)';
+                }
+            @endphp
             <div class="bloqueCredencial">
 
                 {{-- Fondo de la credencial --}}
                 <img class="credenciales" src="{{ public_path('imagenes/credencial.jpg') }}" alt="Credencial">
 
 
-                <img class="logo" src="{{ public_path('storage/logos/' . ($nivel->logo ?: 'logo.png')) }}"
+                <img class="logo" src="{{ public_path('storage/logos/' . ($nivelCredencial->logo ?: 'logo.png')) }}"
                     alt="Logo del nivel">
 
 
-                <img class="logo2" src="{{ public_path('storage/logos/' . ($nivel->logo ?: 'logo.png')) }}"
+                <img class="logo2" src="{{ public_path('storage/logos/' . ($nivelCredencial->logo ?: 'logo.png')) }}"
                     alt="Logo del nivel">
 
 
 
                 @if ($alumno->nivel)
                     <span class="cct">
-                        C.C.T.{{ $nivel->cct ?? 'CCT no especificado' }}
+                        C.C.T.{{ $nivelCredencial->cct ?? 'CCT no especificado' }}
                     </span>
                 @endif
 
@@ -231,11 +244,11 @@
 
 
                 </div>
-                <span class="director">{{ $nombreDirector }}<br>FIRMA Y SELLO</span>
+                <span class="director">{{ $directorCredencial }}<br>FIRMA Y SELLO</span>
             </div>
 
 
-            @if (($index + 1) % 4 === 0)
+            @if (($index + 1) % 4 === 0 && ! $loop->last)
                 <div class="page-break"></div>
             @endif
         @endforeach
