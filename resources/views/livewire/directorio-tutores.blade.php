@@ -242,7 +242,7 @@
                 </label>
 
                 <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    El INE se muestra con el folio registrado del documento “INE del responsable”; si no existe, la columna queda vacía.
+                    La columna INE muestra la CURP registrada del tutor; si no existe, se muestra un guion (—).
                 </div>
             </div>
         </div>
@@ -441,7 +441,7 @@
                                 <div class="mt-3 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
                                     <div><span class="font-black text-slate-500">Parentesco:</span> <span class="text-slate-700 dark:text-slate-300">{{ $familia['parentesco'] ?: '—' }}</span></div>
                                     <div><span class="font-black text-slate-500">Teléfono:</span> <span class="{{ $familia['sin_telefono'] ? 'font-bold text-amber-700 dark:text-amber-300' : 'text-slate-700 dark:text-slate-300' }}">{{ $familia['telefono'] ?: 'Sin teléfono registrado' }}</span></div>
-                                    <div><span class="font-black text-slate-500">INE:</span> <span class="text-slate-700 dark:text-slate-300">{{ $familia['ine'] ?: '—' }}</span></div>
+                                    <div><span class="font-black text-slate-500">INE:</span> <span class="text-slate-700 dark:text-slate-300">{{ $familia['curp'] ?: '—' }}</span></div>
                                     <div><span class="font-black text-slate-500">Niveles:</span> <span class="text-slate-700 dark:text-slate-300">{{ $familia['niveles_texto'] ?: '—' }}</span></div>
                                 </div>
                                 <p class="mt-2 text-xs leading-5 {{ $familia['sin_domicilio'] ? 'font-bold text-orange-700 dark:text-orange-300' : 'text-slate-500 dark:text-slate-400' }}">
@@ -553,7 +553,7 @@
                                 </td>
                                 <td class="px-3 py-3 text-center text-slate-600 dark:text-slate-300">{{ $fila['parentesco'] }}</td>
                                 <td class="px-3 py-3 {{ $fila['sin_telefono'] ? 'font-bold text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300' }}">{{ $fila['telefono'] }}</td>
-                                <td class="px-3 py-3 text-slate-600 dark:text-slate-300">{{ $fila['ine'] ?: '—' }}</td>
+                                <td class="px-3 py-3 text-slate-600 dark:text-slate-300">{{ $fila['tutor_curp'] ?: '—' }}</td>
                                 <td class="max-w-[320px] px-3 py-3 leading-5 {{ $fila['sin_domicilio'] ? 'font-bold text-orange-700 dark:text-orange-300' : 'text-slate-600 dark:text-slate-300' }}">{{ $fila['domicilio'] }}</td>
                                 <td class="px-3 py-3">
                                     <p class="font-bold text-slate-900 dark:text-white">{{ $fila['alumno'] }}</p>

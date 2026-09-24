@@ -361,7 +361,7 @@
                                 <td class="centro">{{ $fila['parentesco'] }}</td>
                                 <td class="{{ $fila['sin_telefono'] ? 'faltante' : '' }}">
                                     {{ $fila['telefono'] ?: 'Sin teléfono registrado' }}</td>
-                                <td class="centro">{{ $fila['ine'] ?? '' }}</td>
+                                <td class="centro">{{ $fila['curp'] ?? '' }}</td>
                                 <td class="{{ $fila['sin_domicilio'] ? 'faltante' : '' }}">
                                     {{ $fila['domicilio'] ?: 'Sin domicilio registrado' }}</td>
                                 <td>
@@ -421,7 +421,7 @@
                                 </td>
                                 <td class="centro">{{ $fila['parentesco'] }}</td>
                                 <td class="{{ $fila['sin_telefono'] ? 'faltante' : '' }}">{{ $fila['telefono'] }}</td>
-                                <td class="centro">{{ $fila['ine'] ?? '' }}</td>
+                                <td class="centro">{{ $fila['tutor_curp'] ?? '' }}</td>
                                 <td class="{{ $fila['sin_domicilio'] ? 'faltante' : '' }}">{{ $fila['domicilio'] }}
                                 </td>
                                 <td>{{ $fila['alumno'] }}</td>
@@ -456,8 +456,8 @@
             ($metricas['sin_domicilio'] ?? 0) ||
             ($metricas['sin_curp'] ?? 0))
         <div class="nota">
-            Los datos faltantes se conservan para facilitar su corrección posterior. La columna INE permanece vacía
-            cuando no existe un folio registrado para el documento “INE del responsable”.
+            Los datos faltantes se conservan para facilitar su corrección posterior. La columna INE muestra la CURP del tutor y permanece vacía
+            cuando el tutor no tiene CURP registrada.
         </div>
     @endif
 

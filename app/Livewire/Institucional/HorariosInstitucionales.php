@@ -18,8 +18,17 @@ class HorariosInstitucionales extends Component
 
     public function seleccionarTab(string $tab): void
     {
-        abort_unless(in_array($tab, ['grupo', 'generales', 'vacios', 'docentes', 'planificador', 'talleres'], true), 404);
-        if ($tab === 'talleres' && $this->slug_nivel !== 'secundaria') {
+        abort_unless(in_array($tab, [
+            'grupo',
+            'generales',
+            'vacios',
+            'docentes',
+            'carga_docente',
+            'planificador',
+            'talleres',
+        ], true), 404);
+
+        if (in_array($tab, ['carga_docente', 'talleres'], true) && $this->slug_nivel !== 'secundaria') {
             $tab = 'grupo';
         }
 
@@ -28,7 +37,7 @@ class HorariosInstitucionales extends Component
 
     protected function alCambiarNivel(): void
     {
-        if ($this->tab === 'talleres' && $this->slug_nivel !== 'secundaria') {
+        if (in_array($this->tab, ['carga_docente', 'talleres'], true) && $this->slug_nivel !== 'secundaria') {
             $this->tab = 'grupo';
         }
     }

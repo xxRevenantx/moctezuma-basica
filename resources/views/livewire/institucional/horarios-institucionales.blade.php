@@ -8,6 +8,7 @@
     ];
 
     if ($slug_nivel === 'secundaria') {
+        $tabs['carga_docente'] = 'Horarios y carga docente';
         $tabs['talleres'] = 'Talleres conjuntos';
     }
 @endphp
@@ -16,7 +17,7 @@
     <x-institucional.encabezado-modulo
         eyebrow="Académica"
         title="Horarios institucionales"
-        description="Concentra captura por grupo, horarios generales, formatos vacíos, planificador, talleres conjuntos y consulta individual de docentes." />
+        description="Concentra captura por grupo, horarios generales, formatos vacíos, consulta docente, carga docente, planificador y talleres conjuntos." />
 
     <x-institucional.selector-nivel :niveles="$niveles" :slug-nivel="$slug_nivel" />
     <x-institucional.pestanas :tabs="$tabs" :active="$tab" />
@@ -38,6 +39,14 @@
             <livewire:profesor.horario-profesor
                 :nivel-id="(int) ($this->nivelActual?->id ?? 0)"
                 :key="'horarios-docentes-global-' . $slug_nivel" />
+        @break
+
+        @case('carga_docente')
+            @if ($slug_nivel === 'secundaria')
+                <livewire:accion.generales.horarios-carga-docente
+                    :slug_nivel="$slug_nivel"
+                    :key="'horarios-carga-docente-' . $slug_nivel" />
+            @endif
         @break
 
         @case('planificador')
