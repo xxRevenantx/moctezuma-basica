@@ -426,6 +426,11 @@ class Inscripcion extends Model
     {
         return $this->hasMany(\App\Models\Constancia::class, 'inscripcion_id');
     }
+
+    public function cartasCompromiso()
+    {
+        return $this->hasMany(\App\Models\CartaCompromiso::class, 'inscripcion_id');
+    }
     public function oficios()
     {
         return $this->hasMany(\App\Models\Oficio::class, 'inscripcion_id');

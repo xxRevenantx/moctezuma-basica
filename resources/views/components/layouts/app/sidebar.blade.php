@@ -83,6 +83,7 @@
             'misrutas.expedientes.*',
             'misrutas.credenciales-institucionales',
             'misrutas.constancias*',
+            'misrutas.cartas-compromiso*',
             'misrutas.oficios*',
         );
 
@@ -492,14 +493,6 @@
                             Expedientes digitales
                         </flux:sidebar.item>
 
-                        <flux:sidebar.item icon="identification" :href="route('misrutas.credenciales-institucionales')"
-                            :current="request()->routeIs('misrutas.credenciales-institucionales')" wire:navigate
-                            data-sidebar-search-item
-                            data-sidebar-search="credenciales institucionales alumnos profesores personal identificación"
-                            x-show="itemMatches($el)">
-                            Credenciales institucionales
-                        </flux:sidebar.item>
-
                         <flux:sidebar.item icon="file-check" :href="route('misrutas.constancias')"
                             :current="request()->routeIs('misrutas.constancias*')" wire:navigate
                             data-sidebar-search-item
@@ -508,11 +501,27 @@
                             Constancias
                         </flux:sidebar.item>
 
+                        <flux:sidebar.item icon="document-text" :href="route('misrutas.cartas-compromiso')"
+                            :current="request()->routeIs('misrutas.cartas-compromiso*')" wire:navigate
+                            data-sidebar-search-item
+                            data-sidebar-search="carta compromiso tutor responsable inscripción grado anterior"
+                            x-show="itemMatches($el)">
+                            Carta compromiso
+                        </flux:sidebar.item>
+
                         <flux:sidebar.item icon="scroll-text" :href="route('misrutas.oficios')"
                             :current="request()->routeIs('misrutas.oficios*')" wire:navigate data-sidebar-search-item
                             data-sidebar-search="oficios documentos administrativos invitaciones"
                             x-show="itemMatches($el)">
                             Oficios
+                        </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="identification" :href="route('misrutas.credenciales-institucionales')"
+                            :current="request()->routeIs('misrutas.credenciales-institucionales')" wire:navigate
+                            data-sidebar-search-item
+                            data-sidebar-search="credenciales institucionales alumnos profesores personal identificación"
+                            x-show="itemMatches($el)">
+                            Credenciales institucionales
                         </flux:sidebar.item>
                     </flux:sidebar.group>
                 @endif

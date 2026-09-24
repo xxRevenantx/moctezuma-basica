@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\AsignacionMateria;
 use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
@@ -9,7 +10,9 @@ use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Parcial;
+use App\Models\Persona;
 use App\Models\Semestre;
+use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
 use App\Services\ListaAcademicaService;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,7 +39,12 @@ class ListasGenerales extends Component
     /** @var array<int, int|string> */
     public array $alumnos_seleccionados = [];
 
+    /** @var array<int, int|string> */
+    public array $profesores_seleccionados = [];
+
     public string $buscar_alumno = '';
+    public string $buscar_profesor = '';
+    public string $audiencia_personalizador = 'alumnos';
     public string $modo_descarga = 'seleccionados';
     public string $tipo_descarga = 'formatos';
     public string $opcion_descarga = 'personalizadores';
@@ -70,6 +78,33 @@ class ListasGenerales extends Component
         $this->ciclo_escolar_id = $ciclo?->id;
     }
 
+    public function updatedAudienciaPersonalizador(): void
+    {
+        if (!in_array($this->audiencia_personalizador, ['alumnos', 'profesores'], true)) {
+            $this->audiencia_personalizador = 'alumnos';
+        }
+
+        if ($this->tipo_descarga !== 'formatos' || $this->opcion_descarga !== 'personalizadores') {
+            $this->audiencia_personalizador = 'alumnos';
+        }
+
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
+        $this->grupos = collect();
+        $this->modo_descarga = 'seleccionados';
+        $this->mostrar_motivo = false;
+        $this->buscar_alumno = '';
+        $this->buscar_profesor = '';
+        $this->alumnos_seleccionados = [];
+        $this->profesores_seleccionados = [];
+        $this->resetErrorBag();
+    }
+
     public function updatedNivelId(): void
     {
         $this->generacion_id = null;
@@ -81,6 +116,13 @@ class ListasGenerales extends Component
         $this->semestres = collect();
         $this->grupos = collect();
         $this->mostrar_motivo = false;
+
+        if ($this->esPersonalizadoresProfesores()) {
+            if (!$this->nivel_id && $this->modo_descarga === 'nivel') {
+                $this->modo_descarga = 'seleccionados';
+            }
+            return;
+        }
 
         if ($this->nivel_id) {
             $this->cargarGeneraciones();
@@ -153,6 +195,12 @@ class ListasGenerales extends Component
 
     public function updatedTipoDescarga(): void
     {
+        if ($this->tipo_descarga !== 'formatos') {
+            $this->audiencia_personalizador = 'alumnos';
+            $this->profesores_seleccionados = [];
+            $this->buscar_profesor = '';
+        }
+
         if (!$this->nivel_id) {
             $this->tipo_descarga = 'formatos';
         }
@@ -180,6 +228,12 @@ class ListasGenerales extends Component
 
     public function updatedOpcionDescarga(): void
     {
+        if ($this->opcion_descarga !== 'personalizadores') {
+            $this->audiencia_personalizador = 'alumnos';
+            $this->profesores_seleccionados = [];
+            $this->buscar_profesor = '';
+        }
+
         if (!$this->nivel_id && !in_array($this->opcion_descarga, ['personalizadores', 'etiquetas'], true)) {
             $this->opcion_descarga = 'personalizadores';
         }
@@ -205,6 +259,23 @@ class ListasGenerales extends Component
         }
 
         $this->mostrar_motivo = false;
+
+        if ($this->esPersonalizadoresProfesores()) {
+            $this->generacion_id = null;
+            $this->grado_id = null;
+            $this->semestre_id = null;
+            $this->grupo_id = null;
+            $this->generaciones = collect();
+            $this->grados = collect();
+            $this->semestres = collect();
+            $this->grupos = collect();
+
+            if ($this->modo_descarga === 'todos_activos') {
+                $this->nivel_id = null;
+            }
+
+            return;
+        }
 
         if ($this->modo_descarga === 'todos_activos') {
             $this->nivel_id = null;
@@ -266,6 +337,16 @@ class ListasGenerales extends Component
         $this->alumnos_seleccionados = $this->idsAlumnosSeleccionadosValidos;
     }
 
+    public function updatedProfesoresSeleccionados(mixed $value = null, mixed $key = null): void
+    {
+        if (!$this->esPersonalizadoresProfesores() || $this->modo_descarga !== 'seleccionados') {
+            $this->profesores_seleccionados = [];
+            return;
+        }
+
+        $this->profesores_seleccionados = $this->idsProfesoresSeleccionadosValidos;
+    }
+
     public function seleccionarNivelRapido(?int $nivelId): void
     {
         if ($nivelId !== null && !$this->niveles->contains('id', $nivelId)) {
@@ -292,12 +373,32 @@ class ListasGenerales extends Component
         $this->opcion_descarga = 'personalizadores';
         $this->mostrar_motivo = false;
         $this->buscar_alumno = '';
+        $this->buscar_profesor = '';
+        $this->audiencia_personalizador = 'alumnos';
         $this->alumnos_seleccionados = [];
+        $this->profesores_seleccionados = [];
         $this->resetErrorBag();
     }
 
     public function seleccionarTodos(): void
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            $ids = $this->profesoresDisponibles
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $this->profesores_seleccionados = collect($this->profesores_seleccionados)
+                ->map(fn ($id): int => (int) $id)
+                ->merge($ids)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            return;
+        }
+
         $ids = $this->alumnosDisponibles
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
@@ -318,7 +419,22 @@ class ListasGenerales extends Component
 
     public function limpiarSeleccion(): void
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            $this->profesores_seleccionados = [];
+            return;
+        }
+
         $this->alumnos_seleccionados = [];
+    }
+
+    public function quitarProfesorSeleccionado(int $profesorId): void
+    {
+        $this->profesores_seleccionados = collect($this->profesores_seleccionados)
+            ->map(fn ($id): int => (int) $id)
+            ->reject(fn (int $id): bool => $id === $profesorId)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function quitarAlumnoSeleccionado(int $alumnoId): void
@@ -414,6 +530,10 @@ class ListasGenerales extends Component
 
     public function tiposDescarga(): array
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            return ['formatos' => 'Formatos'];
+        }
+
         if (!$this->nivel_id) {
             return ['formatos' => 'Formatos'];
         }
@@ -435,6 +555,10 @@ class ListasGenerales extends Component
 
     public function opcionesDescarga(): array
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            return ['personalizadores' => 'Personalizadores'];
+        }
+
         if (!$this->nivel_id && $this->tipo_descarga === 'formatos') {
             return [
                 'personalizadores' => 'Personalizadores',
@@ -471,6 +595,20 @@ class ListasGenerales extends Component
 
     public function modosDescarga(): array
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            $modos = [
+                'seleccionados' => 'Profesores seleccionados',
+            ];
+
+            if ($this->nivel_id) {
+                $modos['nivel'] = 'Nivel completo';
+            }
+
+            $modos['todos_activos'] = 'Todos los profesores activos';
+
+            return $modos;
+        }
+
         if ($this->esFormatoGlobal()) {
             $modos = [
                 'seleccionados' => 'Alumnos seleccionados',
@@ -499,6 +637,13 @@ class ListasGenerales extends Component
             && in_array($this->opcion_descarga, ['personalizadores', 'etiquetas'], true);
     }
 
+    public function esPersonalizadoresProfesores(): bool
+    {
+        return $this->tipo_descarga === 'formatos'
+            && $this->opcion_descarga === 'personalizadores'
+            && $this->audiencia_personalizador === 'profesores';
+    }
+
     public function esListaAlumnosInstitucional(): bool
     {
         return $this->tipo_descarga === 'alumnos_institucional';
@@ -524,6 +669,14 @@ class ListasGenerales extends Component
         }
 
         return $this->niveles->firstWhere('id', $this->nivel_id);
+    }
+
+    #[Computed]
+    public function cicloSeleccionado(): ?CicloEscolar
+    {
+        return $this->ciclo_escolar_id
+            ? CicloEscolar::query()->find($this->ciclo_escolar_id)
+            : null;
     }
 
     #[Computed]
@@ -575,7 +728,7 @@ class ListasGenerales extends Component
     #[Computed]
     public function alumnosDisponibles(): Collection
     {
-        if ($this->modo_descarga !== 'seleccionados') {
+        if ($this->esPersonalizadoresProfesores() || $this->modo_descarga !== 'seleccionados') {
             return collect();
         }
 
@@ -668,9 +821,194 @@ class ListasGenerales extends Component
             ->values();
     }
 
+    private function consultaProfesoresGlobales(?int $nivelId = null): Builder
+    {
+        $cicloId = (int) ($this->ciclo_escolar_id ?? 0);
+
+        $query = Persona::query()
+            ->with([
+                'rolesPersona:id,nombre,slug,status,es_docente',
+                'personaNiveles' => fn ($q) => $q
+                    ->select('id', 'persona_id', 'nivel_id', 'estado', 'fecha_fin')
+                    ->where('estado', 'activo')
+                    ->where(function ($vigencia) {
+                        $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
+                    })
+                    ->with('nivel:id,nombre,slug'),
+                'asignacionMaterias' => fn ($q) => $q
+                    ->select('id', 'profesor_id', 'ciclo_escolar_id', 'nivel_id', 'estado')
+                    ->where('ciclo_escolar_id', $cicloId)
+                    ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA])
+                    ->with('nivel:id,nombre,slug'),
+                'tallerSesiones' => fn ($q) => $q
+                    ->select('id', 'profesor_id', 'ciclo_escolar_id', 'estado')
+                    ->where('ciclo_escolar_id', $cicloId)
+                    ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
+                    ->with(['grupos:id,nivel_id', 'grupos.nivel:id,nombre,slug']),
+            ])
+            ->withCount([
+                'asignacionMaterias as cargas_materias_count' => fn ($q) => $q
+                    ->where('ciclo_escolar_id', $cicloId)
+                    ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]),
+                'tallerSesiones as cargas_talleres_count' => fn ($q) => $q
+                    ->where('ciclo_escolar_id', $cicloId)
+                    ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA),
+            ])
+            ->where('personas.status', true)
+            ->where(function (Builder $candidato) use ($cicloId): void {
+                $candidato
+                    ->whereHas('rolesPersona', fn (Builder $rol) => $rol
+                        ->where('status', true)
+                        ->where('es_docente', true))
+                    ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                        ->where('ciclo_escolar_id', $cicloId)
+                        ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
+                    ->orWhereHas('tallerSesiones', fn (Builder $taller) => $taller
+                        ->where('ciclo_escolar_id', $cicloId)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
+            });
+
+        if ($nivelId) {
+            $query->where(function (Builder $porNivel) use ($nivelId, $cicloId): void {
+                $porNivel
+                    ->whereHas('personaNiveles', fn (Builder $relacion) => $relacion
+                        ->where('nivel_id', $nivelId)
+                        ->where('estado', 'activo')
+                        ->where(function ($vigencia) {
+                            $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
+                        }))
+                    ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                        ->where('ciclo_escolar_id', $cicloId)
+                        ->where('nivel_id', $nivelId)
+                        ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
+                    ->orWhereHas('tallerSesiones', fn (Builder $taller) => $taller
+                        ->where('ciclo_escolar_id', $cicloId)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
+                        ->whereHas('grupos', fn (Builder $grupo) => $grupo->where('nivel_id', $nivelId)));
+            });
+        }
+
+        return $query;
+    }
+
+    #[Computed]
+    public function profesoresDisponibles(): Collection
+    {
+        if (!$this->esPersonalizadoresProfesores() || $this->modo_descarga !== 'seleccionados' || !$this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        $query = $this->consultaProfesoresGlobales($this->nivel_id);
+        $busqueda = trim($this->buscar_profesor);
+
+        if ($busqueda !== '') {
+            $terminos = preg_split('/\s+/', $busqueda) ?: [];
+
+            foreach ($terminos as $termino) {
+                $termino = trim((string) $termino);
+                if ($termino === '') {
+                    continue;
+                }
+
+                $like = '%' . $termino . '%';
+                $query->where(function (Builder $q) use ($like): void {
+                    $q->where('nombre', 'like', $like)
+                        ->orWhere('apellido_paterno', 'like', $like)
+                        ->orWhere('apellido_materno', 'like', $like)
+                        ->orWhere('curp', 'like', $like)
+                        ->orWhere('rfc', 'like', $like)
+                        ->orWhere('correo', 'like', $like);
+                });
+            }
+        }
+
+        return $query
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    #[Computed]
+    public function idsProfesoresSeleccionadosValidos(): array
+    {
+        $ids = collect($this->profesores_seleccionados)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty() || !$this->ciclo_escolar_id) {
+            return [];
+        }
+
+        return $this->consultaProfesoresGlobales()
+            ->whereIn('personas.id', $ids)
+            ->pluck('personas.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
+    public function profesoresSeleccionadosDetalle(): Collection
+    {
+        $ids = $this->idsProfesoresSeleccionadosValidos;
+        if ($ids === []) {
+            return collect();
+        }
+
+        return $this->consultaProfesoresGlobales()
+            ->whereIn('personas.id', $ids)
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    #[Computed]
+    public function resumenSeleccionProfesoresPorNivel(): Collection
+    {
+        $conteos = [];
+
+        foreach ($this->profesoresSeleccionadosDetalle as $profesor) {
+            $niveles = $this->nivelesProfesor($profesor);
+
+            if ($niveles->isEmpty()) {
+                $conteos['Sin nivel asignado'] = ($conteos['Sin nivel asignado'] ?? 0) + 1;
+                continue;
+            }
+
+            foreach ($niveles as $nivel) {
+                $nombre = (string) ($nivel->nombre ?? 'Sin nivel');
+                $conteos[$nombre] = ($conteos[$nombre] ?? 0) + 1;
+            }
+        }
+
+        return collect($conteos)
+            ->map(fn (int $total, string $nivel): array => ['nivel' => $nivel, 'total' => $total])
+            ->values();
+    }
+
+    #[Computed]
+    public function totalProfesoresDisponibles(): int
+    {
+        return $this->profesoresDisponibles->count();
+    }
+
+    #[Computed]
+    public function totalProfesoresSeleccionados(): int
+    {
+        return count($this->idsProfesoresSeleccionadosValidos);
+    }
+
     #[Computed]
     public function idsAlumnosSeleccionadosValidos(): array
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            return [];
+        }
+
         $ids = collect($this->alumnos_seleccionados)
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
@@ -751,6 +1089,15 @@ class ListasGenerales extends Component
             return false;
         }
 
+        if ($this->esPersonalizadoresProfesores()) {
+            return match ($this->modo_descarga) {
+                'seleccionados' => $this->totalProfesoresSeleccionados > 0,
+                'nivel' => $this->nivel_id !== null,
+                'todos_activos' => true,
+                default => false,
+            };
+        }
+
         if ($this->esFormatoGlobal()) {
             return match ($this->modo_descarga) {
                 'seleccionados' => $this->totalAlumnosSeleccionados > 0,
@@ -816,10 +1163,14 @@ class ListasGenerales extends Component
                 'grado_id' => $this->grado_id,
                 'semestre_id' => $this->semestre_id,
                 'grupo_id' => $this->grupo_id,
-                'alumnos' => $this->modo_descarga === 'seleccionados'
+                'alumnos' => $this->modo_descarga === 'seleccionados' && !$this->esPersonalizadoresProfesores()
                     ? implode(',', $this->idsAlumnosSeleccionadosValidos)
                     : null,
+                'profesores' => $this->modo_descarga === 'seleccionados' && $this->esPersonalizadoresProfesores()
+                    ? implode(',', $this->idsProfesoresSeleccionadosValidos)
+                    : null,
                 'opcion_descarga' => $this->opcion_descarga,
+                'audiencia_personalizador' => $this->audiencia_personalizador,
             ]);
         }
 
@@ -876,6 +1227,16 @@ class ListasGenerales extends Component
     #[Computed]
     public function textoBotonDescarga(): string
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            if ($this->modo_descarga === 'seleccionados') {
+                return 'Descargar PDF (' . $this->totalProfesoresSeleccionados . ' profesores)';
+            }
+
+            return $this->modo_descarga === 'nivel'
+                ? 'Descargar PDF de profesores del nivel'
+                : 'Descargar PDF de profesores';
+        }
+
         if ($this->modo_descarga === 'seleccionados') {
             return 'Descargar PDF (' . $this->totalAlumnosSeleccionados . ' alumnos)';
         }
@@ -890,6 +1251,19 @@ class ListasGenerales extends Component
     #[Computed]
     public function mensajeEstadoDescarga(): string
     {
+        if ($this->esPersonalizadoresProfesores()) {
+            return match ($this->modo_descarga) {
+                'seleccionados' => $this->totalProfesoresSeleccionados > 0
+                    ? 'Listo para generar personalizadores con los profesores seleccionados.'
+                    : 'Selecciona al menos un profesor activo. Puedes cambiar de nivel sin perder la selección.',
+                'nivel' => $this->nivel_id
+                    ? 'Se incluirán todos los profesores activos vinculados al nivel seleccionado.'
+                    : 'Selecciona un nivel.',
+                'todos_activos' => 'Se incluirán todos los profesores activos detectados por función docente o carga académica del ciclo.',
+                default => 'Completa los filtros para continuar.',
+            };
+        }
+
         if ($this->esFormatoGlobal()) {
             return match ($this->modo_descarga) {
                 'seleccionados' => $this->totalAlumnosSeleccionados > 0
@@ -949,6 +1323,82 @@ class ListasGenerales extends Component
         return $this->modo_descarga === 'seleccionados'
             ? 'Se incluirán únicamente los alumnos marcados.'
             : 'Se incluirán todos los alumnos activos del grupo seleccionado.';
+    }
+
+    public function nombreProfesor($profesor): string
+    {
+        $nombre = trim(implode(' ', array_filter([
+            $profesor?->nombre,
+            $profesor?->apellido_paterno,
+            $profesor?->apellido_materno,
+        ])));
+        $titulo = trim((string) ($profesor?->titulo ?? ''));
+
+        return trim(($titulo !== '' ? $titulo . ' ' : '') . $nombre);
+    }
+
+    public function nivelesProfesor($profesor): Collection
+    {
+        $niveles = collect();
+
+        foreach (($profesor?->personaNiveles ?? collect()) as $relacion) {
+            if ($relacion?->nivel) {
+                $niveles->push($relacion->nivel);
+            }
+        }
+
+        foreach (($profesor?->asignacionMaterias ?? collect()) as $carga) {
+            if ($carga?->nivel) {
+                $niveles->push($carga->nivel);
+            }
+        }
+
+        foreach (($profesor?->tallerSesiones ?? collect()) as $sesion) {
+            foreach (($sesion?->grupos ?? collect()) as $grupo) {
+                if ($grupo?->nivel) {
+                    $niveles->push($grupo->nivel);
+                }
+            }
+        }
+
+        return $niveles
+            ->filter()
+            ->unique(fn ($nivel): int => (int) $nivel->id)
+            ->sortBy(fn ($nivel): int => (int) $nivel->id)
+            ->values();
+    }
+
+    public function textoNivelesProfesor($profesor): string
+    {
+        $niveles = $this->nivelesProfesor($profesor)
+            ->pluck('nombre')
+            ->filter()
+            ->map(fn ($nombre): string => mb_strtoupper((string) $nombre, 'UTF-8'))
+            ->values();
+
+        return $niveles->isNotEmpty()
+            ? $niveles->implode(' / ')
+            : 'SIN NIVEL ASIGNADO';
+    }
+
+    public function textoCargaProfesor($profesor): string
+    {
+        $materias = (int) ($profesor?->cargas_materias_count ?? 0);
+        $talleres = (int) ($profesor?->cargas_talleres_count ?? 0);
+
+        if ($materias === 0 && $talleres === 0) {
+            return 'Sin carga académica en el ciclo';
+        }
+
+        $partes = [];
+        if ($materias > 0) {
+            $partes[] = $materias . ' ' . ($materias === 1 ? 'materia' : 'materias');
+        }
+        if ($talleres > 0) {
+            $partes[] = $talleres . ' ' . ($talleres === 1 ? 'taller' : 'talleres');
+        }
+
+        return implode(' · ', $partes);
     }
 
     public function nombreAlumno($alumno): string

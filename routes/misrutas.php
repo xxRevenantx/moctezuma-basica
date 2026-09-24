@@ -10,6 +10,7 @@ use App\Http\Controllers\BoletaOficialPrimariaController;
 use App\Http\Controllers\PromediosOficialesPrimariaPdfController;
 use App\Http\Controllers\PromedioAnualBachilleratoController;
 use App\Http\Controllers\CicloEscolarController;
+use App\Http\Controllers\CartaCompromisoPdfController;
 use App\Http\Controllers\CierreGeneracionReporteController;
 use App\Http\Controllers\AnaliticaInstitucionalReporteController;
 use App\Http\Controllers\AlumnosNoVigentesPdfController;
@@ -334,6 +335,7 @@ Route::middleware('admin')->group(function () {
 });
 
 Route::get('/constancias', [DocumentosController::class, 'constancias'])->middleware('admin')->name('misrutas.constancias');
+Route::get('/cartas-compromiso', [DocumentosController::class, 'cartasCompromiso'])->middleware('admin')->name('misrutas.cartas-compromiso');
 Route::get('/oficios', [DocumentosController::class, 'oficios'])->middleware('admin')->name('misrutas.oficios');
 
 
@@ -586,6 +588,14 @@ Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'co
     ->middleware('admin')
     ->name('misrutas.constancias.pdf');
 
+
+Route::get('/cartas-compromiso/abrir/masivas/pdf', [CartaCompromisoPdfController::class, 'masivas'])
+    ->middleware('admin')
+    ->name('misrutas.cartas-compromiso.masivas.pdf');
+
+Route::get('/cartas-compromiso/{carta}/pdf', [CartaCompromisoPdfController::class, 'individual'])
+    ->middleware('admin')
+    ->name('misrutas.cartas-compromiso.pdf');
 
 Route::get('/oficios/{oficio}/pdf', [DocumentosPDFController::class, 'oficioPdf'])
     ->middleware('admin')

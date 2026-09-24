@@ -13,6 +13,12 @@ class DocumentosController extends Controller
     }
 
 
+    // CARTAS COMPROMISO
+    public function cartasCompromiso()
+    {
+        return view('documentos.cartas-compromiso');
+    }
+
     // OFICIOS
     public function oficios()
     {
