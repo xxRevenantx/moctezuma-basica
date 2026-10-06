@@ -15,7 +15,8 @@
             <div class="max-w-3xl">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
                     <flux:badge color="blue" size="sm">Módulo global</flux:badge>
-                    <flux:badge color="green" size="sm">{{ $esPersonalizadoresProfesores ? 'Solo profesores activos' : 'Solo alumnos activos' }}</flux:badge>
+                    <flux:badge color="green" size="sm">Ciclo {{ $this->cicloSeleccionado?->nombre ?? 'sin seleccionar' }}</flux:badge>
+                    <flux:badge color="amber" size="sm">Estado: {{ $this->estadosCicloDisponibles()[$estado_ciclo] ?? 'Todos' }}</flux:badge>
                     @if ($esFormatoGlobal)
                         <flux:badge color="purple" size="sm">Selección multinivel</flux:badge>
                     @endif
@@ -24,7 +25,7 @@
                 <flux:heading size="xl">Listas generales</flux:heading>
                 <flux:text variant="subtle" class="mt-2">
                     {{ $esPersonalizadoresProfesores
-                        ? 'Genera personalizadores de profesores por selección, nivel o para todo el personal docente activo desde una sola pantalla.'
+                        ? 'Genera personalizadores de profesores por selección, nivel o para toda la carga docente del ciclo seleccionado desde una sola pantalla.'
                         : 'Genera listas académicas por nivel y crea Personalizadores o Etiquetas con alumnos de cualquier nivel desde una sola pantalla.' }}
                 </flux:text>
             </div>
@@ -39,7 +40,7 @@
 
     <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div wire:loading.flex
-            wire:target="nivel_id,generacion_id,grado_id,semestre_id,grupo_id,tipo_descarga,opcion_descarga,audiencia_personalizador,modo_descarga,limpiarFiltros"
+            wire:target="ciclo_escolar_id,estado_ciclo,nivel_id,generacion_id,grado_id,semestre_id,grupo_id,tipo_descarga,opcion_descarga,audiencia_personalizador,modo_descarga,limpiarFiltros"
             class="absolute inset-0 z-30 hidden items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
             <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                 <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -58,7 +59,7 @@
                 <div>
                     <h2 class="text-base font-black text-slate-900 dark:text-white">Filtros de descarga</h2>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Selecciona el nivel y el documento. Los Personalizadores permiten trabajar con alumnos o profesores; las Etiquetas permanecen disponibles para alumnos.
+                        Selecciona primero el ciclo escolar. Las listas, Personalizadores y Etiquetas respetan la ubicación y el estado que cada alumno tenía en ese ciclo.
                     </p>
                 </div>
             </div>
@@ -72,11 +73,11 @@
                             <flux:icon.users class="h-5 w-5" />
                         </span>
                         <div>
-                            <p class="text-sm font-black text-emerald-900 dark:text-emerald-100">{{ $esPersonalizadoresProfesores ? 'Modo global de profesores' : 'Modo global de alumnos' }}</p>
+                            <p class="text-sm font-black text-emerald-900 dark:text-emerald-100">{{ $esPersonalizadoresProfesores ? 'Modo global de profesores por ciclo' : 'Modo histórico de alumnos por ciclo' }}</p>
                             <p class="mt-1 text-xs font-semibold leading-5 text-emerald-700 dark:text-emerald-300">
                                 {{ $esPersonalizadoresProfesores
-                                    ? 'Puedes buscar por nombre, apellidos, CURP, RFC o correo, cambiar de nivel y conservar la selección. El nivel se obtiene de la relación activa de personal y se complementa con la carga académica del ciclo.'
-                                    : 'Puedes buscar por nombre, apellidos, matrícula o CURP, cambiar de nivel y conservar la selección. Los filtros de generación, grado y grupo son opcionales cuando el alcance es “Alumnos seleccionados”.' }}
+                                    ? 'Puedes buscar por nombre, apellidos, CURP, RFC o correo. Solo se muestran profesores con carga académica registrada en el ciclo seleccionado.'
+                                    : 'Puedes buscar por nombre, apellidos, matrícula o CURP. El nivel, generación, grado, semestre y grupo corresponden al ciclo seleccionado, no a la ubicación actual del alumno.' }}
                             </p>
                         </div>
                     </div>
@@ -124,6 +125,30 @@
             @endif
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <flux:field>
+                    <flux:label>Ciclo escolar</flux:label>
+                    <flux:select id="ciclo_escolar_id" wire:model.live="ciclo_escolar_id">
+                        @foreach ($ciclosEscolares as $cicloOpcion)
+                            <flux:select.option value="{{ $cicloOpcion->id }}">
+                                {{ $cicloOpcion->nombre }}{{ $cicloOpcion->es_actual ? ' · Actual' : '' }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="ciclo_escolar_id" />
+                </flux:field>
+
+                @if (!$esPersonalizadoresProfesores)
+                    <flux:field>
+                        <flux:label>Estado en el ciclo</flux:label>
+                        <flux:select id="estado_ciclo" wire:model.live="estado_ciclo">
+                            @foreach ($this->estadosCicloDisponibles() as $valorEstado => $textoEstado)
+                                <flux:select.option value="{{ $valorEstado }}">{{ $textoEstado }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="estado_ciclo" />
+                    </flux:field>
+                @endif
+
                 <flux:field>
                     <flux:label>Nivel</flux:label>
                     <flux:select id="nivel_id" wire:model.live="nivel_id" :disabled="$modo_descarga === 'todos_activos'">
@@ -253,7 +278,7 @@
                             <p class="text-sm font-black text-slate-900 dark:text-white">Lista institucional de alumnos</p>
                             <p class="mt-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
                                 Formato Carta vertical inspirado en el documento oficial: logo de Educación Guerrero, C.C.T., grado, grupo, 30 espacios por página, sexo (H/M), CURP, fecha de nacimiento, firmas y concentrado H/M/Total.
-                                Solo toma matrícula vigente del ciclo; alumnos anulados, no reinscritos, bajas o traslados no se imprimen.
+                                Respeta el ciclo y el filtro de estado seleccionados; en ciclos históricos utiliza la ubicación académica registrada en ese ciclo.
                             </p>
                         </div>
                     </div>
@@ -277,7 +302,7 @@
 
     @if ($modo_descarga === 'seleccionados' && $esPersonalizadoresProfesores)
         <section class="relative overflow-hidden rounded-3xl border border-sky-200 bg-white shadow-sm dark:border-sky-900/50 dark:bg-neutral-900">
-            <div wire:loading.flex wire:target="buscar_profesor,seleccionarTodos,limpiarSeleccion,profesores_seleccionados,nivel_id"
+            <div wire:loading.flex wire:target="buscar_profesor,seleccionarTodos,limpiarSeleccion,profesores_seleccionados,nivel_id,ciclo_escolar_id"
                 class="absolute inset-0 z-30 hidden items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-neutral-900/75">
                 <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-200">
                     <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -382,6 +407,9 @@
                                     <span class="mt-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                                         {{ $this->textoCargaProfesor($profesor) }}
                                     </span>
+                                    <span class="mt-1 block text-[10px] font-semibold leading-4 text-slate-400 dark:text-slate-500">
+                                        {{ $this->textoDetalleCargaProfesor($profesor) }}
+                                    </span>
                                 </span>
 
                                 @if ($incluido)
@@ -393,7 +421,7 @@
                                 <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-neutral-800 dark:text-slate-300">
                                     <flux:icon.academic-cap class="h-6 w-6" />
                                 </span>
-                                <p class="mt-3 text-sm font-black text-slate-800 dark:text-slate-100">No hay profesores activos con estos filtros.</p>
+                                <p class="mt-3 text-sm font-black text-slate-800 dark:text-slate-100">No hay profesores con carga académica en este ciclo y filtros.</p>
                                 <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Prueba con otro nivel o término de búsqueda.</p>
                             </div>
                         @endforelse
@@ -528,8 +556,8 @@
                     <p class="mt-3 text-sm font-black text-slate-800 dark:text-slate-100">Selecciona primero el contexto escolar</p>
                     <p class="mx-auto mt-1 max-w-xl text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
                         {{ $esBachillerato
-                            ? 'Elige nivel, generación, grado, semestre y grupo para cargar los alumnos activos.'
-                            : 'Elige nivel, generación, grado y grupo para cargar los alumnos activos.' }}
+                            ? 'Elige nivel, generación, grado, semestre y grupo para cargar los alumnos del ciclo.'
+                            : 'Elige nivel, generación, grado y grupo para cargar los alumnos del ciclo.' }}
                     </p>
                 </div>
             @else
@@ -547,7 +575,7 @@
                             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 <span>{{ $this->totalAlumnosDisponibles }} alumno(s) visibles con los filtros actuales.</span>
                                 @if ($esFormatoGlobal)
-                                    <span>Solo se muestran alumnos con matrícula activa.</span>
+                                    <span>Se muestran alumnos según el ciclo y estado seleccionados.</span>
                                 @endif
                             </div>
                         </div>
@@ -586,7 +614,7 @@
                                     <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-neutral-800 dark:text-slate-300">
                                         <flux:icon.users class="h-6 w-6" />
                                     </span>
-                                    <p class="mt-3 text-sm font-black text-slate-800 dark:text-slate-100">No hay alumnos activos con estos filtros.</p>
+                                    <p class="mt-3 text-sm font-black text-slate-800 dark:text-slate-100">No hay alumnos que coincidan con el ciclo, estado y filtros actuales.</p>
                                     <p class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Prueba con otro nivel, contexto o término de búsqueda.</p>
                                 </div>
                             @endforelse
@@ -703,8 +731,8 @@
         @if ($modo_descarga === 'todos_activos')
             <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
                 {{ $esPersonalizadoresProfesores
-                    ? 'Esta opción genera personalizadores para todo el personal docente activo detectado por rol o carga académica del ciclo. Úsala cuando necesites el lote docente completo.'
-                    : 'Esta opción puede generar un PDF grande porque incluye toda la matrícula activa institucional. Úsala cuando realmente necesites el lote completo.' }}
+                    ? 'Esta opción genera personalizadores para todos los profesores con carga académica registrada en el ciclo seleccionado.'
+                    : 'Esta opción puede generar un PDF grande porque incluye todos los alumnos que coincidan con el ciclo y estado seleccionados.' }}
             </div>
         @endif
     </section>

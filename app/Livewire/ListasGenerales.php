@@ -7,14 +7,13 @@ use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
-use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Parcial;
 use App\Models\Persona;
 use App\Models\Semestre;
 use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
-use App\Services\ListaAcademicaService;
+use App\Services\ListasGeneralesCicloService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -28,6 +27,7 @@ class ListasGenerales extends Component
     public Collection $grupos;
     public Collection $semestres;
     public Collection $parciales;
+    public Collection $ciclosEscolares;
 
     public ?int $nivel_id = null;
     public ?int $generacion_id = null;
@@ -35,6 +35,7 @@ class ListasGenerales extends Component
     public ?int $semestre_id = null;
     public ?int $grupo_id = null;
     public ?int $ciclo_escolar_id = null;
+    public string $estado_ciclo = 'activos';
 
     /** @var array<int, int|string> */
     public array $alumnos_seleccionados = [];
@@ -67,6 +68,11 @@ class ListasGenerales extends Component
             ->orderBy('id')
             ->get(['id', 'parcial', 'descripcion']);
 
+        $this->ciclosEscolares = CicloEscolar::query()
+            ->orderByDesc('inicio_anio')
+            ->orderByDesc('fin_anio')
+            ->get();
+
         $ciclo = CicloEscolar::query()
             ->where('es_actual', true)
             ->first()
@@ -76,6 +82,56 @@ class ListasGenerales extends Component
                 ->first();
 
         $this->ciclo_escolar_id = $ciclo?->id;
+        if ($ciclo) {
+            $this->estado_ciclo = app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo);
+        }
+    }
+
+    public function updatedCicloEscolarId(): void
+    {
+        $ciclo = $this->ciclo_escolar_id
+            ? CicloEscolar::query()->find($this->ciclo_escolar_id)
+            : null;
+
+        if (!$ciclo) {
+            $ciclo = CicloEscolar::query()->where('es_actual', true)->first()
+                ?? CicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->first();
+            $this->ciclo_escolar_id = $ciclo?->id;
+        }
+
+        if ($ciclo) {
+            $this->estado_ciclo = app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo);
+        }
+
+        $this->generacion_id = null;
+        $this->grado_id = null;
+        $this->semestre_id = null;
+        $this->grupo_id = null;
+        $this->generaciones = collect();
+        $this->grados = collect();
+        $this->semestres = collect();
+        $this->grupos = collect();
+        $this->alumnos_seleccionados = [];
+        $this->profesores_seleccionados = [];
+        $this->buscar_alumno = '';
+        $this->buscar_profesor = '';
+
+        if ($this->nivel_id) {
+            $this->cargarGeneraciones();
+            if ($this->esFormatoGlobal()) {
+                $this->cargarGrados();
+            }
+        }
+    }
+
+    public function updatedEstadoCiclo(): void
+    {
+        if (!array_key_exists($this->estado_ciclo, app(ListasGeneralesCicloService::class)->estadosDisponibles())) {
+            $this->estado_ciclo = 'todos';
+        }
+
+        $this->alumnos_seleccionados = [];
+        $this->buscar_alumno = '';
     }
 
     public function updatedAudienciaPersonalizador(): void
@@ -359,6 +415,12 @@ class ListasGenerales extends Component
 
     public function limpiarFiltros(): void
     {
+        $ciclo = CicloEscolar::query()->where('es_actual', true)->first()
+            ?? CicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->first();
+        $this->ciclo_escolar_id = $ciclo?->id;
+        $this->estado_ciclo = $ciclo
+            ? app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo)
+            : 'activos';
         $this->nivel_id = null;
         $this->generacion_id = null;
         $this->grado_id = null;
@@ -464,6 +526,7 @@ class ListasGenerales extends Component
         $this->generaciones = app(ContextoEscolarService::class)->generaciones(
             nivelId: $this->nivel_id,
             cicloEscolarId: $this->ciclo_escolar_id,
+            soloGruposActivos: (bool) ($this->cicloSeleccionado?->es_actual ?? false),
         );
     }
 
@@ -483,6 +546,7 @@ class ListasGenerales extends Component
             nivelId: $this->nivel_id,
             cicloEscolarId: $this->ciclo_escolar_id,
             generacionId: $this->generacion_id,
+            soloGruposActivos: (bool) ($this->cicloSeleccionado?->es_actual ?? false),
         );
     }
 
@@ -498,6 +562,7 @@ class ListasGenerales extends Component
             cicloEscolarId: $this->ciclo_escolar_id,
             generacionId: $this->generacion_id,
             gradoId: $this->grado_id,
+            soloGruposActivos: (bool) ($this->cicloSeleccionado?->es_actual ?? false),
         );
     }
 
@@ -525,6 +590,7 @@ class ListasGenerales extends Component
             gradoId: $this->grado_id,
             semestreId: $this->semestre_id,
             bachillerato: $this->esBachillerato(),
+            soloActivos: (bool) ($this->cicloSeleccionado?->es_actual ?? false),
         );
     }
 
@@ -604,7 +670,7 @@ class ListasGenerales extends Component
                 $modos['nivel'] = 'Nivel completo';
             }
 
-            $modos['todos_activos'] = 'Todos los profesores activos';
+            $modos['todos_activos'] = 'Todos los profesores del ciclo';
 
             return $modos;
         }
@@ -619,7 +685,7 @@ class ListasGenerales extends Component
                 $modos['nivel'] = 'Nivel completo';
             }
 
-            $modos['todos_activos'] = 'Todos los alumnos activos';
+            $modos['todos_activos'] = 'Todos los alumnos del ciclo';
 
             return $modos;
         }
@@ -711,18 +777,18 @@ class ListasGenerales extends Component
             : null;
     }
 
-    private function consultaGlobalAlumnos(): Builder
+    private function alumnosHistoricos(array $filtros = [], array $ids = []): Collection
     {
-        return Inscripcion::query()
-            ->visiblesEnListas()
-            ->with([
-                'nivel:id,nombre,slug',
-                'generacion:id,nivel_id,nombre,anio_ingreso,anio_egreso',
-                'grado:id,nivel_id,nombre,orden',
-                'semestre:id,grado_id,numero,orden_global',
-                'grupo:id,nivel_id,grado_id,generacion_id,semestre_id,asignacion_grupo_id',
-                'grupo.asignacionGrupo:id,nombre',
-            ]);
+        if (!$this->ciclo_escolar_id) {
+            return collect();
+        }
+
+        return app(ListasGeneralesCicloService::class)->alumnos(
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            filtros: $filtros,
+            estado: $this->estado_ciclo,
+            ids: $ids,
+        );
     }
 
     #[Computed]
@@ -732,73 +798,29 @@ class ListasGenerales extends Component
             return collect();
         }
 
-        if ($this->esFormatoGlobal()) {
-            $query = $this->consultaGlobalAlumnos()
-                ->when($this->nivel_id, fn (Builder $q) => $q->where('nivel_id', $this->nivel_id))
-                ->when($this->generacion_id, fn (Builder $q) => $q->where('generacion_id', $this->generacion_id))
-                ->when($this->grado_id, fn (Builder $q) => $q->where('grado_id', $this->grado_id))
-                ->when($this->semestre_id, fn (Builder $q) => $q->where('semestre_id', $this->semestre_id))
-                ->when($this->grupo_id, fn (Builder $q) => $q->where('grupo_id', $this->grupo_id));
+        $filtros = [
+            'nivel_id' => $this->nivel_id,
+            'generacion_id' => $this->generacion_id,
+            'grado_id' => $this->grado_id,
+            'grupo_id' => $this->grupo_id,
+        ];
 
-            $busqueda = trim($this->buscar_alumno);
-            if ($busqueda !== '') {
-                $terminos = preg_split('/\s+/', $busqueda) ?: [];
-
-                foreach ($terminos as $termino) {
-                    $termino = trim((string) $termino);
-                    if ($termino === '') {
-                        continue;
-                    }
-
-                    $like = '%' . $termino . '%';
-                    $query->where(function (Builder $q) use ($like): void {
-                        $q->where('matricula', 'like', $like)
-                            ->orWhere('curp', 'like', $like)
-                            ->orWhere('nombre', 'like', $like)
-                            ->orWhere('apellido_paterno', 'like', $like)
-                            ->orWhere('apellido_materno', 'like', $like);
-                    });
-                }
-            }
-
-            return $query
-                ->orderBy('nivel_id')
-                ->orderBy('grado_id')
-                ->orderBy('grupo_id')
-                ->orderBy('apellido_paterno')
-                ->orderBy('apellido_materno')
-                ->orderBy('nombre')
-                ->get();
+        if ($this->esBachillerato()) {
+            $filtros['semestre_id'] = $this->semestre_id;
+        } elseif ($this->nivel_id) {
+            $filtros['sin_semestre'] = 1;
         }
 
-        if (!$this->contextoGrupoCompleto()) {
+        if (!$this->esFormatoGlobal() && !$this->contextoGrupoCompleto()) {
             return collect();
         }
 
-        $grupo = $this->grupoSeleccionado;
-        if (!$grupo || !$this->nivelSeleccionado) {
-            return collect();
-        }
-
-        $alumnos = app(ListaAcademicaService::class)
-            ->alumnosPorContexto(
-                cicloEscolarId: (int) $this->ciclo_escolar_id,
-                grupoIds: [(int) $grupo->id],
-                fechaCorte: now(),
-                nivelId: (int) $this->nivel_id,
-                gradoId: (int) $this->grado_id,
-                generacionId: (int) $this->generacion_id,
-                semestreId: $this->esBachillerato() ? (int) $this->semestre_id : null,
-                usarHistorialCiclo: true,
-                incluirNoActivos: false,
-                usarActualComoRespaldo: true,
-                incluirTodaGeneracionBachillerato: $this->esBachillerato(),
-            )
-            ->filter(fn ($alumno): bool => $alumno->visibleEnListas());
-
+        $alumnos = $this->alumnosHistoricos($filtros);
         $busqueda = mb_strtolower(trim($this->buscar_alumno));
+
         if ($busqueda !== '') {
-            $alumnos = $alumnos->filter(function ($alumno) use ($busqueda): bool {
+            $terminos = preg_split('/\s+/', $busqueda) ?: [];
+            $alumnos = $alumnos->filter(function ($alumno) use ($terminos): bool {
                 $texto = mb_strtolower(implode(' ', [
                     (string) ($alumno->matricula ?? ''),
                     (string) ($alumno->curp ?? ''),
@@ -807,18 +829,17 @@ class ListasGenerales extends Component
                     (string) ($alumno->apellido_materno ?? ''),
                 ]));
 
-                return str_contains($texto, $busqueda);
+                foreach ($terminos as $termino) {
+                    $termino = mb_strtolower(trim((string) $termino));
+                    if ($termino !== '' && !str_contains($texto, $termino)) {
+                        return false;
+                    }
+                }
+                return true;
             });
         }
 
-        return $alumnos
-            ->unique(fn ($alumno): int => (int) $alumno->id)
-            ->sortBy(fn ($alumno): string => mb_strtolower(trim(
-                (string) $alumno->apellido_paterno . ' ' .
-                (string) $alumno->apellido_materno . ' ' .
-                (string) $alumno->nombre
-            )))
-            ->values();
+        return $alumnos->values();
     }
 
     private function consultaProfesoresGlobales(?int $nivelId = null): Builder
@@ -827,24 +848,28 @@ class ListasGenerales extends Component
 
         $query = Persona::query()
             ->with([
-                'rolesPersona:id,nombre,slug,status,es_docente',
-                'personaNiveles' => fn ($q) => $q
-                    ->select('id', 'persona_id', 'nivel_id', 'estado', 'fecha_fin')
-                    ->where('estado', 'activo')
-                    ->where(function ($vigencia) {
-                        $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
-                    })
-                    ->with('nivel:id,nombre,slug'),
                 'asignacionMaterias' => fn ($q) => $q
-                    ->select('id', 'profesor_id', 'ciclo_escolar_id', 'nivel_id', 'estado')
+                    ->select('id', 'materia_id', 'grupo_id', 'profesor_id', 'ciclo_escolar_id', 'nivel_id', 'grado_id', 'generacion_id', 'semestre_id', 'estado')
                     ->where('ciclo_escolar_id', $cicloId)
                     ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA])
-                    ->with('nivel:id,nombre,slug'),
+                    ->with([
+                        'nivel:id,nombre,slug',
+                        'materia:id,materia',
+                        'grupo:id,nivel_id,grado_id,generacion_id,semestre_id,asignacion_grupo_id',
+                        'grupo.grado:id,nivel_id,nombre,orden',
+                        'grupo.asignacionGrupo:id,nombre',
+                    ]),
                 'tallerSesiones' => fn ($q) => $q
-                    ->select('id', 'profesor_id', 'ciclo_escolar_id', 'estado')
+                    ->select('id', 'taller_id', 'profesor_id', 'ciclo_escolar_id', 'estado')
                     ->where('ciclo_escolar_id', $cicloId)
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
-                    ->with(['grupos:id,nivel_id', 'grupos.nivel:id,nombre,slug']),
+                    ->with([
+                        'taller:id,nombre',
+                        'grupos:id,nivel_id,grado_id,generacion_id,semestre_id,asignacion_grupo_id',
+                        'grupos.nivel:id,nombre,slug',
+                        'grupos.grado:id,nivel_id,nombre,orden',
+                        'grupos.asignacionGrupo:id,nombre',
+                    ]),
             ])
             ->withCount([
                 'asignacionMaterias as cargas_materias_count' => fn ($q) => $q
@@ -854,13 +879,9 @@ class ListasGenerales extends Component
                     ->where('ciclo_escolar_id', $cicloId)
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA),
             ])
-            ->where('personas.status', true)
             ->where(function (Builder $candidato) use ($cicloId): void {
                 $candidato
-                    ->whereHas('rolesPersona', fn (Builder $rol) => $rol
-                        ->where('status', true)
-                        ->where('es_docente', true))
-                    ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                    ->whereHas('asignacionMaterias', fn (Builder $carga) => $carga
                         ->where('ciclo_escolar_id', $cicloId)
                         ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
                     ->orWhereHas('tallerSesiones', fn (Builder $taller) => $taller
@@ -871,13 +892,7 @@ class ListasGenerales extends Component
         if ($nivelId) {
             $query->where(function (Builder $porNivel) use ($nivelId, $cicloId): void {
                 $porNivel
-                    ->whereHas('personaNiveles', fn (Builder $relacion) => $relacion
-                        ->where('nivel_id', $nivelId)
-                        ->where('estado', 'activo')
-                        ->where(function ($vigencia) {
-                            $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
-                        }))
-                    ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                    ->whereHas('asignacionMaterias', fn (Builder $carga) => $carga
                         ->where('ciclo_escolar_id', $cicloId)
                         ->where('nivel_id', $nivelId)
                         ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
@@ -1020,9 +1035,7 @@ class ListasGenerales extends Component
         }
 
         if ($this->esFormatoGlobal()) {
-            return Inscripcion::query()
-                ->visiblesEnListas()
-                ->whereIn('id', $ids)
+            return $this->alumnosHistoricos(ids: $ids->all())
                 ->pluck('id')
                 ->map(fn ($id): int => (int) $id)
                 ->values()
@@ -1047,15 +1060,7 @@ class ListasGenerales extends Component
             return collect();
         }
 
-        return $this->consultaGlobalAlumnos()
-            ->whereIn('id', $ids)
-            ->orderBy('nivel_id')
-            ->orderBy('grado_id')
-            ->orderBy('grupo_id')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+        return $this->alumnosHistoricos(ids: $ids);
     }
 
     #[Computed]
@@ -1144,6 +1149,7 @@ class ListasGenerales extends Component
                 'slug_nivel' => $this->nivelSeleccionado?->slug,
                 'modo_descarga' => $this->modo_descarga,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'estado_ciclo' => $this->estado_ciclo,
                 'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
                 'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
                 'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
@@ -1158,6 +1164,7 @@ class ListasGenerales extends Component
             return route('listas-generales.formatos.pdf', [
                 'modo_descarga' => $this->modo_descarga,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'estado_ciclo' => $this->estado_ciclo,
                 'nivel_id' => $this->nivel_id,
                 'generacion_id' => $this->generacion_id,
                 'grado_id' => $this->grado_id,
@@ -1178,6 +1185,7 @@ class ListasGenerales extends Component
             'slug_nivel' => $this->nivelSeleccionado?->slug,
             'modo_descarga' => $this->modo_descarga,
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'estado_ciclo' => $this->estado_ciclo,
             'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
             'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
             'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
@@ -1202,6 +1210,7 @@ class ListasGenerales extends Component
             'slug_nivel' => $this->nivelSeleccionado?->slug,
             'modo_descarga' => $this->modo_descarga,
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'estado_ciclo' => $this->estado_ciclo,
             'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
             'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
             'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
@@ -1255,11 +1264,11 @@ class ListasGenerales extends Component
             return match ($this->modo_descarga) {
                 'seleccionados' => $this->totalProfesoresSeleccionados > 0
                     ? 'Listo para generar personalizadores con los profesores seleccionados.'
-                    : 'Selecciona al menos un profesor activo. Puedes cambiar de nivel sin perder la selección.',
+                    : 'Selecciona al menos un profesor con carga académica en el ciclo. Puedes cambiar de nivel sin perder la selección.',
                 'nivel' => $this->nivel_id
-                    ? 'Se incluirán todos los profesores activos vinculados al nivel seleccionado.'
+                    ? 'Se incluirán todos los profesores con carga académica en el nivel y ciclo seleccionados.'
                     : 'Selecciona un nivel.',
-                'todos_activos' => 'Se incluirán todos los profesores activos detectados por función docente o carga académica del ciclo.',
+                'todos_activos' => 'Se incluirán todos los profesores con carga académica registrada en el ciclo seleccionado.',
                 default => 'Completa los filtros para continuar.',
             };
         }
@@ -1268,16 +1277,16 @@ class ListasGenerales extends Component
             return match ($this->modo_descarga) {
                 'seleccionados' => $this->totalAlumnosSeleccionados > 0
                     ? 'Listo para generar el documento con alumnos de uno o varios niveles.'
-                    : 'Selecciona al menos un alumno activo. Puedes mezclar niveles sin perder la selección.',
+                    : 'Selecciona al menos un alumno del ciclo y estado elegidos. Puedes mezclar niveles sin perder la selección.',
                 'grupo' => $this->contextoGrupoCompleto()
-                    ? 'Se incluirán todos los alumnos activos del grupo seleccionado.'
+                    ? 'Se incluirán todos los alumnos que coincidan con el ciclo, estado y grupo seleccionados.'
                     : ($this->esBachillerato()
                         ? 'Selecciona generación, grado, semestre y grupo.'
                         : 'Selecciona generación, grado y grupo.'),
                 'nivel' => $this->nivel_id
-                    ? 'Se incluirán todos los alumnos activos del nivel seleccionado.'
+                    ? 'Se incluirán todos los alumnos que coincidan con el ciclo, estado y nivel seleccionados.'
                     : 'Selecciona un nivel.',
-                'todos_activos' => 'Se incluirán todos los alumnos activos de Preescolar, Primaria, Secundaria y Bachillerato.',
+                'todos_activos' => 'Se incluirán los alumnos del ciclo y estado seleccionados de todos los niveles.',
                 default => 'Completa los filtros para continuar.',
             };
         }
@@ -1288,7 +1297,7 @@ class ListasGenerales extends Component
 
         if ($this->esListaAlumnosInstitucional()) {
             if ($this->modo_descarga === 'nivel') {
-                return 'Se generará un documento institucional con una página por grupo activo del nivel. Cada lista incluye hasta 30 espacios, firmas y concentrado H/M/Total.';
+                return 'Se generará un documento institucional con una página por grupo del nivel en el ciclo seleccionado. Cada lista incluye hasta 30 espacios, firmas y concentrado H/M/Total.';
             }
 
             if (!$this->contextoGrupoCompleto()) {
@@ -1298,12 +1307,12 @@ class ListasGenerales extends Component
             }
 
             if ($this->modo_descarga === 'seleccionados' && $this->totalAlumnosSeleccionados === 0) {
-                return 'Selecciona al menos un alumno activo del grupo para generar la lista institucional.';
+                return 'Selecciona al menos un alumno del ciclo y estado elegidos para generar la lista institucional.';
             }
 
             return $this->modo_descarga === 'seleccionados'
                 ? 'Se generará la lista institucional únicamente con los alumnos seleccionados.'
-                : 'Se generará la lista institucional con la matrícula vigente del grupo seleccionado.';
+                : 'Se generará la lista institucional con los alumnos del ciclo, estado y grupo seleccionados.';
         }
 
         if ($this->modo_descarga === 'nivel') {
@@ -1317,12 +1326,12 @@ class ListasGenerales extends Component
         }
 
         if ($this->modo_descarga === 'seleccionados' && $this->totalAlumnosSeleccionados === 0) {
-            return 'Selecciona al menos un alumno activo del grupo.';
+            return 'Selecciona al menos un alumno del ciclo y estado elegidos.';
         }
 
         return $this->modo_descarga === 'seleccionados'
             ? 'Se incluirán únicamente los alumnos marcados.'
-            : 'Se incluirán todos los alumnos activos del grupo seleccionado.';
+            : 'Se incluirán todos los alumnos que coincidan con el ciclo, estado y grupo seleccionados.';
     }
 
     public function nombreProfesor($profesor): string
@@ -1340,12 +1349,6 @@ class ListasGenerales extends Component
     public function nivelesProfesor($profesor): Collection
     {
         $niveles = collect();
-
-        foreach (($profesor?->personaNiveles ?? collect()) as $relacion) {
-            if ($relacion?->nivel) {
-                $niveles->push($relacion->nivel);
-            }
-        }
 
         foreach (($profesor?->asignacionMaterias ?? collect()) as $carga) {
             if ($carga?->nivel) {
@@ -1401,6 +1404,46 @@ class ListasGenerales extends Component
         return implode(' · ', $partes);
     }
 
+    public function textoDetalleCargaProfesor($profesor): string
+    {
+        $detalles = collect();
+
+        foreach (($profesor?->asignacionMaterias ?? collect()) as $carga) {
+            $materia = trim((string) ($carga?->materia?->materia ?? 'Materia'));
+            $grado = trim((string) ($carga?->grupo?->grado?->nombre ?? ''));
+            $grupo = trim((string) ($carga?->grupo?->asignacionGrupo?->nombre ?? ''));
+            $contexto = trim(implode(' ', array_filter([
+                $grado !== '' ? $grado . '°' : null,
+                $grupo !== '' ? $grupo : null,
+            ])));
+
+            $detalles->push($contexto !== '' ? $materia . ' · ' . $contexto : $materia);
+        }
+
+        foreach (($profesor?->tallerSesiones ?? collect()) as $sesion) {
+            $taller = trim((string) ($sesion?->taller?->nombre ?? 'Taller'));
+            foreach (($sesion?->grupos ?? collect()) as $grupo) {
+                $grado = trim((string) ($grupo?->grado?->nombre ?? ''));
+                $seccion = trim((string) ($grupo?->asignacionGrupo?->nombre ?? ''));
+                $contexto = trim(implode(' ', array_filter([
+                    $grado !== '' ? $grado . '°' : null,
+                    $seccion !== '' ? $seccion : null,
+                ])));
+                $detalles->push($contexto !== '' ? $taller . ' · ' . $contexto : $taller);
+            }
+        }
+
+        $detalles = $detalles->filter()->unique()->values();
+        if ($detalles->isEmpty()) {
+            return 'Sin detalle de carga registrado';
+        }
+
+        $visibles = $detalles->take(4)->implode(' · ');
+        $restantes = max(0, $detalles->count() - 4);
+
+        return $restantes > 0 ? $visibles . ' · +' . $restantes . ' más' : $visibles;
+    }
+
     public function nombreAlumno($alumno): string
     {
         return trim(implode(' ', array_filter([
@@ -1447,6 +1490,11 @@ class ListasGenerales extends Component
         }
 
         return 'PARCIAL ' . ($parcial?->id ?? '');
+    }
+
+    public function estadosCicloDisponibles(): array
+    {
+        return app(ListasGeneralesCicloService::class)->estadosDisponibles();
     }
 
     public function etiquetaOpcionDescarga(): string

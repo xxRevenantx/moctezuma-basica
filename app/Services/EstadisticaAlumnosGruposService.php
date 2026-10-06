@@ -23,7 +23,7 @@ class EstadisticaAlumnosGruposService
      *
      * @return array<string, mixed>
      */
-    public function generar(int $cicloEscolarId, int $nivelId): array
+    public function generar(int $cicloEscolarId, int $nivelId, ?string $fechaEdad = null): array
     {
         $ciclo = CicloEscolar::query()->findOrFail($cicloEscolarId);
         $nivel = Nivel::query()->findOrFail($nivelId);
@@ -36,7 +36,7 @@ class EstadisticaAlumnosGruposService
         }
 
         $corte = $this->edadEscolar->fechaCorte911($ciclo);
-        $corteEdad = $this->edadEscolar->fechaEdad911($ciclo);
+        $corteEdad = $this->resolverFechaEdad($fechaEdad, $ciclo);
         $columnas = $this->columnasEdad($slug);
         $grados = Grado::query()
             ->where('nivel_id', $nivel->id)
@@ -172,6 +172,27 @@ class EstadisticaAlumnosGruposService
             ],
             'incidencias' => $incidencias,
         ];
+    }
+
+    private function resolverFechaEdad(?string $fechaEdad, CicloEscolar $ciclo): CarbonImmutable
+    {
+        if (blank($fechaEdad)) {
+            return $this->edadEscolar->fechaEdad911($ciclo);
+        }
+
+        try {
+            $fecha = CarbonImmutable::createFromFormat('!Y-m-d', $fechaEdad);
+        } catch (\Throwable) {
+            $fecha = false;
+        }
+
+        if (! $fecha || $fecha->format('Y-m-d') !== $fechaEdad) {
+            throw ValidationException::withMessages([
+                'fecha_edad' => 'Selecciona una fecha válida para calcular la edad.',
+            ]);
+        }
+
+        return $fecha->endOfDay();
     }
 
     /** @return array<string, string> */

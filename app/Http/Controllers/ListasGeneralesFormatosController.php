@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AsignacionMateria;
 use App\Models\CicloEscolar;
-use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Models\Persona;
 use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
+use App\Services\ListasGeneralesCicloService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -74,25 +74,19 @@ class ListasGeneralesFormatosController extends Controller
         CicloEscolar $cicloEscolar,
         ?Nivel $nivel,
     ) {
-        $query = Inscripcion::query()
-            ->visiblesEnListas()
-            ->with([
-                'nivel:id,nombre,slug',
-                'generacion:id,nivel_id,nombre,anio_ingreso,anio_egreso',
-                'grado:id,nivel_id,nombre,orden',
-                'semestre:id,grado_id,numero,orden_global',
-                'grupo:id,nivel_id,grado_id,generacion_id,semestre_id,asignacion_grupo_id',
-                'grupo.asignacionGrupo:id,nombre',
-            ]);
+        $estadoCiclo = (string) $request->input('estado_ciclo', app(ListasGeneralesCicloService::class)->estadoPredeterminado($cicloEscolar));
+        abort_unless(array_key_exists($estadoCiclo, app(ListasGeneralesCicloService::class)->estadosDisponibles()), 422, 'El estado del ciclo seleccionado no es válido.');
+
+        $filtros = [];
+        $ids = [];
 
         if ($modo === 'seleccionados') {
             $ids = $this->idsSeleccionados($request, 'alumnos', 'alumno');
-            $query->whereIn('id', $ids);
         }
 
         if ($modo === 'nivel') {
             abort_unless($nivel, 422, 'Selecciona un nivel para generar el documento.');
-            $query->where('nivel_id', $nivel->id);
+            $filtros['nivel_id'] = (int) $nivel->id;
         }
 
         if ($modo === 'grupo') {
@@ -115,37 +109,34 @@ class ListasGeneralesFormatosController extends Controller
                 gradoId: $gradoId,
                 semestreId: $semestreId,
                 bachillerato: $esBachillerato,
+                soloActivo: (bool) $cicloEscolar->es_actual,
             );
 
-            abort_unless($grupo, 404, 'El grupo seleccionado no pertenece al contexto escolar actual.');
+            abort_unless($grupo, 404, 'El grupo seleccionado no pertenece al ciclo escolar seleccionado.');
 
-            $query
-                ->where('nivel_id', $nivel->id)
-                ->where('generacion_id', $generacionId)
-                ->where('grado_id', $gradoId)
-                ->where('grupo_id', $grupoId)
-                ->when($esBachillerato, fn (Builder $q) => $q->where('semestre_id', $semestreId));
+            $filtros = [
+                'nivel_id' => (int) $nivel->id,
+                'generacion_id' => $generacionId,
+                'grado_id' => $gradoId,
+                'grupo_id' => $grupoId,
+            ];
+            $esBachillerato ? $filtros['semestre_id'] = $semestreId : $filtros['sin_semestre'] = 1;
         }
 
-        $alumnos = $query
-            ->orderBy('nivel_id')
-            ->orderBy('grado_id')
-            ->orderBy('semestre_id')
-            ->orderBy('grupo_id')
-            ->orderBy('apellido_paterno')
-            ->orderBy('apellido_materno')
-            ->orderBy('nombre')
-            ->get();
+        $alumnos = app(ListasGeneralesCicloService::class)->alumnos(
+            cicloEscolarId: (int) $cicloEscolar->id,
+            filtros: $filtros,
+            estado: $estadoCiclo,
+            ids: $ids,
+        );
 
         if ($modo === 'seleccionados') {
-            $idsSolicitados = $this->idsSeleccionados($request, 'alumnos', 'alumno');
             $idsEncontrados = $alumnos->pluck('id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
-            $invalidos = array_values(array_diff($idsSolicitados, $idsEncontrados));
-
-            abort_if($invalidos !== [], 422, 'Uno o más alumnos seleccionados ya no están activos. Actualiza la selección e inténtalo nuevamente.');
+            $invalidos = array_values(array_diff($ids, $idsEncontrados));
+            abort_if($invalidos !== [], 422, 'Uno o más alumnos seleccionados no pertenecen al ciclo o al estado seleccionado. Actualiza la selección e inténtalo nuevamente.');
         }
 
-        abort_if($alumnos->isEmpty(), 404, 'No se encontraron alumnos activos para generar el documento.');
+        abort_if($alumnos->isEmpty(), 404, 'No se encontraron alumnos para el ciclo, estado y contexto seleccionados.');
 
         $vista = $opcion === 'personalizadores'
             ? 'pdf.personalizadores'
@@ -160,7 +151,8 @@ class ListasGeneralesFormatosController extends Controller
 
         $nombreArchivo = $opcion
             . '-' . Str::slug($nombreAlcance, '-')
-            . '-' . now()->format('Ymd-His')
+            . '-' . Str::slug($cicloEscolar->nombre, '-')
+            . '-' . Str::slug($estadoCiclo, '-')
             . '.pdf';
 
         return Pdf::loadView($vista, [
@@ -173,6 +165,7 @@ class ListasGeneralesFormatosController extends Controller
             'semestre' => null,
             'esBachillerato' => false,
             'cicloEscolar' => $cicloEscolar,
+            'estadoCiclo' => $estadoCiclo,
             'imagenPersonalizador' => $this->imagenBase64Publica('imagenes/personalizador.jpg'),
         ])
             ->setPaper('letter', 'portrait')
@@ -208,10 +201,10 @@ class ListasGeneralesFormatosController extends Controller
             $idsEncontrados = $profesores->pluck('id')->map(fn ($id): int => (int) $id)->unique()->values()->all();
             $invalidos = array_values(array_diff($idsSolicitados, $idsEncontrados));
 
-            abort_if($invalidos !== [], 422, 'Uno o más profesores seleccionados ya no están activos o ya no cumplen los criterios docentes del ciclo. Actualiza la selección e inténtalo nuevamente.');
+            abort_if($invalidos !== [], 422, 'Uno o más profesores seleccionados no tienen carga académica válida en el ciclo seleccionado. Actualiza la selección e inténtalo nuevamente.');
         }
 
-        abort_if($profesores->isEmpty(), 404, 'No se encontraron profesores activos para generar el documento.');
+        abort_if($profesores->isEmpty(), 404, 'No se encontraron profesores con carga académica en el ciclo seleccionado.');
 
         $profesores->each(function (Persona $profesor): void {
             $profesor->setAttribute('niveles_personalizador', $this->nivelesProfesor($profesor));
@@ -225,7 +218,7 @@ class ListasGeneralesFormatosController extends Controller
 
         $nombreArchivo = 'personalizadores-profesores-'
             . Str::slug($nombreAlcance, '-')
-            . '-' . now()->format('Ymd-His')
+            . '-' . Str::slug($cicloEscolar->nombre, '-')
             . '.pdf';
 
         return Pdf::loadView('pdf.personalizadores_profesores', [
@@ -240,13 +233,6 @@ class ListasGeneralesFormatosController extends Controller
     {
         return Persona::query()
             ->with([
-                'personaNiveles' => fn ($q) => $q
-                    ->select('id', 'persona_id', 'nivel_id', 'estado', 'fecha_fin')
-                    ->where('estado', 'activo')
-                    ->where(function ($vigencia) {
-                        $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
-                    })
-                    ->with('nivel:id,nombre,slug'),
                 'asignacionMaterias' => fn ($q) => $q
                     ->select('id', 'profesor_id', 'ciclo_escolar_id', 'nivel_id', 'estado')
                     ->where('ciclo_escolar_id', $cicloEscolarId)
@@ -258,13 +244,9 @@ class ListasGeneralesFormatosController extends Controller
                     ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA)
                     ->with(['grupos:id,nivel_id', 'grupos.nivel:id,nombre,slug']),
             ])
-            ->where('personas.status', true)
             ->where(function (Builder $candidato) use ($cicloEscolarId): void {
                 $candidato
-                    ->whereHas('rolesPersona', fn (Builder $rol) => $rol
-                        ->where('status', true)
-                        ->where('es_docente', true))
-                    ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                    ->whereHas('asignacionMaterias', fn (Builder $carga) => $carga
                         ->where('ciclo_escolar_id', $cicloEscolarId)
                         ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
                     ->orWhereHas('tallerSesiones', fn (Builder $taller) => $taller
@@ -277,13 +259,7 @@ class ListasGeneralesFormatosController extends Controller
     {
         $query->where(function (Builder $porNivel) use ($nivelId, $cicloEscolarId): void {
             $porNivel
-                ->whereHas('personaNiveles', fn (Builder $relacion) => $relacion
-                    ->where('nivel_id', $nivelId)
-                    ->where('estado', 'activo')
-                    ->where(function ($vigencia) {
-                        $vigencia->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', now()->toDateString());
-                    }))
-                ->orWhereHas('asignacionMaterias', fn (Builder $carga) => $carga
+                ->whereHas('asignacionMaterias', fn (Builder $carga) => $carga
                     ->where('ciclo_escolar_id', $cicloEscolarId)
                     ->where('nivel_id', $nivelId)
                     ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
@@ -297,12 +273,6 @@ class ListasGeneralesFormatosController extends Controller
     private function nivelesProfesor(Persona $profesor): string
     {
         $niveles = collect();
-
-        foreach ($profesor->personaNiveles as $relacion) {
-            if ($relacion->nivel) {
-                $niveles->push($relacion->nivel);
-            }
-        }
 
         foreach ($profesor->asignacionMaterias as $carga) {
             if ($carga->nivel) {

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\CicloEscolar;
 use App\Models\Nivel;
+use App\Services\EdadEscolarService;
 use App\Services\EstadisticaAlumnosGruposService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,7 @@ class EstadisticaAlumnosGrupos extends Component
 
     public ?int $ciclo_escolar_id = null;
     public ?int $nivel_id = null;
+    public ?string $fecha_edad = null;
 
     /** @var array<string,mixed> */
     public array $datos = [];
@@ -40,6 +42,7 @@ class EstadisticaAlumnosGrupos extends Component
             ?? $this->ciclosEscolares->first()?->id;
         $this->nivel_id = $this->niveles->firstWhere('slug', 'primaria')?->id
             ?? $this->niveles->first()?->id;
+        $this->fecha_edad = $this->fechaEdadPredeterminada();
 
         $this->cargarDatos();
     }
@@ -47,12 +50,22 @@ class EstadisticaAlumnosGrupos extends Component
     public function updatedCicloEscolarId($value): void
     {
         $this->ciclo_escolar_id = $value ? (int) $value : null;
+        $this->fecha_edad = $this->fechaEdadPredeterminada();
         $this->cargarDatos();
     }
 
     public function updatedNivelId($value): void
     {
         $this->nivel_id = $value ? (int) $value : null;
+        $this->cargarDatos();
+    }
+
+    public function updatedFechaEdad($value): void
+    {
+        $this->fecha_edad = filled($value)
+            ? (string) $value
+            : $this->fechaEdadPredeterminada();
+
         $this->cargarDatos();
     }
 
@@ -74,6 +87,7 @@ class EstadisticaAlumnosGrupos extends Component
             $this->datos = app(EstadisticaAlumnosGruposService::class)->generar(
                 $this->ciclo_escolar_id,
                 $this->nivel_id,
+                $this->fecha_edad,
             );
         } catch (ValidationException $exception) {
             $this->error = collect($exception->errors())->flatten()->first();
@@ -81,6 +95,23 @@ class EstadisticaAlumnosGrupos extends Component
             report($exception);
             $this->error = 'No fue posible construir el desglose estadístico. Revisa la integridad del ciclo y del historial de alumnos.';
         }
+    }
+
+    private function fechaEdadPredeterminada(): ?string
+    {
+        if (! $this->ciclo_escolar_id) {
+            return null;
+        }
+
+        $ciclo = $this->ciclosEscolares->firstWhere('id', $this->ciclo_escolar_id);
+
+        if (! $ciclo instanceof CicloEscolar) {
+            return null;
+        }
+
+        return app(EdadEscolarService::class)
+            ->fechaEdad911($ciclo)
+            ->toDateString();
     }
 
     public function render()

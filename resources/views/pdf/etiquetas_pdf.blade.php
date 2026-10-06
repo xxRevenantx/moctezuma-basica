@@ -108,6 +108,19 @@
             color: #4a9f00;
         }
 
+        .ciclo-hoja {
+            position: absolute;
+            top: 0.55cm;
+            left: 0;
+            width: 100%;
+            z-index: 3;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 700;
+            color: #26384f;
+            text-transform: uppercase;
+        }
+
         .sin-alumnos {
             margin: 2cm auto;
             padding: 1cm;
@@ -123,6 +136,7 @@
 <body>
     @php
         $modoGlobalActivo = (bool) ($modoGlobal ?? false);
+        $cicloTexto = (string) ($cicloEscolar?->nombre ?? '');
         $coleccionAlumnos = collect($alumnos ?? [])->values();
         $paginas = $coleccionAlumnos->chunk(2)->map(fn($pagina) => $pagina->values())->values();
 
@@ -184,6 +198,10 @@
         <div class="pagina-etiquetas {{ !$loop->last ? 'salto-pagina-etiquetas' : '' }}">
             @if ($fondoPersonalizador)
                 <img class="fondo-hoja" src="{{ $fondoPersonalizador }}" alt="Personalizador">
+            @endif
+
+            @if ($cicloTexto !== '')
+                <div class="ciclo-hoja">Ciclo escolar: {{ $cicloTexto }}</div>
             @endif
 
             @if ($alumno1)

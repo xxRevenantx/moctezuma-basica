@@ -20,6 +20,7 @@ use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
 use App\Services\ListaAcademicaService;
+use App\Services\ListasGeneralesCicloService;
 use App\Services\CalificacionOficialPrimariaService;
 use App\Services\PromedioBachilleratoService;
 use App\Services\PromedioSecundariaService;
@@ -5940,11 +5941,10 @@ class PDFController extends Controller
         }
 
         $nombreArchivo = 'listas-' . $nivel->slug . '-todas-las-generaciones'
+            . '-' . Str::slug($cicloEscolar->nombre, '-')
             . '-' . Str::slug($tipoDescarga, '-')
             . '-' . Str::slug($opcionDescarga, '-')
             . '.pdf';
-
-        $nombreArchivo .= '-' . Str::slug($tipoDescarga, '-') . '-' . Str::slug($opcionDescarga, '-') . '.pdf';
 
         return Pdf::loadView('pdf.listas_nivel_pdf', [
             'nivel' => $nivel,
@@ -7008,64 +7008,33 @@ class PDFController extends Controller
             $tipoPeriodo = $datosPeriodo['tipoPeriodo'];
         }
 
-        $fechaCorte = $periodo?->fecha_fin
-            ?? $periodo?->fecha_inicio
-            ?? $request->input('fecha_fin')
-            ?? ($cicloEscolar->es_actual
-                ? now()->toDateString()
-                : sprintf('%04d-07-31', (int) $cicloEscolar->fin_anio));
-
-        $alumnos = app(ListaAcademicaService::class)->alumnosPorContexto(
-            cicloEscolarId: (int) $cicloEscolarId,
-            grupoIds: [(int) $grupo->id],
-            fechaCorte: $fechaCorte,
-            nivelId: (int) $nivel->id,
-            gradoId: (int) $grado->id,
-            generacionId: (int) $generacion->id,
-            semestreId: $esBachillerato ? (int) $semestre?->id : null,
-            usarHistorialCiclo: true,
-            incluirNoActivos: false,
-            fechaInicio: $periodo?->fecha_inicio ?? $request->input('fecha_inicio'),
-            fechaFin: $periodo?->fecha_fin ?? $request->input('fecha_fin'),
-            periodoId: $periodo?->id ? (int) $periodo->id : null,
-            usarActualComoRespaldo: (bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at),
-            incluirTodaGeneracionBachillerato: $esBachillerato,
+        $estadoCiclo = (string) $request->input(
+            'estado_ciclo',
+            app(ListasGeneralesCicloService::class)->estadoPredeterminado($cicloEscolar)
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Matrícula operativa vigente
-        |--------------------------------------------------------------------------
-        | En el ciclo actual, Listas Generales está rotulado como "Solo alumnos
-        | activos". Por ello, la reconstrucción histórica no puede reincorporar
-        | alumnos anulados, no reinscritos, trasladados o cerrados.
-        | Los ciclos históricos conservan la reconstrucción por fecha.
-        */
-        if ((bool) $cicloEscolar->es_actual && blank($cicloEscolar->cerrado_at)) {
-            $idsVigentes = InscripcionCiclo::query()
-                ->where('ciclo_escolar_id', $cicloEscolarId)
-                ->where('nivel_id', $nivel->id)
-                ->where('grado_id', $grado->id)
-                ->where('generacion_id', $generacion->id)
-                ->where('grupo_id', $grupo->id)
-                ->when(
-                    $esBachillerato,
-                    fn (Builder $query) => $query->where('semestre_id', $semestre?->id),
-                    fn (Builder $query) => $query->whereNull('semestre_id')
-                )
-                ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
-                ->where('estatus_actual_ciclo', 'activo')
-                ->whereHas('inscripcion', fn (Builder $query) => $query->visiblesEnListas())
-                ->pluck('inscripcion_id')
-                ->map(fn ($id): int => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-
-            $alumnos = $alumnos
-                ->filter(fn ($alumno): bool => in_array((int) $alumno->id, $idsVigentes, true))
-                ->values();
+        if (!array_key_exists($estadoCiclo, app(ListasGeneralesCicloService::class)->estadosDisponibles())) {
+            abort(422, 'El estado del ciclo seleccionado no es válido.');
         }
+
+        $filtrosAlumnos = [
+            'nivel_id' => (int) $nivel->id,
+            'generacion_id' => (int) $generacion->id,
+            'grado_id' => (int) $grado->id,
+            'grupo_id' => (int) $grupo->id,
+        ];
+
+        if ($esBachillerato) {
+            $filtrosAlumnos['semestre_id'] = (int) $semestre?->id;
+        } else {
+            $filtrosAlumnos['sin_semestre'] = 1;
+        }
+
+        $alumnos = app(ListasGeneralesCicloService::class)->alumnos(
+            cicloEscolarId: (int) $cicloEscolarId,
+            filtros: $filtrosAlumnos,
+            estado: $estadoCiclo,
+        );
 
         if ($alumnosSeleccionadosIds !== []) {
             $idsEncontrados = $alumnos
@@ -7078,7 +7047,7 @@ class PDFController extends Controller
             $idsInvalidos = array_values(array_diff($alumnosSeleccionadosIds, $idsEncontrados));
 
             if ($idsInvalidos !== []) {
-                abort(422, 'Uno o más alumnos seleccionados ya no pertenecen a la matrícula activa del grupo. Actualiza la selección e inténtalo nuevamente.');
+                abort(422, 'Uno o más alumnos seleccionados no pertenecen al ciclo, estado o grupo seleccionados. Actualiza la selección e inténtalo nuevamente.');
             }
 
             $alumnos = $alumnos
@@ -7087,7 +7056,7 @@ class PDFController extends Controller
         }
 
         if ($alumnos->isEmpty()) {
-            abort(404, 'No se encontraron alumnos activos para generar el documento.');
+            abort(404, 'No se encontraron alumnos para el ciclo, estado y grupo seleccionados.');
         }
 
         /*
@@ -7155,6 +7124,7 @@ class PDFController extends Controller
 
             'tipoPeriodo' => $tipoPeriodo,
             'cicloEscolar' => $cicloEscolar,
+            'estadoCiclo' => $estadoCiclo,
 
             'parcialSeleccionado' => $parcialSeleccionado,
             'parcialId' => $parcialId,
@@ -7230,6 +7200,7 @@ class PDFController extends Controller
 
         $nombreArchivo = $nombreTipo
             . '-' . $nivel->slug
+            . '-' . Str::slug($cicloEscolar->nombre, '-')
             . '-grado-' . Str::slug((string) ($grado->nombre ?? 'grado'), '-')
             . ($esBachillerato && $semestre ? '-semestre-' . $semestre->numero : '')
             . '-grupo-' . Str::slug($this->nombreGrupo($grupo), '-')

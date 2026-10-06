@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\CicloEscolar;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
-use App\Models\InscripcionCiclo;
 use App\Models\Nivel;
 use App\Models\PersonaNivelDetalle;
+use App\Services\ListasGeneralesCicloService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -73,6 +73,7 @@ class ListaAlumnosInstitucionalController extends Controller
             'semestre_id' => ['nullable', 'integer', 'exists:semestres,id'],
             'grupo_id' => ['nullable', 'integer', 'exists:grupos,id'],
             'alumnos' => ['nullable', 'string'],
+            'estado_ciclo' => ['nullable', 'string', 'in:todos,activos,bajas,egresados,promovidos'],
         ]);
 
         $nivel = Nivel::query()
@@ -82,11 +83,12 @@ class ListaAlumnosInstitucionalController extends Controller
 
         $ciclo = CicloEscolar::query()->findOrFail((int) $datosValidados['ciclo_escolar_id']);
         $modo = (string) $datosValidados['modo_descarga'];
+        $estadoCiclo = (string) ($datosValidados['estado_ciclo'] ?? app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo));
 
         $idsSeleccionados = $this->idsSeleccionados((string) ($datosValidados['alumnos'] ?? ''));
 
         if ($modo === 'seleccionados' && $idsSeleccionados === []) {
-            abort(422, 'Selecciona al menos un alumno activo para generar la lista institucional.');
+            abort(422, 'Selecciona al menos un alumno del ciclo y estado elegidos para generar la lista institucional.');
         }
 
         if ($modo === 'nivel') {
@@ -121,11 +123,12 @@ class ListaAlumnosInstitucionalController extends Controller
         }
 
         $bloques = $grupos
-            ->map(function (Grupo $grupo) use ($nivel, $ciclo, $modo, $idsSeleccionados): array {
-                $alumnos = $this->alumnosActivosDelGrupo(
+            ->map(function (Grupo $grupo) use ($nivel, $ciclo, $modo, $idsSeleccionados, $estadoCiclo): array {
+                $alumnos = $this->alumnosDelGrupo(
                     grupo: $grupo,
                     ciclo: $ciclo,
                     nivel: $nivel,
+                    estadoCiclo: $estadoCiclo,
                     idsSeleccionados: $modo === 'seleccionados' ? $idsSeleccionados : [],
                 );
 
@@ -134,7 +137,7 @@ class ListaAlumnosInstitucionalController extends Controller
             ->values();
 
         if ($modo === 'seleccionados' && $bloques->sum(fn (array $bloque): int => $bloque['alumnos']->count()) === 0) {
-            abort(422, 'Los alumnos seleccionados ya no pertenecen a la matrícula vigente del grupo.');
+            abort(422, 'Los alumnos seleccionados no pertenecen al ciclo, estado o grupo elegidos.');
         }
 
         $paginas = collect();
@@ -165,6 +168,7 @@ class ListaAlumnosInstitucionalController extends Controller
             'nivel' => $nivel,
             'ciclo' => $ciclo,
             'modo' => $modo,
+            'estado_ciclo' => $estadoCiclo,
             'bloques' => $bloques,
             'paginas' => $paginas,
             'logo_seg' => public_path('imagenes/logo-edu.png'),
@@ -174,7 +178,7 @@ class ListaAlumnosInstitucionalController extends Controller
 
     private function gruposDelNivel(Nivel $nivel, CicloEscolar $ciclo): Collection
     {
-        return Grupo::query()
+        return Grupo::withTrashed()
             ->with([
                 'grado:id,nivel_id,nombre,orden',
                 'generacion:id,nivel_id,nombre,anio_ingreso,anio_egreso',
@@ -183,8 +187,7 @@ class ListaAlumnosInstitucionalController extends Controller
             ])
             ->where('ciclo_escolar_id', $ciclo->id)
             ->where('nivel_id', $nivel->id)
-            ->where('estado', 'activo')
-            ->whereNull('archivado_at')
+            ->when($ciclo->es_actual, fn ($query) => $query->where('estado', 'activo')->whereNull('archivado_at'))
             ->orderBy('grado_id')
             ->orderByRaw('COALESCE(semestre_id, 0)')
             ->orderBy('asignacion_grupo_id')
@@ -200,7 +203,7 @@ class ListaAlumnosInstitucionalController extends Controller
         ?int $semestreId,
         int $grupoId,
     ): Grupo {
-        return Grupo::query()
+        return Grupo::withTrashed()
             ->with([
                 'grado:id,nivel_id,nombre,orden',
                 'generacion:id,nivel_id,nombre,anio_ingreso,anio_egreso',
@@ -217,52 +220,43 @@ class ListaAlumnosInstitucionalController extends Controller
                 fn ($query) => $query->where('semestre_id', $semestreId),
                 fn ($query) => $query->whereNull('semestre_id'),
             )
-            ->where('estado', 'activo')
-            ->whereNull('archivado_at')
+            ->when($ciclo->es_actual, fn ($query) => $query->where('estado', 'activo')->whereNull('archivado_at'))
             ->firstOrFail();
     }
 
     /**
-     * Fuente de verdad de este formato: matrícula vigente del ciclo.
-     * Un historial cerrado/anulado o un alumno no visible nunca se imprime.
+     * Fuente de verdad de este formato: historial académico del ciclo seleccionado.
+     * Los registros anulados se excluyen; el estado solicitado controla qué alumnos se imprimen.
      *
      * @param array<int, int> $idsSeleccionados
      * @return Collection<int, Inscripcion>
      */
-    private function alumnosActivosDelGrupo(
+    private function alumnosDelGrupo(
         Grupo $grupo,
         CicloEscolar $ciclo,
         Nivel $nivel,
+        string $estadoCiclo,
         array $idsSeleccionados = [],
     ): Collection {
-        $historiales = InscripcionCiclo::query()
-            ->with(['inscripcion'])
-            ->where('ciclo_escolar_id', $ciclo->id)
-            ->where('nivel_id', $nivel->id)
-            ->where('generacion_id', $grupo->generacion_id)
-            ->where('grado_id', $grupo->grado_id)
-            ->where('grupo_id', $grupo->id)
-            ->when(
-                $nivel->slug === 'bachillerato',
-                fn ($query) => $query->where('semestre_id', $grupo->semestre_id),
-                fn ($query) => $query->whereNull('semestre_id'),
-            )
-            ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
-            ->where('estatus_actual_ciclo', Inscripcion::ESTATUS_VISIBLE_LISTAS)
-            ->when($idsSeleccionados !== [], fn ($query) => $query->whereIn('inscripcion_id', $idsSeleccionados))
-            ->whereHas('inscripcion', fn ($query) => $query->visiblesEnListas())
-            ->get();
+        $filtros = [
+            'nivel_id' => (int) $nivel->id,
+            'generacion_id' => (int) $grupo->generacion_id,
+            'grado_id' => (int) $grupo->grado_id,
+            'grupo_id' => (int) $grupo->id,
+        ];
 
-        return $historiales
-            ->map(fn (InscripcionCiclo $historial) => $historial->inscripcion)
-            ->filter(fn ($alumno): bool => $alumno instanceof Inscripcion && $alumno->visibleEnListas())
-            ->unique('id')
-            ->sortBy(fn (Inscripcion $alumno): string => mb_strtolower(trim(implode(' ', array_filter([
-                $alumno->apellido_paterno,
-                $alumno->apellido_materno,
-                $alumno->nombre,
-            ])))))
-            ->values();
+        if ($nivel->slug === 'bachillerato') {
+            $filtros['semestre_id'] = $grupo->semestre_id ? (int) $grupo->semestre_id : null;
+        } else {
+            $filtros['sin_semestre'] = 1;
+        }
+
+        return app(ListasGeneralesCicloService::class)->alumnos(
+            cicloEscolarId: (int) $ciclo->id,
+            filtros: $filtros,
+            estado: $estadoCiclo,
+            ids: $idsSeleccionados,
+        );
     }
 
     /**

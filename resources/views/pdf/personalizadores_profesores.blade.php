@@ -70,6 +70,10 @@
         );
     @endphp
 
+    <div style="text-align:center; font-size:10px; font-weight:700; margin:2px 0 6px;">
+        CICLO ESCOLAR: {{ $cicloTexto !== '-' ? $cicloTexto : '—' }}
+    </div>
+
     <table>
         @forelse ($profesores as $profesor)
             @php

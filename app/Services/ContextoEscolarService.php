@@ -24,7 +24,9 @@ class ContextoEscolarService
         int $cicloEscolarId,
         bool $soloActivos = true,
     ): Builder {
-        return Grupo::query()
+        $query = $soloActivos ? Grupo::query() : Grupo::withTrashed();
+
+        return $query
             ->where('nivel_id', $nivelId)
             ->where('ciclo_escolar_id', $cicloEscolarId)
             ->when($soloActivos, fn (Builder $query) => $query->where('estado', 'activo'));

@@ -24,9 +24,14 @@ class EstadisticaAlumnosGruposReporteController extends Controller
         $filtros = $request->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'nivel_id' => ['required', 'integer', 'exists:niveles,id'],
+            'fecha_edad' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $datos = $service->generar((int) $filtros['ciclo_escolar_id'], (int) $filtros['nivel_id']);
+        $datos = $service->generar(
+            (int) $filtros['ciclo_escolar_id'],
+            (int) $filtros['nivel_id'],
+            $filtros['fecha_edad'] ?? null,
+        );
         $nombre = sprintf(
             'desglose-911-%s-%s-%s',
             Str::slug((string) data_get($datos, 'contexto.nivel', 'nivel')),

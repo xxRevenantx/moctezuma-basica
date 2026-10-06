@@ -385,6 +385,11 @@
                         <span class="valor">{{ $turnoTexto }}</span>
                     </span>
                 @endif
+
+                <span>
+                    <span class="label">Ciclo escolar:</span>
+                    <span class="valor">{{ $cicloEscolar?->nombre ?? '—' }}</span>
+                </span>
             </div>
 
             <table class="tabla-grupo">
@@ -427,7 +432,7 @@
                     @empty
                         <tr>
                             <td colspan="{{ $totalColumnas }}" class="sin-alumnos">
-                                No hay alumnos activos con los filtros seleccionados.
+                                No hay alumnos para el ciclo, estado y filtros seleccionados.
                             </td>
                         </tr>
                     @endforelse

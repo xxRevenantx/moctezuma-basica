@@ -33,7 +33,7 @@
     </div>
 
     <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-neutral-800 dark:bg-neutral-900/70">
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto] xl:items-end">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr_auto] xl:items-end">
             <flux:field>
                 <flux:label>Ciclo escolar</flux:label>
                 <flux:select wire:model.live="ciclo_escolar_id">
@@ -54,19 +54,25 @@
                 </flux:select>
             </flux:field>
 
+            <flux:field>
+                <flux:label>Calcular edad al</flux:label>
+                <flux:input type="date" wire:model.live.debounce.400ms="fecha_edad" />
+                <flux:description>Selecciona manualmente la fecha de referencia para calcular la edad.</flux:description>
+            </flux:field>
+
             <div class="flex flex-wrap gap-2">
                 <flux:button type="button" variant="ghost" wire:click="actualizar" icon="arrow-path">
                     Actualizar
                 </flux:button>
 
                 @if ($ciclo_escolar_id && $nivel_id && empty($error))
-                    <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'pdf', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id]) }}"
+                    <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'pdf', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id, 'fecha_edad' => $fecha_edad]) }}"
                         target="_blank"
                         class="inline-flex items-center gap-2 rounded-xl bg-[#006492] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:brightness-110">
                         <flux:icon.arrow-down-tray class="h-4 w-4" />
                         PDF
                     </a>
-                    <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'excel', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id]) }}"
+                    <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'excel', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id, 'fecha_edad' => $fecha_edad]) }}"
                         class="inline-flex items-center gap-2 rounded-xl bg-[#88AC2E] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:brightness-95">
                         <flux:icon.table-cells class="h-4 w-4" />
                         Excel
