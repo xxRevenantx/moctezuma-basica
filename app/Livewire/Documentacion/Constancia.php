@@ -52,6 +52,15 @@ class Constancia extends Component
 
     public array $grupos = [];
 
+    /**
+     * IDs de alumnos seleccionados para la generación masiva.
+     * La selección se reinicia automáticamente cuando cambia el alcance
+     * (nivel, grado, grupo o tipo de constancia) para evitar IDs obsoletos.
+     */
+    public array $alumnos_seleccionados = [];
+
+    public string $buscar_alumno_masivo = '';
+
     public ?int $plantilla_id = null;
 
     public string $tipo_constancia = '';
@@ -217,6 +226,10 @@ class Constancia extends Component
         // que únicamente admite alumnos activos.
         if ($this->selectedAlumno !== null) {
             $this->limpiarAlumno();
+        }
+
+        if ($this->modo_descarga !== 'alumno') {
+            $this->sincronizarSeleccionMasiva();
         }
     }
 
@@ -630,6 +643,9 @@ class Constancia extends Component
 
     public function updatedModoDescarga(): void
     {
+        $this->buscar_alumno_masivo = '';
+        $this->alumnos_seleccionados = [];
+
         if ($this->modo_descarga !== 'alumno') {
             $this->limpiarAlumno();
         }
@@ -638,18 +654,81 @@ class Constancia extends Component
             $this->nivel_id = null;
             $this->grado_id = null;
             $this->grupo_id = null;
+            return;
         }
+
+        $this->sincronizarSeleccionMasiva();
     }
 
     public function updatedNivelId(): void
     {
         $this->grado_id = null;
         $this->grupo_id = null;
+        $this->buscar_alumno_masivo = '';
+        $this->sincronizarSeleccionMasiva();
     }
 
     public function updatedGradoId(): void
     {
         $this->grupo_id = null;
+        $this->buscar_alumno_masivo = '';
+        $this->sincronizarSeleccionMasiva();
+    }
+
+    public function updatedGrupoId(): void
+    {
+        $this->buscar_alumno_masivo = '';
+        $this->sincronizarSeleccionMasiva();
+    }
+
+    public function seleccionarTodosAlumnosMasivos(): void
+    {
+        $this->alumnos_seleccionados = $this->idsAlumnosMasivosDisponibles();
+        $this->resetValidation('alumnos_seleccionados');
+    }
+
+    public function limpiarSeleccionAlumnosMasivos(): void
+    {
+        $this->alumnos_seleccionados = [];
+    }
+
+    private function sincronizarSeleccionMasiva(): void
+    {
+        if (!$this->filtrosMasivosCompletos()) {
+            $this->alumnos_seleccionados = [];
+            return;
+        }
+
+        // Mantiene el comportamiento masivo anterior: al elegir un alcance,
+        // todos los alumnos elegibles quedan seleccionados inicialmente.
+        // Después el usuario puede desmarcar los que no desea generar.
+        $this->alumnos_seleccionados = $this->idsAlumnosMasivosDisponibles();
+    }
+
+    private function filtrosMasivosCompletos(): bool
+    {
+        return match ($this->modo_descarga) {
+            'nivel' => filled($this->nivel_id),
+            'grado' => filled($this->nivel_id) && filled($this->grado_id),
+            'grupo' => filled($this->nivel_id) && filled($this->grupo_id),
+            default => false,
+        };
+    }
+
+    private function idsAlumnosMasivosDisponibles(): array
+    {
+        if (!$this->filtrosMasivosCompletos()) {
+            return [];
+        }
+
+        return $this->consultaAlumnosMasivos()
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 
     public function descargarConstancia(): void
@@ -700,6 +779,17 @@ class Constancia extends Component
             ]);
         }
 
+        if (empty($this->alumnos_seleccionados)) {
+            $this->addError('alumnos_seleccionados', 'Selecciona al menos un alumno para generar las constancias.');
+            $this->dispatch('cerrar-ventana-constancia-vacia');
+            return;
+        }
+
+        $this->validate([
+            'alumnos_seleccionados' => ['array', 'min:1'],
+            'alumnos_seleccionados.*' => ['integer', 'exists:inscripciones,id'],
+        ]);
+
         $alumnos = $this->obtenerAlumnosParaDescarga();
 
         if ($alumnos->isEmpty()) {
@@ -723,7 +813,17 @@ class Constancia extends Component
 
     private function obtenerAlumnosParaDescarga()
     {
-        $consulta = Inscripcion::query()
+        $idsSeleccionados = collect($this->alumnos_seleccionados)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($idsSeleccionados->isEmpty() || !$this->filtrosMasivosCompletos()) {
+            return collect();
+        }
+
+        return $this->consultaAlumnosMasivos()
             ->with([
                 'nivel.director',
                 'grado:id,nombre',
@@ -731,7 +831,20 @@ class Constancia extends Component
                 'grupo:id,asignacion_grupo_id',
                 'grupo.asignacionGrupo:id,nombre',
                 'ciclo:id,ciclo',
-            ]);
+            ])
+            // Intersección de seguridad: aunque llegue un ID manipulado desde
+            // el navegador, solo se generan alumnos pertenecientes al alcance
+            // actualmente seleccionado.
+            ->whereIn('id', $idsSeleccionados->all())
+            ->orderBy('apellido_paterno')
+            ->orderBy('apellido_materno')
+            ->orderBy('nombre')
+            ->get();
+    }
+
+    private function consultaAlumnosMasivos(): Builder
+    {
+        $consulta = Inscripcion::query();
 
         $this->aplicarFiltroAlumnosDisponibles($consulta);
 
@@ -749,11 +862,52 @@ class Constancia extends Component
                         $query->where('grado_id', $this->grado_id);
                     })
                     ->where('grupo_id', $this->grupo_id);
+            });
+    }
+
+    private function alumnosMasivosParaVista(): array
+    {
+        if (!$this->filtrosMasivosCompletos()) {
+            return [];
+        }
+
+        $buscar = trim($this->buscar_alumno_masivo);
+
+        return $this->consultaAlumnosMasivos()
+            ->with([
+                'nivel:id,nombre,cct',
+                'grado:id,nombre',
+                'generacion:id,anio_ingreso,anio_egreso',
+                'grupo:id,asignacion_grupo_id',
+                'grupo.asignacionGrupo:id,nombre',
+                'ciclo:id,ciclo',
+            ])
+            ->when($buscar !== '', function (Builder $consulta) use ($buscar) {
+                $consulta->where(function (Builder $query) use ($buscar) {
+                    $query->where('nombre', 'like', "%{$buscar}%")
+                        ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
+                        ->orWhere('apellido_materno', 'like', "%{$buscar}%")
+                        ->orWhere('curp', 'like', "%{$buscar}%")
+                        ->orWhere('matricula', 'like', "%{$buscar}%")
+                        ->orWhere('folio', 'like', "%{$buscar}%");
+                });
             })
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
             ->orderBy('nombre')
-            ->get();
+            ->get()
+            ->map(fn (Inscripcion $alumno) => $this->formatearAlumno($alumno))
+            ->values()
+            ->all();
+    }
+
+    private function totalAlumnosMasivosDisponibles(): int
+    {
+        if (!$this->filtrosMasivosCompletos()) {
+            return 0;
+        }
+
+        return $this->consultaAlumnosMasivos()->count();
     }
 
     private function aplicarFiltroAlumnosDisponibles(Builder $consulta): Builder
@@ -1042,8 +1196,12 @@ class Constancia extends Component
     public function render()
     {
         $buscar = trim($this->buscar_constancia);
+        $alumnosMasivos = $this->alumnosMasivosParaVista();
+        $totalAlumnosMasivos = $this->totalAlumnosMasivosDisponibles();
 
         return view('livewire.documentacion.constancia', [
+            'alumnosMasivos' => $alumnosMasivos,
+            'totalAlumnosMasivos' => $totalAlumnosMasivos,
             'plantillas' => ConstanciaPlantilla::query()
                 ->orderBy('titulo')
                 ->get(),

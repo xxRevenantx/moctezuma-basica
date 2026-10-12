@@ -307,9 +307,127 @@
                 @if ($modo_descarga !== 'alumno')
                     <div
                         class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200">
-                        Se abrirá un solo PDF en otra pestaña, con una constancia por página y los alumnos
-                        ordenados por apellidos. La generación masiva no se guardará en el historial.
+                        Se abrirá un solo PDF en otra pestaña, con una constancia por página y únicamente los alumnos
+                        seleccionados, ordenados por apellidos. La generación masiva no se guardará en el historial.
                     </div>
+
+                    @php
+                        $seleccionMasivaLista = match ($modo_descarga) {
+                            'nivel' => filled($nivel_id),
+                            'grado' => filled($nivel_id) && filled($grado_id),
+                            'grupo' => filled($nivel_id) && filled($grupo_id),
+                            default => false,
+                        };
+                    @endphp
+
+                    @if ($seleccionMasivaLista)
+                        <div
+                            class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <div
+                                class="flex flex-col gap-4 border-b border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/70 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h4 class="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                                            Seleccionar alumnos
+                                        </h4>
+                                        <flux:badge color="blue">
+                                            {{ count($alumnos_seleccionados) }} de {{ $totalAlumnosMasivos }} seleccionados
+                                        </flux:badge>
+                                    </div>
+                                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                        Al cambiar el nivel, grado o grupo se seleccionan automáticamente todos los alumnos elegibles. Puedes desmarcar los que no necesites.
+                                    </p>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2">
+                                    <flux:button type="button" size="sm" variant="filled"
+                                        wire:click="seleccionarTodosAlumnosMasivos">
+                                        Seleccionar todos
+                                    </flux:button>
+                                    <flux:button type="button" size="sm" variant="ghost"
+                                        wire:click="limpiarSeleccionAlumnosMasivos">
+                                        Quitar selección
+                                    </flux:button>
+                                </div>
+                            </div>
+
+                            <div class="p-4">
+                                <flux:field>
+                                    <flux:label>Buscar dentro de los alumnos del filtro</flux:label>
+                                    <flux:input type="search" wire:model.live.debounce.350ms="buscar_alumno_masivo"
+                                        placeholder="Nombre, matrícula, CURP o folio" />
+                                </flux:field>
+
+                                <flux:error name="alumnos_seleccionados" class="mt-3" />
+
+                                @if (count($alumnosMasivos) > 0)
+                                    <div
+                                        class="mt-4 max-h-96 overflow-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
+                                        <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                                            <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-800">
+                                                <tr>
+                                                    <th class="w-14 px-4 py-3 text-center">Sel.</th>
+                                                    <th class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">Alumno</th>
+                                                    <th class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">Matrícula</th>
+                                                    <th class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">Grado / grupo</th>
+                                                    <th class="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-200">Estatus</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody
+                                                class="divide-y divide-zinc-200 bg-white dark:divide-zinc-700 dark:bg-zinc-900">
+                                                @foreach ($alumnosMasivos as $alumnoMasivo)
+                                                    <tr wire:key="constancia-masiva-alumno-{{ $alumnoMasivo['id'] }}"
+                                                        class="transition hover:bg-indigo-50/60 dark:hover:bg-zinc-800/70">
+                                                        <td class="px-4 py-3 text-center">
+                                                            <flux:checkbox wire:model.live="alumnos_seleccionados"
+                                                                value="{{ $alumnoMasivo['id'] }}" />
+                                                        </td>
+                                                        <td class="px-4 py-3">
+                                                            <p class="font-semibold text-zinc-800 dark:text-zinc-100">
+                                                                {{ $alumnoMasivo['nombre_completo'] }}
+                                                            </p>
+                                                            <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                                                {{ $alumnoMasivo['curp'] ?: 'Sin CURP' }}
+                                                            </p>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                                                            {{ $alumnoMasivo['matricula'] ?: 'Sin matrícula' }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                                                            {{ $alumnoMasivo['grado'] ?: 'Sin grado' }}
+                                                            @if ($alumnoMasivo['grupo'])
+                                                                · Grupo {{ $alumnoMasivo['grupo'] }}
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-4 py-3">
+                                                            <span
+                                                                class="inline-flex rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                                                {{ $alumnoMasivo['estatus'] ?? 'Sin estatus' }}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @else
+                                    <div
+                                        class="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                                        @if (filled($buscar_alumno_masivo))
+                                            No hay alumnos que coincidan con la búsqueda dentro del filtro seleccionado.
+                                        @else
+                                            No hay alumnos disponibles para este filtro.
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <div
+                            class="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
+                            Completa los filtros del modo de generación para mostrar y seleccionar a los alumnos.
+                        </div>
+                    @endif
                 @endif
 
                 @if ($modo_descarga === 'alumno')
@@ -419,7 +537,7 @@
                         wire:click="descargarConstancia" wire:loading.attr="disabled"
                         wire:target="descargarConstancia">
                         <span wire:loading.remove wire:target="descargarConstancia">
-                            {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Abrir constancias' }}
+                            {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Abrir ' . count($alumnos_seleccionados) . ' constancia(s)' }}
                         </span>
 
                         <span wire:loading wire:target="descargarConstancia">
