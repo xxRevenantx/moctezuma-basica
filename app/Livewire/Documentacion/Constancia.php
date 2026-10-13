@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -733,6 +734,21 @@ class Constancia extends Component
 
     public function descargarConstancia(): void
     {
+        try {
+            $this->procesarDescargaConstancia();
+        } catch (ValidationException $error) {
+            // Livewire puede responder una validación sin rechazar la promesa JS.
+            // Registrar los errores y cerrar explícitamente el visor de espera.
+            $this->setErrorBag($error->validator->errors());
+            $this->dispatch('cerrar-visor-constancia');
+        } catch (Throwable $error) {
+            $this->dispatch('cerrar-visor-constancia');
+            throw $error;
+        }
+    }
+
+    private function procesarDescargaConstancia(): void
+    {
         $this->validate([
             'plantilla_id' => ['required', 'exists:constancia_plantillas,id'],
             'fecha_expedicion' => ['nullable', 'date'],
@@ -742,7 +758,7 @@ class Constancia extends Component
 
         if ($this->incluir_calificaciones && !$this->hayPeriodosSeleccionados()) {
             $this->addError('periodos_calificaciones', 'Selecciona al menos un periodo para incluir calificaciones.');
-            $this->dispatch('cerrar-ventana-constancia-vacia');
+            $this->dispatch('cerrar-visor-constancia');
             return;
         }
 
@@ -755,7 +771,7 @@ class Constancia extends Component
             $constancia = $this->crearConstanciaIndividual((int) $this->selectedAlumno['id']);
             $url = route('misrutas.constancias.pdf', $constancia);
 
-            $this->dispatch('abrir-constancia-nueva-ventana', url: $url);
+            $this->dispatch('abrir-visor-constancia', url: $url, titulo: 'Constancia · ' . $constancia->folio);
             return;
         }
 
@@ -781,7 +797,7 @@ class Constancia extends Component
 
         if (empty($this->alumnos_seleccionados)) {
             $this->addError('alumnos_seleccionados', 'Selecciona al menos un alumno para generar las constancias.');
-            $this->dispatch('cerrar-ventana-constancia-vacia');
+            $this->dispatch('cerrar-visor-constancia');
             return;
         }
 
@@ -793,12 +809,15 @@ class Constancia extends Component
         $alumnos = $this->obtenerAlumnosParaDescarga();
 
         if ($alumnos->isEmpty()) {
-            $this->dispatch('abrir-constancia-nueva-ventana', url: null);
+            $this->dispatch('cerrar-visor-constancia');
             $this->dispatch('notificar', tipo: 'error', mensaje: 'No se encontraron alumnos para generar constancias.');
             return;
         }
 
-        session()->put('constancias_masivas_payload', [
+        // Lote único por generación: el visor y la descarga deben consultar
+        // el mismo PDF, incluso si se abre otro lote en la sesión.
+        $lote = (string) Str::uuid();
+        session()->put('constancia_lote_' . $lote, [
             'alumno_ids' => $alumnos->pluck('id')->values()->toArray(),
             'plantilla_id' => $this->plantilla_id,
             'contenido_html' => app(HtmlSanitizerService::class)->sanitize($this->contenido_html),
@@ -808,7 +827,19 @@ class Constancia extends Component
             'periodos_calificaciones' => $this->periodosSeleccionados(),
         ]);
 
-        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.masivas.pdf'));
+        // No acumular lotes indefinidamente dentro de la sesión.
+        $lotes = (array) session()->get('constancias_lotes_recientes', []);
+        $lotes[] = $lote;
+        while (count($lotes) > 5) {
+            session()->forget('constancia_lote_' . array_shift($lotes));
+        }
+        session()->put('constancias_lotes_recientes', $lotes);
+
+        $this->dispatch(
+            'abrir-visor-constancia',
+            url: route('misrutas.constancias.masivas.pdf', ['lote' => $lote]),
+            titulo: 'Constancias · ' . $alumnos->count() . ' alumnos'
+        );
     }
 
     private function obtenerAlumnosParaDescarga()
@@ -1190,7 +1221,7 @@ class Constancia extends Component
     {
         $constancia = ConstanciaModelo::query()->findOrFail($constanciaId);
 
-        $this->dispatch('abrir-constancia-nueva-ventana', url: route('misrutas.constancias.pdf', $constancia));
+        $this->dispatch('abrir-visor-constancia', url: route('misrutas.constancias.pdf', $constancia), titulo: 'Constancia · ' . $constancia->folio);
     }
 
     public function render()

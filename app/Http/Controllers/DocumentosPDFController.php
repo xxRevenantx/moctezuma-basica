@@ -53,10 +53,13 @@ class DocumentosPDFController extends Controller
             report($e);
         }
 
+        $disposicion = request()->boolean('download') ? 'attachment' : 'inline';
+
         return response($contenidoPdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $nombreArchivo . '"',
+            'Content-Disposition' => $disposicion . '; filename="' . $nombreArchivo . '"',
             'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 
@@ -120,7 +123,12 @@ class DocumentosPDFController extends Controller
      */
     public function constanciasMasivasPdf()
     {
-        $payload = session()->pull('constancias_masivas_payload');
+        // En modo visor se necesitan varias consultas al mismo documento:
+        // una para previsualizar y otra para descargar. Nunca consumir el lote.
+        $lote = (string) request()->query('lote', '');
+        $payload = ($lote !== '' && Str::isUuid($lote))
+            ? session()->get('constancia_lote_' . $lote)
+            : session()->get('constancias_masivas_payload');
 
         if (!$payload || empty($payload['alumno_ids'])) {
             abort(404, 'No hay constancias para mostrar. Vuelve a generarlas desde el módulo de constancias.');
@@ -208,10 +216,13 @@ class DocumentosPDFController extends Controller
             Str::upper($payload['modo_descarga'] ?? 'MASIVO') . '_' .
             now()->format('Ymd_His') . '.pdf';
 
+        $disposicion = request()->boolean('download') ? 'attachment' : 'inline';
+
         return response($pdf->output(), 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $nombreArchivo . '"',
+            'Content-Disposition' => $disposicion . '; filename="' . $nombreArchivo . '"',
             'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 

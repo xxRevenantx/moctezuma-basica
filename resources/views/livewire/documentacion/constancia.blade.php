@@ -1,7 +1,70 @@
 <div x-data="{
     open: false,
     historialAbierto: false,
-}" class="space-y-6">
+    visorAbierto: false,
+    visorPantallaCompleta: false,
+    visorCargando: false,
+    visorUrl: '',
+    visorTitulo: 'Vista previa de constancia',
+    visorError: '',
+    prepararVisorPdf() {
+        this.visorTitulo = 'Generando constancia...';
+        this.visorUrl = '';
+        this.visorError = '';
+        this.visorCargando = true;
+        this.visorPantallaCompleta = false;
+        this.visorAbierto = true;
+    },
+    abrirVisorPdf(url, titulo = 'Vista previa de constancia') {
+        if (!url) {
+            this.visorError = 'No se recibió una dirección válida para el documento.';
+            this.visorCargando = false;
+            this.visorAbierto = true;
+            return;
+        }
+
+        // Sólo se muestran rutas del propio sistema (misma sesión autenticada).
+        const destino = new URL(url, window.location.origin);
+        if (destino.origin !== window.location.origin || !['http:', 'https:'].includes(destino.protocol)) {
+            this.visorError = 'La dirección del documento no es válida.';
+            this.visorCargando = false;
+            this.visorAbierto = true;
+            return;
+        }
+
+        this.visorTitulo = titulo;
+        this.visorUrl = destino.href;
+        this.visorError = '';
+        this.visorCargando = true;
+        this.visorAbierto = true;
+    },
+    mostrarVisorPdf(evento) {
+        this.abrirVisorPdf(evento.detail?.url, evento.detail?.titulo || 'Vista previa de constancia');
+    },
+    cerrarVisorPdf() {
+        this.visorAbierto = false;
+        this.visorCargando = false;
+        this.visorPantallaCompleta = false;
+        this.visorUrl = '';
+        this.visorError = '';
+        document.body.style.overflow = '';
+    },
+    cancelarPreparacionVisor() {
+        // Si falla la validación de Livewire, mostrar los errores del formulario.
+        this.cerrarVisorPdf();
+    },
+    urlDescargaVisor() {
+        if (!this.visorUrl) return '#';
+        const destino = new URL(this.visorUrl);
+        destino.searchParams.set('download', '1');
+        destino.hash = '';
+        return destino.href;
+    },
+}"
+    x-on:abrir-visor-constancia.window="mostrarVisorPdf($event)"
+    x-on:cerrar-visor-constancia.window="cerrarVisorPdf()"
+    x-on:livewire:navigating.window="cerrarVisorPdf()"
+    class="space-y-6">
     @once
         <style>
             [x-cloak] {
@@ -533,9 +596,8 @@
 
                 <div class="flex justify-start">
                     <flux:button type="button" variant="primary"
-                        x-on:click="window.ventanaConstancia = window.open('', '_blank');"
-                        wire:click="descargarConstancia" wire:loading.attr="disabled"
-                        wire:target="descargarConstancia">
+                        x-on:click="prepararVisorPdf(); $wire.descargarConstancia().catch(() => cancelarPreparacionVisor())"
+                        wire:loading.attr="disabled" wire:target="descargarConstancia">
                         <span wire:loading.remove wire:target="descargarConstancia">
                             {{ $modo_descarga === 'alumno' ? 'Abrir constancia' : 'Abrir ' . count($alumnos_seleccionados) . ' constancia(s)' }}
                         </span>
@@ -706,8 +768,10 @@
                                                 <td class="px-4 py-3">
                                                     <div class="flex flex-wrap justify-end gap-2">
                                                         <flux:button type="button" size="xs" variant="primary"
-                                                            wire:click="abrirPdfConstancia({{ $constanciaGenerada->id }})">
-                                                            PDF
+                                                            data-url="{{ route('misrutas.constancias.pdf', $constanciaGenerada) }}"
+                                                            data-titulo="Constancia · {{ $constanciaGenerada->folio }}"
+                                                            x-on:click="abrirVisorPdf($el.dataset.url, $el.dataset.titulo)">
+                                                            Ver PDF
                                                         </flux:button>
 
                                                         @if (($constanciaGenerada->estado_documento ?? 'emitida') !== 'cancelada')
@@ -752,6 +816,88 @@
             </div>
         </div>
     </div>
+
+    {{-- Visor institucional de PDFs; el iframe solo existe cuando hay una URL lista. --}}
+    <template x-teleport="body">
+        <div x-cloak x-show="visorAbierto" x-transition.opacity.duration.200ms
+            x-on:keydown.escape.window="if (visorAbierto) cerrarVisorPdf()"
+            x-effect="document.body.style.overflow = visorAbierto ? 'hidden' : ''"
+            class="fixed inset-0 z-[2000] flex items-center justify-center p-2 sm:p-4"
+            role="dialog" aria-modal="true" aria-label="Visor de constancias PDF">
+            <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-md" x-on:click="cerrarVisorPdf()"></div>
+
+            <section class="relative flex min-h-0 w-full flex-col overflow-hidden border border-white/20 bg-white shadow-[0_25px_90px_rgba(15,23,42,0.45)] dark:border-zinc-700 dark:bg-zinc-900"
+                :class="visorPantallaCompleta ? 'h-[100dvh] max-w-none rounded-none' : 'h-[95dvh] max-w-[1500px] rounded-2xl sm:h-[93dvh]'"
+                x-on:click.stop>
+
+                <header class="shrink-0 border-b border-slate-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="h-1 w-full bg-gradient-to-r from-[#006492] via-indigo-500 to-[#88AC2E]"></div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 ring-1 ring-sky-100 dark:bg-sky-950 dark:ring-sky-900">
+                                <svg class="h-6 w-6 text-[#006492] dark:text-sky-300" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h6l4 4V20.25H7a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 3.75v5h5M8.5 13h7M8.5 16.5h7"/>
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#006492] dark:text-sky-300">Centro Universitario Moctezuma</p>
+                                <h2 class="truncate text-base font-bold text-slate-900 sm:text-lg dark:text-white" x-text="visorTitulo"></h2>
+                                <p class="text-xs text-slate-500 dark:text-zinc-400">Visualizador institucional de documentos · PDF</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 sm:gap-2">
+                            <span x-show="visorUrl && !visorCargando" class="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:inline-flex dark:bg-emerald-900/30 dark:text-emerald-300">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Listo para consultar
+                            </span>
+                            <a x-show="visorUrl && !visorError" :href="urlDescargaVisor()"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-[#006492] px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[#004b6e] focus:outline-none focus:ring-2 focus:ring-[#88AC2E] sm:text-sm"
+                                aria-label="Descargar constancia PDF">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3"/></svg>
+                                <span class="hidden sm:inline">Descargar PDF</span><span class="sm:hidden">PDF</span>
+                            </a>
+                            <button type="button" x-on:click="visorPantallaCompleta = !visorPantallaCompleta"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#88AC2E] dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                                :title="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'"
+                                :aria-label="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+                            </button>
+                            <button type="button" x-on:click="cerrarVisorPdf()"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-600 transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-400 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+                                title="Cerrar visor" aria-label="Cerrar visor">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="relative min-h-0 flex-1 bg-slate-100 dark:bg-zinc-950">
+                    <template x-if="visorUrl && !visorError">
+                        <iframe :src="visorUrl + '#toolbar=1&navpanes=0&view=FitH'"
+                            x-on:load="visorCargando = false" x-on:error="visorCargando = false; visorError = 'No se pudo cargar el PDF.'"
+                            class="h-full w-full border-0" title="Vista previa del PDF de la constancia"></iframe>
+                    </template>
+                    <div x-show="visorCargando" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-slate-100 dark:bg-zinc-950">
+                        <div class="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-zinc-800">
+                            <svg class="h-8 w-8 animate-spin text-[#006492]" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".2" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                        </div>
+                        <div class="text-center"><p class="font-semibold text-slate-800 dark:text-zinc-100">Preparando la vista previa...</p><p class="mt-1 text-sm text-slate-500 dark:text-zinc-400">Estamos generando tu documento institucional.</p></div>
+                    </div>
+                    <div x-show="visorError" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                        <div class="rounded-full bg-rose-100 p-3 text-rose-600 dark:bg-rose-950/50"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.5 3.5 2.75 17A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.75-3L13.5 3.5a2 2 0 0 0-3 0Z"/></svg></div>
+                        <p class="font-semibold text-slate-800 dark:text-white">No se pudo visualizar la constancia</p>
+                        <p class="max-w-md text-sm text-slate-500 dark:text-zinc-400" x-text="visorError"></p>
+                        <button type="button" x-on:click="cerrarVisorPdf()" class="rounded-lg bg-[#006492] px-4 py-2 text-sm font-medium text-white hover:bg-[#004b6e]">Volver al formulario</button>
+                    </div>
+                </div>
+                <footer class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2.5 text-[11px] text-slate-500 sm:px-6 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                    <span>Documento de Control Escolar · Uso institucional</span>
+                    <span>Usa los controles del PDF para acercar, imprimir o navegar por las páginas.</span>
+                </footer>
+            </section>
+        </div>
+    </template>
 
     {{-- Modal de crear / editar plantilla --}}
     <div x-data="{
@@ -1234,32 +1380,6 @@
 
                 window.addEventListener('cerrar-modal-editar-constancia', () => {
                     quitarEditor('editor_constancia_edicion');
-                });
-
-                window.addEventListener('cerrar-ventana-constancia-vacia', () => {
-                    if (window.ventanaConstancia && !window.ventanaConstancia.closed) {
-                        window.ventanaConstancia.close();
-                    }
-                });
-
-                window.addEventListener('abrir-constancia-nueva-ventana', (event) => {
-                    const url = event.detail.url;
-
-                    if (!url) {
-                        if (window.ventanaConstancia && !window.ventanaConstancia.closed) {
-                            window.ventanaConstancia.close();
-                        }
-
-                        return;
-                    }
-
-                    if (window.ventanaConstancia && !window.ventanaConstancia.closed) {
-                        window.ventanaConstancia.location.href = url;
-                        window.ventanaConstancia.focus();
-                        return;
-                    }
-
-                    window.open(url, '_blank');
                 });
 
                 document.addEventListener('livewire:navigating', () => {
