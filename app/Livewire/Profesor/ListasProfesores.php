@@ -18,6 +18,7 @@ class ListasProfesores extends Component
     public ?int $profesor_id = null;
     public ?int $ciclo_escolar_id = null;
     public string $fecha_corte = '';
+    public string $fecha_inicio_asistencia = '';
 
     public string $buscar_materia = '';
     public string $filtro_nivel = '';
@@ -40,6 +41,7 @@ class ListasProfesores extends Component
 
         $this->ciclo_escolar_id = $ciclo?->id;
         $this->fecha_corte = $this->fechaSugeridaParaCiclo($ciclo);
+        $this->fecha_inicio_asistencia = $this->fecha_corte;
     }
 
     public function esAdministrador(): bool
@@ -61,6 +63,7 @@ class ListasProfesores extends Component
         $this->fecha_corte = $this->fechaSugeridaParaCiclo(
             CicloEscolar::query()->find($this->ciclo_escolar_id)
         );
+        $this->fecha_inicio_asistencia = $this->fecha_corte;
         $this->limpiarFiltrosMaterias();
     }
 
@@ -448,6 +451,7 @@ class ListasProfesores extends Component
             'profesor_id' => $this->profesor_id,
             'ciclo_escolar_id' => $this->ciclo_escolar_id,
             'fecha_corte' => $this->fecha_corte,
+            'fecha_inicio_asistencia' => $tipo === 'asistencia' ? $this->fecha_inicio_asistencia : null,
         ];
 
         if ($clave) {

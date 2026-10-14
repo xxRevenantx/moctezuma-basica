@@ -268,6 +268,25 @@
                 @endif
             </div>
 
+            @if ($tipo_descarga === 'asistencia')
+                <div class="mt-5 rounded-2xl border border-[#006492]/20 bg-sky-50/70 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+                        <div>
+                            <p class="text-sm font-black text-slate-800 dark:text-white">Asistencia bimestral · 8 semanas</p>
+                            <p class="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                Oficio horizontal, 40 casillas de lunes a viernes y resumen por cada mes calendario más total general.
+                                Si las ocho semanas abarcan tres meses, aparecerán los tres resúmenes para no mezclar fechas.
+                            </p>
+                        </div>
+                        <flux:field>
+                            <flux:label>Fecha de inicio</flux:label>
+                            <flux:input type="date" wire:model.live.debounce.400ms="fecha_inicio_asistencia" />
+                            <flux:description>Inicia el lunes de esa semana.</flux:description>
+                        </flux:field>
+                    </div>
+                </div>
+            @endif
+
             @if ($tipo_descarga === 'alumnos_institucional')
                 <div class="mt-5 rounded-2xl border border-[#006492]/20 bg-sky-50/70 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
                     <div class="flex items-start gap-3">

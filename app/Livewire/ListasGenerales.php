@@ -50,6 +50,7 @@ class ListasGenerales extends Component
     public string $tipo_descarga = 'formatos';
     public string $opcion_descarga = 'personalizadores';
     public bool $mostrar_motivo = false;
+    public string $fecha_inicio_asistencia = '';
 
     public function mount(): void
     {
@@ -82,9 +83,19 @@ class ListasGenerales extends Component
                 ->first();
 
         $this->ciclo_escolar_id = $ciclo?->id;
+        $this->fecha_inicio_asistencia = $this->fechaSugeridaAsistencia($ciclo);
         if ($ciclo) {
             $this->estado_ciclo = app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo);
         }
+    }
+
+    private function fechaSugeridaAsistencia(?CicloEscolar $ciclo): string
+    {
+        if ($ciclo && !$ciclo->es_actual && (int) $ciclo->inicio_anio > 0) {
+            return (int) $ciclo->inicio_anio . '-09-01';
+        }
+
+        return now()->toDateString();
     }
 
     public function updatedCicloEscolarId(): void
@@ -98,6 +109,8 @@ class ListasGenerales extends Component
                 ?? CicloEscolar::query()->orderByDesc('inicio_anio')->orderByDesc('fin_anio')->first();
             $this->ciclo_escolar_id = $ciclo?->id;
         }
+
+        $this->fecha_inicio_asistencia = $this->fechaSugeridaAsistencia($ciclo);
 
         if ($ciclo) {
             $this->estado_ciclo = app(ListasGeneralesCicloService::class)->estadoPredeterminado($ciclo);
@@ -154,6 +167,7 @@ class ListasGenerales extends Component
         $this->grupos = collect();
         $this->modo_descarga = 'seleccionados';
         $this->mostrar_motivo = false;
+        $this->fecha_inicio_asistencia = $this->fechaSugeridaAsistencia($ciclo);
         $this->buscar_alumno = '';
         $this->buscar_profesor = '';
         $this->alumnos_seleccionados = [];
@@ -261,7 +275,7 @@ class ListasGenerales extends Component
             $this->tipo_descarga = 'formatos';
         }
 
-        if (($this->esBachillerato() || $this->esSecundaria()) && in_array($this->tipo_descarga, ['evaluacion', 'asistencia'], true)) {
+        if (($this->esBachillerato() || $this->esSecundaria()) && $this->tipo_descarga === 'evaluacion') {
             $this->tipo_descarga = 'grupo';
         }
 
@@ -613,7 +627,7 @@ class ListasGenerales extends Component
         ];
 
         if ($this->esBachillerato() || $this->esSecundaria()) {
-            unset($tipos['evaluacion'], $tipos['asistencia']);
+            unset($tipos['evaluacion']);
         }
 
         return $tipos;
@@ -1194,6 +1208,7 @@ class ListasGenerales extends Component
                 ? implode(',', $this->idsAlumnosSeleccionadosValidos)
                 : null,
             'tipo_descarga' => $this->tipo_descarga,
+            'fecha_inicio_asistencia' => $this->tipo_descarga === 'asistencia' ? $this->fecha_inicio_asistencia : null,
             'opcion_descarga' => $this->opcion_descarga,
             'mostrar_motivo' => $this->tipo_descarga === 'grupo' && $this->mostrar_motivo ? 1 : 0,
         ]);

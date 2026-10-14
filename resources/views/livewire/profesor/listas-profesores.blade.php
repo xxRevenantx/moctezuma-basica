@@ -50,6 +50,12 @@
                         <flux:description>El alumno aparece únicamente si estaba activo en esta fecha.</flux:description>
                     </flux:field>
 
+                    <flux:field>
+                        <flux:label>Inicio de las 8 semanas de asistencia</flux:label>
+                        <flux:input type="date" wire:model.live.debounce.400ms="fecha_inicio_asistencia" />
+                        <flux:description>Se ajusta al lunes de la semana elegida. El PDF será oficio horizontal, con 40 días lectivos y resúmenes mensuales.</flux:description>
+                    </flux:field>
+
                     <div class="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/20">
                         <p class="text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">Regla histórica</p>
                         <p class="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">

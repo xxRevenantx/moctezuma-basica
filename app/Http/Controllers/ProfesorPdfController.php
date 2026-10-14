@@ -10,6 +10,7 @@ use App\Models\Horario;
 use App\Models\Materia;
 use App\Models\Persona;
 use App\Models\TallerSesion;
+use App\Services\AsistenciaBimestralService;
 use App\Services\ListaAcademicaService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class ProfesorPdfController extends Controller
             'profesor_id' => ['required', 'integer', 'exists:personas,id'],
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
             'fecha_corte' => ['required', 'date'],
+            'fecha_inicio_asistencia' => ['nullable', 'date_format:Y-m-d'],
             'tipo_carga' => ['nullable', 'in:materia,taller'],
             'carga_id' => ['nullable', 'integer'],
             'grupo_id' => ['nullable', 'integer'],
@@ -120,7 +122,13 @@ class ProfesorPdfController extends Controller
             'fecha' => now()->locale('es')->translatedFormat('d \\d\\e F \\d\\e Y'),
             'fechaCorte' => $listas->fechaCorte($datos['fecha_corte'])->locale('es')->translatedFormat('d \\d\\e F \\d\\e Y'),
             'cicloEscolar' => $ciclo,
-        ])->setPaper('letter', 'portrait')->stream($nombreArchivo);
+            'calendarioAsistencia' => $tipo === 'asistencia'
+                ? app(AsistenciaBimestralService::class)->construir(
+                    ($datos['fecha_inicio_asistencia'] ?? null) ?: $datos['fecha_corte']
+                )
+                : null,
+        ])->setPaper($tipo === 'asistencia' ? 'legal' : 'letter',
+                $tipo === 'asistencia' ? 'landscape' : 'portrait')->stream($nombreArchivo);
     }
 
     private function autorizarConsultaDelCiclo(CicloEscolar $ciclo): void

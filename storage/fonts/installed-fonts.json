@@ -19,5 +19,9 @@
     },
     "ralewaybd": {
         "bold": "ralewaybd_bold_c0d34211ad819eda433f4975add61e9d"
+    },
+    "asistenciacalibri": {
+        "normal": "C:\\laragon\\www\\moctezuma-basica\\storage\\fonts\/asistenciacalibri_normal_3a44805eec3bd68a7ccf41069b9678c6",
+        "bold": "asistenciacalibri_bold_53e40537f13cfe039246430830fe7505"
     }
 }

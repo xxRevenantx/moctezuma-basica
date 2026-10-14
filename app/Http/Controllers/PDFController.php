@@ -19,6 +19,7 @@ use App\Models\Parcial;
 use App\Models\Periodos;
 use App\Models\Persona;
 use App\Models\Semestre;
+use App\Services\AsistenciaBimestralService;
 use App\Services\ListaAcademicaService;
 use App\Services\ListasGeneralesCicloService;
 use App\Services\CalificacionOficialPrimariaService;
@@ -5741,6 +5742,7 @@ class PDFController extends Controller
     // LISTAS PDF
     public function lista_pdf(Request $request, string $slug_nivel)
     {
+        $request->validate(['fecha_inicio_asistencia' => ['nullable', 'date_format:Y-m-d']]);
         $cicloEscolar = CicloEscolar::query()
             ->when($request->integer('ciclo_escolar_id'), fn($q) => $q->whereKey($request->integer('ciclo_escolar_id')))
             ->when(!$request->integer('ciclo_escolar_id'), fn($q) => $q->where('es_actual', true))
@@ -5783,6 +5785,7 @@ class PDFController extends Controller
 
         $tiposPermitidos = ($esBachillerato || $esSecundaria)
             ? [
+                'asistencia',
                 'grupo',
                 'boletas',
                 'formatos',
@@ -5903,7 +5906,7 @@ class PDFController extends Controller
             );
 
             return Pdf::loadView($contexto['vistaPdf'], $contexto['data'])
-                ->setPaper('letter', $contexto['orientacionPdf'])
+                ->setPaper($tipoDescarga === 'asistencia' ? 'legal' : 'letter', $contexto['orientacionPdf'])
                 ->stream($contexto['nombreArchivo']);
         }
 
@@ -5953,7 +5956,7 @@ class PDFController extends Controller
             'opcion_descarga' => $opcionDescarga,
             'modoDescarga' => $modoDescarga,
         ])
-            ->setPaper('letter', $primerContexto['orientacionPdf'])
+            ->setPaper($tipoDescarga === 'asistencia' ? 'legal' : 'letter', $primerContexto['orientacionPdf'])
             ->stream($nombreArchivo);
     }
 
@@ -7142,6 +7145,11 @@ class PDFController extends Controller
             'imagenPersonalizador' => $imagenPersonalizador,
 
             'turno' => $request->input('turno', 'Matutino'),
+            'calendarioAsistencia' => $tipoDescarga === 'asistencia'
+                ? app(AsistenciaBimestralService::class)->construir(
+                    $request->input('fecha_inicio_asistencia') ?: now()->toDateString()
+                )
+                : null,
             'fechaInicio' => $request->input('fecha_inicio'),
             'fechaFin' => $request->input('fecha_fin'),
 
