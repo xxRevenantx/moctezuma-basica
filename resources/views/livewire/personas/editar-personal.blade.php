@@ -131,8 +131,11 @@
                                             class="relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700
                                bg-white dark:bg-neutral-900 p-2">
                                             <img src="{{ $foto_actual_url }}"
+                                                data-foto-visor data-foto-contexto="Fotografía actual del personal"
+                                                role="button" tabindex="0" title="Ver fotografía ampliada"
+                                                aria-label="Ampliar fotografía actual de la persona"
                                                 alt="Foto actual de la persona"
-                                                class="w-full h-32 md:h-40 object-contain mx-auto">
+                                                class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] w-full h-32 md:h-40 object-contain mx-auto cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E]">
                                             <span
                                                 class="absolute bottom-2 left-2 rounded-full bg-black/70 text-white text-[11px] px-2 py-0.5">
                                                 Foto actual

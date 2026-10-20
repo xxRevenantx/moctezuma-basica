@@ -121,8 +121,11 @@
                             <div class="flex min-w-0 items-start gap-4 sm:gap-5">
                                 <div class="relative shrink-0">
                                     @if ($alumno['foto_url'])
-                                        <img src="{{ $alumno['foto_url'] }}" alt="Foto de {{ $alumno['nombre'] }}"
-                                            class="h-20 w-20 rounded-[24px] object-cover ring-4 ring-white/25 shadow-2xl sm:h-24 sm:w-24 sm:rounded-[28px]">
+                                        <img src="{{ $alumno['foto_url'] }}"
+                                            data-foto-visor data-foto-nombre="{{ $alumno['nombre'] }}"
+                                            data-foto-contexto="Línea de tiempo académica" role="button" tabindex="0"
+                                            title="Ver fotografía ampliada" aria-label="Ampliar fotografía de {{ $alumno['nombre'] }}" alt="Foto de {{ $alumno['nombre'] }}"
+                                            class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-20 w-20 rounded-[24px] object-cover ring-4 ring-white/25 shadow-2xl sm:h-24 sm:w-24 sm:rounded-[28px] cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E]">
                                     @else
                                         <div class="flex h-20 w-20 items-center justify-center rounded-[24px] bg-white/15 text-2xl font-black ring-4 ring-white/20 backdrop-blur sm:h-24 sm:w-24 sm:rounded-[28px] sm:text-3xl">
                                             {{ $alumno['iniciales'] }}

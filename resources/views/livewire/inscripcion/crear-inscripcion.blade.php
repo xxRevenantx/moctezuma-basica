@@ -496,8 +496,11 @@
                                               <div class="flex min-w-0 items-center gap-4">
                                                   @if ($alumnoExistente['foto_url'])
                                                       <img src="{{ $alumnoExistente['foto_url'] }}"
+                                                          data-foto-visor data-foto-nombre="{{ $alumnoExistente['nombre_completo'] }}"
+                                                          data-foto-contexto="Inscripción · Alumno localizado" role="button" tabindex="0"
+                                                          title="Ver fotografía ampliada" aria-label="Ampliar fotografía de {{ $alumnoExistente['nombre_completo'] }}"
                                                           alt="Fotografía del alumno"
-                                                          class="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow dark:ring-neutral-800">
+                                                          class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow dark:ring-neutral-800 cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E]">
                                                   @else
                                                       <div
                                                           class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-lg font-black text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">

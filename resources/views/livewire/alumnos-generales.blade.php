@@ -854,8 +854,11 @@
                             <td class="px-4 py-4">
                                 @if ($alumno->foto_existe && $alumno->foto_url)
                                     <img src="{{ $alumno->foto_url }}"
+                                        data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
+                                        data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Alumnos · Consulta escolar"
+                                        role="button" tabindex="0" title="Ver fotografía ampliada" aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}"
                                         alt="Foto de {{ $alumno->nombre }}"
-                                        class="h-10 w-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-neutral-700">
+                                        class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-10 w-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-neutral-700">
                                 @else
                                     <div
                                         class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 ring-2 ring-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:ring-neutral-700">
@@ -1057,8 +1060,11 @@
                                             <div class="flex items-start gap-3">
                                                 @if ($alumno->foto_existe && $alumno->foto_url)
                                                     <img src="{{ $alumno->foto_url }}"
+                                        data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
+                                        data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Alumnos · Consulta escolar"
+                                        role="button" tabindex="0" title="Ver fotografía ampliada" aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}"
                                                         alt="Foto de {{ $alumno->nombre }}"
-                                                        class="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
+                                                        class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                                                 @else
                                                     <div
                                                         class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 ring-1 ring-slate-200 dark:bg-neutral-800 dark:ring-neutral-700">
@@ -1364,8 +1370,11 @@
 
                             @if ($alumno->foto_existe && $alumno->foto_url)
                                 <img src="{{ $alumno->foto_url }}"
+                                        data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
+                                        data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Alumnos · Consulta escolar"
+                                        role="button" tabindex="0" title="Ver fotografía ampliada" aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}"
                                     alt="Foto de {{ $alumno->nombre }}"
-                                    class="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
+                                    class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                             @else
                                 <div
                                     class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 ring-1 ring-slate-200 dark:bg-neutral-800 dark:ring-neutral-700">

@@ -1,3 +1,5 @@
+import './foto-visor-global.js';
+
 
 Livewire.on('swal', (data) => {
           const Toast = Swal.mixin({

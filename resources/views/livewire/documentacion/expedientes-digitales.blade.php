@@ -370,8 +370,12 @@
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-3">
                                     @if ($alumno->foto_existe)
-                                        <img src="{{ $alumno->foto_url }}" alt="Fotografía de {{ $this->nombreCompleto($alumno) }}"
-                                            class="size-11 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
+                                        <img src="{{ $alumno->foto_url }}"
+                                            data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
+                                            data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Expedientes digitales"
+                                            role="button" tabindex="0" title="Ver fotografía ampliada"
+                                            aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}" alt="Fotografía de {{ $this->nombreCompleto($alumno) }}"
+                                            class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] size-11 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-neutral-700">
                                     @else
                                         <div class="relative flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 font-black text-white shadow-sm">
                                             {{ $alumno->iniciales }}

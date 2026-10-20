@@ -546,8 +546,12 @@
 
                             <td class="px-4 py-4">
                                 @if ($alumno->foto_existe && $alumno->foto_url)
-                                    <img src="{{ $alumno->foto_url }}" alt="Foto"
-                                        class="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow">
+                                    <img src="{{ $alumno->foto_url }}"
+                                        data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
+                                        data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Fichas escolares"
+                                        role="button" tabindex="0" title="Ver fotografía ampliada"
+                                        aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}" alt="Foto"
+                                        class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-11 w-11 rounded-full object-cover ring-2 ring-white shadow">
                                 @else
                                     <div
                                         class="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-xl shadow-sm dark:bg-indigo-500/15">

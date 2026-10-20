@@ -119,6 +119,9 @@
 
         {{ $slot }}
 
-        @fluxScripts
+        {{-- Visor de fotografías reutilizable en todas las pantallas autenticadas. --}}
+    <x-foto-visor-global />
+
+    @fluxScripts
     </body>
 </html>
