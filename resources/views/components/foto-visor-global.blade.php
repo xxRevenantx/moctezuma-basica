@@ -56,7 +56,7 @@
                                 <span class="text-xs">Revisa que el archivo original todavía exista.</span>
                             </div>
                             <img x-show="!error" x-cloak :src="url" :alt="'Fotografía ampliada de ' + nombre"
-                                @load="cargada = true" @error="error = true" draggable="false"
+                                x-on:load="cargada = true" x-on:error="error = true" draggable="false"
                                 :style="`transform: scale(${zoom}) rotate(${rotacion}deg)`"
                                 class="max-h-[48vh] max-w-full rounded-xl object-contain shadow-2xl shadow-slate-950/20 transition-transform duration-200 ease-out sm:max-h-[56vh]"
                                 :class="{ 'hidden': !cargada }">
