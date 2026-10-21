@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Academico\SeguimientoAcademico;
+use App\Livewire\Academico\CalificacionesPorDocente;
 use App\Livewire\Academico\AnaliticaInstitucional;
 use App\Livewire\Accion\GestorFotografias;
 use App\Livewire\Alumno\Expediente360;
@@ -97,6 +98,12 @@ Route::prefix('docente')->group(function (): void {
     Route::get('/fichas-descriptivas', [DocenteController::class, 'fichas'])->name('docente.fichas');
     Route::get('/entregas/{entrega}/pdf', CalificacionEntregaPdfController::class)->name('docente.entregas.pdf');
 });
+
+// Gestión administrativa por docente: Primaria, Secundaria y Bachillerato.
+Route::get('/calificaciones-por-docente/{slug_nivel}', CalificacionesPorDocente::class)
+    ->middleware('admin')
+    ->whereIn('slug_nivel', ['primaria', 'secundaria', 'bachillerato'])
+    ->name('misrutas.calificaciones-docente');
 
 // CENTRO DE CONTROL, INTEGRIDAD, AUDITORÍA Y RESPALDOS
 Route::get('/centro-control', [SystemControlCenterController::class, 'index'])

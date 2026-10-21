@@ -306,6 +306,14 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
         </div>
     @endif
 
+    {{-- Acceso separado a la captura por docente (administración, tres niveles numéricos). --}}
+    @if (auth()->user()?->is_admin && in_array($slug_nivel, ['primaria', 'secundaria', 'bachillerato'], true))
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 dark:border-sky-900 dark:bg-sky-950/20">
+            <div><p class="font-black text-[#006492] dark:text-sky-300">Calificaciones por Docente PRO</p><p class="text-xs text-slate-600 dark:text-slate-300">Captura e importa por profesor sin mezclar la matriz general.</p></div>
+            <a href="{{ route('misrutas.calificaciones-docente', ['slug_nivel' => $slug_nivel]) }}" wire:navigate class="rounded-xl bg-[#006492] px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-800">Abrir módulo →</a>
+        </div>
+    @endif
+
     {{-- Navegación entre captura vigente e historial --}}
     @unless ($this->esProfesorAutenticado)
     <div class="mt-4 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
