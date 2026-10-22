@@ -53,6 +53,14 @@
         // Si falla la validación de Livewire, mostrar los errores del formulario.
         this.cerrarVisorPdf();
     },
+    urlWordVisor() {
+        if (!this.visorUrl) return '#';
+        const destino = new URL(this.visorUrl);
+        destino.pathname = destino.pathname.replace(/\/pdf$/, '/word');
+        destino.searchParams.delete('download');
+        destino.hash = '';
+        return destino.href;
+    },
     urlDescargaVisor() {
         if (!this.visorUrl) return '#';
         const destino = new URL(this.visorUrl);
@@ -774,6 +782,10 @@
                                                             Ver PDF
                                                         </flux:button>
 
+                                                        <flux:button size="xs" variant="filled"
+                                                            :href="route('misrutas.constancias.word', $constanciaGenerada)"
+                                                            icon="document-text">Word</flux:button>
+
                                                         @if (($constanciaGenerada->estado_documento ?? 'emitida') !== 'cancelada')
                                                             <flux:button type="button" size="xs"
                                                                 variant="filled"
@@ -857,7 +869,13 @@
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3"/></svg>
                                 <span class="hidden sm:inline">Descargar PDF</span><span class="sm:hidden">PDF</span>
                             </a>
-                            <button type="button" x-on:click="visorPantallaCompleta = !visorPantallaCompleta"
+                            <a x-show="visorUrl && !visorError" :href="urlWordVisor()"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#006492]/25 bg-sky-50 px-3 text-xs font-semibold text-[#006492] transition hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-[#88AC2E] dark:bg-sky-950 dark:text-sky-200"
+                                aria-label="Descargar constancia Word editable" title="Descargar Word editable (.docx)">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M14 3v5h5 M9 12l1.5 6 1.5-4 1.5 4 1.5-6"/></svg>
+                                <span class="hidden sm:inline">Descargar Word</span><span class="sm:hidden">Word</span>
+                            </a>
+                            <button type="button" x-on:click="visorPantallaCompleta = !visorPantallaCompleta
                                 class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#88AC2E] dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                                 :title="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'"
                                 :aria-label="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\EstadisticaAlumnosGruposExport;
 use App\Services\EstadisticaAlumnosGruposService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ class EstadisticaAlumnosGruposReporteController extends Controller
         EstadisticaAlumnosGruposService $service,
     ): Response|BinaryFileResponse {
         abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
-        abort_unless(in_array($formato, ['pdf', 'excel'], true), 404);
+        abort_unless(in_array($formato, ['pdf', 'word', 'excel'], true), 404);
 
         $filtros = $request->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
@@ -43,10 +44,12 @@ class EstadisticaAlumnosGruposReporteController extends Controller
             return Excel::download(new EstadisticaAlumnosGruposExport($datos), $nombre.'.xlsx');
         }
 
-        return Pdf::loadView('pdf.estadistica-alumnos-grupos', [
-            'datos' => $datos,
-            'logo' => $this->logoDataUri(),
-        ])->setPaper('legal', 'landscape')->download($nombre.'.pdf');
+        $datosDocumento = ['datos' => $datos, 'logo' => $this->logoDataUri()];
+        if ($formato === 'word') {
+            return app(BladeWordExporter::class)->descargar('pdf.estadistica-alumnos-grupos', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.estadistica-alumnos-grupos', $datosDocumento)
+            ->setPaper('legal', 'landscape')->download($nombre.'.pdf');
     }
 
     private function logoDataUri(): ?string

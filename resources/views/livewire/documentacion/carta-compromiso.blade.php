@@ -547,6 +547,8 @@
                                     <div class="flex flex-wrap justify-end gap-2">
                                         @if ($carta->estado_documento !== 'cancelada')
                                             <flux:button type="button" size="sm" variant="ghost" wire:click="abrirPdf({{ $carta->id }})">PDF</flux:button>
+                                            <flux:button size="sm" variant="filled" icon="document-text"
+                                                :href="route('misrutas.cartas-compromiso.word', $carta)">Word</flux:button>
                                             <flux:button type="button" size="sm" variant="ghost" wire:click="editarCarta({{ $carta->id }})">Editar</flux:button>
                                             <flux:button type="button" size="sm" variant="ghost" wire:click="duplicarCarta({{ $carta->id }})">Duplicar</flux:button>
                                             <flux:button type="button" size="sm" variant="danger" wire:click="cancelarCarta({{ $carta->id }})" wire:confirm="¿Cancelar esta carta compromiso? El PDF archivado dejará de estar vigente.">Cancelar</flux:button>

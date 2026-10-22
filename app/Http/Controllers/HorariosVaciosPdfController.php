@@ -15,6 +15,7 @@ use App\Models\PersonaNivelDetalle;
 use App\Models\TallerSesion;
 use App\Services\HorarioRecesoService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -151,7 +152,7 @@ class HorariosVaciosPdfController extends Controller
             $cicloEscolar->fin_anio,
         );
 
-        return Pdf::loadView('pdf.horarios-vacios', [
+        $datosDocumento = [
             'escuela' => $escuela,
             'nivel' => $nivel,
             'cicloEscolar' => $cicloEscolar,
@@ -172,7 +173,11 @@ class HorariosVaciosPdfController extends Controller
                 'bachillerato' => 'imagenes/personajes_bachillerato.png',
                 default => null,
             }),
-        ])
+        ];
+        if (request()->routeIs('generales.horarios-vacios.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.horarios-vacios', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
+        }
+        return Pdf::loadView('pdf.horarios-vacios', $datosDocumento)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
     }
@@ -249,7 +254,7 @@ class HorariosVaciosPdfController extends Controller
             $cicloEscolar->fin_anio,
         );
 
-        return Pdf::loadView('pdf.horarios-vacios-profesores', [
+        $datosDocumento = [
             'escuela' => $escuela,
             'nivel' => $nivel,
             'cicloEscolar' => $cicloEscolar,
@@ -267,7 +272,11 @@ class HorariosVaciosPdfController extends Controller
                     ? 'storage/logos/' . $nivel->logo
                     : 'imagenes/logo-letra.png'
             ),
-        ])
+        ];
+        if (request()->routeIs('generales.horarios-vacios.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.horarios-vacios-profesores', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
+        }
+        return Pdf::loadView('pdf.horarios-vacios-profesores', $datosDocumento)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
     }

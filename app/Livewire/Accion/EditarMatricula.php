@@ -129,6 +129,14 @@ class EditarMatricula extends Component
     /** @var array<string, mixed> */
     public array $diagnostico_anulacion_administrativa = [];
 
+    /** El formulario se muestra antes de consultar los diagnósticos y el expediente. */
+    public bool $complementosCargados = false;
+
+    /** @var array<string, mixed> */
+    public array $resumenDocumental = [];
+
+    public bool $errorComplementos = false;
+
     public ?string $observaciones = null;
     /** @var array<string,mixed> */
     public array $edadEscolar = [];
@@ -166,8 +174,8 @@ class EditarMatricula extends Component
             ->orderByDesc('fin_anio')
             ->get(['id', 'inicio_anio', 'fin_anio', 'es_actual']);
         $this->cargar($inscripcion);
-        $this->cargarDiagnosticoAnulacionIngreso();
-        $this->cargarDiagnosticoAnulacionAdministrativa();
+        // Los diagnósticos y el expediente no deben impedir abrir el formulario.
+        // Se solicitan desde wire:init una vez visible la información esencial.
 
         if (request()->boolean('anular_ingreso')) {
             $this->prepararAnulacionIngreso();
@@ -231,6 +239,64 @@ class EditarMatricula extends Component
 
         $this->recargarOpcionesAsignacionEscolar();
         $this->actualizarEdadEscolar();
+    }
+
+    /**
+     * Consulta opcional, diferida hasta que el formulario ya esté pintado.
+     * No concede permisos de anulación: los servicios de anulación vuelven a
+     * validar el estado del alumno en el momento de ejecutar la operación.
+     */
+    public function cargarComplementosEdicion(): void
+    {
+        abort_unless(auth()->user()?->canAccess('alumnos.editar'), 403);
+
+        if ($this->complementosCargados || !$this->InscripcionId) {
+            return;
+        }
+
+        try {
+            $this->cargarDiagnosticoAnulacionIngreso();
+        } catch (\Throwable $excepcion) {
+            report($excepcion);
+            $this->errorComplementos = true;
+            $this->diagnostico_anulacion_ingreso = [
+                'puede_anular' => false,
+                'bloqueos' => ['No se pudo consultar el diagnóstico de ingreso. Revisa storage/logs/laravel.log.'],
+            ];
+        }
+
+        if (auth()->user()?->is_admin) {
+            try {
+                $this->cargarDiagnosticoAnulacionAdministrativa();
+            } catch (\Throwable $excepcion) {
+                report($excepcion);
+                $this->errorComplementos = true;
+                $this->diagnostico_anulacion_administrativa = [
+                    'puede_anular' => false,
+                    'bloqueos' => ['No se pudo consultar el diagnóstico de anulación administrativa.'],
+                ];
+            }
+
+            try {
+                $alumno = Inscripcion::query()
+                    ->with([
+                        'nivel:id,nombre,slug,color',
+                        'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
+                        'documentos.nivel:id,nombre,slug,color',
+                    ])
+                    ->find($this->InscripcionId);
+
+                $this->resumenDocumental = $alumno
+                    ? app(ExpedienteDigitalService::class)->resumen($alumno)
+                    : [];
+            } catch (\Throwable $excepcion) {
+                report($excepcion);
+                $this->errorComplementos = true;
+                $this->resumenDocumental = [];
+            }
+        }
+
+        $this->complementosCargados = true;
     }
 
     private function cargarDiagnosticoAnulacionIngreso(): void
@@ -1432,22 +1498,6 @@ class EditarMatricula extends Component
 
     public function render()
     {
-        $resumenDocumental = null;
-
-        if ($this->InscripcionId && auth()->user()?->is_admin) {
-            $alumnoDocumental = Inscripcion::query()
-                ->with([
-                    'nivel:id,nombre,slug,color',
-                    'documentos.tipoDocumento:id,nombre,slug,es_general,requiere_nivel,orden',
-                    'documentos.nivel:id,nombre,slug,color',
-                ])
-                ->find($this->InscripcionId);
-
-            if ($alumnoDocumental) {
-                $resumenDocumental = app(ExpedienteDigitalService::class)->resumen($alumnoDocumental);
-            }
-        }
-
         return view('livewire.accion.editar-matricula', [
             'niveles' => $this->niveles,
             'grados' => $this->gradosOptions,
@@ -1457,7 +1507,7 @@ class EditarMatricula extends Component
             'ciclos' => $this->ciclosOptions,
             'ciclosEscolaresObservacion' => $this->ciclosEscolaresObservacion,
             'esBachillerato' => $this->esBachillerato(),
-            'resumenDocumental' => $resumenDocumental,
+            'resumenDocumental' => $this->resumenDocumental,
             'diagnosticoAnulacionIngreso' => $this->diagnostico_anulacion_ingreso,
             'diagnosticoAnulacionAdministrativa' => $this->diagnostico_anulacion_administrativa,
         ]);

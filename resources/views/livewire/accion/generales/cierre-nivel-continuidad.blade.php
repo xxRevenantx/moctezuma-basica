@@ -601,6 +601,8 @@
                                 <div class="flex justify-end gap-2">
                                     <a href="{{ route('generales.cierre-generacion.reporte', ['proceso' => $proceso->id, 'formato' => 'pdf']) }}" target="_blank"
                                         class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black hover:bg-slate-50 dark:border-neutral-700">PDF</a>
+                                    <a href="{{ route('generales.cierre-generacion.reporte', ['proceso' => $proceso->id, 'formato' => 'word']) }}"
+                                        class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-[#006492] hover:bg-sky-100">Word</a>
                                     <a href="{{ route('generales.cierre-generacion.reporte', ['proceso' => $proceso->id, 'formato' => 'excel']) }}"
                                         class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black hover:bg-slate-50 dark:border-neutral-700">Excel</a>
                                     <button type="button" wire:click="alternarDetallesProceso({{ $proceso->id }})"

@@ -76,6 +76,10 @@
                                 {{ $entrega->nivel?->nombre }} · {{ $entrega->grado?->nombre }} · {{ $entrega->grupo?->asignacionGrupo?->nombre ?? 'Grupo' }} · {{ $entrega->confirmada_at?->format('d/m/Y H:i') }}
                             </p>
                         </div>
+                        <a href="{{ route('docente.entregas.word', $entrega) }}"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-bold text-[#006492] transition hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                            <flux:icon.document-text class="size-4" /> Word
+                        </a>
                         <a href="{{ route('docente.entregas.pdf', $entrega) }}" target="_blank"
                             class="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-700 transition hover:border-[#006492]/40 hover:text-[#006492] dark:border-zinc-700 dark:text-zinc-200">
                             <flux:icon.arrow-down-tray class="size-4" /> PDF

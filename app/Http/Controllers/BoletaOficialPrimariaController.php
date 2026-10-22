@@ -8,6 +8,7 @@ use App\Models\Inscripcion;
 use App\Models\Nivel;
 use App\Services\CalificacionOficialPrimariaService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 
 class BoletaOficialPrimariaController extends Controller
@@ -41,15 +42,19 @@ class BoletaOficialPrimariaController extends Controller
 
         $escuela = Escuela::query()->first();
 
-        return Pdf::loadView('pdf.boleta-oficial-primaria', [
+        $datosDocumento = [
             'alumnoModel' => $inscripcion,
             'alumno' => $alumno,
             'campos' => $reporte['campos'],
             'nivel' => $nivel,
             'ciclo' => $ciclo,
             'escuela' => $escuela,
-        ])->setPaper('letter', 'landscape')->stream(
-            'BOLETA_OFICIAL_' . $inscripcion->matricula . '_' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio . '.pdf'
-        );
+        ];
+        $nombre = 'BOLETA_OFICIAL_' . $inscripcion->matricula . '_' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio;
+        if ($request->routeIs('calificaciones.boleta-oficial-primaria.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.boleta-oficial-primaria', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.boleta-oficial-primaria', $datosDocumento)
+            ->setPaper('letter', 'landscape')->stream($nombre.'.pdf');
     }
 }

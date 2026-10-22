@@ -273,6 +273,10 @@
                                                 </span>
                                             </flux:button>
 
+                                            <flux:button size="xs" variant="filled"
+                                                :href="route('misrutas.oficios.word', $oficio)"
+                                                icon="document-text">Word</flux:button>
+
                                             {{-- Editar --}}
                                             <flux:button type="button" size="xs" variant="filled"
                                                 wire:click="editarOficio({{ $oficio->id }})"

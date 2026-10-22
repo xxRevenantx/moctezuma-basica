@@ -13,6 +13,7 @@ use App\Models\TallerSesion;
 use App\Services\AsistenciaBimestralService;
 use App\Services\ListaAcademicaService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -115,7 +116,7 @@ class ProfesorPdfController extends Controller
             ? 'lista-asistencia-profesor-' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio . '.pdf'
             : 'lista-evaluacion-profesor-' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio . '.pdf';
 
-        return Pdf::loadView($vista, [
+        $datosDocumento = [
             'profesor' => $profesor,
             'bloques' => $bloques,
             'escuela' => Escuela::query()->first(),
@@ -127,7 +128,16 @@ class ProfesorPdfController extends Controller
                     ($datos['fecha_inicio_asistencia'] ?? null) ?: $datos['fecha_corte']
                 )
                 : null,
-        ])->setPaper($tipo === 'asistencia' ? 'legal' : 'letter',
+        ];
+        $nombreRutaWord = $tipo === 'asistencia' ? 'profesor.listas.asistencia.word' : 'profesor.listas.evaluacion.word';
+        if ($request->routeIs($nombreRutaWord)) {
+            return app(BladeWordExporter::class)->descargar(
+                $vista, $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo),
+                $tipo === 'asistencia' ? 'landscape' : 'portrait'
+            );
+        }
+        return Pdf::loadView($vista, $datosDocumento)
+            ->setPaper($tipo === 'asistencia' ? 'legal' : 'letter',
                 $tipo === 'asistencia' ? 'landscape' : 'portrait')->stream($nombreArchivo);
     }
 

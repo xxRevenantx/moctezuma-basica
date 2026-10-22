@@ -556,6 +556,10 @@
                             <flux:icon.document-arrow-down class="h-4 w-4" />
                             Extraedad PDF
                         </a>
+                        <a href="{{ route('misrutas.alumnos.edad-escolar.reporte', array_merge(['formato' => 'word'], $parametrosExtraedad)) }}"
+                            class="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-3.5 py-2 text-xs font-black text-[#006492] ring-1 ring-sky-200 transition hover:bg-sky-100">
+                            <flux:icon.document-text class="h-4 w-4" /> Extraedad Word
+                        </a>
                         <a href="{{ route('misrutas.alumnos.edad-escolar.reporte', array_merge(['formato' => 'excel'], $parametrosExtraedad)) }}"
                             class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-emerald-700">
                             <flux:icon.table-cells class="h-4 w-4" />

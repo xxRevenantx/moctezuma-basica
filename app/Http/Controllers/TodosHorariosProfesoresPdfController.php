@@ -8,6 +8,7 @@ use App\Models\TallerSesion;
 use App\Models\Escuela;
 use App\Models\Horario;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -163,15 +164,18 @@ class TodosHorariosProfesoresPdfController extends Controller
         $logoDerecho = public_path('penacho.jpg');
         $escuela = Escuela::query()->first();
 
-        $pdf = Pdf::loadView('pdf.profesores-horarios-todos', [
+        $datosDocumento = [
             'profesoresHorarios' => $profesoresHorarios,
             'logoIzquierdo' => file_exists($logoIzquierdo) ? $logoIzquierdo : null,
             'logoDerecho' => file_exists($logoDerecho) ? $logoDerecho : null,
             'cicloEscolar' => $cicloEscolar,
             'escuela' => $escuela,
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('todos-los-horarios-docentes.pdf');
+        ];
+        if ($request->routeIs('profesores.horarios.todos.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.profesores-horarios-todos', $datosDocumento, 'todos-los-horarios-docentes.docx');
+        }
+        return Pdf::loadView('pdf.profesores-horarios-todos', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream('todos-los-horarios-docentes.pdf');
     }
 
     private function crearHorarioGeneral(Collection $horarios): array

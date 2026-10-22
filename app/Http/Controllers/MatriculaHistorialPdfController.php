@@ -7,6 +7,7 @@ use App\Models\InscripcionCiclo;
 use App\Models\Nivel;
 use App\Models\CicloEscolar;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Fluent;
 use Illuminate\Support\Str;
@@ -183,17 +184,16 @@ class MatriculaHistorialPdfController extends Controller
             $nombreGeneracion
         );
 
-        return Pdf::loadView('pdf.matricula-generaciones', compact(
-            'rows',
-            'nivel',
-            'resumen',
-            'generaciones',
-            'etiquetasGeneracion',
-            'tituloDocumento',
-            'filtros'
-        ))
-            ->setPaper('letter', 'landscape')
-            ->stream($nombreArchivo);
+        $datosDocumento = compact('rows', 'nivel', 'resumen', 'generaciones',
+            'etiquetasGeneracion', 'tituloDocumento', 'filtros');
+        if ($request->routeIs('misrutas.matricula.historial.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.matricula-generaciones', $datosDocumento,
+                str_replace('.pdf', '.docx', $nombreArchivo), 'landscape'
+            );
+        }
+        return Pdf::loadView('pdf.matricula-generaciones', $datosDocumento)
+            ->setPaper('letter', 'landscape')->stream($nombreArchivo);
     }
 
     private function normalizarEstatus(string $estatus): string

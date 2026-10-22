@@ -7,6 +7,7 @@ use App\Models\Escuela;
 use App\Models\Nivel;
 use App\Services\CalificacionOficialPrimariaService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 
 class PromediosOficialesPrimariaPdfController extends Controller
@@ -30,13 +31,17 @@ class PromediosOficialesPrimariaPdfController extends Controller
             grupoId: $request->filled('grupo_id') ? (int) $request->integer('grupo_id') : null,
         );
 
-        return Pdf::loadView('pdf.promedios-oficiales-primaria', [
+        $datosDocumento = [
             'reporte' => $reporte,
             'nivel' => $nivel,
             'ciclo' => $ciclo,
             'escuela' => Escuela::query()->first(),
-        ])->setPaper('a3', 'landscape')->stream(
-            'PROMEDIOS_OFICIALES_PRIMARIA_' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio . '.pdf'
-        );
+        ];
+        $nombre = 'PROMEDIOS_OFICIALES_PRIMARIA_' . $ciclo->inicio_anio . '-' . $ciclo->fin_anio;
+        if ($request->routeIs('generales.promedios-oficiales-primaria.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.promedios-oficiales-primaria', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.promedios-oficiales-primaria', $datosDocumento)
+            ->setPaper('a3', 'landscape')->stream($nombre.'.pdf');
     }
 }

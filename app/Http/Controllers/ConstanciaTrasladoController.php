@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ConstanciaTraslado;
+use App\Services\Documentos\BladeWordExporter;
 use App\Services\ConstanciaTrasladoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
@@ -12,7 +13,7 @@ class ConstanciaTrasladoController extends Controller
     public function show(ConstanciaTraslado $constancia, ConstanciaTrasladoService $service)
     {
         abort_unless(auth()->user()?->is_admin, 403);
-        if ($constancia->ruta_pdf && Storage::disk('local')->exists($constancia->ruta_pdf)) {
+        if (! request()->routeIs('misrutas.constancias-traslado.word') && $constancia->ruta_pdf && Storage::disk('local')->exists($constancia->ruta_pdf)) {
             $nombre = $constancia->documentoAlumno?->nombre_original ?: 'constancia-traslado-' . $constancia->folio . '.pdf';
             return response()->file(Storage::disk('local')->path($constancia->ruta_pdf), [
                 'Content-Type' => 'application/pdf',
@@ -25,6 +26,12 @@ class ConstanciaTrasladoController extends Controller
             'inscripcion.generacion', 'inscripcion.semestre', 'inscripcion.matriculasAlumno', 'cicloEscolar',
         ]);
         $calificaciones = $service->calificacionesPara($constancia);
+        if (request()->routeIs('misrutas.constancias-traslado.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.constancia-traslado-calificaciones', compact('constancia', 'calificaciones'),
+                'constancia-traslado-' . $constancia->folio . '.docx'
+            );
+        }
         return Pdf::loadView('pdf.constancia-traslado-calificaciones', compact('constancia', 'calificaciones'))
             ->setPaper('letter', 'portrait')
             ->stream('constancia-traslado-' . $constancia->folio . '.pdf');

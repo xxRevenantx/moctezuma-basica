@@ -9,6 +9,7 @@ use App\Models\Escuela;
 use App\Models\Horario;
 use App\Models\Persona;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -138,7 +139,7 @@ class ProfesorHorarioPdfController extends Controller
         $logoIzquierdo = public_path('imagenes/logo-letra.png');
         $logoDerecho = public_path('penacho.jpg');
 
-        $pdf = Pdf::loadView('pdf.profesor-horario', [
+        $datosDocumento = [
             'profesor' => $profesor,
             'profesorNombre' => $profesorNombre,
             'horarios' => $horarios,
@@ -150,9 +151,13 @@ class ProfesorHorarioPdfController extends Controller
             'logoDerecho' => file_exists($logoDerecho) ? $logoDerecho : null,
             'cicloEscolar' => $cicloEscolar,
             'escuela' => $escuela,
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('horario-profesor-' . Str::slug($profesorNombre) . '.pdf');
+        ];
+        $nombre = 'horario-profesor-' . Str::slug($profesorNombre);
+        if ($request->routeIs('profesor.horario.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.profesor-horario', $datosDocumento, $nombre.'.docx');
+        }
+        return Pdf::loadView('pdf.profesor-horario', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombre.'.pdf');
     }
 
     private function crearHorarioGeneral(Collection $horarios): array

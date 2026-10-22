@@ -20,6 +20,9 @@
                 <flux:button :href="route('misrutas.analitica.reporte', array_merge(['formato' => 'pdf'], $this->parametrosReporte))" target="_blank" icon="document-arrow-down">
                     PDF ejecutivo
                 </flux:button>
+                <flux:button :href="route('misrutas.analitica.reporte', array_merge(['formato' => 'word'], $this->parametrosReporte))" icon="document-text">
+                    Word editable
+                </flux:button>
                 <flux:button :href="route('misrutas.analitica.reporte', array_merge(['formato' => 'excel'], $this->parametrosReporte))" icon="table-cells">
                     Excel detallado
                 </flux:button>

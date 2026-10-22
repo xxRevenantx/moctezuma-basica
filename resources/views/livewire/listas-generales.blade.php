@@ -729,7 +729,7 @@
                     </button>
                 @endif
 
-                @if ($tipo_descarga === 'alumnos_institucional')
+                @if ($this->puedeDescargar)
                     @if ($this->urlWord)
                         <a href="{{ $this->urlWord }}"
                             class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#88AC2E] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#759625]">

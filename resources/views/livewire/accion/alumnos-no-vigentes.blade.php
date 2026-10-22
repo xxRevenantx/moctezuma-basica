@@ -114,6 +114,20 @@
                         class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-violet-800 transition hover:bg-violet-50">
                         <flux:icon.document-arrow-down class="h-4 w-4" /> PDF
                     </a>
+                    <a 
+                        href="{{ route('misrutas.alumnos-no-vigentes.word', array_filter([
+                            'slug_nivel' => $slug_nivel,
+                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                            'generacion_id' => $generacion_id,
+                            'grado_id' => $grado_id,
+                            'semestre_id' => $semestre_id,
+                            'grupo_id' => $grupo_id,
+                            'categoria' => $categoria,
+                            'search' => $search,
+                        ], fn ($value) => $value !== null && $value !== '')) }}"
+                        class="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-2.5 text-sm font-bold text-[#006492] transition hover:bg-violet-50">
+                        <flux:icon.document-arrow-down class="h-4 w-4" /> Word
+                    </a>
                 </div>
             </div>
         </div>

@@ -8,6 +8,7 @@ use App\Models\Nivel;
 use App\Models\CicloEscolar;
 use App\Services\HorarioGeneralBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -109,7 +110,7 @@ class HorariosGeneralesPdfController extends Controller
             $cicloEscolar->fin_anio
         );
 
-        return Pdf::loadView('pdf.horarios-generales', [
+        $datosDocumento = [
             'escuela' => $escuela,
             'nivel' => $nivel,
             'ciclo_escolar' => $cicloEscolar,
@@ -121,7 +122,11 @@ class HorariosGeneralesPdfController extends Controller
                     : 'imagenes/logo-letra.png'
             ),
             'imagen_nivel' => $builder->imagenBase64Publica($imagenesPorNivel[$nivel->slug] ?? null),
-        ])
+        ];
+        if (request()->routeIs('generales.horarios.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.horarios-generales', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'portrait');
+        }
+        return Pdf::loadView('pdf.horarios-generales', $datosDocumento)
             ->setPaper('letter', 'portrait')
             ->stream($nombreArchivo);
     }

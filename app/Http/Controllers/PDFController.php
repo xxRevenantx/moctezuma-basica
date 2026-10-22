@@ -32,6 +32,7 @@ use App\Support\CalificacionBachillerato;
 use App\Support\PromedioExcel;
 use App\Support\ReglasMateriaBachillerato;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -1421,6 +1422,12 @@ class PDFController extends Controller
             default => 'pdf.boleta_promedio_pdf',
         };
 
+        if ($request->routeIs('misrutas.promedios.boleta.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                $vista, $data, str_replace('.pdf', '.docx', $nombreArchivo),
+                in_array($tipo, ['reconocimiento', 'diploma'], true) ? 'landscape' : 'portrait'
+            );
+        }
         return Pdf::loadView($vista, $data)
             ->setPaper('letter', in_array($tipo, ['reconocimiento', 'diploma'], true) ? 'landscape' : 'portrait')
             ->stream($nombreArchivo);
@@ -1485,7 +1492,7 @@ class PDFController extends Controller
             abort(404, 'No se encontró personal asignado al nivel para generar credenciales.');
         }
 
-        $pdf = Pdf::loadView('pdf.credenciales_profesores_pdf', [
+        $datosDocumento = [
             'nivel' => $nivel,
             'personas' => $personas,
             'vigencia' => $request->query(
@@ -1493,9 +1500,13 @@ class PDFController extends Controller
                 'Ciclo escolar ' . now()->year . ' - ' . now()->addYear()->year
             ),
             'cargo' => $request->query('cargo', 'PERSONAL'),
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('credenciales-personal-' . $nivel->slug . '.pdf');
+        ];
+        $nombre = 'credenciales-personal-' . $nivel->slug;
+        if ($request->routeIs('credenciales.profesores.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.credenciales_profesores_pdf', $datosDocumento, $nombre.'.docx');
+        }
+        return Pdf::loadView('pdf.credenciales_profesores_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombre.'.pdf');
     }
 
     private function obtenerPersonasCredencialProfesor(Request $request, string $modoDescarga, int $nivelId)
@@ -2356,7 +2367,7 @@ class PDFController extends Controller
                 : '') .
             '.pdf';
 
-        return Pdf::loadView('pdf.horarios_pdf', [
+        $datosDocumento = [
             'escuela' => $escuela,
             'nivel' => $nivel,
             'generacion' => $generacion,
@@ -2385,9 +2396,12 @@ class PDFController extends Controller
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,
-        ])
-            ->setPaper('letter', 'portrait')
-            ->stream($nombreArchivo);
+        ];
+        if ($request->routeIs('misrutas.horarios.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.horarios_pdf', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo));
+        }
+        return Pdf::loadView('pdf.horarios_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
 
@@ -3237,6 +3251,9 @@ class PDFController extends Controller
             '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
             '.pdf';
 
+        if ($request->routeIs('misrutas.reconocimiento.calificaciones.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.reconocimiento_pdf', $data, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
+        }
         return Pdf::loadView('pdf.reconocimiento_pdf', $data)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
@@ -3966,7 +3983,7 @@ class PDFController extends Controller
         $logoDerecho = file_exists($logoDerecho) ? $logoDerecho : null;
         $imagenNivel = ($imagenNivel && file_exists($imagenNivel)) ? $imagenNivel : null;
 
-        $pdf = Pdf::loadView('pdf.calificaciones_pdf', [
+        $datosDocumento = [
             'titulo' => 'REPORTE DE CALIFICACIONES',
 
             'escuela' => $escuela,
@@ -4010,7 +4027,7 @@ class PDFController extends Controller
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
             'imagen_nivel' => $imagenNivel,
-        ])->setPaper('letter', 'landscape');
+        ];
 
         $nombreArchivo = 'CALIFICACIONES_' .
             mb_strtoupper($nivel->nombre ?? 'NIVEL') . '_' .
@@ -4020,7 +4037,11 @@ class PDFController extends Controller
             '_' . ($esBachillerato ? 'PARCIAL_' : 'PERIODO_') . $periodoNumero .
             '.pdf';
 
-        return $pdf->stream($nombreArchivo);
+        if ($request->routeIs('misrutas.calificaciones.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.calificaciones_pdf', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
+        }
+        return Pdf::loadView('pdf.calificaciones_pdf', $datosDocumento)
+            ->setPaper('letter', 'landscape')->stream($nombreArchivo);
     }
 
 
@@ -4740,7 +4761,7 @@ class PDFController extends Controller
 
         $tipoBoleta = $esBachillerato ? 'BOLETA PARCIAL' : 'BOLETA DE PERIODO';
 
-        $pdf = Pdf::loadView('pdf.boleta_calificaciones_pdf', [
+        $datosDocumento = [
             'titulo' => $tipoBoleta,
             'escuela' => $escuela,
             'nivel' => $nivel,
@@ -4793,14 +4814,18 @@ class PDFController extends Controller
             'fecha_impresion' => now(),
             'logo_izquierdo' => $logoIzquierdo,
             'logo_derecho' => $logoDerecho,
-        ])->setPaper('letter', 'portrait');
+        ];
 
         $nombreArchivo = 'BOLETA_' .
             str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) .
             '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
             '.pdf';
 
-        return $pdf->stream($nombreArchivo);
+        if ($request->routeIs('misrutas.boleta.calificaciones.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.boleta_calificaciones_pdf', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'portrait');
+        }
+        return Pdf::loadView('pdf.boleta_calificaciones_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
 
@@ -5573,6 +5598,9 @@ class PDFController extends Controller
             '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
             '.pdf';
 
+        if ($request->routeIs('misrutas.diploma.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.reconocimiento_pdf', $data, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
+        }
         return Pdf::loadView('pdf.reconocimiento_pdf', $data)
             ->setPaper('letter', 'landscape')
             ->stream($nombreArchivo);
@@ -5726,16 +5754,19 @@ class PDFController extends Controller
 
         $nombreArchivo = 'credenciales_' . $nivel->slug . '_' . $modoDescarga . '.pdf';
 
-        return Pdf::loadView('pdf.credenciales_pdf', [
+        $datosDocumento = [
             'alumnos' => $alumnos,
             'nivel' => $nivel,
             'cicloEscolar' => $cicloEscolar,
             'modoDescarga' => $modoDescarga,
             'nombreDirector' => $nombreDirector,
             'fotosDataUri' => $fotosDataUri,
-        ])
-            ->setPaper('letter', 'portrait')
-            ->stream($nombreArchivo);
+        ];
+        if ($request->routeIs('generales.credenciales.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.credenciales_pdf', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo));
+        }
+        return Pdf::loadView('pdf.credenciales_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
 

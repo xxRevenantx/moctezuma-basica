@@ -6,6 +6,7 @@ use App\Exports\EdadEscolarExport;
 use App\Services\EdadEscolarService;
 use App\Services\ReporteEdadEscolarService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ class EdadEscolarReporteController extends Controller
         ReporteEdadEscolarService $service,
     ): Response|BinaryFileResponse {
         abort_unless(auth()->user()?->canAccess('alumnos.consultar'), 403);
-        abort_unless(in_array($formato, ['pdf', 'excel'], true), 404);
+        abort_unless(in_array($formato, ['pdf', 'word', 'excel'], true), 404);
 
         $filtros = $request->validate([
             'ciclo_escolar_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
@@ -43,11 +44,16 @@ class EdadEscolarReporteController extends Controller
             return Excel::download(new EdadEscolarExport($datos), $nombre.'.xlsx');
         }
 
-        return Pdf::loadView('pdf.edad-escolar', [
+        $datosDocumento = [
             'datos' => $datos,
             'titulo' => $filtros['situacion'] === EdadEscolarService::SITUACION_EXTRAEDAD
                 ? 'Reporte de alumnos en extraedad'
                 : 'Reporte de edad escolar',
-        ])->setPaper('letter', 'landscape')->download($nombre.'.pdf');
+        ];
+        if ($formato === 'word') {
+            return app(BladeWordExporter::class)->descargar('pdf.edad-escolar', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.edad-escolar', $datosDocumento)
+            ->setPaper('letter', 'landscape')->download($nombre.'.pdf');
     }
 }

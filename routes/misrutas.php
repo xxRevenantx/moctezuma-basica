@@ -96,7 +96,10 @@ Route::prefix('docente')->group(function (): void {
     Route::get('/mi-horario', [DocenteController::class, 'horario'])->name('docente.horario');
     Route::get('/calificaciones/{slug_nivel}', [DocenteController::class, 'calificaciones'])->name('docente.calificaciones');
     Route::get('/fichas-descriptivas', [DocenteController::class, 'fichas'])->name('docente.fichas');
-    Route::get('/entregas/{entrega}/pdf', CalificacionEntregaPdfController::class)->name('docente.entregas.pdf');
+    Route::get('/entregas/{entrega}/word', CalificacionEntregaPdfController::class)
+    ->name('docente.entregas.word');
+
+Route::get('/entregas/{entrega}/pdf', CalificacionEntregaPdfController::class)->name('docente.entregas.pdf');
 });
 
 // Gestión administrativa por docente: Primaria, Secundaria y Bachillerato.
@@ -129,7 +132,7 @@ Route::get('/analitica-institucional', AnaliticaInstitucional::class)
     ->name('misrutas.analitica-institucional');
 
 Route::get('/analitica-institucional/reporte/{formato}', AnaliticaInstitucionalReporteController::class)
-    ->whereIn('formato', ['pdf', 'excel'])
+    ->whereIn('formato', ['pdf', 'word', 'excel'])
     ->middleware('permission:analitica.exportar')
     ->name('misrutas.analitica.reporte');
 
@@ -160,12 +163,12 @@ Route::post('/alumnos/lista-seleccionados/pdf', [ListaAlumnosSeleccionadosContro
 Route::post('/alumnos/lista-seleccionados/word', [ListaAlumnosSeleccionadosController::class, 'word'])
     ->name('misrutas.alumnos.lista.word');
 Route::get('/alumnos/estadistica-911/reporte/{formato}', EstadisticaAlumnosGruposReporteController::class)
-    ->whereIn('formato', ['pdf', 'excel'])
+    ->whereIn('formato', ['pdf', 'word', 'excel'])
     ->middleware('permission:alumnos.consultar')
     ->name('misrutas.alumnos.estadistica-911.reporte');
 
 Route::get('/alumnos/edad-escolar/reporte/{formato}', EdadEscolarReporteController::class)
-    ->whereIn('formato', ['pdf', 'excel'])
+    ->whereIn('formato', ['pdf', 'word', 'excel'])
     ->middleware('permission:alumnos.consultar')
     ->name('misrutas.alumnos.edad-escolar.reporte');
 
@@ -173,6 +176,9 @@ Route::get('/alumnos/edad-escolar/reporte/{formato}', EdadEscolarReporteControll
 Route::get('/listas-generales', ListasGenerales::class)
     ->middleware('admin')
     ->name('misrutas.listas-generales');
+
+Route::get('/listas-generales/formatos/word', ListasGeneralesFormatosController::class)
+    ->middleware('admin')->name('listas-generales.formatos.word');
 
 Route::get('/listas-generales/formatos/pdf', ListasGeneralesFormatosController::class)
     ->middleware('admin')
@@ -247,7 +253,7 @@ Route::get('/roles-del-personal', [PersonaController::class, 'rolePersona'])->na
 Route::get('/plantilla', [PersonaNivelController::class, 'plantilla'])->name('misrutas.plantilla');
 Route::get('/plantilla/reportes/{tipo}/{formato}', PersonaNivelReporteController::class)
     ->whereIn('tipo', ['plantilla', 'carga', 'historial'])
-    ->whereIn('formato', ['pdf', 'excel'])
+    ->whereIn('formato', ['pdf', 'word', 'excel'])
     ->middleware('admin')
     ->name('misrutas.plantilla-personal.reporte');
 
@@ -405,9 +411,15 @@ Route::get('/nivel/{slug_nivel}/matricula/{inscripcion}/editar', [MatriculaContr
 
 
 
+Route::get('/nivel/{slug_nivel}/matricula-historica/word', MatriculaHistorialPdfController::class)
+    ->middleware('admin')->name('misrutas.matricula.historial.word');
+
 Route::get('/nivel/{slug_nivel}/matricula-historica/pdf', MatriculaHistorialPdfController::class)
     ->middleware('admin')
     ->name('misrutas.matricula.historial.pdf');
+
+Route::get('/nivel/{slug_nivel}/alumnos-no-vigentes/word', AlumnosNoVigentesPdfController::class)
+    ->middleware('admin')->name('misrutas.alumnos-no-vigentes.word');
 
 Route::get('/nivel/{slug_nivel}/alumnos-no-vigentes/pdf', AlumnosNoVigentesPdfController::class)
     ->middleware('admin')
@@ -418,6 +430,9 @@ Route::get('/nivel/{slug_nivel}/reingreso-alumno/formulario', ReingresoAlumnoCon
     ->name('misrutas.reingreso-alumno');
 
 
+Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/word', [PDFController::class, 'boletareconocimientoPromedioPdf'])
+    ->name('misrutas.promedios.boleta.word');
+
 Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController::class, 'boletareconocimientoPromedioPdf'])
     ->name('misrutas.promedios.boleta.pdf');
 
@@ -425,9 +440,11 @@ Route::get('/promedios-generales/{slug_nivel}/boleta/{tipo}/pdf', [PDFController
 // REPORTES DEL CIERRE DE GENERACIÓN Y CONTINUIDAD
 Route::prefix('generales/cierre-generacion')->group(function () {
     Route::get('/{proceso}/reporte/{formato}', [CierreGeneracionReporteController::class, 'reporte'])
-        ->whereIn('formato', ['pdf', 'excel'])
+        ->whereIn('formato', ['pdf', 'word', 'excel'])
         ->name('generales.cierre-generacion.reporte');
 
+    Route::get('/{proceso}/detalle/{detalle}/comprobante/word', [CierreGeneracionReporteController::class, 'comprobante'])
+        ->name('generales.cierre-generacion.comprobante.word');
     Route::get('/{proceso}/detalle/{detalle}/comprobante', [CierreGeneracionReporteController::class, 'comprobante'])
         ->name('generales.cierre-generacion.comprobante');
 });
@@ -459,11 +476,20 @@ Route::middleware('admin')->prefix('/generales/bachillerato/promedio-anual')->gr
 Route::get('/fichas/preescolar/excel', [FichaController::class, 'excel'])
     ->name('misrutas.fichas.excel');
 
+Route::get('/fichas/preescolar/grupo/word', [FichaController::class, 'grupoPdf'])
+    ->name('misrutas.fichas.grupo.word');
+
 Route::get('/fichas/preescolar/grupo/pdf', [FichaController::class, 'grupoPdf'])
     ->name('misrutas.fichas.grupo.pdf');
 
+Route::get('/fichas/preescolar/alumno/{inscripcion}/word', [FichaController::class, 'alumnoPdf'])
+    ->name('misrutas.fichas.alumno.word');
+
 Route::get('/fichas/preescolar/alumno/{inscripcion}/pdf', [FichaController::class, 'alumnoPdf'])
     ->name('misrutas.fichas.alumno.pdf');
+
+Route::get('/lugares-preescolar/{lugarPreescolar}/word', [LugarPreescolarPDFController::class, 'show'])
+    ->name('misrutas.lugares-preescolar.word');
 
 Route::get('/lugares-preescolar/{lugarPreescolar}/pdf', [LugarPreescolarPDFController::class, 'show'])
     ->name('misrutas.lugares-preescolar.pdf');
@@ -476,15 +502,26 @@ Route::get('/lugares-preescolar/documentos/{tipo}/zip', [DocumentosAcademicosZip
     ->name('misrutas.lugares-preescolar.documentos.zip');
 
 // PDF
+Route::get('/horarios/word', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.word');
+
 Route::get('/horarios/pdf', [PDFController::class, 'horario_pdf'])->name('misrutas.horarios.pdf');
+
+Route::get('/generales/horarios/word', HorariosGeneralesPdfController::class)
+    ->name('generales.horarios.word');
 
 Route::get('/generales/horarios/pdf', HorariosGeneralesPdfController::class)
     ->name('generales.horarios.pdf');
+
+Route::get('/generales/horarios-vacios/word', HorariosVaciosPdfController::class)
+    ->name('generales.horarios-vacios.word');
 
 Route::get('/generales/horarios-vacios/pdf', HorariosVaciosPdfController::class)
     ->middleware('admin')
     ->name('generales.horarios-vacios.pdf');
 
+
+Route::get('/generales/{slug_nivel}/promedios-materias/word', PromediosMateriasPdfController::class)
+    ->middleware('admin')->name('generales.promedios-materias.word');
 
 Route::get('/generales/{slug_nivel}/promedios-materias/pdf', PromediosMateriasPdfController::class)
     ->middleware('admin')
@@ -503,11 +540,20 @@ Route::middleware('admin')->prefix('generales/{slug_nivel}/distribucion')->group
         ->name('generales.distribucion.zip');
 });
 
+Route::get('/profesores/horario-profesor/word', ProfesorHorarioPdfController::class)
+    ->name('profesor.horario.word');
+
 Route::get('/profesores/horario-profesor/pdf', ProfesorHorarioPdfController::class)
     ->name('profesor.horario.pdf');
 
+Route::get('/profesores/horarios/todos/word', TodosHorariosProfesoresPdfController::class)
+    ->name('profesores.horarios.todos.word');
+
 Route::get('/profesores/horarios/todos/pdf', TodosHorariosProfesoresPdfController::class)
     ->name('profesores.horarios.todos.pdf');
+
+Route::get('/listas/word/{slug_nivel}', [PDFController::class, 'lista_word'])
+    ->middleware('admin')->name('accion.generales.listas.word');
 
 Route::get('/listas/pdf/{slug_nivel}', [PDFController::class, 'lista_pdf'])
     ->middleware('admin')
@@ -520,19 +566,33 @@ Route::get('/generales/{slug_nivel}/generaciones-historicas/{formato}', ListaGen
     ->name('generales.generaciones-historicas');
 
 
+Route::get('/calificaciones/word', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.word');
+
 Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.pdf');
+
+Route::get('/calificaciones/boleta/word', [PDFController::class, 'boleta_calificaciones_pdf'])
+    ->name('misrutas.boleta.calificaciones.word');
 
 Route::get('/calificaciones/boleta', [PDFController::class, 'boleta_calificaciones_pdf'])
     ->name('misrutas.boleta.calificaciones.pdf');
 
 
 Route::middleware('admin')->group(function () {
+    Route::get('/calificaciones/boleta-oficial-primaria/{inscripcion}/word', BoletaOficialPrimariaController::class)
+        ->name('calificaciones.boleta-oficial-primaria.word');
+
     Route::get('/calificaciones/boleta-oficial-primaria/{inscripcion}', BoletaOficialPrimariaController::class)
         ->name('calificaciones.boleta-oficial-primaria');
+
+    Route::get('/generales/promedios-oficiales-primaria/word', PromediosOficialesPrimariaPdfController::class)
+        ->name('generales.promedios-oficiales-primaria.word');
 
     Route::get('/generales/promedios-oficiales-primaria/pdf', PromediosOficialesPrimariaPdfController::class)
         ->name('generales.promedios-oficiales-primaria.pdf');
 });
+
+Route::get('/calificaciones/diploma/word', [PDFController::class, 'diploma_calificaciones_pdf'])
+    ->name('misrutas.diploma.word');
 
 Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_calificaciones_pdf'])
     ->name('misrutas.diploma.pdf');
@@ -540,6 +600,9 @@ Route::get('/calificaciones/diploma', [PDFController::class, 'diploma_calificaci
 
 
 // Ruta nueva para reconocimiento
+Route::get('/reconocimiento/calificaciones/word', [PDFController::class, 'reconocimiento_calificaciones_pdf'])
+    ->name('misrutas.reconocimiento.calificaciones.word');
+
 Route::get('/reconocimiento/calificaciones/pdf', [PDFController::class, 'reconocimiento_calificaciones_pdf'])
     ->name('misrutas.reconocimiento.calificaciones.pdf');
 
@@ -548,6 +611,9 @@ Route::get('/reconocimiento/calificaciones/pdf', [PDFController::class, 'reconoc
 //     ->name('misrutas.diploma.calificaciones.pdf');
 
 
+
+Route::get('/credenciales/profesores/word', [PDFController::class, 'credencial_profesor_pdf'])
+    ->name('credenciales.profesores.word');
 
 Route::get('/credenciales/profesores/pdf', [PDFController::class, 'credencial_profesor_pdf'])
     ->name('credenciales.profesores.pdf');
@@ -559,12 +625,21 @@ Route::get('/credenciales/profesores/imagen/{formato}', [CredencialImagenControl
 Route::get('/credenciales/profesores/preview', [CredencialImagenController::class, 'previewProfesores'])
     ->name('credenciales.profesores.preview');
 
+Route::get('/profesores/documentos/portadas/word', [ProfesorDocumentoController::class, 'portadasPdf'])
+    ->name('profesores.documentos.portadas.word');
+
 Route::get('/profesores/documentos/portadas/pdf', [ProfesorDocumentoController::class, 'portadasPdf'])
     ->name('profesores.documentos.portadas.pdf');
 
 
+Route::get('/profesor/listas/asistencia/word', [ProfesorPdfController::class, 'asistencia'])
+    ->name('profesor.listas.asistencia.word');
+
 Route::get('/profesor/listas/asistencia/pdf', [ProfesorPdfController::class, 'asistencia'])
     ->name('profesor.listas.asistencia.pdf');
+
+Route::get('/profesor/listas/evaluacion/word', [ProfesorPdfController::class, 'evaluacion'])
+    ->name('profesor.listas.evaluacion.word');
 
 Route::get('/profesor/listas/evaluacion/pdf', [ProfesorPdfController::class, 'evaluacion'])
     ->name('profesor.listas.evaluacion.pdf');
@@ -572,6 +647,9 @@ Route::get('/profesor/listas/evaluacion/pdf', [ProfesorPdfController::class, 'ev
 // WORD
 Route::get('/{slug_nivel}/listas/word', [WordController::class, 'lista_word'])
     ->name('lista.evaluacion.word');
+
+Route::get('/generales/{slug_nivel}/credenciales/word', [PDFController::class, 'credenciales_pdf'])
+    ->name('generales.credenciales.word');
 
 Route::get('/generales/{slug_nivel}/credenciales/pdf', [PDFController::class, 'credenciales_pdf'])
     ->name('generales.credenciales.pdf');
@@ -583,26 +661,44 @@ Route::get('/generales/{slug_nivel}/credenciales/imagen/{formato}', [CredencialI
 Route::get('/generales/{slug_nivel}/credenciales/preview', [CredencialImagenController::class, 'previewAlumnos'])
     ->name('generales.credenciales.preview');
 
+Route::get('/constancias/abrir/word', [DocumentosPDFController::class, 'constanciasMasivasPdf'])
+    ->middleware('admin')->name('misrutas.constancias.masivas.word');
+
 Route::get('/constancias/abrir/pdf', [DocumentosPDFController::class, 'constanciasMasivasPdf'])
     ->middleware('admin')
     ->name('misrutas.constancias.masivas.pdf');
 
+Route::get('/constancias-traslado/{constancia}/word', [ConstanciaTrasladoController::class, 'show'])
+    ->middleware('admin')->name('misrutas.constancias-traslado.word');
+
 Route::get('/constancias-traslado/{constancia}/pdf', [ConstanciaTrasladoController::class, 'show'])
     ->middleware('admin')
     ->name('misrutas.constancias-traslado.pdf');
+
+Route::get('/constancias/{constancia}/word', [DocumentosPDFController::class, 'constanciaPdf'])
+    ->middleware('admin')->name('misrutas.constancias.word');
 
 Route::get('/constancias/{constancia}/pdf', [DocumentosPDFController::class, 'constanciaPdf'])
     ->middleware('admin')
     ->name('misrutas.constancias.pdf');
 
 
+Route::get('/cartas-compromiso/abrir/masivas/word', [CartaCompromisoPdfController::class, 'masivas'])
+    ->middleware('admin')->name('misrutas.cartas-compromiso.masivas.word');
+
 Route::get('/cartas-compromiso/abrir/masivas/pdf', [CartaCompromisoPdfController::class, 'masivas'])
     ->middleware('admin')
     ->name('misrutas.cartas-compromiso.masivas.pdf');
 
+Route::get('/cartas-compromiso/{carta}/word', [CartaCompromisoPdfController::class, 'individual'])
+    ->middleware('admin')->name('misrutas.cartas-compromiso.word');
+
 Route::get('/cartas-compromiso/{carta}/pdf', [CartaCompromisoPdfController::class, 'individual'])
     ->middleware('admin')
     ->name('misrutas.cartas-compromiso.pdf');
+
+Route::get('/oficios/{oficio}/word', [DocumentosPDFController::class, 'oficioPdf'])
+    ->middleware('admin')->name('misrutas.oficios.word');
 
 Route::get('/oficios/{oficio}/pdf', [DocumentosPDFController::class, 'oficioPdf'])
     ->middleware('admin')

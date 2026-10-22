@@ -1,5 +1,4 @@
 <div x-data="{
-    cargandoPagina: true,
     regresandoMatricula: false,
 
     llaveRetorno() {
@@ -36,32 +35,7 @@
         this.regresandoMatricula = true;
         setTimeout(() => window.location.href = url, 300);
     }
-}" x-init="setTimeout(() => cargandoPagina = false, 600)" class="space-y-6">
-
-    {{-- Loader inicial --}}
-    <div x-cloak x-show="cargandoPagina" x-transition.opacity
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-md dark:bg-neutral-950/80">
-        <div
-            class="mx-4 w-full max-w-sm rounded-[28px] border border-indigo-100 bg-white/95 p-7 text-center shadow-2xl shadow-indigo-500/20 dark:border-indigo-900/40 dark:bg-neutral-900/95">
-            <div class="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center">
-                <div class="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-indigo-900/40"></div>
-                <div
-                    class="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-r-sky-500 border-t-indigo-500">
-                </div>
-                <div
-                    class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-blue-600 to-sky-500 text-white shadow-lg shadow-indigo-500/30">
-                    <flux:icon.user class="h-5 w-5" />
-                </div>
-            </div>
-            <h3 class="text-lg font-bold text-slate-800 dark:text-white">Cargando matrícula</h3>
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Consultando la información del alumno...</p>
-            <div class="mt-5 flex items-center justify-center gap-1.5">
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-indigo-500 [animation-delay:-0.3s]"></span>
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]"></span>
-                <span class="h-2.5 w-2.5 animate-bounce rounded-full bg-sky-500"></span>
-            </div>
-        </div>
-    </div>
+}" class="space-y-6">
 
     {{-- Loader de regreso --}}
     <div x-cloak x-show="regresandoMatricula" x-transition.opacity
@@ -94,6 +68,29 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Actualizando la matrícula del alumno...</p>
         </div>
     </div>
+
+    {{-- La carga de complementos es opcional y nunca debe refrescar la página automáticamente. --}}
+    @if (!$complementosCargados)
+        <section class="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-100 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <p class="font-bold">Formulario de matrícula disponible</p>
+                <p class="mt-1 text-xs leading-5 text-sky-800 dark:text-sky-200">
+                    Para consultar requisitos de anulación y el expediente, usa el botón. La consulta no es necesaria para editar o guardar los datos del alumno.
+                </p>
+            </div>
+            <flux:button type="button" variant="primary"
+                wire:click="cargarComplementosEdicion" wire:loading.attr="disabled"
+                wire:target="cargarComplementosEdicion"
+                class="shrink-0">
+                <span wire:loading.remove wire:target="cargarComplementosEdicion">Consultar diagnósticos</span>
+                <span wire:loading wire:target="cargarComplementosEdicion">Consultando…</span>
+            </flux:button>
+        </section>
+    @elseif ($errorComplementos)
+        <div role="alert" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            El formulario está disponible, pero algunos diagnósticos no pudieron cargarse. Las operaciones de anulación permanecerán bloqueadas hasta revisar el registro de errores.
+        </div>
+    @endif
 
     <form wire:submit.prevent="actualizarInscripcion" class="space-y-6">
         <div
@@ -699,7 +696,9 @@
                                             Anular ingreso / No inició el ciclo
                                         </h2>
 
-                                        @if (data_get($diagnosticoAnulacionIngreso, 'ya_anulado'))
+                                        @if (!$complementosCargados)
+                                            <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-sky-700">Pendiente de consulta</span>
+                                        @elseif (data_get($diagnosticoAnulacionIngreso, 'ya_anulado'))
                                             <span
                                                 class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-700 dark:bg-neutral-700 dark:text-slate-200">
                                                 Ya anulado
@@ -806,6 +805,8 @@
                                     Este ingreso ya se conserva como <b>anulado / no iniciado</b>. El alumno no forma
                                     parte de las listas operativas del ciclo.
                                 </div>
+                            @elseif (!$complementosCargados)
+                                <p class="mt-4 text-sm text-sky-700">Diagnóstico pendiente. Si necesitas anular el ingreso, utiliza «Consultar diagnósticos» al principio del formulario.</p>
                             @elseif (!data_get($diagnosticoAnulacionIngreso, 'puede_anular'))
                                 <div
                                     class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">

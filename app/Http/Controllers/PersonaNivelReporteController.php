@@ -10,6 +10,7 @@ use App\Models\TipoDocumentoPersonal;
 use App\Services\CargaLaboralPersonaNivelService;
 use App\Services\ExpedientePersonalResumenService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -25,7 +26,7 @@ class PersonaNivelReporteController extends Controller
         ExpedientePersonalResumenService $expedienteService,
     ) {
         abort_unless(in_array($tipo, ['plantilla', 'carga', 'historial'], true), 404);
-        abort_unless(in_array($formato, ['pdf', 'excel'], true), 404);
+        abort_unless(in_array($formato, ['pdf', 'word', 'excel'], true), 404);
 
         $ciclo = $this->resolverCiclo($request);
 
@@ -42,13 +43,18 @@ class PersonaNivelReporteController extends Controller
             );
         }
 
-        return Pdf::loadView('pdf.persona-nivel-reporte', [
+        $datosDocumento = [
             'titulo' => $titulo,
             'encabezados' => $encabezados,
             'filas' => $filas,
             'tipo' => $tipo,
             'cicloEscolar' => $ciclo,
-        ])->setPaper('letter', 'landscape')->download($nombre . '.pdf');
+        ];
+        if ($formato === 'word') {
+            return app(BladeWordExporter::class)->descargar('pdf.persona-nivel-reporte', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.persona-nivel-reporte', $datosDocumento)
+            ->setPaper('letter', 'landscape')->download($nombre . '.pdf');
     }
 
     private function resolverCiclo(Request $request): CicloEscolar

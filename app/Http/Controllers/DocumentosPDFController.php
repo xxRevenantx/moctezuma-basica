@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Documentos\BladeWordExporter;
 use App\Models\Constancia;
 use App\Models\ConstanciaPlantilla;
 use App\Models\Escuela;
@@ -37,12 +38,21 @@ class DocumentosPDFController extends Controller
             $constancia->plantilla
         );
 
-        $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
+        $datosDocumento = [
             'constancia' => $constancia,
             'alumno' => $constancia->alumno,
             'plantilla' => $constancia->plantilla,
             'calificacionesConstancia' => $calificacionesConstancia,
-        ])->setPaper('letter', 'portrait');
+        ];
+
+        if (request()->routeIs('misrutas.constancias.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.constancia_estudios_pdf', $datosDocumento, Str::slug($constancia->folio, '_') . '.docx'
+            );
+        }
+
+        $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait');
 
         $nombreArchivo = Str::slug($constancia->folio, '_') . '.pdf';
         $contenidoPdf = $pdf->output();
@@ -207,6 +217,13 @@ class DocumentosPDFController extends Controller
                 ),
             ];
         })->values()->all();
+
+        if (request()->routeIs('misrutas.constancias.masivas.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.constancia_estudios_pdf', ['constanciasMasivas' => $documentos],
+                'CONSTANCIAS_' . Str::upper($payload['modo_descarga'] ?? 'MASIVO') . '_' . now()->format('Ymd_His') . '.docx'
+            );
+        }
 
         $pdf = Pdf::loadView('pdf.constancia_estudios_pdf', [
             'constanciasMasivas' => $documentos,
@@ -601,13 +618,21 @@ class DocumentosPDFController extends Controller
 
 
 
-        $pdf = Pdf::loadView($vistaPdf, [
+        $datosOficio = [
             'oficio' => $oficio,
             'alumno' => $oficio->alumno,
             'nivel' => $oficio->nivel ?? $oficio->alumno?->nivel,
             'director' => $oficio->director ?? $oficio->nivel?->director,
             'lema' => $lema,
-        ])->setPaper('letter', 'portrait');
+        ];
+
+        if (request()->routeIs('misrutas.oficios.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                $vistaPdf, $datosOficio, Str::slug($oficio->folio, '_') . '.docx'
+            );
+        }
+
+        $pdf = Pdf::loadView($vistaPdf, $datosOficio)->setPaper('letter', 'portrait');
 
         $nombreArchivo = Str::slug($oficio->folio, '_') . '.pdf';
 

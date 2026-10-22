@@ -6,6 +6,7 @@ use App\Exports\CierreGeneracionExport;
 use App\Models\ProcesoCierreCiclo;
 use App\Models\ProcesoCierreCicloDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -52,13 +53,17 @@ class CierreGeneracionReporteController extends Controller
             return Excel::download(new CierreGeneracionExport($proceso), $base.'.xlsx');
         }
 
-        abort_unless($formato === 'pdf', 404);
-
-        return Pdf::loadView('pdf.cierre-generacion-continuidad', [
+        abort_unless(in_array($formato, ['pdf', 'word'], true), 404);
+        $datosDocumento = [
             'proceso' => $proceso,
             'detallesPorResultado' => $proceso->detalles->groupBy('resultado'),
             'logo' => $this->logoDataUri(),
-        ])->setPaper('letter', 'landscape')->download($base.'.pdf');
+        ];
+        if ($formato === 'word') {
+            return app(BladeWordExporter::class)->descargar('pdf.cierre-generacion-continuidad', $datosDocumento, $base.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.cierre-generacion-continuidad', $datosDocumento)
+            ->setPaper('letter', 'landscape')->download($base.'.pdf');
     }
 
     public function comprobante(ProcesoCierreCiclo $proceso, ProcesoCierreCicloDetalle $detalle): Response
@@ -87,14 +92,18 @@ class CierreGeneracionReporteController extends Controller
         ]);
         $proceso->load(['nivel', 'generacion', 'cicloEscolar', 'cicloDestino', 'usuarioRealizo']);
 
-        $nombre = 'comprobante-cierre-academico-'.$detalle->inscripcion_id.'-'.$proceso->id.'.pdf';
-
-        return Pdf::loadView('pdf.comprobante-cierre-generacion', [
+        $nombre = 'comprobante-cierre-academico-'.$detalle->inscripcion_id.'-'.$proceso->id;
+        $datosDocumento = [
             'proceso' => $proceso,
             'detalle' => $detalle,
             'etiquetaResultado' => $this->etiquetaResultado((string) $detalle->resultado),
             'logo' => $this->logoDataUri(),
-        ])->setPaper('letter')->download($nombre);
+        ];
+        if (request()->routeIs('generales.cierre-generacion.comprobante.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.comprobante-cierre-generacion', $datosDocumento, $nombre.'.docx');
+        }
+        return Pdf::loadView('pdf.comprobante-cierre-generacion', $datosDocumento)
+            ->setPaper('letter')->download($nombre.'.pdf');
     }
 
     private function etiquetaResultado(string $resultado): string

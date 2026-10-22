@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\AnaliticaInstitucionalExport;
 use App\Services\AnaliticaInstitucionalService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -15,7 +16,7 @@ class AnaliticaInstitucionalReporteController extends Controller
     public function __invoke(Request $request, string $formato, AnaliticaInstitucionalService $service): Response|BinaryFileResponse
     {
         abort_unless(auth()->user()?->canAccess('analitica.exportar'), 403);
-        abort_unless(in_array($formato, ['pdf', 'excel'], true), 404);
+        abort_unless(in_array($formato, ['pdf', 'word', 'excel'], true), 404);
 
         $filtros = $request->validate([
             'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
@@ -33,10 +34,12 @@ class AnaliticaInstitucionalReporteController extends Controller
             return Excel::download(new AnaliticaInstitucionalExport($datos), $nombre.'.xlsx');
         }
 
-        return Pdf::loadView('pdf.analitica-institucional', [
-            'datos' => $datos,
-            'logo' => $this->logoDataUri(),
-        ])->setPaper('letter', 'landscape')->download($nombre.'.pdf');
+        $datosDocumento = ['datos' => $datos, 'logo' => $this->logoDataUri()];
+        if ($formato === 'word') {
+            return app(BladeWordExporter::class)->descargar('pdf.analitica-institucional', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.analitica-institucional', $datosDocumento)
+            ->setPaper('letter', 'landscape')->download($nombre.'.pdf');
     }
 
     private function logoDataUri(): ?string

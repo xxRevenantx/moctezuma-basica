@@ -10,6 +10,7 @@ use App\Models\TallerSesion;
 use App\Services\ContextoEscolarService;
 use App\Services\ListasGeneralesCicloService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -155,7 +156,7 @@ class ListasGeneralesFormatosController extends Controller
             . '-' . Str::slug($estadoCiclo, '-')
             . '.pdf';
 
-        return Pdf::loadView($vista, [
+        $datosDocumento = [
             'alumnos' => $alumnos,
             'modoGlobal' => true,
             'nivel' => $nivel,
@@ -167,9 +168,12 @@ class ListasGeneralesFormatosController extends Controller
             'cicloEscolar' => $cicloEscolar,
             'estadoCiclo' => $estadoCiclo,
             'imagenPersonalizador' => $this->imagenBase64Publica('imagenes/personalizador.jpg'),
-        ])
-            ->setPaper('letter', 'portrait')
-            ->stream($nombreArchivo);
+        ];
+        if ($request->routeIs('listas-generales.formatos.word')) {
+            return app(BladeWordExporter::class)->descargar($vista, $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo));
+        }
+        return Pdf::loadView($vista, $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
     private function personalizadoresProfesores(
@@ -221,12 +225,15 @@ class ListasGeneralesFormatosController extends Controller
             . '-' . Str::slug($cicloEscolar->nombre, '-')
             . '.pdf';
 
-        return Pdf::loadView('pdf.personalizadores_profesores', [
+        $datosDocumento = [
             'profesores' => $profesores,
             'cicloEscolar' => $cicloEscolar,
-        ])
-            ->setPaper('letter', 'portrait')
-            ->stream($nombreArchivo);
+        ];
+        if ($request->routeIs('listas-generales.formatos.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.personalizadores_profesores', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo));
+        }
+        return Pdf::loadView('pdf.personalizadores_profesores', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombreArchivo);
     }
 
     private function consultaProfesores(int $cicloEscolarId): Builder

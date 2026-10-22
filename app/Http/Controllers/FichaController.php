@@ -9,6 +9,7 @@ use App\Models\Nivel;
 use App\Models\CicloEscolar;
 use App\Services\TeacherAcademicScopeService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -74,7 +75,7 @@ class FichaController extends Controller
 
         $educadoraNombre = $this->educadoraNombre($inscripcion, $cicloEscolarId);
 
-        $pdf = Pdf::loadView('pdf.ficha_descriptiva_pdf', [
+        $datosDocumento = [
             'alumno' => $inscripcion,
             'periodo' => $periodo,
             'periodoNombre' => $this->nombrePeriodo($periodo),
@@ -88,9 +89,12 @@ class FichaController extends Controller
             'campoImagenes' => $this->campoImagenes(),
             'educadoraNombre' => $educadoraNombre,
             'directoraNombre' => $this->directorNombre($inscripcion),
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('ficha-descriptiva-' . $inscripcion->id . '.pdf');
+        ];
+        if ($request->routeIs('misrutas.fichas.alumno.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.ficha_descriptiva_pdf', $datosDocumento, 'ficha-descriptiva-' . $inscripcion->id . '.docx');
+        }
+        return Pdf::loadView('pdf.ficha_descriptiva_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream('ficha-descriptiva-' . $inscripcion->id . '.pdf');
     }
 
     public function grupoPdf(Request $request)
@@ -137,7 +141,7 @@ class FichaController extends Controller
             ? $this->educadoraNombre($alumnoBase, $cicloEscolarId)
             : 'EDUCADORA';
 
-        $pdf = Pdf::loadView('pdf.fichas_descriptivas_grupo_pdf', [
+        $datosDocumento = [
             'alumnos' => $alumnos,
             'periodo' => $periodo,
             'periodoNombre' => $this->nombrePeriodo($periodo),
@@ -151,9 +155,12 @@ class FichaController extends Controller
             'campoImagenes' => $this->campoImagenes(),
             'educadoraNombre' => $educadoraNombre,
             'directoraNombre' => $nivel->director ? $this->nombreCompletoDirector($nivel->director) : 'DIRECCIÓN',
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('fichas-descriptivas-preescolar.pdf');
+        ];
+        if ($request->routeIs('misrutas.fichas.grupo.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.fichas_descriptivas_grupo_pdf', $datosDocumento, 'fichas-descriptivas-preescolar.docx');
+        }
+        return Pdf::loadView('pdf.fichas_descriptivas_grupo_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream('fichas-descriptivas-preescolar.pdf');
     }
 
     public function excel(Request $request)

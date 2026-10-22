@@ -535,6 +535,7 @@
                     <p class="mt-1 text-sm text-slate-500">{{ $descripcion }}</p>
                     <div class="mt-5 flex gap-2">
                         <a target="_blank" href="{{ route('misrutas.plantilla-personal.reporte', array_merge(['tipo'=>$tipo,'formato'=>'pdf'], $filtrosReporte)) }}" class="rounded-xl bg-[#006492] px-4 py-2 text-xs font-black text-white">PDF nuevo</a>
+                        <a href="{{ route('misrutas.plantilla-personal.reporte', array_merge(['tipo'=>$tipo,'formato'=>'word'], $filtrosReporte)) }}" class="rounded-xl bg-sky-50 px-4 py-2 text-xs font-black text-[#006492] ring-1 ring-sky-200">Word</a>
                         <a href="{{ route('misrutas.plantilla-personal.reporte', array_merge(['tipo'=>$tipo,'formato'=>'excel'], $filtrosReporte)) }}" class="rounded-xl bg-[#88AC2E] px-4 py-2 text-xs font-black text-white">Excel</a>
                     </div>
                 </article>

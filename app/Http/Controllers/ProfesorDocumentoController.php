@@ -8,6 +8,7 @@ use App\Models\Persona;
 use App\Models\ProfesorDocumentoPlantilla;
 use App\Services\ProfesorDocumentoPortadaService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 
 class ProfesorDocumentoController extends Controller
@@ -41,16 +42,20 @@ class ProfesorDocumentoController extends Controller
             ];
         })->values();
 
-        $pdf = Pdf::loadView('pdf.profesor_portadas_pdf', [
+        $datosDocumento = [
             'nivel' => $nivel,
             'ciclo' => $ciclo,
             'plantilla' => $plantilla,
             'fondo_data_uri' => $service->fondoDataUri($plantilla),
             'configuracion' => $service->configuracionNormalizada($plantilla, $nivel),
             'documentos' => $documentos,
-        ])->setPaper('letter', 'portrait');
-
-        return $pdf->stream('portadas-personal-' . ($nivel->slug ?: $nivel->id) . '.pdf');
+        ];
+        $nombre = 'portadas-personal-' . ($nivel->slug ?: $nivel->id);
+        if ($request->routeIs('profesores.documentos.portadas.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.profesor_portadas_pdf', $datosDocumento, $nombre.'.docx');
+        }
+        return Pdf::loadView('pdf.profesor_portadas_pdf', $datosDocumento)
+            ->setPaper('letter', 'portrait')->stream($nombre.'.pdf');
     }
 
     private function resolverPersonas(array $data, int $nivelId, ?int $cicloEscolarId)

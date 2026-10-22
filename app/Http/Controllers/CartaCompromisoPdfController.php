@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CartaCompromiso;
+use App\Services\Documentos\BladeWordExporter;
 use App\Services\ExpedienteArchivoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -16,6 +17,11 @@ class CartaCompromisoPdfController extends Controller
         abort_if($carta->estado_documento === 'cancelada', 404);
 
         $this->cargarRelaciones($carta);
+        if (request()->routeIs('misrutas.cartas-compromiso.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.carta_compromiso', ['cartas' => [$carta]], Str::slug($carta->folio, '_') . '.docx'
+            );
+        }
         $contenido = $this->renderizar([$carta]);
         $this->archivarSiHaceFalta($carta);
 
@@ -51,6 +57,13 @@ class CartaCompromisoPdfController extends Controller
             ->values();
 
         abort_if($cartas->isEmpty(), 404);
+
+        if ($request->routeIs('misrutas.cartas-compromiso.masivas.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.carta_compromiso', ['cartas' => $cartas->all()],
+                'cartas_compromiso_' . now()->format('Ymd_His') . '.docx'
+            );
+        }
 
         foreach ($cartas as $carta) {
             $this->archivarSiHaceFalta($carta);

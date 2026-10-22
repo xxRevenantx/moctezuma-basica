@@ -7,6 +7,7 @@ use App\Models\Grado;
 use App\Models\Inscripcion;
 use App\Models\LugarPreescolar;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -30,7 +31,7 @@ class LugarPreescolarPDFController extends Controller
 
         $fechaPdf = $this->fechaPdf($request->query('fecha'));
 
-        $pdf = Pdf::loadView('pdf.reconocimiento_preescolar_pdf', [
+        $datosDocumento = [
             'reconocimiento' => $lugarPreescolar,
             'alumno' => $alumno,
             'cicloEscolar' => $lugarPreescolar->cicloEscolar,
@@ -41,9 +42,13 @@ class LugarPreescolarPDFController extends Controller
             'logoPrincipal' => $this->publicImagePath('imagenes/logo-letra.png'),
             'logoPenacho' => $this->publicImagePath('imagenes/logo-seg.png') ?: $this->publicImagePath('penacho.jpg'),
             'marcaAgua' => $this->publicImagePath('imagenes/logo-letra.png') ?: $this->publicImagePath('logo.png'),
-        ])->setPaper('letter', 'landscape');
-
-        return $pdf->stream('reconocimiento-preescolar-' . $alumno->id . '.pdf');
+        ];
+        $nombre = 'reconocimiento-preescolar-' . $alumno->id;
+        if ($request->routeIs('misrutas.lugares-preescolar.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.reconocimiento_preescolar_pdf', $datosDocumento, $nombre.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.reconocimiento_preescolar_pdf', $datosDocumento)
+            ->setPaper('letter', 'landscape')->stream($nombre.'.pdf');
     }
 
     private function publicImagePath(string $path): ?string

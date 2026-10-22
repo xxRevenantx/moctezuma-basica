@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Models\Nivel;
 use App\Services\PromediosTresPeriodosService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -34,13 +35,12 @@ class PromediosMateriasPdfController extends Controller
             grupoId: isset($datos['grupo_id']) ? (int) $datos['grupo_id'] : null,
         );
 
-        $pdf = Pdf::loadView('pdf.promedios-materias-concentrado', [
-            'reporte' => $reporte,
-            'alcance' => $datos['alcance'] ?? 'completo',
-        ])->setPaper('a3', 'landscape');
-
-        $nombre = 'promedios-tres-periodos-' . $slug_nivel . '-' . ($reporte['ciclo']['texto'] ?? 'ciclo') . '.pdf';
-
-        return $pdf->download($nombre);
+        $datosDocumento = ['reporte' => $reporte, 'alcance' => $datos['alcance'] ?? 'completo'];
+        $nombreBase = 'promedios-tres-periodos-' . $slug_nivel . '-' . ($reporte['ciclo']['texto'] ?? 'ciclo');
+        if ($request->routeIs('generales.promedios-materias.word')) {
+            return app(BladeWordExporter::class)->descargar('pdf.promedios-materias-concentrado', $datosDocumento, $nombreBase.'.docx', 'landscape');
+        }
+        return Pdf::loadView('pdf.promedios-materias-concentrado', $datosDocumento)
+            ->setPaper('a3', 'landscape')->download($nombreBase.'.pdf');
     }
 }

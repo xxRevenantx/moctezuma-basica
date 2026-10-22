@@ -72,6 +72,10 @@
                         <flux:icon.arrow-down-tray class="h-4 w-4" />
                         PDF
                     </a>
+                    <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'word', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id, 'fecha_edad' => $fecha_edad]) }}"
+                        class="inline-flex items-center gap-2 rounded-xl border border-[#006492] bg-sky-50 px-4 py-2.5 text-sm font-black text-[#006492] transition hover:bg-sky-100">
+                        <flux:icon.document-text class="h-4 w-4" /> Word
+                    </a>
                     <a href="{{ route('misrutas.alumnos.estadistica-911.reporte', ['formato' => 'excel', 'ciclo_escolar_id' => $ciclo_escolar_id, 'nivel_id' => $nivel_id, 'fecha_edad' => $fecha_edad]) }}"
                         class="inline-flex items-center gap-2 rounded-xl bg-[#88AC2E] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:brightness-95">
                         <flux:icon.table-cells class="h-4 w-4" />

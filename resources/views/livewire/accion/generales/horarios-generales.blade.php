@@ -343,6 +343,11 @@
                             <flux:icon.document-arrow-down class="h-5 w-5" />
                             Descargar horario PDF
                         </a>
+                        <a href="{{ preg_replace('~/pdf(?=\?|$)~', '/word', $this->urlDescarga) }}" target="_blank"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-white px-5 py-3 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-blue-300 dark:hover:bg-neutral-800">
+                            <flux:icon.document-text class="h-5 w-5" />
+                            Descargar horario Word
+                        </a>
                     @else
                         <button type="button" disabled
                             class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-500 dark:bg-neutral-800 dark:text-slate-500">

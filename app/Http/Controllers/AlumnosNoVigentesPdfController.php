@@ -6,6 +6,7 @@ use App\Models\CicloEscolar;
 use App\Models\Nivel;
 use App\Services\AlumnosNoVigentesService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Documentos\BladeWordExporter;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -44,13 +45,14 @@ class AlumnosNoVigentesPdfController extends Controller
         $alumnos = $service->query($nivel, $ciclo->id, $filtros)->get();
         $categoria = $service->etiquetaCategoria($filtros['categoria']);
 
-        $pdf = Pdf::loadView('pdf.alumnos-no-vigentes', compact(
-            'alumnos',
-            'nivel',
-            'ciclo',
-            'categoria',
-            'service'
-        ))->setPaper('letter', 'landscape');
+        $datosDocumento = compact('alumnos', 'nivel', 'ciclo', 'categoria', 'service');
+        if ($request->routeIs('misrutas.alumnos-no-vigentes.word')) {
+            return app(BladeWordExporter::class)->descargar(
+                'pdf.alumnos-no-vigentes', $datosDocumento,
+                sprintf('alumnos_no_vigentes_%s_%s.docx', $nivel->slug, $ciclo->inicio_anio), 'landscape'
+            );
+        }
+        $pdf = Pdf::loadView('pdf.alumnos-no-vigentes', $datosDocumento)->setPaper('letter', 'landscape');
 
         $nombre = sprintf(
             'alumnos_no_vigentes_%s_%s_%s.pdf',

@@ -1217,23 +1217,14 @@ class ListasGenerales extends Component
     #[Computed]
     public function urlWord(): ?string
     {
-        if (!$this->puedeDescargar || !$this->esListaAlumnosInstitucional()) {
+        // Todas las listas/formatos usan exactamente los mismos filtros en PDF y Word.
+        // Se conserva la query del URL ya validado por urlPdf.
+        $urlPdf = $this->urlPdf;
+        if (!$urlPdf) {
             return null;
         }
-
-        return route('listas-generales.alumnos-institucional.word', [
-            'slug_nivel' => $this->nivelSeleccionado?->slug,
-            'modo_descarga' => $this->modo_descarga,
-            'ciclo_escolar_id' => $this->ciclo_escolar_id,
-            'estado_ciclo' => $this->estado_ciclo,
-            'generacion_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->generacion_id : null,
-            'grado_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grado_id : null,
-            'semestre_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->semestre_id : null,
-            'grupo_id' => in_array($this->modo_descarga, ['grupo', 'seleccionados'], true) ? $this->grupo_id : null,
-            'alumnos' => $this->modo_descarga === 'seleccionados'
-                ? implode(',', $this->idsAlumnosSeleccionadosValidos)
-                : null,
-        ]);
+        $url = str_replace('/listas/pdf/', '/listas/word/', $urlPdf);
+        return preg_replace('~/pdf(?=\?|$)~', '/word', $url) ?: null;
     }
 
     #[Computed]

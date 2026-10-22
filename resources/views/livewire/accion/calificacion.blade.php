@@ -300,6 +300,10 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 <p class="text-sm font-black text-emerald-900 dark:text-emerald-100">Entrega confirmada y bloqueada</p>
                 <p class="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">Folio {{ $this->entregaConfirmadaActual->folio }} · {{ $this->entregaConfirmadaActual->confirmada_at?->format('d/m/Y H:i') }}. Solo administración puede reabrir esta captura.</p>
             </div>
+            <a href="{{ route('docente.entregas.word', $this->entregaConfirmadaActual) }}"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-black text-[#006492] hover:bg-sky-100">
+                <flux:icon.document-text class="size-4" /> Descargar Word
+            </a>
             <a href="{{ route('docente.entregas.pdf', $this->entregaConfirmadaActual) }}" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-800">
                 <flux:icon.document-arrow-down class="size-4" /> Descargar comprobante
             </a>
