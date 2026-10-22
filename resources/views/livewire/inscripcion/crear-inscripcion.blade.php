@@ -250,12 +250,8 @@
               this.$nextTick(() => {
                   this.$refs.inicioFormulario?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       
-                  if (this.paso === 4) {
-                      setTimeout(() => {
-                          window.dispatchEvent(new Event('resize'));
-                          window.tinymce?.get('observaciones-inscripcion-crear')?.execCommand('mceAutoResize');
-                      }, 120);
-                  }
+                  // Observaciones utiliza un editor estable sin iframe.
+                  // No es necesario inicializar TinyMCE al cambiar de paso.
               });
           },
           pasoPorCampo(campo) {
@@ -371,7 +367,7 @@
                   <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
                       <div class="min-w-0 space-y-6">
                           {{-- DATOS PERSONALES --}}
-                          <section x-cloak x-show="paso === 1" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 1" x-transition.opacity class="space-y-5">
                               <div class="flex items-center gap-3">
                                   <div
                                       class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
@@ -795,7 +791,7 @@
                           </div>
 
                           {{-- ASIGNACIÓN ESCOLAR --}}
-                          <section x-cloak x-show="paso === 2" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 2" x-transition.opacity class="space-y-5">
                               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                   <div class="flex items-center gap-3">
                                       <div
@@ -1052,7 +1048,7 @@
                           </div>
 
                           {{-- OBSERVACIONES Y SEGUIMIENTO --}}
-                          <section x-cloak x-show="paso === 4" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 4" x-transition.opacity class="space-y-5">
                               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                   <div class="flex items-center gap-3">
                                       <div
@@ -1089,8 +1085,8 @@
 
                               <div
                                   class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-sky-50/60 p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/10 dark:via-neutral-900 dark:to-sky-950/10 sm:p-5">
-                                  <x-forms.tinymce-observaciones model="observaciones"
-                                      id="observaciones-inscripcion-crear" :value="$observaciones" :height="260" />
+                                  <x-forms.observaciones-estables model="observaciones"
+                                      id="observaciones-inscripcion-crear" :value="$observaciones" />
 
                                   @error('observaciones')
                                       <p class="mt-3 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -1103,7 +1099,7 @@
                           </div>
 
                           {{-- NACIMIENTO --}}
-                          <section x-cloak x-show="paso === 4" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 4" x-transition.opacity class="space-y-5">
                               <div class="flex items-center gap-3">
                                   <div
                                       class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -1169,7 +1165,7 @@
                           </div>
 
                           {{-- TUTOR Y DOMICILIO --}}
-                          <section x-cloak x-show="paso === 3" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 3" x-transition.opacity class="space-y-5">
                               <div class="flex items-center gap-3">
                                   <div
                                       class="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
@@ -1308,7 +1304,7 @@
 
                           {{-- FOTO --}}
                           {{-- FOTO --}}
-                          <section x-cloak x-show="paso === 4" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 4" x-transition.opacity class="space-y-5">
                               <div
                                   class="rounded-[26px] border border-pink-200 bg-pink-50/70 p-4 dark:border-pink-900/40 dark:bg-pink-950/20">
                                   <div class="flex items-center gap-3">
@@ -1536,7 +1532,7 @@
                               </div>
                           </section>
 
-                          <section x-cloak x-show="paso === 5" x-transition.opacity class="space-y-5">
+                          <section x-show="paso === 5" x-transition.opacity class="space-y-5">
                               <div class="flex items-center gap-3">
                                   <div
                                       class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">

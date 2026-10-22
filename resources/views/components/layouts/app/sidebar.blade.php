@@ -140,7 +140,7 @@
         @else
             <a href="{{ route('misrutas.inscripcion') }}"
                 class="sidebar-primary-action inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#006492] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00547a] focus:outline-none focus:ring-2 focus:ring-[#006492]/40 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 in-data-flux-sidebar-collapsed-desktop:w-10 in-data-flux-sidebar-collapsed-desktop:px-0"
-                wire:navigate aria-label="Registrar un nuevo alumno" title="Nuevo alumno">
+                aria-label="Registrar un nuevo alumno" title="Nuevo alumno">
                 <flux:icon name="user-plus" class="size-4 shrink-0" />
                 <span class="in-data-flux-sidebar-collapsed-desktop:hidden">Nuevo alumno</span>
             </a>
@@ -238,7 +238,7 @@
                     @endif
 
                     <flux:sidebar.item icon="user-plus" :href="route('misrutas.inscripcion')"
-                        :current="request()->routeIs('misrutas.inscripcion')" wire:navigate data-sidebar-search-item
+                        :current="request()->routeIs('misrutas.inscripcion')" data-sidebar-search-item
                         data-sidebar-search="inscripción inscripciones registrar nuevo alumno alta"
                         x-show="itemMatches($el)">
                         Inscripción de alumnos

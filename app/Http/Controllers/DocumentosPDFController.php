@@ -627,7 +627,8 @@ class DocumentosPDFController extends Controller
         ];
 
         if (request()->routeIs('misrutas.oficios.word')) {
-            return app(BladeWordExporter::class)->descargar(
+            // Maqueta Word institucional editable basada en los mismos datos del PDF.
+            return app(\App\Services\Documentos\OficioWordExporter::class)->descargar(
                 $vistaPdf, $datosOficio, Str::slug($oficio->folio, '_') . '.docx'
             );
         }
@@ -636,7 +637,9 @@ class DocumentosPDFController extends Controller
 
         $nombreArchivo = Str::slug($oficio->folio, '_') . '.pdf';
 
-        return $pdf->stream($nombreArchivo);
+        return request()->boolean('download')
+            ? $pdf->download($nombreArchivo)
+            : $pdf->stream($nombreArchivo);
     }
     private function obtenerCalificacionesOficio(?Inscripcion $alumno, Oficio $oficio): array
     {

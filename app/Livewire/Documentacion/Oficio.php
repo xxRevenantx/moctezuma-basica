@@ -466,7 +466,11 @@ class Oficio extends Component
 
         $this->resetFormulario();
 
-        $this->dispatch('abrir-oficio-nueva-ventana', url: route('misrutas.oficios.pdf', $oficio));
+        $this->dispatch('abrir-visor-oficio',
+            url: route('misrutas.oficios.pdf', $oficio),
+            wordUrl: route('misrutas.oficios.word', $oficio),
+            titulo: 'Oficio · ' . $oficio->folio
+        );
         $this->dispatch('notificar', tipo: 'success', mensaje: 'Oficio guardado correctamente.');
     }
 
@@ -474,7 +478,11 @@ class Oficio extends Component
     {
         $oficio = OficioModel::query()->findOrFail($oficioId);
 
-        $this->dispatch('abrir-oficio-nueva-ventana', url: route('misrutas.oficios.pdf', $oficio));
+        $this->dispatch('abrir-visor-oficio',
+            url: route('misrutas.oficios.pdf', $oficio),
+            wordUrl: route('misrutas.oficios.word', $oficio),
+            titulo: 'Oficio · ' . $oficio->folio
+        );
     }
 
     public function eliminarOficio(int $oficioId): void

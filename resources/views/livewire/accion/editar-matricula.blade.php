@@ -667,8 +667,8 @@
 
                     <div
                         class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-sky-50/60 p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/10 dark:via-neutral-900 dark:to-sky-950/10 sm:p-5">
-                        <x-forms.tinymce-observaciones model="observaciones" id="observaciones-inscripcion-editar"
-                            :value="$observaciones" :height="280" />
+                        <x-forms.observaciones-estables model="observaciones" id="observaciones-inscripcion-editar"
+                            :value="$observaciones" />
 
                         @error('observaciones')
                             <p class="mt-3 text-xs font-semibold text-rose-600">{{ $message }}</p>
